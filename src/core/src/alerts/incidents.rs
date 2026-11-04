@@ -41,6 +41,30 @@ const UNKNOWN_SERVICE: &str = "unknown";
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// The group values of a finding's incident: which finding, on which stream.
+pub const FINDING_KIND_DIMENSION: &str = "autoobserve_finding";
+pub const FINDING_STREAM_TYPE_DIMENSION: &str = "stream_type";
+pub const FINDING_STREAM_NAME_DIMENSION: &str = "stream_name";
+/// Stored in `rca_off_reason` when `O2_INCIDENTS_RCA_ENABLED` (or incidents) is off.
+pub const RCA_OFF_DISABLED: &str = "rca_disabled";
+/// Stored when AI is off, no agent is set or the licence lacks AI (`rca_agent_available`).
+pub const RCA_OFF_AI_UNAVAILABLE: &str = "ai_unavailable";
+/// Stored when the org's AI quota refused the run (`trial_quota::precheck_ai_usage`).
+pub const RCA_OFF_QUOTA: &str = "quota_exceeded";
+/// Stored when the last run is too recent for another (`StartOutcome::CoolingDown`).
+pub const RCA_OFF_COOLING_DOWN: &str = "cooling_down";
+/// Stored when `start_run`, or the incident read before it, failed.
+pub const RCA_OFF_START_FAILED: &str = "start_failed";
+/// Turn locks for findings' incident work on a node; one finding always maps to one lock.
+#[cfg(feature = "enterprise")]
+const FINDING_TURNS: usize = 64;
+#[cfg(feature = "enterprise")]
+static FINDING_TURN_LOCKS: std::sync::LazyLock<Vec<std::sync::Arc<tokio::sync::Mutex<()>>>> =
+    std::sync::LazyLock::new(|| {
+        (0..FINDING_TURNS)
+            .map(|_| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+            .collect()
+    });
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -84,6 +108,48 @@ pub struct CorrelationSubject<'a> {
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
     pub title_inputs: Option<super::incident_title::TitleInputs<'a>>,
+    /// A fixed id for a new incident, so two attempts at one finding cannot both open one.
+    pub incident_id: Option<String>,
+    /// Awaited before each correlation step; the finding path stops there off its turn.
+    pub(crate) fence: Option<std::sync::Arc<dyn TurnFence>>,
+}
+
+impl CorrelationSubject<'_> {
+    /// A finding's: its firing lands in one incident only, placed under its alert's row locks.
+    fn places_once(&self) -> bool {
+        self.incident_id.is_some()
+    }
+
+    async fn fence_at(&self, step: FenceStep) -> anyhow::Result<()> {
+        match &self.fence {
+            Some(fence) => fence.before(step).await,
+            None => Ok(()),
+        }
+    }
+}
+
+/// A check a caller runs before each correlation step that decides or writes.
+#[async_trait::async_trait]
+pub(crate) trait TurnFence: Send + Sync + std::fmt::Debug {
+    async fn before(&self, step: FenceStep) -> anyhow::Result<()>;
+}
+
+/// The correlation steps a [TurnFence] runs before.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FenceStep {
+    Lookup,
+    Join,
+    Open,
+}
+
+impl FenceStep {
+    fn doing(self) -> &'static str {
+        match self {
+            Self::Lookup => "looking up the open incident",
+            Self::Join => "joining the incident",
+            Self::Open => "opening the incident",
+        }
+    }
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -94,6 +160,173 @@ pub struct CorrelatedIncident {
     pub notify_error: Option<String>,
     /// Whether a notification was due and had a destination to go to.
     pub notify_attempted: bool,
+}
+
+/// A finding to open or join an incident for, as the AutoObserve investigation port hands it over.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FindingIncident {
+    pub org_id: String,
+    /// The trigger's `alert_id`: one per finding, so its open incident is joined, not copied.
+    pub subject_id: String,
+    pub title: String,
+    pub dimensions: HashMap<String, String>,
+    pub triggered_at: i64,
+}
+
+/// What on-call routing did for a new incident: the record that paged, and what failed.
+#[cfg(feature = "enterprise")]
+pub(crate) struct RoutedIncident {
+    pub record: Option<config::meta::oncall::Response>,
+    /// Paging or linking the record failed; a record that paged is kept beside the error.
+    pub error: Option<anyhow::Error>,
+}
+
+/// How a finding's incident reaches on-call, behind a seam so routing failures can be tested.
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+pub(crate) trait FindingPager: Send + Sync {
+    /// The incident's on-call record, open or closed, if one was ever opened.
+    async fn record(
+        &self,
+        org_id: &str,
+        incident_id: &str,
+    ) -> anyhow::Result<Option<config::meta::oncall::Response>>;
+    async fn route(&self, org_id: &str, incident_id: &str, title: &str) -> RoutedIncident;
+    async fn attach(&self, org_id: &str, record_id: &str, incident_id: &str) -> anyhow::Result<()>;
+}
+
+/// The production [FindingPager]: the org's default team at the default paging priority.
+#[cfg(feature = "enterprise")]
+pub(crate) struct OncallPager;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl FindingPager for OncallPager {
+    async fn record(
+        &self,
+        org_id: &str,
+        incident_id: &str,
+    ) -> anyhow::Result<Option<config::meta::oncall::Response>> {
+        let latest = infra::table::oncall_responses::history_for_source(
+            org_id,
+            config::meta::oncall::SubjectType::Incident,
+            incident_id,
+            1,
+        )
+        .await?;
+        Ok(latest.into_iter().next())
+    }
+
+    async fn route(&self, org_id: &str, incident_id: &str, title: &str) -> RoutedIncident {
+        // No team and no routing dimensions: the page goes to the org's default team.
+        let dimensions = HashMap::new();
+        // Firing 1 only: a holder that lost its lease mid-route meets the subject's unique index.
+        let started = o2_enterprise::enterprise::oncall::escalation::start_once_for_incident(
+            org_id,
+            incident_id,
+            title,
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            None,
+            &dimensions,
+        )
+        .await;
+        routed_from(org_id, incident_id, &dimensions, started).await
+    }
+
+    async fn attach(&self, org_id: &str, record_id: &str, incident_id: &str) -> anyhow::Result<()> {
+        infra::table::oncall_responses::attach_incident(org_id, record_id, incident_id).await?;
+        Ok(())
+    }
+}
+
+/// Where a finding's incident work takes turns, behind a seam so two nodes can be tested.
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+pub(crate) trait FindingTurns: Send + Sync {
+    async fn take(&self, org_id: &str, subject_id: &str) -> anyhow::Result<FindingTurn>;
+}
+
+/// The production [FindingTurns]: the node's stripe, then the cluster lock (none in local mode).
+#[cfg(feature = "enterprise")]
+pub(crate) struct ClusterTurns;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl FindingTurns for ClusterTurns {
+    async fn take(&self, org_id: &str, subject_id: &str) -> anyhow::Result<FindingTurn> {
+        let stripe = finding_turn(subject_id).clone().lock_owned().await;
+        let key = finding_lock_key(org_id, subject_id);
+        let cluster = infra::dist_lock::lock(&key, 0).await?;
+        let lease = LeaseWatch {
+            key,
+            lost: cluster.as_ref().map(infra::dist_lock::Locker::lost),
+        };
+        Ok(FindingTurn {
+            held: vec![Box::new(stripe) as Box<dyn Send + Sync>],
+            cluster,
+            fence: std::sync::Arc::new(lease.clone()),
+            lease,
+        })
+    }
+}
+
+/// A finding's turn while held: the local locks, and the cluster lock when there is one.
+#[cfg(feature = "enterprise")]
+pub(crate) struct FindingTurn {
+    held: Vec<Box<dyn Send + Sync>>,
+    cluster: Option<infra::dist_lock::Locker>,
+    lease: LeaseWatch,
+    /// Run before each correlation step; the DB fences, not this check, keep the incident single.
+    fence: std::sync::Arc<dyn TurnFence>,
+}
+
+#[cfg(feature = "enterprise")]
+impl FindingTurn {
+    /// Fails once the lease is lost, so a step about to page, link or analyse goes no further.
+    fn held(&self, step: &str) -> anyhow::Result<()> {
+        self.lease.held(step)
+    }
+
+    /// A failed release only logs: its keep-alive has stopped, so the cluster lock expires.
+    async fn end(self) {
+        if let Err(e) = infra::dist_lock::unlock(&self.cluster).await {
+            log::error!(
+                "[incidents] releasing the finding lock {} failed: {e}",
+                self.lease.key
+            );
+        }
+        drop(self.held);
+    }
+}
+
+/// A turn's cluster lease as any step reads it.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Debug)]
+pub(crate) struct LeaseWatch {
+    key: String,
+    /// Turns `true` once the cluster lock lapsed and another node may hold this turn.
+    lost: Option<tokio::sync::watch::Receiver<bool>>,
+}
+
+#[cfg(feature = "enterprise")]
+impl LeaseWatch {
+    fn held(&self, step: &str) -> anyhow::Result<()> {
+        if self.lost.as_ref().is_some_and(|lost| *lost.borrow()) {
+            anyhow::bail!(
+                "lost the finding lock {} before {step}; the act retries under a new one",
+                self.key
+            );
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl TurnFence for LeaseWatch {
+    async fn before(&self, step: FenceStep) -> anyhow::Result<()> {
+        self.held(step.doing())
+    }
 }
 
 /// Combined correlation result from both Service Discovery and semantic extraction
@@ -786,6 +1019,8 @@ pub async fn correlate_alert_to_incident(
             notify_rows,
             labels: &labels,
         }),
+        incident_id: None,
+        fence: None,
     };
 
     // Find or create incident
@@ -861,52 +1096,19 @@ pub async fn correlate_alert_to_incident(
             Ok(Some(incident)) => incident.title.unwrap_or_else(|| alert.name.clone()),
             _ => alert.name.clone(),
         };
-        match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
+        let routed = route_new_incident(
             &alert.org_id,
-            &incident_id.to_string(),
+            incident_id,
             &title,
             priority,
             alert.oncall_team.as_deref(),
             &dimensions,
         )
-        .await
-        {
-            // The blast radius hangs off whichever record actually paged, which here is this one.
-            Ok(Some(origin)) => {
-                // Without this, nothing can get from an incident to the record that paged.
-                if let Err(e) = infra::table::oncall_responses::attach_incident(
-                    &alert.org_id,
-                    &origin.id,
-                    &incident_id.to_string(),
-                )
-                .await
-                {
-                    log::error!(
-                        "[incidents] could not link on-call record for {}/{incident_id}: {e}",
-                        alert.org_id
-                    );
-                }
-
-                if let Err(e) = crate::alerts::scheduler::handlers::page_blast_radius(
-                    &alert.org_id,
-                    &origin,
-                    &dimensions,
-                )
-                .await
-                {
-                    log::error!(
-                        "[incidents] impacted paging failed for {}/{incident_id}: {e}",
-                        alert.org_id
-                    );
-                }
-                routed_origin = Some(origin);
-            }
-            Ok(None) => {}
-            Err(e) => log::error!(
-                "[incidents] on-call paging failed for {}/{incident_id}: {e}",
-                alert.org_id
-            ),
+        .await;
+        if let Some(e) = routed.error {
+            log::error!("[incidents] {e:#}");
         }
+        routed_origin = routed.record;
     }
 
     // A new alert is new evidence, so a page whose ladder ran out may page again.
@@ -924,7 +1126,11 @@ pub async fn correlate_alert_to_incident(
         && downtime.is_none()
     {
         if correlation.created {
-            start_new_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
+            if let Err(e) =
+                start_new_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await
+            {
+                log::error!("[INCIDENTS::RCA] {e:#}");
+            }
         } else {
             start_unmuted_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
         }
@@ -1048,6 +1254,8 @@ pub async fn correlate_external_event(
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
         title_inputs: None,
+        incident_id: None,
+        fence: None,
     };
 
     let triggered_at = external.last_seen_at;
@@ -1116,6 +1324,36 @@ pub async fn correlate_external_event(
     }
 
     Ok(Some(outcome))
+}
+
+/// Opens or joins a finding's incident, then makes sure it is paged and its analysis decided.
+#[cfg(feature = "enterprise")]
+pub async fn open_finding_incident(
+    f: &FindingIncident,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    open_finding_incident_with(f, &OncallPager, &ClusterTurns).await
+}
+
+/// Never empty: an open incident with no group values is joined by any later dimensional alert.
+pub fn finding_dimensions(
+    decision_kind: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> HashMap<String, String> {
+    HashMap::from([
+        (
+            FINDING_KIND_DIMENSION.to_string(),
+            decision_kind.to_string(),
+        ),
+        (
+            FINDING_STREAM_TYPE_DIMENSION.to_string(),
+            stream_type.to_string(),
+        ),
+        (
+            FINDING_STREAM_NAME_DIMENSION.to_string(),
+            stream_name.to_string(),
+        ),
+    ])
 }
 
 /// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
@@ -1568,7 +1806,10 @@ async fn create_new_incident(
         o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values)
     });
 
-    let incident = infra::table::alert_incidents::create_with_mute(
+    subject.fence_at(FenceStep::Open).await?;
+    // One transaction with its first firing: an incident without it no later lookup could find.
+    let opening = infra::table::alert_incidents::create_with_first_alert(
+        subject.incident_id.as_deref(),
         org_id,
         &severity,
         serde_json::to_value(group_values)?,
@@ -1576,8 +1817,39 @@ async fn create_new_incident(
         triggered_at,
         Some(title.clone()),
         muted_by.map(str::to_string),
+        &infra::table::alert_incidents::FirstAlert {
+            alert_id: &subject.id,
+            alert_name: &subject.name,
+            alert_kind: subject.kind.as_str(),
+            correlation_reason,
+        },
     )
     .await?;
+    let incident = match opening {
+        infra::table::alert_incidents::Opening::Opened(incident) => *incident,
+        infra::table::alert_incidents::Opening::Held(incident_id) => {
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id,
+                service_name: service_name.to_string(),
+            });
+        }
+        infra::table::alert_incidents::Opening::IdTaken => {
+            let incident_id = subject
+                .incident_id
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("a generated incident id was already taken"))?;
+            return join_taken_incident(
+                org_id,
+                incident_id,
+                subject,
+                triggered_at,
+                correlation_reason,
+                service_name,
+                muted_by,
+            )
+            .await;
+        }
+    };
 
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
@@ -1590,17 +1862,6 @@ async fn create_new_incident(
     if muted_by.is_none() {
         trigger_created_workflows(org_id, &incident.id).await;
     }
-
-    // Add the first alert to the incident
-    infra::table::alert_incidents::add_alert_to_incident(
-        &incident.id,
-        &subject.id,
-        &subject.name,
-        subject.kind.as_str(),
-        triggered_at,
-        correlation_reason,
-    )
-    .await?;
 
     // Record alert event
     if let Err(e) = infra::table::incident_events::record_alert(
@@ -1681,6 +1942,105 @@ async fn create_new_incident(
         incident_id: incident.id,
         service_name: service_name.to_string(),
     })
+}
+
+/// Another creator took this id first and did the creation work; the firing joins it as it is.
+async fn join_taken_incident(
+    org_id: &str,
+    incident_id: &str,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+    service_name: &str,
+    muted_by: Option<&str>,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    let joined = |incident_id: String| IncidentCorrelationOutcome::ExistingAlertRepeated {
+        incident_id,
+        service_name: service_name.to_string(),
+    };
+    let alert = infra::table::alert_incidents::FirstAlert {
+        alert_id: &subject.id,
+        alert_name: &subject.name,
+        alert_kind: subject.kind.as_str(),
+        correlation_reason,
+    };
+    if let infra::table::alert_incidents::Joining::Held(holder) =
+        infra::table::alert_incidents::add_firing_once(org_id, incident_id, &alert, triggered_at)
+            .await?
+    {
+        return Ok(joined(holder));
+    }
+    let incident = infra::table::alert_incidents::get_rw(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("incident {org_id}/{incident_id} is gone"))?;
+    if let Err(e) = infra::table::incident_events::record_alert(
+        org_id,
+        incident_id,
+        &subject.id,
+        &subject.name,
+        triggered_at,
+    )
+    .await
+    {
+        log::error!(
+            "[Incidents] Failed to record alert event for incident {org_id}/{incident_id}: {e}"
+        );
+    }
+    if muted_by.is_none()
+        && incident.status != "resolved"
+        && let Err(e) = crate::incidents::send_incident_event_trigger(
+            org_id,
+            incident_id,
+            IncidentEvent::alert(&subject.id, &subject.name, triggered_at),
+        )
+        .await
+    {
+        log::error!(
+            "error triggering workflow for alert added for {org_id} incident id {incident_id} : {e}"
+        );
+    }
+    Ok(joined(incident_id.to_string()))
+}
+
+/// Joins the open incident an alert id matched; a finding's firing goes in once, under its locks.
+async fn join_alert_id_incident(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+    muted_by: Option<&str>,
+) -> Result<AlertIdJoin, anyhow::Error> {
+    if !subject.places_once() {
+        let (_, reopened) = join_then_unmute(
+            infra::table::alert_incidents::add_alert_to_incident(
+                &incident.id,
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
+                triggered_at,
+                correlation_reason,
+            ),
+            async || unmute_for_firing(org_id, incident, muted_by).await,
+        )
+        .await?;
+        return Ok(AlertIdJoin::Joined { reopened });
+    }
+    subject.fence_at(FenceStep::Join).await?;
+    let alert = infra::table::alert_incidents::FirstAlert {
+        alert_id: &subject.id,
+        alert_name: &subject.name,
+        alert_kind: subject.kind.as_str(),
+        correlation_reason,
+    };
+    match infra::table::alert_incidents::add_firing_once(org_id, &incident.id, &alert, triggered_at)
+        .await?
+    {
+        infra::table::alert_incidents::Joining::Held(holder) => Ok(AlertIdJoin::HeldBy(holder)),
+        infra::table::alert_incidents::Joining::Joined { .. } => Ok(AlertIdJoin::Joined {
+            reopened: unmute_for_firing(org_id, incident, muted_by).await,
+        }),
+    }
 }
 
 /// A repeat at a more urgent level raises the severity; the alert's own priority beats the level.
@@ -1777,6 +2137,170 @@ impl Correlation {
     }
 }
 
+/// What joining the open incident an alert id matched did.
+enum AlertIdJoin {
+    /// Linked; `reopened` when the firing cleared a downtime mute.
+    Joined { reopened: bool },
+    /// A finding's firing another write already placed, in this incident.
+    HeldBy(String),
+}
+
+/// [open_finding_incident] with its seams; attempts at one finding take turns across the cluster.
+#[cfg(feature = "enterprise")]
+async fn open_finding_incident_with(
+    f: &FindingIncident,
+    pager: &dyn FindingPager,
+    turns: &dyn FindingTurns,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    // A detached attempt outlives its act and claim, so a retry on another node can overlap it.
+    let turn = turns.take(&f.org_id, &f.subject_id).await?;
+    let outcome = settle_finding(f, pager, &turn).await;
+    turn.end().await;
+    outcome
+}
+
+/// Opens or joins the firing's incident, then pages it and decides its analysis.
+#[cfg(feature = "enterprise")]
+async fn settle_finding(
+    f: &FindingIncident,
+    pager: &dyn FindingPager,
+    turn: &FindingTurn,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    // By the firing itself, on the primary: a resolved or re-keyed incident still holds it.
+    let held = infra::table::alert_incidents::find_incident_with_firing(
+        &f.org_id,
+        &f.subject_id,
+        f.triggered_at,
+    )
+    .await?;
+    let outcome = match held {
+        Some(incident) => IncidentCorrelationOutcome::ExistingAlertRepeated {
+            incident_id: incident.id,
+            service_name: UNKNOWN_SERVICE.to_string(),
+        },
+        None => {
+            turn.held("correlating")?;
+            correlate_finding(f, turn).await?
+        }
+    };
+    finish_finding_incident(f, outcome.incident_id(), pager, turn).await?;
+    Ok(outcome)
+}
+
+/// Joins the finding's open incident, or opens one under the firing's own id.
+#[cfg(feature = "enterprise")]
+async fn correlate_finding(
+    f: &FindingIncident,
+    turn: &FindingTurn,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    use config::meta::alerts::incidents::{IncidentSeverity, KeyType};
+
+    // Before the open-incident lookup: creators that saw the same incidents name the same id.
+    let known =
+        infra::table::alert_incidents::incident_ids_for_alert(&f.org_id, &f.subject_id).await?;
+    let subject = CorrelationSubject {
+        id: f.subject_id.clone(),
+        name: f.title.clone(),
+        org_id: f.org_id.clone(),
+        kind: AlertKind::AutoObserve,
+        base_destinations: Vec::new(),
+        severity: Some(IncidentSeverity::P2),
+        title_inputs: None,
+        incident_id: Some(finding_incident_id(f, &known)),
+        fence: Some(turn.fence.clone()),
+    };
+    let Correlation { outcome, .. } = find_or_create_incident(
+        &f.org_id,
+        &f.dimensions,
+        KeyType::AlertId,
+        &subject,
+        f.triggered_at,
+        &config::meta::alerts::incidents::CorrelationReason::AlertId.to_string(),
+        UNKNOWN_SERVICE,
+        None,
+        None,
+    )
+    .await?;
+    Ok(outcome)
+}
+
+/// Pages an incident never paged and decides an analysis never decided; a resolved one rests.
+#[cfg(feature = "enterprise")]
+async fn finish_finding_incident(
+    f: &FindingIncident,
+    incident_id: &str,
+    pager: &dyn FindingPager,
+    turn: &FindingTurn,
+) -> Result<(), anyhow::Error> {
+    let incident = infra::table::alert_incidents::get_rw(&f.org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("incident {}/{incident_id} is gone", f.org_id))?;
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    let record = match pager.record(&f.org_id, incident_id).await? {
+        Some(record) => {
+            if record.incident_id.is_none() {
+                turn.held("linking the on-call record")?;
+                pager.attach(&f.org_id, &record.id, incident_id).await?;
+            }
+            Some(record)
+        }
+        None => {
+            turn.held("paging")?;
+            let routed = pager.route(&f.org_id, incident_id, &f.title).await;
+            if let Some(e) = routed.error {
+                return Err(e);
+            }
+            routed.record
+        }
+    };
+    if incident.rca_run_id.is_some() || incident.rca_off_reason.is_some() {
+        return Ok(());
+    }
+    turn.held("deciding the analysis")?;
+    if let Some(reason) = start_new_incident_rca(&f.org_id, incident_id, record.as_ref()).await? {
+        infra::table::alert_incidents::set_rca_off_reason(&f.org_id, incident_id, Some(reason))
+            .await?;
+    }
+    Ok(())
+}
+
+/// The finding's next incident id: a digest of org, finding and the incidents it already has.
+#[cfg(feature = "enterprise")]
+fn finding_incident_id(f: &FindingIncident, known: &[String]) -> String {
+    use sha2::{Digest, Sha256};
+    use svix_ksuid::KsuidLike;
+
+    // No onset in it: every onset that saw the same incidents names the same id under the PK.
+    let digest = Sha256::digest(format!(
+        "{}\n{}\n{}",
+        f.org_id,
+        f.subject_id,
+        known.join("\n")
+    ));
+    let mut bytes = [0u8; 20];
+    bytes.copy_from_slice(&digest[..20]);
+    svix_ksuid::Ksuid::from_bytes(bytes).to_string()
+}
+
+/// The turn a finding's incident work waits on, so a detached attempt and its retry never overlap.
+#[cfg(feature = "enterprise")]
+fn finding_turn(subject_id: &str) -> &'static std::sync::Arc<tokio::sync::Mutex<()>> {
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    subject_id.hash(&mut hasher);
+    let turn = usize::try_from(hasher.finish() % FINDING_TURNS as u64).unwrap_or_default();
+    &FINDING_TURN_LOCKS[turn]
+}
+
+/// One cluster lock per finding in an org, so every onset of it waits on the same turn.
+#[cfg(feature = "enterprise")]
+fn finding_lock_key(org_id: &str, subject_id: &str) -> String {
+    format!("/autoobserve/finding/{org_id}/{subject_id}")
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -1796,23 +2320,32 @@ async fn find_or_create_incident(
     if key_type == KeyType::AlertId {
         let alert_id = subject.id.clone();
 
+        subject.fence_at(FenceStep::Lookup).await?;
         // Use the dedicated DB query: junction table lookup + incident fetch
         if let Some(incident) =
             infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
         {
             // Found existing AlertId incident for this alert - join it
-            let (_, reopened) = join_then_unmute(
-                infra::table::alert_incidents::add_alert_to_incident(
-                    &incident.id,
-                    &alert_id,
-                    &subject.name,
-                    subject.kind.as_str(),
-                    triggered_at,
-                    correlation_reason,
-                ),
-                async || unmute_for_firing(org_id, &incident, muted_by).await,
+            let reopened = match join_alert_id_incident(
+                org_id,
+                &incident,
+                subject,
+                triggered_at,
+                correlation_reason,
+                muted_by,
             )
-            .await?;
+            .await?
+            {
+                AlertIdJoin::Joined { reopened } => reopened,
+                AlertIdJoin::HeldBy(incident_id) => {
+                    return Ok(Correlation::existing(
+                        IncidentCorrelationOutcome::ExistingAlertRepeated {
+                            incident_id,
+                            service_name: service_name.to_string(),
+                        },
+                    ));
+                }
+            };
 
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
@@ -2089,10 +2622,11 @@ async fn find_or_create_incident(
         muted_by,
     )
     .await?;
-    Ok(Correlation {
+    let created = matches!(
         outcome,
-        created: true,
-    })
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    );
+    Ok(Correlation { outcome, created })
 }
 
 /// Get incident with its alerts and RCA runs for the detail view.
@@ -2473,34 +3007,56 @@ async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> Ed
 /// Whether the deployment can run an analysis at all.
 #[cfg(feature = "enterprise")]
 pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
-    use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
-
-    let cfg = get_config();
-    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
-    if !will_run {
-        rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+    let off = rca_not_run_reason();
+    if off.is_some() {
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            org_id,
+            incident_id,
+        )
+        .await;
     }
-    will_run
+    off.is_none()
+}
+
+/// Why the deployment cannot run an analysis, or `None` when it can.
+#[cfg(feature = "enterprise")]
+pub fn rca_not_run_reason() -> Option<&'static str> {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    rca_off_reason_for(
+        incidents_enabled() && cfg.incidents.rca_enabled,
+        rca_agent_available(),
+    )
+}
+
+/// The pure half of [rca_not_run_reason].
+pub fn rca_off_reason_for(analysis_on: bool, agent_available: bool) -> Option<&'static str> {
+    if !analysis_on {
+        Some(RCA_OFF_DISABLED)
+    } else if !agent_available {
+        Some(RCA_OFF_AI_UNAVAILABLE)
+    } else {
+        None
+    }
 }
 
 /// The user that automatic runs act and are metered as.
 #[cfg(feature = "enterprise")]
 const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
-/// The one start path of automatic runs.
+/// The one start path of automatic runs; returns why none started, `None` when one did or runs.
 #[cfg(feature = "enterprise")]
 async fn start_automatic_rca(
     org_id: &str,
     incident_id: &str,
     trigger: config::meta::alerts::rca_runs::RunTrigger,
-) {
+) -> Option<&'static str> {
     use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     use o2_enterprise::enterprise::alerts::rca_service;
 
     use super::rca_runs::{RunSubject, StartOutcome, StartRun};
 
     if !rca_will_run(org_id, incident_id).await {
-        return;
+        return rca_not_run_reason();
     }
     match infra::table::alert_incidents::get(org_id, incident_id).await {
         Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
@@ -2509,13 +3065,14 @@ async fn start_automatic_rca(
                 trigger.as_str()
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return;
+            // Already recorded, so there is nothing new to say.
+            return None;
         }
         Ok(_) => {}
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return;
+            return Some(RCA_OFF_START_FAILED);
         }
     }
 
@@ -2536,7 +3093,7 @@ async fn start_automatic_rca(
         );
         // No verdict is coming, so nothing may go on holding a page for one.
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-        return;
+        return Some(RCA_OFF_QUOTA);
     }
 
     let outcome = super::rca_runs::start_run(StartRun {
@@ -2558,7 +3115,7 @@ async fn start_automatic_rca(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
                 trigger.as_str()
             );
-            return;
+            return None;
         }
         Ok(StartOutcome::CoolingDown) => {
             log::debug!(
@@ -2566,12 +3123,12 @@ async fn start_automatic_rca(
                 trigger.as_str()
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return;
+            return Some(RCA_OFF_COOLING_DOWN);
         }
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return;
+            return Some(RCA_OFF_START_FAILED);
         }
     };
 
@@ -2606,40 +3163,101 @@ async fn start_automatic_rca(
             );
         }
     });
+    None
 }
 
-/// A new incident's first analysis, decided after on-call routing.
+/// Pages a new incident's on-call record and blast radius; the record decides L0.
+#[cfg(feature = "enterprise")]
+async fn route_new_incident(
+    org_id: &str,
+    incident_id: &str,
+    title: &str,
+    priority: config::meta::alerts::priority::AlertPriority,
+    team: Option<&str>,
+    dimensions: &HashMap<String, String>,
+) -> RoutedIncident {
+    let started = o2_enterprise::enterprise::oncall::escalation::start_for_incident(
+        org_id,
+        incident_id,
+        title,
+        priority,
+        team,
+        dimensions,
+    )
+    .await;
+    routed_from(org_id, incident_id, dimensions, started).await
+}
+
+/// Links the record a start opened and pages its blast radius; a failed start is the error.
+#[cfg(feature = "enterprise")]
+async fn routed_from(
+    org_id: &str,
+    incident_id: &str,
+    dimensions: &HashMap<String, String>,
+    started: anyhow::Result<Option<config::meta::oncall::Response>>,
+) -> RoutedIncident {
+    let origin = match started {
+        Ok(Some(origin)) => origin,
+        Ok(None) => {
+            return RoutedIncident {
+                record: None,
+                error: None,
+            };
+        }
+        Err(e) => {
+            return RoutedIncident {
+                record: None,
+                error: Some(e.context(format!("on-call paging failed for {org_id}/{incident_id}"))),
+            };
+        }
+    };
+    // Without this, nothing can get from an incident to the record that paged.
+    let error = infra::table::oncall_responses::attach_incident(org_id, &origin.id, incident_id)
+        .await
+        .err()
+        .map(|e| anyhow::anyhow!("could not link on-call record for {org_id}/{incident_id}: {e}"));
+    // The blast radius hangs off whichever record actually paged, which here is this one.
+    if let Err(e) =
+        crate::alerts::scheduler::handlers::page_blast_radius(org_id, &origin, dimensions).await
+    {
+        log::error!("[incidents] impacted paging failed for {org_id}/{incident_id}: {e}");
+    }
+    RoutedIncident {
+        record: Some(origin),
+        error,
+    }
+}
+
+/// A new incident's first analysis, decided after on-call routing; returns why none started.
 #[cfg(feature = "enterprise")]
 async fn start_new_incident_rca(
     org_id: &str,
     incident_id: &str,
     routed: Option<&config::meta::oncall::Response>,
-) {
+) -> Result<Option<&'static str>, anyhow::Error> {
     if let Some(record) = routed
         && o2_enterprise::enterprise::alerts::rca_service::l0_off_for_record(org_id, record).await
     {
-        if let Err(e) =
+        let stored =
             infra::table::alert_incidents::set_rca_off_reason(org_id, incident_id, Some("l0_off"))
-                .await
-        {
-            log::error!(
-                "[INCIDENTS::RCA] Could not record that L0 is off for {org_id}/{incident_id}: {e}"
-            );
-        }
+                .await;
         // No verdict is coming, so nothing may go on holding a page for one.
         o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
             org_id,
             incident_id,
         )
         .await;
-        return;
+        stored.map_err(|e| {
+            anyhow::anyhow!("Could not record that L0 is off for {org_id}/{incident_id}: {e}")
+        })?;
+        return Ok(None);
     }
-    start_automatic_rca(
+    Ok(start_automatic_rca(
         org_id,
         incident_id,
         config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
     )
-    .await;
+    .await)
 }
 
 /// An un-muted incident's analysis.
@@ -2659,7 +3277,9 @@ async fn start_unmuted_incident_rca(
         }
     };
     if undecided {
-        start_new_incident_rca(org_id, incident_id, routed).await;
+        if let Err(e) = start_new_incident_rca(org_id, incident_id, routed).await {
+            log::error!("[INCIDENTS::RCA] {e:#}");
+        }
     } else {
         start_automatic_rca(
             org_id,
@@ -3489,6 +4109,792 @@ pub async fn update_severity(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    mod findings {
+        use std::{
+            collections::HashMap,
+            sync::{
+                Arc, Mutex,
+                atomic::{AtomicU64, AtomicUsize, Ordering},
+            },
+        };
+
+        use infra::table::entity::alert_incidents as incident_rows;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
+
+        use super::super::*;
+
+        const TITLE: &str = "checkout (logs) stopped sending data";
+        const ONSET: i64 = 1_793_784_600_000_000;
+        const QUARTER_HOUR: i64 = 900_000_000;
+
+        /// Stands in for on-call: counts pages and links, and refuses either on demand.
+        #[derive(Default)]
+        struct Pager {
+            state: Mutex<Paged>,
+            /// Record lookups wait briefly for a second one, so racing attempts both pass it.
+            meet: bool,
+            lookups: AtomicUsize,
+            /// The first route waits inside, as a holder whose lease lapses mid-route does.
+            stall: bool,
+            routing: tokio::sync::Notify,
+            resume: tokio::sync::Notify,
+            stalls: AtomicUsize,
+        }
+
+        impl Pager {
+            fn meeting() -> Self {
+                Self {
+                    meet: true,
+                    ..Self::default()
+                }
+            }
+
+            fn stalling() -> Self {
+                Self {
+                    stall: true,
+                    ..Self::default()
+                }
+            }
+
+            fn pages(&self) -> usize {
+                self.state.lock().unwrap().pages
+            }
+
+            fn for_team(team_id: &str) -> Self {
+                let pager = Self::default();
+                pager.state.lock().unwrap().team_id = Some(team_id.to_string());
+                pager
+            }
+
+            fn refusing(route: bool, attach: bool) -> Self {
+                let pager = Self::default();
+                {
+                    let mut s = pager.state.lock().unwrap();
+                    s.refuse_route = route;
+                    s.refuse_attach = attach;
+                }
+                pager
+            }
+
+            fn heal(&self) {
+                let mut s = self.state.lock().unwrap();
+                s.refuse_route = false;
+                s.refuse_attach = false;
+            }
+
+            fn counts(&self) -> (usize, usize) {
+                let s = self.state.lock().unwrap();
+                (s.routes, s.attaches)
+            }
+
+            /// The incident the only on-call record is linked to.
+            fn linked_to(&self) -> Option<String> {
+                let s = self.state.lock().unwrap();
+                match s.records.len() {
+                    1 => s
+                        .records
+                        .values()
+                        .next()
+                        .and_then(|r| r.incident_id.clone()),
+                    _ => None,
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl FindingPager for Pager {
+            async fn record(
+                &self,
+                _org_id: &str,
+                incident_id: &str,
+            ) -> anyhow::Result<Option<config::meta::oncall::Response>> {
+                let record = self.state.lock().unwrap().records.get(incident_id).cloned();
+                if self.meet {
+                    self.lookups.fetch_add(1, Ordering::SeqCst);
+                    for _ in 0..50 {
+                        if self.lookups.load(Ordering::SeqCst) >= 2 {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                }
+                Ok(record)
+            }
+
+            async fn route(&self, org_id: &str, incident_id: &str, title: &str) -> RoutedIncident {
+                if self.stall && self.stalls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    self.routing.notify_one();
+                    self.resume.notified().await;
+                }
+                let mut s = self.state.lock().unwrap();
+                s.routes += 1;
+                // Opens firing 1 once, like the unique index under start_once_for_incident.
+                if let Some(record) = s.records.get(incident_id).cloned() {
+                    return RoutedIncident {
+                        record: Some(record),
+                        error: None,
+                    };
+                }
+                if s.refuse_route {
+                    return RoutedIncident {
+                        record: None,
+                        error: Some(anyhow::anyhow!("paging refused")),
+                    };
+                }
+                let mut record = page_record(org_id, incident_id, title);
+                record.team_id = s.team_id.clone();
+                s.pages += 1;
+                if s.refuse_attach {
+                    s.records.insert(incident_id.to_string(), record.clone());
+                    return RoutedIncident {
+                        record: Some(record),
+                        error: Some(anyhow::anyhow!("link refused")),
+                    };
+                }
+                record.incident_id = Some(incident_id.to_string());
+                s.records.insert(incident_id.to_string(), record.clone());
+                RoutedIncident {
+                    record: Some(record),
+                    error: None,
+                }
+            }
+
+            async fn attach(
+                &self,
+                _org_id: &str,
+                record_id: &str,
+                incident_id: &str,
+            ) -> anyhow::Result<()> {
+                let mut s = self.state.lock().unwrap();
+                s.attaches += 1;
+                if s.refuse_attach {
+                    anyhow::bail!("link refused");
+                }
+                if let Some(record) = s.records.values_mut().find(|r| r.id == record_id) {
+                    record.incident_id = Some(incident_id.to_string());
+                }
+                Ok(())
+            }
+        }
+
+        #[derive(Default)]
+        struct Paged {
+            /// On-call records by incident, one each, as the subject's unique index allows.
+            records: HashMap<String, config::meta::oncall::Response>,
+            routes: usize,
+            pages: usize,
+            attaches: usize,
+            refuse_route: bool,
+            refuse_attach: bool,
+            team_id: Option<String>,
+        }
+
+        fn page_record(
+            org_id: &str,
+            incident_id: &str,
+            title: &str,
+        ) -> config::meta::oncall::Response {
+            serde_json::from_value(serde_json::json!({
+                "id": format!("page-{incident_id}"),
+                "org_id": org_id,
+                "subject": {"subject_type": "incident", "source_id": incident_id, "firing": 1},
+                "team_id": null,
+                "title": title,
+                "priority": 2,
+                "responder_role": "owner",
+                "state": "triggered",
+                "opened_at": 1,
+                "incident_id": null,
+                "updated_at": 1
+            }))
+            .unwrap()
+        }
+
+        fn finding(org_id: &str, at: i64) -> FindingIncident {
+            FindingIncident {
+                org_id: org_id.to_string(),
+                subject_id: "autoobserve:finding-a".to_string(),
+                title: TITLE.to_string(),
+                dimensions: finding_dimensions("stream_silence", "logs", "checkout"),
+                triggered_at: at,
+            }
+        }
+
+        fn new_org() -> String {
+            format!("ao_{}", config::ider::generate().to_lowercase())
+        }
+
+        async fn open(f: &FindingIncident, pager: &Pager) -> anyhow::Result<String> {
+            open_finding_incident_with(f, pager, &ClusterTurns)
+                .await
+                .map(|o| o.incident_id().to_string())
+        }
+
+        /// One node of a test cluster: its own stripe, then the lease its cluster shares.
+        struct Node {
+            stripe: Arc<tokio::sync::Mutex<()>>,
+            cluster: Arc<Lease>,
+            gate: Option<Arc<Gate>>,
+        }
+
+        impl Node {
+            fn of(cluster: &Arc<Lease>) -> Self {
+                Self {
+                    stripe: Arc::default(),
+                    cluster: cluster.clone(),
+                    gate: None,
+                }
+            }
+
+            fn gated(cluster: &Arc<Lease>, gate: &Arc<Gate>) -> Self {
+                Self {
+                    gate: Some(gate.clone()),
+                    ..Self::of(cluster)
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl FindingTurns for Node {
+            async fn take(&self, org_id: &str, subject_id: &str) -> anyhow::Result<FindingTurn> {
+                let stripe = self.stripe.clone().lock_owned().await;
+                let (held, lost) = self.cluster.take().await;
+                let lease = LeaseWatch {
+                    key: finding_lock_key(org_id, subject_id),
+                    lost: Some(lost),
+                };
+                let fence: Arc<dyn TurnFence> = match &self.gate {
+                    Some(gate) => Arc::new(Gated {
+                        lease: lease.clone(),
+                        gate: gate.clone(),
+                    }),
+                    None => Arc::new(lease.clone()),
+                };
+                Ok(FindingTurn {
+                    held: vec![Box::new(stripe) as Box<dyn Send + Sync>, Box::new(held)],
+                    cluster: None,
+                    lease,
+                    fence,
+                })
+            }
+        }
+
+        /// Holds a node once, right before one step, on either side of its lease check.
+        #[derive(Debug)]
+        struct Gate {
+            step: FenceStep,
+            checked_first: bool,
+            reached: tokio::sync::Notify,
+            resume: tokio::sync::Notify,
+            passes: AtomicUsize,
+        }
+
+        impl Gate {
+            fn at(step: FenceStep, checked_first: bool) -> Arc<Self> {
+                Arc::new(Self {
+                    step,
+                    checked_first,
+                    reached: tokio::sync::Notify::new(),
+                    resume: tokio::sync::Notify::new(),
+                    passes: AtomicUsize::new(0),
+                })
+            }
+
+            /// Fails instead of hanging when the gated node never gets there.
+            async fn arrived(&self) {
+                tokio::time::timeout(std::time::Duration::from_secs(10), self.reached.notified())
+                    .await
+                    .expect("the gated node reaches its step");
+            }
+        }
+
+        /// A node's fence with its [Gate] around one step.
+        #[derive(Debug)]
+        struct Gated {
+            lease: LeaseWatch,
+            gate: Arc<Gate>,
+        }
+
+        #[async_trait::async_trait]
+        impl TurnFence for Gated {
+            async fn before(&self, step: FenceStep) -> anyhow::Result<()> {
+                if step != self.gate.step {
+                    return self.lease.before(step).await;
+                }
+                if self.gate.checked_first {
+                    self.lease.before(step).await?;
+                }
+                if self.gate.passes.fetch_add(1, Ordering::SeqCst) == 0 {
+                    self.gate.reached.notify_one();
+                    self.gate.resume.notified().await;
+                }
+                if self.gate.checked_first {
+                    return Ok(());
+                }
+                self.lease.before(step).await
+            }
+        }
+
+        /// A cluster lock with a lease: one holder at a time, and the test can let it lapse.
+        #[derive(Default)]
+        struct Lease {
+            holder: Mutex<Option<(u64, tokio::sync::watch::Sender<bool>)>>,
+            takes: AtomicU64,
+            freed: tokio::sync::Notify,
+        }
+
+        impl Lease {
+            async fn take(self: &Arc<Self>) -> (LeaseHeld, tokio::sync::watch::Receiver<bool>) {
+                loop {
+                    {
+                        let mut holder = self.holder.lock().unwrap();
+                        if holder.is_none() {
+                            let id = self.takes.fetch_add(1, Ordering::SeqCst);
+                            let (lost, lease) = tokio::sync::watch::channel(false);
+                            *holder = Some((id, lost));
+                            let held = LeaseHeld {
+                                lease: self.clone(),
+                                id,
+                            };
+                            return (held, lease);
+                        }
+                    }
+                    self.freed.notified().await;
+                }
+            }
+
+            /// As an unrenewed NATS lock: its holder learns it is lost; the next taker gets it.
+            fn lapse(&self) {
+                if let Some((_, lost)) = self.holder.lock().unwrap().take() {
+                    lost.send_replace(true);
+                }
+                self.freed.notify_one();
+            }
+        }
+
+        /// One take of a [Lease]; dropping it frees the lease only if it still holds it.
+        struct LeaseHeld {
+            lease: Arc<Lease>,
+            id: u64,
+        }
+
+        impl Drop for LeaseHeld {
+            fn drop(&mut self) {
+                let mut holder = self.lease.holder.lock().unwrap();
+                if holder.as_ref().is_some_and(|(id, _)| *id == self.id) {
+                    *holder = None;
+                    drop(holder);
+                    self.lease.freed.notify_one();
+                }
+            }
+        }
+
+        /// A team whose L0 policy is off at P2, the priority a finding pages at.
+        async fn l0_off_team(org_id: &str) -> String {
+            use infra::table::entity::oncall_policies;
+            use sea_orm::{ActiveModelTrait, ConnectionTrait, Schema, Set};
+
+            let conn = infra::db::get_orm_client_rw().await;
+            let backend = conn.get_database_backend();
+            let mut table = Schema::new(backend).create_table_from_entity(oncall_policies::Entity);
+            conn.execute(backend.build(table.if_not_exists()))
+                .await
+                .unwrap();
+            let mut l0 = config::meta::oncall::L0Policy::defaults();
+            l0.mode.p2 = config::meta::oncall::L0Mode::Off;
+            let team_id = format!("team-{org_id}");
+            oncall_policies::ActiveModel {
+                id: Set(config::ider::uuid()),
+                org_id: Set(org_id.to_string()),
+                team_id: Set(team_id.clone()),
+                rungs: Set("[]".to_string()),
+                destinations: Set("[]".to_string()),
+                l0_json: Set(serde_json::to_string(&l0).unwrap()),
+                template: Set(None),
+                created_at: Set(1),
+                updated_at: Set(1),
+            }
+            .insert(conn)
+            .await
+            .unwrap();
+            team_id
+        }
+
+        async fn incidents_of(org_id: &str) -> Vec<incident_rows::Model> {
+            incident_rows::Entity::find()
+                .filter(incident_rows::Column::OrgId.eq(org_id))
+                .all(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap()
+        }
+
+        async fn off_reason(org_id: &str, incident_id: &str) -> Option<String> {
+            infra::table::alert_incidents::get_rw(org_id, incident_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .rca_off_reason
+        }
+
+        /// Lapses the gated node's lease at its gate, runs `f` on `node`, then lets it resume.
+        async fn take_over(
+            cluster: &Lease,
+            gate: &Gate,
+            f: &FindingIncident,
+            pager: &Pager,
+            node: &Node,
+        ) -> anyhow::Result<IncidentCorrelationOutcome> {
+            gate.arrived().await;
+            cluster.lapse();
+            let taken = open_finding_incident_with(f, pager, node).await;
+            gate.resume.notify_one();
+            taken
+        }
+
+        /// One incident for the finding, paged once and linked, holding both onsets.
+        async fn assert_one_paged_incident(org_id: &str, id: &str, pager: &Pager) {
+            let opened: Vec<String> = incidents_of(org_id)
+                .await
+                .into_iter()
+                .map(|i| i.id)
+                .collect();
+            assert_eq!(opened, [id], "one incident");
+            assert_eq!(pager.pages(), 1, "paged once");
+            assert_eq!(pager.linked_to().as_deref(), Some(id));
+            let links = infra::table::alert_incidents::get_incident_alerts(id)
+                .await
+                .unwrap();
+            let onsets: Vec<i64> = links.iter().map(|l| l.alert_fired_at).collect();
+            assert_eq!(onsets, [ONSET + QUARTER_HOUR, ONSET], "both onsets");
+        }
+
+        #[tokio::test]
+        async fn a_replay_of_a_resolved_or_rekeyed_firing_opens_nothing_new() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                .await
+                .unwrap();
+            assert_eq!(open(&f, &pager).await.unwrap(), id, "a resolved incident");
+            incident_rows::Entity::update_many()
+                .col_expr(incident_rows::Column::KeyType, Expr::value("Primary"))
+                .filter(incident_rows::Column::Id.eq(&id))
+                .exec(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap();
+            assert_eq!(open(&f, &pager).await.unwrap(), id, "a re-keyed incident");
+            assert_eq!(incidents_of(&org).await.len(), 1);
+            assert_eq!(pager.counts(), (1, 0), "paged once");
+        }
+
+        #[tokio::test]
+        async fn overlapping_attempts_open_one_incident_and_page_once() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let ids = futures::future::join_all((0..4).map(|_| open(&f, &pager))).await;
+            let ids: Vec<String> = ids.into_iter().map(Result::unwrap).collect();
+            assert!(ids.iter().all(|id| *id == ids[0]), "{ids:?}");
+            assert_eq!(incidents_of(&org).await.len(), 1);
+            let links = infra::table::alert_incidents::get_incident_alerts(&ids[0])
+                .await
+                .unwrap();
+            assert_eq!(links.len(), 1, "{links:?}");
+            assert_eq!(pager.counts(), (1, 0));
+        }
+
+        #[tokio::test]
+        async fn a_new_onset_joins_the_open_incident_and_pages_nothing_more() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let id = open(&finding(&org, ONSET), &pager).await.unwrap();
+            let later = open(&finding(&org, ONSET + QUARTER_HOUR), &pager)
+                .await
+                .unwrap();
+            assert_eq!(later, id);
+            assert_eq!(incidents_of(&org).await.len(), 1);
+            let links = infra::table::alert_incidents::get_incident_alerts(&id)
+                .await
+                .unwrap();
+            assert_eq!(links.len(), 2);
+            assert_eq!(pager.counts(), (1, 0));
+        }
+
+        #[tokio::test]
+        async fn a_routing_failure_fails_the_act_and_the_replay_pages_once() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let org = new_org();
+            let pager = Pager::refusing(true, false);
+            let f = finding(&org, ONSET);
+            assert!(open(&f, &pager).await.is_err(), "the act sees the failure");
+            let opened = incidents_of(&org).await;
+            assert_eq!(opened.len(), 1);
+            assert_eq!(
+                opened[0].rca_off_reason, None,
+                "nothing is decided before the page"
+            );
+            pager.heal();
+            let id = open(&f, &pager).await.unwrap();
+            assert_eq!(id, opened[0].id);
+            assert_eq!(pager.counts(), (2, 0), "one refused page, one page");
+            assert_eq!(pager.linked_to(), Some(id.clone()));
+            assert_eq!(
+                off_reason(&org, &id).await.as_deref(),
+                Some(RCA_OFF_DISABLED)
+            );
+        }
+
+        #[tokio::test]
+        async fn a_link_failure_after_the_page_fails_the_act_and_the_replay_only_links() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let org = new_org();
+            let pager = Pager::refusing(false, true);
+            let f = finding(&org, ONSET);
+            assert!(open(&f, &pager).await.is_err(), "the act sees the failure");
+            pager.heal();
+            let id = open(&f, &pager).await.unwrap();
+            assert_eq!(pager.counts(), (1, 1), "paged once, linked on the replay");
+            assert_eq!(pager.linked_to(), Some(id));
+        }
+
+        #[tokio::test]
+        async fn a_replay_after_the_link_finishes_the_page_and_the_analysis() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            // The state a process exit right after the link commit leaves behind.
+            let incident = infra::table::alert_incidents::create(
+                &org,
+                "P2",
+                serde_json::to_value(&f.dimensions).unwrap(),
+                "AlertId",
+                ONSET,
+                Some(TITLE.to_string()),
+            )
+            .await
+            .unwrap();
+            infra::table::alert_incidents::add_alert_to_incident(
+                &incident.id,
+                &f.subject_id,
+                TITLE,
+                AlertKind::AutoObserve.as_str(),
+                ONSET,
+                "alert_id",
+            )
+            .await
+            .unwrap();
+            assert_eq!(open(&f, &pager).await.unwrap(), incident.id);
+            assert_eq!(pager.counts(), (1, 0), "the replay pages");
+            assert_eq!(
+                off_reason(&org, &incident.id).await.as_deref(),
+                Some(RCA_OFF_DISABLED),
+                "and decides the analysis"
+            );
+        }
+
+        #[tokio::test]
+        async fn two_nodes_racing_past_the_record_lookup_page_once() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::meeting());
+            let f = finding(&org, ONSET);
+            let cluster = Arc::default();
+            let (a, b) = (Node::of(&cluster), Node::of(&cluster));
+            let (x, y) = tokio::join!(
+                open_finding_incident_with(&f, &pager, &a),
+                open_finding_incident_with(&f, &pager, &b)
+            );
+            assert_eq!(x.unwrap().incident_id(), y.unwrap().incident_id());
+            assert_eq!(incidents_of(&org).await.len(), 1);
+            assert_eq!(pager.counts(), (1, 0), "one on-call record, paged once");
+        }
+
+        #[tokio::test]
+        async fn a_node_that_loses_its_lease_mid_route_stops_and_the_next_holder_pages_once() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::stalling());
+            let f = finding(&org, ONSET);
+            let cluster = Arc::default();
+            let (a, b) = (Node::of(&cluster), Node::of(&cluster));
+            let takeover = async {
+                pager.routing.notified().await;
+                cluster.lapse();
+                let taken = open_finding_incident_with(&f, &pager, &b).await;
+                pager.resume.notify_one();
+                taken
+            };
+            let (old, new) = tokio::join!(open_finding_incident_with(&f, &pager, &a), takeover);
+            let lost = old.expect_err("the old holder's act fails");
+            assert!(lost.to_string().contains("lost the finding lock"), "{lost}");
+            let id = new.unwrap().incident_id().to_string();
+            assert_eq!(incidents_of(&org).await.len(), 1);
+            assert_eq!(pager.pages(), 1, "one on-call record, paged once");
+            assert_eq!(
+                pager.counts(),
+                (2, 0),
+                "both routed; the second met the first's record"
+            );
+            assert_eq!(pager.linked_to(), Some(id.clone()));
+            assert_eq!(
+                off_reason(&org, &id).await.as_deref(),
+                Some(RCA_OFF_DISABLED)
+            );
+        }
+
+        #[tokio::test]
+        async fn a_node_stalled_past_its_lease_check_joins_the_incident_the_next_holder_opened() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let (old_onset, new_onset) =
+                (finding(&org, ONSET), finding(&org, ONSET + QUARTER_HOUR));
+            let cluster = Arc::default();
+            let gate = Gate::at(FenceStep::Open, true);
+            let (a, b) = (Node::gated(&cluster, &gate), Node::of(&cluster));
+            let (old, new) = tokio::join!(
+                open_finding_incident_with(&old_onset, &pager, &a),
+                take_over(&cluster, &gate, &new_onset, &pager, &b)
+            );
+            let id = new.unwrap().incident_id().to_string();
+            let replay = open_finding_incident_with(&old_onset, &pager, &a).await;
+            assert_one_paged_incident(&org, &id, &pager).await;
+            assert_eq!(old.unwrap().incident_id(), id, "the old holder joined it");
+            assert_eq!(replay.unwrap().incident_id(), id, "and so does its replay");
+            assert_eq!(pager.counts(), (1, 0));
+        }
+
+        #[tokio::test]
+        async fn a_node_whose_lease_lapses_before_its_insert_opens_nothing() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let (old_onset, new_onset) =
+                (finding(&org, ONSET), finding(&org, ONSET + QUARTER_HOUR));
+            let cluster = Arc::default();
+            let gate = Gate::at(FenceStep::Open, false);
+            let (a, b) = (Node::gated(&cluster, &gate), Node::of(&cluster));
+            let (old, new) = tokio::join!(
+                open_finding_incident_with(&old_onset, &pager, &a),
+                take_over(&cluster, &gate, &new_onset, &pager, &b)
+            );
+            let lost = old.expect_err("the old holder stops at its insert");
+            assert!(
+                lost.to_string().contains("before opening the incident"),
+                "{lost}"
+            );
+            let id = new.unwrap().incident_id().to_string();
+            let replay = open_finding_incident_with(&old_onset, &pager, &a).await;
+            assert_eq!(replay.unwrap().incident_id(), id, "the replay joins it");
+            assert_one_paged_incident(&org, &id, &pager).await;
+            assert_eq!(pager.counts(), (1, 0));
+        }
+
+        #[tokio::test]
+        async fn a_stale_join_that_lands_after_a_takeover_keeps_its_onset_in_one_incident() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let x = open(&finding(&org, ONSET), &pager).await.unwrap();
+            let f = finding(&org, ONSET + QUARTER_HOUR);
+            let cluster = Arc::default();
+            let (a_gate, b_gate) = (
+                Gate::at(FenceStep::Join, true),
+                Gate::at(FenceStep::Lookup, true),
+            );
+            let (a, b) = (
+                Node::gated(&cluster, &a_gate),
+                Node::gated(&cluster, &b_gate),
+            );
+            let a_done = tokio::sync::Notify::new();
+            let stale = async {
+                let joined = open_finding_incident_with(&f, &pager, &a).await;
+                a_done.notify_one();
+                joined
+            };
+            let takeover = async {
+                a_gate.arrived().await;
+                cluster.lapse();
+                open_finding_incident_with(&f, &pager, &b).await
+            };
+            let script = async {
+                b_gate.arrived().await;
+                a_gate.resume.notify_one();
+                tokio::time::timeout(std::time::Duration::from_secs(10), a_done.notified())
+                    .await
+                    .expect("the stale join lands");
+                infra::table::alert_incidents::update_status(&org, &x, "resolved")
+                    .await
+                    .unwrap();
+                b_gate.resume.notify_one();
+            };
+            let (old, new, ()) = tokio::join!(stale, takeover, script);
+            let opened: Vec<String> = incidents_of(&org).await.into_iter().map(|i| i.id).collect();
+            assert_eq!(opened, [x.clone()], "one incident");
+            let holder = infra::table::alert_incidents::find_incident_with_firing(
+                &org,
+                &f.subject_id,
+                f.triggered_at,
+            )
+            .await
+            .unwrap();
+            assert_eq!(holder.map(|i| i.id), Some(x.clone()), "it holds the onset");
+            assert_eq!(pager.pages(), 1, "paged once");
+            assert_eq!(old.unwrap().incident_id(), x, "the stale join landed in X");
+            assert_eq!(
+                new.unwrap().incident_id(),
+                x,
+                "the takeover found the onset in X"
+            );
+            let replay = open_finding_incident_with(&f, &pager, &b).await.unwrap();
+            assert_eq!(replay.incident_id(), x);
+            assert_eq!(pager.pages(), 1, "and its replay pages nothing");
+        }
+
+        #[tokio::test]
+        async fn a_refused_l0_off_write_fails_the_act_and_the_replay_stores_it() {
+            use sea_orm::ConnectionTrait;
+
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let org = new_org();
+            let pager = Pager::for_team(&l0_off_team(&org).await);
+            let f = finding(&org, ONSET);
+            let conn = infra::db::get_orm_client_rw().await;
+            conn.execute_unprepared(&format!(
+                "CREATE TRIGGER refuse_off_reason BEFORE UPDATE OF rca_off_reason ON alert_incidents \
+                 WHEN NEW.org_id = '{org}' BEGIN SELECT RAISE(ABORT, 'the test refused this write'); END"
+            ))
+            .await
+            .unwrap();
+            let refused = open(&f, &pager).await;
+            conn.execute_unprepared("DROP TRIGGER refuse_off_reason")
+                .await
+                .unwrap();
+            assert!(refused.is_err(), "the act sees the failed write");
+            let id = open(&f, &pager).await.unwrap();
+            assert_eq!(off_reason(&org, &id).await.as_deref(), Some("l0_off"));
+            assert_eq!(pager.counts(), (1, 0), "paged once");
+        }
+
+        #[tokio::test]
+        async fn a_finding_incident_with_analysis_off_says_why() {
+            let _db = crate::alerts::rca_runs::tests::db().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let id = open(&finding(&org, ONSET), &pager).await.unwrap();
+            let row = infra::table::alert_incidents::get_rw(&org, &id)
+                .await
+                .unwrap()
+                .unwrap();
+            let links = infra::table::alert_incidents::get_incident_alerts(&id)
+                .await
+                .unwrap();
+            let item = crate::autoobserve::incidents::item_of(&row, &links[0]);
+            assert_eq!(
+                item.investigation.not_run_reason.as_deref(),
+                Some(RCA_OFF_DISABLED)
+            );
+            assert_eq!(item.investigation.run_id, None);
+        }
+    }
+
     use super::*;
 
     #[cfg(feature = "enterprise")]
@@ -3561,6 +4967,50 @@ mod tests {
         );
         assert!(status_change_is_muted(false, Some("dt-1")));
         assert!(!status_change_is_muted(false, None));
+    }
+
+    #[test]
+    fn finding_dims_never_absorb_or_are_absorbed_by_an_alert() {
+        use config::meta::alerts::incidents::DimensionRelationship;
+
+        let ours = finding_dimensions("stream_silence", "logs", "checkout");
+        assert_eq!(ours.len(), 3);
+        assert_eq!(ours[FINDING_KIND_DIMENSION], "stream_silence");
+        assert_eq!(ours[FINDING_STREAM_TYPE_DIMENSION], "logs");
+        assert_eq!(ours[FINDING_STREAM_NAME_DIMENSION], "checkout");
+        let alert = HashMap::from([("service".to_string(), "api".to_string())]);
+        assert_eq!(
+            DimensionRelationship::check(&ours, &alert),
+            DimensionRelationship::PartialOverlap
+        );
+        assert_eq!(
+            DimensionRelationship::check(&ours, &HashMap::new()),
+            DimensionRelationship::PartialOverlap
+        );
+    }
+
+    #[test]
+    fn the_not_run_reason_names_what_is_off() {
+        assert_eq!(rca_off_reason_for(false, true), Some(RCA_OFF_DISABLED));
+        assert_eq!(rca_off_reason_for(false, false), Some(RCA_OFF_DISABLED));
+        assert_eq!(
+            rca_off_reason_for(true, false),
+            Some(RCA_OFF_AI_UNAVAILABLE)
+        );
+        assert_eq!(rca_off_reason_for(true, true), None);
+        let codes = [
+            RCA_OFF_DISABLED,
+            RCA_OFF_AI_UNAVAILABLE,
+            RCA_OFF_QUOTA,
+            RCA_OFF_COOLING_DOWN,
+            RCA_OFF_START_FAILED,
+        ];
+        let distinct: std::collections::HashSet<_> = codes.iter().collect();
+        assert_eq!(distinct.len(), codes.len());
+        assert!(
+            !codes.contains(&"l0_off"),
+            "the team's L0 reason keeps its meaning"
+        );
     }
 
     #[test]

@@ -1407,6 +1407,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::list_marks,
     openobserve_api_management::request::autoobserve::put_mark,
     openobserve_api_management::request::autoobserve::delete_mark,
+    openobserve_api_management::request::autoobserve::incidents::list_incidents,
 ))]
 #[openapi(tags(
     (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
@@ -2216,6 +2217,7 @@ mod tests {
             (format!("{base}/coverage"), "get", "get"),
             (format!("{base}/coverage/history"), "get", "list"),
             (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/incidents"), "get", "list"),
             (format!("{base}/marks"), "get", "list"),
             (mark.to_string(), "put", "update"),
             (mark.to_string(), "delete", "delete"),

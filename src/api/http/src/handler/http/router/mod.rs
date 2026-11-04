@@ -1295,6 +1295,7 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/coverage", get(autoobserve::coverage))
         .route("/v2/{org_id}/autoobserve/coverage/history", get(autoobserve::coverage_history))
         .route("/v2/{org_id}/autoobserve/suggestions", get(autoobserve::suggestions))
+        .route("/v2/{org_id}/autoobserve/incidents", get(autoobserve::incidents::list_incidents))
         .route("/v2/{org_id}/autoobserve/marks", get(autoobserve::list_marks))
         .route("/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}", put(autoobserve::put_mark).delete(autoobserve::delete_mark))
 }

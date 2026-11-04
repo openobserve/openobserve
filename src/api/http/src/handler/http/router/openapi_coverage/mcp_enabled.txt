@@ -10,6 +10,7 @@ ent AutoObserveCoverage
 ent AutoObserveCoverageHistory
 ent AutoObserveDeleteMark
 ent AutoObserveEntityTypes
+ent AutoObserveListIncidents
 ent AutoObserveListMarks
 ent AutoObservePutMark
 ent AutoObserveSuggestions
