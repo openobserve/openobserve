@@ -1190,6 +1190,41 @@ describe("AddTemplate - playground Kind drives the variables", () => {
     expect(chips(w)).toEqual(["alert_name", "status_dot", "downtime_window", "downtime_targets"]);
   });
 
+  it("a cloned custom template lists every kind's group and its Kind narrows the guide", async () => {
+    const templateService = (await import("@/services/alert_templates")).default as any;
+    templateService.preview.mockResolvedValueOnce({ data: { variable_groups: groups } });
+    const w = await mountComp({
+      template: {
+        name: "prebuilt_slack",
+        body: '{"text":"{alert_name}"}',
+        type: "http",
+        title: "",
+        kind: "custom",
+        applies_to: [],
+      },
+      isClone: true,
+    });
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "alert", "anomaly", "downtime"]);
+
+    const guideKind = w
+      .find('[data-test="add-template-variable-guide-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((guideKind.props("options") as any[]).map((o) => o.value)).toEqual([
+      "all_kinds",
+      "alert",
+      "incident",
+      "anomaly",
+      "synthetics",
+      "downtime",
+      "on_call",
+    ]);
+    await guideKind.vm.$emit("update:modelValue", "downtime");
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "downtime"]);
+  });
+
   it("opens a template limited by Applies to on its first kind and offers only its kinds", async () => {
     const spec = {
       title: "Anomaly",

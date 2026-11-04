@@ -219,15 +219,6 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
     }
 }
 
-/// The on-call and incident priority a chosen severity reads as; P2 is the sample's own.
-fn sample_priority(level: Option<AlertLevel>) -> &'static str {
-    match level {
-        Some(AlertLevel::Critical) => "P1",
-        Some(AlertLevel::Warning) | None => "P2",
-        Some(AlertLevel::Ok | AlertLevel::NoData) => "P3",
-    }
-}
-
 /// Preview a draft `ContentSpec` for one channel, sharing the exact
 /// `resolve_content` + `render` code path the send path uses.
 pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
@@ -245,11 +236,7 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
     let ctx = match req.kind {
         NotificationKind::Alert => synthetic_context(level),
         kind => {
-            let mut ctx = super::examples::example_context_at(
-                kind,
-                level == Some(AlertLevel::Ok),
-                sample_priority(level),
-            );
+            let mut ctx = super::examples::example_context_at(kind, level);
             if let Some(level) = level {
                 ctx.level = Some(level);
                 // On-call's alert_level is a priority and synthetics/downtime leave it blank.
@@ -639,5 +626,65 @@ mod tests {
             let resp = preview(&req).unwrap();
             assert_eq!(resp.preview_model.title, expected, "{kind:?}");
         }
+    }
+
+    fn sample_title(kind: NotificationKind, severity: &str, title: &str) -> String {
+        let req = PreviewRequest {
+            definition: ContentSpec {
+                title: title.into(),
+                ..sample_spec()
+            },
+            channel: "slack".into(),
+            severity: Some(severity.into()),
+            sample: None,
+            kind,
+        };
+        preview(&req).unwrap().preview_model.title
+    }
+
+    #[test]
+    fn each_playground_priority_reads_its_own_number() {
+        // The panel sends P1 to P4 as these four severities, in this order.
+        for (severity, priority) in [
+            ("critical", "P1"),
+            ("warning", "P2"),
+            ("single_level", "P3"),
+            ("no_data", "P4"),
+        ] {
+            assert_eq!(
+                sample_title(NotificationKind::Incident, severity, "{incident_severity}"),
+                priority,
+                "incident {severity}"
+            );
+            assert_eq!(
+                sample_title(NotificationKind::OnCall, severity, "{oncall_priority}"),
+                priority,
+                "on-call {severity}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_degraded_or_flaky_check_gets_its_own_sample() {
+        let read = |severity: &str| {
+            sample_title(
+                NotificationKind::Synthetics,
+                severity,
+                "{status_dot} {alert_name} {alert_status}|{check_status_label}|{check_degraded}|{check_flaky}",
+            )
+        };
+        assert_eq!(
+            read("warning"),
+            "🟠 checkout API degraded|Degraded|true|false"
+        );
+        assert_eq!(read("no_data"), "🟠 checkout API flaky|Flaky|false|true");
+        assert_eq!(
+            read("critical"),
+            "🔴 checkout API failing|Failing|false|false"
+        );
+        assert_eq!(
+            read("ok"),
+            "🟢 checkout API recovered|Recovered|false|false"
+        );
     }
 }

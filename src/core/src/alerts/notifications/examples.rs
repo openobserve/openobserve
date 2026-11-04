@@ -125,6 +125,15 @@ const COMMON_VARIABLES: [&str; 27] = [
     "group.<label>",
 ];
 
+/// The state a synthetics sample shows: the Playground lists failing, degraded, flaky, recovered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckSample {
+    Failing,
+    Degraded,
+    Flaky,
+    Recovered,
+}
+
 /// The variables a template of `kind` can use: common, shared send path, then the kind's own.
 pub fn variables_for(kind: NotificationKind) -> Vec<String> {
     let kind_vars: &[&str] = match kind {
@@ -202,19 +211,53 @@ pub fn variable_groups() -> Vec<VariableGroup> {
 
 /// The sample of the Examples tab for `kind`; `resolved` gives the recovery of the same episode.
 pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationContext {
-    example_context_at(kind, resolved, "P2")
+    let check = if resolved {
+        CheckSample::Recovered
+    } else {
+        CheckSample::Failing
+    };
+    sample(kind, resolved, "P2", check)
 }
 
-/// The sample with on-call and incident carrying `priority`, so a chosen severity reads through.
+/// The sample for the Playground severity `level`, so its priority and check state read through.
 pub fn example_context_at(
+    kind: NotificationKind,
+    level: Option<AlertLevel>,
+) -> NotificationContext {
+    let check = match level {
+        Some(AlertLevel::Ok) => CheckSample::Recovered,
+        Some(AlertLevel::Warning) => CheckSample::Degraded,
+        Some(AlertLevel::NoData) => CheckSample::Flaky,
+        _ => CheckSample::Failing,
+    };
+    sample(
+        kind,
+        level == Some(AlertLevel::Ok),
+        sample_priority(level),
+        check,
+    )
+}
+
+/// The priority a Playground severity reads as: P1 to P4 in the order the panel lists them.
+pub fn sample_priority(level: Option<AlertLevel>) -> &'static str {
+    match level {
+        Some(AlertLevel::Critical) => "P1",
+        Some(AlertLevel::Warning) => "P2",
+        None | Some(AlertLevel::Ok) => "P3",
+        Some(AlertLevel::NoData) => "P4",
+    }
+}
+
+fn sample(
     kind: NotificationKind,
     resolved: bool,
     priority: &str,
+    check: CheckSample,
 ) -> NotificationContext {
     match kind {
         NotificationKind::Anomaly => anomaly_example(resolved),
         NotificationKind::Incident => incident_example(resolved, priority),
-        NotificationKind::Synthetics => synthetics_example(resolved),
+        NotificationKind::Synthetics => synthetics_example(check),
         NotificationKind::OnCall => on_call_example(resolved, priority),
         NotificationKind::Downtime => downtime_example(resolved),
         _ => {
@@ -322,47 +365,70 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
-fn synthetics_example(resolved: bool) -> NotificationContext {
+fn synthetics_example(check: CheckSample) -> NotificationContext {
     let url = "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme";
-    let level = if resolved {
-        AlertLevel::Ok
-    } else {
-        AlertLevel::Critical
+    let resolved = check == CheckSample::Recovered;
+    let level = match check {
+        CheckSample::Recovered => AlertLevel::Ok,
+        CheckSample::Degraded | CheckSample::Flaky => AlertLevel::Warning,
+        CheckSample::Failing => AlertLevel::Critical,
     };
     let mut ctx = base(NotificationKind::Synthetics, resolved, level);
     ctx.stream_type = "synthetics".into();
     ctx.stream_name = String::new();
     ctx.alert_level = String::new();
-    ctx.alert_status = if resolved { "recovered" } else { "failing" }.into();
     ctx.alert_name = "checkout API".into();
     ctx.alert_url = url.into();
     ctx.episode_id = Some("chk_9d".into());
     ctx.event = event_of(resolved);
     ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
-    let (title, description, label, locations, error) = if resolved {
-        (
+    // (state word, subject, headline, label, raw status, locations, error)
+    let (state, title, description, label, status, locations, error) = match check {
+        CheckSample::Recovered => (
+            "recovered",
             "[OpenObserve Synthetics] ✅ checkout API has RECOVERED",
             "checkout API has recovered",
             "Recovered",
+            "passed",
             "us-east-1, eu-west-1 recovered",
             "",
-        )
-    } else {
-        (
+        ),
+        CheckSample::Degraded => (
+            "degraded",
+            "[OpenObserve Synthetics] 🟡 checkout API is DEGRADED",
+            "checkout API is degraded\nresponse took 4.2s, over the 2s limit",
+            "Degraded",
+            "warning",
+            "1 of 2 slow: us-east-1",
+            "",
+        ),
+        CheckSample::Flaky => (
+            "flaky",
+            "[OpenObserve Synthetics] 🔁 checkout API is FLAKY",
+            "checkout API is flaky\n2 of the last 5 runs failed",
+            "Flaky",
+            "failed",
+            "1 of 2 failed: us-east-1",
+            "connection reset by peer",
+        ),
+        CheckSample::Failing => (
+            "failing",
             "[OpenObserve Synthetics] 🔴 checkout API is FAILED",
             "checkout API is failing\nconnection timed out after 10s",
             "Failing",
+            "failed",
             "1 of 2 failed: us-east-1",
             "connection timed out after 10s",
-        )
+        ),
     };
+    ctx.alert_status = state.into();
     ctx.alert_description = description.into();
     ctx.context_attributes = [
         ("check_id", "chk_9d"),
         ("check_name", "checkout API"),
         ("check_type", "http"),
         ("check_target", "https://shop.acme.com/api/health"),
-        ("check_status", if resolved { "passed" } else { "failed" }),
+        ("check_status", status),
         ("check_status_label", label),
         ("check_status_reason", ""),
         ("check_locations_line", locations),
@@ -371,8 +437,22 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
             "check_consecutive_failures",
             if resolved { "0" } else { "3" },
         ),
-        ("check_flaky", "false"),
-        ("check_degraded", "false"),
+        (
+            "check_flaky",
+            if check == CheckSample::Flaky {
+                "true"
+            } else {
+                "false"
+            },
+        ),
+        (
+            "check_degraded",
+            if check == CheckSample::Degraded {
+                "true"
+            } else {
+                "false"
+            },
+        ),
         ("check_run_id", "run_42"),
         ("check_url", url),
         ("check_error", error),

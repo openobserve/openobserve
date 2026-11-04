@@ -263,6 +263,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="variableGuideOpen"
             data-test="add-template-variable-guide-collapsible"
           >
+            <div v-if="editorMode === 'custom'" class="px-1 pt-3">
+              <OSelect
+                v-model="guideKind"
+                :label="t('alert_templates.previewKind')"
+                :options="guideKindOptions"
+                width="sm"
+                :searchable="false"
+                data-test="add-template-variable-guide-kind-select"
+              />
+            </div>
             <div
               v-for="group in shownVariableGroups"
               :key="group.name"
@@ -518,13 +528,26 @@ const resetAppliesTo = () => {
 const variableGroups = ref<VariableGroup[]>([]);
 // The playground's Kind; the panel only offers kinds inside Applies to, so it narrows that list.
 const previewKind = ref<NotificationKind>("alert");
+// Custom mode has no playground, so the guide has its own Kind; ALL_KINDS shows every kind applied to.
+const guideKind = ref<NotificationKind | typeof ALL_KINDS>(ALL_KINDS);
+const guideKinds = computed<NotificationKind[]>(() =>
+  appliesTo.value.length ? appliesTo.value : [...NOTIFICATION_KINDS],
+);
+const guideKindOptions = computed(() => [
+  { label: t("alert_templates.appliesToAll"), value: ALL_KINDS },
+  ...guideKinds.value.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+]);
+watch(guideKinds, (kinds) => {
+  if (guideKind.value !== ALL_KINDS && !kinds.includes(guideKind.value))
+    guideKind.value = ALL_KINDS;
+});
 const shownVariableGroups = computed(() => {
   const kinds: string[] =
     editorMode.value === "content"
       ? [previewKind.value]
-      : appliesTo.value.length
-        ? appliesTo.value
-        : [...NOTIFICATION_KINDS];
+      : guideKind.value === ALL_KINDS
+        ? guideKinds.value
+        : [guideKind.value];
   return variableGroups.value.filter(
     (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
   );
@@ -538,8 +561,16 @@ const variableGroupLabel = (name: string) =>
 
 // Custom mode has no preview panel, so the guide's groups come from one preview call.
 const store = useStore();
-const loadVariableGroups = async () => {
-  if (variableGroups.value.length) return;
+// Mount and a later switch to custom mode can both ask, so one call serves both.
+let variableGroupsLoad: Promise<void> | null = null;
+const loadVariableGroups = () => {
+  if (variableGroups.value.length) return Promise.resolve();
+  variableGroupsLoad ??= fetchVariableGroups().finally(() => {
+    variableGroupsLoad = null;
+  });
+  return variableGroupsLoad;
+};
+const fetchVariableGroups = async () => {
   try {
     const res = await templateService.preview({
       org_identifier: store.state.selectedOrganization?.identifier,
@@ -909,8 +940,8 @@ const templateDraft = useEditorDraft<TemplateDraftData>({
 });
 
 onMounted(async () => {
-  // The content preview panel emits the groups itself; only custom mode needs the call.
-  if (editorMode.value === "custom") loadVariableGroups();
+  // A clone or an edit can reach custom mode after mount, so the guide's groups load either way.
+  loadVariableGroups();
   if (draftsActive) await templateDraft.start();
 });
 
