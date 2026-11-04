@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="session.welcomeOpen.value"
     size="xl"
+    :aria-title="headerTitle"
     :show-close="false"
     data-test="sample-welcome-dialog"
     @update:open="(open) => !open && dismiss()"

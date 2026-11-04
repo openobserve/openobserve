@@ -295,6 +295,13 @@ describe("SampleDataWelcome finish", () => {
     expect(session.welcomeOpen.value).toBe(true);
   });
 
+  it("names the dialog after its visible title", async () => {
+    await mountAtHome();
+    const id = wrapper!.findComponent(DialogContent).attributes("aria-labelledby");
+    expect(wrapper!.find(`#${id}`).text()).toBe(byTest("sample-welcome-title").text());
+    expect(wrapper!.find(`#${id}`).text()).not.toBe("Dialog");
+  });
+
   describe("a source pick", () => {
     it.each(CHIP_ROUTES)("chip %s sends that source and opens %s", async (id, route) => {
       await mountAtHome();
