@@ -65,10 +65,19 @@ fn looks_like_json(tpl: &str) -> bool {
     let mut chars = tpl.trim_start().chars();
     match chars.next() {
         // `[prod] {alert_name}` is text; an array opens with a value.
-        Some('[') => matches!(
-            chars.find(|c| !c.is_whitespace()),
-            Some('{' | '"' | '[' | ']' | '-' | '0'..='9')
-        ),
+        Some('[') => {
+            let rest = chars.as_str().trim_start();
+            let literal = ["null", "true", "false"].iter().any(|word| {
+                rest.strip_prefix(word).is_some_and(|after| {
+                    !after.starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                })
+            });
+            literal
+                || matches!(
+                    rest.chars().next(),
+                    Some('{' | '"' | '[' | ']' | '-' | '0'..='9')
+                )
+        }
         Some('{') => matches!(chars.find(|c| !c.is_whitespace()), Some('"' | '}')),
         _ => false,
     }
@@ -292,6 +301,12 @@ pub(crate) fn apply_custom_template_plain(
             // Another kind's JSON body: real JSON string escaping, as for its scalars.
             scan_and_replace_var(&mut resp, key, |len| {
                 json_string_contents(&VarValue::Str(value).to_string_with_length(len, true))
+            });
+        } else if ctx.kind != NotificationKind::Alert && !is_email {
+            // Another kind's plain text body, such as an SNS message, gets its attributes as
+            // written.
+            scan_and_replace_var(&mut resp, key, |len| {
+                VarValue::Str(value).to_string_with_length(len, true)
             });
         } else {
             process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
@@ -628,6 +643,17 @@ mod golden {
         assert_eq!(
             apply_custom_template("[prod] {alert_name}", &ctx, false),
             "[prod] Nightly \"deploy\" <db>"
+        );
+        assert!(looks_like_json("[true, \"{alert_name}\"]"));
+        assert!(looks_like_json("[ null ]"));
+        assert!(!looks_like_json("[test] {alert_name}"));
+        let sns = NotificationContext {
+            context_attributes: vec![("check_error".into(), "timed \"out\"\nnow".into())],
+            ..ctx.clone()
+        };
+        assert_eq!(
+            apply_custom_template("error: {check_error}", &sns, false),
+            "error: timed \"out\"\nnow"
         );
         // A plain text body, such as an SNS message, gets the values as written.
         assert_eq!(

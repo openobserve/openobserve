@@ -87,10 +87,7 @@ pub enum TemplateError {
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
-    // Only reserved and retired names are ever renamed, so other lookups skip the alias reads.
-    let renamable = table::templates::is_reserved_default_name(name)
-        || table::templates::RETIRED_DEFAULT_NAMES.contains(&name);
-    if !renamable {
+    if !follows_alias(name) {
         return get_shared(org_id, name).await;
     }
     // A node whose destination or alert cache predates a rename still asks for the old name: the
@@ -112,6 +109,14 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
         },
         found => found,
     }
+}
+
+/// Only reserved and retired names are ever renamed, so other lookups skip the alias reads; the
+/// system owns prebuilt_default now, so a new binding to it reads the system row.
+fn follows_alias(name: &str) -> bool {
+    (table::templates::is_reserved_default_name(name)
+        || table::templates::RETIRED_DEFAULT_NAMES.contains(&name))
+        && name != table::templates::DEFAULT_TEMPLATE_NAME
 }
 
 /// The org's row, else the shared default org's row of that name.
@@ -579,6 +584,16 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn only_a_retired_or_reserved_user_name_follows_its_rename() {
+        assert!(!follows_alias("prebuilt_default"));
+        assert!(!follows_alias("prebuilt_slack"));
+        assert!(!follows_alias("ops-card"));
+        assert!(follows_alias("o2_default_content"));
+        assert!(follows_alias("o2_default_mine"));
+        assert!(follows_alias("prebuilt_downtime"));
+    }
 
     fn seed_destination(org_id: &str, name: &str, template: &str) {
         DESTINATIONS.insert(
