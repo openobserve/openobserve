@@ -346,9 +346,9 @@ const DESTINATION_ICON: Record<string, IconName> = {
   awss3: "inventory-2",
 };
 
-const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input", e: "send" };
+const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input" };
 
-// An exporter failing at least this share of its items, or a receiver refusing it, is rung like its issue.
+// A destination failing at least this share of its items, or a receiver refusing it, is rung like its issue.
 const ISSUE_RATIO = 0.01;
 const QUEUE_WARNING = 0.8;
 
@@ -574,13 +574,13 @@ function nodeSignal(n: MapNode): FlowSignal {
 
 function nodeLabel(n: MapNode): I18nText {
   if (n.column === "fleet") return raw(fleetName(n.name));
-  if (n.column === "destination") return destinationLabel(n.name);
+  if (n.column === "destination" || n.column === "sink") return destinationLabel(n.name);
   return raw(n.name);
 }
 
 function nodeRing(n: MapNode): PathSeverity | undefined {
-  if (n.column === "exporter") {
-    if (ratio(n.failed, n.rate) >= ISSUE_RATIO || n.dropped > 0) return "error";
+  if (n.column === "destination") {
+    if (n.failedRatio >= ISSUE_RATIO || n.dropped > 0) return "error";
     if ((n.queue ?? 0) >= QUEUE_WARNING) return "warning";
   }
   if (n.column === "receiver" && ratio(n.refused, n.rate) >= ISSUE_RATIO) return "warning";
@@ -623,7 +623,7 @@ function nodeData(n: MapNode): FleetFlowNodeData {
     compact: !destination,
     selected: sel?.kind === "node" && sel.id === n.id,
     inbound: true,
-    outbound: !destination,
+    outbound: !destination || n.failed > 0 || n.dropped > 0,
     ring: nodeRing(n),
   };
 }

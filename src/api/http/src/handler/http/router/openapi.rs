@@ -960,6 +960,7 @@ use crate::{
             config::meta::fleet::ValidationFailed,
             config::meta::fleet::AuditEvent,
             config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
             config::meta::fleet::DeliveryState,
             config::meta::fleet::RolloutStart,
             config::meta::fleet::Batching,

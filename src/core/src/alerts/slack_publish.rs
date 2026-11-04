@@ -115,6 +115,7 @@ pub fn unavailable_reason(org_id: &str) -> Option<String> {
                 "Slack is not available on super-cluster deployments".to_string()
             }
             DisabledReason::Edition => "Slack app needs Enterprise".to_string(),
+            DisabledReason::License => "Slack app is not included in your license".to_string(),
             DisabledReason::Flag | DisabledReason::MasterKey => {
                 "Slack is turned off on this deployment".to_string()
             }

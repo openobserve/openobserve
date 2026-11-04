@@ -18,7 +18,7 @@ import { auditKind } from "./auditKind";
 
 describe("auditKind", () => {
   it("files each action under what it acted on", () => {
-    expect(auditKind("fleet.audit.setDesired")).toBe("rollout");
+    expect(auditKind("fleet.audit.setDesired")).toBe("fleet");
     expect(auditKind("fleet.audit.autoRollback")).toBe("rollout");
     expect(auditKind("fleet.audit.publishedVersion")).toBe("configuration");
     expect(auditKind("fleet.audit.movedByToken")).toBe("collector");
@@ -29,6 +29,7 @@ describe("auditKind", () => {
 
   it("keeps an action it does not know under other, with or without the key prefix", () => {
     expect(auditKind("fleet.audit.someFutureAction")).toBe("other");
+    expect(auditKind("fleet.audit.assignedFleetConfig")).toBe("other");
     expect(auditKind("createdToken")).toBe("token");
   });
 });

@@ -438,11 +438,37 @@ pub struct AuditList {
     pub audit_disabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct AuditQuery {
+    /// Epoch milliseconds; defaults to 30 days before `to`.
     pub from: Option<i64>,
+    /// Epoch milliseconds, exclusive; defaults to now.
     pub to: Option<i64>,
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Only this fleet's events, which leaves out org-wide ones.
+    #[serde(default)]
+    pub fleet: Option<String>,
+    #[serde(default)]
+    pub module: Option<AuditModule>,
+    /// Matches the actor or the target, ignoring case.
+    #[serde(default)]
+    pub q: Option<String>,
+}
+
+/// The part of the fleet API an event was made through; `settings` is the org's fleet settings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditModule {
+    Collectors,
+    Tokens,
+    Fleets,
+    Rollouts,
+    Configs,
+    Settings,
 }
 
 /// Per-fleet overrides; `None` inherits the organization default.
