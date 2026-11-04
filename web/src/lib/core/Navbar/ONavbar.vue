@@ -26,8 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-o2-navbar
     :data-overflow-top="overflowTop ? 'true' : undefined"
     :data-overflow-bottom="overflowBottom ? 'true' : undefined"
-    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto pb-1 data-overflow-bottom:mask-b-from-[calc(100%-3rem)] data-overflow-top:mask-t-from-[calc(100%-3rem)] max-md:w-full"
-    :class="overlay ? 'fixed inset-y-0 left-0 z-40 shadow-lg' : 'shrink-0'"
+    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto data-overflow-bottom:mask-b-from-[calc(100%-3rem)] data-overflow-top:mask-t-from-[calc(100%-3rem)] max-md:w-full"
+    :class="[
+      overlay ? 'fixed inset-y-0 left-0 z-40 shadow-lg' : 'shrink-0',
+      connectedTab ? 'relative z-10 -me-px box-content bg-clip-content pe-px' : 'pb-1',
+    ]"
     @keydown="handleKeydown"
     @scroll.passive="updateOverflow"
     @click.capture="markRailNavigation"
@@ -40,10 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="relative flex min-h-0 flex-1 flex-col gap-y-1">
-      <!-- Single sliding-selection pill: tracks the active rail tile and slides to
-           it on navigation. Active MenuLinks defer their fill to this (see
-           RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
+    <div
+      class="relative flex min-h-0 flex-1 flex-col gap-y-1"
+      :class="connectedTab ? 'pt-3 after:h-2 after:shrink-0' : undefined"
+    >
+      <!-- Single selection pill: tracks the active rail tile and fades in on it on
+           navigation. Active MenuLinks defer their fill to this (see
+           RailIndicatorActiveKey). Snaps (no fade) on mount/reflow/reveal. -->
       <div ref="indicatorRef" aria-hidden="true" :class="indicatorClass" :style="indicatorStyle" />
       <div
         v-if="loading"
@@ -153,6 +159,8 @@ const { t } = useI18nTyped();
 
 // Fade and reveal are desktop-rail only: the drawer keeps its scroll where the user left it.
 const { isMobile } = useBreakpoint();
+// The phone drawer and overlay rail don't sit against the content card, so there is nothing to join.
+const connectedTab = computed(() => !isMobile.value && !props.overlay);
 
 const { isPaywalled } = useTrialPaywall();
 
@@ -179,11 +187,11 @@ const bottomEntries = computed(
     >[],
 );
 
-// ── Sliding-selection pill ──────────────────────────────────────────────────
-// One indicator tracks the active rail tile (.nav-menu-item--active) and slides
-// to it when the route changes. Same approach as OToggleGroup: animate only real
-// selection changes; snap on mount, reflow and reveal; skip measuring while the
-// rail is hidden so a bogus 0-position is never stored.
+// ── Selection pill ──────────────────────────────────────────────────────────
+// One indicator tracks the active rail tile (.nav-menu-item--active) and fades in
+// on it when the route changes: animate only real selection changes; snap on mount,
+// reflow and reveal; skip measuring while the rail is hidden so a bogus 0-position
+// is never stored.
 const router: any = useRouter();
 
 const navRef = ref<HTMLElement | null>(null);
@@ -191,9 +199,14 @@ const indicatorRef = ref<HTMLElement | null>(null);
 const indicatorStyle = ref<Record<string, string>>({});
 const indicatorVisible = ref(false);
 const hasValidPosition = ref(false);
-const transitionOn = ref(false);
+const tabAtTop = ref(false);
 
 let resizeObserver: ResizeObserver | null = null;
+
+const fadeIndicatorIn = (indicator: HTMLElement) => {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  indicator.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+};
 
 const measure = (animated: boolean) => {
   const indicator = indicatorRef.value;
@@ -215,13 +228,20 @@ const measure = (animated: boolean) => {
     return;
   }
 
-  transitionOn.value = animated && hasValidPosition.value;
+  // The first tile starts where the card's curved corner ends, so a flare above it would poke past the card.
+  tabAtTop.value = activeRect.top - listRect.top < 16;
+  const transform = `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`;
+  // Pages mirroring state into the query re-measure the same tile, which must not flicker.
+  if (animated && hasValidPosition.value && indicatorStyle.value.transform !== transform) {
+    fadeIndicatorIn(indicator);
+  }
   hasValidPosition.value = true;
   indicatorVisible.value = true;
   indicatorStyle.value = {
-    width: `${activeRect.width}px`,
+    // One pixel past the rail so the tab covers the content card's border where they join.
+    width: `${connectedTab.value ? listRect.right - activeRect.left + 1 : activeRect.width}px`,
     height: `${activeRect.height}px`,
-    transform: `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`,
+    transform,
   };
 };
 
@@ -304,7 +324,7 @@ function onRailFocusin(event: FocusEvent) {
   applyReveal(tile);
 }
 
-// Slide to the newly-active tile when the route changes …
+// Fade in on the newly-active tile when the route changes …
 watch(
   () => router.currentRoute.value.fullPath,
   async () => {
@@ -335,7 +355,7 @@ onMounted(async () => {
     updateOverflow();
     revealActiveTile();
   });
-  // … but snap (not slide) when tile sizes/visibility change — reflow, the rail
+  // … but snap (no fade) when tile sizes/visibility change — reflow, the rail
   // being revealed, labels rewrapping — none of which are user selections.
   const list = indicatorRef.value?.parentElement;
   if (list && typeof ResizeObserver !== "undefined") {
@@ -360,14 +380,15 @@ onBeforeUnmount(() => {
 // tinted selected pill + lighter accent in dark, where a white pill would vanish
 // on the near-black rail.
 const indicatorClass = computed(() => [
-  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border border-accent",
-  "bg-surface-base shadow-xs dark:bg-tabs-active-bg dark:shadow-none",
-  transitionOn.value &&
-    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+  "pointer-events-none absolute left-0 top-0 z-0",
+  connectedTab.value
+    ? "rounded-s-surface border border-e-0 border-nav-tab-edge bg-nav-tab-fill before:absolute before:end-px before:bottom-full before:size-3 before:nav-tab-concave-top after:absolute after:end-px after:top-full after:size-3 after:nav-tab-concave-bottom"
+    : "rounded-surface border border-accent bg-surface-base shadow-xs dark:bg-tabs-active-bg dark:shadow-none",
+  connectedTab.value && tabAtTop.value && "before:hidden",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 
-// Tiles read this to know whether to defer their fill to the sliding pill.
+// Tiles read this to know whether to defer their fill to the selection pill.
 provide(
   RailIndicatorActiveKey,
   computed(() => indicatorVisible.value),

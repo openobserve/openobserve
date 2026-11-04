@@ -247,6 +247,8 @@
   --color-tabs-active-text: var(--color-white);
   --color-tabs-hover-bg: var(--d-hover);
   --color-tabs-rail-hover-bg: var(--color-grey-800);
+  --color-nav-tab-edge: var(--color-border-default);
+  --color-nav-tab-fill: var(--color-surface-panel);
   --color-tabs-bar-border: var(--color-grey-700);
   --color-nav-label-accent: var(--color-accent);
 

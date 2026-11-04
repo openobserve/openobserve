@@ -217,3 +217,30 @@
   background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
   background-size: 1.125rem 1.125rem;
 }
+
+/* ── Connected nav tab ──────────────────────────
+   The concave corners where the selected rail tab flares into the content card. */
+@utility nav-tab-concave-top {
+  background-image: radial-gradient(
+    circle at 0 0,
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab edge is one device pixel */
+      transparent calc(var(--radius-surface) - 1px),
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab edge is one device pixel */
+      var(--color-nav-tab-edge) calc(var(--radius-surface) - 1px),
+    var(--color-nav-tab-edge) var(--radius-surface),
+    /* eslint-disable-next-line local/no-hardcoded-px -- sub-pixel ramp that anti-aliases the curve */
+      var(--color-nav-tab-fill) calc(var(--radius-surface) + 0.5px)
+  );
+}
+@utility nav-tab-concave-bottom {
+  background-image: radial-gradient(
+    circle at 0 100%,
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab edge is one device pixel */
+      transparent calc(var(--radius-surface) - 1px),
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab edge is one device pixel */
+      var(--color-nav-tab-edge) calc(var(--radius-surface) - 1px),
+    var(--color-nav-tab-edge) var(--radius-surface),
+    /* eslint-disable-next-line local/no-hardcoded-px -- sub-pixel ramp that anti-aliases the curve */
+      var(--color-nav-tab-fill) calc(var(--radius-surface) + 0.5px)
+  );
+}

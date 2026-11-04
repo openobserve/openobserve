@@ -202,6 +202,8 @@
   --color-tabs-hover-text: var(--color-text-heading);
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-rail-hover-bg: var(--color-grey-150);
+  --color-nav-tab-edge: transparent;
+  --color-nav-tab-fill: var(--color-surface-base);
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --spacing-tabs-height: var(--spacing-10);
@@ -1532,6 +1534,8 @@
   --color-tabs-hover-text: var(--color-tabs-hover-text);
   --color-tabs-hover-bg: var(--color-tabs-hover-bg);
   --color-tabs-rail-hover-bg: var(--color-tabs-rail-hover-bg);
+  --color-nav-tab-edge: var(--color-nav-tab-edge);
+  --color-nav-tab-fill: var(--color-nav-tab-fill);
   --color-tabs-disabled-text: var(--color-tabs-disabled-text);
   --color-tabs-bar-border: var(--color-tabs-bar-border);
   --spacing-tabs-height: var(--spacing-tabs-height);
