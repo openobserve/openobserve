@@ -25,7 +25,7 @@ use datafusion::{
 };
 use parking_lot::Mutex;
 use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
-pub use search::datafusion::plan_metrics::{get_cluster_metrics, get_peak_memory_from_ctx};
+pub use search::datafusion::plan_metrics::get_peak_memory_from_ctx;
 
 pub fn get_scan_stats(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
     let mut visitor = RemoteScanVisitor::new();
@@ -153,12 +153,6 @@ mod tests {
     fn test_get_scan_stats_no_remote_exec_returns_none() {
         let plan = empty_plan();
         assert!(get_scan_stats(&plan).is_none());
-    }
-
-    #[test]
-    fn test_get_cluster_metrics_no_remote_exec_returns_empty() {
-        let plan = empty_plan();
-        assert!(get_cluster_metrics(&plan).is_empty());
     }
 
     #[test]

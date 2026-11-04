@@ -43,9 +43,14 @@
 //! A plan with several remote scans, such as a join of two streams, has one
 //! `remote` list per scan, so the same node appears once under each of them.
 //!
-//! Each plan appears exactly once: a node takes its callees' plans out of the
-//! metrics it receives before it forwards those metrics upstream, so only the
-//! node's own metrics entry carries a plan.
+//! Each plan appears exactly once: a node sends back only its own plan, and its
+//! caller stores it under the remote scan that made the call.
+//!
+//! The leader also renders the text rows of EXPLAIN ANALYZE from this tree, one per
+//! node that sent back its plan, which is why `ProfileMetric::display` keeps each
+//! value exactly as DataFusion prints it.
+
+use std::fmt::Write;
 
 use config::meta::search::ScanStats;
 use serde::{Deserialize, Serialize};
@@ -72,6 +77,37 @@ pub struct ProfileNode {
     pub inputs: ProfileInputs,
 }
 
+impl ProfileNode {
+    /// Renders the EXPLAIN ANALYZE text of the plan this node heads, stopping at remote scans.
+    pub fn to_text(&self) -> String {
+        let mut out = String::new();
+        self.write_text(&mut out, 0);
+        out
+    }
+
+    fn write_text(&self, out: &mut String, indent: usize) {
+        let metrics = self
+            .metrics
+            .iter()
+            .map(|m| format!("{}={}", m.name, m.display))
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(
+            out,
+            "{:indent$}{}, metrics=[{metrics}]",
+            "",
+            self.detail,
+            indent = indent * 2
+        )
+        .expect("write to String");
+        if let ProfileInputs::Children(children) = &self.inputs {
+            for child in children {
+                child.write_text(out, indent + 1);
+            }
+        }
+    }
+}
+
 /// Where a node's input came from; serialized as a `children` or a `remote` key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -96,6 +132,9 @@ pub struct ProfileMetric {
     pub value: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
+    /// The value as DataFusion prints it, such as `1.20 MB` or `100 total → 20 matched`.
+    #[serde(default)]
+    pub display: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -148,6 +187,7 @@ mod tests {
                 kind: MetricKind::Count,
                 value: 1,
                 total: None,
+                display: "1".to_string(),
             }],
             ..Default::default()
         };
@@ -178,5 +218,34 @@ mod tests {
             panic!("expected remote inputs");
         };
         assert_eq!(remote[0].node_name, "q-0");
+    }
+
+    #[test]
+    fn test_to_text_indents_children_and_stops_at_remote() {
+        let metric = |name: &str, display: &str| ProfileMetric {
+            name: name.to_string(),
+            display: display.to_string(),
+            ..Default::default()
+        };
+        let node = ProfileNode {
+            detail: "SortExec: expr=[a@0 ASC]".to_string(),
+            metrics: vec![metric("output_rows", "3"), metric("spilled_bytes", "0.0 B")],
+            inputs: ProfileInputs::Children(vec![ProfileNode {
+                detail: "RemoteScanExec: partitions=2".to_string(),
+                inputs: ProfileInputs::Remote(vec![RemoteNodeProfile {
+                    plan: Some(ProfileNode {
+                        detail: "FilterExec".to_string(),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        assert_eq!(
+            node.to_text(),
+            "SortExec: expr=[a@0 ASC], metrics=[output_rows=3, spilled_bytes=0.0 B]\n  RemoteScanExec: partitions=2, metrics=[]\n"
+        );
     }
 }

@@ -101,7 +101,6 @@ message SearchInfo {
     bool                       is_analyze = 9;
     optional SamplingConfig sampling_config = 10;
     bool                      clear_cache = 11;
-    bool                  analyze_profile = 12;
 }
 
 message IndexInfo {

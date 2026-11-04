@@ -49,10 +49,7 @@ use crate::handler::grpc::{
     MetadataMap,
     flight::{
         stream::{FlightEncoderStreamBuilder, MAX_FLIGHT_DATA_SIZE},
-        visitor::{
-            get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
-            get_scan_stats,
-        },
+        visitor::{get_partial_err, get_peak_memory, get_peak_memory_from_ctx, get_scan_stats},
     },
 };
 
@@ -179,12 +176,7 @@ impl FlightService for FlightServiceImpl {
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
         let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
             plan: plan.clone(),
-            is_super_cluster,
-            func: Box::new(super_cluster_enabled),
-            build_profile: req
-                .search_info
-                .analyze_profile
-                .then_some(profile::build_profile as _),
+            build_profile: profile::build_profile,
         });
 
         // Get the peak memory usage from the memory pool
@@ -193,7 +185,6 @@ impl FlightService for FlightServiceImpl {
 
         // used for super cluster follower leader to get information from follower node
         let scan_stats_ref = get_scan_stats(&plan);
-        let metrics_ref = get_cluster_metrics(&plan);
         let peak_memory_ref = get_peak_memory(&plan);
         let partial_err_ref = get_partial_err(&plan);
 
@@ -214,7 +205,6 @@ impl FlightService for FlightServiceImpl {
                 .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
                 .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
                 .with_custom_message(PreCustomMessage::Metrics(metrics))
-                .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
                 .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
                 .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
                 .with_custom_message(PreCustomMessage::PartialErrRefEarly(
@@ -374,16 +364,6 @@ fn clear_session_data(trace_id: &str) {
     log::info!("Cleared session for trace_id: {trace_id}");
 }
 
-#[cfg(feature = "enterprise")]
-fn super_cluster_enabled() -> bool {
-    get_o2_config().super_cluster.enabled
-}
-
-#[cfg(not(feature = "enterprise"))]
-fn super_cluster_enabled() -> bool {
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,10 +371,5 @@ mod tests {
     #[test]
     fn test_flight_service_impl_default() {
         let _impl = FlightServiceImpl;
-    }
-
-    #[test]
-    fn test_super_cluster_disabled_in_oss() {
-        assert!(!super_cluster_enabled());
     }
 }

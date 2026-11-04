@@ -39,7 +39,7 @@ pub fn optimize_distribute_analyze(
             profile,
             analyze.input().clone(),
         )) as Arc<dyn ExecutionPlan>;
-        let mut rewriter = AnalyzeRewrite::new(profile);
+        let mut rewriter = AnalyzeRewrite::new();
         let plan = distribute_analyze.rewrite(&mut rewriter)?.data;
         return Ok(plan);
     }
@@ -47,13 +47,11 @@ pub fn optimize_distribute_analyze(
 }
 
 #[derive(Debug)]
-struct AnalyzeRewrite {
-    profile: bool,
-}
+struct AnalyzeRewrite {}
 
 impl AnalyzeRewrite {
-    fn new(profile: bool) -> Self {
-        AnalyzeRewrite { profile }
+    fn new() -> Self {
+        AnalyzeRewrite {}
     }
 }
 
@@ -62,8 +60,7 @@ impl TreeNodeRewriter for AnalyzeRewrite {
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
         if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
-            let remote =
-                Arc::new(remote.clone().set_analyze(self.profile)) as Arc<dyn ExecutionPlan>;
+            let remote = Arc::new(remote.clone().set_analyze()) as Arc<dyn ExecutionPlan>;
             return Ok(Transformed::yes(remote));
         }
         Ok(Transformed::no(node))
@@ -120,13 +117,9 @@ mod tests {
             )
             .unwrap(),
         ) as Arc<dyn ExecutionPlan>;
-        let rewrite = |profile| {
-            let mut rewriter = AnalyzeRewrite::new(profile);
-            let plan = plan.clone().rewrite(&mut rewriter).unwrap().data;
-            let remote_scan = plan.downcast_ref::<RemoteScanExec>().unwrap();
-            (remote_scan.analyze(), remote_scan.analyze_profile())
-        };
-        assert_eq!(rewrite(false), (true, false));
-        assert_eq!(rewrite(true), (true, true));
+        let mut rewriter = AnalyzeRewrite::new();
+        let plan = plan.rewrite(&mut rewriter).unwrap().data;
+        let remote_scan = plan.downcast_ref::<RemoteScanExec>().unwrap();
+        assert!(remote_scan.analyze());
     }
 }

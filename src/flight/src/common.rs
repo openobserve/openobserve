@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    fmt,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 use arrow::array::RecordBatch;
@@ -31,8 +28,7 @@ use config::{
 use datafusion::{
     self,
     physical_plan::{
-        DisplayFormatType, ExecutionPlan,
-        display::DisplayableExecutionPlan,
+        ExecutionPlan,
         metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
     },
 };
@@ -117,11 +113,13 @@ pub enum CustomMessage {
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
+    /// Unused; kept, like `metrics`, so that older leaders can still parse the message.
     pub stage: i32,
     pub node_address: String,
     pub node_name: String,
+    /// Left empty: the leader renders the text plan from `profile`.
     pub metrics: String,
-    /// Older nodes do not send it, so the leader falls back to the text plan.
+    /// The plan this node ran; older nodes do not send it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<ProfileNode>,
 }
@@ -134,8 +132,6 @@ pub enum PreCustomMessage {
     ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
     // physical plan, is_super_cluster
     Metrics(Option<MetricsInfo>),
-    // use for super cluster follower leader
-    MetricsRef(Vec<Arc<Mutex<Vec<Metrics>>>>),
     // use for storing memory pool reference to extract peak later
     PeakMemoryRef(Option<Arc<AtomicUsize>>),
     // sent before first batch (early signal for fast-failing nodes)
@@ -146,9 +142,8 @@ pub enum PreCustomMessage {
 
 pub struct MetricsInfo {
     pub plan: Arc<dyn ExecutionPlan>,
-    pub is_super_cluster: bool,
-    pub func: Box<dyn Fn() -> bool + Send>,
-    pub build_profile: Option<fn(&dyn ExecutionPlan) -> ProfileNode>,
+    /// Passed in because it lives in the search crate, which depends on this one.
+    pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
 }
 
 impl PreCustomMessage {
@@ -170,10 +165,6 @@ impl PreCustomMessage {
             PreCustomMessage::Metrics(metrics_ref) => metrics_ref
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
-            PreCustomMessage::MetricsRef(metrics) => {
-                let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
-                (!metrics.is_empty()).then_some(CustomMessage::Metrics(metrics))
-            }
             PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
                 .as_ref()
                 .map(|peak| CustomMessage::PeakMemory(peak.load(Ordering::Relaxed))),
@@ -192,69 +183,12 @@ impl PreCustomMessage {
 
 // collect metrics from physical plan
 fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
-    let plan = &metrics_info.plan;
-    let is_super_cluster = metrics_info.is_super_cluster;
-    let func = &metrics_info.func;
-    let plan_with_metrics = if is_super_cluster {
-        format_leader_plan(plan.as_ref())
-    } else {
-        DisplayableExecutionPlan::with_metrics(plan.as_ref())
-            .set_show_statistics(false)
-            .indent(false)
-            .to_string()
-    };
-    let stage = if func() {
-        if is_super_cluster { 1 } else { 2 }
-    } else {
-        1
-    };
     vec![Metrics {
-        stage,
         node_address: LOCAL_NODE.get_grpc_addr().to_string(),
         node_name: LOCAL_NODE.get_name().to_string(),
-        metrics: plan_with_metrics,
-        profile: metrics_info.build_profile.map(|build| build(plan.as_ref())),
+        profile: Some((metrics_info.build_profile)(metrics_info.plan.as_ref())),
+        ..Default::default()
     }]
-}
-
-fn format_leader_plan(plan: &dyn ExecutionPlan) -> String {
-    let mut output = String::new();
-    write_plan(&mut output, plan, 0);
-    output
-}
-
-struct PlanDisplay<'a>(&'a dyn ExecutionPlan);
-
-impl fmt::Display for PlanDisplay<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt_as(DisplayFormatType::Default, f)
-    }
-}
-
-fn write_plan(output: &mut String, plan: &dyn ExecutionPlan, indent: usize) {
-    use fmt::Write;
-
-    write!(output, "{:indent$}", "", indent = indent * 2).expect("write to String");
-    write!(output, "{}", PlanDisplay(plan)).expect("write to String");
-
-    if let Some(metrics) = plan.metrics() {
-        let metrics = metrics
-            .aggregate_by_name()
-            .sorted_for_display()
-            .timestamps_removed();
-        write!(output, ", metrics=[{metrics}]").expect("write to String");
-    } else {
-        write!(output, ", metrics=[]").expect("write to String");
-    }
-    writeln!(output).expect("write to String");
-
-    if plan.name() == "RemoteScanExec" {
-        return;
-    }
-
-    for child in plan.children() {
-        write_plan(output, child.as_ref(), indent + 1);
-    }
 }
 
 #[cfg(test)]
@@ -263,13 +197,7 @@ mod tests {
 
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
-    use datafusion::{
-        common::Result,
-        execution::{SendableRecordBatchStream, TaskContext},
-        physical_plan::{
-            DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, empty::EmptyExec,
-        },
-    };
+    use datafusion::physical_plan::{ExecutionPlan, empty::EmptyExec};
     use parking_lot::Mutex;
 
     use super::*;
@@ -304,65 +232,6 @@ mod tests {
         Arc::new(EmptyExec::new(schema))
     }
 
-    #[derive(Debug)]
-    struct NamedExec {
-        name: &'static str,
-        inner: Arc<dyn ExecutionPlan>,
-    }
-
-    impl DisplayAs for NamedExec {
-        fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(f, "{}", self.name)
-        }
-    }
-
-    impl ExecutionPlan for NamedExec {
-        fn apply_expressions(
-            &self,
-            _f: &mut dyn FnMut(
-                &Arc<dyn datafusion::physical_expr::PhysicalExpr>,
-            ) -> datafusion::common::Result<
-                datafusion::common::tree_node::TreeNodeRecursion,
-            >,
-        ) -> datafusion::common::Result<datafusion::common::tree_node::TreeNodeRecursion> {
-            Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
-        }
-
-        fn name(&self) -> &'static str {
-            self.name
-        }
-
-        fn properties(&self) -> &Arc<PlanProperties> {
-            self.inner.properties()
-        }
-
-        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
-            vec![&self.inner]
-        }
-
-        fn with_new_children(
-            self: Arc<Self>,
-            _children: Vec<Arc<dyn ExecutionPlan>>,
-        ) -> Result<Arc<dyn ExecutionPlan>> {
-            unimplemented!()
-        }
-
-        fn execute(
-            &self,
-            _partition: usize,
-            _context: Arc<TaskContext>,
-        ) -> Result<SendableRecordBatchStream> {
-            unimplemented!()
-        }
-    }
-
-    fn create_named_test_execution_plan(
-        name: &'static str,
-        inner: Arc<dyn ExecutionPlan>,
-    ) -> Arc<dyn ExecutionPlan> {
-        Arc::new(NamedExec { name, inner })
-    }
-
     #[test]
     fn test_metrics_default() {
         let metrics = Metrics::default();
@@ -391,10 +260,6 @@ mod tests {
 
         // Test Metrics variant (should be false)
         let pre_msg = PreCustomMessage::Metrics(None);
-        assert!(!pre_msg.is_early_emit());
-
-        // Test MetricsRef variant (should be false)
-        let pre_msg = PreCustomMessage::MetricsRef(vec![]);
         assert!(!pre_msg.is_early_emit());
     }
 
@@ -443,9 +308,7 @@ mod tests {
         let plan = create_test_execution_plan();
         let metrics_info = MetricsInfo {
             plan,
-            is_super_cluster: false,
-            func: Box::new(|| true),
-            build_profile: Some(test_profile),
+            build_profile: test_profile,
         };
 
         let pre_msg = PreCustomMessage::Metrics(Some(metrics_info));
@@ -454,10 +317,9 @@ mod tests {
         match custom_msg {
             CustomMessage::Metrics(metrics) => {
                 assert_eq!(metrics.len(), 1);
-                assert_eq!(metrics[0].stage, 2); // func() returns true, is_super_cluster is false
                 assert!(!metrics[0].node_address.is_empty());
                 assert!(!metrics[0].node_name.is_empty());
-                assert!(!metrics[0].metrics.is_empty());
+                assert_eq!(metrics[0].profile.as_ref().unwrap().name, "EmptyExec");
             }
             _ => panic!("Expected Metrics variant"),
         }
@@ -471,65 +333,6 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_get_custom_message_metrics_ref() {
-        let metrics1 = vec![Metrics {
-            stage: 1,
-            node_address: "node1".to_string(),
-            node_name: "Node 1".to_string(),
-            metrics: "metrics1".to_string(),
-            profile: None,
-        }];
-        let metrics2 = vec![Metrics {
-            stage: 2,
-            node_address: "node2".to_string(),
-            node_name: "Node 2".to_string(),
-            metrics: "metrics2".to_string(),
-            profile: None,
-        }];
-
-        let metrics_refs = vec![
-            Arc::new(Mutex::new(metrics1)),
-            Arc::new(Mutex::new(metrics2)),
-        ];
-
-        let pre_msg = PreCustomMessage::MetricsRef(metrics_refs);
-        let custom_msg = pre_msg.get_custom_message().unwrap();
-
-        match custom_msg {
-            CustomMessage::Metrics(metrics) => {
-                assert_eq!(metrics.len(), 2);
-                assert_eq!(metrics[0].node_address, "node1");
-                assert_eq!(metrics[1].node_address, "node2");
-            }
-            _ => panic!("Expected Metrics variant"),
-        }
-    }
-
-    #[test]
-    fn test_collect_metrics_attaches_own_profile() {
-        let metrics_info = MetricsInfo {
-            plan: create_test_execution_plan(),
-            is_super_cluster: false,
-            func: Box::new(|| false),
-            build_profile: Some(test_profile),
-        };
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics[0].profile.as_ref().unwrap().name, "EmptyExec");
-    }
-
-    #[test]
-    fn test_collect_metrics_skips_profile_when_not_requested() {
-        let metrics_info = MetricsInfo {
-            plan: create_test_execution_plan(),
-            is_super_cluster: false,
-            func: Box::new(|| false),
-            build_profile: None,
-        };
-        let metrics = collect_metrics(&metrics_info);
-        assert!(metrics[0].profile.is_none());
-    }
-
-    #[test]
     fn test_metrics_without_profile_deserializes() {
         let json = r#"{"stage":1,"node_address":"a","node_name":"b","metrics":"m"}"#;
         let metrics: Metrics = serde_json::from_str(json).unwrap();
@@ -537,99 +340,15 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_get_custom_message_metrics_ref_empty() {
-        let metrics_refs = vec![Arc::new(Mutex::new(vec![]))];
-
-        let pre_msg = PreCustomMessage::MetricsRef(metrics_refs);
-        let custom_msg = pre_msg.get_custom_message();
-        assert!(custom_msg.is_none());
-    }
-
-    #[test]
-    fn test_collect_metrics_super_cluster_true() {
-        let plan = create_test_execution_plan();
-        let metrics_info = MetricsInfo {
-            plan,
-            is_super_cluster: true,
-            func: Box::new(|| true),
-            build_profile: Some(test_profile),
+    fn test_metrics_keeps_fields_older_leaders_require() {
+        let metrics = Metrics {
+            profile: Some(ProfileNode::default()),
+            ..Default::default()
         };
-
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].stage, 1); // func() returns true, is_super_cluster is true
-        assert!(!metrics[0].node_address.is_empty());
-        assert!(!metrics[0].metrics.is_empty());
-    }
-
-    #[test]
-    fn test_collect_metrics_super_cluster_false() {
-        let plan = create_test_execution_plan();
-        let metrics_info = MetricsInfo {
-            plan,
-            is_super_cluster: false,
-            func: Box::new(|| true),
-            build_profile: Some(test_profile),
-        };
-
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].stage, 2); // func() returns true, is_super_cluster is false
-    }
-
-    #[test]
-    fn test_collect_metrics_func_returns_false() {
-        let plan = create_test_execution_plan();
-        let metrics_info = MetricsInfo {
-            plan,
-            is_super_cluster: true,
-            func: Box::new(|| false),
-            build_profile: Some(test_profile),
-        };
-
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].stage, 1); // func() returns false, stage defaults to 1
-    }
-
-    #[test]
-    fn test_super_cluster_stops_at_remote_scan() {
-        let follower_plan =
-            create_named_test_execution_plan("FollowerOnlyExec", create_test_execution_plan());
-        let remote_scan_plan = create_named_test_execution_plan("RemoteScanExec", follower_plan);
-        let region_leader_plan =
-            create_named_test_execution_plan("SortPreservingMergeExec", remote_scan_plan);
-        let metrics_info = MetricsInfo {
-            plan: region_leader_plan,
-            is_super_cluster: true,
-            func: Box::new(|| true),
-            build_profile: Some(test_profile),
-        };
-
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics.len(), 1);
-        assert!(metrics[0].metrics.contains("SortPreservingMergeExec"));
-        assert!(metrics[0].metrics.contains("RemoteScanExec"));
-        assert!(!metrics[0].metrics.contains("FollowerOnlyExec"));
-    }
-
-    #[test]
-    fn test_non_super_cluster_keeps_remote_scan_child_metrics() {
-        let follower_plan =
-            create_named_test_execution_plan("FollowerOnlyExec", create_test_execution_plan());
-        let remote_scan_plan = create_named_test_execution_plan("RemoteScanExec", follower_plan);
-        let region_leader_plan =
-            create_named_test_execution_plan("SortPreservingMergeExec", remote_scan_plan);
-        let metrics_info = MetricsInfo {
-            plan: region_leader_plan,
-            is_super_cluster: false,
-            func: Box::new(|| true),
-            build_profile: Some(test_profile),
-        };
-
-        let metrics = collect_metrics(&metrics_info);
-        assert_eq!(metrics.len(), 1);
-        assert!(metrics[0].metrics.contains("FollowerOnlyExec, metrics=[]"));
+        let json = serde_json::to_value(&metrics).unwrap();
+        for key in ["stage", "node_address", "node_name", "metrics"] {
+            assert!(json.get(key).is_some(), "missing {key}");
+        }
     }
 
     #[test]

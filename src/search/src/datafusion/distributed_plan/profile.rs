@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
     utils::time::now_micros,
 };
 use datafusion::physical_plan::{
-    ExecutionPlan, ExecutionPlanProperties, displayable,
+    DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
@@ -64,9 +64,9 @@ impl NodeProfileRecorder {
         }
     }
 
-    /// Takes the node's own plan out of `metrics`; forwarded entries never carry one.
-    pub fn take_plan(&mut self, metrics: &mut [Metrics]) {
-        if let Some(plan) = metrics.iter_mut().find_map(|m| m.profile.take()) {
+    /// Keeps the plan the node sent back about itself.
+    pub fn record_plan(&mut self, metrics: Vec<Metrics>) {
+        if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
             self.profile.plan = Some(plan);
         }
     }
@@ -97,6 +97,15 @@ impl Drop for NodeProfileRecorder {
 
 /// Profile of an executed plan; a remote scan carries its nodes' plans, as its local children never
 /// ran.
+/// A plan node's own line, exactly as EXPLAIN prints it.
+struct PlanDetail<'a>(&'a dyn ExecutionPlan);
+
+impl fmt::Display for PlanDetail<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt_as(DisplayFormatType::Default, f)
+    }
+}
+
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let inputs = match plan.downcast_ref::<RemoteScanExec>() {
         Some(remote) => {
@@ -111,11 +120,7 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     };
     ProfileNode {
         name: plan.name().to_string(),
-        detail: displayable(plan)
-            .one_line()
-            .to_string()
-            .trim_end()
-            .replace('\n', " "),
+        detail: PlanDetail(plan).to_string(),
         partitions: plan.output_partitioning().partition_count(),
         metrics: plan
             .metrics()
@@ -126,29 +131,25 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
 }
 
 /// One entry per metric name in first-seen order, so related metrics stay adjacent.
+/// Aggregates and orders the metrics the same way the text plan does, so `display` matches it.
 fn convert_metrics(metrics: &MetricsSet) -> Vec<ProfileMetric> {
-    let mut out: Vec<ProfileMetric> = Vec::new();
-    for metric in metrics.iter() {
-        let Some((kind, value, total)) = metric_value(metric.value()) else {
-            continue;
-        };
-        let name = metric.value().name();
-        match out.iter_mut().find(|m| m.name == name) {
-            Some(m) => {
-                m.value += value;
-                if let Some(t) = total {
-                    *m.total.get_or_insert(0) += t;
-                }
-            }
-            None => out.push(ProfileMetric {
-                name: name.to_string(),
+    metrics
+        .aggregate_by_name()
+        .sorted_for_display()
+        .timestamps_removed()
+        .iter()
+        .filter_map(|metric| {
+            let value = metric.value();
+            let (kind, number, total) = metric_value(value)?;
+            Some(ProfileMetric {
+                name: value.name().to_string(),
                 kind,
-                value,
+                value: number,
                 total,
-            }),
-        }
-    }
-    out
+                display: value.to_string(),
+            })
+        })
+        .collect()
 }
 
 fn metric_value(value: &MetricValue) -> Option<(MetricKind, u64, Option<u64>)> {
@@ -163,14 +164,13 @@ fn metric_value(value: &MetricValue) -> Option<(MetricKind, u64, Option<u64>)> {
         MetricValue::SpilledBytes(c) | MetricValue::OutputBytes(c) => {
             (MetricKind::Bytes, as_u64(c.value()), None)
         }
+        MetricValue::CurrentMemoryUsage(g) | MetricValue::PeakMemoryUsage { gauge: g, .. } => {
+            (MetricKind::Bytes, as_u64(g.value()), None)
+        }
         MetricValue::ElapsedCompute(t) | MetricValue::Time { time: t, .. } => {
             (MetricKind::Time, as_u64(t.value()), None)
         }
-        MetricValue::CurrentMemoryUsage(g)
-        | MetricValue::Gauge { gauge: g, .. }
-        | MetricValue::PeakMemoryUsage { gauge: g, .. } => {
-            (MetricKind::Gauge, as_u64(g.value()), None)
-        }
+        MetricValue::Gauge { gauge: g, .. } => (MetricKind::Gauge, as_u64(g.value()), None),
         MetricValue::PruningMetrics {
             pruning_metrics, ..
         } => {
@@ -193,10 +193,15 @@ mod tests {
 
     use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::physical_plan::{
-        empty::EmptyExec,
-        metrics::{ExecutionPlanMetricsSet, MetricBuilder},
-        union::UnionExec,
+    use datafusion::{
+        physical_plan::{
+            collect,
+            display::DisplayableExecutionPlan,
+            empty::EmptyExec,
+            metrics::{ExecutionPlanMetricsSet, MetricBuilder},
+            union::UnionExec,
+        },
+        prelude::SessionContext,
     };
 
     use super::*;
@@ -244,17 +249,13 @@ mod tests {
         let metrics = RemoteScanMetrics::new(2, &ExecutionPlanMetricsSet::new());
         metrics.record_output(&batch(3));
         metrics.record_output(&batch(4));
-        let mut cluster_metrics = vec![
-            Metrics::default(),
-            Metrics {
-                profile: Some(ProfileNode {
-                    name: "FilterExec".to_string(),
-                    ..Default::default()
-                }),
+        recorder.record_plan(vec![Metrics {
+            profile: Some(ProfileNode {
+                name: "FilterExec".to_string(),
                 ..Default::default()
-            },
-        ];
-        recorder.take_plan(&mut cluster_metrics);
+            }),
+            ..Default::default()
+        }]);
         recorder.finish(
             &metrics,
             ScanStats {
@@ -273,7 +274,6 @@ mod tests {
         assert!(p.end_us >= p.start_us);
         assert_eq!(p.scan_stats.unwrap().files, 5);
         assert_eq!(p.plan.unwrap().name, "FilterExec");
-        assert!(cluster_metrics[1].profile.is_none());
     }
 
     #[test]
@@ -306,6 +306,38 @@ mod tests {
             .unwrap();
         assert_eq!(time.kind, MetricKind::Time);
         assert_eq!(time.value, 5);
+        assert_eq!(time.display, "5ns");
+    }
+
+    #[tokio::test]
+    async fn test_profile_text_matches_datafusion() {
+        let ctx = SessionContext::new();
+        let sql = "SELECT a % 7 AS k, count(*) FROM (SELECT unnest(range(1, 50)) AS a) \
+                   WHERE a > 10 GROUP BY k ORDER BY k";
+        let plan = ctx
+            .sql(sql)
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        collect(plan.clone(), ctx.task_ctx()).await.unwrap();
+        let expected = DisplayableExecutionPlan::with_metrics(plan.as_ref())
+            .indent(false)
+            .to_string();
+        let profile = build_profile(plan.as_ref());
+        assert_eq!(profile.to_text(), expected);
+        assert!(expected.contains("selectivity="), "{expected}");
+    }
+
+    #[test]
+    fn test_memory_metrics_are_bytes() {
+        let set = ExecutionPlanMetricsSet::new();
+        MetricBuilder::new(&set).mem_used(0).set(2048);
+        let metrics = convert_metrics(&set.clone_inner());
+        assert_eq!(metrics[0].kind, MetricKind::Bytes);
+        assert_eq!(metrics[0].value, 2048);
+        assert_eq!(metrics[0].display, "2.0 KB");
     }
 
     #[test]

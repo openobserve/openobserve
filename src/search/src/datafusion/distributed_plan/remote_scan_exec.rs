@@ -35,7 +35,7 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::{Metrics, RemoteScanMetrics};
+use flight::common::RemoteScanMetrics;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;
@@ -66,7 +66,6 @@ pub struct RemoteScanExec {
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub peak_memory: Arc<AtomicUsize>,
     pub partial_err: Arc<Mutex<String>>,
-    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub enrich_mode_node_idx: usize,
     pub metrics: ExecutionPlanMetricsSet,
     pub node_profiles: NodeProfiles,
@@ -107,7 +106,6 @@ impl RemoteScanExec {
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
-            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
             peak_memory: Arc::new(AtomicUsize::new(0)),
             enrich_mode_node_idx,
             metrics: ExecutionPlanMetricsSet::new(),
@@ -121,10 +119,6 @@ impl RemoteScanExec {
 
     pub fn partial_err(&self) -> Arc<Mutex<String>> {
         self.partial_err.clone()
-    }
-
-    pub fn cluster_metrics(&self) -> Arc<Mutex<Vec<Metrics>>> {
-        self.cluster_metrics.clone()
     }
 
     pub fn peak_memory(&self) -> Arc<AtomicUsize> {
@@ -143,11 +137,6 @@ impl RemoteScanExec {
 
     pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
         self.partial_err = partial_err;
-        self
-    }
-
-    pub fn with_cluster_metrics(mut self, cluster_metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
-        self.cluster_metrics = cluster_metrics;
         self
     }
 
@@ -197,9 +186,8 @@ impl RemoteScanExec {
         )))
     }
 
-    pub fn set_analyze(mut self, profile: bool) -> Self {
+    pub fn set_analyze(mut self) -> Self {
         self.remote_scan_node.search_infos.is_analyze = true;
-        self.remote_scan_node.search_infos.analyze_profile = profile;
         self
     }
 
@@ -211,11 +199,6 @@ impl RemoteScanExec {
     #[cfg(test)]
     pub fn analyze(&self) -> bool {
         self.remote_scan_node.search_infos.is_analyze
-    }
-
-    #[cfg(test)]
-    pub fn analyze_profile(&self) -> bool {
-        self.remote_scan_node.search_infos.analyze_profile
     }
 
     #[cfg(test)]
@@ -272,7 +255,6 @@ impl ExecutionPlan for RemoteScanExec {
         let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
             .with_scan_stats(self.scan_stats.clone())
             .with_partial_err(self.partial_err.clone())
-            .with_cluster_metrics(self.cluster_metrics.clone())
             .with_peak_memory(self.peak_memory.clone())
             .with_metrics(self.metrics.clone())
             .with_node_profiles(self.node_profiles.clone());
@@ -292,7 +274,6 @@ impl ExecutionPlan for RemoteScanExec {
             self.input.schema().clone(),
             self.scan_stats(),
             self.partial_err(),
-            self.cluster_metrics(),
             self.peak_memory(),
             baseline_metrics,
             self.node_profiles.clone(),
@@ -317,7 +298,6 @@ async fn get_remote_batch(
     schema: SchemaRef,
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
-    cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     peak_memory: Arc<AtomicUsize>,
     metrics: RemoteScanMetrics,
     node_profiles: NodeProfiles,
@@ -354,7 +334,7 @@ async fn get_remote_batch(
         }
     }
 
-    let mut recorder = if remote_scan_node.search_infos.analyze_profile {
+    let mut recorder = if remote_scan_node.search_infos.is_analyze {
         NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
     } else {
         NodeProfileRecorder::default()
@@ -438,7 +418,6 @@ async fn get_remote_batch(
         .with_is_querier(is_querier)
         .with_scan_stats(scan_stats)
         .with_partial_err(partial_err.clone())
-        .with_cluster_metrics(cluster_metrics)
         .with_peak_memory(peak_memory)
         .with_start_time(start)
         .with_node_profile(recorder);
@@ -563,9 +542,8 @@ mod tests {
     fn test_remote_scan_exec_set_analyze() {
         let exec = make_remote_exec();
         assert!(!exec.analyze());
-        let exec = exec.set_analyze(false);
+        let exec = exec.set_analyze();
         assert!(exec.analyze());
-        assert!(!exec.analyze_profile());
     }
 
     #[test]

@@ -3535,8 +3535,6 @@ pub struct SearchInfo {
     pub sampling_config: ::core::option::Option<SamplingConfig>,
     #[prost(bool, tag = "11")]
     pub clear_cache: bool,
-    #[prost(bool, tag = "12")]
-    pub analyze_profile: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexInfo {

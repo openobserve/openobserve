@@ -66,9 +66,8 @@ impl FlightDecoderStream {
                 self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
             }
-            CustomMessage::Metrics(mut metrics) => {
-                self.query_context.node_profile.take_plan(&mut metrics);
-                self.query_context.cluster_metrics.lock().extend(metrics);
+            CustomMessage::Metrics(metrics) => {
+                self.query_context.node_profile.record_plan(metrics);
             }
             CustomMessage::PeakMemory(peak_memory) => {
                 self.query_context

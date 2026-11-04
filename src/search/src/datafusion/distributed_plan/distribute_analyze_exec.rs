@@ -32,12 +32,11 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::{common::Metrics, profile::QueryProfile};
+use flight::profile::{ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
 use futures::StreamExt;
 
-use crate::datafusion::{
-    distributed_plan::{display::DisplayableExecutionPlan, profile::build_profile},
-    plan_metrics::get_cluster_metrics,
+use crate::datafusion::distributed_plan::{
+    display::DisplayableExecutionPlan, profile::build_profile,
 };
 
 /// query EXPLAIN ANALYZE in distributed mode
@@ -46,6 +45,7 @@ use crate::datafusion::{
 /// node: the ip or partition id
 /// plan: plan with metrics
 /// profile: the structured profile as JSON on the first row, only when requested
+/// remote rows are rendered from the same profile, one per node that sent back its plan
 #[derive(Debug)]
 pub struct DistributeAnalyzeExec {
     /// Control how much extra to print
@@ -164,8 +164,8 @@ impl ExecutionPlan for DistributeAnalyzeExec {
         let captured_input = Arc::clone(&self.input);
         let captured_schema = Arc::clone(&self.schema);
         let verbose = self.verbose;
-        let show_statistics = self.show_statistics;
-        let profile_start_us = self.profile.then(now_micros);
+        let emit_profile = self.profile;
+        let start_us = now_micros();
 
         let mut stream = execute_stream(self.input.clone(), context.clone())?;
         let output = async move {
@@ -177,11 +177,18 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             drop(stream);
 
             let duration = std::time::Instant::now() - start;
+            let profile = QueryProfile {
+                node_name: LOCAL_NODE.get_name(),
+                node_address: LOCAL_NODE.get_grpc_addr(),
+                start_us,
+                end_us: now_micros(),
+                output_rows: total_rows,
+                plan: build_profile(captured_input.as_ref()),
+            };
             create_output_batch(
                 verbose,
-                show_statistics,
-                profile_start_us,
-                total_rows,
+                emit_profile,
+                &profile,
                 duration,
                 captured_input,
                 captured_schema,
@@ -197,9 +204,8 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
 fn create_output_batch(
     verbose: bool,
-    _show_statistics: bool,
-    profile_start_us: Option<i64>,
-    total_rows: usize,
+    emit_profile: bool,
+    profile: &QueryProfile,
     duration: std::time::Duration,
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
@@ -218,25 +224,20 @@ fn create_output_batch(
         .to_string();
     plan_builder.append_value(annotated_plan);
 
-    let profile = profile_start_us
-        .map(|start_us| profile_json(input.as_ref(), total_rows, start_us))
-        .transpose()?;
-
-    // add metrics from remote scan
-    let metrics = collect_metrics(input);
-
-    for m in metrics {
-        phase_builder.append_value(m.stage);
-        address_builder.append_value(m.node_address);
-        name_builder.append_value(m.node_name);
-        plan_builder.append_value(m.metrics);
+    let mut remote_rows = Vec::new();
+    collect_remote_rows(&profile.plan, 1, &mut remote_rows);
+    for (stage, node, plan) in remote_rows {
+        phase_builder.append_value(stage);
+        address_builder.append_value(&node.node_address);
+        name_builder.append_value(&node.node_name);
+        plan_builder.append_value(plan.to_text());
     }
 
     if verbose {
         phase_builder.append_value(0); // Phase 0 for the main plan
         address_builder.append_value("Output Rows");
         name_builder.append_value("");
-        plan_builder.append_value(total_rows.to_string());
+        plan_builder.append_value(profile.output_rows.to_string());
 
         phase_builder.append_value(0); // Phase 0 for the main plan
         address_builder.append_value("Duration");
@@ -251,34 +252,39 @@ fn create_output_batch(
         Arc::new(name_builder.finish()),
         Arc::new(plan_builder.finish()),
     ];
-    if let Some(profile) = profile {
+    if emit_profile {
+        let json =
+            serde_json::to_string(profile).map_err(|e| DataFusionError::External(e.into()))?;
         columns.push(Arc::new(StringArray::from_iter(
-            std::iter::once(Some(profile)).chain(std::iter::repeat_n(None, rows - 1)),
+            std::iter::once(Some(json)).chain(std::iter::repeat_n(None, rows - 1)),
         )));
     }
 
     RecordBatch::try_new(schema, columns).map_err(DataFusionError::from)
 }
 
-fn profile_json(input: &dyn ExecutionPlan, total_rows: usize, start_us: i64) -> Result<String> {
-    let profile = QueryProfile {
-        node_name: LOCAL_NODE.get_name(),
-        node_address: LOCAL_NODE.get_grpc_addr(),
-        start_us,
-        end_us: now_micros(),
-        output_rows: total_rows,
-        plan: build_profile(input),
-    };
-    serde_json::to_string(&profile).map_err(|e| DataFusionError::External(e.into()))
-}
-
-fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
-    let mut metrics = Vec::new();
-    for m in get_cluster_metrics(&plan) {
-        let m = m.lock().clone();
-        metrics.extend(m);
+/// Lists, depth first, each remote node that sent back its plan, with its stage below the leader.
+fn collect_remote_rows<'a>(
+    node: &'a ProfileNode,
+    stage: i32,
+    rows: &mut Vec<(i32, &'a RemoteNodeProfile, &'a ProfileNode)>,
+) {
+    match &node.inputs {
+        ProfileInputs::Children(children) => {
+            for child in children {
+                collect_remote_rows(child, stage, rows);
+            }
+        }
+        ProfileInputs::Remote(remotes) => {
+            for (remote, plan) in remotes
+                .iter()
+                .filter_map(|r| r.plan.as_ref().map(|plan| (r, plan)))
+            {
+                rows.push((stage, remote, plan));
+                collect_remote_rows(plan, stage + 1, rows);
+            }
+        }
     }
-    metrics
 }
 
 #[cfg(test)]
@@ -358,5 +364,40 @@ mod tests {
         let parsed: QueryProfile = serde_json::from_str(profile.value(0)).unwrap();
         assert_eq!(parsed.plan.name, "EmptyExec");
         assert!(parsed.end_us >= parsed.start_us);
+    }
+
+    #[test]
+    fn test_collect_remote_rows_nests_stages_and_skips_nodes_without_plan() {
+        let node = |name: &str, plan: Option<ProfileNode>| RemoteNodeProfile {
+            node_name: name.to_string(),
+            plan,
+            ..Default::default()
+        };
+        let scan = |remotes| ProfileNode {
+            name: "RemoteScanExec".to_string(),
+            inputs: ProfileInputs::Remote(remotes),
+            ..Default::default()
+        };
+        let cluster_leader = node(
+            "b-querier-0",
+            Some(scan(vec![node(
+                "b-querier-1",
+                Some(ProfileNode::default()),
+            )])),
+        );
+        let root = ProfileNode {
+            inputs: ProfileInputs::Children(vec![scan(vec![
+                cluster_leader,
+                node("skipped", None),
+            ])]),
+            ..Default::default()
+        };
+        let mut rows = Vec::new();
+        collect_remote_rows(&root, 1, &mut rows);
+        let rows: Vec<_> = rows
+            .iter()
+            .map(|(stage, node, _)| (*stage, node.node_name.as_str()))
+            .collect();
+        assert_eq!(rows, vec![(1, "b-querier-0"), (2, "b-querier-1")]);
     }
 }

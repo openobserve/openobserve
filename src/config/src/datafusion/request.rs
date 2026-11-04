@@ -146,7 +146,7 @@ impl From<FlightSearchRequest> for Request {
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
             chat_history_reader: false,
-            analyze_profile: req.search_info.analyze_profile,
+            analyze_profile: false,
         }
     }
 }

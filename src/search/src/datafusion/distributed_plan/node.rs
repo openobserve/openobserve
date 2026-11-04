@@ -80,8 +80,7 @@ impl RemoteScanNodes {
             timeout: self.req.timeout as u64,
             use_cache: self.req.use_cache,
             histogram_interval: self.req.histogram_interval,
-            is_analyze: false,      // set in distribute Analyze
-            analyze_profile: false, // set in distribute Analyze
+            is_analyze: false, // set in distribute Analyze
             sampling_config: self.sampling_config.clone(),
             clear_cache: self.req.overwrite_cache,
         };
@@ -181,7 +180,6 @@ pub struct SearchInfos {
     pub use_cache: bool,
     pub histogram_interval: i64,
     pub is_analyze: bool,
-    pub analyze_profile: bool,
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
     pub clear_cache: bool,
 }
@@ -202,7 +200,6 @@ impl SearchInfos {
             use_cache: self.use_cache,
             histogram_interval: self.histogram_interval,
             is_analyze: self.is_analyze,
-            analyze_profile: self.analyze_profile,
             sampling_config: self.sampling_config.clone(),
             clear_cache: self.clear_cache,
         }
