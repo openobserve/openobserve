@@ -5,7 +5,7 @@
       :columns="columns"
       row-key="id"
       :frame="false"
-      pagination="client"
+      :pagination="filteredRows.length ? 'client' : 'none'"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-team-members"
@@ -733,7 +733,7 @@ function focusMemberPicker() {
   openAddDialog();
   void nextTick(() => memberPickerRef.value?.focus());
 }
-// Exposed so the attention banner's "Add a member" can land the cursor here even when this tab is already open.
+// Exposed so the attention banner's "Add members" can land the cursor here even when this tab is already open.
 defineExpose({ focusMemberPicker });
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);

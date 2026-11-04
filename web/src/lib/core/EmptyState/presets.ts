@@ -532,7 +532,6 @@ export const emptyStatePresets = {
     illustration: "users",
     variant: "create",
     titleKey: "emptyState.noOncallMembers.title",
-    descriptionKey: "emptyState.noOncallMembers.description",
     actions: [
       {
         id: "add",
@@ -562,7 +561,6 @@ export const emptyStatePresets = {
     illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noOncallRules.title",
-    descriptionKey: "emptyState.noOncallRules.description",
     actions: [
       {
         id: "create",
@@ -592,7 +590,6 @@ export const emptyStatePresets = {
     illustration: "schedule",
     variant: "create",
     titleKey: "emptyState.noOncallSchedule.title",
-    descriptionKey: "emptyState.noOncallSchedule.description",
     actions: [
       {
         id: "presets",

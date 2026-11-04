@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="rule_id"
       :frame="false"
       :loading="loading"
-      pagination="client"
+      :pagination="showPager ? 'client' : 'none'"
       :global-filter="search"
       :show-global-filter="false"
       :table-id="teamId ? 'oncall-team-routing-rules' : 'oncall-ownership-rules'"
@@ -243,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             size="block"
             preset="no-oncall-rules"
-            :description="emptyDescription"
             data-test="oncall-ownership-empty"
             @action="emit('add')"
           />
@@ -327,10 +326,13 @@ const store = useStore();
 const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
 /// Most specific first, the order the engine consults them; the endpoint returns storage order.
+const orgOrdered = computed(() => props.rules.slice().sort(compareRulePrecedence));
+
+/// A team's tab lists its own rules but numbers each by its place in the org's order.
 const ordered = computed(() =>
-  (props.teamId ? props.rules.filter((rule) => rule.team_id === props.teamId) : props.rules)
-    .slice()
-    .sort(compareRulePrecedence),
+  props.teamId
+    ? orgOrdered.value.filter((rule) => rule.team_id === props.teamId)
+    : orgOrdered.value,
 );
 
 const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
@@ -339,7 +341,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleOrder"),
     size: 70,
     sortable: false,
-    accessorFn: (row: OwnershipRuleStats) => ordered.value.indexOf(row) + 1,
+    accessorFn: (row: OwnershipRuleStats) => orgOrdered.value.indexOf(row) + 1,
     meta: { align: "center" },
   },
   {
@@ -438,13 +440,8 @@ const catchAllAction = computed<I18nText>(() => {
     : t("oncall.routingCatchAllRowSet");
 });
 
-const emptyDescription = computed<I18nText>(() => {
-  if (!props.teamId) return t("oncall.noOwnershipRulesOrg");
-  const name = props.teams.find((team) => team.id === props.teamId)?.name;
-  return name
-    ? t("oncall.routingEmptyBodyNamed", { team: raw(name) })
-    : t("oncall.noOwnershipRules");
-});
+/// An empty list has no page to turn; the org list keeps its bar while it carries the catch-all note.
+const showPager = computed(() => props.loading || ordered.value.length > 0 || !props.teamId);
 
 function teamNameOf(rule: OwnershipRuleStats): I18nText {
   return raw(

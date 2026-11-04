@@ -213,6 +213,7 @@ const services = computed<DiscoveredService[]>(() => {
   const fromRules = [
     ...new Set(
       rules.value
+        .filter((rule) => rule.team_id === props.teamId)
         .map((rule) => rule.dimensions?.[SERVICE_DIMENSION])
         .filter((name): name is string => !!name && !name.endsWith("*")),
     ),
@@ -321,7 +322,8 @@ async function previewConflict(dimensions: Record<string, string>) {
 async function fetchRules() {
   loadingRules.value = true;
   try {
-    const stats = await queryClient.fetchQuery(ownershipStatsQuery(orgId.value, props.teamId));
+    // The org's whole list, so this tab numbers its rules by their place in the org's order.
+    const stats = await queryClient.fetchQuery(ownershipStatsQuery(orgId.value));
     rules.value = stats?.rules ?? [];
     emit("rules-loaded", rules.value.filter((rule) => rule.team_id === props.teamId).length);
   } catch (err) {

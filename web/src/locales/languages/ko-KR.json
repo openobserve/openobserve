@@ -531,9 +531,9 @@
       "description": "알림이 팀으로 라우팅되면 미해결 호출이 여기에 표시됩니다."
     },
     "noOncallRules": {
-      "title": "아직 소유권이 없습니다",
+      "title": "아직 라우팅 규칙이 없습니다",
       "description": "클러스터나 네임스페이스를 지정하면 그 안의 모든 것이 소유자를 상속받습니다. 아직 존재하지 않는 서비스도 포함됩니다.",
-      "action": "소유권 규칙 추가",
+      "action": "새 규칙",
       "actionDesc": "차원과 값을 선택하세요. 규칙 언어는 필요 없습니다."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "로테이션 {n}",
     "rotationTitle": "로테이션",
     "rotationOrderHint": "사람들이 교대 근무를 수행하는 순서입니다. 목록의 다음 사람이 인수인계 시점에 이어받습니다.",
-    "rotationOpenMembers": "사람 추가",
+    "rotationOpenMembers": "멤버 추가",
     "rotationNeedsPeople": "최소 한 명을 선택하세요. 이 규칙은 아무도 호출하지 않습니다.",
     "rotationEmptyNotSaved": "\"{name}\"에 아무도 없어 저장되지 않았습니다. 먼저 최소 한 명을 선택하세요.",
     "noRotations": "아직 로테이션이 없습니다. 여기로 라우팅되는 알림이 누군가에게 도달하도록 로테이션을 추가하세요.",
@@ -25854,6 +25854,7 @@
     "awayReason": "사유",
     "awayReasonPlaceholder": "선택 사항",
     "awaySave": "부재로 표시",
+    "awayWindowRequired": "부재 시작과 종료 시점을 선택하세요.",
     "awaySaved": "부재가 등록되었습니다.",
     "awaySaveFailed": "부재를 등록할 수 없습니다.",
     "awayRemove": "이 부재 삭제",

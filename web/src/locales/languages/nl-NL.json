@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Nog geen leden",
       "description": "Voeg mensen uit de organisatie toe om ze in de oproepvolgorde voor dit team te plaatsen.",
-      "action": "Lid toevoegen",
+      "action": "Leden toevoegen",
       "actionDesc": "Kies uit je organisatie of plak een lijst met e-mailadressen"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Openstaande oproepen verschijnen hier zodra een alarm naar een team wordt gerouteerd."
     },
     "noOncallRules": {
-      "title": "Nog geen eigenaren",
+      "title": "Nog geen routeringsregels",
       "description": "Claim een cluster of een namespace en alles erin erft een eigenaar — ook services die nog niet bestaan.",
-      "action": "Eigenaarsregel toevoegen",
+      "action": "Nieuwe regel",
       "actionDesc": "Kies een dimensie en een waarde. Geen programmeertaal nodig."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotatie {n}",
     "rotationTitle": "Rotatie",
     "rotationOrderHint": "De volgorde waarin mensen de dienst op zich nemen. De volgende in de lijst neemt het over bij de overdracht.",
-    "rotationOpenMembers": "Mensen toevoegen",
+    "rotationOpenMembers": "Leden toevoegen",
     "rotationNeedsPeople": "Kies minstens één persoon — anders zou deze regel niemand oproepen.",
     "rotationEmptyNotSaved": "\"{name}\" bevat niemand, dus is het niet opgeslagen. Kies eerst minstens één persoon.",
     "noRotations": "Nog geen rotaties. Voeg er één toe, zodat alarmen die hierheen worden gerouteerd iemand bereiken.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Reden",
     "awayReasonPlaceholder": "Optioneel",
     "awaySave": "Afwezig markeren",
+    "awayWindowRequired": "Kies wanneer de afwezigheid begint en eindigt.",
     "awaySaved": "Afwezigheid vastgelegd",
     "awaySaveFailed": "Kon de afwezigheid niet vastleggen",
     "awayRemove": "Verwijder deze afwezigheid",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Als twee regels overeenkomen, wint de regel met meer voorwaarden.",
     "attentionNoTransportHeadline": "Deze deployment kan geen e-mail verzenden, dus deze oproepen kunnen niemand bereiken",
     "attentionNoTransportDetail": "E-mail heeft geen SMTP-transport of geen geldig afzenderadres (ZO_SMTP_FROM_EMAIL) op deze deployment. Elke trede die afhankelijk is van e-mail komt uit bij een persoon die op geen enkele manier te bereiken is.",
-    "attentionAddMember": "Lid toevoegen",
+    "attentionAddMember": "Leden toevoegen",
     "attentionAddFinalRung": "Laatste trede toevoegen",
     "attentionFindings": "{count} bevinding | {count} bevindingen",
     "attentionCountBlocking": "{count} blokkerend",

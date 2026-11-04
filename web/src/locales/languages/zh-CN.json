@@ -531,9 +531,9 @@
       "description": "一旦告警路由到团队，未处理的呼叫会出现在这里。"
     },
     "noOncallRules": {
-      "title": "暂无归属规则",
+      "title": "暂无路由规则",
       "description": "认领一个集群或命名空间，其中的所有内容都会继承该负责人——包括尚不存在的服务。",
-      "action": "添加归属规则",
+      "action": "新建规则",
       "actionDesc": "选择一个维度和一个值。无需规则语言。"
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "轮换 {n}",
     "rotationTitle": "轮换",
     "rotationOrderHint": "人员值班的顺序。列表中下一位将在交接时接手。",
-    "rotationOpenMembers": "添加人员",
+    "rotationOpenMembers": "添加成员",
     "rotationNeedsPeople": "至少选择一位人员——否则该规则不会通知任何人。",
     "rotationEmptyNotSaved": "\"{name}\" 中没有任何人，因此未保存。请先至少选择一个人。",
     "noRotations": "还没有轮换。请添加一个轮换，以便路由到此处的告警可以联系到人。",
@@ -25854,6 +25854,7 @@
     "awayReason": "原因",
     "awayReasonPlaceholder": "可选",
     "awaySave": "标记为请假",
+    "awayWindowRequired": "选择缺席的开始和结束时间。",
     "awaySaved": "请假记录已保存",
     "awaySaveFailed": "无法保存请假记录",
     "awayRemove": "删除此请假记录",

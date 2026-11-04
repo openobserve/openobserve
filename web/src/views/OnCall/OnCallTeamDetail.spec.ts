@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryClient } from "@/composables/query/queryClient";
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
@@ -61,6 +62,9 @@ vi.mock("@/services/oncall", () => ({
     testPage: vi.fn(),
     listUnavailability: vi.fn(),
     createUnavailability: vi.fn(),
+    getRoutingConfig: vi.fn(),
+    setRoutingConfig: vi.fn(),
+    coverageGaps: vi.fn(),
   },
 }));
 
@@ -877,6 +881,55 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(true);
   });
 
+  /// The header's Edit team is the Teams list's drawer, Default switch included.
+  describe("default team switch", () => {
+    beforeEach(() => {
+      __resetOnCallRoutingConfig();
+      service.coverageGaps.mockResolvedValue({ data: { teams: [] } } as any);
+      service.setRoutingConfig.mockResolvedValue({ data: {} } as any);
+    });
+
+    it("offers the switch, locked on while this team is the default", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_1", updated_at: 0 },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const form = wrapper.findComponent({ name: "OnCallTeamForm" });
+      expect(form.props("offerDefault")).toBe(true);
+      expect(form.props("isDefault")).toBe(true);
+    });
+
+    it("nominates this team when saved with the switch on", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_2", updated_at: 0 },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const form = wrapper.findComponent({ name: "OnCallTeamForm" });
+      expect(form.props("isDefault")).toBe(false);
+      form.vm.$emit("saved", "team_1", true);
+      await flushPromises();
+      expect(service.setRoutingConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { default_team_id: "team_1" } }),
+      );
+    });
+
+    it("leaves the default alone when saved with the switch off", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_2", updated_at: 0 },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      wrapper.findComponent({ name: "OnCallTeamForm" }).vm.$emit("saved", "team_1", false);
+      await flushPromises();
+      expect(service.setRoutingConfig).not.toHaveBeenCalled();
+    });
+  });
+
   it("ignores a tab the URL invented", async () => {
     routeParams.tab = "not-a-tab";
     const wrapper = render();
@@ -1370,7 +1423,7 @@ describe("OnCallTeamDetail", () => {
     expect(editor.props("intent")).toBeFalsy();
   });
 
-  /// The banner's "Add a member" fix is the Members tab itself, so on an
+  /// The banner's "Add members" fix is the Members tab itself, so on an
   /// empty team the reader is already there — `activeTab.value = "members"`
   /// is a no-op write, and nothing else used to react to the click.
   it("focuses the member picker from the attention banner, even when already on Members", async () => {
@@ -1770,20 +1823,26 @@ describe("OnCallTeamDetail", () => {
     /// The real away dialog: opened on the shift's person and window, and saved against them.
     it("marks the shift's person away for that shift's window", async () => {
       service.createUnavailability.mockResolvedValue({ data: {} } as any);
-      const { wrapper, timeline } = await onSchedule({ ODialog: DialogStub });
+      const { wrapper, timeline } = await onSchedule({
+        ODialog: DialogStub,
+        OFormDateTimeRange: { name: "OFormDateTimeRange", template: "<span />" },
+      });
       const segment = future({ user_email: "bo@o2.ai" });
       const readsBefore = service.resolvedSchedule.mock.calls.length;
 
       timeline.vm.$emit("shift-action", "away", segment);
       await flushPromises();
-      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      const away = wrapper
+        .findAllComponents({ name: "OForm" })
+        .find((form) => form.attributes("id") === "oncall-away-form")!;
+      await (away.vm as any).form.handleSubmit();
       await flushPromises();
 
       const sent = (service.createUnavailability.mock.calls[0][0] as any).data;
       expect(sent.user_email).toBe("bo@o2.ai");
-      // The fields hold minutes, so the round trip lands on the shift's minute.
-      expect(Math.floor(sent.start_at / 60_000_000)).toBe(Math.floor(segment.from / 60_000_000));
-      expect(Math.floor(sent.end_at / 60_000_000)).toBe(Math.floor(segment.to / 60_000_000));
+      // The range control holds the instants themselves, so the shift's window goes through untouched.
+      expect(sent.start_at).toBe(segment.from);
+      expect(sent.end_at).toBe(segment.to);
       expect(service.resolvedSchedule.mock.calls.length).toBeGreaterThan(readsBefore);
     });
   });

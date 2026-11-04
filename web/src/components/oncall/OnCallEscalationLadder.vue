@@ -448,18 +448,13 @@ function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   return raw(parts.join(" · "));
 }
 
-/// The rows the card draws for this priority, so the chip never counts a step the card folded away.
+/// Every configured step, repeats included, so the chip reads the same count as the policy editor's.
 function stepCount(entry: TeamRungSummary): number {
   if (props.preview?.priority === entry.priority && props.preview.rungs.length) {
-    return rungGroups.value.length;
+    return props.preview.rungs.length;
   }
   const steps = props.policy?.rungs.find((rung) => rung.priority === numberOf(entry))?.steps;
-  if (!steps?.length) return entry.rungs;
-  const ordered = [...steps].sort((a, b) => a.after_micros - b.after_micros);
-  return ordered.filter(
-    (step, index) =>
-      index === 0 || JSON.stringify(step.targets) !== JSON.stringify(ordered[index - 1].targets),
-  ).length;
+  return steps?.length || entry.rungs;
 }
 
 const MINUTES_PER_HOUR = 60;

@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "No members yet",
       "description": "Add people from the org to put them in the paging order for this team.",
-      "action": "Add member",
+      "action": "Add members",
       "actionDesc": "Pick from your org, or paste a list of emails"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Open pages appear here as soon as an alert routes to a team."
     },
     "noOncallRules": {
-      "title": "No ownership yet",
+      "title": "No routing rules yet",
       "description": "Claim a cluster or a namespace and everything inside it inherits an owner — including services that do not exist yet.",
-      "action": "Add an ownership rule",
+      "action": "New rule",
       "actionDesc": "Pick a dimension and a value. No rule language."
     },
     "noTeamRouting": {
@@ -25723,7 +25723,7 @@
     "rotationNthName": "Rotation {n}",
     "rotationTitle": "Rotation",
     "rotationOrderHint": "The order people take the shift. The next in the list takes over at the handover.",
-    "rotationOpenMembers": "Add people",
+    "rotationOpenMembers": "Add members",
     "rotationNeedsPeople": "Pick at least one person — this rule would page nobody.",
     "rotationEmptyNotSaved": "\"{name}\" has nobody in it, so it was not saved. Pick at least one person first.",
     "noRotations": "No rotations yet. Add one so alerts routed here reach somebody.",
@@ -25852,6 +25852,7 @@
     "awayReason": "Reason",
     "awayReasonPlaceholder": "ไม่บังคับ",
     "awaySave": "Mark away",
+    "awayWindowRequired": "Pick when the absence starts and ends.",
     "awaySaved": "Absence recorded",
     "awaySaveFailed": "Could not record the absence",
     "awayRemove": "Remove this absence",
@@ -27012,7 +27013,7 @@
     "ruleEditorPrecedence": "If two rules match, the one with more conditions wins.",
     "attentionNoTransportHeadline": "No transport is configured, so no page can reach anyone",
     "attentionNoTransportDetail": "Email, Slack and webhook are all unset on this deployment. Every rung of every escalation policy resolves to a person with no way to reach them.",
-    "attentionAddMember": "Add a member",
+    "attentionAddMember": "Add members",
     "attentionAddFinalRung": "Add a final rung",
     "attentionFindings": "{count} finding | {count} findings",
     "attentionCountBlocking": "{count} blocking",

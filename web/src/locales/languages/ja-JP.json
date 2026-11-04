@@ -531,9 +531,9 @@
       "description": "アラートがチームにルーティングされると、未解決の呼び出しがここに表示されます。"
     },
     "noOncallRules": {
-      "title": "所有権ルールはまだありません",
+      "title": "ルーティングルールはまだありません",
       "description": "クラスターまたはネームスペースを指定すると、その中のすべてのリソースが所有者を継承します。まだ存在しないサービスも含みます。",
-      "action": "所有権ルールを追加",
+      "action": "新しいルール",
       "actionDesc": "ディメンションと値を選択します。ルール言語は不要です。"
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "ローテーション {n}",
     "rotationTitle": "ローテーション",
     "rotationOrderHint": "担当者がシフトに入る順番です。引き継ぎ時にリストの次の担当者へ交代します。",
-    "rotationOpenMembers": "人を追加",
+    "rotationOpenMembers": "メンバーを追加",
     "rotationNeedsPeople": "少なくとも1人を選択してください。このルールでは誰も呼び出されません。",
     "rotationEmptyNotSaved": "「{name}」には誰も含まれていないため、保存されませんでした。まず少なくとも1人を選択してください。",
     "noRotations": "まだローテーションがありません。ここにルーティングされるアラートを誰かに届けるため、1つ追加してください。",
@@ -25854,6 +25854,7 @@
     "awayReason": "理由",
     "awayReasonPlaceholder": "任意",
     "awaySave": "不在にする",
+    "awayWindowRequired": "不在の開始と終了を選択してください。",
     "awaySaved": "不在を登録しました",
     "awaySaveFailed": "不在を登録できませんでした",
     "awayRemove": "この不在を削除",

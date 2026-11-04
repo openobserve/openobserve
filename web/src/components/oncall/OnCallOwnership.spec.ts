@@ -148,11 +148,12 @@ describe("OnCallOwnership", () => {
     );
   });
 
-  it("asks for this team's stats and lists only this team's rules", async () => {
+  /// The org's list, the same entry org Routing reads, so Order is each rule's place in the org.
+  it("reads the org's stats and lists only this team's rules", async () => {
     const wrapper = render();
     await settle();
     expect(service.ownershipStats).toHaveBeenCalledWith(
-      expect.objectContaining({ team_id: "team_1" }),
+      expect.not.objectContaining({ team_id: expect.anything() }),
     );
     expect(wrapper.find('[data-test="oncall-routing-says-checkout"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-routing-says-moved"]').exists()).toBe(false);

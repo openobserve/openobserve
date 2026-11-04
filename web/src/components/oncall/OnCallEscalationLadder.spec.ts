@@ -178,8 +178,8 @@ describe("OnCallEscalationLadder", () => {
     );
   });
 
-  /// The chip counts the rows the card draws, so a folded repeat is not a step the reader cannot find.
-  it("counts the steps the card draws, folding repeats", () => {
+  /// The card folds a repeat into one row, but the chip counts every step, as the policy editor does.
+  it("counts every configured step, repeats included", () => {
     const whole = (after: number) => ({
       after_micros: after,
       targets: ["the whole team"],
@@ -202,11 +202,11 @@ describe("OnCallEscalationLadder", () => {
     });
 
     expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(2);
-    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("2 steps");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 steps");
   });
 
-  /// An unselected priority has no preview, so the policy's steps are folded the same way.
-  it("folds an unselected priority's repeated steps from the policy", () => {
+  /// An unselected priority has no preview, so the policy's steps are counted the same way.
+  it("counts an unselected priority's repeated steps from the policy", () => {
     const policy = {
       ...sharedPolicy,
       rungs: sharedPolicy.rungs.map((rung) =>
@@ -227,7 +227,7 @@ describe("OnCallEscalationLadder", () => {
     };
     const wrapper = render({ priorities: [paging("P1", 2), paging("P2", 3)], policy });
 
-    expect(wrapper.find('[data-test="oncall-ladder-priority-p2"]').text()).toContain("2 steps");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2"]').text()).toContain("3 steps");
   });
 
   /// The chips carry the same priority colours the Pages list does.

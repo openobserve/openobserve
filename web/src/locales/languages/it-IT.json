@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Ancora nessun membro",
       "description": "Aggiungi persone dall'organizzazione per metterle nell'ordine di contatto di questo team.",
-      "action": "Aggiungi membro",
+      "action": "Aggiungi membri",
       "actionDesc": "Scegli dalla tua organizzazione o incolla un elenco di email."
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Le notifiche aperte compaiono qui non appena un avviso viene instradato a un team."
     },
     "noOncallRules": {
-      "title": "Ancora nessuna proprietà",
+      "title": "Ancora nessuna regola di instradamento",
       "description": "Seleziona un cluster o un namespace e tutto ciò che contiene eredita un proprietario, inclusi i servizi che non esistono ancora.",
-      "action": "Aggiungi una regola di proprietà",
+      "action": "Nuova regola",
       "actionDesc": "Scegli una dimensione e un valore. Nessun linguaggio di regole."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotazione {n}",
     "rotationTitle": "Rotazione",
     "rotationOrderHint": "L'ordine in cui le persone si alternano nel turno. Il successivo in elenco subentra al passaggio di consegne.",
-    "rotationOpenMembers": "Aggiungi persone",
+    "rotationOpenMembers": "Aggiungi membri",
     "rotationNeedsPeople": "Scegli almeno una persona: questa regola non avviserà nessuno.",
     "rotationEmptyNotSaved": "\"{name}\" non contiene nessuno, quindi non è stata salvata. Seleziona prima almeno una persona.",
     "noRotations": "Nessuna rotazione ancora. Aggiungine una così gli avvisi instradati qui raggiungono qualcuno.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Motivo",
     "awayReasonPlaceholder": "Facoltativo",
     "awaySave": "Segna come assente",
+    "awayWindowRequired": "Scegli quando inizia e finisce l'assenza.",
     "awaySaved": "Assenza registrata",
     "awaySaveFailed": "Impossibile registrare l'assenza",
     "awayRemove": "Rimuovi questa assenza",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Se due regole corrispondono, vince quella con più condizioni.",
     "attentionNoTransportHeadline": "Questa distribuzione non può inviare email, quindi queste notifiche non possono raggiungere nessuno",
     "attentionNoTransportDetail": "L'email non ha un trasporto SMTP o un indirizzo From valido (ZO_SMTP_FROM_EMAIL) in questa distribuzione. Ogni livello che si affida all'email identifica una persona che non può essere raggiunta in alcun modo.",
-    "attentionAddMember": "Aggiungi un membro",
+    "attentionAddMember": "Aggiungi membri",
     "attentionAddFinalRung": "Aggiungi un livello finale",
     "attentionFindings": "{count} rilevazione | {count} rilevazioni",
     "attentionCountBlocking": "{count} criticità",

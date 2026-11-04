@@ -632,12 +632,14 @@ describe("OnCallTeamForm", () => {
       oncall.updateTeam.mockResolvedValue({ data: TEAM } as any);
       const wrapper = renderEdit({ offerDefault: true, isDefault: false });
       await flushPromises();
-      expect(wrapper.find('[data-test="oncall-team-form-default-hint"]').text()).toBe(
-        "Gets every alert no team owns",
-      );
+      // No hint while off; the outcome line appears once switched on, before Save.
+      expect(wrapper.find('[data-test="oncall-team-form-default-hint"]').exists()).toBe(false);
 
       await toggle(wrapper).find('button, [role="switch"]').trigger("click");
       await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-form-default-hint"]').text()).toBe(
+        "Gets every alert no team owns",
+      );
       expect(wrapper.emitted("saved")).toBeUndefined();
       await submit(wrapper);
       await flushPromises();

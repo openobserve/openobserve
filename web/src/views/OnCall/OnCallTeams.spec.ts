@@ -556,13 +556,41 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').text()).toBe("Delete team");
     });
 
-    /// G18: a row holds its actions as icons, never a menu; setting the default lives in the Edit drawer.
-    it("offers no row menu and no set-default on the row, with no star", async () => {
+    /// G18: a row holds its actions as icons on desktop; setting the default lives in the Edit drawer.
+    it("offers no set-default on the row, with no star", async () => {
       const wrapper = await rendered();
-      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(false);
       expect(wrapper.html()).not.toContain("star-outline");
+    });
+
+    /// On a phone the icons give way to one ⋯ holding both, so Delete is never cut off the pinned column.
+    it("mirrors Edit and Delete in a phone-only menu", async () => {
+      const wrapper = await rendered();
+      expect(wrapper.find('[data-test="oncall-team-edit-team_1"]').classes()).toContain(
+        "max-md:hidden",
+      );
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').classes()).toContain(
+        "max-md:hidden",
+      );
+      expect(wrapper.find('[data-test="oncall-team-more-team_1"]').classes()).toContain(
+        "md:hidden",
+      );
+
+      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
+
+    it("keeps the default team's phone Delete off, with the reason", async () => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
+      const wrapper = await rendered();
+      const item = wrapper.findComponent('[data-test="oncall-team-delete-team_1-menu"]');
+      expect(item.props("disabled")).toBe(true);
+      expect(String(item.props("description"))).toBe("Make another team the default first");
     });
 
     /// The destructive one last, so the mouse does not pass over it on the way
@@ -755,20 +783,6 @@ describe("OnCallTeams", () => {
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(usersExpiry);
     spy.mockRestore();
-  });
-
-  /// A phone keeps both icons in the row: two fit, and a menu of the same two would only add a click.
-  describe("the row on a phone", () => {
-    it("keeps Edit and Delete visible below md", async () => {
-      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-      const wrapper = render();
-      await flushPromises();
-
-      for (const id of ["oncall-team-edit-team_1", "oncall-team-delete-team_1"]) {
-        expect(wrapper.find(`[data-test="${id}"]`).classes()).not.toContain("max-md:hidden");
-      }
-      expect(wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').exists()).toBe(false);
-    });
   });
 });
 
