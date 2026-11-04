@@ -16,22 +16,27 @@
 import http from "./http";
 import { queryClient } from "@/composables/query/queryClient";
 import { ingestionTokensQuery, orgPasscodeQuery } from "@/services/organizations.queries";
+import store from "@/stores";
 import { b64EncodeStandard } from "@/utils/formatters";
 
 // ingest routes read only the Authorization header, never the session cookie; the org token comes
 // first because root's passcode only validates in the default org
 const ingestAuth = async (org: string) => {
-  const [tokens, res] = await Promise.all([
-    queryClient.fetchQuery(ingestionTokensQuery(org)).catch(() => undefined),
+  const [tokens, read] = await Promise.allSettled([
+    queryClient.fetchQuery(ingestionTokensQuery(org)),
     queryClient.fetchQuery(orgPasscodeQuery(org)),
   ]);
-  const orgToken = ((tokens?.data ?? []) as { token?: string; enabled?: boolean }[]).find(
+  const tokenList = tokens.status === "fulfilled" ? tokens.value?.data : undefined;
+  const orgToken = ((tokenList ?? []) as { token?: string; enabled?: boolean }[]).find(
     (t) => t?.enabled && t.token,
   )?.token;
-  const { user, passcode } = res?.data ?? {};
+  // an org token is checked without the user, so a failed passcode read only matters without one
+  if (!orgToken && read.status === "rejected") throw read.reason;
+  const { user, passcode } = (read.status === "fulfilled" ? read.value?.data : undefined) ?? {};
   const secret = orgToken ?? passcode;
   if (!secret) throw new Error("No ingestion credential for this user");
-  return { Authorization: `Basic ${b64EncodeStandard(`${user}:${secret}`)}` };
+  const name = user ?? (store.state.userInfo as { email?: string } | null)?.email;
+  return { Authorization: `Basic ${b64EncodeStandard(`${name}:${secret}`)}` };
 };
 
 export interface SampleDataState {

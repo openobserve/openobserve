@@ -89,7 +89,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
-import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 
 // the menu and its confirm dialog are siblings, so the header's class goes to the menu
 defineOptions({ inheritAttrs: false });
@@ -119,12 +118,7 @@ const askRemove = () => {
 };
 watch(org, () => (confirmRemove.value = false));
 
-const startTour = () => {
-  session.startTour(org.value);
-  resolveTourTarget(org.value, SAMPLE_TOUR_STEPS[0].id)
-    .then((to) => router.push(to))
-    .catch(() => {});
-};
+const startTour = () => session.startTourAndShow(org.value, () => org.value, router);
 
 const removeAll = async () => {
   confirmRemove.value = false;

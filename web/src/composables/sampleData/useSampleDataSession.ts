@@ -15,6 +15,7 @@
 
 import { computed, reactive, ref } from "vue";
 import { MutationObserver } from "@tanstack/vue-query";
+import type { Router } from "vue-router";
 import { queryClient } from "@/composables/query/queryClient";
 import { loadSampleDataMutation, removeSampleDataMutation } from "@/services/sample_data.queries";
 import {
@@ -25,7 +26,7 @@ import {
   type SampleProgress,
   type SampleStepId,
 } from "@/utils/sampleData/loader";
-import { SAMPLE_TOUR_STEPS } from "@/utils/sampleData/tour";
+import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 
 export type SampleStepStatus = "pending" | "running" | "done" | "failed";
 export type SampleLoadStatus = "idle" | "loading" | "loaded" | "failed";
@@ -146,6 +147,10 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
 };
 
 const remove = async (org: string) => {
+  // the running load would recreate the streams and mark the org loaded again
+  if (status.value === "loading" && loadingOrg.value === org) {
+    throw new Error("Sample data is still loading");
+  }
   const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
   await observer.mutate();
   // the progress and result belong to the last load's org; a load running elsewhere keeps them
@@ -165,6 +170,24 @@ const startTour = (org: string, index = 0) => {
   tour.value = { org, index, minimized: false };
   welcomeOpen.value = false;
   persistTour();
+};
+
+/** Starts the tour and opens its first chapter, unless the user closed it, moved on or switched org meanwhile. */
+const startTourAndShow = async (
+  org: string,
+  selectedOrg: () => string,
+  router: Pick<Router, "push">,
+) => {
+  const from = selectedOrg();
+  startTour(org);
+  try {
+    const to = await resolveTourTarget(org, SAMPLE_TOUR_STEPS[0].id);
+    if (selectedOrg() === from && tour.value?.org === org && tour.value.index === 0) {
+      await router.push(to);
+    }
+  } catch {
+    // a redundant navigation to the page already open is fine
+  }
 };
 
 const stopTour = () => {
@@ -221,6 +244,7 @@ export const useSampleDataSession = () => ({
   start,
   remove,
   startTour,
+  startTourAndShow,
   stopTour,
   setTourIndex,
   setTourMinimized,

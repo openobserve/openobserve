@@ -16,7 +16,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 
-const mocks = vi.hoisted(() => ({ load: vi.fn(), remove: vi.fn() }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), remove: vi.fn(), resolveTarget: vi.fn() }));
+vi.mock("@/utils/sampleData/tour", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sampleData/tour")>()),
+  resolveTourTarget: (...args: unknown[]) => mocks.resolveTarget(...args),
+}));
 vi.mock("@/services/sample_data.queries", () => ({
   loadSampleDataMutation: (org: string) => ({
     mutationFn: (vars: unknown) => mocks.load(org, vars),
@@ -60,6 +64,17 @@ describe("useSampleDataSession remove", () => {
     expect(session.status.value).toBe("loaded");
   });
 
+  it("refuses to remove the org whose load is still running, so the load cannot bring it back", async () => {
+    const load = session.start("org-a");
+    await flushPromises();
+    await expect(session.remove("org-a")).rejects.toThrow();
+    expect(mocks.remove).not.toHaveBeenCalled();
+
+    finishLoad(loaded);
+    await load;
+    expect(session.status.value).toBe("loaded");
+  });
+
   it("resets the session when it removes the org that was loaded", async () => {
     const load = session.start("org-a");
     await flushPromises();
@@ -70,5 +85,56 @@ describe("useSampleDataSession remove", () => {
     expect(session.status.value).toBe("idle");
     expect(session.result.value).toBeUndefined();
     expect(session.counts.logs).toBe(0);
+  });
+});
+
+describe("useSampleDataSession startTourAndShow", () => {
+  let session: ReturnType<typeof import("./useSampleDataSession").useSampleDataSession>;
+  let resolveTarget: (to: string) => void;
+  const push = vi.fn();
+
+  beforeEach(async () => {
+    vi.resetModules();
+    localStorage.clear();
+    push.mockReset();
+    mocks.resolveTarget
+      .mockReset()
+      .mockImplementation(() => new Promise((resolve) => (resolveTarget = resolve)));
+    session = (await import("./useSampleDataSession")).useSampleDataSession();
+  });
+
+  it("opens the first chapter once its target resolves", async () => {
+    const shown = session.startTourAndShow("org-a", () => "org-a", { push });
+    expect(session.tour.value).toMatchObject({ org: "org-a", index: 0 });
+    resolveTarget("/dashboards");
+    await shown;
+    expect(push).toHaveBeenCalledWith("/dashboards");
+  });
+
+  it("opens another org's tour started from its finished-load toast", async () => {
+    const shown = session.startTourAndShow("org-b", () => "org-a", { push });
+    resolveTarget("/dashboards");
+    await shown;
+    expect(push).toHaveBeenCalledWith("/dashboards");
+  });
+
+  it.each([
+    ["closed the tour", () => session.stopTour()],
+    ["moved to the next chapter", () => session.setTourIndex(1)],
+  ])("does not navigate when the user %s meanwhile", async (_, act) => {
+    const shown = session.startTourAndShow("org-a", () => "org-a", { push });
+    act();
+    resolveTarget("/dashboards");
+    await shown;
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate when the user switched org meanwhile", async () => {
+    let selected = "org-a";
+    const shown = session.startTourAndShow("org-a", () => selected, { push });
+    selected = "org-b";
+    resolveTarget("/dashboards");
+    await shown;
+    expect(push).not.toHaveBeenCalled();
   });
 });

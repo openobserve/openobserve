@@ -248,6 +248,7 @@ const showStep = async () => {
 const next = async () => {
   session.setTourIndex(index.value + 1);
   if (current.value) await showStep();
+  else cancelPendingStep();
 };
 
 const back = async () => {

@@ -160,7 +160,6 @@ import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
-import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 import SampleDataProgress from "@/components/sampleData/SampleDataProgress.vue";
 
 const { t } = useI18nTyped();
@@ -207,12 +206,7 @@ const close = () => {
   session.closeWelcome();
 };
 
-const startTourFor = (target: string) => {
-  session.startTour(target);
-  resolveTourTarget(target, SAMPLE_TOUR_STEPS[0].id)
-    .then((to) => router.push(to))
-    .catch(() => {});
-};
+const startTourFor = (target: string) => session.startTourAndShow(target, () => org.value, router);
 
 const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_allowed_upto);
 

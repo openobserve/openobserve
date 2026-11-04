@@ -207,14 +207,16 @@ const ingestTelemetry = async (
 const createDashboards = async (org: string, range: SampleWindow) => {
   const folderId = await findOrCreateFolder(org, "dashboards");
   const existing = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
-  const titles = new Set(
-    (existing.data?.dashboards ?? []).map((row: any) => toSearchHit(row).title),
+  const idByTitle = new Map<string, string>(
+    (existing.data?.dashboards ?? [])
+      .map(toSearchHit)
+      .map((hit: { title: string; dashboardId: string }) => [hit.title, hit.dashboardId]),
   );
-  let overviewId: string | undefined = (existing.data?.dashboards ?? [])
-    .map(toSearchHit)
-    .find((hit: { title: string }) => hit.title === SAMPLE_OVERVIEW_TITLE)?.dashboardId;
+  let overviewId: string | undefined;
   for (const dash of sampleDashboards(range)) {
-    if (titles.has(dash.title)) continue;
+    // a reload moves the window, and a kept dashboard would still query the old one
+    const oldId = idByTitle.get(dash.title);
+    if (oldId) await ignoreMissing(() => dashboardService.delete(org, oldId, folderId));
     const res = await dashboardService.create(org, dash, folderId);
     if (dash.title === SAMPLE_OVERVIEW_TITLE) overviewId = toSearchHit(res.data).dashboardId;
   }
@@ -395,9 +397,10 @@ export const removeSampleData = async (org: string) => {
   for (const name of SAMPLE_FUNCTIONS) {
     await ignoreMissing(() => jsTransformService.delete(org, name, true));
   }
+  // the sample alerts and pipeline are gone by name; the cascade would also take the user's own
   await Promise.all(
     SAMPLE_STREAM_SET.map((s) =>
-      ignoreMissing(() => streamService.delete(org, s.name, s.type, true)),
+      ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
     ),
   );
   try {

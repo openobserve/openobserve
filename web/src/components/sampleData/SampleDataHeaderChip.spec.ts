@@ -31,11 +31,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
-vi.mock("@/utils/sampleData/tour", () => ({
-  SAMPLE_TOUR_STEPS: [{ id: "dashboard" }],
-  resolveTourTarget: vi.fn().mockResolvedValue("/dashboards"),
-}));
-
 const data = vi.hoisted(() => ({ sample: true, own: false, loadingHere: false }));
 vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
   const { computed } = await import("vue");
@@ -49,12 +44,12 @@ vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
 });
 
 const remove = vi.fn();
-const startTour = vi.fn();
+const startTourAndShow = vi.fn();
 const loadInDialog = vi.fn();
 vi.mock("@/composables/sampleData/useSampleDataSession", () => ({
   useSampleDataSession: () => ({
     remove,
-    startTour,
+    startTourAndShow,
     loadInDialog,
     status: { value: data.loadingHere ? "loading" : "idle" },
     loadingOrg: { value: data.loadingHere ? ORG : "" },
@@ -116,7 +111,7 @@ describe("SampleDataHeaderChip", () => {
   beforeEach(() => {
     toastMock.mockClear();
     push.mockClear();
-    startTour.mockClear();
+    startTourAndShow.mockClear();
     loadInDialog.mockClear();
     Object.assign(data, { sample: true, own: false, loadingHere: false });
     remove.mockReset();
@@ -154,8 +149,8 @@ describe("SampleDataHeaderChip", () => {
   it("starts the tour", async () => {
     await items()[0].trigger("click");
     await flushPromises();
-    expect(startTour).toHaveBeenCalledWith(ORG);
-    expect(push).toHaveBeenCalledWith("/dashboards");
+    expect(startTourAndShow).toHaveBeenCalledWith(ORG, expect.any(Function), { push });
+    expect(startTourAndShow.mock.calls[0][1]()).toBe(ORG);
   });
 
   it("asks before deleting, and Cancel deletes nothing", async () => {

@@ -188,6 +188,35 @@ describe("loadSampleData", () => {
     expect(oldest).toBeGreaterThanOrEqual(endUs - 60 * minuteUs + 5 * minuteUs);
   });
 
+  it("keeps the last metric scrape inside the saved window", async () => {
+    const { createSampleGenerator } =
+      await vi.importActual<typeof import("./generator")>("./generator");
+    // one second into a 30s scrape slot
+    const endUs = 1_793_793_601_000_000;
+    const gen = createSampleGenerator({ startUs: endUs - 120_000_000, endUs });
+    const last = Math.max(
+      ...gen.generateChunk(gen.chunkCount - 1).metrics.map((r) => Number(r._timestamp)),
+    );
+    expect(last).toBeLessThanOrEqual(endUs);
+  });
+
+  it("rebuilds a sample dashboard left by an earlier load on the new window", async () => {
+    vi.mocked(dashboardService.list).mockResolvedValueOnce({
+      data: {
+        dashboards: [
+          { dashboard_id: "old", title: SAMPLE_DASHBOARD_TITLES.overview, folder_id: "f1" },
+        ],
+      },
+    } as any);
+    await loadSampleData("acme", 5, () => {});
+    const [, startUs, endUs] = mocks.sampleData.putState.mock.calls[0];
+    expect(dashboardService.delete).toHaveBeenCalledWith("acme", "old", "f1");
+    const overview = mocks.dashboardCreate.mock.calls
+      .map((c) => c[1])
+      .find((d) => d.title === SAMPLE_DASHBOARD_TITLES.overview);
+    expect(overview.defaultDatetimeDuration).toMatchObject({ startTime: startUs, endTime: endUs });
+  });
+
   it("loads four hours when the server allows more", () => {
     expect(sampleWindowHours(undefined)).toBe(4);
     expect(sampleWindowHours(5)).toBe(4);
@@ -211,6 +240,12 @@ describe("removeSampleData", () => {
     expect(mocks.streamDelete.mock.invocationCallOrder.at(-1)).toBeLessThan(
       mocks.sampleData.deleteState.mock.invocationCallOrder[0],
     );
+  });
+
+  it("deletes the sample streams without the alerts and pipelines the user attached to them", async () => {
+    await removeSampleData("acme");
+    expect(mocks.streamDelete).toHaveBeenCalled();
+    for (const call of mocks.streamDelete.mock.calls) expect(call[3]).toBe(false);
   });
 
   it("deletes only the sample dashboards and alerts, and keeps a folder that still has the user's", async () => {

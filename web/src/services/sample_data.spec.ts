@@ -19,9 +19,16 @@ import http from "./http";
 import sampleData from "./sample_data";
 
 vi.mock("./http", () => {
-  const client = { get: vi.fn(), put: vi.fn(), delete: vi.fn() };
+  const client = { get: vi.fn(), put: vi.fn(), delete: vi.fn(), post: vi.fn() };
   return { default: vi.fn(() => client) };
 });
+
+const fetchQuery = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/query/queryClient", () => ({ queryClient: { fetchQuery } }));
+vi.mock("@/services/organizations.queries", () => ({
+  ingestionTokensQuery: () => "tokens",
+  orgPasscodeQuery: () => "passcode",
+}));
 
 describe("sampleData state calls", () => {
   const client = (http as unknown as ReturnType<typeof vi.fn>)();
@@ -47,5 +54,28 @@ describe("sampleData state calls", () => {
   it("deletes the state of the org", async () => {
     await sampleData.deleteState("acme");
     expect(client.delete).toHaveBeenCalledWith("/api/acme/sample_data");
+  });
+});
+
+describe("sampleData ingest credential", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("ingests with the org token when the passcode cannot be read", async () => {
+    fetchQuery.mockImplementation(async (query: string) => {
+      if (query === "tokens") return { data: [{ token: "o2oi_x", enabled: true }] };
+      throw { response: { status: 500 } };
+    });
+    await sampleData.ingestLogs("acme", "s", [{}]);
+    const { headers } = vi.mocked(http).mock.calls.at(-1)![0] as any;
+    expect(atob(headers.Authorization.replace("Basic ", ""))).toMatch(/:o2oi_x$/);
+  });
+
+  it("fails with the passcode error when there is no org token", async () => {
+    const failure = { response: { status: 500 } };
+    fetchQuery.mockImplementation(async (query: string) => {
+      if (query === "tokens") return { data: [] };
+      throw failure;
+    });
+    await expect(sampleData.ingestLogs("acme", "s", [{}])).rejects.toBe(failure);
   });
 });

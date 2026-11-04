@@ -112,6 +112,24 @@ describe("SampleDataTour", () => {
     expect(wrapper.find('[data-test="sample-tour-next"]').exists()).toBe(true);
   });
 
+  it("reaching the finale while the last step resolves does not navigate afterwards", async () => {
+    session.startTour(ORG, SAMPLE_TOUR_STEPS.length - 2);
+    const { wrapper, router } = await mountTour();
+    let release = () => {};
+    resolveMock.mockImplementation(
+      (_org: string, id: string) =>
+        new Promise((resolve) => {
+          release = () => resolve({ name: "page", params: { id } });
+        }),
+    );
+    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+    expect(session.tour.value?.index).toBe(SAMPLE_TOUR_STEPS.length);
+    release();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
+  });
+
   it("ending the tour while a step resolves does not navigate afterwards", async () => {
     session.startTour(ORG, 0);
     const { wrapper, router } = await mountTour();

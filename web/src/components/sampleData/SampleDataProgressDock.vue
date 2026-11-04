@@ -123,7 +123,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
-import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -177,9 +176,6 @@ const retry = () => {
 
 const startTour = () => {
   dismissed.value = true;
-  session.startTour(org.value);
-  resolveTourTarget(org.value, SAMPLE_TOUR_STEPS[0].id)
-    .then((to) => router.push(to))
-    .catch(() => {});
+  session.startTourAndShow(org.value, () => org.value, router);
 };
 </script>

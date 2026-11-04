@@ -745,7 +745,8 @@ export function createSampleGenerator(window: SampleWindow) {
   };
 
   const emitSlot = (slotUs: number, stats: SlotStats, out: Row[]) => {
-    const ts = slotUs + SCRAPE_US - 1;
+    // the last slot can run past the saved window, which the absolute dashboard ranges would miss
+    const ts = Math.min(slotUs + SCRAPE_US, endUs) - 1;
     for (const svc of SAMPLE_SERVICES) {
       for (const pod of svc.pods) {
         for (const statusClass of ["2xx", "4xx", "5xx"]) {
