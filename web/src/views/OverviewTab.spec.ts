@@ -127,6 +127,7 @@ import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
 
 // OverviewTab renders only O2 `lib` components.
@@ -1388,6 +1389,23 @@ describe("OverviewTab", () => {
 
       expect(streamService.nameList).not.toHaveBeenCalled();
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should drop the no-data hero when sample data finishes loading for this org", async () => {
+      const session = useSampleDataSession();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(HERO).exists()).toBe(true);
+
+      session.loadingOrg.value = store.state.selectedOrganization.identifier;
+      session.status.value = "loading";
+      await flushPromises();
+      givenStreams({ logs: [{ name: "sample_logs", stream_type: "logs" }] });
+      session.status.value = "loaded";
+      await flushPromises();
+      session.status.value = "idle";
+
       expect(wrapper.find(HERO).exists()).toBe(false);
     });
 

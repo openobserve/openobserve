@@ -807,6 +807,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
 import DateTime from "@/components/DateTime.vue";
@@ -1873,6 +1874,13 @@ watch(
     }
   },
 );
+
+// A sample load that ends while Home is open must re-check the empty org, not wait for a reload
+const sampleSession = useSampleDataSession();
+watch(sampleSession.status, (now, was) => {
+  if (was === "loading" && now !== "idle" && sampleSession.loadingOrg.value === orgId.value)
+    loadAll(true);
+});
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
