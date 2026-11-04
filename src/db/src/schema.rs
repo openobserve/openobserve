@@ -142,6 +142,19 @@ async fn ensure_gen_ai_fields_in_schema_inner(
     update_defined_schema_fields: bool,
 ) -> Result<(), anyhow::Error> {
     let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+    let missing_fields = get_missing_or_widened_gen_ai_fields(&schema_cache);
+
+    if !missing_fields.is_empty() {
+        let llm_schema = Schema::new(missing_fields);
+        merge(org_id, stream_name, stream_type, &llm_schema, None).await?;
+    }
+    if update_defined_schema_fields {
+        ensure_gen_ai_fields_in_defined_schema_fields(org_id, stream_name, stream_type).await?;
+    }
+    Ok(())
+}
+
+fn get_missing_or_widened_gen_ai_fields(schema_cache: &SchemaCache) -> Vec<Field> {
     let mut missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
         .iter()
         .filter(|f| match schema_cache.field_with_name(f.name()) {
@@ -156,15 +169,7 @@ async fn ensure_gen_ai_fields_in_schema_inner(
     if !schema_cache.contains_field(O2_INGEST_TS_COL_NAME) {
         missing_fields.push(Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true));
     }
-
-    if !missing_fields.is_empty() {
-        let llm_schema = Schema::new(missing_fields);
-        merge(org_id, stream_name, stream_type, &llm_schema, None).await?;
-    }
-    if update_defined_schema_fields {
-        ensure_gen_ai_fields_in_defined_schema_fields(org_id, stream_name, stream_type).await?;
-    }
-    Ok(())
+    missing_fields
 }
 
 async fn ensure_gen_ai_fields_in_defined_schema_fields(
@@ -986,24 +991,8 @@ mod tests {
             true,
         )]));
 
-        let fields_to_update: Vec<Field> = GEN_AI_SCHEMA_FIELDS
-            .iter()
-            .filter(|f| match existing_schema.field_with_name(f.name()) {
-                None => true,
-                Some(existing) => {
-                    existing.data_type() != f.data_type()
-                        && infra::schema::is_widening_conversion(
-                            existing.data_type(),
-                            f.data_type(),
-                        )
-                }
-            })
-            .cloned()
-            .collect();
-
-        let prompt_version_field = fields_to_update
-            .iter()
-            .find(|f| f.name() == "gen_ai_prompt_version");
+        let missing = get_missing_or_widened_gen_ai_fields(&existing_schema);
+        let prompt_version_field = missing.iter().find(|f| f.name() == "gen_ai_prompt_version");
         assert!(prompt_version_field.is_some());
         assert_eq!(prompt_version_field.unwrap().data_type(), &DataType::Utf8);
     }
