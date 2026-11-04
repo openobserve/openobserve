@@ -26,8 +26,9 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, ObjectName, ObjectNamePart, Query, Select, SelectItem, SetExpr,
-        Statement, TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor, VisitorMut,
+        BinaryOperator, Expr, Ident, ObjectName, ObjectNamePart, Query, Select, SelectItem,
+        SetExpr, Statement, TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor,
+        VisitorMut,
     },
     dialect::PostgreSqlDialect,
     keywords::ALL_KEYWORDS,
@@ -138,6 +139,8 @@ pub struct WhereInfo {
 pub struct SingleStream {
     pub table: String,
     pub where_clause: Option<String>,
+    /// The SQL has a WHERE, so a None `where_clause` means a filter the link could not carry.
+    pub has_where: bool,
 }
 
 /// Parse `sql` once and return both the full outer WHERE (single-stream base filter)
@@ -232,14 +235,18 @@ pub fn single_stream(sql: &str, expected: Option<&str>) -> Option<SingleStream> 
     if table.is_empty() || expected.is_some_and(|e| e != table) {
         return None;
     }
-    let alias = alias.as_ref().map(|a| a.name.value.as_str());
+    // A column list renames the table's columns, so its WHERE names are not the stream's own.
+    let renames_columns = alias.as_ref().is_some_and(|a| !a.columns.is_empty());
+    let alias = alias.as_ref().map(|a| &a.name);
     let where_clause = select
         .selection
         .as_ref()
+        .filter(|_| !renames_columns)
         .and_then(|selection| checked_where(selection, &table, alias));
     Some(SingleStream {
         table,
         where_clause,
+        has_where: select.selection.is_some(),
     })
 }
 
@@ -392,7 +399,7 @@ fn from_streams(from: &[TableWithJoins]) -> (HashMap<String, String>, Vec<String
 }
 
 /// None when the WHERE holds a subquery or a column of another table.
-fn checked_where(selection: &Expr, table: &str, alias: Option<&str>) -> Option<String> {
+fn checked_where(selection: &Expr, table: &str, alias: Option<&Ident>) -> Option<String> {
     if Visit::visit(selection, &mut SubqueryFinder).is_break() {
         return None;
     }
@@ -489,7 +496,7 @@ impl Visitor for SubqueryFinder {
 /// Turns `t.col` into `col` for the one table or its alias; breaks on any other qualifier.
 struct OwnQualifierRemover<'a> {
     table: &'a str,
-    alias: Option<&'a str>,
+    alias: Option<&'a Ident>,
 }
 
 impl VisitorMut for OwnQualifierRemover<'_> {
@@ -502,7 +509,19 @@ impl VisitorMut for OwnQualifierRemover<'_> {
         let [qualifier, column] = ids.as_slice() else {
             return ControlFlow::Break(());
         };
-        if qualifier.value != self.table && Some(qualifier.value.as_str()) != self.alias {
+        // An unquoted name folds case, as Postgres does; a quoted one matches exactly.
+        let same = |name: &str, quoted: bool| {
+            if qualifier.quote_style.is_none() && !quoted {
+                qualifier.value.eq_ignore_ascii_case(name)
+            } else {
+                qualifier.value == name
+            }
+        };
+        let own = same(self.table, false)
+            || self
+                .alias
+                .is_some_and(|a| same(&a.value, a.quote_style.is_some()));
+        if !own {
             return ControlFlow::Break(());
         }
         *expr = Expr::Identifier(column.clone());
@@ -871,6 +890,7 @@ mod tests {
         Some(SingleStream {
             table: table.to_string(),
             where_clause: where_clause.map(str::to_string),
+            has_where: true,
         })
     }
 
@@ -941,6 +961,8 @@ mod tests {
             "SELECT * FROM \"app\" WHERE n > (SELECT max(n) FROM \"hosts\")",
             "SELECT * FROM \"app\" a WHERE b.level = 'error'",
             "SELECT * FROM \"app\" a WHERE x.y.z = 'error'",
+            "SELECT * FROM \"app\" AS a(_timestamp, level) WHERE a.level = 'error'",
+            "SELECT * FROM \"app\" \"A\" WHERE a.level = 'error'",
         ] {
             assert_eq!(
                 single_stream(sql, Some("app")),
@@ -958,7 +980,10 @@ mod tests {
         );
         assert_eq!(
             single_stream("SELECT count(*) FROM \"payments\"", None),
-            stream("payments", None)
+            Some(SingleStream {
+                has_where: false,
+                ..stream("payments", None).unwrap()
+            })
         );
     }
 
@@ -971,5 +996,16 @@ mod tests {
             stream("app", Some("level = 'error'"))
         );
         assert_eq!(single_stream("SELEC x", None), None);
+    }
+
+    #[test]
+    fn test_single_stream_folds_an_unquoted_alias() {
+        assert_eq!(
+            single_stream(
+                "SELECT * FROM \"app\" AS A WHERE a.level = 'error'",
+                Some("app")
+            ),
+            stream("app", Some("level = 'error'"))
+        );
     }
 }

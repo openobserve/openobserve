@@ -22,7 +22,7 @@
 //! substitute last, which is the only thing stopping a pod named
 //! `{alert_name}` from being expanded by a later pass.
 
-use config::utils::json::Value;
+use config::{meta::alerts::notification_kind::NotificationKind, utils::json::Value};
 
 use super::context::NotificationContext;
 
@@ -64,6 +64,16 @@ pub(crate) fn apply_custom_template_plain(
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let rows_tpl_val: &[Value] = &ctx.rows_tpl_val;
 
+    // Another kind's names and text are free (a downtime "deploy" <db>), so in a JSON body they are
+    // escaped as its attributes are; alerts keep their output byte for byte.
+    let escape = ctx.kind != NotificationKind::Alert && !is_email;
+    let esc = |v: &str| -> String {
+        if escape {
+            format_variable_value(v.to_string())
+        } else {
+            v.to_string()
+        }
+    };
     let mut resp = tpl
         // Newer tokens run first so a value inserted below is never re-scanned for them.
         .replace("{notification_kind}", ctx.kind.as_str())
@@ -82,47 +92,50 @@ pub(crate) fn apply_custom_template_plain(
             "{alert_trigger_time_utc}",
             &super::resolve::utc_stamp(ctx.alert_trigger_time),
         )
-        .replace("{cluster_name}", &ctx.cluster_name)
-        .replace("{org_name}", &ctx.org_name)
-        .replace("{stream_type}", &ctx.stream_type)
-        .replace("{stream_name}", &ctx.stream_name)
-        .replace("{alert_name}", &ctx.alert_name)
-        .replace("{alert_type}", &ctx.alert_type)
-        .replace("{alert_period}", &ctx.alert_period)
-        .replace("{alert_operator}", &ctx.alert_operator)
-        .replace("{alert_threshold}", &ctx.alert_threshold)
-        .replace("{alert_count}", &ctx.alert_count)
-        .replace("{alert_agg_value}", &ctx.alert_agg_value)
+        .replace("{cluster_name}", &esc(&ctx.cluster_name))
+        .replace("{org_name}", &esc(&ctx.org_name))
+        .replace("{stream_type}", &esc(&ctx.stream_type))
+        .replace("{stream_name}", &esc(&ctx.stream_name))
+        .replace("{alert_name}", &esc(&ctx.alert_name))
+        .replace("{alert_type}", &esc(&ctx.alert_type))
+        .replace("{alert_period}", &esc(&ctx.alert_period))
+        .replace("{alert_operator}", &esc(&ctx.alert_operator))
+        .replace("{alert_threshold}", &esc(&ctx.alert_threshold))
+        .replace("{alert_count}", &esc(&ctx.alert_count))
+        .replace("{alert_agg_value}", &esc(&ctx.alert_agg_value))
         // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
         // what lets a template branch warning vs critical wording — per-level
         // DESTINATIONS are Phase 4; v1 routing is template-side.
-        .replace("{alert_level}", &ctx.alert_level)
+        .replace("{alert_level}", &esc(&ctx.alert_level))
         // `firing` / `resolved` (openobserve#6751). One template, both states.
-        .replace("{alert_status}", &ctx.alert_status)
+        .replace("{alert_status}", &esc(&ctx.alert_status))
         // The key that pairs a resolve with its trigger. Empty when the alert
         // does not notify on recovery, which is when nothing will resolve.
         .replace(
             "{episode_id}",
-            ctx.episode_id.as_deref().unwrap_or_default(),
+            &esc(ctx.episode_id.as_deref().unwrap_or_default()),
         )
-        .replace("{recovery_reason}", &ctx.recovery_reason)
+        .replace("{recovery_reason}", &esc(&ctx.recovery_reason))
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
         // empty tags render as "" rather than "P0"/"null", so a template that
         // interpolates them unconditionally still produces clean output.
-        .replace("{alert_priority}", &ctx.alert_priority)
-        .replace("{alert_tags}", &ctx.alert_tags)
-        .replace("{alert_threshold_crit}", &ctx.alert_threshold_crit)
-        .replace("{alert_threshold_warn}", &ctx.alert_threshold_warn)
+        .replace("{alert_priority}", &esc(&ctx.alert_priority))
+        .replace("{alert_tags}", &esc(&ctx.alert_tags))
+        .replace("{alert_threshold_crit}", &esc(&ctx.alert_threshold_crit))
+        .replace("{alert_threshold_warn}", &esc(&ctx.alert_threshold_warn))
         // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
         // previously it always read the count-family warning.
-        .replace("{alert_warning_threshold}", &ctx.alert_threshold_warn)
-        .replace("{alert_start_time}", &ctx.alert_start_time)
-        .replace("{alert_end_time}", &ctx.alert_end_time)
-        .replace("{alert_start_time_millis}", &ctx.alert_start_time_millis)
-        .replace("{alert_end_time_millis}", &ctx.alert_end_time_millis)
-        .replace("{alert_url}", &ctx.alert_url)
+        .replace("{alert_warning_threshold}", &esc(&ctx.alert_threshold_warn))
+        .replace("{alert_start_time}", &esc(&ctx.alert_start_time))
+        .replace("{alert_end_time}", &esc(&ctx.alert_end_time))
+        .replace(
+            "{alert_start_time_millis}",
+            &esc(&ctx.alert_start_time_millis),
+        )
+        .replace("{alert_end_time_millis}", &esc(&ctx.alert_end_time_millis))
+        .replace("{alert_url}", &esc(&ctx.alert_url))
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
         .replace(
             "{alert_trigger_time_millis}",
@@ -132,11 +145,14 @@ pub(crate) fn apply_custom_template_plain(
             "{alert_trigger_time_seconds}",
             &evaluation_timestamp_seconds.to_string(),
         )
-        .replace("{alert_trigger_time_str}", &ctx.alert_trigger_time_str)
+        .replace(
+            "{alert_trigger_time_str}",
+            &esc(&ctx.alert_trigger_time_str),
+        )
         // Back-compat alias: shipped prebuilt bodies historically used {alert_time},
         // which was never substituted. Alias it to the trigger-time string.
-        .replace("{alert_time}", &ctx.alert_trigger_time_str)
-        .replace("{alert_description}", &ctx.alert_description);
+        .replace("{alert_time}", &esc(&ctx.alert_trigger_time_str))
+        .replace("{alert_description}", &esc(&ctx.alert_description));
 
     if let (Some(operator), Some(value)) = (&ctx.promql_operator, &ctx.promql_value) {
         resp = resp
@@ -535,6 +551,33 @@ mod golden {
     use config::meta::alerts::level::AlertLevel;
 
     use super::*;
+
+    #[test]
+    fn another_kinds_quoted_name_keeps_a_custom_json_body_valid() {
+        let ctx = NotificationContext {
+            kind: NotificationKind::Downtime,
+            alert_name: "Nightly \"deploy\" <db>".into(),
+            alert_description: "line one\nline two".into(),
+            ..Default::default()
+        };
+        let body = apply_custom_template(
+            r#"{"text":"{alert_name}","detail":"{alert_description}"}"#,
+            &ctx,
+            false,
+        );
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["text"], "Nightly \"deploy\" <db>");
+        assert_eq!(json["detail"], "line one\nline two");
+        // An alert keeps the raw insert it always had.
+        let alert = NotificationContext {
+            alert_name: "cpu high".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(r#"{"text":"{alert_name}"}"#, &alert, false),
+            r#"{"text":"cpu high"}"#
+        );
+    }
 
     fn fixture_ctx() -> NotificationContext {
         NotificationContext {
