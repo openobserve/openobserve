@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import ORefreshButton from "./ORefreshButton.vue";
+import { raw } from "@/types/i18n";
 
 // The component calls useI18n() in setup, so an i18n instance must be installed
 // or vue-i18n throws "Need to install with app.use function". Source the real
@@ -134,6 +135,16 @@ describe("ORefreshButton", () => {
       global: globalConfig,
     });
     expect(ran.find("button").attributes("aria-label")).toBe("Refresh, last refreshed 57s ago");
+  });
+
+  it("shows a passed tooltip instead of the last-refreshed time", () => {
+    const wrapper = mount(ORefreshButton, {
+      props: { lastRunAt: Date.now() - 3_000, tooltip: raw("Data as of 16:19") },
+      global: globalConfig,
+    });
+    const tips = wrapper.findAll("[data-stub-tooltip]").map((tip) => tip.text());
+    expect(tips).toContain("Data as of 16:19");
+    expect(tips.some((tip) => tip.startsWith("Last refreshed"))).toBe(false);
   });
 
   // --- layout="inline" ---

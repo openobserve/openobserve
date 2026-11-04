@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   layout: "split",
   dataTest: "refresh-button",
   shortcutId: undefined,
+  tooltip: undefined,
   size: "toolbar",
 });
 
@@ -71,6 +72,7 @@ const buttonName = computed(() =>
 );
 
 const exactTime = computed(() => {
+  if (props.tooltip) return props.tooltip;
   if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
   return t("refreshButton.lastRefreshed", {
     time: new Date(props.lastRunAt).toLocaleTimeString(),
