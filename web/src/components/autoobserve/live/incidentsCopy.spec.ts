@@ -137,6 +137,40 @@ describe("analysisLine", () => {
     }
   });
 
+  it("each stored not-run reason reads in plain words", () => {
+    const reasons = [
+      ["rca_disabled", "Not analyzed", "muted", "AI analysis was off when this incident opened."],
+      [
+        "ai_unavailable",
+        "Not analyzed",
+        "muted",
+        "AI analysis wasn't available when this incident opened.",
+      ],
+      [
+        "quota_exceeded",
+        "Not analyzed",
+        "warn",
+        "The organization had reached its AI analysis limit.",
+      ],
+      [
+        "cooling_down",
+        "Not analyzed",
+        "muted",
+        "An analysis had just run, so a new one did not start.",
+      ],
+      ["start_failed", "Failed", "err", "The analysis couldn't start."],
+    ] as const;
+    for (const [reason, label, tone, detail] of reasons) {
+      for (const rcaEnabled of [true, false]) {
+        const line = analysisLine(gt, withRun(4, { not_run_reason: reason }), rcaEnabled);
+        expect(line).toEqual({ label, tone, detail, hasRun: false, spinner: false });
+        expect(`${line.label} ${line.detail}`).not.toMatch(
+          /rca_disabled|ai_unavailable|quota_exceeded|cooling_down|start_failed/,
+        );
+      }
+    }
+  });
+
   it("labels match rcaCellModel for the same run", () => {
     for (const i of [0, 2]) {
       const run = item(i).investigation;

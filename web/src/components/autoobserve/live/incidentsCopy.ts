@@ -20,7 +20,13 @@ import type {
   AutoObserveIncidentList,
 } from "@/services/autoobserve";
 import type { Incident } from "@/services/incidents";
-import { OUTCOME, isLiveRca, type RcaCellTone } from "@/utils/incidents/rcaCell";
+import {
+  NOT_RUN,
+  OUTCOME,
+  isLiveRca,
+  isStoredNotRunReason,
+  type RcaCellTone,
+} from "@/utils/incidents/rcaCell";
 import { agoText, formatWhen } from "./liveCopy";
 
 export interface AnalysisLine {
@@ -90,6 +96,10 @@ const notRunLine = (
         severity: raw(String(item.incident.severity).toUpperCase()),
       }),
     );
+  if (isStoredNotRunReason(reason)) {
+    const notRun = NOT_RUN[reason];
+    return line(t(notRun.label), notRun.tone, false, t(notRun.detail));
+  }
   if (reason)
     return line(
       t("alerts.incidents.aiAnalysis.rcaOff"),
@@ -105,7 +115,7 @@ const notRunLine = (
       t("autoobserveLive.incidents.analysis.disabledDetail"),
     );
   return line(
-    t("autoobserveLive.incidents.analysis.notRun"),
+    t("alerts.incidents.aiAnalysis.notAnalyzed"),
     "muted",
     false,
     t("autoobserveLive.incidents.analysis.notRunDetail"),

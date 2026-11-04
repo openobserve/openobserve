@@ -12199,6 +12199,14 @@
         "unblockedBy": "unblocked by {user}",
         "until": "until {time}",
         "unavailable": "AI analysis is not available for this organization.",
+        "notAnalyzed": "Not analyzed",
+        "reason": {
+          "rcaDisabled": "AI analysis was off when this incident opened.",
+          "aiUnavailable": "AI analysis wasn't available when this incident opened.",
+          "quotaExceeded": "The organization had reached its AI analysis limit.",
+          "coolingDown": "An analysis had just run, so a new one did not start.",
+          "startFailed": "The analysis couldn't start."
+        },
         "outcome": {
           "rootCauseIdentified": "Root cause identified",
           "multipleRootCauses": "Multiple root causes",
@@ -12280,6 +12288,7 @@
       "rawPayloadTitle": "Raw alert payload",
       "rawPayloadError": "Failed to load the raw payload for this alert",
       "externalSourceTooltip": "Triggered by external alert source(s)",
+      "triggerSourceAutoObserve": "AutoObserve",
       "correlatedByServiceDiscovery": "Dimensions",
       "correlatedBySemanticGroups": "Dimensions",
       "correlatedByAlertId": "Alert ID",
@@ -12521,6 +12530,18 @@
       "initialTrigger": "Initial trigger",
       "noDimensionsAvailable": "No dimensions available",
       "noAlertDetailsAvailable": "No alert details available",
+      "findingDimension": "Finding",
+      "findingKind": {
+        "stream_silence": "Stopped sending data",
+        "stream_drop": "Volume dropped sharply",
+        "stream_rise": "Volume rose sharply",
+        "other": "Stream finding"
+      },
+      "findingDetailsHeader": "Finding details",
+      "findingWhatHappened": "What happened",
+      "findingStarted": "Started",
+      "findingNote": "AutoObserve opened this incident from a stream finding, so there is no alert rule to show.",
+      "findingNoteNoFacts": "AutoObserve opened this incident from a stream finding. Its stream details are not available.",
       "clickOnTriggerToViewDetails": "Click on a trigger in the table to view details",
       "refreshCorrelatedData": "Refresh correlated data",
       "showingCorrelatedTraces": "Showing correlated traces from incident timeframe",
@@ -28750,7 +28771,6 @@
         "noResponse": "The request got no response at {time}."
       },
       "analysis": {
-        "notRun": "Not analyzed",
         "notRunDetail": "No analysis has started. Open the incident to start one.",
         "disabledDetail": "AI analysis is turned off for this deployment.",
         "offOther": "Automatic analysis did not run for this incident.",

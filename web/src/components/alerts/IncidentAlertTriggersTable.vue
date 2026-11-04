@@ -63,6 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ row.detected_source }}
         </OTag>
+        <OTag
+          v-else-if="row.alert_kind === 'autoobserve'"
+          data-test="trigger-source-autoobserve"
+          variant="default-outline"
+        >
+          {{ t("alerts.incidents.triggerSourceAutoObserve") }}
+        </OTag>
         <span v-else class="text-text-secondary text-xs">—</span>
       </template>
 
@@ -158,7 +165,7 @@ interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
-  alert_kind?: "internal" | "external";
+  alert_kind?: "internal" | "external" | "autoobserve";
   alert_fired_at: number;
   correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;

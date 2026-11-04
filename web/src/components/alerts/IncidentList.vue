@@ -169,11 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
             <ODimensionChip
-              v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
-              :key="key"
-              :dim-key="key"
-              :value="value"
-              :tooltip="true"
+              v-for="dim in displayDimensions(row.group_values).slice(0, 2)"
+              :key="dim.key"
+              :dim-key="dim.key"
+              :key-label="dim.label"
+              :value="dim.value"
+              :tooltip="!dim.label"
               class="min-w-0"
             />
             <OTag
@@ -181,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="countChip"
               value="neutral"
               class="shrink-0"
+              data-test="incident-dimensions-more"
             >
               {{
                 t("alerts.incidents.moreDimensions", {
@@ -190,12 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
                   <div class="space-y-1">
-                    <div
-                      v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
-                      :key="key"
-                    >
-                      <span>{{ key }}</span
-                      >=<span>{{ value }}</span>
+                    <div v-for="dim in displayDimensions(row.group_values).slice(2)" :key="dim.key">
+                      <span>{{ dim.label ?? dim.key }}</span
+                      >=<span>{{ dim.value }}</span>
                     </div>
                   </div>
                 </template>
@@ -401,6 +400,7 @@ import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import { dimensionDisplay } from "@/utils/incidents/findingDimensions";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -1011,6 +1011,12 @@ export default defineComponent({
       return sorted;
     };
 
+    const displayDimensions = (dimensions: Record<string, string> | undefined) =>
+      getSortedDimensions(dimensions).map(([key, value]) => {
+        const shown = dimensionDisplay(t, dimensions, key, value);
+        return { key, label: shown.label ?? undefined, value: shown.value };
+      });
+
     const getDimensionColorClass = (key: string) => {
       const colorMap: Record<string, string> = {
         "k8s-deployment": "badge-blue",
@@ -1176,6 +1182,7 @@ export default defineComponent({
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
+      displayDimensions,
       getDimensionColorClass,
       qTableRef,
       store,
