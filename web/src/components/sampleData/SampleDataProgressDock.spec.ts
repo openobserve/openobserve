@@ -65,6 +65,21 @@ describe("SampleDataProgressDock", () => {
     session.start.mockClear();
   });
 
+  it("announces only the state line, not the counts", async () => {
+    const wrapper = mountDock();
+    await flushPromises();
+    expect(
+      wrapper.get('[data-test="sample-data-progress-dock"]').attributes("role"),
+    ).toBeUndefined();
+    const live = wrapper.findAll('[role="status"]');
+    expect(live.map((el) => el.text())).toEqual([enLocale.sampleData.welcome.progress.title]);
+    session.status.value = "failed";
+    await flushPromises();
+    expect(wrapper.findAll('[role="status"]').map((el) => el.text())).toEqual([
+      enLocale.sampleData.toast.loadFailed,
+    ]);
+  });
+
   it("shows a failed state with retry when a background load fails", async () => {
     const wrapper = mountDock();
     session.status.value = "failed";

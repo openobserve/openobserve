@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section
     v-if="loading || done || failed"
     class="bg-surface-base border-border-default rounded-surface fixed end-4 bottom-4 z-40 flex w-92 max-w-[calc(100vw-2rem)] flex-col gap-3 border p-4 shadow-lg"
-    role="status"
     data-test="sample-data-progress-dock"
     :data-state="failed ? 'failed' : done ? 'done' : 'loading'"
   >
     <template v-if="loading">
       <div class="flex items-center gap-2">
         <OIcon name="progress-activity" size="sm" class="text-accent animate-spin" />
-        <strong class="text-text-heading flex-1 text-sm">{{
+        <strong role="status" class="text-text-heading flex-1 text-sm">{{
           t("sampleData.welcome.progress.title")
         }}</strong>
         <span class="text-text-secondary text-xs">{{ percent }}</span>
@@ -53,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else-if="failed">
       <div class="flex items-center gap-2">
         <OIcon name="error" size="sm" class="text-status-error-text" />
-        <strong class="text-text-heading flex-1 text-sm">{{
+        <strong role="status" class="text-text-heading flex-1 text-sm">{{
           t("sampleData.toast.loadFailed")
         }}</strong>
         <OButton
@@ -87,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="flex items-center gap-2">
         <OIcon name="check-circle" size="sm" class="text-status-success-text" />
-        <strong class="text-text-heading flex-1 text-sm">{{
+        <strong role="status" class="text-text-heading flex-1 text-sm">{{
           t("sampleData.welcome.ready.title")
         }}</strong>
         <OButton
