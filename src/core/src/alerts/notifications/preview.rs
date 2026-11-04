@@ -235,25 +235,8 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
 
     let ctx = match req.kind {
         NotificationKind::Alert => synthetic_context(level),
-        kind => {
-            let mut ctx = super::examples::example_context_at(kind, level);
-            if let Some(level) = level {
-                ctx.level = Some(level);
-                // On-call's alert_level is a priority and synthetics/downtime leave it blank.
-                if [
-                    AlertLevel::Critical,
-                    AlertLevel::Warning,
-                    AlertLevel::Ok,
-                    AlertLevel::NoData,
-                ]
-                .iter()
-                .any(|l| l.as_str() == ctx.alert_level)
-                {
-                    ctx.alert_level = level.as_str().into();
-                }
-            }
-            ctx
-        }
+        // The selection only picks the sample; its level is the one a live send carries.
+        kind => super::examples::example_context_at(kind, level),
     };
 
     let content = resolve_content(&req.definition, &ctx, format.channel_family());
@@ -685,6 +668,36 @@ mod tests {
         assert_eq!(
             read("ok"),
             "🟢 checkout API recovered|Recovered|false|false"
+        );
+    }
+
+    #[test]
+    fn a_playground_sample_carries_the_level_and_event_a_live_send_has() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        use super::super::examples::example_context_at;
+        let at = |kind, level| {
+            let ctx = example_context_at(kind, level);
+            (ctx.level, ctx.event)
+        };
+        let firing = NotificationEvent::Firing;
+        let notice = NotificationEvent::Informational;
+        assert_eq!(
+            at(NotificationKind::Incident, Some(AlertLevel::Warning)),
+            (Some(AlertLevel::Critical), firing)
+        );
+        assert_eq!(
+            at(NotificationKind::Incident, None),
+            (Some(AlertLevel::Warning), firing)
+        );
+        assert_eq!(at(NotificationKind::OnCall, None), (None, firing));
+        assert_eq!(
+            at(NotificationKind::Synthetics, Some(AlertLevel::NoData)),
+            (Some(AlertLevel::Warning), notice)
+        );
+        assert_eq!(
+            at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
+            (Some(AlertLevel::Warning), notice)
         );
     }
 }

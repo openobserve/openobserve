@@ -367,9 +367,12 @@ pub fn is_reserved_default_name(name: &str) -> bool {
 }
 
 /// Renames user rows with a reserved default name to `user_{name}` and moves their references.
+/// `overrides` also moves the anomaly, synthetics and on-call template columns; migration 137
+/// runs before 138 to 140 add them, so it passes false.
 pub async fn rename_reserved_collisions<C>(
     db: &C,
     seeds: &[&str],
+    overrides: bool,
 ) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
 where
     C: ConnectionTrait + sea_orm::TransactionTrait,
@@ -399,6 +402,9 @@ where
             .await?;
         let scope = (row.org != DEFAULT_ORG).then_some(row.org.as_str());
         follow_rename(&txn, scope, &row.name, &to).await?;
+        if overrides {
+            follow_override_rename(&txn, scope, &row.name, &to).await?;
+        }
         renames.push(ReservedRename {
             org: row.org,
             from: row.name,
@@ -484,6 +490,37 @@ async fn follow_rename<C: ConnectionTrait>(
         active.setting_value = Set(value);
         active.update(db).await?;
     }
+    Ok(())
+}
+
+/// Points anomaly, synthetics and on-call template overrides at the new name; `None` is every org.
+async fn follow_override_rename<C: ConnectionTrait>(
+    db: &C,
+    org: Option<&str>,
+    from: &str,
+    to: &str,
+) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::sea_query::Expr;
+
+    use super::entity::{anomaly_detection_config, oncall_policies, synthetics_checks};
+
+    let mut anomaly = anomaly_detection_config::Entity::update_many()
+        .col_expr(anomaly_detection_config::Column::Template, Expr::value(to))
+        .filter(anomaly_detection_config::Column::Template.eq(from));
+    let mut synthetics = synthetics_checks::Entity::update_many()
+        .col_expr(synthetics_checks::Column::Template, Expr::value(to))
+        .filter(synthetics_checks::Column::Template.eq(from));
+    let mut oncall = oncall_policies::Entity::update_many()
+        .col_expr(oncall_policies::Column::Template, Expr::value(to))
+        .filter(oncall_policies::Column::Template.eq(from));
+    if let Some(org) = org {
+        anomaly = anomaly.filter(anomaly_detection_config::Column::OrgId.eq(org));
+        synthetics = synthetics.filter(synthetics_checks::Column::OrgId.eq(org));
+        oncall = oncall.filter(oncall_policies::Column::OrgId.eq(org));
+    }
+    anomaly.exec(db).await?;
+    synthetics.exec(db).await?;
+    oncall.exec(db).await?;
     Ok(())
 }
 
@@ -1144,7 +1181,9 @@ mod tests {
         .await
         .unwrap();
 
-        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
 
         assert_eq!(
             renames,
@@ -1219,7 +1258,7 @@ mod tests {
 
         // A second boot finds nothing left under the prefix that is not a seed.
         assert!(
-            rename_reserved_collisions(&db, &BOOT_SEEDS)
+            rename_reserved_collisions(&db, &BOOT_SEEDS, false)
                 .await
                 .unwrap()
                 .is_empty()
@@ -1232,7 +1271,9 @@ mod tests {
         insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
         insert_row(&db, DEFAULT_ORG, "user_o2_default_anomaly", false, "custom").await;
 
-        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
 
         assert_eq!(
             renames,
@@ -1269,7 +1310,9 @@ mod tests {
         let before = body_for(&db, "o2_default_mine").await;
         assert_eq!(before, "shared body");
 
-        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
 
         assert_eq!(
             renames,
@@ -1350,7 +1393,9 @@ mod tests {
         let mine = row_id(&db, DEFAULT_ORG, "o2_default_incident").await;
         insert_destination(&db, "mine-dest", &mine).await;
 
-        rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
         retire_default_templates(&db).await.unwrap();
 
         assert_eq!(
@@ -1380,7 +1425,7 @@ mod tests {
         let seed = row_id(&db, DEFAULT_ORG, "o2_default_anomaly").await;
         insert_destination(&db, "seed-dest", &seed).await;
 
-        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS, false)
             .await
             .unwrap();
         retire_default_templates(&db).await.unwrap();
@@ -1512,11 +1557,11 @@ mod tests {
         let mine = row_id(&db, DEFAULT_ORG, DEFAULT_TEMPLATE_NAME).await;
 
         // Migration 137 then 143, as an upgrade from main runs them.
-        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS, false)
             .await
             .unwrap();
         record_pending_renames(&db, &renames).await.unwrap();
-        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS, false)
             .await
             .unwrap();
         record_pending_renames(&db, &renames).await.unwrap();
@@ -1551,7 +1596,7 @@ mod tests {
         assert_eq!(pending_renames(&db).await.unwrap(), pending);
         // The seeder's own prebuilt_default is a seed at boot.
         assert!(
-            rename_reserved_collisions(&db, &BOOT_SEEDS)
+            rename_reserved_collisions(&db, &BOOT_SEEDS, false)
                 .await
                 .unwrap()
                 .is_empty()
@@ -1563,7 +1608,9 @@ mod tests {
         let db = reference_db().await;
         let long = format!("o2_default_{}", "x".repeat(245));
         insert_row(&db, "acme", &long, false, "custom").await;
-        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
         assert!(renames[0].to.starts_with("user_o2_default_x"));
         assert!(renames[0].to.chars().count() <= 250, "{}", renames[0].to);
     }
@@ -1578,7 +1625,9 @@ mod tests {
         insert_alert(&db, "alerts", "other", "seed-alert", "o2_default").await;
         insert_alert(&db, "alerts", "acme", "mine-alert", "o2_default").await;
 
-        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
         retire_default_templates(&db).await.unwrap();
 
         assert_eq!(
@@ -1601,5 +1650,39 @@ mod tests {
             alert_template(&db, "alerts", "mine-alert").await.as_deref(),
             Some("user_o2_default")
         );
+    }
+
+    #[tokio::test]
+    async fn a_boot_rename_moves_the_anomaly_synthetics_and_on_call_overrides() {
+        let db = retire_db().await;
+        // A user row saved in the default org has is_default set, so it is not the seed.
+        insert_row(&db, DEFAULT_ORG, "prebuilt_default", true, "content").await;
+        insert_alert(
+            &db,
+            "anomaly_detection_config",
+            "acme",
+            "spike",
+            "prebuilt_default",
+        )
+        .await;
+        insert_alert(&db, "synthetics", "acme", "home", "prebuilt_default").await;
+        insert_alert(&db, "oncall_policies", "acme", "team-a", "prebuilt_default").await;
+
+        rename_reserved_collisions(&db, &BOOT_SEEDS, true)
+            .await
+            .unwrap();
+
+        for table in ["anomaly_detection_config", "synthetics", "oncall_policies"] {
+            let name = match table {
+                "anomaly_detection_config" => "spike",
+                "synthetics" => "home",
+                _ => "team-a",
+            };
+            assert_eq!(
+                alert_template(&db, table, name).await.as_deref(),
+                Some("user_prebuilt_default"),
+                "{table}"
+            );
+        }
     }
 }

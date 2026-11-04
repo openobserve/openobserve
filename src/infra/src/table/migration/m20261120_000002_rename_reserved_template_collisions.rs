@@ -27,7 +27,8 @@ impl MigrationTrait for Migration {
             MIGRATION_SEEDS, record_pending_renames, rename_reserved_collisions,
         };
         let db = manager.get_connection();
-        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS).await?;
+        // The override columns arrive in 138 to 140, after this migration.
+        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS, false).await?;
         // The ownership tuples live outside the meta store, so boot moves them.
         record_pending_renames(db, &renames).await?;
         for r in renames {

@@ -230,12 +230,32 @@ pub fn example_context_at(
         Some(AlertLevel::NoData) => CheckSample::Flaky,
         _ => CheckSample::Failing,
     };
-    sample(
-        kind,
-        level == Some(AlertLevel::Ok),
-        sample_priority(level),
-        check,
-    )
+    let priority = sample_priority(level);
+    let mut ctx = sample(kind, level == Some(AlertLevel::Ok), priority, check);
+    // The level a live send of this kind carries, so the dot and show_when match it.
+    match kind {
+        NotificationKind::Incident if level != Some(AlertLevel::Ok) => {
+            ctx.level = Some(match priority {
+                "P1" | "P2" => AlertLevel::Critical,
+                _ => AlertLevel::Warning,
+            });
+        }
+        NotificationKind::OnCall if level != Some(AlertLevel::Ok) => {
+            ctx.level = match priority {
+                "P1" => Some(AlertLevel::Critical),
+                "P2" => Some(AlertLevel::Warning),
+                _ => None,
+            };
+        }
+        NotificationKind::Anomaly => {
+            if let Some(level) = level {
+                ctx.level = Some(level);
+                ctx.alert_level = level.as_str().into();
+            }
+        }
+        _ => {}
+    }
+    ctx
 }
 
 /// The priority a Playground severity reads as: P1 to P4 in the order the panel lists them.
@@ -380,7 +400,11 @@ fn synthetics_example(check: CheckSample) -> NotificationContext {
     ctx.alert_name = "checkout API".into();
     ctx.alert_url = url.into();
     ctx.episode_id = Some("chk_9d".into());
-    ctx.event = event_of(resolved);
+    // A live degraded or flaky send is a notice, which platforms skip.
+    ctx.event = match check {
+        CheckSample::Degraded | CheckSample::Flaky => NotificationEvent::Informational,
+        _ => event_of(resolved),
+    };
     ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
     // (state word, subject, headline, label, raw status, locations, error)
     let (state, title, description, label, status, locations, error) = match check {

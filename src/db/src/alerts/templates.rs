@@ -402,9 +402,10 @@ pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<St
 pub async fn rename_reserved_collisions()
 -> Result<Vec<table::templates::ReservedRename>, TemplateError> {
     let db = infra::db::get_orm_client_rw().await;
-    let renames = table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS)
-        .await
-        .map_err(infra::errors::Error::from)?;
+    let renames =
+        table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS, true)
+            .await
+            .map_err(infra::errors::Error::from)?;
     for r in &renames {
         infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
             .await?;

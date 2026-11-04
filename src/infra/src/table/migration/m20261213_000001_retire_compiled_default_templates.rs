@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
             MIGRATION_SEEDS, record_pending_renames, rename_reserved_collisions,
         };
         // A user row named prebuilt_default moves aside before the retired rows take the name.
-        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS).await?;
+        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS, true).await?;
         record_pending_renames(db, &renames).await?;
         for r in crate::table::templates::retire_default_templates(db).await? {
             log::info!("[TEMPLATES] retired template '{}' into '{}'", r.from, r.to);
