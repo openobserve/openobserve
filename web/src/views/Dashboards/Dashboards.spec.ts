@@ -80,6 +80,8 @@ vi.mock("@/services/settings", async (importOriginal) => {
 import settingsService from "@/services/settings";
 import * as commons from "@/utils/commons";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { gt } from "@/types/i18n";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, "removeAttribute", {
@@ -1088,6 +1090,47 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+  });
+
+  describe("Home pin after a move", () => {
+    const pinIn = (folderId: string) => ({
+      data: { setting_value: { dashboardId: "d1", folderId, label: "Pinned" } },
+    });
+
+    afterEach(() => {
+      useHomeDashboard(gt).homeDashboard.value = null;
+    });
+
+    const mountWithWarmPin = async () => {
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("B") as any);
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
+      vi.mocked(settingsService.getSetting).mockClear();
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("A") as any);
+    };
+
+    it("re-reads the pin past a warm cache when the pinned dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["d1"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+      expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+
+    it("does not re-read the pin when a different dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["other"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(settingsService.getSetting).not.toHaveBeenCalled();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
     });
   });
 

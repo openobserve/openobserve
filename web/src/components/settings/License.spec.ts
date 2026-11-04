@@ -1275,6 +1275,306 @@ describe("License.vue", () => {
     });
   });
 
+  describe("License features row", () => {
+    const configFeatures = {
+      alerts: "enabled",
+      dashboards: "enabled",
+      sso: "enabled",
+      rbac: "locked",
+      ai: "locked",
+      pipelines: "hidden",
+    };
+    const featureDefinition = {
+      features: {
+        alerts: {},
+        dashboards: { gate: false },
+        sso: { gate: true },
+        rbac: { gate: true },
+        ai: { gate: true },
+        pipelines: { gate: false },
+        metering: { gate: true, plumbing: true },
+      },
+    };
+
+    const mountWith = async (
+      license: Record<string, unknown>,
+      features: object = configFeatures,
+    ) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          license: { ...mockLicenseData.license, ...license },
+        }),
+      );
+      store = createStore({
+        state: { zoConfig: { license_server_url: "https://license.example.com", features } },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    };
+
+    const find = (name: string) => wrapper.find(`[data-test=settings-license-features${name}]`);
+    const items = (name: string) =>
+      find(`-${name}`)
+        .findAll("li")
+        .map((li: any) => li.text());
+    const selectTab = async (id: string) => {
+      wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", id);
+      await flushPromises();
+    };
+    const licenseUrl =
+      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123";
+
+    it("summarises unlocked of paid features and the free count", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(find("").text()).toContain("Features");
+      expect(find("-summary").text()).toBe(
+        "Your license unlocks 1 of 3 paid features. 3 free features are always included.",
+      );
+    });
+
+    it("splits a feature definition into unlocked, missing and free", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(items("unlocked")).toEqual(["sso"]);
+      expect(items("missing")).toEqual(["ai", "rbac"]);
+      expect(items("free")).toEqual(["alerts", "dashboards", "metering"]);
+    });
+
+    it("falls back to the license list and the org config without a feature definition", async () => {
+      await mountWith({ features: ["sso", "alerts"] });
+
+      expect(items("unlocked")).toEqual(["alerts", "sso"]);
+      expect(items("missing")).toEqual(["ai", "rbac"]);
+      expect(items("free")).toEqual(["dashboards"]);
+    });
+
+    it("keeps a listed key unlocked even when the config hides it", async () => {
+      await mountWith({ features: ["sso", "pipelines"], feature_definition: featureDefinition });
+
+      expect(items("unlocked")).toEqual(["pipelines", "sso"]);
+      expect(find("-summary").text()).toContain("2 of 4 paid features");
+    });
+
+    it("hides the missing group and request access when nothing is missing", async () => {
+      await mountWith({ features: ["sso"] }, { alerts: "enabled", sso: "enabled" });
+
+      expect(find("-missing").exists()).toBe(false);
+      expect(find("-request-access").exists()).toBe(false);
+    });
+
+    it("reads 0 of N for an empty features list", async () => {
+      await mountWith({ features: [], feature_definition: featureDefinition });
+
+      expect(find("-summary").text()).toContain("0 of 3 paid features");
+      expect(find("-unlocked").exists()).toBe(false);
+    });
+
+    it("shows only the all-features summary for a license without a features list", async () => {
+      await mountWith({ feature_definition: featureDefinition });
+
+      expect(find("-summary").text()).toBe("Your license unlocks all features.");
+      expect(find("-list").exists()).toBe(false);
+      expect(find("-search").exists()).toBe(false);
+    });
+
+    it("always shows search, tabs and the fixed list box without expand or collapse", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(find("-search").exists()).toBe(true);
+      expect(find("-filter").exists()).toBe(true);
+      expect(find("-list").classes()).toEqual(expect.arrayContaining(["h-44", "overflow-auto"]));
+      expect(find("-expand").exists()).toBe(false);
+      expect(find("-collapse").exists()).toBe(false);
+    });
+
+    it("shows only the selected group for a filter tab", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(find("-filter").text()).toContain("All 6");
+      expect(find("-filter").text()).toContain("Not in your license 2");
+      await selectTab("missing");
+      expect(items("missing")).toEqual(["ai", "rbac"]);
+      expect(find("-unlocked").exists()).toBe(false);
+      expect(find("-free").exists()).toBe(false);
+    });
+
+    it("searches across groups and shows the no-match state when nothing matches", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const search = wrapper.findComponent({ name: "OSearchInput" });
+
+      search.vm.$emit("update:modelValue", "AL");
+      await flushPromises();
+      expect(items("free")).toEqual(["alerts"]);
+      expect(find("-unlocked").exists()).toBe(false);
+      expect(find("-missing").exists()).toBe(false);
+
+      search.vm.$emit("update:modelValue", "zzz");
+      await flushPromises();
+      expect(find("-empty").text()).toBe("No features match your search");
+      search.vm.$emit("update:modelValue", "");
+      await flushPromises();
+      expect(find("-empty").exists()).toBe(false);
+      expect(items("free")).toEqual(["alerts", "dashboards", "metering"]);
+    });
+
+    it("request access opens the same license-server page as Request new License", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+      await wrapper.find("[data-test=request-new-license-btn]").trigger("click");
+
+      expect(open).toHaveBeenCalledTimes(2);
+      for (const call of open.mock.calls) expect(call).toEqual([licenseUrl, "_blank"]);
+      open.mockRestore();
+    });
+
+    it("lets the masked license key wrap while the reveal button keeps its size", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const button = wrapper.find("[data-test=show-license-key-btn]");
+
+      expect(button.classes()).toContain("shrink-0");
+      expect(button.element.parentElement?.classList).toContain("flex-wrap");
+      expect(button.element.previousElementSibling?.classList).toContain("break-all");
+    });
+
+    it("strips trailing slashes from the license server url", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      store.state.zoConfig.license_server_url = "https://license.example.com//";
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+
+      expect(open).toHaveBeenCalledWith(licenseUrl, "_blank");
+      open.mockRestore();
+    });
+
+    describe("new after your license", () => {
+      const withNew = {
+        ...configFeatures,
+        workflows: "locked",
+        traces_v2: "enabled",
+        legacy_beta: "hidden",
+      };
+      const licensed = { features: ["sso"], feature_definition: featureDefinition };
+
+      it("lists config keys missing from the license definition, ignoring hidden ones", async () => {
+        await mountWith(licensed, withNew);
+
+        expect(items("new")).toEqual(["traces_v2", "workflows"]);
+        expect(find("-new").text()).not.toContain("legacy_beta");
+        expect(find("-new").text()).toContain("New after your license · 2");
+        expect(find("-summary").text()).toBe(
+          "Your license unlocks 1 of 3 paid features. 3 free features are always included.",
+        );
+      });
+
+      it("hides the group when New is empty", async () => {
+        await mountWith(licensed, { ...configFeatures, legacy_beta: "hidden" });
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("hides the group without a feature definition", async () => {
+        await mountWith({ features: ["sso"] }, withNew);
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("hides the group without a features list", async () => {
+        await mountWith({ feature_definition: featureDefinition }, withNew);
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("shows enabled keys with the free dot and locked keys with a lock", async () => {
+        await mountWith(licensed, withNew);
+        const icons = find("-new")
+          .findAll("li")
+          .map((li: any) => li.findComponent({ name: "OIcon" }).exists());
+
+        expect(icons).toEqual([false, true]);
+        expect(find("-new").find("li .lock-chip").exists()).toBe(true);
+      });
+
+      it("shows request access when only a New key is locked and opens the license page", async () => {
+        const allPaid = { features: ["sso", "ai", "rbac"], feature_definition: featureDefinition };
+        await mountWith(allPaid, { ...configFeatures, traces_v2: "enabled" });
+        expect(find("-request-access").exists()).toBe(false);
+
+        wrapper.unmount();
+        await mountWith(allPaid, withNew);
+        const open = vi.spyOn(window, "open").mockReturnValue(null);
+        await find("-request-access").trigger("click");
+
+        expect(open).toHaveBeenCalledWith(licenseUrl, "_blank");
+        open.mockRestore();
+      });
+
+      it("filters to the New group with its tab and covers it in search", async () => {
+        await mountWith(licensed, withNew);
+
+        expect(find("-filter").text()).toContain("All 8");
+        expect(find("-filter").text()).toContain("New 2");
+        await selectTab("new");
+        expect(items("new")).toEqual(["traces_v2", "workflows"]);
+        expect(find("-unlocked").exists()).toBe(false);
+        expect(find("-missing").exists()).toBe(false);
+        expect(find("-free").exists()).toBe(false);
+
+        await selectTab("all");
+        wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "WORK");
+        await flushPromises();
+        expect(items("new")).toEqual(["workflows"]);
+        expect(find("-free").exists()).toBe(false);
+      });
+
+      it("orders groups and filter tabs unlocked, missing, new, free", async () => {
+        await mountWith(licensed, withNew);
+        const order = (prefix: string, ids: string[]) =>
+          wrapper
+            .findAll(`[data-test^=${prefix}]`)
+            .map((el: any) => el.attributes("data-test").slice(prefix.length))
+            .filter((id: string) => ids.includes(id));
+
+        expect(order("settings-license-features-", ["unlocked", "missing", "new", "free"])).toEqual(
+          ["unlocked", "missing", "new", "free"],
+        );
+        expect(
+          order("settings-license-features-filter-", ["all", "unlocked", "missing", "new", "free"]),
+        ).toEqual(["all", "unlocked", "missing", "new", "free"]);
+      });
+
+      it("cuts list keys with an overflow-only tooltip instead of a title or breaking them", async () => {
+        await mountWith(licensed, withNew);
+        const label = find("-new").find("li [data-test=o-truncated-text]");
+
+        expect(label.text()).toBe("traces_v2");
+        expect(label.attributes("title")).toBeUndefined();
+        expect(label.classes()).not.toContain("break-all");
+      });
+
+      it("has no New tab when New is empty", async () => {
+        await mountWith(licensed);
+
+        expect(find("-filter-new").exists()).toBe(false);
+      });
+
+      it("never puts a key in two groups", async () => {
+        await mountWith({ ...licensed, features: ["sso", "workflows"] }, withNew);
+        const all = ["unlocked", "missing", "free", "new"].flatMap((group) => items(group));
+
+        expect(new Set(all).size).toBe(all.length);
+        expect(items("unlocked")).toEqual(["sso", "workflows"]);
+        expect(items("new")).toEqual(["traces_v2"]);
+      });
+    });
+  });
+
   describe("Component Cleanup", () => {
     it("should cleanup properly on unmount", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));

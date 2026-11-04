@@ -2,6 +2,10 @@ import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
+// The search-job worker starts one queued job per 10 s tick, and parallel tests queue several jobs.
+const SEARCH_JOB_START_TIMEOUT_MS = 120000;
+const JOB_STATUS = { PENDING: 0, RUNNING: 1, FINISHED: 2 };
+
 export class JobSchedulerPage {
     constructor(page) {
         this.page = page;
@@ -96,6 +100,16 @@ export class JobSchedulerPage {
         return jobs.findIndex(job => job.trace_id === trace_id);
     }
 
+    async _getJobStatus(trace_id) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
+        const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+        expect(response.status(), `GET search_jobs failed: ${await response.text()}`).toBe(200);
+        const job = (await response.json()).find(j => j.trace_id === trace_id);
+        expect(job, `Job with trace ID ${trace_id} not found in search_jobs`).toBeTruthy();
+        return job.status;
+    }
+
 
 async deleteJobSearch(trace_id) {
       const rowIndex = await this._getJobRowIndex(trace_id);
@@ -165,33 +179,27 @@ async cancelJobSearch(trace_id) {
 }
 
 async exploreJob(trace_id) {
-    // The explore button is disabled while the job is pending (status=0) or failed (status=3).
-    // Retry: each attempt re-fetches the list and checks whether the button is enabled.
-    const maxRetries = 5;
-    let clicked = false;
+    // Explore is enabled only once the job has left pending (0) and was not cancelled (3).
+    let status;
+    await expect.poll(async () => {
+        status = await this._getJobStatus(trace_id);
+        return status;
+    }, {
+        message: `Search job ${trace_id} never left the pending queue`,
+        timeout: SEARCH_JOB_START_TIMEOUT_MS,
+        intervals: [2000, 5000],
+    }).not.toBe(JOB_STATUS.PENDING);
+    expect([JOB_STATUS.RUNNING, JOB_STATUS.FINISHED], `Search job ${trace_id} ended in status ${status}`).toContain(status);
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
-        if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
+    const rowIndex = await this._getJobRowIndex(trace_id, 15000);
+    if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-        const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
+    const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+    await row.waitFor({ state: 'visible', timeout: 10000 });
 
-        const exploreButton = row.locator('[data-test="search-scheduler-explore-btn"]');
-        const isEnabled = await exploreButton.isEnabled();
-        if (isEnabled) {
-            await exploreButton.click();
-            clicked = true;
-            break;
-        }
-
-        testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled (attempt ${attempt + 1}/${maxRetries}).`);
-        if (attempt < maxRetries - 1) await this.page.waitForTimeout(5000);
-    }
-
-    if (!clicked) {
-        throw new Error(`Explore button for trace ID ${trace_id} remained disabled after ${maxRetries} attempts.`);
-    }
+    const exploreButton = row.locator('[data-test="search-scheduler-explore-btn"]');
+    await expect(exploreButton, `Explore button for trace ID ${trace_id} is disabled`).toBeEnabled({ timeout: 10000 });
+    await exploreButton.click();
 
     await expect(
         this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job have been applied successfully' }).first()
