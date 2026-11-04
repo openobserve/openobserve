@@ -90,10 +90,10 @@ pub(super) fn optimizer_physical_plan(
     );
     let original_plan = Arc::clone(&plan);
     // a skipped rule leaves no condition and cannot optimize, which also drops the leader's mode
-    let plan = if index_info.skip_index {
-        plan
-    } else {
+    let plan = if index_info.use_index {
         index_rule.optimize(plan, ctx.state().config_options())?
+    } else {
+        plan
     };
 
     // if the index rule can't optimize, we should take the index optimizer rule
@@ -231,7 +231,7 @@ mod tests {
                 index_fields: vec!["kubernetes_namespace_name".to_string()],
                 ..Default::default()
             },
-            &IndexInfo::default(),
+            &index_on(),
         )
         .unwrap();
 
@@ -250,6 +250,13 @@ mod tests {
         ));
     }
 
+    fn index_on() -> IndexInfo {
+        IndexInfo {
+            use_index: true,
+            ..Default::default()
+        }
+    }
+
     async fn plan_with_index(sql: &str, use_index: bool) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
         let settings = StreamSearchSettings {
             index_fields: vec!["service".to_string()],
@@ -257,7 +264,7 @@ mod tests {
             ..Default::default()
         };
         let index_info = IndexInfo {
-            skip_index: !use_index,
+            use_index,
             ..Default::default()
         };
         let start_time = BASE_TIME.timestamp_micros();
@@ -358,8 +365,7 @@ mod tests {
         ] {
             let settings = settings_with_fts_added_at(field_added_at, index_updated_at);
             let (plan, index) =
-                plan_with_settings(sql, (start, start + 100), &settings, &IndexInfo::default())
-                    .await;
+                plan_with_settings(sql, (start, start + 100), &settings, &index_on()).await;
             assert_eq!(
                 index.condition.is_some(),
                 uses_index,
@@ -375,7 +381,7 @@ mod tests {
         let start = BASE_TIME.timestamp_micros() + 100;
         let settings = settings_with_fts_added_at(Some(start + 1), 0);
         let (plan, index) =
-            plan_with_settings(sql, (start, start + 100), &settings, &IndexInfo::default()).await;
+            plan_with_settings(sql, (start, start + 100), &settings, &index_on()).await;
         assert_eq!(
             index.condition,
             Some(IndexCondition {
@@ -462,7 +468,7 @@ mod tests {
                 stream_type,
                 (0, 100),
                 &StreamSearchSettings::default(),
-                &IndexInfo::default(),
+                &index_on(),
             )
             .unwrap();
 

@@ -141,7 +141,7 @@ impl From<FlightSearchRequest> for Request {
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
             use_cache: req.search_info.use_cache,
-            use_index: !req.index_info.skip_index,
+            use_index: req.index_info.use_index,
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
@@ -215,7 +215,10 @@ mod tests {
                 histogram_interval: 60,
                 ..Default::default()
             },
-            index_info: IndexInfo::default(),
+            index_info: IndexInfo {
+                use_index: true,
+                ..Default::default()
+            },
             super_cluster_info: SuperClusterInfo {
                 user_id: Some("alice".to_string()),
                 work_group: Some("wg1".to_string()),
@@ -245,9 +248,10 @@ mod tests {
     }
 
     #[test]
-    fn test_from_flight_request_maps_skip_index() {
+    fn test_from_flight_request_maps_use_index() {
         let mut flight = make_flight_request();
-        flight.index_info.skip_index = true;
+        assert!(Request::from(flight.clone()).use_index);
+        flight.index_info.use_index = false;
         assert!(!Request::from(flight).use_index);
         assert!(Request::default().use_index);
     }
