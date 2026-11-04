@@ -41,6 +41,12 @@ describe("calculateGridForSubPlot", () => {
       expect(result).toEqual([]);
     });
 
+    it("lays out a cell per grid when the panel measures 0 x 0, as a detached panel does", () => {
+      const result = calculateGridPositions(0, 0, 4);
+      expect(result.gridArray).toHaveLength(4);
+      expect(result.gridArray[3]).toEqual({ left: "50%", top: "50%", width: "50%", height: "50%" });
+    });
+
     it("should calculate grid for single element", () => {
       const result = calculateGridPositions(100, 100, 1);
 

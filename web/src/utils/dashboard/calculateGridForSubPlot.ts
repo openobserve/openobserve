@@ -6,8 +6,8 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
   if (numGrids <= 0) {
     return gridArray;
   }
-  // Calculate the aspect ratio of the available space
-  const aspectRatio = width / height;
+  // A detached or hidden panel measures 0 x 0, and NaN would lay out no cells at all.
+  const aspectRatio = width > 0 && height > 0 ? width / height : 1;
 
   let numRows = 1;
   let numCols = 1;
