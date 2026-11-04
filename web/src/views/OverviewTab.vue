@@ -958,13 +958,25 @@ const onDateChange = (value: any) => {
   loadAll();
 };
 
+interface ServiceCard {
+  id: string;
+  label: string;
+  requests: number;
+  error_rate: number;
+  stream_name?: string;
+  health: ServiceHealthStatus;
+  errorFlag: boolean;
+  latencyFlag: boolean;
+  latencyMultiplier: string | null;
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 const isLoading = ref(false);
 const lastFetched = ref<Date | null>(null);
 const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
 const incidentsTotal = ref(0);
-const services = ref<any[]>([]);
+const services = ref<ServiceCard[]>([]);
 const recentEvents = ref<any[]>([]);
 
 // True once any section has something to show. Gates the skeleton and the empty
