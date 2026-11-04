@@ -194,6 +194,47 @@ describe("FilterBuilder", () => {
       },
     );
 
+    it("dashboard-panel hides Is Empty and Is Not Empty while the server keeps them off", async () => {
+      const rows = await operatorRows("dashboard-panel", false);
+      expect(rows).not.toContain("is_empty");
+      expect(rows).not.toContain("is_not_empty");
+      expect(rows).toContain("is_null");
+    });
+
+    it("dashboard-panel still shows and writes back a saved Is Empty while the server keeps it off", async () => {
+      const empty = {
+        type: "condition",
+        column: { field: "level", streamAlias: null },
+        filterType: "condition",
+        operator: "Is Empty",
+        value: null,
+        logicalOperator: "AND",
+        values: [],
+      };
+      const other = { ...empty, column: { field: "service", streamAlias: null }, operator: "=" };
+      const saved = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [empty, { ...other, value: "api", logicalOperator: "OR" }],
+      };
+      const state = mountBuilder(
+        "dashboard-panel",
+        saved,
+        {},
+        { extended_condition_operators: false },
+      );
+      await flushPromises();
+      expect(wrapper!.text()).toContain("Is Empty");
+      await click("connector-1");
+      expect(state.value.conditions[1].logicalOperator).toBe("AND");
+      expect(state.value.conditions[0]).toEqual(empty);
+    });
+
+    it("dashboard-panel offers Is Empty and Is Not Empty once the server allows them", async () => {
+      const rows = await operatorRows("dashboard-panel", true);
+      expect(rows).toEqual(expect.arrayContaining(["is_empty", "is_not_empty"]));
+    });
+
     it("still shows a saved IN condition while the server keeps them off", async () => {
       const saved = v2(leaf("level", ["error", "warn"], "AND", "in"));
       const state = mountBuilder("alert", saved, {}, { extended_condition_operators: false });

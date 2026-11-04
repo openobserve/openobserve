@@ -547,23 +547,30 @@ export const EXTENDED_ENGINE_OPERATORS: readonly FilterOperatorId[] = [
   "contains_ci",
 ];
 
-const ENGINE_PROFILES: ReadonlySet<FilterProfileName> = new Set([
-  "alert",
-  "pipeline",
-  "workflow",
-  "eval",
-  "annotation",
-]);
+/** Dashboard panel operators older UIs drop on load, which then blocks the panel save. */
+export const EXTENDED_DASHBOARD_OPERATORS: readonly FilterOperatorId[] = [
+  "is_empty",
+  "is_not_empty",
+];
 
-/** A profile as this server allows it: engine profiles lose the extended operators unless `extendedOperators`. */
+const GATED_OPERATORS: Partial<Record<FilterProfileName, readonly FilterOperatorId[]>> = {
+  alert: EXTENDED_ENGINE_OPERATORS,
+  pipeline: EXTENDED_ENGINE_OPERATORS,
+  workflow: EXTENDED_ENGINE_OPERATORS,
+  eval: EXTENDED_ENGINE_OPERATORS,
+  annotation: EXTENDED_ENGINE_OPERATORS,
+  "dashboard-panel": EXTENDED_DASHBOARD_OPERATORS,
+};
+
+/** A profile as this server allows it: gated operators are dropped unless `extendedOperators`. */
 export const serverProfile = (
   name: FilterProfileName,
   extendedOperators: boolean,
 ): FilterProfile => {
   const profile = FILTER_PROFILES[name];
-  if (extendedOperators || !ENGINE_PROFILES.has(name)) return profile;
-  const allowed = (ids: FilterOperatorId[]) =>
-    ids.filter((id) => !EXTENDED_ENGINE_OPERATORS.includes(id));
+  const gated = GATED_OPERATORS[name];
+  if (extendedOperators || !gated) return profile;
+  const allowed = (ids: FilterOperatorId[]) => ids.filter((id) => !gated.includes(id));
   return {
     ...profile,
     operators: {

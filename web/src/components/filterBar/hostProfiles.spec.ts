@@ -20,6 +20,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { encodeProfileRouteFilters, parseProfileFilters } from "@/services/profiles";
 import { DASHBOARD_SPELLINGS } from "./codecs";
 import {
+  EXTENDED_DASHBOARD_OPERATORS,
   EXTENDED_ENGINE_OPERATORS,
   FILTER_PROFILES,
   serverProfile,
@@ -309,7 +310,17 @@ describe("serverProfile", () => {
     expect(serverProfile(name, false).codec).toBe(FILTER_PROFILES[name].codec);
   });
 
-  it.each(["logs", "traces", "metrics", "dashboard-panel", "rum-funnel", "profiles"] as const)(
+  it("drops Is Empty and Is Not Empty from dashboard panel filters unless the server allows them", () => {
+    const off = serverProfile("dashboard-panel", false).operators.string;
+    expect(off.filter((id) => EXTENDED_DASHBOARD_OPERATORS.includes(id))).toEqual([]);
+    expect(off).toEqual(expect.arrayContaining(["is_null", "is_not_null", "in", "contains_ci"]));
+    expect(serverProfile("dashboard-panel", true)).toBe(FILTER_PROFILES["dashboard-panel"]);
+    expect(serverProfile("dashboard-panel", false).codec).toBe(
+      FILTER_PROFILES["dashboard-panel"].codec,
+    );
+  });
+
+  it.each(["logs", "traces", "metrics", "rum-funnel", "profiles"] as const)(
     "leaves %s as it is",
     (name) => {
       expect(serverProfile(name, false)).toBe(FILTER_PROFILES[name]);
