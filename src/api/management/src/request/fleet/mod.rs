@@ -264,7 +264,7 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector is offline or does not accept restart commands", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn restart_collector(
@@ -1536,14 +1536,14 @@ pub async fn skip_rollout(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "RollbackFleetRollout",
-    summary = "Start an immediate rollout back to stable and mark this one rolled back",
+    summary = "Roll back to stable, or to the placeholder without one, and mark this rollout rolled back",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Rollout id"),
     ),
     responses(
-        (status = 200, description = "The rollout to stable", content_type = "application/json", body = config::meta::fleet::Rollout),
+        (status = 200, description = "The rollout to stable, or this rollout when the fleet has no stable version", content_type = "application/json", body = config::meta::fleet::Rollout),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
