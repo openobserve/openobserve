@@ -914,7 +914,9 @@ test.describe('RUM Product Analytics', () => {
       await expect(pa.addToDashboardDialog).toBeVisible();
       await expect(pa.addToDashboardNotice).toBeVisible();
       await pa.pickOption('dashboard-dropdown-dashboard-selection', { label: title, search: title });
-      await page.locator('[data-test="metrics-new-dashboard-panel-title-field"]').fill('Funnel e2e');
+      const panelTitles = pa.addToDashboardDialog.locator('[data-test="add-to-dashboard-panel-title"]');
+      await expect(panelTitles).toHaveCount(1);
+      await expect(panelTitles.first()).toContainText('Funnel:');
       const add = pa.addToDashboardDialog.locator('[data-test="o-dialog-primary-btn"]');
       await expect(add).toBeEnabled({ timeout: 15000 });
       await add.click();

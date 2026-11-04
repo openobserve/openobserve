@@ -2824,3 +2824,78 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     w.unmount();
   });
 });
+
+describe("TraceDetailsSidebar — Ask AI about this span", () => {
+  const ASK_AI = '[data-test="trace-span-ask-ai-btn"]';
+
+  async function mountWith(props: Record<string, unknown> = {}) {
+    const w = mountSidebar({ streamName: "default", ...props });
+    await flushPromises();
+    return w;
+  }
+
+  beforeEach(() => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue({
+      data: { hits: [{ n: 120, p50: 1000, p75: 2000, p90: 4000, p99: 8000 }] },
+    });
+    mockSearchObj.data = {
+      stream: { selectedStream: { label: "default", value: "default" } },
+      queryPayload: { query: { start_time: 1752490000000000, end_time: 1752490900000000 } },
+      traceDetails: {
+        selectedTrace: { trace_start_time: 1752490492843000, trace_end_time: 1752490493164419 },
+      },
+    };
+  });
+
+  afterEach(() => {
+    delete (mockSearchObj as Record<string, unknown>).data;
+  });
+
+  it("is hidden unless the parent turns it on", async () => {
+    const w = await mountWith();
+    expect(w.find(ASK_AI).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("sits in the always-visible action group, not beside the standalone-only View logs", async () => {
+    const w = await mountWith({ showAskAi: true, parentMode: "embedded" });
+    const actions = w.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
+    expect(actions.find(ASK_AI).exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("emits sendToAiChat with the span payload and its operation p50", async () => {
+    const w = await mountWith({ showAskAi: true });
+    await w.find(ASK_AI).trigger("click");
+    const [payload] = w.emitted("sendToAiChat")![0] as [Record<string, any>];
+    expect(payload.query).toBe("Why did this span take 321.37 ms? Its operation's p50 is 1 ms.");
+    expect(payload.chipName).toBe(`Span · ${mockSpan.operation_name}`);
+    expect(payload).toMatchObject({ newChat: true, autoSend: false });
+    expect(payload.context).toMatchObject({
+      currentPage: "traces",
+      streamType: "traces",
+      selectedStreams: ["default"],
+      traceId: mockSpan.trace_id,
+      traceStartTime: 1752490492843000,
+      traceEndTime: 1752490493164419,
+      span: {
+        span_id: mockSpan.span_id,
+        duration_us: mockSpan.duration,
+        operation_p50_us: 1000,
+      },
+    });
+    w.unmount();
+  });
+
+  it("sends a null p50 when the operation has too few samples", async () => {
+    mockSearch.mockResolvedValue({
+      data: { hits: [{ n: 3, p50: 1000, p75: 2000, p90: 4000, p99: 8000 }] },
+    });
+    const w = await mountWith({ showAskAi: true });
+    await w.find(ASK_AI).trigger("click");
+    const [payload] = w.emitted("sendToAiChat")![0] as [Record<string, any>];
+    expect(payload.context.span.operation_p50_us).toBeNull();
+    w.unmount();
+  });
+});

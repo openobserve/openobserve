@@ -122,6 +122,12 @@ impl StreamKeyChecks {
     }
 }
 
+/// One stream's realtime alert work, sent only after its records are written.
+pub(super) struct StreamTriggers {
+    triggers: TriggerAlertData,
+    mute_split: Option<crate::ingestion::realtime_mute::RealtimeMuteSplit>,
+}
+
 /// Runs each stream's pipelines over its buffered records, grouping the output by destination.
 pub(super) async fn run_pipelines<T: Clone>(
     org_id: &str,
@@ -317,7 +323,7 @@ pub(super) async fn buffer_stream_records(
     partition_keys: Option<&Vec<StreamPartition>>,
     alerts: Option<&Vec<alert::Alert>>,
     partitions: &mut HashMap<String, SchemaRecords>,
-) -> Option<TriggerAlertData> {
+) -> Option<StreamTriggers> {
     let partition_keys = partition_keys.unwrap_or(&NO_PARTITION_KEYS);
     let partition_time_level = infra::schema::get_partition_time_level(StreamType::Metrics);
     let mut partition_memo = PartitionMemo::new(partition_keys, partition_time_level);
@@ -338,6 +344,13 @@ pub(super) async fn buffer_stream_records(
         .unwrap_or_default();
     let mut triggers: TriggerAlertData = Vec::with_capacity(alert_keys.len());
     let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
+    // An org with an alert downtime classifies each series before the label cap.
+    let mut mute_split = alerts.and_then(|_| {
+        crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(
+            org_id,
+            super::TRIGGER_LABEL_LIMIT,
+        )
+    });
 
     for (record, timestamp) in records {
         if let Some(alerts) = alerts {
@@ -347,6 +360,7 @@ pub(super) async fn buffer_stream_records(
                 &alert_keys,
                 &mut triggers,
                 &mut trigger_slots,
+                mute_split.as_mut(),
             )
             .await;
         }
@@ -364,7 +378,10 @@ pub(super) async fn buffer_stream_records(
         partition.records.push(Arc::new(record));
     }
 
-    (!triggers.is_empty()).then_some(triggers)
+    (!triggers.is_empty() || mute_split.is_some()).then_some(StreamTriggers {
+        triggers,
+        mute_split,
+    })
 }
 
 /// Each stream's WAL entries, from its JSON partitions and from what went straight to arrow.
@@ -487,10 +504,15 @@ pub(super) fn observe_request(
 }
 
 /// Sends each stream's alert notification off the request path.
-pub(super) fn spawn_triggers(stream_trigger_map: HashMap<String, Option<TriggerAlertData>>) {
+pub(super) fn spawn_triggers(stream_trigger_map: HashMap<String, Option<StreamTriggers>>) {
     // only one trigger per request; notification/db work must not block ingestion
     for entry in stream_trigger_map.into_values().flatten() {
-        tokio::spawn(evaluate_trigger(entry));
+        if !entry.triggers.is_empty() {
+            tokio::spawn(evaluate_trigger(entry.triggers));
+        }
+        if let Some(split) = entry.mute_split {
+            tokio::spawn(split.evaluate());
+        }
     }
 }
 
@@ -622,25 +644,35 @@ async fn evaluate_record_alerts(
     alert_keys: &[String],
     triggers: &mut TriggerAlertData,
     trigger_slots: &mut HashMap<String, super::TriggerSlot>,
+    mut mute_split: Option<&mut crate::ingestion::realtime_mute::RealtimeMuteSplit>,
 ) {
     let end_time = now_micros();
     let dedup = super::series_signature(record);
     for (alert, key) in alerts.iter().zip(alert_keys) {
         // one row per label set: a series repeats its labels on every sample
-        if !super::trigger_wants_labels(trigger_slots, key, dedup) {
+        let wanted = match mute_split.as_deref() {
+            Some(split) => !split.is_full(key) && !split.seen(key, dedup),
+            None => super::trigger_wants_labels(trigger_slots, key, dedup),
+        };
+        if !wanted {
             continue;
         }
         match alert.evaluate(Some(record), (None, end_time), None).await {
-            Ok(results) if results.data.is_some() => {
-                super::merge_trigger_rows(
+            Ok(results) if results.data.is_some() => match mute_split.as_deref_mut() {
+                Some(split) => {
+                    split
+                        .push(key, alert, results.data.unwrap(), Some(dedup))
+                        .await
+                }
+                None => super::merge_trigger_rows(
                     triggers,
                     trigger_slots,
                     key,
                     dedup,
                     alert,
                     results.data.unwrap(),
-                );
-            }
+                ),
+            },
             Ok(_) => {}
             Err(e) => {
                 log::error!("[METRICS] Error while evaluating realtime alert: {e}");

@@ -193,9 +193,8 @@ pub async fn list(
 
 pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, DowntimeError> {
     ensure_enabled()?;
-    let row = infra::table::downtimes::get(org, id)
-        .await?
-        .ok_or(DowntimeError::NotFound)?;
+    // The primary, so a detail opened right after its create is never a replica-lag 404.
+    let row = load(org, id).await?;
     access::authorize_row(org, user_id, &row, "GET").await?;
     let inventory = inventory::cached(org).await?;
     let matches = matches_of(&row, &inventory);
@@ -378,8 +377,9 @@ pub async fn extend(
             created_id: None,
         });
     }
-    let cached = db::downtimes::list_cached(org);
-    if let Some(follow_up) = live_follow_up(&cached, &before.id, window.end, now) {
+    // The primary: a follow-up created moments ago may not be in this node's cache yet.
+    let rows = primary_rows(org).await?;
+    if let Some(follow_up) = live_follow_up(&rows, &before.id, window.end, now) {
         let follow_up = load(org, &follow_up.id).await?;
         access::authorize_row(org, user_id, &follow_up, "PUT").await?;
         let current_end = follow_up.schedule.ends_at.unwrap_or(window.end);
@@ -736,8 +736,18 @@ async fn extend_follow_up(
 
 /// A follow-up outlives its parent's cancel unless it is cancelled too; a failure is logged.
 async fn cancel_follow_ups(org: &str, user_id: &str, parent_id: &str, now: i64) {
-    let cached = db::downtimes::list_cached(org);
-    for id in follow_ups_to_cancel(&cached, parent_id, now) {
+    // The primary: an extend moments ago may have created a follow-up this cache lacks.
+    let rows = match primary_rows(org).await {
+        Ok(rows) => Arc::new(rows),
+        Err(e) => {
+            // The parent cancel already committed, so the cache beats leaving every follow-up live.
+            log::warn!(
+                "[downtimes] primary list of {org} failed, cancelling follow-ups of {parent_id} from the cache: {e}"
+            );
+            db::downtimes::list_cached(org)
+        }
+    };
+    for id in follow_ups_to_cancel(&rows, parent_id, now) {
         if let Err(e) = cancel_follow_up(org, user_id, id, now).await {
             log::warn!(
                 "[downtimes] could not cancel {org}/{id}, the follow-up of {parent_id}: {e}"
@@ -849,6 +859,12 @@ async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
     infra::table::downtimes::get_rw(org, id)
         .await?
         .ok_or(DowntimeError::NotFound)
+}
+
+/// Every row of the org as the primary holds it, for a decision a replica lag must not skew.
+pub(crate) async fn primary_rows(org: &str) -> Result<Vec<Downtime>, DowntimeError> {
+    let conn = infra::db::get_orm_client_rw().await;
+    Ok(infra::table::downtimes::list_with(conn, org, None).await?)
 }
 
 /// An unknown folder is a 400; the default folder is created on first use.
@@ -3199,7 +3215,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_load_the_row_from_the_primary_and_the_detail_from_the_replica() {
+    fn writes_and_the_detail_load_the_row_from_the_primary() {
         assert!(body_of("async fn load(").contains("downtimes::get_rw(org, id)"));
         for write in [
             "pub async fn update(",
@@ -3211,8 +3227,7 @@ mod tests {
         ] {
             assert!(body_of(write).contains("load(org, "), "{write}");
         }
-        let detail = body_of("pub async fn get(");
-        assert!(detail.contains("downtimes::get(org, id)"));
-        assert!(!detail.contains("load(org, "));
+        // A detail opened right after its create must not 404 on replica lag.
+        assert!(body_of("pub async fn get(").contains("load(org, id)"));
     }
 }
