@@ -295,7 +295,8 @@ const browseAll = () => {
   }
 };
 
-const flowOn = () => sampleDataFlowOn(store.state.zoConfig);
+// the switches come only with the full org config; the bootstrap /config has no version
+const flowOn = () => !!store.state.zoConfig?.version && sampleDataFlowOn(store.state.zoConfig);
 
 const maybeGreet = async () => {
   const id = org.value;
@@ -341,7 +342,8 @@ watch(session.status, (now, before) => {
 });
 
 // a load in another org holds the welcome back, so check again once it ends
-// the flow's switch arrives with the full config, after mount
 watch([org, () => route.name, () => session.status.value === "loading", flowOn], maybeGreet);
+// a deployment that turns the flow off gets no welcome, and closing it records no skip
+watch(flowOn, (on) => !on && session.closeWelcome());
 onMounted(maybeGreet);
 </script>

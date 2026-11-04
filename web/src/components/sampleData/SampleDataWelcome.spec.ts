@@ -116,6 +116,7 @@ const session = useSampleDataSession() as unknown as {
 
 const makeStore = (
   zoConfig: Record<string, unknown> = {
+    version: "v0.0.0",
     onboarding_flow_enabled: false,
     sample_data_onboarding_enabled: true,
   },
@@ -240,9 +241,34 @@ describe("SampleDataWelcome finish", () => {
 
   it("opens once the full config turns the sample data flow on", async () => {
     await mountAtHome({});
-    store.state.zoConfig = { onboarding_flow_enabled: false, sample_data_onboarding_enabled: true };
+    store.state.zoConfig = {
+      version: "v0.0.0",
+      onboarding_flow_enabled: false,
+      sample_data_onboarding_enabled: true,
+    };
     await flush();
     expect(session.welcomeOpen.value).toBe(true);
+  });
+
+  it("waits for the full config before it decides", async () => {
+    mockConfig.isCloud = "false";
+    vi.mocked(fetchHasUserStreams).mockClear();
+    await mountAtHome({});
+    expect(session.welcomeOpen.value).toBe(false);
+    expect(fetchHasUserStreams).not.toHaveBeenCalled();
+    store.state.zoConfig = { version: "v0.0.0", sample_data_onboarding_enabled: false };
+    await flush();
+    expect(session.welcomeOpen.value).toBe(false);
+  });
+
+  it("closes an open welcome, without a skip, when the full config turns the flow off", async () => {
+    await mountAtHome();
+    expect(session.welcomeOpen.value).toBe(true);
+    store.state.zoConfig = { version: "v0.0.0", sample_data_onboarding_enabled: false };
+    await flush();
+    expect(session.welcomeOpen.value).toBe(false);
+    expect(submitNewUserInfo).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
   });
 
   it("opens in a new org while a tour is left open in another org", async () => {
@@ -323,6 +349,7 @@ describe("SampleDataWelcome finish", () => {
 
   it("locks a chip whose guide the license locks, and a click picks nothing", async () => {
     await mountAtHome({
+      version: "v0.0.0",
       onboarding_flow_enabled: false,
       sample_data_onboarding_enabled: true,
       features: { rum: "locked" },
