@@ -497,16 +497,6 @@ pub async fn delete_by_date(
         )
     };
 
-    // the request's check holds only until a day merge lands; local disk removes a directory whole
-    if let Err(e) =
-        file_list::check_delete_range(org_id, stream_type, stream_name, time_range).await
-    {
-        log::error!(
-            "[COMPACTOR] delete_by_date [{org_id}/{stream_type}/{stream_name}] refused: {e}"
-        );
-        return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
-    }
-
     if is_local_disk_storage() {
         let dirs_to_delete =
             generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
