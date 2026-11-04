@@ -792,7 +792,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="1"
               :label="t('dashboard.distributionBucketCount')"
               :placeholder="defaultPlaceholder(t, DISTRIBUTION_DEFAULT_BUCKETS)"
-              :disabled="dashboardPanelData.data.config.distribution_bucket_size != null"
+              :disabled="distributionBucketSizeSet"
+              :error="!!distributionBucketCountError"
+              :error-message="distributionBucketCountError"
               data-test="dashboard-config-distribution_bucket_count"
               @update:model-value="
                 (value: any) => setNumberConfig('distribution_bucket_count', value)
@@ -805,6 +807,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="0"
               :label="t('dashboard.distributionBucketSize')"
               :placeholder="defaultPlaceholder(t, t('dashboard.auto'))"
+              :error="!!distributionBucketSizeError"
+              :error-message="distributionBucketSizeError"
               data-test="dashboard-config-distribution_bucket_size"
               @update:model-value="
                 (value: any) => setNumberConfig('distribution_bucket_size', value)
@@ -3567,6 +3571,7 @@ import {
   DISTRIBUTION_DEFAULT_BUCKETS,
   DISTRIBUTION_DEFAULT_OFFSET,
 } from "@/utils/dashboard/convertDistributionData";
+import { panelConfigRangeError } from "@/utils/dashboard/panelValidation";
 import { DEFAULT_TABLE_DENSITY, TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
@@ -5104,6 +5109,20 @@ export default defineComponent({
 
     const decimalsTouched = ref(false);
 
+    const distributionBucketSizeSet = computed(() =>
+      ["", null, undefined].every(
+        (unset) => dashboardPanelData.data.config.distribution_bucket_size !== unset,
+      ),
+    );
+
+    const distributionBucketCountError = computed(() =>
+      panelConfigRangeError(t, dashboardPanelData.data, "distribution_bucket_count"),
+    );
+
+    const distributionBucketSizeError = computed(() =>
+      panelConfigRangeError(t, dashboardPanelData.data, "distribution_bucket_size"),
+    );
+
     const isHeatmapColorRangeInvalid = computed(() =>
       isHeatmapColorRangeInverted(dashboardPanelData.data.config),
     );
@@ -5162,6 +5181,9 @@ export default defineComponent({
       shouldShowNoDataText,
       toMinInterval,
       isHeatmapColorRangeInvalid,
+      distributionBucketSizeSet,
+      distributionBucketCountError,
+      distributionBucketSizeError,
       axisLabelModeModel,
       axisLabelModeOptions,
       legendsPositionModel,

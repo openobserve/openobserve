@@ -256,6 +256,24 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     expect("distribution_bucket_size" in panel.data.config).toBe(false);
   });
 
+  it("distribution: explains an out-of-range bucket count or size under the field", async () => {
+    mountPanel("distribution");
+    await flushPromises();
+    const error = (test: string) => wrapper!.find(`[data-test="${test}-error"]`);
+    await type("dashboard-config-distribution_bucket_count", "0");
+    expect(error("dashboard-config-distribution_bucket_count").text()).toBe(
+      "Bucket count must be between 1 and 1000",
+    );
+    await type("dashboard-config-distribution_bucket_size", "-2");
+    expect(error("dashboard-config-distribution_bucket_size").text()).toBe(
+      "Bucket size must be greater than 0",
+    );
+    expect(error("dashboard-config-distribution_bucket_count").exists()).toBe(false);
+    await type("dashboard-config-distribution_bucket_size", "");
+    await type("dashboard-config-distribution_bucket_count", "20");
+    expect(error("dashboard-config-distribution_bucket_count").exists()).toBe(false);
+  });
+
   it("distribution: names each bucket default in its placeholder", async () => {
     mountPanel("distribution");
     await flushPromises();
