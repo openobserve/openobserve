@@ -26082,6 +26082,8 @@
     "noteAdded": "Notiz hinzugefügt",
     "addNoteFailed": "Die Notiz konnte nicht hinzugefügt werden.",
     "activitySendNote": "Notiz senden",
+    "activityShowMore": "Mehr anzeigen",
+    "activityShowLess": "Weniger anzeigen",
     "activityScrollToTop": "Nach oben scrollen",
     "activityScrollToBottom": "Nach unten scrollen",
     "activityNotedPrefix": "notiert",

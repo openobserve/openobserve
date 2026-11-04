@@ -26167,6 +26167,8 @@
     "noteAdded": "Note added",
     "addNoteFailed": "Could not add the note",
     "activitySendNote": "Send note",
+    "activityShowMore": "Show more",
+    "activityShowLess": "Show less",
     "activityScrollToTop": "Scroll to top",
     "activityScrollToBottom": "Scroll to bottom",
     "activityNotedPrefix": "noted",

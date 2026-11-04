@@ -26082,6 +26082,8 @@
     "noteAdded": "Notitie toegevoegd",
     "addNoteFailed": "Kan de notitie niet toevoegen",
     "activitySendNote": "Notitie verzenden",
+    "activityShowMore": "Meer weergeven",
+    "activityShowLess": "Minder weergeven",
     "activityScrollToTop": "Scroll naar boven",
     "activityScrollToBottom": "Scroll naar beneden",
     "activityNotedPrefix": "noteerde",

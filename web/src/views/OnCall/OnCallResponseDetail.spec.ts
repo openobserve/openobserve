@@ -109,7 +109,7 @@ const stubs = {
     // `title-trail` carries the state tags and `subtitle` the team/firing/
     // opened line, both of which are assertions of their own.
     template:
-      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
+      "<div><div data-test='stub-subtitle'><slot name='subtitle' /></div><div data-test='stub-title-trail'><slot name='title-trail' /></div><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
   },
   OTooltip: {
     name: "OTooltip",
@@ -632,6 +632,39 @@ describe("OnCallResponseDetail", () => {
     expect(acked.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("ana@acme.io");
   });
 
+  /// A long ladder line beside the title ran under the header actions, so it reads on the subtitle line.
+  it("says how far the page has climbed on the subtitle line, not beside the title", async () => {
+    const wrapper = await renderWith();
+    const phrase = wrapper.find('[data-test="stub-subtitle"] [data-test="oncall-response-phrase"]');
+    expect(phrase.exists()).toBe(true);
+    expect(phrase.classes()).toContain("min-w-0");
+    expect(
+      wrapper.find('[data-test="stub-title-trail"] [data-test="oncall-response-phrase"]').exists(),
+    ).toBe(false);
+  });
+
+  /// The title row holds only state and priority; an exhausted ladder is said in words on the subtitle line.
+  it("says nobody answered on the subtitle line, not as a chip beside the title", async () => {
+    service.escalationProgress.mockResolvedValue({
+      data: {
+        fired: [{ after_micros: 0, at: 1, targets: ["ana@acme.io"], reached: ["ana@acme.io"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+      },
+    } as any);
+    const wrapper = await renderWith();
+    const words = wrapper.find(
+      '[data-test="stub-subtitle"] [data-test="oncall-response-phrase-exhausted"]',
+    );
+    expect(words.text()).toContain("Nobody answered");
+    const trail = wrapper.find('[data-test="stub-title-trail"]');
+    expect(trail.findAllComponents({ name: "OTag" })).toHaveLength(2);
+    expect(trail.find('[data-test="oncall-response-title-trail"]').classes()).toContain(
+      "overflow-hidden",
+    );
+  });
+
   describe("an Unacknowledge the server cannot apply", () => {
     const held = () => ({
       state: "acknowledged",
@@ -1072,8 +1105,7 @@ describe("OnCallResponseDetail", () => {
       });
 
       const tag = wrapper.find('[data-test="oncall-response-liaison-tag"]');
-      const tooltip = tag.element.nextElementSibling;
-      expect(tooltip?.textContent).toContain("one chase");
+      expect(tag.text()).toContain("one chase");
     });
 
     it("leaves an owner record with no liaison language at all", async () => {
@@ -1604,14 +1636,15 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
   });
 
-  /// R13, L2: the phrase keeps a readable floor and truncates past it, and the header keeps the title's floor.
+  /// R13, L2: on the subtitle line the phrase gives way after team and time; in the body it keeps a readable floor; the title keeps its floor.
   it("keeps the escalation phrase readable and the title floored", async () => {
     for (const lgUp of [true, false]) {
       mockViewport.lgUp = lgUp;
       const wrapper = await renderWith();
       const classes = wrapper.find('[data-test="oncall-response-phrase"]').classes();
-      expect(classes, `lg ${lgUp}`).toEqual(expect.arrayContaining(["min-w-32", "truncate"]));
-      expect(classes, `lg ${lgUp}`).not.toContain("min-w-0");
+      expect(classes, `lg ${lgUp}`).toEqual(
+        expect.arrayContaining(lgUp ? ["min-w-0", "shrink-[100]"] : ["min-w-32", "truncate"]),
+      );
       expect(wrapper.findComponent({ name: "OPageLayout" }).attributes()).toHaveProperty(
         "title-min-width",
       );
@@ -1756,10 +1789,10 @@ describe("OnCallResponseDetail — responding", () => {
       expect(
         wrapper
           .find(
-            '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-exhausted"]',
+            '[data-test="oncall-response-phrase"] [data-test="oncall-response-phrase-exhausted"]',
           )
-          .exists(),
-      ).toBe(true);
+          .text(),
+      ).toContain("Nobody answered");
       const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
       expect(banner.text()).toMatch(
         /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,

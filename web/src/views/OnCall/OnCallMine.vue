@@ -16,13 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The reader's own on-call: their shifts, how pages reach them, and what has been sent to them. -->
 <template>
-  <OPageLayout
-    bleed
-    data-test="oncall-mine-page"
-    :title="t('oncall.mineTitle')"
-    icon="person"
-    scroll
-  >
+  <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')" icon="person">
     <template #title-trail>
       <BetaBadge class="shrink-0" />
     </template>
@@ -61,9 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-mine-unavailable"
     />
 
-    <OContent v-else y class="flex flex-col gap-5">
-      <OnCallSetupBanner ref="setupRef" />
-      <div class="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
+    <!-- Below xl the two top cards stack and leave no room to share, so the body scrolls instead. -->
+    <OContent
+      v-else
+      y
+      class="flex min-h-0 flex-1 flex-col gap-5 max-xl:overflow-y-auto"
+      data-test="oncall-mine-body"
+    >
+      <OnCallSetupBanner ref="setupRef" class="shrink-0" />
+      <div class="grid shrink-0 grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
         <!-- The shift first: "am I on call, and until when" is the question this page opens on. -->
         <section
           class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"

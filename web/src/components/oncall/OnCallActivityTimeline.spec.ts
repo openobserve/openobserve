@@ -162,4 +162,39 @@ describe("OnCallActivityTimeline", () => {
     expect(text).toContain("14:37");
     expect(text).toContain("14:39 · +2m");
   });
+  /// The agent's paragraph is held to three lines with a way to read the rest; generated lines are not.
+  it("clamps the AI verdict line and leaves the other lines whole", async () => {
+    const verdict: OnCallResponseEvent = {
+      kind: "ai_verdict",
+      at: OPENED + 300_000_000,
+      actor: "o2-sre",
+      body: "The alert fired because the test stream carries synthetic data. ".repeat(8),
+    };
+    const wrapper = mount(OnCallActivityTimeline, {
+      props: { events: [...events, verdict], commentText: "", openedAt: OPENED },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    const clamped = wrapper.findAll('[data-test="oncall-clamped-text-body"]');
+    expect(clamped).toHaveLength(1);
+    expect(clamped[0].text()).toContain("synthetic data");
+    expect(clamped[0].classes()).toContain("line-clamp-3");
+  });
+
+  /// The page scrolls past a long feed, so the note box stays stuck to its foot rather than below the fold.
+  it("sticks the note box to the page's foot when pinned", async () => {
+    const wrapper = mount(OnCallActivityTimeline, {
+      props: { events, commentText: "", openedAt: OPENED, pinComposer: true },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    const composer = wrapper
+      .find('[data-test="oncall-response-note-input"]')
+      .element.closest(".pt-2");
+    expect(composer?.className).toContain("sticky");
+    expect(composer?.className).toContain("bottom-0");
+    expect(composer?.className).toContain("bg-surface-base");
+  });
 });

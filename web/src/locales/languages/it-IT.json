@@ -26082,6 +26082,8 @@
     "noteAdded": "Nota aggiunta",
     "addNoteFailed": "Impossibile aggiungere la nota",
     "activitySendNote": "Invia nota",
+    "activityShowMore": "Mostra di più",
+    "activityShowLess": "Mostra di meno",
     "activityScrollToTop": "Scorri in alto",
     "activityScrollToBottom": "Scorri in basso",
     "activityNotedPrefix": "ha annotato",

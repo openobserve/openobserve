@@ -26080,6 +26080,8 @@
     "noteAdded": "Note added",
     "addNoteFailed": "Could not add the note",
     "activitySendNote": "Send note",
+    "activityShowMore": "แสดงเพิ่มเติม",
+    "activityShowLess": "แสดงน้อยลง",
     "activityScrollToTop": "Scroll to top",
     "activityScrollToBottom": "Scroll to bottom",
     "activityNotedPrefix": "noted",

@@ -26082,6 +26082,8 @@
     "noteAdded": "Заметка добавлена",
     "addNoteFailed": "Не удалось добавить заметку",
     "activitySendNote": "Отправить заметку",
+    "activityShowMore": "Показать больше",
+    "activityShowLess": "Показать меньше",
     "activityScrollToTop": "Прокрутить вверх",
     "activityScrollToBottom": "Прокрутить вниз",
     "activityNotedPrefix": "отметил",

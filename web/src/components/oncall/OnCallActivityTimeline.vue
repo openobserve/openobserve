@@ -32,8 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @pointerout="onPointerOut"
   >
     <ActivityTimeline
-      ref="timelineRef"
-      :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
+      :composer-class="pinComposer ? 'bg-surface-base sticky bottom-0 z-10 pb-2' : ''"
       :events="visibleEvents"
       :submitting="submitting"
       :show-scroll-buttons="showScrollButtons"
@@ -62,7 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test-comment-input="oncall-response-note-input"
       data-test-comment-send="oncall-response-note-submit"
       @submit="$emit('submit')"
-    />
+    >
+      <template #inline-text="{ event, html }">
+        <OnCallClampedText v-if="CLAMPED_KINDS.includes(event.kind)" :html="html" />
+        <span v-else class="text-text-body text-sm" v-html="html" />
+      </template>
+    </ActivityTimeline>
     <OTooltip
       :anchor="personAnchor"
       :open="!!personAnchor"
@@ -73,11 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OnCallClampedText from "@/components/oncall/OnCallClampedText.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -98,7 +103,7 @@ interface Props {
   showScrollButtons?: boolean;
   /** Micros the page opened at, for the "+2m" offset beside each clock time. */
   openedAt?: number | null;
-  /** Fixes the feed's height so the note box sits at the panel's foot with the newest event above it. */
+  /** Keeps the note box stuck to the scrolling page's foot while the feed runs past it. */
   pinComposer?: boolean;
   /** The policy step a rung delay belongs to, or null when the policy no longer has it. */
   stepOf?: (rungMicros: number) => number | null;
@@ -139,6 +144,8 @@ const { nameOf } = useOrgUserNames();
 const currentUserId = computed(() => nameOf(String(store.state.userInfo?.email ?? "")) || "User");
 
 const HUMAN_KINDS: ResponseEventKind[] = ["ack", "handoff", "note"];
+/// The agent's free text runs to a paragraph; every other line is one generated sentence.
+const CLAMPED_KINDS: ResponseEventKind[] = ["ai_verdict", "rca"];
 
 const visibleEvents = computed(() => {
   const merged = mergeTimelineEvents(props.events);
@@ -153,19 +160,6 @@ const getUserId = (event: OnCallResponseEvent): string =>
 const getAvatarColor = getActivityAvatarColor;
 const formatRelativeTime = (at: number): string =>
   timelineStamp(at, props.openedAt, nowMicros.value, store.state.timezone);
-
-const timelineRef = ref<{ scrollToBottom: () => void } | null>(null);
-
-// Chat order: the newest line sits just above the note box, so a pinned feed opens scrolled to it.
-watch(
-  () => visibleEvents.value.length,
-  async () => {
-    if (!props.pinComposer) return;
-    await nextTick();
-    timelineRef.value?.scrollToBottom();
-  },
-  { immediate: true },
-);
 
 const getEventIcon = (event: OnCallResponseEvent): string => {
   switch (event.kind) {
