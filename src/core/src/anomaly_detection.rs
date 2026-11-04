@@ -5089,7 +5089,7 @@ mod tests {
                         .unwrap();
                     infra::table::templates::put(content(
                         config::DEFAULT_ORG,
-                        "o2_default",
+                        "prebuilt_default",
                         vec![],
                     ))
                     .await
@@ -5106,8 +5106,8 @@ mod tests {
                         "validation error: template 'incident-only' does not apply to anomaly"
                     );
                     assert_eq!(
-                        err("o2_default").await,
-                        "validation error: template 'o2_default' is reserved"
+                        err("prebuilt_default").await,
+                        "validation error: template 'prebuilt_default' is reserved"
                     );
                     assert_eq!(
                         err("gone").await,

@@ -103,7 +103,7 @@ pub async fn save(
             return Err(TemplateError::ReservedName(template.name.clone()));
         }
         // Updates are allowed for root (internal ops / self-hosted admins);
-        // all other callers get a 403. The `o2_default` row mirrors code
+        // all other callers get a 403. The `prebuilt_default` row mirrors code
         // and stay read only for root too: the seeder owns them.
         if !is_root || is_compiled_default_name(&template.name) {
             return Err(TemplateError::PrebuiltReadOnly(template.name.clone()));
@@ -162,7 +162,8 @@ pub async fn save(
     Ok(saved)
 }
 
-/// The seeded `o2_default` row and its reserved prefix: read only for every caller, root included.
+/// The seeded `prebuilt_default` row and its reserved prefix: read only for every caller, root
+/// included.
 fn is_compiled_default_name(name: &str) -> bool {
     infra::table::templates::is_reserved_default_name(name)
 }
@@ -707,7 +708,7 @@ mod tests {
             user("a-hook", TemplateKind::Custom, vec![]),
             user("b-card", TemplateKind::Content, vec![Anomaly]),
             user("c-incident", TemplateKind::Content, vec![Incident]),
-            user("o2_default", TemplateKind::Content, vec![]),
+            user("prebuilt_default", TemplateKind::Content, vec![]),
             user("prebuilt_slack", TemplateKind::Content, vec![]),
             email,
         ];
@@ -738,7 +739,7 @@ mod tests {
     #[tokio::test]
     async fn creating_any_name_under_the_reserved_prefix_is_refused() {
         for name in [
-            "o2_default",
+            "prebuilt_default",
             "o2_default_anomaly",
             "o2_default_x",
             "prebuilt_downtime",
@@ -765,16 +766,18 @@ mod tests {
             body: "{}".to_string(),
             ..Default::default()
         };
-        let err = save("o2_default", template, None, None, false, true)
+        let err = save("prebuilt_default", template, None, None, false, true)
             .await
             .unwrap_err();
         assert!(
-            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default"),
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "prebuilt_default"),
             "{err}"
         );
-        let err = delete(DEFAULT_ORG, "o2_default", true).await.unwrap_err();
+        let err = delete(DEFAULT_ORG, "prebuilt_default", true)
+            .await
+            .unwrap_err();
         assert!(
-            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default"),
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "prebuilt_default"),
             "{err}"
         );
     }

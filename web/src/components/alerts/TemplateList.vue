@@ -563,7 +563,7 @@ const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
-// "Prebuilt" trusts the server's isPrebuilt flag, which covers o2_default and the prebuilt_* rows.
+// "Prebuilt" trusts the server's isPrebuilt flag, which covers prebuilt_default and the prebuilt_* rows.
 const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
 watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
   Object.assign(viewState, {

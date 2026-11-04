@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Picks the template for one send: the producer's override, then the destination's
-//! template when it applies to the kind, then the compiled `o2_default`.
+//! template when it applies to the kind, then the compiled `prebuilt_default`.
 
 use config::meta::{
     alerts::notification_kind::NotificationKind,
@@ -84,7 +84,7 @@ impl EffectiveTemplate {
     }
 }
 
-/// Not a reserved row (`prebuilt_*`, `o2_default`).
+/// Not a reserved row (`prebuilt_*`, `prebuilt_default`).
 pub fn is_user_template(t: &Template) -> bool {
     !is_reserved_template_name(&t.name)
 }
@@ -176,7 +176,7 @@ pub fn choose_explicit_or_destination(
     Some((t, TemplateSource::Destination))
 }
 
-/// A transient `Template` holding the compiled `o2_default`; never read from the database.
+/// A transient `Template` holding the compiled `prebuilt_default`; never read from the database.
 pub fn compiled_fallback(org_id: &str) -> Template {
     Template {
         id: None,
@@ -268,12 +268,12 @@ mod tests {
     }
 
     #[test]
-    fn every_kind_and_transport_falls_back_to_o2_default() {
+    fn every_kind_and_transport_falls_back_to_prebuilt_default() {
         for kind in NotificationKind::ALL {
             for dt in [slack_dest(), email_dest()] {
                 let got = walk(kind, &[], None, &dt);
                 assert_eq!(got.source, TemplateSource::Compiled);
-                assert_eq!(got.template.name, "o2_default", "{kind:?}");
+                assert_eq!(got.template.name, "prebuilt_default", "{kind:?}");
                 assert_eq!(got.template.org_id, "org1");
             }
         }

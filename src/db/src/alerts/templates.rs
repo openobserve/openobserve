@@ -436,7 +436,7 @@ pub async fn rename_reserved_collisions()
     Ok(renames)
 }
 
-/// Folds the retired default rows into `o2_default` and tells every node's cache.
+/// Folds the retired default rows into `prebuilt_default` and tells every node's cache.
 pub async fn retire_default_templates()
 -> Result<Vec<table::templates::ReservedRename>, TemplateError> {
     let moved = table::templates::retire_default_templates(infra::db::get_orm_client_rw().await)
@@ -447,7 +447,7 @@ pub async fn retire_default_templates()
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
-        // System rows: the seeder writes no tuple for o2_default, so none is set here.
+        // System rows: the seeder writes no tuple for prebuilt_default, so none is set here.
         disown_old_name(r).await?;
     }
     Ok(moved)

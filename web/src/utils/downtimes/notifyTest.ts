@@ -16,7 +16,7 @@
 import type { DowntimeDetail, DowntimeWindow, TargetModule } from "@/services/downtimes";
 
 // The one built-in default every kind and channel falls back to, email included.
-export const DOWNTIME_TEMPLATE = "o2_default";
+export const DOWNTIME_TEMPLATE = "prebuilt_default";
 
 const DOWNTIME_VARIABLE_PREFIX = "{downtime_";
 

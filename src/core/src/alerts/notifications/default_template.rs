@@ -16,7 +16,7 @@
 //! The one compiled default every kind falls back to (amendment A, D3).
 //!
 //! It is literal Rust rather than a database row, so resolution never dead-ends on a fresh
-//! org or a seeding race. `o2_default` is its seeded read only copy, kept identical by test.
+//! org or a seeding race. `prebuilt_default` is its seeded read only copy, kept identical by test.
 //! A field whose variables are blank for a kind hides, so each kind shows only its own facts.
 
 use config::{
@@ -78,7 +78,7 @@ pub fn compiled_default_content() -> ContentSpec {
     }
 }
 
-/// The `prebuilt_*` family, `o2_default` and its prefix, and the retired names: system owned.
+/// The `prebuilt_*` family, `prebuilt_default`, `o2_default` and its prefix, and the retired names.
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
         || infra::table::templates::is_reserved_default_name(name)
@@ -237,8 +237,9 @@ mod tests {
     }
 
     #[test]
-    fn o2_default_and_the_retired_names_are_reserved() {
+    fn the_default_and_the_retired_names_are_reserved() {
         for name in [
+            "prebuilt_default",
             "o2_default",
             "o2_default_content",
             "o2_default_anomaly",

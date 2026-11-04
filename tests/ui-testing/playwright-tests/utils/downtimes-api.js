@@ -439,7 +439,7 @@ async function anomalySinkCount(page, sink, anomalyId, sinceUs) {
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
 }
 
-/** Lifecycle notifications render the built-in o2_default template (the sink destination template leaves out downtime); counts match on downtime_name / downtime_event. */
+/** Lifecycle notifications render the built-in prebuilt_default template (the sink destination template leaves out downtime); counts match on downtime_name / downtime_event. */
 async function downtimeEventCount(page, sink, downtimeName, event, sinceUs) {
   const byEvent = event ? ` AND downtime_event = '${sqlStr(event)}'` : '';
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE downtime_name = '${sqlStr(downtimeName)}'${byEvent} AND _timestamp > ${Math.floor(sinceUs)}`;

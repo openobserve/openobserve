@@ -300,8 +300,10 @@ async fn delete_by_org_returning_with<C: ConnectionTrait>(
 /// The prefix of compiled default names; every name under it is reserved.
 pub const RESERVED_PREFIX: &str = "o2_default_";
 /// The one compiled default every kind falls back to; reserved like the prefix.
-pub const DEFAULT_TEMPLATE_NAME: &str = "o2_default";
-/// The rows main seeded that `o2_default` replaced; their references move to it.
+pub const DEFAULT_TEMPLATE_NAME: &str = "prebuilt_default";
+/// The name an earlier build of this release seeded the compiled default under.
+const LEGACY_DEFAULT_NAME: &str = "o2_default";
+/// The rows main seeded that `prebuilt_default` replaced; their references move to it.
 pub const RETIRED_DEFAULT_NAMES: [&str; 3] = [
     "o2_default_content",
     "prebuilt_downtime",
@@ -319,13 +321,14 @@ pub struct ReservedRename {
 }
 
 /// Main seeded only `o2_default_content`, so a migration treats any other reserved name as a user
-/// row, `o2_default` included.
+/// row, `prebuilt_default` included.
 pub const MIGRATION_SEEDS: [&str; 1] = ["o2_default_content"];
-/// After the migrations the seeder owns `o2_default`, so a boot rename leaves it alone.
+/// After the migrations the seeder owns `prebuilt_default`, so a boot rename leaves its row alone.
 pub const BOOT_SEEDS: [&str; 2] = [DEFAULT_TEMPLATE_NAME, "o2_default_content"];
-/// The per-kind rows an earlier build of this release seeded with `is_default` false; a user row
-/// saved in the default org always has it true, so the flag tells the two apart.
-pub const BRANCH_KIND_SEEDS: [&str; 4] = [
+/// The rows an earlier build of this release seeded with `is_default` false; a user row saved in
+/// the default org always has it true, so the flag tells the two apart.
+pub const BRANCH_KIND_SEEDS: [&str; 5] = [
+    LEGACY_DEFAULT_NAME,
     "o2_default_incident",
     "o2_default_anomaly",
     "o2_default_synthetics",
@@ -336,11 +339,15 @@ pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
 /// The templates name column is varchar(256).
 const NAME_MAX_CHARS: usize = 256;
 
-/// A shipped seed row: the default org, one of `seeds` or a branch kind seed, Content.
+/// A shipped seed row: the default org, one of `seeds` or a branch kind seed, Content; the seeder
+/// writes `prebuilt_default` with `is_default` false, which an API save in the default org never
+/// does.
 fn is_shipped_seed(seeds: &[&str], m: &Model) -> bool {
+    let seeded =
+        seeds.contains(&m.name.as_str()) && (m.name != DEFAULT_TEMPLATE_NAME || !m.is_default);
     m.org == DEFAULT_ORG
         && m.kind == TemplateKind::Content.to_string()
-        && (seeds.contains(&m.name.as_str()) || is_branch_kind_seed(m))
+        && (seeded || is_branch_kind_seed(m))
 }
 
 /// A per-kind row an earlier build seeded, which the fold retires instead of renaming.
@@ -351,13 +358,15 @@ fn is_branch_kind_seed(m: &Model) -> bool {
         && BRANCH_KIND_SEEDS.contains(&m.name.as_str())
 }
 
-/// A name only the system may use: `o2_default` or anything under `o2_default_`.
+/// A name only the system may use: `prebuilt_default`, `o2_default` or anything under
+/// `o2_default_`.
 pub fn is_reserved_default_name(name: &str) -> bool {
-    name == DEFAULT_TEMPLATE_NAME || name.starts_with(RESERVED_PREFIX)
+    name == DEFAULT_TEMPLATE_NAME
+        || name == LEGACY_DEFAULT_NAME
+        || name.starts_with(RESERVED_PREFIX)
 }
 
-/// Renames user rows named `o2_default` or under `o2_default_` to `user_{name}` and moves their
-/// references.
+/// Renames user rows with a reserved default name to `user_{name}` and moves their references.
 pub async fn rename_reserved_collisions<C>(
     db: &C,
     seeds: &[&str],
@@ -367,7 +376,11 @@ where
 {
     let txn = db.begin().await?;
     let mut rows: Vec<Model> = Entity::find()
-        .filter(Column::Name.like(format!("{DEFAULT_TEMPLATE_NAME}%")))
+        .filter(
+            sea_orm::Condition::any()
+                .add(Column::Name.like(format!("{LEGACY_DEFAULT_NAME}%")))
+                .add(Column::Name.eq(DEFAULT_TEMPLATE_NAME)),
+        )
         .all(&txn)
         .await?
         .into_iter()
@@ -579,8 +592,8 @@ async fn pending_row<C: ConnectionTrait>(
         .await
 }
 
-/// Folds the retired default rows into `o2_default`, moves every reference to it and drops the
-/// org default pointers; safe to run again.
+/// Folds the retired default rows into `prebuilt_default`, moves every reference to it and drops
+/// the org default pointers; safe to run again.
 pub async fn retire_default_templates<C>(db: &C) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
 where
     C: ConnectionTrait + sea_orm::TransactionTrait,
@@ -598,8 +611,13 @@ where
         .into_iter()
         .filter(|m| RETIRED_DEFAULT_NAMES.contains(&m.name.as_str()) || is_branch_kind_seed(m))
         .collect();
-    // The alert default's row becomes o2_default, so a destination bound to it keeps its id.
-    retired.sort_by_key(|m| m.name != "o2_default_content");
+    // The alert default's row becomes prebuilt_default, so a destination bound to it keeps its id.
+    retired.sort_by_key(|m| {
+        (
+            m.name != "o2_default_content",
+            m.name != LEGACY_DEFAULT_NAME,
+        )
+    });
     let mut target = get_org_model(&txn, DEFAULT_ORG, DEFAULT_TEMPLATE_NAME)
         .await?
         .map(|m| m.id);
@@ -644,7 +662,7 @@ where
     Ok(moved)
 }
 
-/// Every override that names a retired default names `o2_default` instead, in every org.
+/// Every override that names a retired default names `prebuilt_default` instead, in every org.
 async fn point_names_at_default<C: ConnectionTrait>(
     db: &C,
     kind_seeds: &[String],
@@ -1367,20 +1385,20 @@ mod tests {
             .unwrap();
         retire_default_templates(&db).await.unwrap();
 
-        // Only the row a user saved moves aside; the seeded one folds into o2_default.
+        // Only the row a user saved moves aside; the seeded one folds into prebuilt_default.
         assert_eq!(
             renames.iter().map(|r| r.from.as_str()).collect::<Vec<_>>(),
             vec!["o2_default_synthetics"]
         );
         assert_eq!(
             names(&db, DEFAULT_ORG).await,
-            vec!["o2_default", "user_o2_default_synthetics"]
+            vec!["prebuilt_default", "user_o2_default_synthetics"]
         );
-        let target = row_id(&db, DEFAULT_ORG, "o2_default").await;
+        let target = row_id(&db, DEFAULT_ORG, "prebuilt_default").await;
         assert_eq!(destination_template(&db, "seed-dest").await, Some(target));
         assert_eq!(
             alert_template(&db, "alerts", "seed-alert").await.as_deref(),
-            Some("o2_default")
+            Some("prebuilt_default")
         );
     }
 
@@ -1431,9 +1449,9 @@ mod tests {
         let moved = retire_default_templates(&db).await.unwrap();
 
         assert_eq!(moved.len(), 3);
-        assert_eq!(names(&db, DEFAULT_ORG).await, vec!["o2_default"]);
+        assert_eq!(names(&db, DEFAULT_ORG).await, vec!["prebuilt_default"]);
         // The alert default's row keeps its id, so a destination bound to it needs no rewrite.
-        assert_eq!(row_id(&db, DEFAULT_ORG, "o2_default").await, content);
+        assert_eq!(row_id(&db, DEFAULT_ORG, "prebuilt_default").await, content);
         assert_eq!(
             destination_template(&db, "alerts-dest").await.as_deref(),
             Some(content.as_str())
@@ -1447,7 +1465,7 @@ mod tests {
             alert_template(&db, "alerts", "content-alert")
                 .await
                 .as_deref(),
-            Some("o2_default")
+            Some("prebuilt_default")
         );
         assert_eq!(
             alert_template(&db, "alerts", "ops-alert").await.as_deref(),
@@ -1457,7 +1475,7 @@ mod tests {
             alert_template(&db, "oncall_policies", "team-a")
                 .await
                 .as_deref(),
-            Some("o2_default")
+            Some("prebuilt_default")
         );
         let keys: Vec<String> = system_settings::Entity::find()
             .all(&db)
@@ -1473,7 +1491,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_user_row_named_o2_default_survives_both_migrations_with_its_tuples_queued() {
+    async fn a_user_row_named_prebuilt_default_survives_both_migrations_with_its_tuples_queued() {
         let db = retire_db().await;
         ActiveModel {
             id: Set(ider::uuid()),
@@ -1506,16 +1524,16 @@ mod tests {
 
         assert_eq!(
             names(&db, DEFAULT_ORG).await,
-            vec!["o2_default", "user_o2_default"]
+            vec!["prebuilt_default", "user_prebuilt_default"]
         );
-        let kept = get_org_model(&db, DEFAULT_ORG, "user_o2_default")
+        let kept = get_org_model(&db, DEFAULT_ORG, "user_prebuilt_default")
             .await
             .unwrap()
             .unwrap();
         assert_eq!((kept.id, kept.body), (mine, "mine".to_string()));
         assert_eq!(
             alert_template(&db, "alerts", "mine-alert").await.as_deref(),
-            Some("user_o2_default")
+            Some("user_prebuilt_default")
         );
         // Boot reads the list, then replaces it with what did not move.
         let pending = pending_renames(&db).await.unwrap();
@@ -1524,14 +1542,14 @@ mod tests {
             vec![ReservedRename {
                 org: DEFAULT_ORG.to_string(),
                 from: DEFAULT_TEMPLATE_NAME.to_string(),
-                to: "user_o2_default".to_string(),
+                to: "user_prebuilt_default".to_string(),
             }]
         );
         set_pending_renames(&db, &pending[1..]).await.unwrap();
         assert!(pending_renames(&db).await.unwrap().is_empty());
         set_pending_renames(&db, &pending).await.unwrap();
         assert_eq!(pending_renames(&db).await.unwrap(), pending);
-        // The seeder's own o2_default is a seed at boot.
+        // The seeder's own prebuilt_default is a seed at boot.
         assert!(
             rename_reserved_collisions(&db, &BOOT_SEEDS)
                 .await
@@ -1548,5 +1566,40 @@ mod tests {
         let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
         assert!(renames[0].to.starts_with("user_o2_default_x"));
         assert!(renames[0].to.chars().count() <= 250, "{}", renames[0].to);
+    }
+
+    #[tokio::test]
+    async fn an_o2_default_seed_folds_into_prebuilt_default_and_a_user_row_moves_aside() {
+        let db = retire_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default", false, "content").await;
+        insert_row(&db, "acme", "o2_default", false, "content").await;
+        let seed = row_id(&db, DEFAULT_ORG, "o2_default").await;
+        insert_destination(&db, "seed-dest", &seed).await;
+        insert_alert(&db, "alerts", "other", "seed-alert", "o2_default").await;
+        insert_alert(&db, "alerts", "acme", "mine-alert", "o2_default").await;
+
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        retire_default_templates(&db).await.unwrap();
+
+        assert_eq!(
+            renames,
+            vec![ReservedRename {
+                org: "acme".to_string(),
+                from: "o2_default".to_string(),
+                to: "user_o2_default".to_string(),
+            }]
+        );
+        assert_eq!(names(&db, DEFAULT_ORG).await, vec!["prebuilt_default"]);
+        assert_eq!(names(&db, "acme").await, vec!["user_o2_default"]);
+        assert_eq!(row_id(&db, DEFAULT_ORG, "prebuilt_default").await, seed);
+        assert_eq!(destination_template(&db, "seed-dest").await, Some(seed));
+        assert_eq!(
+            alert_template(&db, "alerts", "seed-alert").await.as_deref(),
+            Some("prebuilt_default")
+        );
+        assert_eq!(
+            alert_template(&db, "alerts", "mine-alert").await.as_deref(),
+            Some("user_o2_default")
+        );
     }
 }

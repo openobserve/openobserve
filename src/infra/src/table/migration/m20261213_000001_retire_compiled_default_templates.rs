@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Folds the retired compiled default rows into `o2_default`; the seeder repeats it on boot.
+//! Folds the retired compiled default rows into `prebuilt_default`; the seeder repeats it on boot.
 
 use sea_orm_migration::prelude::*;
 
@@ -27,7 +27,7 @@ impl MigrationTrait for Migration {
         use crate::table::templates::{
             MIGRATION_SEEDS, record_pending_renames, rename_reserved_collisions,
         };
-        // A user row named o2_default moves aside before the retired rows take the name.
+        // A user row named prebuilt_default moves aside before the retired rows take the name.
         let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS).await?;
         record_pending_renames(db, &renames).await?;
         for r in crate::table::templates::retire_default_templates(db).await? {
