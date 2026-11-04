@@ -1299,6 +1299,70 @@ describe("PanelContainer", () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it.each([
+      ["logs", "logs"],
+      ["metrics", "metrics"],
+      ["traces", "traces"],
+    ])("go to logs locks while the panel's %s stream type is license-locked", (streamType, key) => {
+      (store.state as any).zoConfig.features = { [key]: "locked" };
+      const panel = {
+        ...mockPanelData,
+        queries: [
+          { ...mockPanelData.queries[0], fields: { stream: "s", stream_type: streamType } },
+        ],
+      };
+      wrapper = createWrapper({ data: panel });
+      expect(wrapper.vm.goToLogsLocked).toBe(true);
+      expect(wrapper.vm.goToLogsLockedReason).toBeTruthy();
+    });
+
+    it("go to logs shows as a disabled, focusable menu item with the reason as description", async () => {
+      (store.state as any).zoConfig.features = { logs: "locked" };
+      wrapper = createWrapper(
+        { data: mockPanelData },
+        {
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div><slot name="trigger" /><slot /></div>',
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            props: {
+              disabled: Boolean,
+              focusableUnavailable: Boolean,
+              iconLeft: String,
+              description: String,
+            },
+            template: "<div><slot /></div>",
+          },
+        },
+      );
+      wrapper.vm.metaData = { queries: [{}] };
+      await flushPromises();
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c: any) => c.attributes("data-test") === "dashboard-move-to-logs-module");
+      expect(item?.props("disabled")).toBe(true);
+      expect(item?.props("focusableUnavailable")).toBe(true);
+      expect(item?.props("iconLeft")).toBe("lock");
+      expect(item?.props("description")).toBe(wrapper.vm.goToLogsLockedReason);
+    });
+
+    it("go to logs stays live while another signal is locked or the stream type is free", () => {
+      (store.state as any).zoConfig.features = { traces: "locked" };
+      wrapper = createWrapper({ data: mockPanelData });
+      expect(wrapper.vm.goToLogsLocked).toBe(false);
+      wrapper.unmount();
+      (store.state as any).zoConfig.features = { logs: "locked" };
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ ...mockPanelData.queries[0], fields: { stream_type: "enrichment_tables" } }],
+        },
+      });
+      expect(wrapper.vm.goToLogsLocked).toBe(false);
+    });
+
     it("should show go to logs option only for SQL queries", () => {
       const sqlPanel = { ...mockPanelData, queryType: "sql" };
       wrapper = createWrapper({ data: sqlPanel });

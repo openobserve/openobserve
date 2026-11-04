@@ -850,6 +850,24 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
     });
 
+    it("disables the button with a lock and hides the picker while traces is locked", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { traces: "locked" } };
+      try {
+        traceWrapper = mountDetailTable();
+        await flushPromises();
+
+        const button = traceWrapper.find(BUTTON);
+        expect(button.attributes("disabled")).toBeDefined();
+        expect(button.attributes("icon-left")).toBe("lock");
+        expect(traceWrapper.find(SELECT).exists()).toBe(false);
+        await button.trigger("click");
+        expect(traceWrapper.emitted()["view-trace"]).toBeUndefined();
+      } finally {
+        const { features: _features, ...rest } = store.state.zoConfig;
+        store.state.zoConfig = rest;
+      }
+    });
+
     // REGRESSION: the gate must read `props.modelValue`, which exists during
     // setup, and not `rowData`, which the async created() hook only fills a
     // microtask later. Reading rowData left the button permanently hidden.
@@ -1131,6 +1149,28 @@ describe("DetailTable Component", () => {
         wrapper.vm.tab = "correlated-traces";
         await flushPromises();
         expect(traces()?.props("shortcutsActive")).toBe(true);
+      });
+
+      describe("when the license locks correlation", () => {
+        beforeEach(() => {
+          store.state.zoConfig = { ...store.state.zoConfig, features: { correlation: "locked" } };
+        });
+        afterEach(() => {
+          const { features: _features, ...rest } = store.state.zoConfig;
+          store.state.zoConfig = rest;
+        });
+
+        it("opens the locked tab on LicenseDeniedState without loading correlation", async () => {
+          await mountFooter({ initialTab: "json" });
+          expect(wrapper.vm.tabOrder.find((t: any) => t.name === "correlated-logs")?.locked).toBe(
+            true,
+          );
+          wrapper.vm.onTabChange("correlated-logs");
+          await flushPromises();
+          expect(wrapper.vm.tab).toBe("correlated-logs");
+          expect(wrapper.findComponent({ name: "LicenseDeniedState" }).exists()).toBe(true);
+          expect(wrapper.emitted("load-correlation")).toBeUndefined();
+        });
       });
     });
 

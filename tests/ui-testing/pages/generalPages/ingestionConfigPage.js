@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class IngestionConfigPage {
     constructor(page) {
@@ -77,6 +78,7 @@ export class IngestionConfigPage {
         this.rumContentText = this.legacyCodeBlockPre.first();
         // Shared by every link in the test so 429 waits stay well under the test timeout
         this.rateLimitRetryBudgetMs = 60000;
+        this.networkErrorRetryBudgetMs = 60000;
     }
 
     // ==================== Navigation ====================
@@ -460,8 +462,7 @@ export class IngestionConfigPage {
     }
 
     async headWithRateLimitRetry(href, maxRetries = 2) {
-        // 5 second timeout to prevent hanging
-        let response = await this.page.request.head(href, { timeout: 5000 });
+        let response = await this.headWithNetworkErrorRetry(href);
         for (let attempt = 0; attempt < maxRetries && response.status() === 429; attempt++) {
             const retryAfter = Number(response.headers()['retry-after']);
             const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000;
@@ -477,5 +478,21 @@ export class IngestionConfigPage {
             this.rateLimitRetryBudgetMs -= Date.now() - started;
         }
         return response;
+    }
+
+    async headWithNetworkErrorRetry(href, maxRetries = 2) {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                // 5 second timeout to prevent hanging
+                return await this.page.request.head(href, { timeout: 5000 });
+            } catch (error) {
+                const retryCostMs = 1000 * (attempt + 1) + 5000;
+                // A spent budget would push the whole test past its timeout, so the real error is reported instead
+                if (attempt >= maxRetries || retryCostMs > this.networkErrorRetryBudgetMs) throw error;
+                testLogger.warn(`[doc-links] HEAD failed (${error.message}), retry ${attempt + 1}/${maxRetries}: ${href}`);
+                this.networkErrorRetryBudgetMs -= retryCostMs;
+                await this.page.waitForTimeout(1000 * (attempt + 1));
+            }
+        }
     }
 }

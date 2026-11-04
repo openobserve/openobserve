@@ -677,6 +677,7 @@ import {
   type ProviderCheckFailure,
 } from "../../views/AIObservability/experimentProviderCheck";
 import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import {
   EXPERIMENT_ROW_SOURCES,
   experimentFormDefaults,
@@ -1336,6 +1337,9 @@ onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
+// A locked page cannot be edited, and its locked save button would trap the user.
+const { locked: pageLocked } = useFeatureLock();
+
 const experimentDraft = useEditorDraft<ExperimentForm>({
   kind: "experiment",
   entityLabel: () => t("common.editorDraft.entities.experiment"),
@@ -1352,7 +1356,7 @@ const experimentDraft = useEditorDraft<ExperimentForm>({
     if (!resolvingPrompt.value) draftOverrides = null;
   },
   base: () => (cloning.value ? cloneDefinition(cloneSource.value) : undefined),
-  hasChanges: () => isDirty.value,
+  hasChanges: () => !pageLocked.value && isDirty.value,
   save: async () => {
     const run = { saved: false };
     leaveSave = run;
