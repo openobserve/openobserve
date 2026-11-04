@@ -20,7 +20,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Utc};
 use config::{
     FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
@@ -31,7 +31,7 @@ use config::{
     },
     utils::{
         parquet::get_recordbatch_reader_from_bytes,
-        time::{BASE_TIME, HourFormat, get_ymdh_from_micros, hour_micros, now, now_micros},
+        time::{BASE_TIME, HourFormat, get_ymdh_from_micros, now, now_micros},
     },
 };
 use db;
@@ -47,7 +47,10 @@ use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
 
-use crate::bloom::compact::bloom_files_deleted;
+use crate::{
+    bloom::compact::bloom_files_deleted,
+    merge::{job_range, job_range_end, scheduling_level},
+};
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -91,13 +94,14 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // we don't dump for file_list stream
             continue;
         }
-        if !super::is_past_hour(*offset) {
-            need_done_ids.push(*job_id); // the data is not past hour, need to wait
-            continue;
-        }
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
+        let level = scheduling_level(stream_type, Some(&stream_settings), *offset);
+        if !super::is_past_hour(job_range_end(*offset, level)) {
+            need_done_ids.push(*job_id); // the data is not past its range, need to wait
+            continue;
+        }
         let partition_time_level = get_partition_time_level(stream_type);
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
@@ -113,6 +117,15 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
             need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
+        }
+        // the dump removes live rows the sealing merge still reads; a lagging offset only retries
+        if level == PartitionTimeLevel::Daily {
+            let (compact_offset, _) =
+                db::compact::files::get_offset(&org_id, stream_type, &stream_name).await;
+            if !is_day_sealed(*offset, compact_offset) {
+                need_release_ids.push(*job_id);
+                continue;
+            }
         }
         if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
@@ -215,34 +228,9 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // check offset
-    let partition_time_level = get_partition_time_level(job.stream_type);
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(job.offset * 1000);
-    let offset_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
-            0,
-            0,
-        )
-        .unwrap();
-    let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
-        (
-            // start of the day
-            offset_hour.with_hour(0).unwrap().timestamp_micros(),
-            // start of next hour
-            offset_hour.timestamp_micros() + hour_micros(1) - 1,
-        )
-    } else {
-        (
-            // start of the hour
-            offset_hour.timestamp_micros(),
-            // start of next hour
-            offset_hour.timestamp_micros() + hour_micros(1) - 1,
-        )
-    };
+    let settings = get_settings(&job.org_id, &job.stream_name, job.stream_type).await;
+    let level = scheduling_level(job.stream_type, settings.as_deref(), job.offset);
+    let (start_time, end_time) = job_range(job.offset, level);
 
     let files = infra_file_list::query_for_dump(
         &job.org_id,
@@ -547,6 +535,11 @@ pub async fn delete_by_time_range(
     }
 
     Ok(())
+}
+
+/// The generator is past the day once it has enqueued the job that seals it.
+fn is_day_sealed(day_offset: i64, compact_offset: i64) -> bool {
+    compact_offset > job_range_end(day_offset, PartitionTimeLevel::Daily)
 }
 
 fn deleted_data_file(file: &FileRecord) -> FileListDeleted {
@@ -1863,5 +1856,16 @@ mod tests {
             "every pair must carry that record's own stored (id, date), in input order"
         );
         assert!(dump_delete_pairs(&[]).is_empty());
+    }
+
+    const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+
+    #[test]
+    fn test_is_day_sealed_needs_the_generator_past_the_day() {
+        use config::utils::time::day_micros;
+        assert!(!is_day_sealed(DAY, DAY));
+        assert!(!is_day_sealed(DAY, DAY + day_micros(1) - 1));
+        assert!(is_day_sealed(DAY, DAY + day_micros(1)));
+        assert!(is_day_sealed(DAY, DAY + day_micros(3)));
     }
 }
