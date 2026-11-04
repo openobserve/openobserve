@@ -16,7 +16,7 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "../../chartDimensionUtils";
 import { type SQLContext } from "../shared/types";
-import { chartColor } from "../../../chartTheme";
+import { chartAxisTextColor, chartColor } from "../../../chartTheme";
 
 /**
  * Applies chart-specific options for: stacked
@@ -58,6 +58,7 @@ export function applyStackedChart(ctx: SQLContext): void {
     : panelSchema.config?.axis_label_truncate_width || 120;
   options.xAxis[0].axisLabel.margin = 5;
   options.xAxis[0].axisLabel = {
+    color: chartAxisTextColor(),
     rotate: stackedXAxisRotation,
   };
   options.xAxis[0].axisTick = {};

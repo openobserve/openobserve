@@ -19,7 +19,12 @@ import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
-import { use as echartsUse } from "echarts/core";
+import { use as echartsUse, init as echartsInit } from "echarts/core";
+import {
+  fakeCanvasPainter,
+  fakeDevicePixelRatio,
+  type DevicePixelRatioFake,
+} from "@/test/unit/helpers/devicePixelRatioFake";
 import {
   BoxplotChart,
   FunnelChart,
@@ -1781,5 +1786,118 @@ describe("ChartRenderer", () => {
         currTrigger: "leave",
       });
     });
+  });
+});
+
+describe("ChartRenderer device pixel ratio", () => {
+  let display: DevicePixelRatioFake;
+  let wrapper: any;
+  let zr: any;
+
+  const mountAt = async (renderType = "canvas") => {
+    wrapper = mount(ChartRenderer, {
+      props: {
+        data: { options: { series: [{ type: "line", data: [[1609459200000, 10]] }] } },
+        renderType,
+      },
+      global: { plugins: [i18n], provide: { store, hoveredSeriesState: ref(null) } },
+    });
+    await flushPromises();
+  };
+
+  const initRatios = () =>
+    vi.mocked(echartsInit).mock.calls.map(([, , opts]) => opts?.devicePixelRatio);
+
+  beforeEach(() => {
+    vi.mocked(echartsInit).mockClear();
+    global.IntersectionObserver = vi.fn(function () {
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    }) as any;
+    store.state.theme = "light";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    display.restore();
+    // The mocked instance and its zr are shared by every test in this file.
+    if (zr) delete zr.painter;
+    zr = null;
+  });
+
+  it("inits the chart at the live ratio, not the one zrender cached at import", async () => {
+    display = fakeDevicePixelRatio(2);
+    await mountAt();
+    expect(initRatios()).toEqual([2]);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+    display = fakeDevicePixelRatio(1.25);
+    await mountAt();
+    const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+    expect(pixelated()).toBe(true);
+
+    display.setRatio(2);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1);
+    await flushPromises();
+    expect(pixelated()).toBe(false);
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
+  });
+
+  const attachPainter = (type: "canvas" | "svg" = "canvas") => {
+    const chart = vi.mocked(echartsInit).mock.results[0].value;
+    const painter = fakeCanvasPainter(1, type);
+    zr = chart.getZr();
+    zr.painter = painter;
+    chart.setOption.mockClear();
+    chart.dispose.mockClear();
+    return { chart, painter };
+  };
+
+  it("re-rasterizes the mounted chart in place when the window changes display", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { chart, painter } = attachPainter();
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(chart.setOption).not.toHaveBeenCalled();
+    expect(painter.dpr).toBe(2);
+    expect(painter.layers["zr_0.0"].ctx.dpr).toBe(2);
+    expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(initRatios()).toEqual([1]);
+    expect(painter.dpr).toBe(1.5);
+  });
+
+  it("leaves an SVG chart alone, since it does not rasterize at a ratio", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    const { chart, painter } = attachPainter("svg");
+
+    display.setRatio(2);
+    await flushPromises();
+
+    expect(initRatios()).toEqual([1]);
+    expect(chart.dispose).not.toHaveBeenCalled();
+    expect(painter.refresh).not.toHaveBeenCalled();
+  });
+
+  it("stops listening for ratio changes on unmount", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    expect(display.listenerCount()).toBe(1);
+    wrapper.unmount();
+    wrapper = null;
+    expect(display.listenerCount()).toBe(0);
   });
 });
