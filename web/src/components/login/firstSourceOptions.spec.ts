@@ -17,10 +17,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import enLocale from "@/locales/languages/en-US.json";
 import {
   FIRST_SOURCE_OPTIONS,
+  FIRST_SOURCE_PREFILL_KEY,
   FIRST_SOURCE_STORAGE_PREFIX,
+  capturePrefill,
+  clearPrefill,
+  docsReferrerSource,
   firstSourceOption,
   firstSourcePickRoute,
+  prefillFirstSource,
   readFirstSource,
+  readPrefill,
   writeFirstSource,
 } from "./firstSourceOptions";
 
@@ -112,6 +118,125 @@ describe("firstSourceOptions", () => {
 
     it("is frozen", () => {
       expect(Object.isFrozen(FIRST_SOURCE_OPTIONS)).toBe(true);
+    });
+  });
+
+  describe("prefillFirstSource", () => {
+    it.each(FIRST_SOURCE_OPTIONS.map((o) => o.id))("accepts utm_content=%s", (id) => {
+      expect(prefillFirstSource({ utm_content: id })).toBe(id);
+    });
+
+    it("leaves no pick for an unknown or differently cased utm_content", () => {
+      expect(prefillFirstSource({ utm_content: "banner" })).toBeUndefined();
+      expect(prefillFirstSource({ utm_content: "Kubernetes" })).toBeUndefined();
+      expect(prefillFirstSource({ utm_content: "" })).toBeUndefined();
+      expect(prefillFirstSource(undefined)).toBeUndefined();
+    });
+
+    it("prefers utm_content over the referrer", () => {
+      expect(
+        prefillFirstSource(
+          { utm_content: "rum" },
+          "https://openobserve.ai/docs/ingestion/logs/kubernetes/",
+        ),
+      ).toBe("rum");
+    });
+
+    it("falls back to a docs referrer when utm_content is unknown", () => {
+      expect(
+        prefillFirstSource(
+          { utm_content: "x" },
+          "https://openobserve.ai/docs/ingestion/logs/linux/",
+        ),
+      ).toBe("linux");
+    });
+
+    it("reads the referrer stored beside utm_content", () => {
+      expect(
+        prefillFirstSource({ referrer: "https://openobserve.ai/docs/integration/nginx/" }),
+      ).toBe("webserver");
+    });
+  });
+
+  describe("docsReferrerSource", () => {
+    it.each([
+      ["https://openobserve.ai/docs/ingestion/logs/kubernetes/", "kubernetes"],
+      ["https://openobserve.ai/docs/integration/k8s/", "kubernetes"],
+      ["https://openobserve.ai/docs/ingestion/logs/windows", "windows"],
+      ["https://openobserve.ai/docs/integration/servers/apache/", "webserver"],
+      ["https://openobserve.ai/docs/integration/servers/iis/", "webserver"],
+      ["https://openobserve.ai/docs/ingestion/traces/opentelemetry/", "otel"],
+      ["https://openobserve.ai/docs/ingestion/logs/curl/", "http"],
+      ["https://openobserve.ai/docs/integration/aws/cloudwatch-logs/", "cloud"],
+      ["https://openobserve.ai/docs/integration/gcp/", "cloud"],
+      ["https://openobserve.ai/docs/rum/", "rum"],
+      ["https://openobserve.ai/docs/integration/llm/openai/", "llm"],
+      ["https://openobserve.ai/docs/mcp/", "agent"],
+      ["https://www.openobserve.ai/docs/ingestion/logs/linux/", "linux"],
+    ])("maps %s to %s", (url, id) => {
+      expect(docsReferrerSource(url)).toBe(id);
+    });
+
+    it("takes the deepest matching segment", () => {
+      expect(docsReferrerSource("https://openobserve.ai/docs/opentelemetry/kubernetes/")).toBe(
+        "kubernetes",
+      );
+    });
+
+    it("ignores other hosts, non-docs paths, unmapped guides and junk", () => {
+      expect(docsReferrerSource("https://evil.example/docs/kubernetes/")).toBeUndefined();
+      expect(
+        docsReferrerSource("https://openobserve.ai.evil.example/docs/kubernetes/"),
+      ).toBeUndefined();
+      expect(docsReferrerSource("https://openobserve.ai/blog/kubernetes/")).toBeUndefined();
+      expect(docsReferrerSource("https://openobserve.ai/docs/alerts/")).toBeUndefined();
+      expect(docsReferrerSource("not a url")).toBeUndefined();
+      expect(docsReferrerSource("")).toBeUndefined();
+    });
+  });
+
+  describe("capturePrefill / readPrefill", () => {
+    it("stores the raw utm_content and a docs referrer", () => {
+      capturePrefill("kubernetes", "https://openobserve.ai/docs/ingestion/logs/linux/");
+      expect(readPrefill()).toEqual({
+        utm_content: "kubernetes",
+        referrer: "https://openobserve.ai/docs/ingestion/logs/linux/",
+      });
+    });
+
+    it("keeps an unknown utm_content raw; mapping happens when the dialog reads it", () => {
+      capturePrefill("banner", "");
+      expect(readPrefill()).toEqual({ utm_content: "banner" });
+      expect(prefillFirstSource(readPrefill())).toBeUndefined();
+    });
+
+    it("never replaces a stored pair with nothing (the SSO callback has neither)", () => {
+      capturePrefill("rum", "");
+      capturePrefill(undefined, "https://dex.openobserve.ai/auth");
+      expect(readPrefill()).toEqual({ utm_content: "rum" });
+    });
+
+    it("ignores a non-string utm_content and a non-docs referrer", () => {
+      capturePrefill(["a", "b"], "https://google.com/");
+      expect(sessionStorage.getItem(FIRST_SOURCE_PREFILL_KEY)).toBeNull();
+    });
+
+    it("clears the stored pair", () => {
+      capturePrefill("rum", "");
+      clearPrefill();
+      expect(readPrefill()).toBeUndefined();
+    });
+
+    it("reads nothing from a corrupt record", () => {
+      sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, "{oops");
+      expect(readPrefill()).toBeUndefined();
+    });
+
+    it("survives a storage that throws", () => {
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("quota");
+      });
+      expect(() => capturePrefill("rum", "")).not.toThrow();
     });
   });
 

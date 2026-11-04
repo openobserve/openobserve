@@ -249,6 +249,13 @@ describe("signOutThroughLeaveGuards", () => {
     expect(store.dispatch).toHaveBeenCalledWith("logout");
     expect(assign).toHaveBeenCalledTimes(1);
   });
+
+  // a deep-link first login keeps the flag for a later Home visit; the next user on this browser must not inherit it
+  it("clears the first-login flag", async () => {
+    localStorage.setItem("isFirstTimeLogin", email);
+    await expect(signOutThroughLeaveGuards(router, makeStore())).resolves.toBe(true);
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+  });
 });
 
 describe("signOutDraftsToConfirm", () => {

@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            The wrapper always renders — an unconditional ref keeps the observer
            attached even when nothing is on screen yet. -->
       <div ref="announcementBarRef">
-        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <!-- Webinar announcement bar: shown above toolbar for cloud users, but not over a focus-mode page -->
         <div
-          v-if="config.isCloud === 'true'"
+          v-if="config.isCloud === 'true' && !focusMode"
           class="bg-button-primary text-button-primary-foreground text-center"
         >
           <WebinarBanner variant="header" />
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true && !store.state.kioskMode"
+        v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :loading="!menuReady"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
+        v-if="!focusMode"
         v-model:open="mobileNavOpen"
         side="left"
         :width="30"
@@ -141,10 +142,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <main
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
+          :class="
+            store.state.kioskMode
+              ? ''
+              : focusMode
+                ? 'px-2 pb-2 max-md:px-0'
+                : 'pe-2 pb-2 max-md:pe-0'
+          "
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
+              focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -161,12 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <div
-              v-if="isLoading && fullConfigSettled"
+              v-if="isLoading && fullConfigSettled && !holdForOnboarding"
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <FirstDataNotice
                 v-if="
+                  !focusMode &&
                   firstDataNotice.visible.value &&
                   router.currentRoute.value.name !== 'home' &&
                   !store.state.kioskMode
@@ -205,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
+          v-if="!focusMode"
           v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
@@ -252,7 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :count="signOutDraftCount"
       @confirm="performSignout"
     />
-    <CommunitySlackInvite />
+    <!-- It checks once, on mount, before the page claims the session, so it stays off focus-mode pages (onboarding). -->
+    <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
@@ -313,6 +323,12 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
+import {
+  isFirstLoginOf,
+  markStartPending,
+  redirectPending,
+} from "@/components/onboarding/onboardingFlow";
+import { orgHasUserData } from "@/composables/useOrgHasUserData";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
 import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
@@ -450,6 +466,13 @@ export default defineComponent({
     const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    // Focus-mode routes (e.g. onboarding) keep the header but drop the side menu, the AI panel and the banners.
+    const focusMode = computed(() => router.currentRoute.value.meta?.focusMode === true);
+    // A first cloud login may be sent to onboarding: show no page until that is decided, so the
+    // user never sees Home for a moment before onboarding replaces it.
+    const holdForOnboarding = ref(
+      config.isCloud === "true" && isFirstLoginOf(store.state.userInfo?.email),
+    );
     const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
@@ -763,6 +786,53 @@ export default defineComponent({
       const barHeightRem = barHeightPx / 16;
       document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
+
+    // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
+    const firstLoginRedirect = async () => {
+      if (!isFirstLoginOf(store.state.userInfo?.email)) return;
+      await router.isReady();
+      // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
+      const notNow = () =>
+        config.isCloud === "true" &&
+        redirectPending(router.currentRoute.value.name as string | undefined);
+      if (notNow()) return;
+      const hasData =
+        config.isCloud !== "true" ||
+        store.state.organizationData.isDataIngested === true ||
+        // the store flag is still false at mount, so an org with data shows only in its stream lists
+        (await orgHasUserData(store.state.selectedOrganization?.identifier)) === true;
+      // A user who left Home while the lists loaded keeps the flag too.
+      if (notNow()) return;
+      localStorage.removeItem("isFirstTimeLogin");
+      if (hasData) return;
+      markStartPending(store.state.userInfo?.email);
+      await router.replace({
+        name: "onboarding",
+        query: { org_identifier: store.state.selectedOrganization?.identifier },
+      });
+    };
+    let deciding = false;
+    const onboardFirstLogin = async () => {
+      if (deciding) return;
+      deciding = true;
+      try {
+        await firstLoginRedirect();
+      } finally {
+        deciding = false;
+        holdForOnboarding.value = false;
+      }
+    };
+    onMounted(onboardFirstLogin);
+    // A first login a pending redirect deferred onboards on the next Home visit, remount or not.
+    watch(
+      () => router.currentRoute.value.name,
+      (name) => {
+        const firstLogin = name === "home" && isFirstLoginOf(store.state.userInfo?.email);
+        // Only Home waits on the decision: a page the user moved to while the lists load shows at once.
+        holdForOnboarding.value = firstLogin && config.isCloud === "true";
+        if (firstLogin && !deciding) void onboardFirstLogin();
+      },
+    );
 
     onMounted(() => {
       setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
@@ -1746,6 +1816,8 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       isMobile,
+      focusMode,
+      holdForOnboarding,
       isChatOverlay,
       miniMode,
       mobileNavOpen,

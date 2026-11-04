@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { raw } from "@/types/i18n";
 
 // ── Mock illustrations module — must be hoisted so the component import sees it ─
 // Each preset references an illustration component by name from the illustrations
@@ -235,6 +236,33 @@ describe("OEmptyState", () => {
 
       // Assert — the inline icon wrapper + OIcon stub should be present
       expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(true);
+    });
+  });
+
+  // ── intro size + eyebrow ────────────────────────────────────────────────────
+
+  describe("intro size", () => {
+    it("fills its pane, centred, with the hero type ramp and a smaller illustration", () => {
+      wrapper = buildWrapper({ size: "intro" });
+
+      const root = wrapper.find('[data-test="o2-empty-state"]');
+      // min-h, not h: a taller stack grows the pane's scroll instead of clipping
+      expect(root.classes()).toEqual(expect.arrayContaining(["min-h-full", "justify-center"]));
+      expect(root.classes()).not.toContain("h-full");
+      expect(wrapper.find("h2").classes()).toContain("text-2xl!");
+      expect(wrapper.findComponent({ name: "IllustrationStub" }).props("width")).toBe(136);
+    });
+
+    it("renders the eyebrow slot above the heading, outside it", () => {
+      wrapper = mount(OEmptyState, {
+        props: { size: "intro", title: raw("Headline") },
+        slots: { eyebrow: "Logs" },
+        global: { plugins: [store, i18n], stubs: { OIcon: OIconStub } },
+      });
+
+      const copy = wrapper.find("h2").element.parentElement!;
+      expect(copy.firstElementChild!.textContent!.trim()).toBe("Logs");
+      expect(wrapper.find("h2").text()).toBe("Headline");
     });
   });
 

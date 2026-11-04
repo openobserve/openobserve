@@ -1336,6 +1336,35 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the new-stream baseline on Troubleshoot and a copy, so a stream that already landed counts", async () => {
+    const w = watchOf(undefined);
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs.push({ name: "default", stats: { doc_num: 1, doc_time_min: NOW * 1000 } });
+    await w.troubleshoot();
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value?.streamName).toBe("default");
+  });
+
+  it("keeps a target's server-clock anchor on Troubleshoot", async () => {
+    const serverNowS = Math.floor(NOW / 1000);
+    rows.logs = [{ name: "default", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.sinceUs.value).toBe(serverNowS * 1_000_000);
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS + 60 }]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await w.troubleshoot();
+    expect(w.sinceUs.value).toBe(serverNowS * 1_000_000);
+    countHits.mockReturnValue([{ zo_count: 1, zo_min: serverNowS * 1_000_000 + 5 }]);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.result.value).toMatchObject({ count: 1, sinceUs: serverNowS * 1_000_000 });
+  });
+
   it("diagnoses at once on Troubleshoot and keeps polling", async () => {
     const w = watchOf("logs");
     w.start("open");
@@ -1523,7 +1552,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).not.toHaveBeenCalled();
   });
 
-  it("marks the detection seen, so the next-visit banner never repeats it", async () => {
+  it("marks the detection seen, and the stream it saw, so the next-visit banner never repeats it", async () => {
     const w = watchOf("logs");
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
@@ -1532,6 +1561,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.state.value).toBe("received");
     expect(JSON.parse(localStorage.getItem("o2.onboarding.firstData.acme")!)).toMatchObject({
       seenDetection: true,
+      detectedStream: { type: "logs", name: "default" },
     });
   });
 });

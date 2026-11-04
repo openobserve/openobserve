@@ -42,6 +42,10 @@ const legacySeenKey = (email: string): string => `communitySlackInviteSeen:${ema
 
 const storageKey = (email: string): string => `slackCommunityInvite:${email}`;
 
+// Set when the onboarding page claims the session (suppressConnectPrompt); CommunitySlackInvite reads it.
+export const connectDataPromptSessionKey = (email: string): string =>
+  `connectDataSourcePromptShown:${email}`;
+
 const readRecord = (email: string): SlackInviteRecord => {
   try {
     const raw = localStorage.getItem(storageKey(email));

@@ -496,7 +496,7 @@ export function useFirstEventWatch(
       sinceUs,
     };
     state.value = "received";
-    markDetectionSeen(ctx.org);
+    markDetectionSeen(ctx.org, { type: ctx.type, name: stream });
     halt();
     forgetEngagement();
   };

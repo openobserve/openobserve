@@ -243,16 +243,41 @@ describe("CommunitySlackInvite", () => {
   });
 
   // ── First-login gate ─────────────────────────────────────────────────────────
-  // Never compete with the onboarding dialog during the user's first-login session.
+  // Never compete with onboarding or the welcome dialog during the user's
+  // first-login session — the day-2 clock only starts once that session ends.
 
   describe("first-login gate", () => {
-    it("does not open during first-time login even with an elapsed day-2 record", () => {
+    it("does not open during first-time login even with an elapsed day-2 record", async () => {
+      localStorage.setItem("isFirstTimeLogin", USER_EMAIL);
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    it("opens for a user whose browser holds another user's first-login flag", async () => {
+      localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      localStorage.removeItem("isFirstTimeLogin");
+    });
+
+    // a flag set before it held the email
+    it("treats a legacy 'true' flag as this user's first login, and stores their email in it", async () => {
       localStorage.setItem("isFirstTimeLogin", "true");
       setPendingDay2(25);
 
       wrapper = buildWrapper();
+      await nextTick();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+      expect(localStorage.getItem("isFirstTimeLogin")).toBe(USER_EMAIL);
     });
 
     it("opens normally once isFirstTimeLogin is cleared (returning session)", async () => {
@@ -265,14 +290,14 @@ describe("CommunitySlackInvite", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
 
-    it("ignores the retired connect-popup session flag", async () => {
+    it("stays closed in a session the onboarding page claimed", async () => {
       sessionStorage.setItem(`connectDataSourcePromptShown:${USER_EMAIL}`, "true");
       setPendingDay2(25);
 
       wrapper = buildWrapper();
       await nextTick();
 
-      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
       sessionStorage.clear();
     });
   });
@@ -413,6 +438,26 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    // users onboarding never reaches (invited, domain-mapped, a new browser) still get the day-two ask
+    it("starts the day-2 clock in a session past the first login", () => {
+      wrapper = buildWrapper();
+
+      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      expect(record.status).toBe("pending_day2");
+      expect(Date.now() - record.shownAt).toBeLessThan(60_000);
+    });
+
+    it("leaves the clock alone in the first-login session and off cloud", () => {
+      localStorage.setItem("isFirstTimeLogin", USER_EMAIL);
+      wrapper = buildWrapper();
+      wrapper.unmount();
+      localStorage.removeItem("isFirstTimeLogin");
+      mockConfig.isCloud = "false";
+      wrapper = buildWrapper();
+
+      expect(localStorage.getItem(STATE_KEY)).toBeNull();
     });
 
     it("stays closed when pending but less than 24h have elapsed", () => {

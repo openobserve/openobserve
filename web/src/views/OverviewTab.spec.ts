@@ -65,6 +65,14 @@ vi.mock("@/services/service_graph", async (importOriginal) => {
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL
 // so the assertions below exercise the actual rendered output.
+// HomeNoDataState's setup buttons read the org's full stream lists, which HomeView has already
+// loaded in the app; mocked so the probe counts below stay OverviewTab's own.
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => ({ hasUserData: ref(undefined), isFetching: ref(false) }),
+  };
+});
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
@@ -1003,10 +1011,12 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="first-data-panel"]').exists()).toBe(false);
     });
 
+    // Refresh is the hero's way to check again once data was sent
     it("should keep the toolbar with a fresh refresh run beside the hero", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
+      expect(wrapper.find(HERO).exists()).toBe(true);
       expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
       expect(refreshLastRun()).not.toBeNull();
     });

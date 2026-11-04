@@ -22,11 +22,14 @@ import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
 import analytics from "@/services/product_analytics";
 import {
+  connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteDismissed,
+  markSlackInviteOffered,
   markSlackInviteResolved,
   shouldShowStandaloneSlackInvite,
 } from "@/utils/slackCommunityInvite";
+import { isFirstLoginOf } from "@/components/onboarding/onboardingFlow";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -37,7 +40,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const session = useSampleDataSession();
 
-// Day-2 follow-up; the onboarding dialog starts the clock via utils/slackCommunityInvite.ts.
+// Day-2 follow-up; its clock starts in either first-run flow or in any later cloud session — shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
@@ -62,13 +65,18 @@ onMounted(() => {
   // captured or shown there.
   if (config.isCloud !== "true") return;
 
-  // Never compete with the onboarding dialog during the user's first-login session.
-  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
+  // Never compete with onboarding or the welcome dialog during the user's
+  // first-login session — the day-2 clock only starts once that session ends.
+  if (isFirstLoginOf(store.state.userInfo?.email)) return;
 
-  if (!shouldShowStandaloneSlackInvite(userEmail)) return;
+  const due = shouldShowStandaloneSlackInvite(userEmail);
+  // every cloud session starts the clock, so users onboarding never reaches (invited, a new browser) get the invite too
+  markSlackInviteOffered(userEmail);
+  if (!due) return;
 
   const show = () => {
-    // the welcome wins this visit; the invite stays due for a later one
+    // the onboarding page claims its session, and the welcome wins this visit; the invite stays due for a later one
+    if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
     if (session.welcomeOpen.value) return;
     isOpen.value = true;
     track("community_slack_prompt_shown");

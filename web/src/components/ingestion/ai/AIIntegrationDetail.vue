@@ -149,6 +149,7 @@ const agentGuideName = computed(
       :key="integrationSlug"
       :content="richContent"
       :subs="subs"
+      :key-pending="!store.state.organizationData?.organizationPasscode"
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />

@@ -243,6 +243,7 @@ import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
@@ -383,7 +384,29 @@ export default defineComponent({
       );
     }
 
-    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
+    // is the app's, so it is not saved as the user's tab.
+    let skipSave = false;
+    watch(activeHomeTab, (val) => {
+      if (skipSave) {
+        skipSave = false;
+        return;
+      }
+      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+    });
+    const { hasAnyStream, isFetching } = useOrgHasUserData(
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
+    watch(
+      [hasAnyStream, isFetching],
+      ([has, fetching]) => {
+        if (has !== false || fetching || activeHomeTab.value !== "ai") return;
+        skipSave = true;
+        activeHomeTab.value = "overview";
+      },
+      { immediate: true },
+    );
 
     // When the user opens the pinned dashboard tab, re-read the authoritative
     // home_dashboard org setting so a snapshot that went stale on another system

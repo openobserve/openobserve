@@ -16,9 +16,18 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
+import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import { writeFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
+import MainLayout from "./MainLayout.vue";
 import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
+import stream from "@/services/stream";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
@@ -34,6 +43,19 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
+
+vi.mock("@/services/config", () => ({
+  default: { get_config_full: vi.fn(() => new Promise(() => {})) },
+}));
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setUser: vi.fn(), startView: vi.fn() },
+}));
+vi.mock("@/composables/useHomeDashboard", () => ({
+  useHomeDashboard: () => ({ load: vi.fn(async () => undefined) }),
+}));
+
+// An earlier describe replaces global.window with a stub and never restores it
+const realWindow = global.window;
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -1916,6 +1938,284 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
       expect(traces).toBe("account-tree");
       expect(profiles).toBe("memory");
     });
+  });
+});
+
+describe("MainLayout — focus-mode route", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const NoticeStub = defineComponent({
+    setup: () => () => h("div", { "data-test": "first-data-notice" }),
+  });
+  const mountAt = async (focusMode: boolean) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/page", name: "page", component: StubDiv, meta: { focusMode } }],
+    });
+    await router.push("/page");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
+          O2AIChat: StubDiv,
+          WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: { name: "CommunitySlackInvite", setup: () => () => h("div") },
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          FirstDataNotice: NoticeStub,
+        },
+      },
+    });
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "focus_org", label: "focus_org" };
+    writeFirstDataRecord("focus_org", { lastVisit: 1, hadData: false });
+    store.state.organizationData.isDataIngested = false;
+    (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
+    store.state.isAiChatEnabled = true;
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    global.window = realWindow;
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    store.state.isAiChatEnabled = false;
+    localStorage.clear();
+  });
+
+  it("keeps the header but hides the side menu, the AI panel and the banners on a focus-mode route", async () => {
+    // The webinar banner shows on cloud builds only.
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(true);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
+    expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the chrome on a normal route", async () => {
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(false);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("MainLayout — first-time cloud login", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const mountAtHome = async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", name: "home", component: StubDiv },
+        { path: "/onboarding", name: "onboarding", component: StubDiv },
+        { path: "/logs", name: "logs", component: StubDiv },
+      ],
+    });
+    // The org rides in the URL, as after a real login; without it the layout clears the selection.
+    window.history.replaceState({}, "", "/?org_identifier=org1");
+    await router.push("/?org_identifier=org1");
+    const replace = vi.spyOn(router, "replace");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    return { wrapper, replace, router };
+  };
+  // The org's stream lists: `logs` names a logs stream holding records.
+  const streams = (logs: string[] = []) =>
+    vi.spyOn(stream, "nameList").mockImplementation((async (_org: string, type: string) => ({
+      data: {
+        list: (type === "logs" ? logs : []).map((name) => ({
+          name,
+          stream_type: type,
+          stats: { doc_num: 3, doc_time_min: 1, doc_time_max: 2 },
+        })),
+      },
+    })) as never);
+
+  beforeEach(() => {
+    streams();
+    // the org list holds org1, as the API's does after a real login; without it the layout picks another
+    store.state.organizations = [{ id: 1, name: "org1", identifier: "org1" }];
+    global.window = realWindow;
+    (config as any).isCloud = "true";
+    store.state.organizationData.isDataIngested = false;
+    store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org1" };
+    localStorage.setItem("isFirstTimeLogin", store.state.userInfo.email);
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, "", "/");
+    queryClient.clear();
+    localStorage.clear();
+    sessionStorage.clear();
+    (config as any).isCloud = "false";
+    vi.mocked(stream.nameList).mockRestore();
+  });
+
+  it("sends a first-time cloud user to onboarding and marks the start as pending", async () => {
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({
+      name: "onboarding",
+      query: { org_identifier: "org1" },
+    });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`)).toBe(
+      "true",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps a pending redirect: no onboarding, and the flag stays for a later visit", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    wrapper.unmount();
+  });
+
+  it("never onboards a user the flag was set for someone else", async () => {
+    localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("does not redirect an org that already has data, and clears the flag", async () => {
+    store.state.organizationData.isDataIngested = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    // A flag left behind would mute the day-two Slack invite for good.
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  // the store flag is still false at mount: weeks after a deep-link sign-up the org has data
+  it("reads the org's stream lists, and leaves an org with data on Home with nothing sent", async () => {
+    streams(["default"]);
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("onboards on the next Home visit in the session after a pending redirect, without a remount", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    sessionStorage.removeItem("redirectURI");
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("leaves a user who moved on while the lists loaded, and onboards on the next Home visit", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    wrapper.unmount();
+  });
+
+  it("holds only Home: a user who leaves it while the lists load sees the page at once", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
+    expect(hold()).toBe(true);
+
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(false);
+    // back on Home before the lists answer, the hold covers it again
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(true);
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(hold()).toBe(false);
+    wrapper.unmount();
+  });
+
+  // a flag set before it held the email, by a login just before the deploy
+  it("takes a legacy 'true' flag as this user's first login, once", async () => {
+    localStorage.setItem("isFirstTimeLogin", "true");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({ name: "onboarding", query: { org_identifier: "org1" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("clears the flag off cloud, where there is no onboarding page", async () => {
+    (config as any).isCloud = "false";
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
   });
 });
 

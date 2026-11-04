@@ -39,7 +39,19 @@ export interface FirstDataRecord {
   shown?: boolean;
   dismissed?: boolean;
   seenDetection?: boolean;
+  /** The stream whose first record a setup page saw arrive. */
+  detectedStream?: DetectedStream;
 }
+
+export interface DetectedStream {
+  type: string;
+  name: string;
+  /** When the record arrived, in ms. */
+  at?: number;
+}
+
+// stats count flushed files only (ZO_MAX_FILE_RETENTION_TIME, 600 s by default); after that they speak for the stream
+const DETECTION_MARK_MS = 15 * 60_000;
 
 export interface FirstDataStream {
   name: string;
@@ -82,11 +94,39 @@ export function writeFirstDataRecord(org: string, record: FirstDataRecord): void
   }
 }
 
+// localStorage is not reactive: a detection bumps this, so an answer that read the mark reads it again
+const detections = ref(0);
+
 /** Called when the setup page's bar turned green, so the next visit never repeats the news. */
-export function markDetectionSeen(org: string): void {
+export function markDetectionSeen(org: string, stream?: DetectedStream): void {
   if (!org) return;
   const record = readFirstDataRecord(org) ?? { lastVisit: Date.now(), hadData: false };
-  writeFirstDataRecord(org, { ...record, seenDetection: true });
+  writeFirstDataRecord(org, {
+    ...record,
+    seenDetection: true,
+    ...(stream ? { detectedStream: { ...stream, at: Date.now() } } : {}),
+  });
+  detections.value++;
+}
+
+const expiryTimers = new Set<string>();
+
+/** The stream whose first record a setup page in this browser saw arrive, until its stats have had time to flush. */
+export function detectedStream(org: string): DetectedStream | undefined {
+  void detections.value;
+  const seen = readFirstDataRecord(org)?.detectedStream;
+  const left = (seen?.at ?? 0) + DETECTION_MARK_MS - Date.now();
+  if (!seen || left <= 0) return undefined;
+  // Date.now() is not reactive and an unchanged refetch keeps its data, so one timer per mark bumps the counter at expiry
+  const key = `${org}:${seen.at}`;
+  if (!expiryTimers.has(key)) {
+    expiryTimers.add(key);
+    setTimeout(() => {
+      expiryTimers.delete(key);
+      detections.value++;
+    }, left);
+  }
+  return seen;
 }
 
 /** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */

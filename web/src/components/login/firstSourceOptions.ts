@@ -46,7 +46,12 @@ export interface FirstSourceOption {
   signals: UserDataStreamType[];
 }
 
-/** The Get started choices in the approved order, each with its guide route. */
+export interface FirstSourcePrefill {
+  utm_content?: string;
+  referrer?: string;
+}
+
+/** The first-source choices in the approved order, each with its guide route. */
 export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze([
   {
     id: "kubernetes",
@@ -135,10 +140,103 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
 ] as FirstSourceOption[]);
 
 export const FIRST_SOURCE_STORAGE_PREFIX = "o2.onboarding.firstSource.";
+export const FIRST_SOURCE_PREFILL_KEY = "o2.onboarding.prefill";
+
+// Docs path segments that name a guide; the deepest matching segment wins.
+const DOCS_SEGMENT_SOURCES: Record<string, FirstSourceId> = {
+  kubernetes: "kubernetes",
+  k8s: "kubernetes",
+  linux: "linux",
+  windows: "windows",
+  nginx: "webserver",
+  apache: "webserver",
+  iis: "webserver",
+  opentelemetry: "otel",
+  otel: "otel",
+  otlp: "otel",
+  curl: "http",
+  aws: "cloud",
+  azure: "cloud",
+  gcp: "cloud",
+  rum: "rum",
+  llm: "llm",
+  genai: "llm",
+  mcp: "agent",
+};
 
 /** The option with this id, or undefined for an unknown id. */
 export function firstSourceOption(id: string | null | undefined): FirstSourceOption | undefined {
   return FIRST_SOURCE_OPTIONS.find((option) => option.id === id);
+}
+
+/** Maps an openobserve.ai docs URL to the option its guide belongs to. */
+export function docsReferrerSource(referrer: string | null | undefined): FirstSourceId | undefined {
+  if (!referrer) return undefined;
+  let url: URL;
+  try {
+    url = new URL(referrer);
+  } catch {
+    return undefined;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host !== "openobserve.ai" && !host.endsWith(".openobserve.ai")) return undefined;
+  const path = url.pathname.toLowerCase();
+  if (!path.startsWith("/docs")) return undefined;
+  const segments = path
+    .split(/[/_.-]+/)
+    .filter(Boolean)
+    .reverse();
+  for (const segment of segments) {
+    const id = DOCS_SEGMENT_SOURCES[segment];
+    if (id) return id;
+  }
+  return undefined;
+}
+
+/** The pick to preselect: utm_content when it equals an option id, else a mapped docs referrer. */
+export function prefillFirstSource(
+  query: FirstSourcePrefill | null | undefined,
+  referrer?: string | null,
+): FirstSourceId | undefined {
+  const utm = typeof query?.utm_content === "string" ? query.utm_content.trim() : "";
+  const fromUtm = firstSourceOption(utm)?.id;
+  if (fromUtm) return fromUtm;
+  return docsReferrerSource(referrer ?? query?.referrer);
+}
+
+/** Stores the signup link's utm_content and docs referrer for the onboarding page, never replacing a stored pair with nothing. */
+export function capturePrefill(utmContent: unknown, referrer: string | null | undefined): void {
+  const utm = typeof utmContent === "string" ? utmContent : "";
+  const docs = docsReferrerSource(referrer) ? (referrer as string) : "";
+  if (!utm && !docs) return;
+  try {
+    const record: FirstSourcePrefill = {};
+    if (utm) record.utm_content = utm;
+    if (docs) record.referrer = docs;
+    window.sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify(record));
+  } catch {
+    // Storage can be unavailable (private mode); onboarding then opens without a pick.
+  }
+}
+
+/** The stored prefill pair, or undefined when none was captured. */
+export function readPrefill(): FirstSourcePrefill | undefined {
+  try {
+    const raw = window.sessionStorage.getItem(FIRST_SOURCE_PREFILL_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as FirstSourcePrefill) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function clearPrefill(): void {
+  try {
+    window.sessionStorage.removeItem(FIRST_SOURCE_PREFILL_KEY);
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
 }
 
 /** The org's stored pick, or undefined when there is none or it is not a known id. */

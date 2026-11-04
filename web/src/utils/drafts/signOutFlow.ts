@@ -60,6 +60,8 @@ export const endSignedInSession = (
   const userEmail = String(store.state.userInfo?.email ?? "");
   stopSessionServices(store);
   invalidateLoginData();
+  // A deep-link first login keeps the flag for a later Home visit; it must not pass to the next user.
+  localStorage.removeItem("isFirstTimeLogin");
   if (keepDrafts) store.dispatch("logout");
   else {
     store.dispatch("logout", { draftsOf: userEmail });

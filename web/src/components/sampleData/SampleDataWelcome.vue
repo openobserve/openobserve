@@ -155,6 +155,7 @@ import {
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
+import { isFirstLoginOf, redirectPending } from "@/components/onboarding/onboardingFlow";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -212,17 +213,7 @@ const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_
 
 const startTour = () => startTourFor(org.value);
 
-// Login has already followed a redirectURI or marketplace link by now, so landing anywhere but Home means one was pending.
-const redirectPending = (): boolean => {
-  if (route.name !== "home") return true;
-  try {
-    const session = window.sessionStorage;
-    if (session.getItem("redirectURI") || session.getItem("azure_marketplace_token")) return true;
-  } catch {
-    // Unreadable storage holds no pending redirect.
-  }
-  return document.cookie.split("; ").some((c) => c.startsWith("aws_marketplace_token="));
-};
+const firstLogin = () => isFirstLoginOf(store.state.userInfo?.email);
 
 const HEARD_FROM = [
   "search",
@@ -246,8 +237,7 @@ watch(
   (open) => {
     if (!open) return;
     heardFrom.value = undefined;
-    askHeard.value =
-      config.isCloud === "true" && localStorage.getItem("isFirstTimeLogin") === "true";
+    askHeard.value = config.isCloud === "true" && firstLogin();
   },
   { immediate: true },
 );
@@ -256,9 +246,9 @@ watch(
 const finish = (firstSource?: FirstSourceId) => {
   const id = org.value;
   if (firstSource) writeFirstSource(id, firstSource);
-  const firstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
+  const wasFirstLogin = firstLogin();
   localStorage.removeItem("isFirstTimeLogin");
-  if (config.isCloud !== "true" || !firstLogin) return;
+  if (config.isCloud !== "true" || !wasFirstLogin) return;
   const skipped = !firstSource;
   const from = heardFrom.value ?? "";
   // The backend still requires from and company; empty strings are its "no answer".
@@ -289,7 +279,9 @@ const pickSample = () => {
 
 const openGuide = (id: FirstSourceId) => {
   finish(id);
-  const name = redirectPending() ? undefined : firstSourceOption(id)?.route;
+  const name = redirectPending(route.name as string | undefined)
+    ? undefined
+    : firstSourceOption(id)?.route;
   close();
   if (name) router.push({ name, query: { org_identifier: org.value } }).catch(() => {});
 };
@@ -297,7 +289,7 @@ const openGuide = (id: FirstSourceId) => {
 const browseAll = () => {
   finish();
   close();
-  if (!redirectPending()) {
+  if (!redirectPending(route.name as string | undefined)) {
     router.push({ name: "ingestion", query: { org_identifier: org.value } }).catch(() => {});
   }
 };
