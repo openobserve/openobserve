@@ -660,6 +660,7 @@ mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            last_tested_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
