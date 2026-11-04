@@ -165,12 +165,12 @@ describe("SampleDataHeaderChip", () => {
   });
 
   it("offers only the guided tour and Delete Sample Data", () => {
-    expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete Sample Data"]);
+    expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
   });
 
   it("keeps the menu for loaded sample data when the deployment runs another first-run flow", () => {
     mountChip(false);
-    expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete Sample Data"]);
+    expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
   });
 
   it("starts the tour", async () => {
@@ -183,7 +183,7 @@ describe("SampleDataHeaderChip", () => {
   it("asks before deleting, and Cancel deletes nothing", async () => {
     expect(wrapper.find(".confirm").exists()).toBe(false);
     await deleteItem().trigger("click");
-    expect(wrapper.find(".confirm").text()).toContain("Remove sample data?");
+    expect(wrapper.find(".confirm").text()).toContain("Delete sample data?");
     expect(remove).not.toHaveBeenCalled();
     await wrapper.find(".cancel").trigger("click");
     expect(wrapper.find(".confirm").exists()).toBe(false);

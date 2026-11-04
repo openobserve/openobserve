@@ -400,14 +400,14 @@ describe("SampleDataWelcome finish", () => {
       await click("onboarding-get-started-sample-btn");
       const progress = () => wrapper!.getComponent({ name: "SampleDataProgress" });
       expect(progress().props("done")).toBe(false);
-      expect(byTest("sample-welcome-background").exists()).toBe(true);
+      expect(byTest("sample-welcome-background").text()).toBe("Continue in the Background");
       session.status.value = "loaded";
       await flush();
       expect(view()).toBe("ready");
       expect(progress().props("done")).toBe(true);
       expect(byTest("sample-welcome-background").exists()).toBe(false);
-      expect(byTest("sample-welcome-own-way").exists()).toBe(true);
-      expect(byTest("sample-welcome-start-tour").exists()).toBe(true);
+      expect(byTest("sample-welcome-own-way").text()).toBe("Explore on My Own");
+      expect(byTest("sample-welcome-start-tour").text()).toBe("Start the Guided Tour");
     });
 
     it("disables Explore With Sample Data while another org's load runs", async () => {

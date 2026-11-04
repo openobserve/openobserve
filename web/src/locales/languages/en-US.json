@@ -30328,7 +30328,7 @@
   },
   "sampleData": {
     "delete": "Delete Sample Data",
-    "remove": "Remove sample data",
+    "remove": "Delete Sample Data",
     "steps": {
       "functions": "Creating functions",
       "pipeline": "Creating a real-time pipeline",
@@ -30347,7 +30347,7 @@
       "metrics": "Metric Points"
     },
     "removeConfirm": {
-      "title": "Remove sample data?",
+      "title": "Delete sample data?",
       "message": "This deletes the sample streams, dashboards, alerts, functions and enrichment table. Your own data is not touched."
     },
     "toast": {
@@ -30362,7 +30362,7 @@
     "callout": {
       "title": "Not ready to send data yet?",
       "body": "Explore {product} with a sample online store first: an incident in progress, and a guided tour through dashboards, alerts, logs, traces, metrics and pipelines.",
-      "cta": "Explore with sample data",
+      "cta": "Explore With Sample Data",
       "loading": "Loading sample data…"
     },
     "header": {
@@ -30374,21 +30374,21 @@
     },
     "homeBanner": {
       "cleanup": {
-        "message": "Your own data is arriving. Remove the sample data so it does not mix into your dashboards, alerts and searches.",
-        "keep": "Keep for now",
-        "remove": "Remove sample data"
+        "message": "Your own data is arriving. Delete the sample data so it does not mix into your dashboards, alerts and searches.",
+        "keep": "Keep for Now",
+        "remove": "Delete Sample Data"
       }
     },
     "welcome": {
-      "continueInBackground": "Continue in the background",
+      "continueInBackground": "Continue in the Background",
       "progress": {
         "title": "Building your sample store",
         "body": "This takes about a minute. You can close this window and loading carries on."
       },
       "ready": {
         "title": "Your sample store is live",
-        "startTour": "Start the guided tour",
-        "ownWay": "Explore on my own"
+        "startTour": "Start the Guided Tour",
+        "ownWay": "Explore on My Own"
       },
       "errorBody": "Something went wrong while loading. Try again: anything already created is reused, not duplicated."
     },
@@ -30453,9 +30453,9 @@
       "finale": {
         "title": "You found the root cause",
         "body": "In a few minutes you went from a spike on a dashboard to the deploy that caused it, with every signal in one place.",
-        "connect": "Connect your own data",
-        "restart": "Restart tour",
-        "finish": "Finish tour"
+        "connect": "Connect Your Own Data",
+        "restart": "Restart Tour",
+        "finish": "Finish Tour"
       }
     }
   },

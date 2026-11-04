@@ -40,6 +40,7 @@ describe("SampleDataCallout", () => {
       },
     });
     expect(wrapper.findAll("button")).toHaveLength(1);
+    expect(wrapper.find("button").text()).toBe("Explore With Sample Data");
     await wrapper.find('[data-test="sample-data-callout-load"]').trigger("click");
     expect(session.loadInDialog).toHaveBeenCalledWith("test-org", undefined);
   });

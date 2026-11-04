@@ -79,6 +79,17 @@ describe("SampleDataTour", () => {
     expect(router.currentRoute.value.params.id).toBe(SAMPLE_TOUR_STEPS[0].id);
   });
 
+  it("labels the finale buttons in Title Case", async () => {
+    session.startTour(ORG, SAMPLE_TOUR_STEPS.length);
+    const { wrapper } = await mountTour();
+    const text = (id: string) => wrapper.get(`[data-test="sample-tour-${id}"]`).text();
+    expect([text("connect"), text("restart"), text("finish")]).toEqual([
+      "Connect Your Own Data",
+      "Restart Tour",
+      "Finish Tour",
+    ]);
+  });
+
   it("a double click on Next opens only the next step", async () => {
     session.startTour(ORG, 1);
     const { wrapper, router } = await mountTour();
