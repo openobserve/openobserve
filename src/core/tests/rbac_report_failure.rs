@@ -17,8 +17,8 @@
 
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::license::{
-    TEST_STATICS_LOCK, block_feature_for_report_failure, last_reported_timestamp,
-    set_last_reported_timestamp_for_tests,
+    License, TEST_STATICS_LOCK, block_feature_for_report_failure, last_reported_timestamp,
+    replace_license_for_tests, set_last_reported_timestamp_for_tests,
 };
 use openobserve_core::{
     auth::AuthExtractor,
@@ -27,6 +27,22 @@ use openobserve_core::{
 };
 
 const DAY_MICROS: i64 = 86_400_000_000;
+
+fn report_grace_license(now: i64, active: bool) -> License {
+    serde_json::from_value(serde_json::json!({
+        "version":2,"license_id":"grace-authz","installation_id":"*","active":true,
+        "created_at":now-1_000_000,"expires_at":now+DAY_MICROS,"msv":"0.0.0",
+        "company":"Test Co","address":"1 Test Way","contact_name":"Test User",
+        "contact_email":"test@example.com","additional_emails":[],"base_urls":[],
+        "limits":{"Ingestion":{"typ":"PerDayCount","value":100}},"company_id":"test",
+        "environment_type":"online","limit_breach_allowed_count":0,
+        "allow_search_after_limit_exceeded":false,"validator_url":"","validator_auth":"",
+        "no_usage_report_allowed_duration":1,
+        "waivers":[{"id":"g","type":"report_grace","starts_at":now-3_600_000_000i64,
+            "ends_at":if active {now+3_600_000_000i64} else {now-1}}]
+    }))
+    .unwrap()
+}
 
 #[tokio::test]
 async fn rbac_stays_enforced_when_usage_reporting_fails() {
@@ -56,5 +72,29 @@ async fn rbac_stays_enforced_when_usage_reporting_fails() {
         use_self_context: false,
         use_self_parent: false,
     };
-    assert!(!check_permissions("viewer@rbac.test", viewer_read, UserRole::Viewer, false).await);
+    assert!(
+        !check_permissions(
+            "viewer@rbac.test",
+            viewer_read.clone(),
+            UserRole::Viewer,
+            false
+        )
+        .await
+    );
+
+    for active in [true, false] {
+        let grace = report_grace_license(now, active);
+        replace_license_for_tests(&statics, Some(("grace".into(), grace))).await;
+        assert_eq!(block_feature_for_report_failure().await, !active);
+        assert!(
+            !check_permissions(
+                "viewer@rbac.test",
+                viewer_read.clone(),
+                UserRole::Viewer,
+                false
+            )
+            .await,
+            "report grace active: {active}"
+        );
+    }
 }
