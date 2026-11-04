@@ -2067,6 +2067,22 @@ export function isOnCallUnavailable(err: unknown): boolean {
   return response.status === 403 && /not supported/i.test(response.data?.message ?? "");
 }
 
+type ApiErrorShape = { response?: { status?: number; data?: { message?: string } } } | null;
+
+/// The server's own message for a failed request; `undefined` when it sent none.
+export function apiErrorMessage(err: unknown): string | undefined {
+  return (err as ApiErrorShape)?.response?.data?.message;
+}
+
+/// What a load-error panel says: the server's message, else the client error's.
+export function apiErrorText(err: unknown): string {
+  return String(apiErrorMessage(err) ?? (err instanceof Error ? err.message : ""));
+}
+
+export function apiErrorStatus(err: unknown): number | undefined {
+  return (err as ApiErrorShape)?.response?.status;
+}
+
 /// ── A date+time picker in somebody else's timezone ─────────────────────────
 ///
 /// The date/time fields carry no zone of their own: they read and write bare

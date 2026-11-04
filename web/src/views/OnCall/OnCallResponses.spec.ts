@@ -56,6 +56,17 @@ vi.mock("@/services/oncall", () => ({
 // a real request from every test in this file.
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
+import { axiosReply, deferredReply } from "@/test/unit/helpers/mockService";
+
+/// What the view hands OTable as a row and a column; only the fields these tests read are typed.
+type TableRow = { latest: { id: string }; firings: unknown[]; [key: string]: unknown };
+type TableColumn = {
+  id: string;
+  header?: unknown;
+  sortable?: boolean;
+  hideable?: boolean;
+  accessorFn: (row: TableRow | undefined) => unknown;
+};
 
 vi.mock("@/services/users", () => ({
   default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
@@ -274,10 +285,10 @@ function render() {
 }
 
 /// Picks "all" explicitly, so a test does not lean on the default tab.
-async function showAllTab(wrapper: any) {
+async function showAllTab(wrapper: VueWrapper) {
   wrapper
     .findAllComponents({ name: "OSelect" })
-    .find((c: any) => c.attributes("data-test") === "oncall-responses-filter-tabs")
+    .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")
     .vm.$emit("update:modelValue", "all");
   await flushPromises();
 }
@@ -287,26 +298,26 @@ const emptyTeam = { policy: { rungs: [] }, on_call: [], schedule: null };
 
 /// The team-context read answers `facts(id)` for each asked team, plus `mine` when `include_mine` is set; `undefined` is a team the server left out.
 function answerTeams(facts: (teamId: string) => object | undefined, mine: string[] = []) {
-  service.teamContext.mockImplementation((async ({ team_ids, include_mine }: any) => {
+  service.teamContext.mockImplementation(async ({ team_ids, include_mine }) => {
     const ids = [...new Set([...team_ids, ...(include_mine ? mine : [])])];
     const teams = ids.flatMap((id) => {
       const answer = facts(id);
       return answer ? [{ team_id: id, ...answer }] : [];
     });
-    return { data: { teams } };
-  }) as any);
+    return axiosReply({ teams });
+  });
 }
 
 /// The batch ladder read answers `progress(id)` for each asked id; `undefined` is an id the server left out.
 function answerProgress(progress: (responseId: string) => object | undefined) {
-  service.escalationProgressBatch.mockImplementation((async ({ response_ids }: any) => ({
-    data: {
+  service.escalationProgressBatch.mockImplementation(async ({ response_ids }) =>
+    axiosReply({
       progress: response_ids.flatMap((id: string) => {
         const answer = progress(id);
         return answer ? [{ response_id: id, ...answer }] : [];
       }),
-    },
-  })) as any);
+    }),
+  );
 }
 
 describe("OnCallResponses", () => {
@@ -317,20 +328,20 @@ describe("OnCallResponses", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
     // A fully configured org by default, so only the tests that care about the
     // checklist have to say anything about it.
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
     // The ladder, the policy behind its denominator, and the expanded row's
     // events. Every one of them degrades a single cell rather than the page,
     // so the default is "answered, with nothing in it".
     answerTeams(() => emptyTeam);
     answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
   });
 
   /// Mounts the real page layout so the tag is proven to reach the rendered header.
@@ -363,8 +374,8 @@ describe("OnCallResponses", () => {
   }
 
   async function withPages(rows: Record<string, unknown>[]) {
-    service.listTeams.mockResolvedValue({ data: [team] } as any);
-    service.listResponses.mockResolvedValue({ data: rows } as any);
+    service.listTeams.mockResolvedValue(axiosReply([team]));
+    service.listResponses.mockResolvedValue(axiosReply(rows));
     const wrapper = render();
     await flushPromises();
     return wrapper;
@@ -372,7 +383,7 @@ describe("OnCallResponses", () => {
 
   /// The state counts the section headings carry — the only counts on the
   /// screen now that the P1/Mine/Unrouted tiles are gone.
-  const sections = (w: any) =>
+  const sections = (w: VueWrapper) =>
     Object.fromEntries(
       ["ringing", "snoozed", "handled"]
         .filter((key) => w.find(`[data-test='oncall-section-header-${key}']`).exists())
@@ -432,7 +443,7 @@ describe("OnCallResponses", () => {
     expect(
       table()
         .props("data")
-        .map((row: any) => row.latest.id),
+        .map((row: TableRow) => row.latest.id),
     ).toEqual(["c"]);
     expect(sections(wrapper)).toEqual({ ringing: 1 });
   });
@@ -441,9 +452,16 @@ describe("OnCallResponses", () => {
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
     const wrapper = await withPages([page()]);
-    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as any;
+    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as (
+      row: TableRow,
+    ) => string | null;
 
-    const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+    const asRow = (p: { id: string }): TableRow => ({
+      latest: p,
+      firings: [p],
+      escalating: [],
+      rowKey: p.id,
+    });
     expect(rowTone(asRow(page()))).toBeNull();
     expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
   });
@@ -462,7 +480,7 @@ describe("OnCallResponses", () => {
       firings: false,
       channels: false,
     });
-    const ids = (table.props("columns") as any[]).map((c) => c.id);
+    const ids = (table.props("columns") as TableColumn[]).map((c) => c.id);
     expect(ids).toContain("escalation");
     expect(ids).toContain("responder");
     expect(ids).toContain("team");
@@ -480,8 +498,8 @@ describe("OnCallResponses", () => {
   /// relative time there — so a reader carried the conversion between them.
   it("renders the time column the way the incident list renders Last Alert", async () => {
     const wrapper = await withPages([page()]);
-    const time = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-    const col = time.find((c) => c.id === "last_alert_at");
+    const time = wrapper.findComponent({ name: "OTable" }).props("columns") as TableColumn[];
+    const col = time.find((c) => c.id === "last_alert_at")!;
 
     expect(col.header).toBe("Created");
     expect(col.sortable).toBe(true);
@@ -790,8 +808,11 @@ describe("OnCallResponses", () => {
       expect(cell("resp_1")).toBe("");
 
       const table = wrapper.findComponent({ name: "OTable" });
-      const escalation = (table.props("columns") as any[]).find((c) => c.id === "escalation");
-      const rowFor = (id: string) => (table.props("data") as any[]).find((r) => r.latest.id === id);
+      const escalation = (table.props("columns") as TableColumn[]).find(
+        (c) => c.id === "escalation",
+      )!;
+      const rowFor = (id: string) =>
+        (table.props("data") as TableRow[]).find((r) => r.latest.id === id);
       expect(escalation.accessorFn(rowFor("resp_2"))).toBe(2);
     });
 
@@ -906,7 +927,7 @@ describe("OnCallResponses", () => {
 
     it("offers unsnooze instead of snooze on a snoozed row", async () => {
       const wrapper = await withPages([page({ snoozed_until: (Date.now() + 60_000) * 1000 })]);
-      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.unsnoozeResponse.mockResolvedValue(axiosReply({}));
 
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
       await wrapper.find('[data-test^="oncall-row-unsnooze-"]').trigger("click");
@@ -975,10 +996,8 @@ describe("OnCallResponses", () => {
     /// The bug this closes: a team with an unstaffed rotation pages nobody,
     /// and the old guide vanished the moment the first team existed.
     it("still shows when a team exists but nobody is on call", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.coverageGaps.mockResolvedValue({
-        data: { at: 0, total: 1, teams: [team] },
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
       const wrapper = render();
       await flushPromises();
 
@@ -990,7 +1009,7 @@ describe("OnCallResponses", () => {
 
     /// The policy step is answered by the team's own policy read, not by alert destinations.
     it("still shows while no team's escalation policy can be read", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       answerTeams(() => ({ on_call: [], schedule: null }));
       const wrapper = render();
       await flushPromises();
@@ -1004,13 +1023,13 @@ describe("OnCallResponses", () => {
 
     /// The row teams are only some of the org's, so a policy on a team with no page still counts.
     it("counts a policy on a team that has no page, from one read of every team", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [team, { ...team, id: "team_2", name: "Payments" }],
-      } as any);
+      service.listTeams.mockResolvedValue(
+        axiosReply([team, { ...team, id: "team_2", name: "Payments" }]),
+      );
       answerTeams((id) =>
         id === "team_2" ? emptyTeam : { on_call: [{ user_email: "a@o2.ai" }], schedule: null },
       );
-      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
       const wrapper = render();
       await flushPromises();
 
@@ -1028,13 +1047,13 @@ describe("OnCallResponses", () => {
       beforeEach(() => {
         resetOnCallPolicyReviewed();
         window.localStorage.clear();
-        service.listTeams.mockResolvedValue({ data: [team] } as any);
+        service.listTeams.mockResolvedValue(axiosReply([team]));
         service.teamContext.mockRejectedValue(notFound);
       });
       afterEach(() => window.localStorage.clear());
 
       it("falls back to the team's own policy read", async () => {
-        service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+        service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
         const wrapper = render();
         await flushPromises();
 
@@ -1048,7 +1067,7 @@ describe("OnCallResponses", () => {
       /// Neither read answered, so the step is unknown rather than owed.
       it("leaves the step unknown when the fallback fails too", async () => {
         service.getPolicy.mockRejectedValue(notFound);
-        service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 1, teams: [team] } } as any);
+        service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
         const wrapper = render();
         await flushPromises();
 
@@ -1070,7 +1089,7 @@ describe("OnCallResponses", () => {
     it("counts a reviewed escalation as done", async () => {
       window.localStorage.setItem(`oncall-setup-policy-reviewed:default:${team.id}`, "1");
       resetOnCallPolicyReviewed();
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       answerTeams(() => ({ on_call: [], schedule: null }));
       const wrapper = render();
       await flushPromises();
@@ -1083,7 +1102,7 @@ describe("OnCallResponses", () => {
     /// Setup must never read as all-good from the shift chip while pages cannot reach anyone yet.
     it("hides the shift chip while setup is unfinished", async () => {
       const viewer = store.state.userInfo.email;
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       answerTeams(
         () => ({
           on_call: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: viewer }],
@@ -1102,9 +1121,9 @@ describe("OnCallResponses", () => {
     /// which ticked the rotation step and hid the checklist on an org whose
     /// team had no rotation at all.
     it("asks each team directly when the coverage endpoint is unavailable", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
-      service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+      service.whoIsOnCall.mockResolvedValue(axiosReply([]));
       const wrapper = render();
       await flushPromises();
 
@@ -1117,11 +1136,11 @@ describe("OnCallResponses", () => {
     });
 
     it("counts the rotation staffed when that fallback finds somebody on call", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
-      service.whoIsOnCall.mockResolvedValue({
-        data: [{ rotation: "Weekdays", user_email: "ana@corp.com" }],
-      } as any);
+      service.whoIsOnCall.mockResolvedValue(
+        axiosReply([{ rotation: "Weekdays", user_email: "ana@corp.com" }]),
+      );
       const wrapper = render();
       await flushPromises();
 
@@ -1129,7 +1148,7 @@ describe("OnCallResponses", () => {
     });
 
     it("disappears once a team is staffed and routed", async () => {
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
       const wrapper = render();
       await flushPromises();
 
@@ -1139,7 +1158,7 @@ describe("OnCallResponses", () => {
 
     // A checklist that flashes on every load would read as "your setup vanished".
     it("does not show before the first fetch resolves", () => {
-      service.listResponses.mockReturnValue(new Promise(() => {}) as any);
+      service.listResponses.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
     });
@@ -1149,7 +1168,7 @@ describe("OnCallResponses", () => {
     /// landed, a configured org was told to create a team — and on an org with
     /// no pages yet, setup took the whole screen before the table appeared.
     it("does not show while the setup fetch is still outstanding", async () => {
-      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       await flushPromises();
 
@@ -1161,7 +1180,7 @@ describe("OnCallResponses", () => {
     /// "no pages yet" is the wrong answer to show while we still cannot tell
     /// whether setup owns the screen.
     it("holds the list in its loading state until setup has answered", async () => {
-      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = render();
       await flushPromises();
 
@@ -1218,10 +1237,8 @@ describe("OnCallResponses", () => {
     /// The other half of the same rule: pages exist, so the list is the work and
     /// setup shrinks to one line above it.
     it("collapses to a bar over the list once pages exist", async () => {
-      service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
-      service.coverageGaps.mockResolvedValue({
-        data: { at: 0, total: 1, teams: [team] },
-      } as any);
+      service.listOwnershipRules.mockResolvedValue(axiosReply([]));
+      service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 1, teams: [team] }));
       const wrapper = await withPages([page({ team_id: null })]);
 
       const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
@@ -1235,15 +1252,16 @@ describe("OnCallResponses", () => {
       ["team", "oncall-responses-team-filter", "team_1"],
       ["cause", "oncall-responses-cause-filter", "genuine_defect"],
     ])("keeps the list when the %s filter matches nothing", async (_, test, value) => {
-      service.listResponses.mockImplementation(((params: any) =>
-        Promise.resolve({ data: params.team_id || params.cause ? [] : [page()] })) as any);
+      service.listResponses.mockImplementation((params) =>
+        Promise.resolve(axiosReply(params.team_id || params.cause ? [] : [page()])),
+      );
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(true);
 
       wrapper
         .findAllComponents({ name: "OSelect" })
-        .find((c: any) => c.attributes("data-test") === test)!
+        .find((c) => c.attributes("data-test") === test)!
         .vm.$emit("update:modelValue", value);
       await flushPromises();
 
@@ -1307,7 +1325,7 @@ describe("OnCallResponses", () => {
       await flushPromises();
       expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeTruthy();
 
-      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
       await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
       await flushPromises();
 
@@ -1319,7 +1337,7 @@ describe("OnCallResponses", () => {
   /// list somebody was paged about.
   it("disables the team filter when teams cannot be listed, and still lists pages", async () => {
     service.listTeams.mockRejectedValue({ response: { status: 403 } });
-    service.listResponses.mockResolvedValue({ data: [page()] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([page()]));
     const wrapper = render();
     await flushPromises();
 
@@ -1336,7 +1354,9 @@ describe("OnCallResponses", () => {
     /// The health card issues its OWN `listResponses` (closed pages included,
     /// no offset), so paging is counted by the offset-bearing calls only.
     const pagingCalls = () =>
-      service.listResponses.mock.calls.filter(([args]) => (args as any)?.offset !== undefined);
+      service.listResponses.mock.calls.filter(
+        ([args]) => (args as { offset?: number } | undefined)?.offset !== undefined,
+      );
 
     it("asks for one page and stops when it comes back short", async () => {
       await withPages([page()]);
@@ -1355,8 +1375,8 @@ describe("OnCallResponses", () => {
     /// rather than a re-run every time somebody sees it red.
     it("walks on while pages come back full, and says so when it stops early", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.listResponses.mockResolvedValue({ data: full } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listResponses.mockResolvedValue(axiosReply(full));
 
       const wrapper = render();
       await flushPromises();
@@ -1381,8 +1401,8 @@ describe("OnCallResponses", () => {
     /// every load and the total was always unknown anyway.
     it("says how many it loaded without claiming that is all of them", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.listResponses.mockResolvedValue({ data: full } as any);
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listResponses.mockResolvedValue(axiosReply(full));
 
       const wrapper = render();
       await flushPromises();
@@ -1416,11 +1436,11 @@ describe("OnCallResponses", () => {
   it("has no Status column, and the always-shown Escalation column says what is happening", async () => {
     const wrapper = await withPages([page()]);
     const table = wrapper.findComponent({ name: "OTable" });
-    const columns = table.props("columns") as any[];
+    const columns = table.props("columns") as TableColumn[];
 
     expect(columns.some((c) => c.id === "state")).toBe(false);
     expect(Object.keys(table.props("columnVisibility"))).not.toContain("state");
-    expect(columns.find((c) => c.id === "escalation").hideable).not.toBe(true);
+    expect(columns.find((c) => c.id === "escalation")!.hideable).not.toBe(true);
   });
 
   /// One signal: the ladder's own progress, which the "nobody answered" tag and the ladder text both read.
@@ -1459,7 +1479,7 @@ describe("OnCallResponses", () => {
 
   it("keeps the id when the team list could not be loaded", async () => {
     service.listTeams.mockRejectedValue(new Error("down"));
-    service.listResponses.mockResolvedValue({ data: [page({ team_id: "team_gone" })] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([page({ team_id: "team_gone" })]));
     const wrapper = render();
     await flushPromises();
 
@@ -1505,6 +1525,39 @@ describe("OnCallResponses", () => {
       const wrapper = await withPages([]);
 
       expect(tabs(wrapper)?.exists()).toBe(true);
+    });
+
+    /// An open-only tab never fetched resolved pages, so their count is unknown rather than zero.
+    it.each(["ringing", "snoozed", "handled"])(
+      "leaves the resolved and all counts off after a saved %s tab",
+      async (tab) => {
+        Object.assign(seed(), { activeFilter: tab });
+        const wrapper = await withPages([page({ id: "a" })]);
+
+        const labels = Object.fromEntries(
+          (tabs(wrapper).props("options") as { value: string; label: string }[]).map((o) => [
+            o.value,
+            o.label,
+          ]),
+        );
+        expect(labels.resolved).toBe("Resolved");
+        expect(labels.all).toBe("All");
+        expect(labels.ringing).toBe("Ringing · 1");
+        expect(tabs(wrapper).props("modelValue")).toBe(tab);
+      },
+    );
+
+    it("counts resolved pages once a resolved-showing tab has fetched them", async () => {
+      Object.assign(seed(), { activeFilter: "ringing" });
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      tabs(wrapper).vm.$emit("update:modelValue", "resolved");
+      await flushPromises();
+
+      const resolved = (tabs(wrapper).props("options") as { value: string; label: string }[]).find(
+        (o) => o.value === "resolved",
+      );
+      expect(resolved?.label).toBe("Resolved · 0");
     });
 
     /// The Status column is gone, and a view saved while sorted by it must still load.
@@ -1583,12 +1636,12 @@ describe("OnCallResponses", () => {
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
 
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
       expect(data.map((row) => row.latest.id)).toEqual(["a"]);
     });
 
     const ids = (wrapper: VueWrapper) =>
-      (wrapper.findComponent({ name: "OTable" }).props("data") as any[]).map(
+      (wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[]).map(
         (row) => row.latest.id,
       );
     async function pick(wrapper: VueWrapper, value: "mine" | "everyone") {
@@ -1816,12 +1869,16 @@ describe("OnCallResponses", () => {
     });
 
     it("reads every team's context in one request, for the row teams and the viewer's", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [team, { ...team, id: "team_2", name: "Payments" }],
-      } as any);
-      service.listResponses.mockResolvedValue({
-        data: [page(), page({ id: "b", team_id: "team_2" }, "al_b"), page({ id: "c" }, "al_c")],
-      } as any);
+      service.listTeams.mockResolvedValue(
+        axiosReply([team, { ...team, id: "team_2", name: "Payments" }]),
+      );
+      service.listResponses.mockResolvedValue(
+        axiosReply([
+          page(),
+          page({ id: "b", team_id: "team_2" }, "al_b"),
+          page({ id: "c" }, "al_c"),
+        ]),
+      );
       render();
       await flushPromises();
 
@@ -1841,8 +1898,8 @@ describe("OnCallResponses", () => {
       );
       const wrapper = await withPages(many);
 
-      const calls = service.teamContext.mock.calls.map(([args]: any) => args);
-      expect(calls.map((c: any) => [c.team_ids.length, c.include_mine])).toEqual([
+      const calls = service.teamContext.mock.calls.map(([args]) => args);
+      expect(calls.map((c) => [c.team_ids.length, c.include_mine])).toEqual([
         [200, true],
         [5, false],
       ]);
@@ -1869,8 +1926,8 @@ describe("OnCallResponses", () => {
     });
 
     it("sends the context and ladder reads together, without waiting for the teams list", async () => {
-      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
-      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      service.listTeams.mockReturnValue(new Promise<never>(() => {}));
+      service.listResponses.mockResolvedValue(axiosReply([page()]));
       render();
       await flushPromises();
 
@@ -1879,24 +1936,25 @@ describe("OnCallResponses", () => {
     });
 
     it("keeps the newer context read when an older one answers last", async () => {
-      let answerOld!: (value: unknown) => void;
-      service.teamContext.mockImplementation((({ team_ids }: { team_ids: string[] }) =>
+      const answerOld = deferredReply();
+      service.teamContext.mockImplementation(({ team_ids }) =>
         team_ids.includes("team_1")
-          ? new Promise((resolve) => (answerOld = resolve))
-          : Promise.resolve({
-              data: {
+          ? answerOld.promise
+          : Promise.resolve(
+              axiosReply({
                 teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("new@o2.ai")] }],
-              },
-            })) as any);
+              }),
+            ),
+      );
       const wrapper = await withPages([page()]);
-      service.listResponses.mockResolvedValue({
-        data: [page({ id: "n", team_id: "team_new" }, "al_new")],
-      } as any);
+      service.listResponses.mockResolvedValue(
+        axiosReply([page({ id: "n", team_id: "team_new" }, "al_new")]),
+      );
       pickTeam(wrapper, "team_new");
       await flushPromises();
 
-      answerOld({
-        data: { teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("old@o2.ai")] }] },
+      answerOld.answer({
+        teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("old@o2.ai")] }],
       });
       await flushPromises();
 
@@ -1908,7 +1966,7 @@ describe("OnCallResponses", () => {
   /// a time to claim them is not triage.
   describe("acting from the list", () => {
     it("acknowledges a single page without opening it", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page()]);
 
       await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt"]').trigger("click");
@@ -1943,7 +2001,7 @@ describe("OnCallResponses", () => {
     /// ninety-five and leaving ninety-four escalating would be worse than
     /// showing all ninety-five rows.
     it("acknowledges every escalating firing the row stands for", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([
         page({ id: "f3", opened_at: 300 }),
         page({ id: "f2", opened_at: 200 }),
@@ -1957,7 +2015,7 @@ describe("OnCallResponses", () => {
     });
 
     it("bulk acknowledges the selection", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -1972,7 +2030,7 @@ describe("OnCallResponses", () => {
 
     /// S11: the selection UI existed and three quarters of its value did not.
     it("bulk snoozes every escalating record in the selection", async () => {
-      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.snoozeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -1988,7 +2046,7 @@ describe("OnCallResponses", () => {
 
     /// The server refuses Snooze on a page with no team (one-ack AK-4), so bulk leaves it out and says why.
     it("leaves a teamless page out of a bulk snooze, and says so", async () => {
-      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.snoozeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([
         page({ id: "a" }),
         page({ id: "b", team_id: null }, "al_pay"),
@@ -2027,7 +2085,7 @@ describe("OnCallResponses", () => {
 
     /// Closing records in bulk is irreversible, so it asks first.
     it("confirms before bulk resolving, and resolves every unresolved firing", async () => {
-      service.resolveResponse.mockResolvedValue({ data: {} } as any);
+      service.resolveResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       wrapper
@@ -2049,7 +2107,7 @@ describe("OnCallResponses", () => {
     /// One page failing must not silently abandon the other ninety-nine.
     it("reports partial failure and still acknowledges the rest", async () => {
       service.acknowledgeResponse
-        .mockResolvedValueOnce({ data: {} } as any)
+        .mockResolvedValueOnce(axiosReply({}))
         .mockRejectedValueOnce(new Error("boom"));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
@@ -2071,7 +2129,7 @@ describe("OnCallResponses", () => {
       beforeEach(() => vi.mocked(analytics.track).mockClear());
 
       it("tracks one acknowledge per row action, counting every firing acknowledged", async () => {
-        service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+        service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([
           page({ id: "f3", opened_at: 300 }),
           page({ id: "f2", opened_at: 200 }),
@@ -2087,7 +2145,7 @@ describe("OnCallResponses", () => {
 
       it("counts only the acknowledgements that succeeded in a bulk action", async () => {
         service.acknowledgeResponse
-          .mockResolvedValueOnce({ data: {} } as any)
+          .mockResolvedValueOnce(axiosReply({}))
           .mockRejectedValueOnce(new Error("boom"));
         const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
         wrapper
@@ -2118,7 +2176,7 @@ describe("OnCallResponses", () => {
       });
 
       it("tracks one resolve per bulk action with its cause and count", async () => {
-        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        service.resolveResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
         wrapper
           .findComponent({ name: "OTable" })
@@ -2136,7 +2194,7 @@ describe("OnCallResponses", () => {
       });
 
       it("tracks one resolve per row action", async () => {
-        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        service.resolveResponse.mockResolvedValue(axiosReply({}));
         const wrapper = await withPages([
           page({ state: "acknowledged", acked_by: "engineer@example.com" }),
         ]);
@@ -2154,9 +2212,14 @@ describe("OnCallResponses", () => {
     /// ksuid.
     it("shows the alert name, not the ksuid, and searches it", async () => {
       const wrapper = await withPages([page({ title: "checkout_failing" })]);
-      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-      const subject = columns.find((c) => c.id === "subject");
-      const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as TableColumn[];
+      const subject = columns.find((c) => c.id === "subject")!;
+      const asRow = (p: { id: string }): TableRow => ({
+        latest: p,
+        firings: [p],
+        escalating: [],
+        rowKey: p.id,
+      });
       expect(subject.accessorFn(asRow(page({ title: "checkout_failing" })))).toBe(
         "checkout_failing",
       );
@@ -2172,10 +2235,10 @@ describe("OnCallResponses", () => {
       page({ id: "b", priority: 3 }, "al_pay"),
     ]);
 
-    (wrapper.vm as any).priorityFilter = "3";
+    (wrapper.vm as unknown as { priorityFilter: string }).priorityFilter = "3";
     await flushPromises();
 
-    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
     expect(data).toHaveLength(1);
     expect(data[0].latest.id).toBe("b");
   });
@@ -2190,7 +2253,7 @@ describe("OnCallResponses", () => {
         page({ id: "other" }, "al_pay"),
       ]);
 
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as TableRow[];
       expect(data).toHaveLength(2);
       expect(data[0].firings).toHaveLength(3);
       // The row stands for the newest firing.
@@ -2247,7 +2310,7 @@ describe("OnCallResponses", () => {
 
     /// The labelled button does not fit the one-control column, so the menu leads with the row's next step.
     it("leads the row menu with acknowledge while the page is ringing", async () => {
-      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
       const wrapper = await withPages([page()]);
 
       await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').trigger("click");
@@ -2324,15 +2387,15 @@ describe("OnCallResponses — the rows' own fields", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
     answerTeams(() => emptyTeam);
     answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
   });
 
   function row(over: Record<string, unknown> = {}) {
@@ -2353,7 +2416,7 @@ describe("OnCallResponses — the rows' own fields", () => {
   }
 
   async function withRows(rows: Record<string, unknown>[]) {
-    service.listResponses.mockResolvedValue({ data: rows } as any);
+    service.listResponses.mockResolvedValue(axiosReply(rows));
     const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs: stubsForList },
     });
@@ -2393,9 +2456,7 @@ describe("OnCallResponses — the rows' own fields", () => {
   /// screen reported that by showing nothing rather than by saying so.
   describe("the team filter", () => {
     it("asks the server rather than filtering what it already loaded", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
 
       service.listResponses.mockClear();
@@ -2413,9 +2474,7 @@ describe("OnCallResponses — the rows' own fields", () => {
     /// rather than off the wire. A filter that sent `team_id: "all"` would key
     /// itself differently and show up here as a round trip.
     it("sends no team_id when the filter is cleared, re-using the walk it already made", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
       const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
 
@@ -2435,21 +2494,17 @@ describe("OnCallResponses — the rows' own fields", () => {
     /// so the cold answer lands LAST — and must not paint its rows under a
     /// filter the reader has already left.
     it("ignores a slower answer for a filter the reader has already left", async () => {
-      service.listTeams.mockResolvedValue({
-        data: [{ id: "team_1", name: "Platform" }],
-      } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
       const wrapper = await withRows([row()]);
-      let answerTeam: (value: unknown) => void = () => {};
-      service.listResponses.mockImplementationOnce(
-        () => new Promise((resolve) => (answerTeam = resolve)),
-      );
+      const answerTeam = deferredReply();
+      service.listResponses.mockImplementationOnce(() => answerTeam.promise);
       const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
 
       filter.vm.$emit("update:modelValue", "team_1");
       await flushPromises();
       filter.vm.$emit("update:modelValue", "all");
       await flushPromises();
-      answerTeam({ data: [row({ id: "resp_t1" }), row({ id: "resp_t2" })] });
+      answerTeam.answer([row({ id: "resp_t1" }), row({ id: "resp_t2" })]);
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
@@ -2462,7 +2517,7 @@ describe("OnCallResponses — the rows' own fields", () => {
     const ROW_KEY = "alert:al_ckt";
 
     async function withExpandedRow() {
-      service.getResponse.mockResolvedValue({ data: { response: row(), events: [] } } as any);
+      service.getResponse.mockResolvedValue(axiosReply({ response: row(), events: [] }));
       const wrapper = await withRows([row()]);
       wrapper.findComponent({ name: "OTable" }).vm.$emit("update:expandedIds", [ROW_KEY]);
       await flushPromises();
@@ -2505,32 +2560,34 @@ describe("OnCallResponses — filtering by cause", () => {
     // be served that entry instead of the mock it had just declared.
     queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
-    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
-    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
+    service.listResponses.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([]));
+    service.coverageGaps.mockResolvedValue(axiosReply({ at: 0, total: 0, teams: [] }));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.listOwnershipRules.mockResolvedValue(axiosReply([{ id: "rule_1" }]));
+    destinations.list.mockResolvedValue(axiosReply([{ name: "dest_1" }]));
     answerTeams(() => emptyTeam);
     answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
-    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    service.getResponse.mockResolvedValue(axiosReply({ events: [] }));
   });
 
   /// The `data-test` lands as an ATTRIBUTE on the rendered root rather than on
   /// the component, which a CSS selector passed to `findComponent` does not
   /// match.
-  const byTest = (wrapper: any, name: string, test: string) =>
-    wrapper.findAllComponents({ name }).find((c: any) => c.attributes("data-test") === test);
+  const byTest = (wrapper: VueWrapper, name: string, test: string) =>
+    wrapper.findAllComponents({ name }).find((c) => c.attributes("data-test") === test);
 
-  const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
-  const filterTabs = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-filter-tabs");
+  const cause = (wrapper: VueWrapper) =>
+    byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
+  const filterTabs = (wrapper: VueWrapper) =>
+    byTest(wrapper, "OSelect", "oncall-responses-filter-tabs");
 
   /// With no pages the setup checklist owns the screen and the toolbar is not
   /// rendered at all, so these tests need something in the list before there
   /// is a filter to drive.
   async function open() {
-    service.listResponses.mockResolvedValue({
-      data: [
+    service.listResponses.mockResolvedValue(
+      axiosReply([
         {
           id: "resp_1",
           org_id: "default",
@@ -2542,8 +2599,8 @@ describe("OnCallResponses — filtering by cause", () => {
           title: "checkout_failing",
           opened_at: 1_700_000_000_000_000,
         },
-      ],
-    } as any);
+      ]),
+    );
     const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs },
     });
@@ -2552,7 +2609,7 @@ describe("OnCallResponses — filtering by cause", () => {
   }
 
   /// `"all"` includes resolved pages; every other tab but `"resolved"` itself excludes them.
-  async function showResolved(wrapper: any, on = true) {
+  async function showResolved(wrapper: VueWrapper, on = true) {
     filterTabs(wrapper)!.vm.$emit("update:modelValue", on ? "all" : "ringing");
     await flushPromises();
   }
@@ -2635,8 +2692,8 @@ describe("OnCallResponses — filtering by cause", () => {
       );
 
     async function openReal() {
-      service.listResponses.mockResolvedValue({
-        data: [
+      service.listResponses.mockResolvedValue(
+        axiosReply([
           {
             id: "resp_1",
             org_id: "default",
@@ -2648,8 +2705,8 @@ describe("OnCallResponses — filtering by cause", () => {
             title: "checkout_failing",
             opened_at: 1_700_000_000_000_000,
           },
-        ],
-      } as any);
+        ]),
+      );
       const wrapper = mountTracked(OnCallResponses, {
         attachTo: document.body,
         global: {
@@ -2698,7 +2755,7 @@ describe("OnCallResponses — filtering by cause", () => {
     /// The narrowed answer is empty, so reading it as "no pages" dropped the toolbar and the popover with it.
     it("clears back to any cause from an empty narrowed list without losing the popover", async () => {
       await openReal();
-      service.listResponses.mockResolvedValue({ data: [] } as any);
+      service.listResponses.mockResolvedValue(axiosReply([]));
       await pickCause("Genuine defect");
       expect(panel()).not.toBeNull();
 

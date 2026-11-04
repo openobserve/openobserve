@@ -83,15 +83,10 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
 
-const { nameOf } = useOrgUserNames();
+const { tooltipOf } = useOrgUserNames();
 
 const youLabel = computed(() => t("oncall.onCallYou"));
-const youTooltip = computed<I18nText>(() => {
-  const name = nameOf(props.userEmail);
-  return name === props.userEmail
-    ? raw(props.userEmail)
-    : t("oncall.personNameWithEmail", { name: raw(name), email: raw(props.userEmail) });
-});
+const youTooltip = computed<I18nText>(() => tooltipOf(props.userEmail));
 
 /// Being on call for three teams at once is worth knowing about, but naming
 /// them all would push the countdown off the header.

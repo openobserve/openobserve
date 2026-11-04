@@ -81,10 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
         <OTooltip :content="t('oncall.mineSlackSetUpHint')" />
       </OButton>
-      <span v-else class="inline-flex" data-test="oncall-slack-ask-admin">
-        <OIcon name="info" size="sm" class="text-text-secondary" />
-        <OTooltip :content="t('oncall.mineSlackAskAdmin')" />
-      </span>
+      <OnCallHint v-else :hint="t('oncall.mineSlackAskAdmin')" data-test="oncall-slack-ask-admin" />
     </template>
   </OnCallReachRow>
 </template>
@@ -96,6 +93,7 @@ import { useStore } from "vuex";
 
 import { useRouter } from "vue-router";
 
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import { useTheme } from "@/composables/useTheme";
 import OTag from "@/lib/core/Badge/OTag.vue";

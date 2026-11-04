@@ -23,8 +23,7 @@ import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
 import {
@@ -360,17 +359,19 @@ const nextSteps = computed<I18nText[]>(() =>
           <!-- What Slack may read is a privacy fact worth one hover, not a paragraph under the steps. -->
           <span class="text-text-secondary flex items-center gap-1 text-xs">
             {{ t("slackApp.connect.permissionHint") }}
-            <span class="inline-flex" data-test="slack-connect-consent">
-              <OIcon name="info" size="sm" />
-              <OTooltip max-width="24rem">
-                <template #content>
-                  <span class="flex flex-col gap-1">
-                    <span>{{ t("slackApp.connect.consent") }}</span>
-                    <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
-                  </span>
-                </template>
-              </OTooltip>
-            </span>
+            <OnCallHint
+              :hint="t('slackApp.connect.consent')"
+              icon-class=""
+              max-width="24rem"
+              data-test="slack-connect-consent"
+            >
+              <template #content>
+                <span class="flex flex-col gap-1">
+                  <span>{{ t("slackApp.connect.consent") }}</span>
+                  <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
+                </span>
+              </template>
+            </OnCallHint>
           </span>
         </template>
       </OEmptyState>

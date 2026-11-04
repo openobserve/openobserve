@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
       </OButton>
-      <!-- The age label arrives with the first answer; the reserved width keeps the header still when it does. -->
       <ORefreshButton
         v-if="!unavailable"
         class="md:min-w-23"
@@ -56,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-mine-unavailable"
     />
 
-    <!-- The tables keep a fixed ten-row height, so the page scrolls instead of squeezing them. -->
     <OContent
       v-else
       y
@@ -107,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="openTeams"
           />
 
-          <!-- A phone has no room for five columns, so each shift is its own two-line row. -->
           <div v-else-if="isMobile" class="flex flex-col" data-test="oncall-mine-shifts-list">
             <template v-if="!loaded">
               <div
@@ -142,14 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ seatLabel(row) }}
                   </OTag>
-                  <span
+                  <OnCallHint
                     v-if="row.roles.length > 1"
-                    class="inline-flex shrink-0"
+                    :hint="t('oncall.mineNoBackup')"
+                    icon="warning"
+                    icon-class="text-status-warning-text"
                     :data-test="`oncall-mine-no-backup-${row.team_id}`"
-                  >
-                    <OIcon name="warning" size="sm" class="text-status-warning-text" />
-                    <OTooltip :content="t('oncall.mineNoBackup')" />
-                  </span>
+                  />
                 </span>
                 <OText
                   v-if="untilLine(row)"
@@ -255,14 +251,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ seatLabel(row) }}
                   </OTag>
-                  <span
+                  <OnCallHint
                     v-if="row.roles.length > 1"
-                    class="inline-flex"
+                    :hint="t('oncall.mineNoBackup')"
+                    icon="warning"
+                    icon-class="text-status-warning-text"
                     :data-test="`oncall-mine-no-backup-${row.team_id}`"
-                  >
-                    <OIcon name="warning" size="sm" class="text-status-warning-text" />
-                    <OTooltip :content="t('oncall.mineNoBackup')" />
-                  </span>
+                  />
                 </span>
               </template>
               <template #cell-until="{ row }">
@@ -319,20 +314,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTable>
-            <!-- Over the last row's lower edge, inside the frame, so the card is the skeleton's height once loaded. -->
             <div
               v-if="loaded && shiftsBelow > 0"
               class="from-surface-base pointer-events-none absolute inset-x-0 bottom-0 flex h-12 items-end justify-center bg-linear-to-t from-40% to-transparent pb-1.5"
               data-test="oncall-mine-shifts-more"
             >
-              <OText
-                variant="meta"
-                as="span"
-                class="bg-surface-base border-border-default inline-flex items-center gap-1 rounded-full border px-2 shadow-xs"
-              >
-                <OIcon name="expand-more" size="sm" aria-hidden="true" />
-                {{ t("oncall.mineShiftsMore", { count: shiftsBelow }, shiftsBelow) }}
-              </OText>
+              <OTag
+                variant="default"
+                size="sm"
+                shape="pill"
+                icon="expand-more"
+                class="shadow-xs"
+                :label="t('oncall.mineShiftsMore', { count: shiftsBelow }, shiftsBelow)"
+              />
             </div>
           </div>
         </section>
@@ -472,6 +466,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
@@ -500,6 +495,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import {
   createOverrideMutation,
@@ -516,9 +512,6 @@ import { orgUsersQuery } from "@/services/users.queries";
 import type {
   MyOnCall,
   MyOnCallTeam,
-  OnCallPosition,
-  OnCallSchedule,
-  OnCallTeam,
   OnCallTeamMember,
   ResolvedSegment,
   Rotation,
@@ -526,7 +519,14 @@ import type {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { fromZonedInputValue, isOnCallUnavailable, testPageOutcome } from "@/utils/oncall";
+import {
+  apiErrorMessage,
+  apiErrorStatus,
+  apiErrorText,
+  fromZonedInputValue,
+  isOnCallUnavailable,
+  testPageOutcome,
+} from "@/utils/oncall";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 
 /// How far ahead the shift card looks for the end of this shift and the next one.
@@ -583,7 +583,7 @@ const teamsState = ref<"pending" | "loaded" | "failed">("pending");
 
 async function fetchTeamNames(force = false) {
   try {
-    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
+    const teams = await readQuery(oncallTeamsQuery(orgId.value), force);
     orgTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
     teamsState.value = "loaded";
   } catch {
@@ -738,20 +738,6 @@ function shiftFromSegments(segments: ResolvedSegment[], me: string, now: number)
   };
 }
 
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
-
 /// Role, shift end and who is next need the team's schedule reads; a role without them sees only the duty tag.
 async function fetchShifts(force = false) {
   const me = viewerEmail.value.toLowerCase();
@@ -764,9 +750,9 @@ async function fetchShifts(force = false) {
         const positions =
           team.on_call_now === false
             ? []
-            : await read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.team_id), force);
+            : await readQuery(whoIsOnCallQuery(orgId.value, team.team_id), force);
         const held = positions.filter((p) => p.user_email.toLowerCase() === me);
-        const segments = await read<ResolvedSegment[]>(
+        const segments = await readQuery(
           resolvedScheduleQuery(
             orgId.value,
             team.team_id,
@@ -795,11 +781,11 @@ async function fetchShifts(force = false) {
 async function fetchMine(force = false) {
   try {
     const options = myOnCallQuery(orgId.value);
-    mine.value = await read<MyOnCall>(options, force);
+    mine.value = await readQuery(options, force);
     loadError.value = null;
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     await Promise.all([fetchShifts(force), fetchTeamNames(force)]);
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (isOnCallUnavailable(err)) {
       unavailable.value = true;
       mine.value = null;
@@ -809,12 +795,12 @@ async function fetchMine(force = false) {
     if (loaded.value) {
       toast({
         variant: "error",
-        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+        message: raw(apiErrorMessage(err)) || t("oncall.refreshFailed"),
       });
       return;
     }
     mine.value = null;
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = apiErrorText(err);
   } finally {
     loaded.value = true;
   }
@@ -845,21 +831,21 @@ async function openCover(row: ShiftRow) {
   coverLoadingId.value = row.team_id;
   try {
     const [members, schedule] = await Promise.all([
-      read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, row.team_id), false),
-      read<OnCallSchedule | null>(teamScheduleQuery(orgId.value, row.team_id), false),
+      readQuery(teamMembersQuery(orgId.value, row.team_id), false),
+      readQuery(teamScheduleQuery(orgId.value, row.team_id), false),
     ]);
     coverTeam.value = row;
     coverMembers.value = members;
     coverRotations.value = schedule?.rotations ?? [];
     coverGap.value = { from: Math.max(Date.now() * 1000, nowMicros.value), to: row.until };
     coverOpen.value = true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        apiErrorStatus(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+          : raw(apiErrorMessage(err)) || t("oncall.coverSaveFailed"),
     });
   } finally {
     coverLoadingId.value = "";
@@ -878,13 +864,13 @@ async function saveCover(value: {
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.mineCoverSaved") });
     await fetchMine(true);
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        apiErrorStatus(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+          : raw(apiErrorMessage(err)) || t("oncall.coverSaveFailed"),
     });
   } finally {
     coverSaving.value = false;
@@ -914,13 +900,13 @@ async function sendTestPage() {
     const res = await testWrite.mutateAsync({ teamId: team.team_id });
     const outcome = testPageOutcome(res.data, t);
     toast({ variant: outcome.variant, message: outcome.message });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        apiErrorStatus(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+          : raw(apiErrorMessage(err)) || t("oncall.testPageFailed"),
     });
   } finally {
     testingId.value = "";
@@ -971,10 +957,10 @@ async function saveAway() {
     awayOpen.value = false;
     toast({ variant: "success", message: t("oncall.mineAwaySaved") });
     await fetchMine(true);
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.awaySaveFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.awaySaveFailed"),
     });
   } finally {
     awaySaving.value = false;

@@ -30,18 +30,25 @@ const toggleableColumns = computed(() =>
   props.columns.filter((col) => col.hideable && !col.isAction),
 );
 
-// Counted against the table's defaults, so a column hidden by design is not reported as hidden.
+// Only a column the user hid counts: one hidden by design is not "hidden", and one shown past its default is not either.
 const hiddenCount = computed(
   () =>
-    toggleableColumns.value.filter(
-      (col) => isVisible(col.id) !== (props.defaultColumnVisibility?.[col.id] !== false),
-    ).length,
+    toggleableColumns.value.filter((col) => !isVisible(col.id) && isVisibleByDefault(col.id))
+      .length,
 );
 
-const atDefault = computed(() => hiddenCount.value === 0 && !props.hasResizedColumns);
+const atDefault = computed(
+  () =>
+    !props.hasResizedColumns &&
+    toggleableColumns.value.every((col) => isVisible(col.id) === isVisibleByDefault(col.id)),
+);
 
 function isVisible(columnId: string): boolean {
   return props.columnVisibility[columnId] !== false;
+}
+
+function isVisibleByDefault(columnId: string): boolean {
+  return props.defaultColumnVisibility?.[columnId] !== false;
 }
 
 function toggleColumn(columnId: string): void {
@@ -56,7 +63,7 @@ function resetToDefault(): void {
   if (atDefault.value) return;
   const reset: Record<string, boolean> = {};
   for (const col of toggleableColumns.value) {
-    reset[col.id] = props.defaultColumnVisibility?.[col.id] !== false;
+    reset[col.id] = isVisibleByDefault(col.id);
   }
   emit("update:columnVisibility", reset);
   if (props.hasResizedColumns) emit("reset:columnSizes");
