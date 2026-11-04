@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownItem
         variant="destructive"
         data-test="header-sample-data-delete"
-        @select="confirmRemove = true"
+        @select="askRemove"
       >
         {{ t("sampleData.delete") }}
       </ODropdownItem>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -111,6 +111,13 @@ const offerTry = computed(
     !(session.status.value === "loading" && session.loadingOrg.value === org.value),
 );
 const confirmRemove = ref(false);
+// the confirmation belongs to the org that opened it, so an org switch closes it
+let removeOrg = "";
+const askRemove = () => {
+  removeOrg = org.value;
+  confirmRemove.value = true;
+};
+watch(org, () => (confirmRemove.value = false));
 
 const startTour = () => {
   session.startTour(org.value);
@@ -122,7 +129,7 @@ const startTour = () => {
 const removeAll = async () => {
   confirmRemove.value = false;
   try {
-    await session.remove(org.value);
+    await session.remove(removeOrg);
     toast({ variant: "success", message: t("sampleData.toast.removed") });
   } catch (e: any) {
     toast({

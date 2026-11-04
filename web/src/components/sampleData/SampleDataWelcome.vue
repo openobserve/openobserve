@@ -316,21 +316,25 @@ const maybeGreet = async () => {
     return;
   }
   if (session.status.value === "loading") return;
-  let hasData: boolean;
+  session.welcomeDeciding.value = true;
   try {
-    hasData = await fetchHasUserStreams(id);
+    const hasData = await fetchHasUserStreams(id);
+    // the Slack invite day-2 clock starts on the first Home visit, data or not
+    if (config.isCloud === "true") {
+      markSlackInviteOffered(store.state.userInfo?.email ?? "anonymous");
+    }
+    if (hasData) {
+      // an org with data never shows the welcome, so its first-login state ends here
+      localStorage.removeItem("isFirstTimeLogin");
+      return;
+    }
+    if (id !== org.value || route.name !== "home") return;
+    session.openWelcome();
   } catch {
-    return;
+    // an org whose streams cannot be read gets no welcome
+  } finally {
+    session.welcomeDeciding.value = false;
   }
-  // the Slack invite day-2 clock starts on the first Home visit, data or not
-  if (config.isCloud === "true") markSlackInviteOffered(store.state.userInfo?.email ?? "anonymous");
-  if (hasData) {
-    // an org with data never shows the welcome, so its first-login state ends here
-    localStorage.removeItem("isFirstTimeLogin");
-    return;
-  }
-  if (id !== org.value || route.name !== "home") return;
-  session.openWelcome();
 };
 
 // every entry point loads through the session, so this one host announces the result

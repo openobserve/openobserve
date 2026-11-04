@@ -164,7 +164,8 @@ const ingestTelemetry = async (
   const range: SampleWindow = { startUs: endUs - hours * HOUR_US, endUs };
   const gen = createSampleGenerator(range);
   const counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
-  let error: string | undefined;
+  const sent: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
+  const errors: Partial<Record<keyof SampleCounts, string>> = {};
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
     const outcomes: IngestOutcome[] = await Promise.all([
@@ -187,11 +188,18 @@ const ingestTelemetry = async (
     counts.logs += app.accepted + access.accepted;
     counts.spans += traces.accepted;
     counts.metrics += metrics.accepted;
-    error ??= outcomes.find((o) => o.error)?.error;
+    sent.logs += batch.appLogs.length + batch.accessLogs.length;
+    sent.spans += batch.spanCount;
+    sent.metrics += batch.metrics.length;
+    errors.logs ??= app.error ?? access.error;
+    errors.spans ??= traces.error;
+    errors.metrics ??= metrics.error;
     report((i + 1) / gen.chunkCount, { ...counts }, feedOf(batch.appLogs));
   }
-  if (!counts.logs && !counts.spans && !counts.metrics) {
-    throw new Error(error || "The server did not accept any sample records");
+  // the tour has a chapter per signal, so one that kept nothing fails the load
+  const empty = (["logs", "spans", "metrics"] as const).find((s) => sent[s] && !counts[s]);
+  if (empty) {
+    throw new Error(errors[empty] || `The server did not accept any sample ${empty}`);
   }
   return { counts, window: range };
 };

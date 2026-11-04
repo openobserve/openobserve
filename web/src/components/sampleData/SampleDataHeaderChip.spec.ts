@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, nextTick } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
@@ -95,13 +95,12 @@ const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale 
 describe("SampleDataHeaderChip", () => {
   let wrapper: VueWrapper;
 
+  let store: ReturnType<typeof createStore<any>>;
   const mountChip = () => {
+    store = createStore({ state: { selectedOrganization: { identifier: ORG }, kioskMode: false } });
     wrapper = mount(SampleDataHeaderChip, {
       global: {
-        plugins: [
-          i18n,
-          createStore({ state: { selectedOrganization: { identifier: ORG }, kioskMode: false } }),
-        ],
+        plugins: [i18n, store],
         stubs: {
           ODropdown: SlotStub,
           ODropdownItem: ItemStub,
@@ -176,6 +175,16 @@ describe("SampleDataHeaderChip", () => {
     expect(remove).toHaveBeenCalledWith(ORG);
     expect(toastMock).toHaveBeenCalledWith({ variant: "success", message: "Sample data removed" });
     expect(wrapper.find(".confirm").exists()).toBe(false);
+  });
+
+  it("never deletes the sample data of an org selected after the confirmation opened", async () => {
+    await deleteItem().trigger("click");
+    store.state.selectedOrganization = { identifier: "other-org" };
+    await nextTick();
+    expect(wrapper.find(".confirm").exists()).toBe(false);
+    wrapper.findComponent(ConfirmStub).vm.$emit("update:ok");
+    await flushPromises();
+    expect(remove).not.toHaveBeenCalledWith("other-org");
   });
 
   it("shows the server's message when deleting fails", async () => {

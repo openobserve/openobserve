@@ -59,6 +59,8 @@ const steps = reactive<Record<SampleStepId, SampleStepStatus>>(
   >,
 );
 const welcomeOpen = ref(false);
+// true while the welcome checks whether to open, so other first-visit dialogs wait for it
+const welcomeDeciding = ref(false);
 const tour = ref<TourState | null>(readTour());
 const flagCache = ref<Record<string, boolean>>({});
 
@@ -146,9 +148,12 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
 const remove = async (org: string) => {
   const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
   await observer.mutate();
-  resetProgress();
-  result.value = undefined;
-  status.value = "idle";
+  // the progress and result belong to the last load's org; a load running elsewhere keeps them
+  if (loadingOrg.value === org) {
+    resetProgress();
+    result.value = undefined;
+    status.value = "idle";
+  }
   for (const flag of ORG_FLAGS) setOrgFlag(flag, org, false);
   if (tour.value?.org === org) stopTour();
 };
@@ -211,6 +216,7 @@ export const useSampleDataSession = () => ({
   steps,
   fraction,
   welcomeOpen,
+  welcomeDeciding,
   tour,
   start,
   remove,

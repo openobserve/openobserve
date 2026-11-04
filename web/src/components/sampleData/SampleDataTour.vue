@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -181,9 +181,10 @@ const org = computed<string>(() => store.state.selectedOrganization?.identifier 
 const active = computed(() => !!tour.value && tour.value.org === org.value);
 const presence = useSampleDataPresence(org, active);
 // only data that arrives during the tour ends it; an org that already had its own streams keeps it
+// a restarted tour is a new object with ownData unset, so key on that, not just on being active
 watch(
-  [active, presence.ready],
-  ([on, ready]) => on && ready && session.setTourOwnData(presence.hasRealData.value),
+  () => active.value && presence.ready.value && tour.value?.ownData === undefined,
+  (needed) => needed && session.setTourOwnData(presence.hasRealData.value),
   { immediate: true },
 );
 const visible = computed(
@@ -218,6 +219,13 @@ const capabilityLabel = (cap: SampleTourStep["capability"]): I18nText =>
   t(`sampleData.tour.capabilities.${cap}`);
 
 let stepRequest = 0;
+const cancelPendingStep = () => {
+  stepRequest++;
+  navigating.value = false;
+};
+// ending the tour, switching org or leaving must not let a pending step navigate
+watch([active, org], cancelPendingStep);
+onBeforeUnmount(cancelPendingStep);
 const showStep = async () => {
   if (!current.value) return;
   const request = ++stepRequest;

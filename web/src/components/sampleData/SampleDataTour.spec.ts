@@ -29,13 +29,15 @@ vi.mock("@/utils/sampleData/tour", async (importOriginal) => ({
   resolveTourTarget: (...args: unknown[]) => resolveMock(...args),
 }));
 
+const hasRealData = vi.hoisted(() => ({ value: false }));
 vi.mock("@/composables/sampleData/useSampleDataPresence", () => ({
-  useSampleDataPresence: () => ({ ready: ref(true), hasRealData: ref(false) }),
+  useSampleDataPresence: () => ({ ready: ref(true), hasRealData: ref(hasRealData.value) }),
 }));
 
 const ORG = "test-org";
 const session = useSampleDataSession();
 
+const mounted: { unmount: () => void }[] = [];
 const mountTour = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -50,18 +52,23 @@ const mountTour = async () => {
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale } });
   const wrapper = mount(SampleDataTour, { global: { plugins: [store, router, i18n] } });
+  mounted.push(wrapper);
   return { wrapper, router };
 };
 
 describe("SampleDataTour", () => {
   beforeEach(() => {
     resolveMock.mockReset();
+    hasRealData.value = false;
     resolveMock.mockImplementation(async (_org: string, id: string) => ({
       name: "page",
       params: { id },
     }));
   });
-  afterEach(() => session.stopTour());
+  afterEach(() => {
+    mounted.splice(0).forEach((w) => w.unmount());
+    session.stopTour();
+  });
 
   it("restart navigates to the first step's page", async () => {
     session.startTour(ORG, SAMPLE_TOUR_STEPS.length);
@@ -91,5 +98,34 @@ describe("SampleDataTour", () => {
     await flushPromises();
     expect(session.tour.value?.index).toBe(2);
     expect(router.currentRoute.value.params.id).toBe(SAMPLE_TOUR_STEPS[2].id);
+  });
+
+  it("a tour restarted while active stays visible in an org with real data", async () => {
+    hasRealData.value = true;
+    session.startTour(ORG, 0);
+    const { wrapper } = await mountTour();
+    await flushPromises();
+    expect(session.tour.value?.ownData).toBe(true);
+    session.startTour(ORG, 0);
+    await flushPromises();
+    expect(session.tour.value?.ownData).toBe(true);
+    expect(wrapper.find('[data-test="sample-tour-next"]').exists()).toBe(true);
+  });
+
+  it("ending the tour while a step resolves does not navigate afterwards", async () => {
+    session.startTour(ORG, 0);
+    const { wrapper, router } = await mountTour();
+    let release = () => {};
+    resolveMock.mockImplementation(
+      (_org: string, id: string) =>
+        new Promise((resolve) => {
+          release = () => resolve({ name: "page", params: { id } });
+        }),
+    );
+    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+    session.stopTour();
+    release();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
   });
 });

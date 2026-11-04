@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -31,9 +31,11 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const session = useSampleDataSession();
 
 // Day-2 follow-up; the onboarding dialog starts the clock via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
@@ -63,10 +65,30 @@ onMounted(() => {
   // Never compete with the onboarding dialog during the user's first-login session.
   if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
-  if (shouldShowStandaloneSlackInvite(userEmail)) {
+  if (!shouldShowStandaloneSlackInvite(userEmail)) return;
+
+  const show = () => {
+    // the welcome wins this visit; the invite stays due for a later one
+    if (session.welcomeOpen.value) return;
     isOpen.value = true;
     track("community_slack_prompt_shown");
+  };
+  // the welcome mounts first, so its stream check for this org has started by now
+  const settled = () =>
+    !!store.state.selectedOrganization?.identifier && !session.welcomeDeciding.value;
+  if (settled()) {
+    show();
+    return;
   }
+  const stop = watch(
+    settled,
+    (done) => {
+      if (!done) return;
+      stop();
+      show();
+    },
+    { flush: "post" },
+  );
 });
 
 // Real member count, sourced from the backend `/config` response
@@ -129,7 +151,7 @@ const joinSlack = () => {
 <template>
   <ODialog
     data-test="community-slack-invite-dialog"
-    :open="isOpen"
+    :open="isOpen && !session.welcomeOpen.value"
     size="sm"
     :show-close="false"
     @update:open="handleOpenChange"

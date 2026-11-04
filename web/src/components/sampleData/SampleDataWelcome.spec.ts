@@ -23,6 +23,7 @@ import { DialogContent } from "reka-ui";
 import enLocale from "@/locales/languages/en-US.json";
 import SampleDataWelcome from "./SampleDataWelcome.vue";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
 
 // Render the dialog inline instead of portalling it into <body>.
 vi.mock("reka-ui", async (importOriginal) => ({
@@ -67,6 +68,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     loadingOrg: ref(""),
     error: ref(null),
     welcomeOpen: ref(false),
+    welcomeDeciding: ref(false),
     tour: ref(null),
     start: vi.fn((org: string) => {
       s.loadingOrg.value = org;
@@ -105,6 +107,7 @@ const session = useSampleDataSession() as unknown as {
   status: { value: string };
   loadingOrg: { value: string };
   welcomeOpen: { value: boolean };
+  welcomeDeciding: { value: boolean };
   tour: { value: { org: string; index: number } | null };
   start: ReturnType<typeof vi.fn>;
   welcomeSeen: ReturnType<typeof vi.fn>;
@@ -189,6 +192,7 @@ describe("SampleDataWelcome finish", () => {
     session.status.value = "idle";
     session.loadingOrg.value = "";
     session.welcomeOpen.value = false;
+    session.welcomeDeciding.value = false;
     session.tour.value = null;
     session.welcomeSeen.mockImplementation(() => false);
     localStorage.clear();
@@ -207,6 +211,18 @@ describe("SampleDataWelcome finish", () => {
     await mountAtHome();
     expect(session.welcomeOpen.value).toBe(true);
     expect(JSON.parse(localStorage.getItem(SLACK_KEY) ?? "{}").status).toBe("pending_day2");
+  });
+
+  it("marks the welcome as deciding while it checks the org's streams", async () => {
+    let answer!: (hasData: boolean) => void;
+    vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+    const mounting = mountAtHome();
+    await flushPromises();
+    expect(session.welcomeDeciding.value).toBe(true);
+    answer(false);
+    await mounting;
+    expect(session.welcomeOpen.value).toBe(true);
+    expect(session.welcomeDeciding.value).toBe(false);
   });
 
   it("opens in a new org while a tour is left open in another org", async () => {

@@ -149,6 +149,32 @@ describe("loadSampleData", () => {
     }
   });
 
+  it("fails with the server's message when it rejected every log and span but kept the metrics", async () => {
+    const tooOld = "Too old data, only last 1 hours data can be ingested";
+    mocks.sampleData.ingestLogs.mockResolvedValue({
+      data: { code: 200, status: [{ name: "s", successful: 0, failed: 1, error: tooOld }] },
+    });
+    mocks.sampleData.ingestTraces.mockResolvedValue({
+      data: { partialSuccess: { rejectedSpans: "3", errorMessage: tooOld } },
+    });
+    try {
+      await expect(loadSampleData("acme", 1, () => {})).rejects.toThrow(tooOld);
+      expect(mocks.sampleData.putState).not.toHaveBeenCalled();
+    } finally {
+      mocks.sampleData.ingestLogs.mockImplementation(async (_o, _s, rows) => accepted(rows));
+      mocks.sampleData.ingestTraces.mockImplementation(async () => ({ data: {} }));
+    }
+  });
+
+  it("names the signal the server kept none of when it gave no message", async () => {
+    mocks.sampleData.ingestMetrics.mockResolvedValueOnce({
+      data: { code: 200, status: [{ name: "s", successful: 0, failed: 1 }] },
+    });
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(
+      "The server did not accept any sample metrics",
+    );
+  });
+
   it("keeps the oldest record minutes inside a one-hour ingest window", async () => {
     const { createSampleGenerator } =
       await vi.importActual<typeof import("./generator")>("./generator");

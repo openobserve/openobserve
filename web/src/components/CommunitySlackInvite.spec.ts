@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -31,8 +31,16 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+vi.mock("@/composables/sampleData/useSampleDataPresence", () => ({
+  fetchHasUserStreams: vi.fn().mockResolvedValue(true),
+}));
+
+import { createMemoryHistory, createRouter } from "vue-router";
 import CommunitySlackInvite from "./CommunitySlackInvite.vue";
+import SampleDataWelcome from "./sampleData/SampleDataWelcome.vue";
 import analytics from "@/services/product_analytics";
+import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
@@ -266,6 +274,135 @@ describe("CommunitySlackInvite", () => {
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
       sessionStorage.clear();
+    });
+  });
+
+  // ── Sample data welcome ─────────────────────────────────────────────────────
+  // The welcome dialog wins: the invite never opens next to it.
+
+  describe("sample data welcome", () => {
+    const session = useSampleDataSession();
+    const dialogOpen = () => wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open");
+
+    afterEach(() => {
+      session.welcomeOpen.value = false;
+      session.welcomeDeciding.value = false;
+    });
+
+    it("stays closed while the welcome is open, until a later visit", async () => {
+      setPendingDay2(25);
+      session.welcomeOpen.value = true;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("false");
+      session.welcomeOpen.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("waits for the welcome's stream check and stays closed when the welcome opens", async () => {
+      setPendingDay2(25);
+      session.welcomeDeciding.value = true;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("false");
+      session.welcomeOpen.value = true;
+      session.welcomeDeciding.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("opens once the welcome's stream check ends without a welcome", async () => {
+      setPendingDay2(25);
+      session.welcomeDeciding.value = true;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      session.welcomeDeciding.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("true");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.anything(),
+      );
+    });
+
+    it("waits until an org is selected", async () => {
+      const org = store.state.selectedOrganization;
+      store.commit("setSelectedOrganization", {});
+      setPendingDay2(25);
+      try {
+        wrapper = buildWrapper();
+        await flushPromises();
+        expect(dialogOpen()).toBe("false");
+        store.commit("setSelectedOrganization", org);
+        await flushPromises();
+        expect(dialogOpen()).toBe("true");
+      } finally {
+        store.commit("setSelectedOrganization", org);
+      }
+    });
+
+    it("never shows next to the welcome when both mount on Home, as in the main layout", async () => {
+      let answer!: (hasData: boolean) => void;
+      vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", name: "home", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      await router.isReady();
+      setPendingDay2(25);
+
+      wrapper = mount(
+        {
+          components: { SampleDataWelcome, CommunitySlackInvite },
+          template: "<div><SampleDataWelcome /><CommunitySlackInvite /></div>",
+        },
+        {
+          global: {
+            plugins: [store, i18n, router],
+            stubs: { ODialog: ODialogStub, WelcomeChoices: true, SampleDataProgress: true },
+          },
+        },
+      );
+      const invite = () =>
+        wrapper
+          .findComponent(CommunitySlackInvite)
+          .find('[data-test="o-dialog-stub"]')
+          .attributes("data-open");
+      await flushPromises();
+      expect(invite()).toBe("false");
+      answer(false);
+      await flushPromises();
+
+      expect(session.welcomeOpen.value).toBe(true);
+      expect(invite()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.anything(),
+      );
+    });
+
+    it("hides, without counting a dismissal, while a welcome opens over it", async () => {
+      setPendingDay2(25);
+      const record = localStorage.getItem(STATE_KEY);
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("true");
+      session.welcomeOpen.value = true;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(localStorage.getItem(STATE_KEY)).toBe(record);
     });
   });
 
