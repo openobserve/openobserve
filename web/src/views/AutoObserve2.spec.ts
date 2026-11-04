@@ -20,6 +20,8 @@ import store from "@/test/unit/helpers/store";
 import autoobserve from "@/services/autoobserve";
 import { SCENARIOS } from "@/components/autoobserve/data/facts";
 import { scenarioData } from "@/components/autoobserve/v2/fixtures";
+import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
+import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
 const routeQuery: Record<string, string> = {};
@@ -30,7 +32,7 @@ vi.mock("vue-router", async (importOriginal) => ({
 }));
 
 vi.mock("@/services/autoobserve", () => ({
-  default: { coverage: vi.fn(), suggestions: vi.fn() },
+  default: { coverage: vi.fn(), suggestions: vi.fn(), incidents: vi.fn() },
 }));
 
 vi.stubGlobal(
@@ -59,6 +61,8 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     vi.mocked(autoobserve.coverage).mockReturnValue(pending());
     vi.mocked(autoobserve.suggestions).mockReturnValue(pending());
+    vi.mocked(autoobserve.incidents).mockReset();
+    vi.mocked(autoobserve.incidents).mockReturnValue(pending());
   });
 
   it("has a fixture scenario with no suggestions to test against", () => {
@@ -76,5 +80,23 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     Object.assign(routeQuery, { scenario: quiet ?? "" });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-rail"]').exists()).toBe(false);
+  });
+
+  it("the paged card shows only in live mode, first in the rail", () => {
+    Object.assign(routeQuery, { live: "1", scenario: quiet ?? "" });
+    const wrapper = mountView();
+    const rail = wrapper.find('[data-test="autoobserve2-rail-scroll"]');
+    const order = Array.from(rail.element.children);
+    const paged = wrapper.findComponent(LivePaged);
+    expect(paged.exists()).toBe(true);
+    expect(order.indexOf(paged.element)).toBe(0);
+    expect(order.indexOf(wrapper.findComponent(LiveSuggestions).element)).toBe(1);
+    expect(paged.classes()).toEqual(expect.arrayContaining(["order-2", "shrink-0"]));
+    wrapper.unmount();
+
+    delete routeQuery.live;
+    const fixtureView = mountView();
+    expect(fixtureView.findComponent(LivePaged).exists()).toBe(false);
+    expect(autoobserve.incidents).not.toHaveBeenCalled();
   });
 });

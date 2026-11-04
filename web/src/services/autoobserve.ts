@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type { Incident, RcaOutcome, RcaRunState, RcaSummaryFields } from "./incidents";
 
 export type AutoObserveClass =
   "errors" | "latency" | "saturation" | "absence" | "external_probe" | "workload_health" | "node";
@@ -142,11 +143,47 @@ export interface AutoObserveSuggestionList {
   offset: number;
 }
 
+export type AutoObserveFindingKind = "stream_silence" | "stream_drop" | "stream_rise";
+
+export interface AutoObserveIncidentItem {
+  // kind and stream are null when the incident's group values are unreadable.
+  finding: {
+    id: string;
+    kind: AutoObserveFindingKind | string | null;
+    stream_type: string | null;
+    stream_name: string | null;
+    first_seen_at: number;
+  };
+  incident: {
+    id: string;
+    status: Incident["status"];
+    severity: Incident["severity"];
+    title: string;
+    created_at: number;
+  };
+  investigation: {
+    run_id: string | null;
+    state: RcaRunState | null;
+    outcome: RcaOutcome | null;
+    summary: RcaSummaryFields | null;
+    not_run_reason: string | null;
+  };
+}
+
+// Items come newest first; there is no total, only has_more.
+export interface AutoObserveIncidentList {
+  paging: boolean;
+  has_more: boolean;
+  items: AutoObserveIncidentItem[];
+}
+
 const autoobserve = {
   coverage: (org: string, view: AutoObserveCoverageView) =>
     http().get<AutoObserveCoverage>(`/api/v2/${org}/autoobserve/coverage`, { params: { view } }),
   suggestions: (org: string, params: AutoObserveSuggestionParams) =>
     http().get<AutoObserveSuggestionList>(`/api/v2/${org}/autoobserve/suggestions`, { params }),
+  incidents: (org: string, params: { limit: number; offset: number }) =>
+    http().get<AutoObserveIncidentList>(`/api/v2/${org}/autoobserve/incidents`, { params }),
 };
 
 export default autoobserve;

@@ -26,12 +26,14 @@ import {
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useNow } from "@/composables/useNow";
 import {
   autoobserveCoverageQuery,
+  autoobserveIncidentsPageQuery,
   autoobserveSuggestionsPageQuery,
 } from "@/services/autoobserve.queries";
+import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import type { Request } from "../v2/fixtures";
 import {
   toCoverageSource,
@@ -41,7 +43,15 @@ import {
   type SourceStatus,
   type Zone,
 } from "./liveAdapter";
-import { RAIL_CAP, liveErrorDetail, liveFailureOf, userTimeZone, type LivePhase } from "./liveCopy";
+import {
+  RAIL_CAP,
+  liveErrorDetail,
+  liveFailureOf,
+  statusOf,
+  userTimeZone,
+  type LivePhase,
+} from "./liveCopy";
+import { PAGED_CAP, failedDetail } from "./incidentsCopy";
 
 export interface RailSource extends Required<SourceState> {
   requests: Request[];
@@ -219,5 +229,95 @@ export const useLiveAutoObserve = () => {
     requests: computed(() => rail.value.requests),
     coverageSkeleton,
     railSkeleton,
+  };
+};
+
+// Rows shown at the last latch: a refetch updates them in place and new ids wait behind Show.
+interface PagedLatch {
+  ids: string[];
+  hasMore: boolean;
+}
+
+// Each latched id keeps its newest copy and nothing else is held, so retention never outgrows the shown rows.
+export const keepLatched = (
+  ids: readonly string[],
+  items: readonly AutoObserveIncidentItem[],
+  kept: readonly AutoObserveIncidentItem[],
+): AutoObserveIncidentItem[] =>
+  ids.flatMap((id) => {
+    const item = items.find((i) => i.finding.id === id) ?? kept.find((i) => i.finding.id === id);
+    return item ? [item] : [];
+  });
+
+export const useLivePaged = () => {
+  const store = useStore();
+  const live = useLiveMode();
+  const now = useNow();
+  const { t } = useI18nTyped();
+  const zone = useLiveZone();
+  const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+  const enabled = computed(() => live.value && !!org.value);
+  const query = useQuery(() =>
+    Object.assign(autoobserveIncidentsPageQuery(org.value, PAGED_CAP, 0), {
+      enabled: enabled.value,
+    }),
+  );
+  const retry = () => void query.refetch();
+  const state = useKeptFailure(
+    () => ({
+      ...stateOf(query, retry),
+      detail: query.isError.value
+        ? failedDetail(
+            t,
+            zone.value.locale,
+            zone.value.timeZone,
+            statusOf(query.error.value),
+            query.errorUpdatedAt.value,
+          )
+        : raw(""),
+    }),
+    () => org.value,
+  );
+  const skeleton = useHeldSkeleton(() => enabled.value && state.value.status === "loading");
+  const rcaEnabled = computed(() => store.state.zoConfig?.incidents_rca_enabled === true);
+  const minute = computed(() => Math.floor(now.value / 60_000));
+  const latch = shallowRef<PagedLatch | null>(null);
+  // A row that left the response keeps its last copy until Show, so nothing moves under the reader.
+  const rows = shallowRef<AutoObserveIncidentItem[]>([]);
+  const items = computed(() => (query.data.value?.items ?? []).slice(0, PAGED_CAP));
+  const relatch = () => {
+    latch.value = {
+      ids: items.value.map((item) => item.finding.id),
+      hasMore: query.data.value?.has_more ?? false,
+    };
+    rows.value = keepLatched(latch.value.ids, items.value, rows.value);
+  };
+  watch(org, () => {
+    latch.value = null;
+    rows.value = [];
+  });
+  watch(
+    items,
+    (list) => {
+      if (!latch.value && query.data.value) relatch();
+      else if (latch.value) rows.value = keepLatched(latch.value.ids, list, rows.value);
+    },
+    { immediate: true },
+  );
+  const newCount = computed(() => {
+    const shown = new Set(latch.value?.ids ?? []);
+    return latch.value ? items.value.filter((i) => !shown.has(i.finding.id)).length : 0;
+  });
+  return {
+    org,
+    state,
+    skeleton,
+    rcaEnabled,
+    now: computed(() => minute.value * 60_000),
+    paging: computed(() => query.data.value?.paging ?? true),
+    rows: computed(() => rows.value),
+    hasMore: computed(() => latch.value?.hasMore ?? false),
+    newCount,
+    showNew: relatch,
   };
 };

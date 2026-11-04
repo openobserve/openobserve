@@ -18,8 +18,13 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import autoobserve, { type AutoObserveCoverage } from "@/services/autoobserve";
-import { useLiveAutoObserve } from "./liveModel";
+import autoobserve, {
+  type AutoObserveCoverage,
+  type AutoObserveIncidentItem,
+  type AutoObserveIncidentList,
+} from "@/services/autoobserve";
+import fixture from "./__fixtures__/autoobserveIncidents.json";
+import { keepLatched, useLiveAutoObserve } from "./liveModel";
 
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -77,5 +82,29 @@ describe("useLiveAutoObserve", () => {
     await nextTick();
     expect(wrapper.text()).toBe("2 hours ago");
     expect(autoobserve.coverage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("keepLatched", () => {
+  const FIXTURE = fixture as unknown as AutoObserveIncidentList;
+  const withId = (id: string, title = id): AutoObserveIncidentItem => ({
+    ...FIXTURE.items[0],
+    finding: { ...FIXTURE.items[0].finding, id },
+    incident: { ...FIXTURE.items[0].incident, title },
+  });
+
+  it("retains only the latched rows across disjoint refreshes without Show", () => {
+    const ids = ["a", "b"];
+    let kept = keepLatched(ids, [withId("a"), withId("b")], []);
+    for (let n = 0; n < 50; n++)
+      kept = keepLatched(
+        ids,
+        [withId(`new-${n}`), withId(`newer-${n}`), withId(`newest-${n}`)],
+        kept,
+      );
+    expect(kept.map((i) => i.finding.id)).toEqual(["a", "b"]);
+    kept = keepLatched(ids, [withId("b", "b again"), withId("c")], kept);
+    expect(kept.map((i) => i.incident.title)).toEqual(["a", "b again"]);
+    expect(keepLatched([], [withId("a")], kept)).toEqual([]);
   });
 });

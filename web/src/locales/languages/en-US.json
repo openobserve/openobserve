@@ -28681,7 +28681,8 @@
       "refreshFailed": "Refresh failed at {failedAt} · showing {what} from {dataAt}",
       "what": {
         "coverage": "coverage",
-        "suggestions": "suggestions"
+        "suggestions": "suggestions",
+        "incidents": "paged findings"
       },
       "coverage": {
         "deniedTitle": "You don't have permission to see coverage",
@@ -28710,11 +28711,58 @@
         "emptyDesc": "I'll add one here when I find a gap in what your monitors cover.",
         "pageEmptyTitle": "The top suggestions were already handled",
         "pageEmptyDesc": "Open the full list for the ones still waiting."
+      },
+      "incidents": {
+        "deniedTitle": "You don't have permission to see paged findings",
+        "deniedDesc": "Paged findings open incidents, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "Paged findings appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Paged findings are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load paged findings",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment."
       }
     },
     "time": {
       "justNow": "just now",
       "ago": "{time} ago"
+    },
+    "incidents": {
+      "title": "Paged findings",
+      "subtitle": "Findings that opened an incident for your on-call team, with its analysis.",
+      "pagingNote": "Paging is off for this organization, so AutoObserve opens no incidents.",
+      "finding": {
+        "stream_silence": "{stream} ({type}) stopped sending data",
+        "stream_drop": "{stream} ({type}) volume dropped sharply",
+        "stream_rise": "{stream} ({type}) volume rose sharply"
+      },
+      "opened": "Incident opened {when}",
+      "openIncident": "Open incident",
+      "viewAnalysis": "View analysis",
+      "newFindings": "{count} new finding | {count} new findings",
+      "showNew": "Show",
+      "more": "Showing the {count} newest",
+      "seeAll": "See all incidents",
+      "failedDetail": {
+        "status": "The request failed with status {status} at {time}.",
+        "noResponse": "The request got no response at {time}."
+      },
+      "analysis": {
+        "notRun": "Not analyzed",
+        "notRunDetail": "No analysis has started. Open the incident to start one.",
+        "disabledDetail": "AI analysis is turned off for this deployment.",
+        "offOther": "Automatic analysis did not run for this incident.",
+        "failedDetail": "The analysis stopped before it finished. View it for details."
+      },
+      "empty": {
+        "title": "Nothing has paged anyone",
+        "desc": "When a stream stops or its volume changes sharply, its incident and analysis show here."
+      },
+      "emptyOff": {
+        "title": "Paging is off",
+        "desc": "AutoObserve records stream findings for this organization but opens no incidents. An administrator turns paging on."
+      },
+      "loading": "Loading paged findings…",
+      "loaded": "Paged findings loaded"
     }
   },
   "autoobserve2": {

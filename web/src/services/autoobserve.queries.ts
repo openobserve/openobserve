@@ -17,10 +17,12 @@ import { queryOptions } from "@tanstack/vue-query";
 import autoobserve, {
   type AutoObserveCoverage,
   type AutoObserveCoverageView,
+  type AutoObserveIncidentList,
   type AutoObserveSuggestionList,
 } from "./autoobserve";
 import { autoobserveKeys } from "./autoobserve.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
+import { PAGED_POLL_MS, anyLive } from "@/components/autoobserve/live/incidentsCopy";
 
 export const autoobserveCoverageQuery = (org: string, view: AutoObserveCoverageView) =>
   queryOptions({
@@ -43,4 +45,14 @@ export const autoobserveSuggestionsPageQuery = (org: string, limit: number, offs
         })
       ).data,
     staleTime: LIVE_STALE_TIME,
+  });
+
+// Polls only while a listed analysis is live, as the incident list does; otherwise the stale time decides.
+export const autoobserveIncidentsPageQuery = (org: string, limit: number, offset: number) =>
+  queryOptions({
+    queryKey: autoobserveKeys.incidentsPage(org, limit, offset),
+    queryFn: async (): Promise<AutoObserveIncidentList> =>
+      (await autoobserve.incidents(org, { limit, offset })).data,
+    staleTime: LIVE_STALE_TIME,
+    refetchInterval: (query) => (anyLive(query.state.data) ? PAGED_POLL_MS : false),
   });
