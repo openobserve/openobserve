@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Pinned dashboard tab -->
           <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
-            <HomeViewSkeleton v-if="pinnedTabPending || pinSyncing" />
+            <HomeViewSkeleton v-if="pinnedTabPending" />
             <PinnedDashboardTab
               v-else
               :key="activeHomeTab"
@@ -260,7 +260,8 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor } = useHomeDashboard(t);
+    const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor, load } =
+      useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -304,9 +305,29 @@ export default defineComponent({
       }
     }
 
+    let verifyingPin = false;
+
     // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
     // the pin and tell the user why — distinct from a deliberate close.
-    function onPinnedUnavailable() {
+    async function onPinnedUnavailable(dashboardId: string, folderId: string) {
+      const org = store.state.selectedOrganization?.identifier;
+      if (!org || verifyingPin) return;
+      verifyingPin = true;
+      try {
+        await load(org, true);
+      } finally {
+        verifyingPin = false;
+      }
+      const failed = `dash:${folderId}:${dashboardId}`;
+      const pin = homeDashboard.value;
+      if (pin?.dashboardId !== dashboardId) return;
+      const pinTab = `dash:${pin.folderId}:${pin.dashboardId}`;
+      // The pin is org-wide, so it is only deleted when a fresh read still names the folder that failed; a late failure from a replaced tab must not.
+      if (pinTab !== failed) {
+        if (activeHomeTab.value === failed) activeHomeTab.value = pinTab;
+        return;
+      }
+      if (activeHomeTab.value !== failed) return;
       removeHomePin();
       toast({
         variant: "error",
@@ -394,49 +415,35 @@ export default defineComponent({
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
-    // The tab holds back until the re-read settles: a stale folder can fail RBAC and its `unavailable` would delete the pin.
-    const pinSyncing = ref(false);
-    let pinSyncRun = 0;
-    async function syncPin(org: string) {
-      const run = ++pinSyncRun;
-      pinSyncing.value = true;
-      try {
-        await useHomeDashboard(t).load(org, true);
-      } finally {
-        if (run === pinSyncRun) pinSyncing.value = false;
-      }
+    // The cached pin can be stale from another device, so it is re-read without holding the tab; a stale folder is caught by onPinnedUnavailable.
+    function revalidatePin() {
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) void load(org, true);
     }
 
-    // When the user opens the pinned dashboard tab, re-read the authoritative
-    // home_dashboard org setting so a snapshot that went stale on another system
-    // (e.g. the dashboard was moved to a different folder elsewhere) self-corrects
-    // before we render / navigate with its folderId.
     watch(activeHomeTab, (val, prev) => {
       if (!val.startsWith("dash:")) return;
-      const sameDashboard =
+      // Only the folder changed, by the watch below, which already applied the fresh pin.
+      if (
         prev?.startsWith("dash:") &&
-        parsePinnedTabId(prev).dashboardId === parsePinnedTabId(val).dashboardId;
-      // Only the folder moved, by the watch below, which already applied the fresh pin.
-      if (sameDashboard) return;
-      const org = store.state.selectedOrganization?.identifier;
-      if (org) void syncPin(org);
+        parsePinnedTabId(prev).dashboardId === parsePinnedTabId(val).dashboardId
+      )
+        return;
+      revalidatePin();
     });
 
-    // The tab id carries the folder, so a re-read that moved the pin must move the open tab with it.
+    // The tab id carries the folder, so a re-read that moved, replaced or dropped the pin must move the open tab with it.
     watch(homeDashboard, (pin) => {
-      if (!pin || !activeHomeTab.value.startsWith("dash:")) return;
-      const nextId = `dash:${pin.folderId}:${pin.dashboardId}`;
-      const open = parsePinnedTabId(activeHomeTab.value);
-      if (open.dashboardId === pin.dashboardId && activeHomeTab.value !== nextId) {
-        activeHomeTab.value = nextId;
+      if (pinnedTabPending.value || !activeHomeTab.value.startsWith("dash:")) return;
+      if (!pin || pin.dashboardId !== parsePinnedTabId(activeHomeTab.value).dashboardId) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+        return;
       }
+      const nextId = `dash:${pin.folderId}:${pin.dashboardId}`;
+      if (activeHomeTab.value !== nextId) activeHomeTab.value = nextId;
     });
 
-    // A restored pinned tab never fires the switch watch above, so the pin is re-read once here; a pending tab is already waiting on a read.
-    if (activeHomeTab.value.startsWith("dash:") && !pinnedTabPending.value) {
-      const org = store.state.selectedOrganization?.identifier;
-      if (org) void syncPin(org);
-    }
+    if (homeDashboard.value && !pinnedTabPending.value) revalidatePin();
 
     // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
     // side of the target) and we apply it to our own ordered list, then persist.
@@ -518,7 +525,6 @@ export default defineComponent({
       onLoadChat,
       onNewChat,
       parsePinnedTabId,
-      pinSyncing,
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
