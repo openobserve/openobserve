@@ -123,6 +123,7 @@ const stubs = {
       "services",
       "signals",
       "saving",
+      "conflict",
     ],
     template: "<div />",
   },
@@ -302,10 +303,14 @@ describe("OnCallRouting", () => {
     });
     expect(wrapper.find(".sub").text()).toBe("");
     const info = wrapper.find('[data-test="oncall-routing-precedence-info"]');
-    expect(info.exists()).toBe(true);
-    expect(info.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      String(i18n.global.t("oncall.routingPrecedence")),
-    );
+    const precedence = String(i18n.global.t("oncall.routingPrecedence"));
+    expect(info.attributes("tabindex")).toBe("0");
+    expect(info.attributes("aria-label")).toBe(precedence);
+    expect(
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .some((c) => c.props("content") === precedence),
+    ).toBe(true);
   });
 
   it("opens on the queue when linked there from a team's tab", async () => {
@@ -412,6 +417,43 @@ describe("OnCallRouting", () => {
     expect(simulator(wrapper).props("seed")).toEqual({ service: "cart" });
   });
 
+  it("keeps the newest dry-run answer when an earlier one returns later", async () => {
+    let resolveSlow!: (value: unknown) => void;
+    service.previewRouting
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveSlow = resolve)) as never)
+      .mockResolvedValueOnce({ data: { team_id: "team_2" } } as never);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+
+    simulator(wrapper).vm.$emit("run", { dimensions: { service: "old" } });
+    simulator(wrapper).vm.$emit("run", { dimensions: { service: "new" } });
+    await flushPromises();
+    expect(simulator(wrapper).props("preview")).toEqual({ team_id: "team_2" });
+    expect(simulator(wrapper).props("loading")).toBe(false);
+
+    resolveSlow({ data: { team_id: "team_1" } });
+    await flushPromises();
+    expect(simulator(wrapper).props("preview")).toEqual({ team_id: "team_2" });
+    expect(simulator(wrapper).props("loading")).toBe(false);
+  });
+
+  it("keeps the conflict for the newest draft when an earlier preview returns later", async () => {
+    let resolveSlow!: (value: unknown) => void;
+    service.previewRouting
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveSlow = resolve)) as never)
+      .mockResolvedValueOnce({ data: { team_id: "team_2" } } as never);
+    const wrapper = render();
+    await flushPromises();
+
+    editor(wrapper).vm.$emit("preview", { service: "old" });
+    editor(wrapper).vm.$emit("preview", { service: "new" });
+    await flushPromises();
+    resolveSlow({ data: { team_id: "team_1" } });
+    await flushPromises();
+    expect(editor(wrapper).props("conflict")).toEqual({ team_id: "team_2" });
+  });
+
   /// A10: Send test page renders for everyone; the server's 403 is what closes it for the org.
   it("latches Send test page disabled after a 403 on the test page", async () => {
     service.testPage.mockRejectedValue({ response: { status: 403, data: {} } });
@@ -516,7 +558,7 @@ describe("OnCallRouting", () => {
         signal("s3", { service: "owned" }),
         signal("s4", { service: "search" }),
       ],
-    } as any);
+    } as never);
     const wrapper = render();
     await flushPromises();
     await showSignals(wrapper);
@@ -548,7 +590,81 @@ describe("OnCallRouting", () => {
     ]);
     expect(toast).toHaveBeenCalledWith({
       variant: "success",
-      message: "2 signals now go to Payments",
+      message: "3 signals now go to Payments",
+    });
+  });
+
+  it("counts claimable signals on the button and names the paths that failed", async () => {
+    const signal = (id: string, dimensions: Record<string, string>) => ({
+      id,
+      org_id: "default",
+      path: "",
+      dimensions,
+      occurrences: 1,
+    });
+    service.ownershipStats.mockResolvedValue({
+      data: { rules: [{ rule_id: "r1", team_id: "team_1", dimensions: { service: "owned" } }] },
+    } as never);
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        signal("s1", { service: "cart", "k8s-pod-name": "pod-1" }),
+        signal("s2", { service: "cart", "k8s-pod-name": "pod-2" }),
+        signal("s3", { service: "owned" }),
+        signal("s4", { service: "search" }),
+      ],
+    } as never);
+    service.createOwnershipRule
+      .mockResolvedValueOnce({ data: {} } as any)
+      .mockRejectedValueOnce({ response: { status: 500, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+    await showSignals(wrapper);
+    expect(wrapper.find('[data-test="oncall-routing-claim-all"]').text()).toBe("Claim all 3");
+    await wrapper.find('[data-test="oncall-routing-claim-all"]').trigger("click");
+    wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-team")!
+      .vm.$emit("update:modelValue", "team_2");
+    await flushPromises();
+    wrapper
+      .findAllComponents({ name: "ODialog" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-dialog")!
+      .vm.$emit("click:primary");
+    await flushPromises();
+
+    expect(toast).toHaveBeenCalledWith({
+      variant: "warning",
+      message: expect.stringMatching(
+        /^2 of 3 signals now go to Payments; could not claim .*search/,
+      ),
+    });
+  });
+
+  it("names every path in the error when no claim lands", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", org_id: "default", path: "", dimensions: { service: "cart" }, occurrences: 1 },
+      ],
+    } as never);
+    service.createOwnershipRule.mockRejectedValue({ response: { status: 500, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+    await showSignals(wrapper);
+    await wrapper.find('[data-test="oncall-routing-claim-all"]').trigger("click");
+    wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-team")!
+      .vm.$emit("update:modelValue", "team_2");
+    await flushPromises();
+    wrapper
+      .findAllComponents({ name: "ODialog" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-dialog")!
+      .vm.$emit("click:primary");
+    await flushPromises();
+
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: expect.stringMatching(/^Could not claim .*cart/),
     });
   });
 

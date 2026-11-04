@@ -42,17 +42,21 @@ export function useOnCallRoutingTester(options: {
   const testing = ref(false);
   const sending = ref(false);
   const testResult = ref<TestPageResult | null>(null);
+  let latestRun = 0;
 
   /// Opens on a real alert shape: the given rule, else the signal that fell through most.
   function openTester(dimensions?: Record<string, string>) {
     const top = [...options.signals.value].sort((a, b) => b.occurrences - a.occurrences)[0];
     seed.value = { ...(dimensions ?? (top ? claimableDimensions(top.dimensions) : {})) };
+    latestRun += 1;
     preview.value = null;
+    testing.value = false;
     testResult.value = null;
     open.value = true;
   }
 
   async function run(query: SimulatorQuery) {
+    const runId = ++latestRun;
     testing.value = true;
     testResult.value = null;
     try {
@@ -61,11 +65,11 @@ export function useOnCallRoutingTester(options: {
         org_identifier: options.orgId.value,
         data: { dimensions: query.dimensions },
       });
-      preview.value = res.data;
+      if (runId === latestRun) preview.value = res.data;
     } catch (err) {
-      options.onError(err, t("oncall.testRoutingFailed"));
+      if (runId === latestRun) options.onError(err, t("oncall.testRoutingFailed"));
     } finally {
-      testing.value = false;
+      if (runId === latestRun) testing.value = false;
     }
   }
 

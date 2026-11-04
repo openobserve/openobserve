@@ -113,11 +113,11 @@ describe("OnCallRuleEditor", () => {
     );
   });
 
-  it("opens a new rule on one live row, field preset to service, and no Add button", () => {
+  it("opens a new rule on one live row, field preset to service", () => {
     const wrapper = render();
     expect(wrapper.findAll('[data-test^="oncall-rule-editor-row-"]')).toHaveLength(1);
     expect(select(wrapper, "oncall-rule-editor-field-0").props("modelValue")).toBe("service");
-    expect(wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-rule-editor-value-0"]').exists()).toBe(true);
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
   });
 

@@ -142,10 +142,12 @@ describe("OnCallOwnership", () => {
       "Alerts that come to Platform",
     );
     const precedence = wrapper.find('[data-test="oncall-ownership-precedence"]');
-    expect(precedence.text()).toBe("");
-    expect(precedence.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      String(i18n.global.t("oncall.routingPrecedence")),
-    );
+    const text = String(i18n.global.t("oncall.routingPrecedence"));
+    expect(precedence.attributes("tabindex")).toBe("0");
+    expect(precedence.attributes("aria-label")).toBe(text);
+    expect(
+      wrapper.findAllComponents({ name: "OTooltip" }).some((c) => c.props("content") === text),
+    ).toBe(true);
   });
 
   /// The org's list, the same entry org Routing reads, so Order is each rule's place in the org.

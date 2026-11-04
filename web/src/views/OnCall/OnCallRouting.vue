@@ -24,14 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #title-trail>
       <BetaBadge class="shrink-0" />
-      <OIcon
-        name="info-outline"
-        size="sm"
-        class="text-text-secondary cursor-help"
-        data-test="oncall-routing-precedence-info"
-      >
-        <OTooltip side="bottom" :content="t('oncall.routingPrecedence')" />
-      </OIcon>
+      <OTooltip side="bottom" :content="t('oncall.routingPrecedence')">
+        <OIcon
+          name="info-outline"
+          size="sm"
+          tabindex="0"
+          :label="t('oncall.routingPrecedence')"
+          class="text-text-secondary cursor-help"
+          data-test="oncall-routing-precedence-info"
+        />
+      </OTooltip>
     </template>
     <template #actions>
       <OButton
@@ -56,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.newRule") }}
       </OButton>
       <OButton
-        v-if="ready && tab === 'signals' && canConfigure && openSignals.length"
+        v-if="ready && tab === 'signals' && canConfigure && claimableCount"
         variant="primary"
         size="sm"
         icon-left="alt-route"
@@ -64,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-routing-claim-all"
         @click="openClaimAll"
       >
-        {{ t("oncall.unroutedClaimAll", { count: openSignals.length }) }}
+        {{ t("oncall.unroutedClaimAll", { count: claimableCount }) }}
       </OButton>
     </template>
     <template #actions-overflow>
@@ -328,10 +330,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       :open="claimAllOpen"
       size="sm"
-      :title="
-        t('oncall.unroutedClaimAllTitlePlain', { count: openSignals.length }, openSignals.length)
-      "
-      :primary-button-label="t('oncall.unroutedClaimAll', { count: openSignals.length })"
+      :title="t('oncall.unroutedClaimAllTitlePlain', { count: claimableCount }, claimableCount)"
+      :primary-button-label="t('oncall.unroutedClaimAll', { count: claimableCount })"
       :secondary-button-label="t('oncall.cancel')"
       :primary-button-disabled="!claimAllTeam"
       :primary-button-loading="claimingAll"
@@ -455,8 +455,7 @@ const teams = ref<OnCallTeam[]>([]);
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
 const aliases = ref<{ id: string; display?: string }[]>([]);
-/// Who holds the path the rule editor is drafting, as opposed to the tester's
-/// preview, which answers a question the reader asked.
+/// Who holds the path the rule editor drafts; separate from the tester's preview, which answers the reader's question.
 const conflict = ref<RoutingPreview | null>(null);
 
 const loaded = ref(false);
@@ -693,15 +692,11 @@ async function fetchAliases(force = false) {
   }
 }
 
-/// Who holds a drafted path today, answered by the engine.
-///
-/// The draft's own conditions are replayed as if they were a signal, so this is
-/// the real decision rather than a second copy of the ordering on this side.
-/// Debounced by the editor, so this runs once per pause.
-///
-/// Never surfaces an error: a conflict line that cannot be drawn is missing
-/// context, not a reason to stop somebody writing a rule.
+let conflictRun = 0;
+
+/// The engine replays the draft as a signal; never surfaces an error, since a missing line must not block a rule.
 async function previewConflict(dimensions: Record<string, string>) {
+  const run = ++conflictRun;
   if (!Object.keys(dimensions).length) {
     conflict.value = null;
     return;
@@ -712,9 +707,9 @@ async function previewConflict(dimensions: Record<string, string>) {
       org_identifier: orgId.value,
       data: { dimensions },
     });
-    conflict.value = res.data ?? null;
+    if (run === conflictRun) conflict.value = res.data ?? null;
   } catch {
-    conflict.value = null;
+    if (run === conflictRun) conflict.value = null;
   }
 }
 
@@ -849,39 +844,76 @@ function openClaimAll() {
   claimAllOpen.value = true;
 }
 
-/// Sequential and deduped by path: the server keys rules on the path, so a parallel twin reads as a failed claim.
-async function claimAll() {
-  const teamId = claimAllTeam.value;
-  if (!teamId) return;
-  claimingAll.value = true;
+/// Open signals whose path no rule owns yet, grouped by that path, since one rule claims them all.
+const claimableByPath = computed(() => {
   const owned = new Set(rules.value.map((rule) => ownershipPath(rule.dimensions)));
-  let claimed = 0;
-  let lastError: unknown = null;
+  const groups = new Map<string, { dimensions: Record<string, string>; count: number }>();
   for (const signal of openSignals.value) {
     const dimensions = claimableDimensions(signal.dimensions);
     const path = ownershipPath(dimensions);
     if (!path || owned.has(path)) continue;
-    owned.add(path);
+    const group = groups.get(path);
+    if (group) group.count += 1;
+    else groups.set(path, { dimensions, count: 1 });
+  }
+  return [...groups.values()];
+});
+
+const claimableCount = computed(() =>
+  claimableByPath.value.reduce((sum, group) => sum + group.count, 0),
+);
+
+const CLAIM_FAILED_LISTED = 3;
+
+function failedPathsText(failedPaths: Record<string, string>[]): string {
+  const shown = failedPaths.slice(0, CLAIM_FAILED_LISTED).map(readable).join(", ");
+  const rest = failedPaths.length - CLAIM_FAILED_LISTED;
+  return rest > 0
+    ? String(t("oncall.claimSignalsMorePaths", { paths: raw(shown), count: rest }))
+    : shown;
+}
+
+/// Sequential: the server keys rules on the path, so a parallel twin reads as a failed claim.
+async function claimAll() {
+  const teamId = claimAllTeam.value;
+  const groups = claimableByPath.value;
+  if (!teamId || !groups.length) return;
+  claimingAll.value = true;
+  const total = claimableCount.value;
+  let claimed = 0;
+  const failedPaths: Record<string, string>[] = [];
+  let lastError: unknown = null;
+  for (const group of groups) {
     try {
-      await ruleCreate.mutateAsync({ team_id: teamId, dimensions });
-      claimed += 1;
+      await ruleCreate.mutateAsync({ team_id: teamId, dimensions: group.dimensions });
+      claimed += group.count;
     } catch (err) {
       lastError = err;
+      failedPaths.push(group.dimensions);
     }
   }
   claimingAll.value = false;
   claimAllOpen.value = false;
-  if (claimed) {
+  const team = raw(teamNameOf(teamId));
+  if (!failedPaths.length) {
     toast({
       variant: "success",
+      message: t("oncall.toastSignalsClaimed", { count: claimed, team }, claimed),
+    });
+  } else if (claimed) {
+    toast({
+      variant: "warning",
       message: t(
-        "oncall.toastSignalsClaimed",
-        { count: claimed, team: raw(teamNameOf(teamId)) },
-        claimed,
+        "oncall.toastSignalsClaimedPartly",
+        { claimed, count: total, team, paths: raw(failedPathsText(failedPaths)) },
+        total,
       ),
     });
   } else {
-    failed(lastError, t("oncall.claimSignalsFailed"));
+    failed(
+      lastError,
+      t("oncall.claimSignalsFailedPaths", { paths: raw(failedPathsText(failedPaths)) }),
+    );
   }
   await Promise.all([fetchRules(), fetchSignals()]);
 }

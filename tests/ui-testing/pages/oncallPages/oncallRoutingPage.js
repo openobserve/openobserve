@@ -495,6 +495,15 @@ export class OnCallRoutingPage {
     }
     await this.page.locator(this.simulatorRemove(0)).click();
     await this.selectOption(this.simulatorField(0), name);
+    this.pendingAnswer = this.page.waitForResponse((response) => {
+      const request = response.request();
+      if (request.method() !== 'POST' || !response.url().includes('/oncall/routing/preview')) return false;
+      try {
+        return JSON.parse(request.postData() ?? '{}')?.dimensions?.[name] === value;
+      } catch {
+        return false;
+      }
+    }, { timeout: 30000 });
     const field = this.simulatorValue(0);
     await this.page.locator(part(field, 'trigger')).first().click();
     const search = this.page.locator(part(field, 'search')).first();
@@ -506,8 +515,15 @@ export class OnCallRoutingPage {
     await expect(this.page.locator(part(field, 'popover'))).toBeHidden({ timeout: 20000 });
   }
 
-  /** The answer is live (debounced); this waits for it to land. */
+  /** The answer is live (debounced); this waits for the one asked by addSimulatorDimension, not the seed's. */
   async runSimulator() {
+    if (this.pendingAnswer) {
+      await this.pendingAnswer;
+      this.pendingAnswer = null;
+    }
+    await expect(
+      this.page.locator(`${this.locators.simulatorResult}:not([aria-busy="true"])`),
+    ).toBeVisible({ timeout: 30000 });
     await expect(this.page.locator(this.locators.simulatorAnswer)).toBeVisible({ timeout: 30000 });
   }
 
@@ -520,7 +536,7 @@ export class OnCallRoutingPage {
     };
     return {
       matched: await textOf(this.locators.simulatorResult),
-      specificity: null,
+      won: await textOf(this.locators.simulatorWon),
       team: await textOf(this.locators.simulatorTeam),
       ladder: await textOf(this.locators.simulatorNext),
       responder: await textOf(this.locators.simulatorResponder),

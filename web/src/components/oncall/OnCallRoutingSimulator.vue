@@ -42,9 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-2">
       <span class="flex items-center gap-1">
         <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
-        <OIcon name="info-outline" size="sm" class="text-text-secondary cursor-help">
-          <OTooltip side="right" :content="t('oncall.simulatorInfo')" />
-        </OIcon>
+        <OTooltip side="right" :content="t('oncall.simulatorInfo')">
+          <OIcon
+            name="info-outline"
+            size="sm"
+            tabindex="0"
+            :label="t('oncall.simulatorInfo')"
+            class="text-text-secondary cursor-help"
+            data-test="oncall-simulator-conditions-info"
+          />
+        </OTooltip>
       </span>
       <OnCallConditionRows
         :key="seedKey"
@@ -102,7 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #channels>{{ wakes.channels }}</template>
           </i18n-t>
-          <span v-else :class="responderTone" data-test="oncall-simulator-responder">
+          <span
+            v-else
+            :class="responderTone"
+            :tabindex="responderWhy ? 0 : undefined"
+            data-test="oncall-simulator-responder"
+          >
             {{ responderNote }}
             <OTooltip
               v-if="responderWhy"
@@ -132,7 +144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <span class="-mt-2 flex flex-col gap-0.5">
-        <OText variant="meta" data-test="oncall-simulator-won">
+        <OText
+          variant="meta"
+          :tabindex="matchedNotes.length ? 0 : undefined"
+          data-test="oncall-simulator-won"
+        >
           {{ wonLine }}
           <OTooltip v-if="matchedNotes.length" side="bottom">
             <template #content>
@@ -142,7 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTooltip>
         </OText>
-        <OText v-if="alsoMatched.length" variant="meta" data-test="oncall-simulator-also">
+        <OText
+          v-if="alsoMatched.length"
+          variant="meta"
+          tabindex="0"
+          data-test="oncall-simulator-also"
+        >
           {{
             t("oncall.simulatorAlsoMatchedCount", { count: alsoMatched.length }, alsoMatched.length)
           }}

@@ -131,9 +131,8 @@ describe("OnCallRoutingSimulator", () => {
     ]);
   });
 
-  it("re-asks live when the priority changes, with no Test button", async () => {
+  it("re-asks live when the priority changes", async () => {
     const wrapper = render({ seed: { service: "checkout" } });
-    expect(wrapper.find('[data-test="oncall-simulator-run"]').exists()).toBe(false);
     select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P3");
     await wrapper.vm.$nextTick();
     vi.advanceTimersByTime(350);
@@ -354,13 +353,12 @@ describe("OnCallRoutingSimulator", () => {
         ],
       }),
     });
-    expect(wrapper.find('[data-test="oncall-simulator-why"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
       "Matched rule: Service = payments-api",
     );
-    expect(wrapper.find('[data-test="oncall-simulator-also"]').text()).toBe(
-      "Also matched, less specific: 1 rule",
-    );
+    const also = wrapper.find('[data-test="oncall-simulator-also"]');
+    expect(also.text()).toBe("Also matched, less specific: 1 rule");
+    expect(also.attributes("tabindex")).toBe("0");
   });
 
   it("leaves out the less-specific line when no other rule matched", () => {
