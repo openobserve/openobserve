@@ -131,10 +131,8 @@ const builderRef = ref<InstanceType<typeof FilterBuilder> | null>(null);
 // The builder states the same rules as the page schema, so a refused save is explained on its chips.
 watch(submissionAttempts, () => builderRef.value?.validate());
 
-// Rules the builder marks on a chip get their words here; the others it states itself.
+// The builder shows blank rows only as unfinished chips, so these get their words here; it states the star rules itself.
 const CHIP_RULES: I18nKey[] = [
-  "alerts.downtimes.validation.loneStar",
-  "alerts.downtimes.validation.innerStar",
   "alerts.downtimes.validation.pairKey",
   "alerts.downtimes.validation.pairValue",
 ];

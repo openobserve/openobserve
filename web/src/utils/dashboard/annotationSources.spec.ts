@@ -218,6 +218,17 @@ describe("buildAnnotationFiltersSql", () => {
     ]);
     expect(buildAnnotationFiltersSql(tree)).toBe(`event = 'deploy' AND x IS NULL`);
   });
+
+  it("runs regex conditions through regexp_like with the raw pattern the backend validates", () => {
+    expect(buildAnnotationFiltersSql(group("AND", [leaf("msg", "re_match", "\\bdeploy\\b")]))).toBe(
+      `regexp_like(msg, '\\bdeploy\\b')`,
+    );
+    expect(buildAnnotationFiltersSql(group("AND", [leaf("msg", "re_not_match", "it's")]))).toBe(
+      `NOT regexp_like(msg, 'it''s')`,
+    );
+    const folded = { ...leaf("msg", "re_match", "prod"), case_insensitive: true };
+    expect(buildAnnotationFiltersSql(group("AND", [folded]))).toBe(`regexp_like(msg, '(?i)prod')`);
+  });
 });
 
 describe("isBlankAnnotationCondition / annotationFiltersHaveBlankCondition", () => {

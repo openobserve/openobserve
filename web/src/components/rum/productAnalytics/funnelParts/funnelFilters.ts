@@ -215,8 +215,10 @@ export function valuesLoader(
   return (field, search) => {
     const now = state();
     const done = now.field === field && (now.status === "ok" || now.status === "error");
-    request(field);
-    if (done) return Promise.resolve(valuesOf(now, search));
+    if (done) {
+      request(field);
+      return Promise.resolve(valuesOf(now, search));
+    }
     // The rows come a render later; idle for this field means the owner had nothing to run.
     return new Promise((resolve) => {
       const finish = (rows: string[]) => {
@@ -225,9 +227,11 @@ export function valuesLoader(
         resolve(rows);
       };
       const timer = setTimeout(() => finish([]), VALUES_WAIT_MS);
+      // Watched before the request, which may settle the state synchronously.
       const stop = watch(state, (next) => {
         if (next.field === field && next.status !== "loading") finish(valuesOf(next, search));
       });
+      request(field);
     });
   };
 }

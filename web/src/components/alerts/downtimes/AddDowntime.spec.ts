@@ -346,6 +346,56 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
+  it("states a star rule once after a refused save", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        id: "d1",
+        org: "default",
+        folder_id: "default",
+        name: "Stars",
+        targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+        condition: {
+          type: "group",
+          op: "and",
+          items: [{ type: "pair", key: "host", operator: "=", value: "*" }],
+        },
+        schedule: {
+          repeat: "none",
+          starts_at: (Date.now() + 3_600_000) * 1000,
+          ends_at: (Date.now() + 7_200_000) * 1000,
+          timezone: "UTC",
+          duration_secs: 3600,
+          weekdays: [],
+        },
+        show_banner: true,
+        version: 1,
+        status: "scheduled",
+        affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+      },
+    } as any);
+    vi.mocked(downtimes.update).mockReset();
+    const router = makeRouter();
+    await router.push({
+      name: "editDowntime",
+      params: { id: "d1" },
+      query: { org_identifier: "default", folder: "default" },
+    });
+    await router.isReady();
+    const wrapper = mount(AddDowntime, {
+      global: { plugins: [store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await save(wrapper);
+    expect(downtimes.update).not.toHaveBeenCalled();
+    // The chip's own copy is for screen readers; the visible alerts are what a user reads.
+    const shown = wrapper
+      .findAll('[data-test="downtime-condition"] [role="alert"]')
+      .filter((alert) => alert.text().includes("A value cannot be a lone *."));
+    expect(shown).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it("saves nothing on two Enters in the name field", async () => {
     const { wrapper } = await mountPage();
     await seeSchedule(wrapper);

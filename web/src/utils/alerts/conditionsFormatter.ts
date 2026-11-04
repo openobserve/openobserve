@@ -171,7 +171,9 @@ function extendedSql(
     );
   }
   const pattern = ignoreCase ? `(?i)${text}` : text;
-  return `${op}(${column}, '${escapeSingleQuotes(pattern)}')`;
+  // regexp_like, not the re_match UDF, which strips escapes like `\b` the backend keeps.
+  const negation = op === "re_match" ? "" : "NOT ";
+  return `${negation}regexp_like(${column}, '${escapeSingleQuotes(pattern)}')`;
 }
 
 /** Case-folded SQL for `case_insensitive` on the original operators; mirrors build_case_insensitive_expr. */
@@ -366,7 +368,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
       const parts: string[] = [];
 
       // Iterate through all conditions in this group
-      node.conditions.forEach((item: any, index: number) => {
+      node.conditions.forEach((item: any) => {
         let conditionStr = "";
 
         // Case 1a: Nested group - recursively process
@@ -387,9 +389,9 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           conditionStr = formatLeaf(item, outputColumn(item.column), leafOptions);
         }
 
-        // Step 3: Add logical operator prefix (except for first item at index 0)
+        // Step 3: the first part written takes no connector, since an earlier item may write nothing
         if (conditionStr) {
-          if (index > 0 && item.logicalOperator) {
+          if (parts.length > 0 && item.logicalOperator) {
             // Format operator based on mode (uppercase for SQL, lowercase for display)
             const operator = sqlMode
               ? item.logicalOperator.toUpperCase()
@@ -397,7 +399,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
             // Add operator BEFORE the condition
             parts.push(`${operator} ${conditionStr}`);
           } else {
-            // First item (index 0) has no operator prefix
+            // The first part written has no operator prefix
             parts.push(conditionStr);
           }
         }

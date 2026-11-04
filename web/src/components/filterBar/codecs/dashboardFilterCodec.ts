@@ -99,11 +99,14 @@ export const hasVariable = (value: string) => value.includes("$") || value.inclu
 
 const LIST_ITEM = /\s*(?:'([^']*)'|"([^"]*)"|([^,()]+))/y;
 
-/** An IN list typed as text (`a, b`, `('a','b')`); a `$variable` stays one value. */
-export const splitListText = (value: unknown): string[] => {
-  const text = typeof value === "string" ? value : value == null ? "" : String(value);
-  if (!text.trim()) return [];
-  if (hasVariable(text)) return [text];
+// The panel SQL builder pastes an IN text holding a `$variable` in verbatim, so its literals are SQL-quoted.
+const SQL_LIST_ITEM = /\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^,()]+))/y;
+
+// A whole value that the variable substitution replaces; anything else holding `$` is a literal.
+const PLACEHOLDER =
+  /^(\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+)$/;
+
+const splitWith = (text: string, pattern: RegExp, unescape: (quoted: string) => string) => {
   const values: string[] = [];
   let index = 0;
   while (index < text.length) {
@@ -111,14 +114,30 @@ export const splitListText = (value: unknown): string[] => {
       index++;
       continue;
     }
-    LIST_ITEM.lastIndex = index;
-    const match = LIST_ITEM.exec(text);
+    pattern.lastIndex = index;
+    const match = pattern.exec(text);
     if (!match) break;
-    const item = (match[1] ?? match[2] ?? match[3]).trim();
+    const item = match[1] !== undefined ? unescape(match[1]) : (match[2] ?? match[3]).trim();
     if (item) values.push(item);
-    index = LIST_ITEM.lastIndex;
+    index = pattern.lastIndex;
   }
   return values;
+};
+
+const unescapeSql = (quoted: string) => quoted.replace(/''/g, "'");
+
+/** An IN list typed as text (`a, b`, `('a','b')`); with a `$variable` in it, the SQL-quoted form `'a',$env`. */
+export const splitListText = (value: unknown): string[] => {
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  if (!text.trim()) return [];
+  if (hasVariable(text)) return splitWith(text, SQL_LIST_ITEM, unescapeSql);
+  return splitWith(text, LIST_ITEM, (quoted) => quoted.trim());
+};
+
+/** An IN list's SQL-quoted text, `''`-escaped; the anomaly SQL builder inserts it verbatim. */
+export const splitSqlListText = (value: unknown): string[] => {
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  return text.trim() ? splitWith(text, SQL_LIST_ITEM, unescapeSql) : [];
 };
 
 /** The inverse of `splitListText`, in the comma-only form the dashboard SQL builder's own splitter reads. */
@@ -130,6 +149,22 @@ export const joinListText = (values: string[]): string => {
       return value.includes("'") ? `"${value}"` : `'${value}'`;
     })
     .join(",");
+};
+
+// A typed `($env)` is the same variable; the SQL builder drops the parentheses of a lone one.
+const placeholderOf = (value: string): string | null => {
+  const inner = value
+    .trim()
+    .replace(/^\((.*)\)$/, "$1")
+    .trim();
+  return PLACEHOLDER.test(inner) ? inner : null;
+};
+
+/** A panel IN leaf's text: as `joinListText`, but with a `$variable` every other value is SQL-quoted. */
+export const joinPanelListText = (values: string[]): string => {
+  if (!values.some(hasVariable)) return joinListText(values);
+  if (values.length === 1 && placeholderOf(values[0])) return values[0];
+  return values.map((value) => placeholderOf(value) ?? `'${value.replace(/'/g, "''")}'`).join(",");
 };
 
 function parseLeaf(item: Record<string, unknown>): FilterNode {
@@ -221,9 +256,16 @@ function serializeLeaf(node: FilterCondition, context: CodecContext): DashboardF
       : (DASHBOARD_SPELLINGS[node.operator] ?? node.operator);
   const arity = OPERATORS[node.operator].arity;
   if (arity === "none") out.value = "";
-  else if (arity === "many") out.value = joinListText(node.values);
+  else if (arity === "many") out.value = joinPanelListText(node.values);
   else out.value = node.values[0] ?? "";
   return out;
+}
+
+// A locked leaf keeps its saved payload; only its AND/OR can change.
+function serializeRaw(item: FilterNode): DashboardFilterCondition {
+  const saved = rawOf<DashboardFilterCondition>(item)!;
+  if (isPristine(item) || !isPlainObject(saved)) return saved;
+  return { ...saved, logicalOperator: item.connector };
 }
 
 function serializeGroup(group: FilterGroup, context: CodecContext): DashboardFilterGroup {
@@ -232,7 +274,7 @@ function serializeGroup(group: FilterGroup, context: CodecContext): DashboardFil
   const conditions = group.items.map((item) => {
     if (item.kind === "group") return serializeGroup(item, context);
     if (item.kind === "condition") return serializeLeaf(item, context);
-    return rawOf<DashboardFilterCondition>(item)!;
+    return serializeRaw(item);
   });
   if (raw) return { ...raw, logicalOperator: group.connector, conditions };
   return { conditions, filterType: "group", logicalOperator: group.connector };

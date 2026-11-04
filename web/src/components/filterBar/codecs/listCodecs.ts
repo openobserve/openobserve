@@ -25,6 +25,7 @@ import {
   hasVariable,
   joinListText,
   splitListText,
+  splitSqlListText,
 } from "./dashboardFilterCodec";
 import { flatCodec, labelGroupsCodec, type FlatCondition, type GroupedItem } from "./flatCodec";
 import { operatorFromWire, valueStrings } from "./types";
@@ -34,12 +35,17 @@ const firstValue = (condition: FlatCondition) => condition.values[0] ?? "";
 const arityOf = (operator: FilterOperatorId) => OPERATORS[operator].arity;
 
 /** Reads a dashboard-spelled `{field, operator, value}` row; IN lists are typed as text. */
-const readDashboardRow = (field: unknown, operator: unknown, value: unknown) => {
+const readDashboardRow = (
+  field: unknown,
+  operator: unknown,
+  value: unknown,
+  splitList: (text: unknown) => string[] = splitListText,
+) => {
   const id = operatorFromWire(operator ?? "=");
   if (!id) return null;
   const arity = arityOf(id);
   let values: string[] = [];
-  if (arity === "many") values = splitListText(value);
+  if (arity === "many") values = splitList(value);
   else if (arity === "one") values = valueStrings(value).filter((v) => v !== "");
   return { field: String(field ?? ""), operator: id, values };
 };
@@ -85,7 +91,7 @@ export interface AnomalyFilter {
 /** Anomaly config's flat filter rows; IN takes a quoted SQL list, as `buildAnomalyFilterExpression` inserts it verbatim. */
 export const anomalyFlatCodec = () =>
   flatCodec<AnomalyFilter>({
-    read: (item) => readDashboardRow(item.field, item.operator, item.value),
+    read: (item) => readDashboardRow(item.field, item.operator, item.value, splitSqlListText),
     label: (item) => [item.field, item.operator, item.value].filter(Boolean).join(" "),
     write: (condition, saved, same) => {
       const arity = arityOf(condition.operator);

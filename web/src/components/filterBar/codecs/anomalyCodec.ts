@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { FilterGroup } from "@/utils/query/filterBar";
+import type { FilterGroup, FilterNode } from "@/utils/query/filterBar";
 import { engineCodec, type EngineGroup } from "./engineCodec";
 import { anomalyFlatCodec, type AnomalyFilter } from "./listCodecs";
 import { isPlainObject, isTreePristine, rawOf, type FilterCodec } from "./types";
@@ -24,6 +24,16 @@ const isFlatAnd = (tree: FilterGroup): boolean =>
   tree.items.every(
     (item, index) => item.kind !== "group" && (index === 0 || item.connector === "AND"),
   );
+
+// A leaf loaded from the V2 group holds an engine payload, so the flat rows are written fresh from the chips.
+const withoutStamps = (tree: FilterGroup): FilterGroup => ({
+  ...tree,
+  items: tree.items.map((item): FilterNode => {
+    if (item.kind !== "condition") return item;
+    const { meta: _meta, ...rest } = item;
+    return rest;
+  }),
+});
 
 /** Anomaly filters: the flat row list, or a V2 group once the tree needs OR or nesting. */
 export function anomalyCodec(): FilterCodec<AnomalyFilters> {
@@ -36,9 +46,11 @@ export function anomalyCodec(): FilterCodec<AnomalyFilters> {
         : flat.parse(Array.isArray(saved) ? saved : null, context),
     serialize: (tree, context) => {
       if (isTreePristine(tree)) return rawOf<AnomalyFilters>(tree) ?? [];
-      return isFlatAnd(tree)
-        ? flat.serialize(tree, context)
-        : (grouped.serialize(tree, context) as AnomalyFilters);
+      const fromGroup = isPlainObject(rawOf(tree));
+      // A locked engine leaf has no flat row, so a tree holding one stays a group.
+      const flatFits = isFlatAnd(tree) && !(fromGroup && tree.items.some((i) => i.kind === "raw"));
+      if (!flatFits) return grouped.serialize(tree, context) as AnomalyFilters;
+      return flat.serialize(fromGroup ? withoutStamps(tree) : tree, context);
     },
   };
 }

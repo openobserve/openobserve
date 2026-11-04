@@ -44,6 +44,7 @@ import {
   modelPricingCodec,
   profilesCodec,
   promqlLabelsCodec,
+  restoreScalar,
   rumExclusionCodec,
   rumFunnelCodec,
   sqlCodec,
@@ -166,8 +167,7 @@ const SQL_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
 
 const PROMQL_OPERATORS = forAll(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
 
-// Alerts offer every operator on every column today, so a type never takes one away.
-const ENGINE_OPERATORS = forAll([
+const ENGINE_LIST: FilterOperatorId[] = [
   "eq",
   "neq",
   "gt",
@@ -187,7 +187,24 @@ const ENGINE_OPERATORS = forAll([
   "is_not_null",
   "is_empty",
   "is_not_empty",
+];
+
+// The backend builds these only on a text column; the operators alerts had before them stay on every column.
+const ENGINE_TEXT_ONLY = new Set<FilterOperatorId>([
+  "contains_ci",
+  "starts_with",
+  "ends_with",
+  "regex",
+  "not_regex",
 ]);
+
+const ENGINE_NON_TEXT = ENGINE_LIST.filter((id) => !ENGINE_TEXT_ONLY.has(id));
+
+const ENGINE_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
+  string: ENGINE_LIST,
+  number: ENGINE_NON_TEXT,
+  boolean: ENGINE_NON_TEXT,
+};
 
 const DASHBOARD_LIST: FilterOperatorId[] = [
   "eq",
@@ -368,6 +385,13 @@ const rumIssues =
       return [{ nodeId: node.id, message }];
     });
 
+// Rust-only syntax JS cannot compile: inline flag groups and the `(?P<name>` spelling of a named group.
+const jsCompilable = (pattern: string) =>
+  pattern
+    .replace(/\(\?[imsxuUR-]+\)/g, "")
+    .replace(/\(\?[imsxuUR-]+:/g, "(?:")
+    .replace(/\(\?P</g, "(?<");
+
 // The profiles API compiles regex with Rust's engine; JS catches the common mistakes before the round trip.
 const profilesIssues = (tree: FilterGroup, { t }: FilterValidationContext): FilterIssue[] =>
   leafConditions(tree).flatMap((node): FilterIssue[] => {
@@ -381,7 +405,7 @@ const profilesIssues = (tree: FilterGroup, { t }: FilterValidationContext): Filt
         },
       ];
     try {
-      new RegExp(pattern);
+      new RegExp(jsCompilable(pattern));
       return [];
     } catch {
       return [{ nodeId: node.id, message: t("filterBar.validation.regexInvalid") }];
@@ -392,10 +416,20 @@ const modelPricingIssues = (
   tree: FilterGroup,
   { t, saved }: FilterValidationContext<ModelPricingFilter>,
 ): FilterIssue[] => {
-  const equality = leafConditions(tree).filter((node) =>
-    TIER_CONDITION_ONLY.includes(node.operator),
-  );
-  const issues: FilterIssue[] = equality.slice(1).map((node) => ({
+  const kept = saved?.condition;
+  let held = false;
+  // A rule has no = / !=, so an equality line the codec did not write as the tier's one condition cannot be saved.
+  const lost = leafConditions(tree).filter((node) => {
+    if (!TIER_CONDITION_ONLY.includes(node.operator)) return false;
+    const isKept =
+      !held &&
+      kept?.usage_key === node.field &&
+      kept?.operator === node.operator &&
+      String(restoreScalar(node.values[0] ?? "", true)) === String(kept?.value ?? "");
+    held ||= isKept;
+    return !isKept;
+  });
+  const issues: FilterIssue[] = lost.map((node) => ({
     nodeId: node.id,
     message: t("filterBar.validation.oneUsageCondition"),
   }));

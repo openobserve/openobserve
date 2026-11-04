@@ -46,7 +46,9 @@ import {
   type FilterCodec,
 } from "./index";
 import { pruneIncomplete } from "../filterValidation";
+import { FILTER_PROFILES } from "../filterProfiles";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 const context: CodecContext = {
   fields: [
@@ -928,5 +930,237 @@ describe("sql codec", () => {
     expectRoundTrip(codec, "count(*) > 1");
     const more = appendNode(tree, makeCondition("level", "eq", ["a"]));
     expect(codec.serialize(more, context)).toBe("(count(*) > 1) AND level = 'a'");
+  });
+});
+
+describe("dashboard filter codec, an IN list with a $variable", () => {
+  const codec = dashboardFilterCodec();
+  const panel = {
+    data: { queries: [{ fields: { stream: "s" }, joins: [] }] },
+    layout: { currentQueryIndex: 0 },
+    meta: {
+      streamFields: {
+        groupedFields: [{ stream_alias: null, schema: [{ name: "env", type: "Utf8" }] }],
+      },
+    },
+  };
+  const written = (values: string[]) => {
+    const tree = appendNode(codec.parse(null, context), makeCondition("env", "in", values));
+    return (codec.serialize(tree, context) as any).conditions[0];
+  };
+
+  it("quotes every literal next to a variable, so the panel SQL stays valid", () => {
+    const leaf = written(["prod", "$env"]);
+    expect(leaf).toMatchObject({ type: "condition", operator: "IN", value: "'prod',$env" });
+    expect(buildCondition(leaf, panel)).toBe("env IN ('prod',$env)");
+    expect(
+      leaves(codec.parse({ ...leaf, filterType: "group", conditions: [leaf] } as never, context))[0]
+        .values,
+    ).toEqual(["prod", "$env"]);
+  });
+
+  it("quotes a literal that only holds a $, alone or in a list", () => {
+    expect(buildCondition(written(["a", "$5.00"]), panel)).toBe("env IN ('a','$5.00')");
+    expect(buildCondition(written(["$5.00"]), panel)).toBe("env IN ('$5.00')");
+  });
+
+  it("reads back what it writes, quotes and every variable spelling included", () => {
+    const values = ["O'Brien", "${env}", "{{ region }}", "a,b"];
+    const leaf = written(values);
+    expect(leaf.value).toBe("'O''Brien',${env},{{ region }},'a,b'");
+    const group = { filterType: "group", logicalOperator: "AND", conditions: [leaf] };
+    expect(leaves(codec.parse(group as never, context))[0].values).toEqual(values);
+  });
+
+  it("keeps a lone variable as typed, and plain lists in the comma form", () => {
+    expect(written(["$env"]).value).toBe("$env");
+    expect(written(["($env)"]).value).toBe("($env)");
+    expect(written(["a", "($env)"]).value).toBe("'a',$env");
+    expect(written(["a", "b c"])).toMatchObject({ type: "list", values: ["a", "b c"] });
+  });
+
+  it("still splits an IN text with no variable as the SQL builder does", () => {
+    const leaf = {
+      type: "condition",
+      column: { field: "env" },
+      filterType: "condition",
+      operator: "IN",
+      value: "('prod','dev'), qa",
+      logicalOperator: "AND",
+      values: [],
+    };
+    const group = { filterType: "group", logicalOperator: "AND", conditions: [leaf] };
+    expectRoundTrip(codec, group as never);
+    expect(leaves(codec.parse(clone(group) as never, context))[0].values).toEqual([
+      "prod",
+      "dev",
+      "qa",
+    ]);
+  });
+});
+
+describe("dashboard filter codec, a locked chip", () => {
+  const codec = dashboardFilterCodec();
+  const locked = {
+    type: "condition",
+    column: { field: "msg" },
+    filterType: "condition",
+    operator: "future_op",
+    value: "x",
+    logicalOperator: "AND",
+    values: [],
+  };
+  const saved = {
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [{ ...locked, column: { field: "level" }, operator: "=", value: "a" }, locked],
+  };
+
+  it("saves a changed AND/OR and nothing else of it", () => {
+    expectRoundTrip(codec, saved as never);
+    const tree = codec.parse(clone(saved) as never, context);
+    expect(tree.items[1].kind).toBe("raw");
+    const out = codec.serialize(toggleConnector(tree, tree.items[1].id), context) as any;
+    expect(out.conditions[1]).toEqual({ ...locked, logicalOperator: "OR" });
+  });
+});
+
+describe("anomaly codec, IN values and the V2 group", () => {
+  const codec = anomalyCodec();
+
+  it("reads a doubled quote inside an IN value as one value", () => {
+    const saved = [{ field: "name", operator: "IN", value: "'O''Brien', 'x'" }];
+    expectRoundTrip(codec, saved);
+    const tree = codec.parse(clone(saved), context);
+    expect(leaves(tree)[0].values).toEqual(["O'Brien", "x"]);
+    const out = codec.serialize(edit(tree, 0, { values: ["O'Brien", "x", "y"] }), context) as any[];
+    expect(out[0].value).toBe("'O''Brien', 'x', 'y'");
+  });
+
+  it("still reads the plain, double-quoted and bare IN values the old form saved", () => {
+    const saved = [{ field: "s", operator: "NOT IN", value: "('a', \"b\", c)" }];
+    expectRoundTrip(codec, saved);
+    expect(leaves(codec.parse(clone(saved), context))[0].values).toEqual(["a", "b", "c"]);
+  });
+
+  const grouped = {
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [
+      {
+        filterType: "condition",
+        column: "level",
+        operator: "=",
+        value: "error",
+        logicalOperator: "AND",
+      },
+      {
+        filterType: "condition",
+        column: "status",
+        operator: "in",
+        value: [500],
+        logicalOperator: "OR",
+      },
+    ],
+  };
+
+  it("writes the flat rows, field included, when a group is edited down to AND", () => {
+    const tree = codec.parse(clone(grouped) as never, context);
+    const out = codec.serialize(toggleConnector(tree, tree.items[1].id), context);
+    expect(out).toEqual([
+      { field: "level", operator: "=", value: "error" },
+      { field: "status", operator: "IN", value: "'500'" },
+    ]);
+  });
+
+  it("stays a group when a locked leaf of it has no flat row", () => {
+    const withLocked = {
+      ...grouped,
+      conditions: [
+        grouped.conditions[0],
+        { ...grouped.conditions[1], operator: "future_op", logicalOperator: "AND" },
+        { ...grouped.conditions[0], column: "host", logicalOperator: "OR" },
+      ],
+    };
+    const tree = codec.parse(clone(withLocked) as never, context);
+    const out = codec.serialize(toggleConnector(tree, tree.items[2].id), context) as any;
+    expect(out.filterType).toBe("group");
+    expect(out.conditions[1]).toEqual(withLocked.conditions[1]);
+  });
+});
+
+describe("engine profiles' operators by column type", () => {
+  const TEXT_ONLY = ["contains_ci", "starts_with", "ends_with", "regex", "not_regex"];
+  const OLD = ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "not_contains"];
+  const UNARY = ["is_null", "is_not_null", "is_empty", "is_not_empty"];
+
+  it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as const)(
+    "%s offers the text operators on text columns only",
+    (name) => {
+      const { operators } = FILTER_PROFILES[name];
+      expect(operators.string).toEqual(expect.arrayContaining([...OLD, ...TEXT_ONLY, ...UNARY]));
+      for (const type of ["number", "boolean"] as const) {
+        expect(operators[type]).toEqual([...OLD, "in", "not_in", ...UNARY]);
+      }
+    },
+  );
+});
+
+describe("profiles regex validation", () => {
+  const { validate } = FILTER_PROFILES.profiles;
+  const t = ((key: string) => key) as never;
+  const issuesFor = (value: string) => {
+    const saved = [{ key: "service", op: "=~", value }];
+    const tree = profilesCodec().parse(saved, context);
+    return validate!(tree, { t, saved }).map((issue) => issue.message);
+  };
+
+  it("accepts the Rust syntax JS does not compile", () => {
+    expect(issuesFor("(?i)prod")).toEqual([]);
+    expect(issuesFor("(?P<name>api)-\\d+")).toEqual([]);
+    expect(issuesFor("a(?i:B)c(?-s)")).toEqual([]);
+  });
+
+  it("still refuses a pattern no engine compiles", () => {
+    expect(issuesFor("(api")).toEqual(["filterBar.validation.regexInvalid"]);
+    expect(issuesFor("[a-")).toEqual(["filterBar.validation.regexInvalid"]);
+  });
+});
+
+describe("model pricing validation", () => {
+  const codec = modelPricingCodec();
+  const { validate } = FILTER_PROFILES["model-pricing"];
+  const t = ((key: string) => key) as never;
+  const usage: CodecContext = {
+    fields: [{ name: "input", type: "number", payload: TIER_USAGE_PAYLOAD }],
+  };
+  const issuesFor = (tree: FilterGroup) =>
+    validate!(tree, { t, saved: codec.serialize(tree, usage) }).map((issue) => issue.nodeId);
+
+  it("flags a new = line while the tier's condition slot is taken, since a rule cannot hold it", () => {
+    const tree = codec.parse(
+      { condition: { usage_key: "input", operator: "gt", value: 10 }, rules: [] },
+      usage,
+    );
+    const added = makeCondition("input", "eq", ["5"]);
+    const next = appendNode(tree, added);
+    expect(codec.serialize(next, usage).rules).toEqual([{ keys: ["usage.input"], op: "eq" }]);
+    expect(issuesFor(next)).toEqual([added.id]);
+  });
+
+  it("lets one = line take a free slot and flags a second one", () => {
+    const first = makeCondition("input", "eq", ["5"]);
+    const second = makeCondition("input", "neq", ["6"]);
+    const tree = codec.parse({ condition: null, rules: [] }, usage);
+    expect(issuesFor(appendNode(tree, first))).toEqual([]);
+    expect(issuesFor(appendNode(appendNode(tree, first), second))).toEqual([second.id]);
+  });
+
+  it("does not flag a saved = condition loaded as it was", () => {
+    const tree = codec.parse(
+      { condition: { usage_key: "input", operator: "eq", value: "5" }, rules: [] },
+      usage,
+    );
+    expect(issuesFor(tree)).toEqual([]);
   });
 });
