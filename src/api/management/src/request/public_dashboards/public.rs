@@ -1108,6 +1108,11 @@ mod tests {
 
     #[tokio::test]
     async fn a_read_of_a_removed_range_answers_404_and_evicts_its_file() {
+        // the closed-gate test below shares the search gate, and the range check runs after it
+        #[cfg(feature = "enterprise")]
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
         let slug = "Rm8Zt2mR7aB3cD4eF5gH6Q";
         let live = Model {
             id: config::ider::uuid(),
