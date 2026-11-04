@@ -18,14 +18,12 @@
 use std::collections::HashMap;
 
 use arrow_schema::{DataType, Field, Schema};
+pub use config::meta::alerts::alert_calibration::DIGEST_STREAM;
 use config::{get_config, meta::stream::StreamType, utils::time::now_micros};
 use proto::cluster_rpc;
 use serde_json::Value;
 
 use crate::traces::service_graph::v4::writer::{ReplyClass, chunk, classify, max_request_bytes};
-
-/// The `_o2_` prefix is load-bearing: `is_internal_rollup_stream` guards user ingest by it.
-pub const DIGEST_STREAM: &str = "_o2_alert_calibration_digests";
 
 /// The columns a run read tells a marker by; a read planned without them sees a skip as a run.
 const CLASSIFYING_COLUMNS: [&str; 2] = ["kind", "rule_id"];

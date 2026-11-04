@@ -990,9 +990,8 @@ async fn prepare_alert(
         .validate_threshold_operator()
         .and_then(|_| alert.query_condition.validate_threshold_operators())
         .map_err(AlertError::InvalidCondition)?;
-    // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
-    // Case-insensitive, so no spelling of the chat stream slips through.
-    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+    // A realtime alert sees every ingested row; lowercased, so no spelling slips through.
+    if config::meta::self_reporting::protected_streams::is_read_protected_stream(
         &alert.stream_name.trim().to_lowercase(),
     ) {
         return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
@@ -1267,6 +1266,13 @@ async fn prepare_alert(
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
             };
+
+            // The check on the alert's own stream misses a digest read through a join or subquery.
+            if config::meta::self_reporting::protected_streams::sql_reads_digest(sql) {
+                return Err(AlertError::ProtectedStream(
+                    config::meta::alerts::alert_calibration::DIGEST_STREAM.to_string(),
+                ));
+            }
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
@@ -6100,6 +6106,94 @@ mod tests {
             axum::response::Response::from(err).status(),
             axum::http::StatusCode::BAD_REQUEST
         );
+    }
+
+    #[tokio::test]
+    async fn no_alert_can_watch_the_calibration_digest_stream() {
+        let mut realtime = Alert::default();
+        realtime.name = "copy-findings".into();
+        realtime.is_real_time = true;
+        let err = prepare_alert(
+            "ops",
+            "_o2_alert_calibration_digests",
+            "",
+            &mut realtime,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_alert_calibration_digests")
+        );
+        let mut scheduled = Alert::default();
+        scheduled.name = "copy-findings-upper".into();
+        let err = prepare_alert(
+            "ops",
+            " _O2_ALERT_CALIBRATION_DIGESTS",
+            "",
+            &mut scheduled,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
+        assert_eq!(
+            axum::response::Response::from(err).status(),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scheduled_alert_on_another_stream_cannot_read_the_digest_in_its_sql() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_digest_sql";
+        let key = format!("{org_id}/{}/default", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "x",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let mut results = Vec::new();
+        for sql in [
+            r#"SELECT count(*) AS n FROM "_o2_alert_calibration_digests""#,
+            r#"SELECT count(*) AS n FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+            r#"SELECT count(*) AS n FROM "default""#,
+            r#"SELECT count(*) AS n FROM "default" WHERE x IN (SELECT id FROM "_o2_ai_chat_events")"#,
+        ] {
+            let mut alert = Alert::default();
+            alert.trigger_condition.frequency = 60;
+            alert.trigger_condition.period = 60;
+            alert.query_condition.query_type = QueryType::SQL;
+            alert.query_condition.sql = Some(sql.to_string());
+            let res = prepare_alert(
+                org_id,
+                "default",
+                "watch_digest_sql",
+                &mut alert,
+                true,
+                false,
+            )
+            .await;
+            results.push((sql, res));
+        }
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        for (sql, res) in &results[..2] {
+            assert!(
+                matches!(res, Err(AlertError::ProtectedStream(s)) if s == "_o2_alert_calibration_digests"),
+                "{sql}: {res:?}"
+            );
+        }
+        // The chat stream keeps its save-time behaviour: only the alert's own stream is checked.
+        for (sql, res) in &results[2..] {
+            assert!(res.is_ok(), "{sql}: {res:?}");
+        }
     }
 
     /// Calls the production predicate, not a copy of it: a resolve updates the record the firing

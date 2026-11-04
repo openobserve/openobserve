@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   │  20006 Data unavailable → Try wider range card                          │
   │  20007 Type mismatch    → Fix query card  + Ask AI                      │
   │  20008 Execute error    → Fix query card  + Ask AI                      │
+  │  20014 Protected stream → Open Alert Calibration card                   │
   │  10001 Server error     → (informational)                               │
   │  0 / other              → (informational) + Ask AI (if aiEnabled)       │
   └─────────────────────────────────────────────────────────────────────────┘
@@ -94,12 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Illustration + title + description + action cards -->
     <OEmptyState
-      :illustration="illustration ?? 'broken-panel'"
+      :illustration="illustration ?? codeIllustration ?? 'broken-panel'"
       size="block"
       :hide-action="true"
       class="w-full shrink-0"
     >
-      <template #title>{{ resolvedTitle }}</template>
+      <template #title>
+        <span
+          :class="tone === 'error' ? 'text-status-error-text' : undefined"
+          data-test="query-error-title"
+          >{{ resolvedTitle }}</span
+        >
+      </template>
       <template #description>{{ resolvedDescription }}</template>
       <template #actions>
         <!-- Caller can replace all action cards via #actions slot -->
@@ -152,6 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :sublabel="t('queryError.expandRangeDesc')"
             data-test="query-error-expand-range-card"
             @click="emit('widen-range')"
+          />
+          <EmptyStateActionCard
+            v-else-if="errorCode === 20014"
+            icon="open-in-new"
+            :label="t('queryError.openCalibration')"
+            :sublabel="t('queryError.openCalibrationDesc')"
+            data-test="query-error-open-calibration-card"
+            @click="openCalibration"
           />
         </slot>
       </template>
@@ -329,6 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -337,6 +353,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { useQueryError } from "@/composables/useQueryError";
+import { useOrgId } from "@/composables/query";
 import ErrorDetailPanel from "./ErrorDetailPanel.vue";
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -400,6 +417,8 @@ const {
   defaultTitle,
   defaultDescription,
   explanation,
+  illustration: codeIllustration,
+  tone,
   showDetail,
   copyErrorDetails,
 } = useQueryError({
@@ -424,6 +443,11 @@ const searchTextFull = computed(() => props.freeTextCandidate?.trim() ?? "");
 const showSearchText = computed(
   () => isQueryError.value && searchTextFull.value !== "" && !showRunSuggestion.value,
 );
+
+const router = useRouter();
+const orgId = useOrgId();
+const openCalibration = () =>
+  router.push({ name: "alertCalibrationRuns", query: { org_identifier: orgId.value } });
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

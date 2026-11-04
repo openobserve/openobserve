@@ -222,6 +222,17 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
   const runRow = (findings: number) =>
     scoped({ ...runColumns(0), finding_count: findings, kind: "run" });
 
+  it("no reader gets View in Logs", async () => {
+    for (const records of [[runRow(0)], [{ ...runColumns(0), kind: "run" }]]) {
+      const wrapper = await mountDetail(records);
+      expect(wrapper.find('[data-test="alert-calibration-digest-clean"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-calibration-digest-view-in-logs"]').exists()).toBe(
+        false,
+      );
+      wrapper.unmount();
+    }
+  });
+
   it("a scoped run hides View in Logs and the org count", async () => {
     const shown = SEARCH_SIZE - 1;
     const wrapper = await mountDetail([
@@ -249,7 +260,7 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
     nothing.unmount();
 
     const root = await mountDetail([{ ...runColumns(0), kind: "run" }]);
-    expect(root.find('[data-test="alert-calibration-digest-view-in-logs"]').exists()).toBe(true);
+    expect(root.find('[data-test="alert-calibration-digest-view-in-logs"]').exists()).toBe(false);
     expect(root.find('[data-test="alert-calibration-digest-clean"]').text()).toContain(
       "across 0 alerts in scope",
     );

@@ -23,6 +23,7 @@ use config::{
     get_config,
     meta::{
         search::SearchEventType,
+        self_reporting::protected_streams::{ProtectedReader, current_reader, refused_stream},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
@@ -102,7 +103,7 @@ impl Sql {
             req.stream_type,
             search_event_type,
             false,
-            req.chat_history_reader,
+            req.protected_reader,
         )
         .await
     }
@@ -129,7 +130,7 @@ impl Sql {
             stream_type,
             search_event_type,
             extract_patterns,
-            false,
+            None,
         )
         .await
     }
@@ -140,7 +141,7 @@ impl Sql {
         stream_type: StreamType,
         search_event_type: Option<SearchEventType>,
         extract_patterns: bool,
-        marked_chat_history_reader: bool,
+        marked_reader: Option<ProtectedReader>,
     ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
@@ -151,20 +152,16 @@ impl Sql {
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
-        // Every data query is resolved here, whoever issues it (UI, dashboards,
-        // alerts, reports, scheduled pipelines). The AI chat-events stream holds
-        // every user's conversations; only the Chat API reader may query it, and
-        // to anyone else it does not exist.
-        let chat_history_reader = marked_chat_history_reader
-            || config::meta::self_reporting::ai_chat::is_chat_history_reader();
-        if !chat_history_reader
-            && let Some(protected) = stream_names.iter().find(|s| {
-                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.stream_name())
-            })
-        {
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                protected.stream_name(),
-            )));
+        // Every data query resolves its streams here, so only a stream's own reader passes.
+        let names = stream_names
+            .iter()
+            .map(|s| s.stream_name())
+            .collect::<Vec<_>>();
+        if let Some(refusal) = protected_stream_refusal(
+            names.iter().map(String::as_str),
+            marked_reader.or_else(current_reader),
+        ) {
+            return Err(Error::ErrorCode(refusal));
         }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
@@ -404,6 +401,19 @@ impl std::fmt::Display for Sql {
     }
 }
 
+/// The refusal for the first of `names` that `reader` may not search, worded by its owner.
+pub fn protected_stream_refusal<'a>(
+    names: impl IntoIterator<Item = &'a str>,
+    reader: Option<ProtectedReader>,
+) -> Option<ErrorCodes> {
+    refused_stream(names, reader).map(|(name, owner)| match owner {
+        // To anyone but the Chat API, chat history does not exist.
+        ProtectedReader::ChatHistory => ErrorCodes::SearchStreamNotFound(name.to_string()),
+        // Listed in Streams for its retention, so "not found" would contradict the picker (P3b-D3).
+        ProtectedReader::AlertCalibration => ErrorCodes::SearchStreamProtected(name.to_string()),
+    })
+}
+
 // A follower interleaves its partitions, so only a plain scan can rely on the files' time order.
 fn can_use_time_order(is_complex: bool, order_by: &[(String, OrderBy)]) -> bool {
     !is_complex
@@ -502,6 +512,10 @@ fn parse_sampling_config(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::self_reporting::{
+        ai_chat::as_chat_history_reader, protected_streams::as_reader,
+    };
+
     use super::*;
 
     fn parse_one(sql: &str) -> Statement {
@@ -589,6 +603,94 @@ mod tests {
         if let Some(caps) = RE_SELECT_FROM.captures(sql) {
             assert_eq!(caps.get(1).map(|m| m.as_str()), Some("a, b"));
         }
+    }
+
+    const DIGEST_SQL: &str = r#"SELECT * FROM "_o2_alert_calibration_digests""#;
+    const CHAT_SQL: &str = r#"SELECT * FROM "_o2_ai_chat_events""#;
+
+    async fn resolve_sql(sql: &str) -> Result<Sql, Error> {
+        let query = SearchQuery {
+            sql: sql.to_string(),
+            ..Default::default()
+        };
+        Sql::new(&query, "ops", StreamType::Logs, None).await
+    }
+
+    fn refused_as(result: Result<Sql, Error>) -> ErrorCodes {
+        match result {
+            Err(Error::ErrorCode(code)) => code,
+            Err(other) => panic!("expected an error code, got {other:?}"),
+            Ok(sql) => panic!("expected a refusal, got {sql}"),
+        }
+    }
+
+    fn is_digest_refusal(code: &ErrorCodes) -> bool {
+        matches!(code, ErrorCodes::SearchStreamProtected(s) if s == "_o2_alert_calibration_digests")
+    }
+
+    #[tokio::test]
+    async fn the_digest_stream_is_refused_to_every_unmarked_query() {
+        let code = refused_as(resolve_sql(DIGEST_SQL).await);
+        assert!(is_digest_refusal(&code), "{code:?}");
+    }
+
+    #[tokio::test]
+    async fn a_digest_read_inside_a_subquery_join_cte_or_typed_name_is_refused() {
+        for sql in [
+            r#"SELECT * FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+            r#"SELECT * FROM "default" JOIN "_o2_alert_calibration_digests" ON "default".a = "_o2_alert_calibration_digests".a"#,
+            r#"WITH d AS (SELECT * FROM "_o2_alert_calibration_digests") SELECT * FROM d"#,
+            r#"SELECT * FROM "logs"."_o2_alert_calibration_digests""#,
+            r#"SELECT * FROM "0ops" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+            r#"SELECT * FROM "0ops" JOIN "_o2_alert_calibration_digests" ON "0ops".a = "_o2_alert_calibration_digests".a"#,
+        ] {
+            let code = refused_as(resolve_sql(sql).await);
+            assert!(is_digest_refusal(&code), "{sql}: {code:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_calibration_reader_passes_the_guard_in_scope_and_by_mark() {
+        let scoped = as_reader(ProtectedReader::AlertCalibration, resolve_sql(DIGEST_SQL)).await;
+        let code = refused_as(scoped);
+        assert!(
+            matches!(code, ErrorCodes::SearchStreamNotFound(_)),
+            "{code:?}"
+        );
+
+        let req = Request {
+            org_id: "ops".to_string(),
+            protected_reader: Some(ProtectedReader::AlertCalibration),
+            ..Default::default()
+        };
+        let query = SearchQuery {
+            sql: DIGEST_SQL.to_string(),
+            ..Default::default()
+        };
+        let code = refused_as(Sql::new_from_req(&req, &query).await);
+        assert!(
+            matches!(code, ErrorCodes::SearchStreamNotFound(_)),
+            "{code:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_chat_stream_is_still_not_found_to_everyone_else() {
+        let unmarked = refused_as(resolve_sql(CHAT_SQL).await);
+        let calibration =
+            refused_as(as_reader(ProtectedReader::AlertCalibration, resolve_sql(CHAT_SQL)).await);
+        for code in [unmarked, calibration] {
+            assert!(
+                matches!(code, ErrorCodes::SearchStreamNotFound(ref s) if s == "_o2_ai_chat_events"),
+                "{code:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_chat_reader_cannot_open_the_digest() {
+        let code = refused_as(as_chat_history_reader(resolve_sql(DIGEST_SQL)).await);
+        assert!(is_digest_refusal(&code), "{code:?}");
     }
 
     #[test]

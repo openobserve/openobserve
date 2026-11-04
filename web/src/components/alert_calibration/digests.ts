@@ -204,9 +204,6 @@ export interface LagRow {
 
 const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
 
-export const runRecordsSql = (windowStart: number, windowEnd: number) =>
-  `SELECT *\nFROM "${DIGEST_STREAM}"\nWHERE window_start = ${Math.trunc(windowStart)} AND window_end = ${Math.trunc(windowEnd)}\nORDER BY _timestamp DESC`;
-
 /** The range the timeline and the dashboard read; a run emitted before it is not listed. */
 export const lookbackRange = (nowMicros: number) => ({
   start_time: nowMicros - RUNS_LOOKBACK_DAYS * MICROS_PER_DAY,
