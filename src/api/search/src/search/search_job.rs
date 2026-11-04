@@ -489,6 +489,9 @@ pub async fn get_job_result(
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
             return res;
         }
+        if let Some(res) = check_license(&model) {
+            return res;
+        }
 
         if let Some(msg) = model.error_message {
             MetaHttpResponse::internal_error(format!("job_id: {job_id} error: {msg}",))
@@ -634,6 +637,9 @@ pub async fn retry_job(
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
             return res;
         }
+        if let Some(res) = check_license(&model) {
+            return res;
+        }
 
         if model.status != 2 && model.status != 3 {
             return MetaHttpResponse::forbidden(format!(
@@ -723,6 +729,32 @@ fn apply_pagination(response: SearchResponse, from: i64, size: i64) -> Response 
     let mut res = response;
     res.pagination(from, size);
     Json(res).into_response()
+}
+
+// The route's `type` query param is caller-controlled, so gate on the type the job was submitted
+// with.
+#[cfg(feature = "enterprise")]
+fn check_license(job: &JobModel) -> Option<Response> {
+    use config::meta::feature::Feature;
+    let feature = match StreamType::from(job.stream_type.as_str()) {
+        StreamType::EnrichmentTables => return None,
+        StreamType::Metrics => Feature::Metrics,
+        StreamType::Traces => Feature::Traces,
+        StreamType::Profiles => Feature::ContinuousProfiling,
+        _ => Feature::Logs,
+    };
+    if o2_enterprise::enterprise::license::check_features(&[feature]) {
+        return None;
+    }
+    let name: &str = feature.into();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(name.to_string());
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
 }
 
 // check permissions

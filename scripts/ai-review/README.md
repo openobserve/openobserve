@@ -36,7 +36,7 @@ so one pass's misses can be another's catches (backtesting on an earlier model s
 findings two catch). The variable `AI_REVIEW_COLD_PASSES` sets the count (default `2`, clamped to
 1–3; `src/passes.mjs`). The coordinator gets every pass's report labelled `<Reviewer>, pass N/M`
 and keeps a finding raised by any pass, merging duplicates; the fallback comment unions the passes
-and folds findings at the same file and nearby line when one title's words contain the other's (two P0/P1 blockers fold only on the same title). An area counts as
+and folds findings at the same file and nearby line when one title's words contain the other's (two P0/P1 findings fold only on the same title). An area counts as
 reviewed when any of its passes finished, and the comment notes a lost pass. Each pass is billed,
 so the review costs about M times one pass; reviewer spans carry `review.pass`.
 
@@ -91,7 +91,7 @@ changes). Each thread carries a hidden fingerprint of file and title, so a re-ru
 already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. The threads are
 off by default; set the variable `AI_REVIEW_INLINE` to `true` to turn them on.
 
-Findings are graded `p0` to `p3`. P0 and P1 are blockers and give the decision `blocked`; P2 and P3
+Findings are graded `p0` to `p3`. P0 (blocker) and P1 (major concern) both give the decision `blocked`; P2 and P3
 do not block, and only those give `approved_with_comments`; no findings gives `approved`. A review
 keeps at most 3 P2 and 2 P3 findings: the coordinator is told to drop the rest, and the runner
 enforces the cap itself only in the fallback comment it renders when the coordinator fails. Legacy
