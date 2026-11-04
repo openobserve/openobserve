@@ -19,7 +19,7 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::stream::{PartitionTimeLevel, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     utils::time::{HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
@@ -45,11 +45,11 @@ pub(super) enum JobScope {
 }
 
 impl JobScope {
-    /// A merged day holds one file set, so a downsample over it must not split by hour.
-    pub(super) fn groups_by_day(self, dynamic_day: bool) -> bool {
+    /// A merged day is one file set a downsample must not split, whatever the switch says now.
+    pub(super) fn groups_by_day(self, files: &[FileKey]) -> bool {
         match self {
             Self::DynamicDay => true,
-            Self::DownsampledDay => dynamic_day,
+            Self::DownsampledDay => merged_by_day(files),
             Self::Partition(_) => false,
         }
     }
@@ -451,7 +451,7 @@ async fn merged_day_job_offset(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::stream::FileMeta;
 
     use super::*;
 
@@ -525,13 +525,33 @@ mod tests {
         assert_eq!(scope, JobScope::DownsampledDay);
     }
 
-    /// A downsample splits by hour unless the day is dynamically merged.
+    /// A downsample splits by hour unless the day's files were merged by day.
     #[test]
-    fn test_groups_by_day_follows_the_dynamic_day() {
-        assert!(JobScope::DynamicDay.groups_by_day(true));
-        assert!(JobScope::DownsampledDay.groups_by_day(true));
-        assert!(!JobScope::DownsampledDay.groups_by_day(false));
-        assert!(!JobScope::Partition(PartitionTimeLevel::Hourly).groups_by_day(true));
+    fn test_groups_by_day_follows_the_files() {
+        let day = day_start();
+        let file = |hour: &str, max_ts: i64| {
+            FileKey::new(
+                0,
+                "default".to_string(),
+                format!("files/o/metrics/m/2026/08/18/{hour}/f.parquet"),
+                FileMeta {
+                    min_ts: day + 1,
+                    max_ts,
+                    records: 1,
+                    original_size: 1,
+                    compressed_size: 1,
+                    ..Default::default()
+                },
+                false,
+            )
+        };
+        let late = file("15", day + hour_micros(16) - 2);
+        let hourly = [file("00", day + hour_micros(1) - 2), late.clone()];
+        let merged = [file("00", day + hour_micros(24) - 2), late];
+        assert!(JobScope::DynamicDay.groups_by_day(&hourly));
+        assert!(!JobScope::DownsampledDay.groups_by_day(&hourly));
+        assert!(JobScope::DownsampledDay.groups_by_day(&merged));
+        assert!(!JobScope::Partition(PartitionTimeLevel::Hourly).groups_by_day(&merged));
     }
 
     #[test]
