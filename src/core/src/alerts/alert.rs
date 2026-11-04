@@ -3868,6 +3868,33 @@ async fn send_discord_with_attachment(
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
+/// A destination's non-2xx reply; `body` is `None` when the peer may not show it.
+#[derive(Debug)]
+pub(crate) struct DestinationStatusError {
+    pub(crate) status: reqwest::StatusCode,
+    body: Option<String>,
+}
+
+impl std::fmt::Display for DestinationStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.body {
+            Some(body) => write!(f, "sent error status: {}, err: {body}", self.status),
+            None => write!(f, "sent error status: {}", self.status),
+        }
+    }
+}
+
+impl std::error::Error for DestinationStatusError {}
+
+#[cfg(all(test, feature = "enterprise"))]
+pub(crate) fn send_outcome_for_test(
+    status: reqwest::StatusCode,
+    body: &str,
+    hide_body: bool,
+) -> Result<String, anyhow::Error> {
+    send_outcome(status, body, hide_body)
+}
+
 /// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
 fn send_outcome(
     status: reqwest::StatusCode,
@@ -3877,8 +3904,10 @@ fn send_outcome(
     match (status.is_success(), hide_body) {
         (true, false) => Ok(format!("sent status: {status}, body: {body}")),
         (true, true) => Ok(format!("sent status: {status}")),
-        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
-        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+        (false, hide_body) => Err(anyhow::Error::new(DestinationStatusError {
+            status,
+            body: (!hide_body).then(|| body.to_string()),
+        })),
     }
 }
 
@@ -5531,6 +5560,24 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn a_failed_send_keeps_its_text_and_hides_the_body_when_asked() {
+        let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+        let shown = send_outcome(status, "boom", false).unwrap_err();
+        assert_eq!(
+            shown.to_string(),
+            "sent error status: 500 Internal Server Error, err: boom"
+        );
+        let hidden = send_outcome(status, "boom", true).unwrap_err();
+        assert_eq!(
+            hidden.to_string(),
+            "sent error status: 500 Internal Server Error"
+        );
+        let typed = hidden.downcast_ref::<DestinationStatusError>().unwrap();
+        assert_eq!(typed.status, status);
+        assert!(typed.body.is_none());
+    }
 
     #[tokio::test]
     async fn a_multi_alert_with_recovery_saves() {
