@@ -177,14 +177,16 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         // Rows written before the column, or by an old node, have none.
         templates: m
             .templates
-            .and_then(|v| serde_json::from_value(v).ok())
+            .and_then(|v| serde_json::from_str(&v).ok())
             .unwrap_or_default(),
     })
 }
 
 /// The column value for an event's templates; null when there are none.
-pub(super) fn templates_json(event: &ResponseEvent) -> Option<serde_json::Value> {
-    (!event.templates.is_empty()).then(|| serde_json::json!(event.templates))
+pub(super) fn templates_json(event: &ResponseEvent) -> Option<String> {
+    (!event.templates.is_empty())
+        .then(|| serde_json::to_string(&event.templates).ok())
+        .flatten()
 }
 
 /// Opens a record for one firing.

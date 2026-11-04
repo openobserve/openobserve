@@ -551,10 +551,11 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
 pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
     match (ctx.event, ctx.level) {
         (NotificationEvent::Resolved, _) | (_, Some(AlertLevel::Ok)) => "🟢",
+        // Before Informational: a degraded synthetics check is a Warning sent as Informational.
+        (_, Some(AlertLevel::Warning | AlertLevel::NoData)) => "🟠",
         (NotificationEvent::Informational, _) => "🔵",
         // A maintenance window opening is a notice, not a failure.
         _ if ctx.kind == NotificationKind::Downtime => "🔵",
-        (_, Some(AlertLevel::Warning | AlertLevel::NoData)) => "🟠",
         _ => "🔴",
     }
 }
@@ -1135,6 +1136,29 @@ mod tests {
                 assert_eq!(substitute_raw_row(input, &row, &mut unknown), expected);
                 assert!(unknown.is_empty());
             }
+        }
+    }
+
+    #[test]
+    fn status_dot_colors_by_event_and_level() {
+        use NotificationEvent::{Firing, Informational, Resolved};
+        use NotificationKind::{Alert, Downtime, Synthetics};
+        for (kind, event, level, expected) in [
+            (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
+            (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
+            (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
+            (Alert, Informational, None, "🔵"),
+            (Downtime, Firing, None, "🔵"),
+            (Alert, Firing, Some(AlertLevel::Critical), "🔴"),
+            (Alert, Firing, None, "🔴"),
+        ] {
+            let ctx = NotificationContext {
+                kind,
+                event,
+                level,
+                ..Default::default()
+            };
+            assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
         }
     }
 }

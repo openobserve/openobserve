@@ -54,7 +54,7 @@ fn add_column_stmt() -> TableAlterStatement {
         .table(OncallResponseEvents::Table)
         .add_column(
             ColumnDef::new(OncallResponseEvents::Templates)
-                .json()
+                .text()
                 .null(),
         )
         .to_owned()
@@ -77,7 +77,7 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &add_column_stmt().to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "oncall_response_events" ADD COLUMN "templates" json NULL"#
+            r#"ALTER TABLE "oncall_response_events" ADD COLUMN "templates" text NULL"#
         );
     }
 
@@ -85,7 +85,7 @@ mod tests {
     fn sqlite() {
         collapsed_eq!(
             &add_column_stmt().to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "oncall_response_events" ADD COLUMN "templates" json_text NULL"#
+            r#"ALTER TABLE "oncall_response_events" ADD COLUMN "templates" text NULL"#
         );
     }
 }

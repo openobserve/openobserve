@@ -16,7 +16,6 @@
 import { keepPreviousData, mutationOptions, queryOptions } from "@tanstack/vue-query";
 import downtimes from "./downtimes";
 import destination from "./alert_destination";
-import template from "./alert_templates";
 import type {
   DowntimeDetail,
   DowntimeListItem,
@@ -38,15 +37,7 @@ import { sloKeys } from "./slos.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { dbmHttpError } from "@/utils/dbm/format";
-import {
-  DOWNTIME_TEMPLATE,
-  downtimeVariables,
-  isEmailDestination,
-  renderDowntimeTemplate,
-  templateNameFor,
-  testRequestFor,
-  type TestDestination,
-} from "@/utils/downtimes/notifyTest";
+import { DOWNTIME_TEMPLATE, type TestDestination } from "@/utils/downtimes/notifyTest";
 
 export interface DowntimeTestResult {
   destination: string;
@@ -249,42 +240,21 @@ export const moveDowntimesMutation = (org: string) =>
     meta: { invalidates: [downtimeKeys.all(org)], silentError: true },
   });
 
-const templateBody = async (org: string, name: string): Promise<string> =>
-  String(
-    (await template.get_by_name({ org_identifier: org, template_name: name })).data?.body ?? "",
-  );
-
-const serverTestSend = async (org: string, dest: TestDestination): Promise<DowntimeTestResult> => {
-  const res = (
-    await destination.testSend({
-      org_identifier: org,
-      destination_name: dest.name,
-      data: { template_name: DOWNTIME_TEMPLATE, kind: "downtime" },
-    })
-  ).data;
-  return {
-    destination: dest.name,
-    ok: !!res?.success,
-    error: res?.success ? undefined : res?.message,
-  };
-};
-
-const sendTestTo = async (
-  org: string,
-  dest: TestDestination,
-  variables: Record<string, string>,
-): Promise<DowntimeTestResult> => {
+// The server renders every template kind, so a Content spec is never posted as a raw body.
+const sendTestTo = async (org: string, dest: TestDestination): Promise<DowntimeTestResult> => {
   try {
-    const own = dest.template ? await templateBody(org, dest.template).catch(() => "") : "";
-    const name = templateNameFor(dest, own);
-    // o2_default is a content spec, so the server renders it with the downtime sample.
-    if (name === DOWNTIME_TEMPLATE) return await serverTestSend(org, dest);
-    const body = own;
-    const escape = isEmailDestination(dest) ? "html" : "json";
-    const request = testRequestFor(dest, renderDowntimeTemplate(body, variables, escape));
-    if (!request) return { destination: dest.name, ok: false, unsupported: true };
-    const res = (await destination.test({ org_identifier: org, data: request })).data;
-    return { destination: dest.name, ok: !!res?.success, error: res?.error ?? undefined };
+    const res = (
+      await destination.testSend({
+        org_identifier: org,
+        destination_name: dest.name,
+        data: { template_name: dest.template || DOWNTIME_TEMPLATE, kind: "downtime" },
+      })
+    ).data;
+    return {
+      destination: dest.name,
+      ok: !!res?.success,
+      error: res?.success ? undefined : res?.message,
+    };
   } catch (err: unknown) {
     return {
       destination: dest.name,
@@ -300,12 +270,7 @@ export const sendDowntimeTestMutation = (org: string) =>
       downtime: DowntimeDetail;
       destinations: TestDestination[];
       url: string;
-    }): Promise<DowntimeTestResult[]> => {
-      const d = vars.downtime;
-      const window = d.current_window ??
-        d.next_window ?? { start: d.schedule.starts_at, end: d.schedule.ends_at ?? 0 };
-      const variables = downtimeVariables(d, window, vars.url);
-      return Promise.all(vars.destinations.map((dest) => sendTestTo(org, dest, variables)));
-    },
+    }): Promise<DowntimeTestResult[]> =>
+      Promise.all(vars.destinations.map((dest) => sendTestTo(org, dest))),
     meta: { silentError: true },
   });

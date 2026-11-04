@@ -94,7 +94,9 @@ pub async fn deliver(row: &Downtime, due: &DueEvent) -> Result<bool, DowntimeErr
             e
         }
     };
-    let templates = (!templates.is_empty()).then(|| serde_json::json!(templates));
+    let templates = (!templates.is_empty())
+        .then(|| serde_json::to_string(&templates).ok())
+        .flatten();
     log_table::set_result(&record.id, &result, templates).await?;
     Ok(true)
 }
@@ -160,7 +162,7 @@ fn log_entry(row: DowntimeNotification) -> DowntimeNotificationLogEntry {
         destinations,
         templates: row
             .templates
-            .and_then(|v| serde_json::from_value(v).ok())
+            .and_then(|v| serde_json::from_str(&v).ok())
             .unwrap_or_default(),
     }
 }
@@ -616,9 +618,14 @@ mod tests {
             template_name: "o2_default_downtime".to_string(),
             template_source: "org_default".to_string(),
         }];
-        log_table::set_result_with(&db, &record.id, RESULT_OK, Some(serde_json::json!(sent)))
-            .await
-            .unwrap();
+        log_table::set_result_with(
+            &db,
+            &record.id,
+            RESULT_OK,
+            Some(serde_json::to_string(&sent).unwrap()),
+        )
+        .await
+        .unwrap();
 
         let rows = log_table::list_for_downtime_with(&db, "acme", &d.id, LOG_LIMIT)
             .await

@@ -530,6 +530,8 @@ fn apply_incident_to_context(
     ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
     ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
     ctx.episode_id = Some(incident_id.to_string());
+    // Level shows the incident severity; `ctx.level` stays the alert's enum for the dot.
+    ctx.alert_level = severity.to_string();
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -4612,6 +4614,7 @@ mod tests {
             stream_name: "go_gc_duration_seconds".into(),
             alert_status: "firing".into(),
             alert_url: "https://o2.example/short/alert".into(),
+            alert_level: "critical".into(),
             ..Default::default()
         };
         super::apply_incident_to_context(
@@ -4625,6 +4628,7 @@ mod tests {
         );
         assert_eq!(ctx.alert_url, incident_url);
         assert_eq!(ctx.incident_id, "inc-1");
+        assert_eq!(ctx.alert_level, "P2");
 
         let content = resolve_content(
             &compiled_default_content(),

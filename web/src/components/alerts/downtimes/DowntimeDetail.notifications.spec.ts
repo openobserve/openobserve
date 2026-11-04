@@ -7,7 +7,6 @@ import store from "@/test/unit/helpers/store";
 import DowntimeDetail from "./DowntimeDetail.vue";
 import downtimes, { type DowntimeDetail as Detail } from "@/services/downtimes";
 import destination from "@/services/alert_destination";
-import template from "@/services/alert_templates";
 import { queryClient } from "@/composables/query/queryClient";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 
@@ -151,11 +150,10 @@ describe("DowntimeDetail notifications tab", () => {
         { name: "slack-oncall", type: "http", url: "https://hooks.example.com", method: "post" },
       ],
     } as any);
-    vi.mocked(template.get_by_name).mockResolvedValue({
-      data: { body: '{"text": "{downtime_name}: {downtime_event}"}' },
-    } as any);
     vi.mocked(destination.test).mockReset();
     vi.mocked(destination.test).mockResolvedValue({ data: { success: true } } as any);
+    vi.mocked(destination.testSend).mockReset();
+    vi.mocked(destination.testSend).mockResolvedValue({ data: { success: true } } as any);
     store.state.selectedOrganization = {
       ...store.state.selectedOrganization,
       identifier: "default",
@@ -184,13 +182,33 @@ describe("DowntimeDetail notifications tab", () => {
   });
 
   it("sends o2_default through the server render with the downtime sample", async () => {
-    vi.mocked(destination.testSend).mockResolvedValue({ data: { success: true } } as any);
     const wrapper = await mountDetail();
     await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
     await flushPromises();
     expect(destination.testSend).toHaveBeenCalledTimes(1);
     const [{ data }] = vi.mocked(destination.testSend).mock.calls[0] as any;
     expect(data).toEqual({ template_name: "o2_default", kind: "downtime" });
+    expect(destination.test).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("sends a destination's own template by name through the server render", async () => {
+    vi.mocked(destination.list).mockResolvedValue({
+      data: [
+        {
+          name: "slack-oncall",
+          type: "http",
+          url: "https://hooks.example.com",
+          method: "post",
+          template: "play_downtime_card",
+        },
+      ],
+    } as any);
+    const wrapper = await mountDetail();
+    await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
+    await flushPromises();
+    const [{ data }] = vi.mocked(destination.testSend).mock.calls[0] as any;
+    expect(data).toEqual({ template_name: "play_downtime_card", kind: "downtime" });
     expect(destination.test).not.toHaveBeenCalled();
     wrapper.unmount();
   });

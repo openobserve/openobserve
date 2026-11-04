@@ -54,6 +54,18 @@ vi.mock("@/utils/templates/validation", () => ({
   getTemplateValidationErrorMessage: vi.fn().mockReturnValue(""),
 }));
 
+const draftOptions = vi.hoisted(() => ({ last: null as any }));
+vi.mock("@/composables/useEditorDraft", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useEditorDraft: (options: any) => {
+      draftOptions.last = options;
+      return actual.useEditorDraft(options);
+    },
+  };
+});
+
 // toast returns a `dismiss` function (used for the loading toast) — mock it so
 // no real toast renders and so we can assert the http JSON-validity toast.
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -1038,15 +1050,30 @@ describe("AddTemplate - applies to", () => {
     expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
   });
 
-  it("an existing template stored as all kinds starts in the inferred mode", async () => {
+  it("an existing template stored as all kinds starts in manual mode", async () => {
     const w = await mountComp({
       template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
     });
     expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
     expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
-      String(i18n.global.t("alert_templates.appliesToInferred")),
+      String(i18n.global.t("alert_templates.appliesToManual")),
     );
-    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(false);
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
+  });
+
+  it("an existing all-kinds template stays all kinds on save after the body gains {check_target}", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    await w
+      .findComponent({ name: "QueryEditor" })
+      .vm.$emit("update:query", '{"text":"{check_target} is down"}');
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await submit(w);
+
+    expect((templateService.update as any).mock.calls[0][0].data.applies_to).toEqual([]);
   });
 
   it("an existing template with a stored list starts in manual mode", async () => {
@@ -1080,6 +1107,42 @@ describe("AddTemplate - applies to", () => {
 
     expect(String(appliesTo(w).props("errorMessage"))).toContain("anomaly config");
     expect(w.emitted("cancel:hideform")).toBeUndefined();
+  });
+
+  it("drafts, restores and compares the Applies to list and mode", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    const opts = draftOptions.last;
+    expect(opts.base()).toMatchObject({ appliesTo: [], appliesToMode: "manual" });
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["incident", "anomaly"]);
+    const drafted = opts.snapshot();
+    expect(drafted).toMatchObject({ appliesTo: ["incident", "anomaly"], appliesToMode: "manual" });
+
+    await w.find('[data-test="add-template-applies-to-reset"]').trigger("click");
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToInferred")),
+    );
+
+    await opts.apply(drafted, { notKeptPaths: [] });
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident", "anomaly"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+
+    await opts.apply(
+      { ...drafted, appliesTo: [], appliesToMode: "inferred" },
+      { notKeptPaths: [] },
+    );
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToInferred")),
+    );
   });
 
   it("fills the variable guide groups from the preview response", async () => {

@@ -65,6 +65,24 @@ pub(crate) fn apply_custom_template_plain(
     let rows_tpl_val: &[Value] = &ctx.rows_tpl_val;
 
     let mut resp = tpl
+        // Newer tokens run first so a value inserted below is never re-scanned for them.
+        .replace("{notification_kind}", ctx.kind.as_str())
+        .replace("{notification_event}", ctx.event.as_str())
+        .replace("{notification_kind_label}", ctx.kind.label())
+        .replace(
+            "{notification_event_label}",
+            ctx.kind.event_label(ctx.event),
+        )
+        .replace("{status_dot}", super::resolve::status_dot(ctx))
+        .replace(
+            "{alert_level_label}",
+            &super::resolve::level_label(&ctx.alert_level),
+        )
+        .replace(
+            "{alert_trigger_time_utc}",
+            &super::resolve::utc_stamp(ctx.alert_trigger_time),
+        )
+        .replace("{cluster_name}", &ctx.cluster_name)
         .replace("{org_name}", &ctx.org_name)
         .replace("{stream_type}", &ctx.stream_type)
         .replace("{stream_name}", &ctx.stream_name)
@@ -88,23 +106,6 @@ pub(crate) fn apply_custom_template_plain(
             ctx.episode_id.as_deref().unwrap_or_default(),
         )
         .replace("{recovery_reason}", &ctx.recovery_reason)
-        .replace("{notification_kind}", ctx.kind.as_str())
-        .replace("{notification_event}", ctx.event.as_str())
-        .replace("{notification_kind_label}", ctx.kind.label())
-        .replace(
-            "{notification_event_label}",
-            ctx.kind.event_label(ctx.event),
-        )
-        .replace("{status_dot}", super::resolve::status_dot(ctx))
-        .replace(
-            "{alert_level_label}",
-            &super::resolve::level_label(&ctx.alert_level),
-        )
-        .replace(
-            "{alert_trigger_time_utc}",
-            &super::resolve::utc_stamp(ctx.alert_trigger_time),
-        )
-        .replace("{cluster_name}", &ctx.cluster_name)
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
@@ -968,5 +969,15 @@ mod golden {
                 "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
             })
         );
+    }
+
+    #[test]
+    fn custom_inserted_values_are_not_rescanned_for_newer_tokens() {
+        let ctx = NotificationContext {
+            alert_name: "cpu-{notification_kind}".into(),
+            ..Default::default()
+        };
+        let rendered = apply_custom_template(r#"{"text":"{alert_name}"}"#, &ctx, false);
+        assert_eq!(rendered, r#"{"text":"cpu-{notification_kind}"}"#);
     }
 }

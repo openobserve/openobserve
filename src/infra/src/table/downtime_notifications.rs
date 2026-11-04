@@ -36,8 +36,9 @@ pub struct DowntimeNotification {
     pub sent_at: i64,
     pub destinations: serde_json::Value,
     pub result: Option<String>,
-    /// Per destination, the template that rendered the send; set with the result.
-    pub templates: Option<serde_json::Value>,
+    /// Per destination, the template that rendered the send, as serialized JSON; set with the
+    /// result.
+    pub templates: Option<String>,
 }
 
 impl From<Model> for DowntimeNotification {
@@ -75,7 +76,7 @@ pub async fn list_for_downtime(
 pub async fn set_result(
     id: &str,
     result: &str,
-    templates: Option<serde_json::Value>,
+    templates: Option<String>,
 ) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     set_result_with(client, id, result, templates).await
@@ -105,7 +106,7 @@ pub async fn set_result_with<C: ConnectionTrait>(
     conn: &C,
     id: &str,
     result: &str,
-    templates: Option<serde_json::Value>,
+    templates: Option<String>,
 ) -> Result<(), errors::Error> {
     Entity::update_many()
         .col_expr(Column::Result, Expr::value(result))
@@ -228,7 +229,8 @@ mod tests {
         ] {
             insert_if_absent_with(&db, &r).await.unwrap();
         }
-        let templates = serde_json::json!([{"destination": "slack", "template_name": "card"}]);
+        let templates =
+            serde_json::json!([{"destination": "slack", "template_name": "card"}]).to_string();
         set_result_with(&db, "n1", "slack: timed out", Some(templates.clone()))
             .await
             .unwrap();

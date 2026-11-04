@@ -301,13 +301,9 @@ async fn delete_by_org_returning_with<C: ConnectionTrait>(
 pub const RESERVED_PREFIX: &str = "o2_default_";
 /// The one compiled default every kind falls back to; reserved like the prefix.
 pub const DEFAULT_TEMPLATE_NAME: &str = "o2_default";
-/// The compiled rows `o2_default` replaced; their references move to it.
-pub const RETIRED_DEFAULT_NAMES: [&str; 7] = [
+/// The rows main seeded that `o2_default` replaced; their references move to it.
+pub const RETIRED_DEFAULT_NAMES: [&str; 3] = [
     "o2_default_content",
-    "o2_default_incident",
-    "o2_default_anomaly",
-    "o2_default_synthetics",
-    "o2_default_on_call",
     "prebuilt_downtime",
     "prebuilt_downtime_email",
 ];
@@ -322,15 +318,9 @@ pub struct ReservedRename {
     pub to: String,
 }
 
-/// The rows the seeder writes in the default org; any other reserved name is a user row.
-const SHIPPED_SEEDS: [&str; 6] = [
-    DEFAULT_TEMPLATE_NAME,
-    "o2_default_content",
-    "o2_default_incident",
-    "o2_default_anomaly",
-    "o2_default_synthetics",
-    "o2_default_on_call",
-];
+/// Main seeded only `o2_default_content`, so any other reserved name in the default org is a user
+/// row.
+const SHIPPED_SEEDS: [&str; 2] = [DEFAULT_TEMPLATE_NAME, "o2_default_content"];
 
 /// A shipped seed row: the default org, one of the seeded names, Content.
 fn is_shipped_seed(org: &str, name: &str, kind: &str) -> bool {
@@ -402,7 +392,9 @@ async fn name_taken<C: ConnectionTrait>(
     name: &str,
 ) -> Result<bool, sea_orm::DbErr> {
     if org != DEFAULT_ORG {
-        return Ok(get_org_model(db, org, name).await?.is_some());
+        // A default org row of that name is shared, so it would collide with this org's row.
+        return Ok(get_org_model(db, org, name).await?.is_some()
+            || get_org_model(db, DEFAULT_ORG, name).await?.is_some());
     }
     Ok(Entity::find()
         .filter(Column::Name.eq(name))
@@ -964,7 +956,7 @@ mod tests {
         let db = reference_db().await;
         // The shipped seeds: default org, written by the seeder, Content.
         insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
-        insert_row(&db, DEFAULT_ORG, "o2_default_anomaly", false, "content").await;
+        insert_row(&db, DEFAULT_ORG, "o2_default", false, "content").await;
         // User rows: another org, and a default org row a user saved.
         insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
         insert_row(&db, "acme", "user_o2_default_anomaly", false, "custom").await;
@@ -973,7 +965,7 @@ mod tests {
         insert_row(&db, DEFAULT_ORG, "o2_default_foo", false, "content").await;
         insert_row(&db, "acme", "ops-card", false, "content").await;
         insert_alert(&db, "alerts", "acme", "acme-alert", "o2_default_anomaly").await;
-        insert_alert(&db, "alerts", "other", "other-alert", "o2_default_anomaly").await;
+        insert_alert(&db, "alerts", "other", "other-alert", "o2_default_content").await;
         insert_alert(&db, "alerts", "other", "shared-alert", "o2_default_mine").await;
         insert_alert(
             &db,
@@ -1029,7 +1021,7 @@ mod tests {
         assert_eq!(
             names(&db, DEFAULT_ORG).await,
             vec![
-                "o2_default_anomaly",
+                "o2_default",
                 "o2_default_content",
                 "user_o2_default_foo",
                 "user_o2_default_mine"
@@ -1044,7 +1036,7 @@ mod tests {
             alert_template(&db, "alerts", "other-alert")
                 .await
                 .as_deref(),
-            Some("o2_default_anomaly")
+            Some("o2_default_content")
         );
         // A renamed default org row is shared, so every org's reference follows it.
         assert_eq!(
@@ -1071,6 +1063,24 @@ mod tests {
 
         // A second boot finds nothing left under the prefix that is not a seed.
         assert!(rename_reserved_collisions(&db).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_org_rename_skips_a_name_the_default_org_holds() {
+        let db = reference_db().await;
+        insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
+        insert_row(&db, DEFAULT_ORG, "user_o2_default_anomaly", false, "custom").await;
+
+        let renames = rename_reserved_collisions(&db).await.unwrap();
+
+        assert_eq!(
+            renames,
+            vec![ReservedRename {
+                org: "acme".to_string(),
+                from: "o2_default_anomaly".to_string(),
+                to: "user_o2_default_anomaly_2".to_string(),
+            }]
+        );
     }
 
     #[tokio::test]
@@ -1112,5 +1122,177 @@ mod tests {
         assert_eq!(after, "user_o2_default_mine_2");
         assert_eq!(body_for(&db, &after).await, before);
         assert_eq!(body_for(&db, "user_o2_default_mine").await, "acme body");
+    }
+
+    /// The reference tables the retire touches; each holds only the columns it rewrites.
+    async fn retire_db() -> DatabaseConnection {
+        let db = reference_db().await;
+        for table in ["anomaly_detection_config", "synthetics", "oncall_policies"] {
+            db.execute_unprepared(&format!(
+                "CREATE TABLE {table} (id TEXT PRIMARY KEY, org TEXT NOT NULL, name TEXT NOT NULL, template TEXT)"
+            ))
+            .await
+            .unwrap();
+        }
+        db.execute_unprepared(
+            "CREATE TABLE destinations (id TEXT PRIMARY KEY, org TEXT NOT NULL, name TEXT NOT NULL, template_id TEXT)",
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn row_id(db: &DatabaseConnection, org: &str, name: &str) -> String {
+        get_org_model(db, org, name).await.unwrap().unwrap().id
+    }
+
+    async fn insert_destination(db: &DatabaseConnection, name: &str, template_id: &str) {
+        db.execute_unprepared(&format!(
+            "INSERT INTO destinations (id, org, name, template_id) VALUES ('{}', 'acme', '{name}', '{template_id}')",
+            ider::uuid()
+        ))
+        .await
+        .unwrap();
+    }
+
+    async fn destination_template(db: &DatabaseConnection, name: &str) -> Option<String> {
+        use sea_orm::{FromQueryResult, Statement};
+
+        #[derive(FromQueryResult)]
+        struct Row {
+            template_id: Option<String>,
+        }
+        Row::find_by_statement(Statement::from_string(
+            db.get_database_backend(),
+            format!("SELECT template_id FROM destinations WHERE name = '{name}'"),
+        ))
+        .one(db)
+        .await
+        .unwrap()
+        .unwrap()
+        .template_id
+    }
+
+    #[tokio::test]
+    async fn a_user_row_named_like_a_kind_default_survives_both_migrations() {
+        let db = retire_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_incident", false, "content").await;
+        insert_alert(
+            &db,
+            "alerts",
+            "acme",
+            "incident-alert",
+            "o2_default_incident",
+        )
+        .await;
+        let mine = row_id(&db, DEFAULT_ORG, "o2_default_incident").await;
+        insert_destination(&db, "mine-dest", &mine).await;
+
+        rename_reserved_collisions(&db).await.unwrap();
+        retire_default_templates(&db).await.unwrap();
+
+        assert_eq!(
+            names(&db, DEFAULT_ORG).await,
+            vec!["user_o2_default_incident"]
+        );
+        assert_eq!(
+            row_id(&db, DEFAULT_ORG, "user_o2_default_incident").await,
+            mine
+        );
+        assert_eq!(
+            alert_template(&db, "alerts", "incident-alert")
+                .await
+                .as_deref(),
+            Some("user_o2_default_incident")
+        );
+        assert_eq!(destination_template(&db, "mine-dest").await, Some(mine));
+    }
+
+    #[tokio::test]
+    async fn the_retired_rows_fold_into_o2_default_and_their_references_follow() {
+        use crate::table::entity::system_settings;
+
+        let db = retire_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
+        insert_row(&db, DEFAULT_ORG, "prebuilt_downtime", true, "custom").await;
+        insert_row(&db, DEFAULT_ORG, "prebuilt_downtime_email", true, "custom").await;
+        insert_row(&db, "acme", "ops-card", false, "content").await;
+        let content = row_id(&db, DEFAULT_ORG, "o2_default_content").await;
+        let downtime = row_id(&db, DEFAULT_ORG, "prebuilt_downtime").await;
+        let ops = row_id(&db, "acme", "ops-card").await;
+        insert_destination(&db, "alerts-dest", &content).await;
+        insert_destination(&db, "downtime-dest", &downtime).await;
+        insert_destination(&db, "ops-dest", &ops).await;
+        insert_alert(&db, "alerts", "acme", "content-alert", "o2_default_content").await;
+        insert_alert(&db, "alerts", "acme", "ops-alert", "ops-card").await;
+        insert_alert(
+            &db,
+            "oncall_policies",
+            "acme",
+            "team-a",
+            "prebuilt_downtime",
+        )
+        .await;
+        for key in [
+            "default_templates",
+            "default_alert_template",
+            "other_setting",
+        ] {
+            system_settings::ActiveModel {
+                scope: Set("org".to_string()),
+                org_id: Set(Some("acme".to_string())),
+                setting_key: Set(key.to_string()),
+                setting_value: Set(serde_json::json!({"template": "o2_default_content"})),
+                created_at: Set(0),
+                updated_at: Set(0),
+                ..Default::default()
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+
+        let moved = retire_default_templates(&db).await.unwrap();
+
+        assert_eq!(moved.len(), 3);
+        assert_eq!(names(&db, DEFAULT_ORG).await, vec!["o2_default"]);
+        // The alert default's row keeps its id, so a destination bound to it needs no rewrite.
+        assert_eq!(row_id(&db, DEFAULT_ORG, "o2_default").await, content);
+        assert_eq!(
+            destination_template(&db, "alerts-dest").await.as_deref(),
+            Some(content.as_str())
+        );
+        assert_eq!(
+            destination_template(&db, "downtime-dest").await.as_deref(),
+            Some(content.as_str())
+        );
+        assert_eq!(destination_template(&db, "ops-dest").await, Some(ops));
+        assert_eq!(
+            alert_template(&db, "alerts", "content-alert")
+                .await
+                .as_deref(),
+            Some("o2_default")
+        );
+        assert_eq!(
+            alert_template(&db, "alerts", "ops-alert").await.as_deref(),
+            Some("ops-card")
+        );
+        assert_eq!(
+            alert_template(&db, "oncall_policies", "team-a")
+                .await
+                .as_deref(),
+            Some("o2_default")
+        );
+        let keys: Vec<String> = system_settings::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.setting_key)
+            .collect();
+        assert_eq!(keys, vec!["other_setting"]);
+
+        // A second boot finds nothing left to fold.
+        assert!(retire_default_templates(&db).await.unwrap().is_empty());
     }
 }

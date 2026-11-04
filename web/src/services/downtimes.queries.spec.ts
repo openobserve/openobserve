@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from "vitest";
 import downtimes from "./downtimes";
 import type { DowntimeDetail, DowntimeListItem } from "./downtimes";
 import destination from "./alert_destination";
-import template from "./alert_templates";
 import {
   downtimesListQuery,
   downtimesLookupQuery,
@@ -26,7 +25,6 @@ import {
 
 vi.mock("./downtimes", () => ({ default: { list: vi.fn() } }));
 vi.mock("./alert_destination", () => ({ default: { test: vi.fn(), testSend: vi.fn() } }));
-vi.mock("./alert_templates", () => ({ default: { get_by_name: vi.fn() } }));
 
 const COUNTS = { active: 1, scheduled: 2, recurring: 3, ended: 4, cancelled: 5, ended_early: 6 };
 const items = (n: number) =>
@@ -80,14 +78,23 @@ describe("the downtime test send", () => {
     expect(result).toEqual({ destination: "ops-slack", ok: true, error: undefined });
   });
 
-  it("keeps the browser render for the destination's own downtime template", async () => {
-    vi.mocked(template.get_by_name).mockResolvedValue({
-      data: { body: '{"text":"{downtime_name}"}' },
-    } as never);
-    vi.mocked(destination.test).mockResolvedValue({ data: { success: true } } as never);
+  it("sends the destination's own template by name through the server", async () => {
     vi.mocked(destination.testSend).mockClear();
-    await send({ name: "hook", type: "http", url: "https://hook", template: "mine" });
-    expect(destination.testSend).not.toHaveBeenCalled();
-    expect(vi.mocked(destination.test).mock.calls[0][0].data.body).toContain("Nightly");
+    vi.mocked(destination.testSend).mockResolvedValue({
+      data: { success: false, message: "bad gateway" },
+    } as never);
+    const [result] = await send({
+      name: "hook",
+      type: "http",
+      url: "https://hook",
+      template: "mine",
+    });
+    expect(destination.testSend).toHaveBeenCalledWith({
+      org_identifier: "acme",
+      destination_name: "hook",
+      data: { template_name: "mine", kind: "downtime" },
+    });
+    expect(destination.test).not.toHaveBeenCalled();
+    expect(result).toEqual({ destination: "hook", ok: false, error: "bad gateway" });
   });
 });

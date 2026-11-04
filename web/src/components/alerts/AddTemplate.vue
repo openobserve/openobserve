@@ -404,6 +404,9 @@ interface TemplateDraftData {
   values: AddTemplateForm;
   contentSpec: ContentSpec;
   customBodyStash: string | null;
+  // Optional because drafts saved before Applies to existed lack them.
+  appliesTo?: NotificationKind[];
+  appliesToMode?: "inferred" | "manual";
 }
 
 const props = withDefaults(
@@ -806,15 +809,16 @@ const applyTemplateData = () => {
     next.kind = "content";
   }
 
-  // A stored template's list is the truth; a new one infers until a ?applies_to= link presets it.
-  // A stored "All kinds" whose body infers nothing reads as inferred, as it did when saved.
   appliesToError.value = null;
   if (props.template) {
     appliesTo.value = NOTIFICATION_KINDS.filter((k) => props.template?.applies_to?.includes(k));
     const stored =
       next.kind === "content" ? serializeContentSpec(contentSpec.value) : props.template.body;
+    // A saved list is the author's choice, so editing the body must never narrow a stored "All kinds".
     appliesToMode.value =
-      appliesTo.value.length === 0 && inferAppliesTo(stored ?? "").length === 0
+      !isUpdatingTemplate.value &&
+      appliesTo.value.length === 0 &&
+      inferAppliesTo(stored ?? "").length === 0
         ? "inferred"
         : "manual";
   } else if (isKind(params.applies_to)) {
@@ -851,6 +855,8 @@ const serverTemplate = () =>
         type: props.template.type ?? "",
         title: String(props.template.title ?? ""),
         kind: props.template.kind ?? "",
+        appliesTo: NOTIFICATION_KINDS.filter((k) => props.template?.applies_to?.includes(k)),
+        appliesToMode: "manual",
       }
     : null;
 
@@ -864,10 +870,17 @@ const templateDraft = useEditorDraft<TemplateDraftData>({
     values: { ...formValues.value },
     contentSpec: contentSpec.value,
     customBodyStash: customBodyStash.value,
+    appliesTo: [...appliesTo.value],
+    appliesToMode: appliesToMode.value,
   }),
   apply: (data) => {
     contentSpec.value = data.contentSpec;
     customBodyStash.value = data.customBodyStash;
+    if (Array.isArray(data.appliesTo)) appliesTo.value = data.appliesTo.filter(isKind);
+    if (data.appliesToMode === "inferred" || data.appliesToMode === "manual") {
+      appliesToMode.value = data.appliesToMode;
+    }
+    appliesToError.value = null;
     isSeededTemplate.value =
       isSeededTemplate.value &&
       serializeContentSpec(data.contentSpec) === serializeContentSpec(starterContentSpec());

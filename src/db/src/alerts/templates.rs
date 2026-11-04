@@ -32,7 +32,10 @@ use config::{
 use infra::table;
 use itertools::Itertools;
 
-use crate::{self as db, authz::remove_ownership};
+use crate::{
+    self as db,
+    authz::{remove_ownership, set_ownership},
+};
 
 // db cache watcher prefix
 const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
@@ -407,6 +410,10 @@ pub async fn rename_reserved_collisions()
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
+        // Ownership tuples are keyed by name, so a rename must move them or the row loses its
+        // owner.
+        disown_old_name(r).await?;
+        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
     }
     Ok(renames)
 }
@@ -422,8 +429,19 @@ pub async fn retire_default_templates()
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
+        // System rows: the seeder writes no tuple for o2_default, so none is set here.
+        disown_old_name(r).await?;
     }
     Ok(moved)
+}
+
+/// Removes the tuples of the name a row was moved off.
+async fn disown_old_name(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let owners = tuple_owners(&r.org, std::slice::from_ref(&r.from)).await?;
+    for owner in owners.get(&r.from).into_iter().flatten() {
+        remove_ownership(owner, "templates", Authz::new(&r.from)).await;
+    }
+    Ok(())
 }
 
 // A `default` template is shared by every org, so its references are checked across all orgs.
