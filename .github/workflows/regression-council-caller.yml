@@ -1,0 +1,162 @@
+name: Regression Council Caller (openobserve)
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      regression_issue:
+        description: "Closed bug issue number or URL (required)"
+        required: true
+      fix_pr:
+        description: "Merged fix PR number, when the issue timeline does not link it (optional)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry-run: triage only, don't generate"
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  dispatch-regression:
+    # Manual backfill needs repo write access to dispatch, so only the automatic door waits for the variable.
+    if: >
+      vars.E2E_COUNCIL_DISABLED != 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issues' && vars.E2E_AUTO_REGRESSION == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Screen the issue and find its fix PR (untrusted event data via env, never spliced into commands)
+        id: ctx
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          IN_ISSUE: ${{ inputs.regression_issue || github.event.issue.number }}
+          IN_FIX_PR: ${{ inputs.fix_pr }}
+          DISPATCH_DRY: ${{ inputs.dry_run }}
+          DISPATCH_ACTOR: ${{ github.actor }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          set -euo pipefail
+          stop() { echo "::notice::not dispatching: $1"; exit 0; }
+          if   [[ "$IN_ISSUE" =~ ^https://github\.com/([^/]+/[^/]+)/issues/([0-9]+)/?$ ]]; then
+            [ "${BASH_REMATCH[1]}" = "openobserve/openobserve" ] || { echo "::error::issue URL is not for openobserve/openobserve: $IN_ISSUE"; exit 1; }
+            ISSUE="${BASH_REMATCH[2]}"
+          elif [[ "$IN_ISSUE" =~ ^\#?([0-9]+)$ ]]; then ISSUE="${BASH_REMATCH[1]}"
+          else echo "::error::invalid issue number or URL: $IN_ISSUE"; exit 1; fi
+          FIX_PR=""
+          if [ -n "$IN_FIX_PR" ]; then
+            [[ "$IN_FIX_PR" =~ ^\#?([0-9]+)$ ]] || { echo "::error::invalid fix_pr: $IN_FIX_PR"; exit 1; }
+            FIX_PR="${BASH_REMATCH[1]}"
+          fi
+
+          # A reporter can close their own issue, so the automatic door needs a merged closing PR or a sender with write access.
+          TRUSTED=no
+          if [ "$EVENT" = "issues" ]; then
+            ROLE=$(gh api "repos/${REPO}/collaborators/${SENDER}/permission" --jq '.role_name' 2>/dev/null || echo none)
+            case "$ROLE" in admin|maintain|write) TRUSTED=yes ;; esac
+            echo "sender @${SENDER} has role '${ROLE}' on ${REPO}"
+          fi
+
+          # Read from the API, not the event, so the automatic and manual doors apply the same checks.
+          gh api "repos/${REPO}/issues/${ISSUE}" --jq '{pr: (.pull_request != null), state, state_reason, type: (.type.name // ""), labels: [.labels[].name]}' > /tmp/issue.json
+          read -r IS_PR STATE REASON IS_BUG < <(python3 - <<'PY'
+          import json
+          d = json.load(open("/tmp/issue.json"))
+          bug = "☢️ Bug" in d["labels"] or d["type"] == "Bug"
+          print("yes" if d["pr"] else "no", d["state"], d["state_reason"] or "none", "yes" if bug else "no")
+          PY
+          )
+          [ "$IS_PR" = "no" ] || stop "#${ISSUE} is a pull request"
+          [ "$STATE" = "closed" ] || stop "#${ISSUE} is not closed"
+          [ "$REASON" = "completed" ] || stop "#${ISSUE} closed as ${REASON}, not completed"
+          [ "$IS_BUG" = "yes" ] || stop "#${ISSUE} has neither the bug label nor the Bug type"
+
+          CLOSER_OK=no
+          if [ -z "$FIX_PR" ]; then
+            # The close and the merge land together, so give the timeline one retry to show the closing PR.
+            for attempt in 1 2; do
+              gh api graphql -F owner="${REPO%%/*}" -F name="${REPO##*/}" -F n="$ISSUE" -f query='
+                query($owner: String!, $name: String!, $n: Int!) {
+                  repository(owner: $owner, name: $name) { issue(number: $n) {
+                    timelineItems(last: 100, itemTypes: [CLOSED_EVENT, CONNECTED_EVENT, CROSS_REFERENCED_EVENT]) { nodes {
+                      __typename
+                      ... on ClosedEvent { closer { ... on PullRequest { number merged mergedAt baseRefName repository { nameWithOwner } } } }
+                      ... on ConnectedEvent { subject { ... on PullRequest { number merged mergedAt baseRefName repository { nameWithOwner } } } }
+                      ... on CrossReferencedEvent { source { ... on PullRequest { number merged mergedAt baseRefName repository { nameWithOwner } } } }
+                    } } } } }' > /tmp/timeline.json
+              read -r CLOSER_OK PICK SOURCE < <(REPO="$REPO" EVENT="$EVENT" python3 - <<'PY'
+          import json, os
+          nodes = json.load(open("/tmp/timeline.json"))["data"]["repository"]["issue"]["timelineItems"]["nodes"]
+          ok = lambda p: bool(p and p.get("number") and p.get("merged") and p.get("baseRefName") == "main"
+                              and p["repository"]["nameWithOwner"] == os.environ["REPO"])
+          closed = [n for n in nodes if n.get("__typename") == "ClosedEvent"]
+          closer = closed[-1].get("closer") if closed else None
+          newest = lambda ps: max(ps, key=lambda p: p["mergedAt"])["number"] if ps else None
+          connected = newest([n["subject"] for n in nodes if n.get("__typename") == "ConnectedEvent" and ok(n.get("subject"))])
+          mentioned = newest([n["source"] for n in nodes if n.get("__typename") == "CrossReferencedEvent" and ok(n.get("source"))])
+          if ok(closer):
+              pick, src = closer["number"], "closer"
+          elif connected:
+              pick, src = connected, "connected"
+          elif mentioned and os.environ["EVENT"] == "workflow_dispatch":
+              pick, src = mentioned, "mention"
+          else:
+              pick, src = "-", "none"
+          print("yes" if ok(closer) else "no", pick, src)
+          PY
+              )
+              if [ "$CLOSER_OK" = "no" ] && [ "$attempt" = 1 ] && { [ "$SOURCE" = "none" ] || [ "$TRUSTED$EVENT" = "noissues" ]; }; then
+                sleep 30; continue
+              fi
+              break
+            done
+            [ "$TRUSTED" = "yes" ] || [ "$EVENT" != "issues" ] || [ "$CLOSER_OK" = "yes" ] \
+              || stop "#${ISSUE} was closed by @${SENDER} without write access and not by a merged PR into main"
+            [ "$SOURCE" != "none" ] || stop "no merged fix PR into main is linked from #${ISSUE}"
+            FIX_PR="$PICK"
+            [ "$SOURCE" != "mention" ] || echo "::warning::fix PR #${FIX_PR} was matched from a mention of #${ISSUE}, not a closing or linked PR; check it is the fix"
+            echo "fix PR #${FIX_PR} chosen from the issue timeline (${SOURCE})"
+          elif [ "$EVENT" = "issues" ]; then
+            stop "the automatic door never takes a fix_pr input"
+          fi
+
+          read -r MERGED BASE < <(gh api "repos/${REPO}/pulls/${FIX_PR}" --jq '"\(.merged) \(.base.ref)"')
+          [ "$MERGED" = "true" ] && [ "$BASE" = "main" ] || stop "fix PR #${FIX_PR} is not merged into main"
+          gh api --paginate "repos/${REPO}/pulls/${FIX_PR}/files" --jq '.[].filename' > /tmp/files.txt
+          grep -q '^web/' /tmp/files.txt || stop "fix PR #${FIX_PR} does not touch web/"
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then DRY="$DISPATCH_DRY"; else DRY="false"; fi
+          ACTOR=$(printf '%s' "$DISPATCH_ACTOR" | tr -cd 'A-Za-z0-9-')
+          { echo "issue=$ISSUE"; echo "pr=$FIX_PR"; echo "dry=$DRY"; echo "actor=$ACTOR"; echo "go=true"; } >> "$GITHUB_OUTPUT"
+          echo "Bug #${ISSUE} → fix PR #${FIX_PR} (dry_run=${DRY})."
+
+      - name: Dispatch the E2E Council engine (o2-enterprise) in regression mode via the org-admin PAT
+        if: steps.ctx.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          DRY: ${{ steps.ctx.outputs.dry }}
+          ACTOR: ${{ steps.ctx.outputs.actor }}
+        run: |
+          TRACE_ID=$(openssl rand -hex 16)
+          # Reuse (force_overwrite=false) so a re-dispatch refines the existing autoe2e/bug-<n> branch instead of replacing it.
+          gh workflow run e2e-council.yml --repo openobserve/o2-enterprise \
+            -f source_repo=openobserve \
+            -f pr_number="$PR" \
+            -f regression_issue="$ISSUE" \
+            -f dry_run="$DRY" \
+            -f force_overwrite=false \
+            -f feature_hint="" \
+            -f actor="$ACTOR" \
+            -f o2_trace_id="$TRACE_ID"
+          echo "Dispatched the E2E Council engine for bug #$ISSUE (fix PR #$PR, dry_run=$DRY, by @$ACTOR, trace=$TRACE_ID)."
