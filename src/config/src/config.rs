@@ -5104,16 +5104,14 @@ fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, a
     list.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let stream_type = StreamType::from(s);
-            stream_type
-                .support_dynamic_merge()
-                .then_some(stream_type)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
-                    )
-                })
+        // not `StreamType::from`: it turns an unknown name into logs instead of refusing it
+        .map(|s| match s.to_lowercase().as_str() {
+            "logs" => Ok(StreamType::Logs),
+            "metrics" => Ok(StreamType::Metrics),
+            "traces" => Ok(StreamType::Traces),
+            _ => Err(anyhow::anyhow!(
+                "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+            )),
         })
         .collect()
 }
@@ -6966,6 +6964,10 @@ mod tests {
                 .is_empty()
         );
         assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+        // unknown names must not fall back to logs
+        assert!(super::parse_dynamic_merge_stream_types("foo").is_err());
+        assert!(super::parse_dynamic_merge_stream_types("log").is_err());
+        assert!(super::parse_dynamic_merge_stream_types("logs,foo").is_err());
     }
 
     #[test]
