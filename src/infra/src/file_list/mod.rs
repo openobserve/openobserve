@@ -943,7 +943,8 @@ fn stream_key_length_violation(
     })
 }
 
-/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
+/// Daily when the stream is or was dynamically merged (its files can span a day), else the type's
+/// level.
 pub async fn max_ts_bound_level(
     org_id: &str,
     stream_type: StreamType,
@@ -953,7 +954,10 @@ pub async fn max_ts_bound_level(
     if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_merge() {
         return level;
     }
-    if crate::schema::get_dynamic_merge(org_id, stream_name, stream_type).await {
+    let settings = crate::schema::get_settings(org_id, stream_name, stream_type).await;
+    // a stream with a value of its own may have been on before: its merged days stay readable
+    let own_value = settings.as_ref().is_some_and(|s| s.dynamic_merge.is_some());
+    if own_value || crate::schema::get_stream_setting_dynamic_merge(stream_type, &settings) {
         PartitionTimeLevel::Daily
     } else {
         level
