@@ -257,10 +257,10 @@ test("ci-full offers skill only because opencode appends a narrower rule, and re
 
 test("ci-full shell runs an allowlisted command and refuses a build outright, without asking", { skip, timeout: 120_000 }, async t => {
   // A RegExp is the output an allowed command must print; null means opencode must refuse it.
-  const ONE = /\b1\b/;
+  const ONE = /(?<!\d)1(?!\d)/;
   const cases = [
     ["cat src/main.rs | wc -l", ONE], ["grep -c main src/main.rs", ONE], ["find src -name '*.rs' | wc -l", ONE], ["tail -n 1 src/main.rs | wc -l", ONE],
-    ["ls src && wc -l src/main.rs", ONE], ["find src -name '*-executor*' | wc -l", /\b0\b/], ["cargo build", null], ["ls && touch built.txt", null],
+    ["ls src && wc -l src/main.rs", ONE], ["find src -name '*-executor*' | wc -l", /(?<!\d)0(?!\d)/], ["cargo build", null], ["ls && touch built.txt", null],
     ["find . -name main.rs -exec touch built.txt ;", null], ["find src -fprint built.txt", null], ["git grep -nOsh main", null],
     ["cat $(touch built.txt)", null], ["cat `touch built.txt`", null], ["cat src/main.rs > built.txt", null], ["cat /proc/self/environ", null],
   ];

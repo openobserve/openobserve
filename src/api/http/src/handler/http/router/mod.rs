@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::get_config;
+use config::{get_config, meta::feature::Feature};
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
@@ -53,13 +53,15 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     audit::audit,
     axum::body::{Body, to_bytes},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     config::utils::time::now_micros,
     o2_enterprise::enterprise::{
         common::{
-            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            auditor::{AuditMessage, AuditTarget, DelegatedAudit, Protocol, ResponseMeta},
             config::get_config as get_o2_config,
         },
         fleet::opamp,
+        license::check_features,
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
@@ -298,6 +300,32 @@ async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     Ok(())
 }
 
+/// 403 naming the required features the license does not entitle.
+#[cfg(feature = "enterprise")]
+fn license_denial(required: &[Feature]) -> Option<Response> {
+    if check_features(required) {
+        return None;
+    }
+    let missing: Vec<&str> = required
+        .iter()
+        .filter(|f| !check_features(std::slice::from_ref(f)))
+        .map(|f| (*f).into())
+        .collect();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(missing.join(", "));
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            axum::Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn license_denial(_required: &[Feature]) -> Option<Response> {
+    None
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -324,36 +352,53 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     };
 
     // Validate authentication using extracted data
-    match oo_validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            // Insert user_id into request headers for downstream handlers
-            parts.headers.insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
+    let result = match oo_validator(&req_data, &auth_info).await {
+        Ok(result) => result,
+        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    };
 
-            // Handle Prometheus POST hack - add content-type if missing
-            if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
-                parts.headers.insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/x-www-form-urlencoded"),
-                );
-            }
+    // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
+    if let Some(denied) = auth_info.feature.and_then(license_denial) {
+        return denied;
+    }
 
-            if let Some(caller) = result.delegation {
-                parts.extensions.insert(caller);
-            }
+    // Insert user_id into request headers for downstream handlers
+    parts.headers.insert(
+        header::HeaderName::from_static("user_id"),
+        header::HeaderValue::from_str(&result.user_email)
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
 
-            let mut response = next.run(Request::from_parts(parts, body)).await;
-            if let Some(token_name) = result.token_name {
-                response.extensions_mut().insert(
-                    openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
-                );
-            }
-            response
-        }
-        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    // Handle Prometheus POST hack - add content-type if missing
+    if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
+        parts.headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+    }
+
+    if let Some(caller) = result.delegation {
+        parts.extensions.insert(caller);
+    }
+
+    let mut response = next.run(Request::from_parts(parts, body)).await;
+    if let Some(token_name) = result.token_name {
+        response.extensions_mut().insert(
+            openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
+        );
+    }
+    response
+}
+
+/// License gate for routes that authenticate outside `auth_middleware`; layer it inside the auth.
+pub async fn require_features(
+    required: &'static [Feature],
+    request: Request,
+    next: Next,
+) -> Response {
+    match license_denial(required) {
+        Some(denied) => denied,
+        None => next.run(request).await,
     }
 }
 
@@ -462,6 +507,10 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     }
     let segments = path.split('/').collect::<Vec<_>>();
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
+        return true;
+    }
+    // Sample data for an endpoint test is often a pasted real call, credentials included.
+    if method == Method::POST && segments.ends_with(&["http_trigger", "test"]) {
         return true;
     }
     if let Some(slack) = slack_path(&segments) {
@@ -726,6 +775,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
         // ERROR_HEADER is an internal detail channel for the auditor and must never reach a client.
         response.headers_mut().remove(ERROR_HEADER);
+        let named = response.extensions_mut().remove::<AuditTarget>();
 
         if response.status().is_success() || response.status().is_redirection() {
             let slack_chat = delegated_chat_audit_body(
@@ -759,6 +809,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     trace_id: None,
                 },
                 delegated,
+                fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
+                target: named.map(|n| n.target),
             })
             .await;
             if fleet_mutation(&http_method, &path) {
@@ -992,17 +1044,24 @@ pub fn basic_routes() -> Router {
     );
 
     // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
+    // Registered on the operator's flag, not the license's, so a new license needs no restart.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
-            get(oncall::ack_page).post(oncall::acknowledge),
+            get(oncall::ack_page)
+                .post(oncall::acknowledge)
+                .route_layer(middleware::from_fn(|req, next| {
+                    require_features(&[Feature::Oncall], req, next)
+                })),
         );
         // Unauthenticated like the email link: the signed token in the path is the credential.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack/voice/{token}",
-            post(oncall::voice_ack),
+            post(oncall::voice_ack).route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Oncall], req, next)
+            })),
         );
     }
 
@@ -1013,15 +1072,27 @@ pub fn basic_routes() -> Router {
     router = router
         .route(
             "/api/v2/{org_id}/incidents/events",
-            post(alerts::external_events::ingest_events),
+            post(alerts::external_events::ingest_events).route_layer(middleware::from_fn(
+                |req, next| require_features(&[Feature::Incidents], req, next),
+            )),
         )
         .route(
             "/api/v2/{org_id}/incidents/events/{token}",
-            post(alerts::external_events::ingest_events_url_token),
+            post(alerts::external_events::ingest_events_url_token).route_layer(
+                middleware::from_fn(|req, next| require_features(&[Feature::Incidents], req, next)),
+            ),
         )
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
         ));
+
+    // Merged after the route_layer above, so the incident body limit does not wrap these routes.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().common.workflows_enabled
+        && openobserve_core::workflows::http_trigger::hooks_enabled()
+    {
+        router = router.merge(workflow_hook_routes());
+    }
 
     // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
     router = router
@@ -1046,7 +1117,7 @@ pub fn basic_routes() -> Router {
     // handlers are pure meta-store point-reads (no search, storage, or
     // cross-node calls on this plane).
     if get_config().synthetics.enabled {
-        router = router
+        let public = Router::new()
             .route(
                 "/api/status_pages_public/{slug}",
                 get(status_pages::public::snapshot),
@@ -1065,12 +1136,16 @@ pub fn basic_routes() -> Router {
                 "/api/status_pages_public/{slug}/feed.xml",
                 get(status_pages::public::feed),
             )
-            .route("/status/{slug}", get(status_pages::public::page));
+            .route("/status/{slug}", get(status_pages::public::page))
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Synthetics], req, next)
+            }));
+        router = router.merge(public);
     }
 
     // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
     if !config::cluster::LOCAL_NODE.is_router() {
-        router = router
+        let public = Router::new()
             .route(
                 "/api/public_dashboards/{slug}",
                 get(public_dashboards::public::config),
@@ -1078,7 +1153,11 @@ pub fn basic_routes() -> Router {
             .route(
                 "/api/public_dashboards/{slug}/data",
                 get(public_dashboards::public::data),
-            );
+            )
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Dashboards], req, next)
+            }));
+        router = router.merge(public);
     }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
@@ -1086,11 +1165,32 @@ pub fn basic_routes() -> Router {
     if get_config().public_ai_chat.enabled {
         router = router.route(
             "/api/public/ai_chats/{token}",
-            get(openobserve_api_management::request::ai::shares::get_public),
+            get(openobserve_api_management::request::ai::shares::get_public).route_layer(
+                middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiAssistant], req, next)
+                }),
+            ),
         );
     }
 
     router
+}
+
+/// Public workflow hooks; the handler reads the body itself, this limit is only defence in depth.
+#[cfg(feature = "enterprise")]
+fn workflow_hook_routes() -> Router {
+    Router::new()
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            post(workflows::hooks::invoke),
+        )
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            get(workflows::hooks::run_status),
+        )
+        .layer(DefaultBodyLimit::max(
+            openobserve_core::workflows::http_trigger::HARD_BODY_CAP,
+        ))
 }
 
 /// Create config routes. `/` is served WITHOUT auth (the login page bootstraps
@@ -1927,6 +2027,31 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/promote/{id}",
                     post(workflows::promote_draft),
                 );
+            if openobserve_core::workflows::http_trigger::hooks_enabled() {
+                router = router
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger",
+                        get(workflows::http_trigger::get_http_trigger)
+                            .put(workflows::http_trigger::put_http_trigger)
+                            .delete(workflows::http_trigger::delete_http_trigger),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials",
+                        post(workflows::http_trigger::rotate_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+                        delete(workflows::http_trigger::revoke_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                        get(workflows::http_trigger::reveal_http_credential_secret),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/test",
+                        post(workflows::http_trigger::test_http_trigger),
+                    );
+            }
         }
     }
 
@@ -2687,6 +2812,9 @@ pub fn other_service_routes() -> Router {
             post(logs::ingest::handle_kinesis_request),
         )
         .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs], req, next)
+        }))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2696,6 +2824,9 @@ pub fn other_service_routes() -> Router {
             post(logs::ingest::handle_gcp_request),
         )
         .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs], req, next)
+        }))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2704,6 +2835,9 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .route_layer(middleware::from_fn(blocked_org_param))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Rum], req, next)
+        }))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2730,6 +2864,9 @@ pub fn splunk_collector_routes() -> Router {
     // rather than both leaking as 401.
     let event_handler = || {
         post(hec_collector::collector_event)
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Logs], req, next)
+            }))
             .route_layer(middleware::from_fn(hec_collector::splunk_auth_middleware))
             .fallback(hec_collector::collector_method_not_allowed)
     };
@@ -3100,6 +3237,27 @@ mod tests {
                 serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
                 "{what}"
             );
+        }
+    }
+
+    #[test]
+    fn workflow_endpoint_test_bodies_are_redacted() {
+        for path in [
+            "org/workflows/wf1/http_trigger/test",
+            "api/org/workflows/wf1/http_trigger/test",
+        ] {
+            assert!(is_secret_write(&Method::POST, path), "{path}");
+            assert_eq!(
+                audited(Method::POST, path, r#"{"data":[{"password":"p"}]}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::PUT, "org/workflows/wf1/http_trigger"),
+            (Method::POST, "org/workflows/wf1/http_trigger/credentials"),
+            (Method::POST, "org/workflows/test"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
         }
     }
 
@@ -3738,6 +3896,71 @@ mod tests {
         assert_ne!(
             app.oneshot(req).await.unwrap().status(),
             StatusCode::NOT_FOUND
+        );
+    }
+
+    // Refused before any lookup, so a 400 proves the hook handler owns the path without a DB.
+    #[cfg(feature = "enterprise")]
+    fn credential_in_url_probe() -> Request<Body> {
+        Request::builder()
+            .method(Method::POST)
+            .uri("/api/v2/o/workflows/hooks/x?token=a")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    // basic_routes already holds the hook routes when the process runs with hooks on.
+    #[cfg(feature = "enterprise")]
+    fn hook_routes_unless_registered() -> Router {
+        if get_o2_config().common.workflows_enabled
+            && openobserve_core::workflows::http_trigger::hooks_enabled()
+        {
+            Router::new()
+        } else {
+            workflow_hook_routes()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn create_app_router_builds_with_workflow_hook_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(splunk_collector_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
+            .merge(other_service_routes())
+            .merge(proxy_routes(true));
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn router_node_app_builds_with_workflow_hook_routes() {
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes);
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "the hook route wins over /api/{{*path}}"
         );
     }
 

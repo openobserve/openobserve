@@ -343,7 +343,7 @@ mod enterprise {
     /// Admits the run (config, AI usage, credentials, the org's active-run cap) and records it.
     pub async fn start_alert_rca(req: AlertRcaRequest) -> Result<AlertRcaStart, AlertRcaRefusal> {
         let cfg = get_o2_config();
-        if !cfg.incidents.rca_enabled || !cfg.ai.enabled || !cfg.ai.has_agent_target() {
+        if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
             return Err(AlertRcaRefusal::NotConfigured(
                 "RCA or the AI agent is not enabled".into(),
             ));

@@ -29,9 +29,12 @@ use crate::traces::otel::attributes::{
     OpenInferenceAttributes, VercelAiSdkAttributes,
 };
 
-/// Scope information for mapping
-pub struct ScopeInfo {
-    pub name: Option<String>,
+/// Scope and span identity used for mapping
+pub struct ScopeInfo<'a> {
+    /// Instrumentation scope name
+    pub name: Option<&'a str>,
+    /// Span name; the Vercel AI SDK names its spans by operation id
+    pub span_name: Option<&'a str>,
 }
 
 const KNOWN_GEN_AI_OPERATION_NAME_VALUES: &[&str] = &[
@@ -57,8 +60,13 @@ const KNOWN_GEN_AI_OPERATION_NAME_VALUES: &[&str] = &[
 pub fn map_to_gen_ai_operation_name(
     attributes: &HashMap<String, json::Value>,
     _resource_attributes: &HashMap<String, json::Value>,
-    scope: Option<&ScopeInfo>,
+    scope: Option<&ScopeInfo<'_>>,
 ) -> &'static str {
+    // Priority 0: Vercel AI SDK operation id, so a wrapper span is never classified as a call.
+    if let Some(op) = vercel_operation_id(attributes, scope).and_then(map_vercel_operation_id) {
+        return op;
+    }
+
     // Priority 1: gen_ai.operation.name — pass through spec values directly
     if let Some(operation) = attributes
         .get(GenAiAttributes::OPERATION_NAME)
@@ -139,7 +147,7 @@ pub fn map_to_gen_ai_operation_name(
 
     // Priority 6: Vercel AI SDK
     if let Some(scope_info) = scope
-        && scope_info.name.as_deref() == Some("ai")
+        && scope_info.name == Some("ai")
         && (attributes.contains_key(VercelAiSdkAttributes::MODEL_ID)
             || attributes.contains_key(GenAiAttributes::REQUEST_MODEL)
             || attributes.contains_key(GenAiAttributes::RESPONSE_MODEL))
@@ -149,7 +157,7 @@ pub fn map_to_gen_ai_operation_name(
 
     // "ai" scope with no model → span
     if let Some(scope_info) = scope
-        && scope_info.name.as_deref() == Some("ai")
+        && scope_info.name == Some("ai")
     {
         return "span";
     }
@@ -264,10 +272,36 @@ pub fn is_llm_trace(attributes: &HashMap<String, json::Value>, scope_name: Optio
 /// Check if a gen_ai.operation.name value represents a generation (chat/completion)
 /// or embedding operation — used to decide whether to auto-count input/output tokens.
 pub fn is_generation_or_embedding(op_name: &str) -> bool {
-    matches!(
-        op_name,
-        "chat" | "text_completion" | "generate_content" | "embeddings"
-    )
+    config::meta::traces::GENERATION_GEN_AI_OPERATIONS.contains(&op_name)
+}
+
+/// Vercel AI SDK operation id, from `ai.operationId` or else the span name.
+fn vercel_operation_id<'a>(
+    attributes: &'a HashMap<String, json::Value>,
+    scope: Option<&ScopeInfo<'a>>,
+) -> Option<&'a str> {
+    if let Some(id) = attributes
+        .get(VercelAiSdkAttributes::OPERATION_ID)
+        .and_then(|v| v.as_str())
+    {
+        return Some(id);
+    }
+    let scope = scope?;
+    if scope.name != Some("ai") {
+        return None;
+    }
+    scope.span_name.filter(|name| name.starts_with("ai."))
+}
+
+/// Wrapper operations (`ai.generateText`, …) sum their children's usage, so stay unpriced.
+fn map_vercel_operation_id(operation_id: &str) -> Option<&'static str> {
+    match operation_id {
+        "ai.generateText" | "ai.streamText" | "ai.generateObject" | "ai.streamObject"
+        | "ai.embed" | "ai.embedMany" => Some("invoke_workflow"),
+        "ai.embed.doEmbed" | "ai.embedMany.doEmbed" => Some("embeddings"),
+        id if id.ends_with(".doGenerate") || id.ends_with(".doStream") => Some("chat"),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -541,7 +575,8 @@ mod tests {
         let attrs = make_attributes(vec![("ai.model.id", "gpt-4")]);
         let resource_attrs = HashMap::new();
         let scope = Some(ScopeInfo {
-            name: Some("ai".to_string()),
+            name: Some("ai"),
+            span_name: None,
         });
         assert_eq!(
             map_to_gen_ai_operation_name(&attrs, &resource_attrs, scope.as_ref()),
@@ -553,10 +588,75 @@ mod tests {
     fn test_vercel_scope_no_model_returns_span() {
         let attrs = HashMap::new();
         let scope = Some(ScopeInfo {
-            name: Some("ai".to_string()),
+            name: Some("ai"),
+            span_name: None,
         });
         let result = map_to_gen_ai_operation_name(&attrs, &HashMap::new(), scope.as_ref());
         assert_eq!(result, "span");
+    }
+
+    fn vercel_op(attrs: &HashMap<String, json::Value>, span_name: &str) -> &'static str {
+        let scope = ScopeInfo {
+            name: Some("ai"),
+            span_name: Some(span_name),
+        };
+        map_to_gen_ai_operation_name(attrs, &HashMap::new(), Some(&scope))
+    }
+
+    #[test]
+    fn test_vercel_wrapper_spans_are_workflows() {
+        let attrs = make_attributes(vec![
+            ("ai.model.id", "gpt-4o"),
+            ("gen_ai.request.model", "gpt-4o"),
+        ]);
+        for name in [
+            "ai.generateText",
+            "ai.streamText",
+            "ai.generateObject",
+            "ai.streamObject",
+            "ai.embed",
+            "ai.embedMany",
+        ] {
+            assert_eq!(vercel_op(&attrs, name), "invoke_workflow", "{name}");
+        }
+    }
+
+    #[test]
+    fn test_vercel_provider_call_spans() {
+        let attrs = make_attributes(vec![("ai.model.id", "gpt-4o")]);
+        assert_eq!(vercel_op(&attrs, "ai.generateText.doGenerate"), "chat");
+        assert_eq!(vercel_op(&attrs, "ai.streamText.doStream"), "chat");
+        assert_eq!(vercel_op(&attrs, "ai.streamObject.doStream"), "chat");
+        assert_eq!(vercel_op(&attrs, "ai.embed.doEmbed"), "embeddings");
+        assert_eq!(vercel_op(&attrs, "ai.embedMany.doEmbed"), "embeddings");
+    }
+
+    #[test]
+    fn test_vercel_operation_id_attribute_wins_over_span_name() {
+        let attrs = make_attributes(vec![
+            ("ai.model.id", "gpt-4o"),
+            ("ai.operationId", "ai.generateText"),
+            ("gen_ai.operation.name", "chat"),
+        ]);
+        // Custom span name, wrapper operation id, and an explicit gen_ai op name.
+        assert_eq!(vercel_op(&attrs, "my-call"), "invoke_workflow");
+        assert_eq!(
+            map_to_gen_ai_operation_name(&attrs, &HashMap::new(), None),
+            "invoke_workflow"
+        );
+    }
+
+    #[test]
+    fn test_span_name_ignored_outside_ai_scope() {
+        let attrs = make_attributes(vec![("gen_ai.request.model", "gpt-4o")]);
+        let scope = ScopeInfo {
+            name: Some("openai"),
+            span_name: Some("ai.generateText"),
+        };
+        assert_eq!(
+            map_to_gen_ai_operation_name(&attrs, &HashMap::new(), Some(&scope)),
+            "chat"
+        );
     }
 
     // ---- default ----

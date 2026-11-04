@@ -37,8 +37,8 @@ use arrow_schema::Schema;
 use config::meta::{
     stream::StreamType,
     traces::{
-        GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-        REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
+        GEN_AI_OPERATION_NAME_COLUMN, GEN_AI_SENTINEL_COLUMN, GENERATION_GEN_AI_OPERATIONS,
+        OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS, REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
     },
 };
 
@@ -76,6 +76,13 @@ impl LlmColumns {
     }
 }
 
+/// Schema facts for callers that only need the generation and usage layout.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct StreamLlmLayout {
+    pub(super) has_gen_ai: bool,
+    pub(super) has_operation_name: bool,
+}
+
 /// Decide which schema generation an Arrow schema belongs to.
 ///
 /// Returns `true` when the new `gen_ai_*` columns are present (i.e. the stream
@@ -94,19 +101,47 @@ pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
     }
 }
 
-/// Fetch the stream's Arrow schema from cache and decide whether it uses the
-/// new `gen_ai_*` columns. Streams missing from the cache default to `false`
-/// (legacy) so query SQL never references columns that aren't there for an
-/// unknown stream.
-pub(super) async fn stream_has_gen_ai_fields(
+/// Whether the stream stores `gen_ai_operation_name`, which totals need to sum only LLM calls.
+pub(super) fn has_operation_name(schema: &Schema) -> bool {
+    has_gen_ai_fields(schema) && schema.field_with_name(GEN_AI_OPERATION_NAME_COLUMN).is_ok()
+}
+
+/// The stream's LLM layout from the cached schema; an uncached stream counts as legacy.
+pub(super) async fn stream_llm_layout(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-) -> bool {
+) -> StreamLlmLayout {
     infra::schema::get_stream_schema_from_cache(org_id, stream_name, stream_type)
         .await
-        .map(|s| has_gen_ai_fields(&s))
-        .unwrap_or(false)
+        .map(|s| StreamLlmLayout {
+            has_gen_ai: has_gen_ai_fields(&s),
+            has_operation_name: has_operation_name(&s),
+        })
+        .unwrap_or_default()
+}
+
+/// LLM-call spans (the ones ingest prices); a span without an operation name also counts.
+pub(super) fn generation_span_predicate() -> String {
+    let ops = GENERATION_GEN_AI_OPERATIONS
+        .iter()
+        .map(|op| format!("'{op}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("({GEN_AI_OPERATION_NAME_COLUMN} IS NULL OR {GEN_AI_OPERATION_NAME_COLUMN} IN ({ops}))")
+}
+
+/// Usage sum over LLM-call spans, so agent/workflow spans repeating their children's usage don't
+/// count.
+pub(super) fn usage_sum_expr(column: &str, has_operation_name: bool) -> String {
+    if has_operation_name {
+        format!(
+            "sum(CASE WHEN {} THEN {column} ELSE 0 END)",
+            generation_span_predicate()
+        )
+    } else {
+        format!("sum({column})")
+    }
 }
 
 /// Validated schema metadata for an LLM trace stream.
@@ -135,6 +170,8 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_net_cache_impact: bool,
     /// `gen_ai_usage_cost_status` exists (ingest marks unpriced / approximate spans).
     pub(super) has_cost_status: bool,
+    /// New schema with `gen_ai_operation_name`, so usage totals sum only LLM-call spans.
+    pub(super) has_operation_name: bool,
 }
 
 impl ValidatedLlmSchema {
@@ -198,7 +235,13 @@ impl ValidatedLlmSchema {
             has_cost_cache_read_savings: false,
             has_cost_net_cache_impact: false,
             has_cost_status: false,
+            has_operation_name: false,
         }
+    }
+
+    /// [`usage_sum_expr`] for this stream's layout.
+    pub(super) fn usage_sum(&self, column: &str) -> String {
+        usage_sum_expr(column, self.has_operation_name)
     }
 }
 
@@ -283,6 +326,7 @@ pub(super) fn validate_llm_schema(
             && schema
                 .field_with_name(config::meta::model_pricing::COST_STATUS_COLUMN)
                 .is_ok(),
+        has_operation_name: has_operation_name(schema),
     })
 }
 
@@ -356,6 +400,30 @@ mod tests {
         // than guess from partial migrations.
         let schema = schema_with(&["trace_id", "gen_ai_usage_cost"]);
         assert!(!has_gen_ai_fields(&schema));
+    }
+
+    #[test]
+    fn operation_name_column_is_detected_only_on_new_schema_streams() {
+        let with_op = schema_with(&[
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+            "gen_ai_conversation_id",
+            "gen_ai_input_messages",
+            "gen_ai_output_messages",
+            "gen_ai_operation_name",
+        ]);
+        assert!(has_operation_name(&with_op));
+        assert!(
+            validate_llm_schema(&with_op, "s")
+                .unwrap()
+                .has_operation_name
+        );
+        let without_op = schema_with(&["gen_ai_usage_input_tokens", "gen_ai_conversation_id"]);
+        assert!(!has_operation_name(&without_op));
+        let legacy_with_op = schema_with(&["llm_usage_tokens_input", "gen_ai_operation_name"]);
+        assert!(!has_operation_name(&legacy_with_op));
     }
 
     #[test]

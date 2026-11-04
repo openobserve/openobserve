@@ -21,6 +21,7 @@ import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import {
+  formatDateVariable,
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
@@ -463,7 +464,12 @@ export function usePanelDrilldown({
       const escape = (value: any) => escapeSingleQuotes(String(value));
 
       if (!Array.isArray(variable.value)) {
-        return variable.value === null ? "" : `${escape(variable.value)}`;
+        const dateText = formatDateVariable(variable, format);
+        return dateText !== undefined
+          ? escape(dateText)
+          : variable.value === null
+            ? ""
+            : `${escape(variable.value)}`;
       }
 
       const singleQuoted = variable.value.map((value: any) => `'${escape(value)}'`).join(",");

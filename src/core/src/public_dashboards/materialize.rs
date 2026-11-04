@@ -1462,6 +1462,8 @@ pub(super) mod tests {
                     value: json!("checkout"),
                     tab_id: None,
                     panel_id: None,
+                    var_type: None,
+                    date_format: None,
                 }],
                 variable_keys: vec!["svc".into()],
                 values_dependencies: vec![ValuesDependency {

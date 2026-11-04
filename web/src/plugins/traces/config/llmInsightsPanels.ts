@@ -135,6 +135,29 @@ const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 // ~9x the real model and its token bar was always a flat zero.
 const modelScopedFilter = `${baseFilter} AND ${MODEL_FIELD} IS NOT NULL`;
 
+// Operations that are LLM calls (mirrors GENERATION_GEN_AI_OPERATIONS in
+// src/config/src/meta/traces.rs). Agent/workflow spans repeat their children's
+// usage, so summing every span double-counts tokens and cost.
+const GENERATION_GEN_AI_OPERATIONS = ["chat", "text_completion", "generate_content", "embeddings"];
+
+/**
+ * SUM of a usage column over LLM-call spans only — the same rule the backend
+ * applies to trace/session totals. A span without an operation name counts.
+ *
+ * Every LLM Insights query already references `gen_ai_operation_name`, so a
+ * stream without that column fails at parse time and lands on the "no LLM
+ * fields" empty state; there is no plain-SUM fallback to pick here.
+ *
+ * @example
+ *   llmCallUsageSum("gen_ai_usage_cost")
+ *   // => SUM(CASE WHEN (gen_ai_operation_name IS NULL OR gen_ai_operation_name IN ('chat', ...)) THEN gen_ai_usage_cost ELSE 0 END)
+ */
+export function llmCallUsageSum(column: string): string {
+  const ops = GENERATION_GEN_AI_OPERATIONS.map((op) => `'${op}'`).join(", ");
+  const predicate = `(${OBSERVATION_TYPE_FIELD} IS NULL OR ${OBSERVATION_TYPE_FIELD} IN (${ops}))`;
+  return `SUM(CASE WHEN ${predicate} THEN ${column} ELSE 0 END)`;
+}
+
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
     id: "cost-trend",
@@ -150,7 +173,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
           ${MODEL_FIELD} as model,
-          COALESCE(SUM(${COST_FIELD}), 0) as cost
+          COALESCE(${llmCallUsageSum(COST_FIELD)}, 0) as cost
         FROM {{stream}}
         WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
@@ -173,7 +196,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
           ${MODEL_FIELD} as model,
-          COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
+          COALESCE(${llmCallUsageSum(TOKENS_FIELD)}, 0) as tokens
         FROM {{stream}}
         WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
@@ -323,7 +346,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       sql: `
         SELECT
           ${MODEL_FIELD} as model,
-          COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
+          COALESCE(${llmCallUsageSum(TOKENS_FIELD)}, 0) as tokens
         FROM {{stream}}
         WHERE ${modelScopedFilter}
         GROUP BY ${MODEL_FIELD}

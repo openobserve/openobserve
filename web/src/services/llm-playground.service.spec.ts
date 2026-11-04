@@ -264,6 +264,17 @@ describe("runPlayground — live adapter", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/api/org/playground/run");
   });
 
+  it("sends every sampling param verbatim, and no temperature the caller left unset", async () => {
+    const fetchMock = stubFetch(
+      streamingResponse([frame({ type: "done", latencyMs: 1, usage: {} })]),
+    );
+    const params = { max_tokens: 256, top_p: 0.9, stop: ["###"], seed: 7 };
+
+    await runPlayground("org", request({ params }), { onDelta: () => {} });
+
+    expect(sentBody(fetchMock).column.params).toEqual(params);
+  });
+
   it("preserves a tool call and its linked result in the request body", async () => {
     const fetchMock = stubFetch(streamingResponse([]));
 

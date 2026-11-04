@@ -14,6 +14,8 @@ GET /api/v2/{org_id}/alerts/charts/render | signed image URL embedded in notific
 GET /api/v2/{org_id}/oncall/ack | browser-only HTML page behind an emailed link
 POST /api/v2/{org_id}/oncall/ack | browser-only form post of the HTML ack page
 POST /api/v2/{org_id}/oncall/ack/voice/{token} | third-party voice provider callback
+POST /api/v2/{org_id}/workflows/hooks/{trigger_id} | third-party callback authenticated by a workflow endpoint credential
+GET /api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id} | run status for that third-party callback, same credential
 GET /api/{org_id}/ | wire-compatibility handshake used by log shipper agents
 HEAD /api/{org_id}/ | wire-compatibility handshake used by log shipper agents
 GET /api/{org_id}/_data_stream/{name} | wire-compatibility handshake used by log shipper agents
