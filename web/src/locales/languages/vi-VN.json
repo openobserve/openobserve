@@ -872,6 +872,7 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Gần đây",
     "timeRangeCalendar": "Lịch",
+    "timeRangeRecentEmpty": "Các khoảng thời gian bạn áp dụng sẽ hiển thị ở đây.",
     "timeRangeRemoveRecent": "Xóa {range} khỏi các khoảng gần đây",
     "timeRangeRecentKeysHint": "Nhấn Delete để xóa, hoặc phím mũi tên phải để đến nút xóa của mục này.",
     "timeRangeShowMore": "Hiển thị thêm",

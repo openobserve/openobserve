@@ -872,6 +872,7 @@
     "calendarQuarterOf": "الربع {quarter} {year}",
     "timeRangeRecent": "الأحدث",
     "timeRangeCalendar": "التقويم",
+    "timeRangeRecentEmpty": "ستظهر النطاقات التي تطبقها هنا.",
     "timeRangeRemoveRecent": "إزالة {range} من النطاقات الأخيرة",
     "timeRangeRecentKeysHint": "اضغط Delete لإزالته، أو السهم الأيمن للوصول إلى زر الإزالة.",
     "timeRangeShowMore": "عرض المزيد",

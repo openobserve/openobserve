@@ -147,7 +147,7 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(el("date-time-rail-recent-0-remove")?.className).not.toContain("opacity-0");
-      expect(el("date-time-rail-recent-0-remove")?.className).toContain("text-text-secondary/60");
+      expect(el("date-time-rail-recent-0-remove")?.className).toContain("text-text-secondary!");
     });
 
     it("switches Relative and Absolute from the segmented control", async () => {
@@ -206,6 +206,16 @@ describe("DateTime rail", () => {
       expect(el("date-time-rail")).not.toBeNull();
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).toBeNull();
       expect(wrapper!.vm.calendarRailItems).toBeNull();
+    });
+
+    it("explains the empty Recent list when there is no calendar to fill the rail", async () => {
+      createWrapper({ calendarPresets: false });
+      await openMenu();
+
+      expect(el("date-time-rail-recent-empty")?.textContent?.trim()).toBe(
+        "Ranges you apply will show up here.",
+      );
+      expect(el("date-time-rail-keys-hint")).toBeNull();
     });
 
     it("has no rail on a date-only picker", async () => {

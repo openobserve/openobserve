@@ -872,6 +872,7 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Recent",
     "timeRangeCalendar": "Calendar",
+    "timeRangeRecentEmpty": "Ranges you apply will show up here.",
     "timeRangeRemoveRecent": "Remove {range} from recent ranges",
     "timeRangeRecentKeysHint": "Press Delete to remove it, or the right arrow to reach its remove button.",
     "timeRangeShowMore": "Show more",

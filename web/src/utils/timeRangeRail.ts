@@ -96,7 +96,18 @@ export const formatRecentRange = (
   return raw(`${start.date} ${start.time} - ${end.date} ${end.time}`);
 };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthNames = new Map<string, string[]>();
+
+// Month names follow the picker's locale, like the sibling older-period labels.
+const monthName = (locale: string, month: number): string => {
+  let names = monthNames.get(locale);
+  if (!names) {
+    const format = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
+    names = Array.from({ length: 12 }, (_, m) => format.format(Date.UTC(2026, m, 1)));
+    monthNames.set(locale, names);
+  }
+  return names[month];
+};
 
 const civilParts = (date: string): { year: number; month: number; day: number } => {
   const [year, month, day] = date.split("/").map(Number);
@@ -118,6 +129,7 @@ export const formatRecentRangeLabel = (
   endUs: number,
   timezone: string | null | undefined,
   nowMs: number = Date.now(),
+  locale: string = "en-US",
 ): string => {
   const zone = safeTimezone(timezone);
   const { start, end } = splitRecentRange(startUs, endUs, zone);
@@ -125,17 +137,20 @@ export const formatRecentRangeLabel = (
   const to = civilParts(end.date);
   const withYear =
     from.year !== currentYearIn(nowMs, zone) || to.year !== currentYearIn(nowMs, zone);
-  const day = (p: typeof from) => `${MONTHS[p.month]} ${p.day}${withYear ? `, ${p.year}` : ""}`;
+  const day = (p: typeof from) =>
+    `${monthName(locale, p.month)} ${p.day}${withYear ? `, ${p.year}` : ""}`;
   if (from.year === to.year && from.month === to.month) {
     if (from.day === to.day) return `${day(from)}${sameDayTimes(start.time, end.time)}`;
-    return `${MONTHS[from.month]} ${from.day} – ${to.day}${withYear ? `, ${from.year}` : ""}`;
+    return `${monthName(locale, from.month)} ${from.day} – ${to.day}${withYear ? `, ${from.year}` : ""}`;
   }
   return `${day(from)} – ${day(to)}`;
 };
 
 /** The two largest non-zero units of d/h/m/s in the span, e.g. "1d 15m", "45m", "30s". */
 export const formatRecentDuration = (startUs: number, endUs: number): string => {
-  const total = Math.max(0, Math.floor((endUs - startUs) / MICROS_PER_SECOND));
+  const spanSeconds = Math.max(0, Math.floor((endUs - startUs) / MICROS_PER_SECOND));
+  // A range ending at :59 is inclusive of that minute, so a whole day reads 1d, not 23h 59m.
+  const total = spanSeconds % 60 === 59 ? spanSeconds + 1 : spanSeconds;
   const units: [string, number][] = [
     ["d", Math.floor(total / 86_400)],
     ["h", Math.floor((total % 86_400) / 3600)],
@@ -151,6 +166,8 @@ export const formatCalendarRailHint = (
   token: string,
   timezone: string | null | undefined,
   nowMs: number = Date.now(),
+  locale: string = "en-US",
+  quarterText: (quarter: number) => string = (quarter) => `Q${quarter}`,
 ): string | null => {
   const span = resolveCalendarCivilSpan(token, timezone, nowMs);
   if (!span) return null;
@@ -158,17 +175,18 @@ export const formatCalendarRailHint = (
   const currentYear = today.getUTCFullYear();
   const withYear = first.getUTCFullYear() !== currentYear || last.getUTCFullYear() !== currentYear;
   const day = (d: Date) =>
-    `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}${withYear ? `, ${d.getUTCFullYear()}` : ""}`;
+    `${monthName(locale, d.getUTCMonth())} ${d.getUTCDate()}${withYear ? `, ${d.getUTCFullYear()}` : ""}`;
   const yearSuffix = withYear ? ` ${first.getUTCFullYear()}` : "";
   if (unit === "day") return day(first);
-  if (unit === "month") return `${MONTHS[first.getUTCMonth()]}${yearSuffix}`;
-  if (unit === "quarter") return `Q${Math.floor(first.getUTCMonth() / 3) + 1}${yearSuffix}`;
+  if (unit === "month") return `${monthName(locale, first.getUTCMonth())}${yearSuffix}`;
+  if (unit === "quarter")
+    return `${quarterText(Math.floor(first.getUTCMonth() / 3) + 1)}${yearSuffix}`;
   if (unit === "year") return String(first.getUTCFullYear());
   if (
     first.getUTCFullYear() === last.getUTCFullYear() &&
     first.getUTCMonth() === last.getUTCMonth()
   ) {
-    return `${MONTHS[first.getUTCMonth()]} ${first.getUTCDate()}–${last.getUTCDate()}${withYear ? `, ${first.getUTCFullYear()}` : ""}`;
+    return `${monthName(locale, first.getUTCMonth())} ${first.getUTCDate()}–${last.getUTCDate()}${withYear ? `, ${first.getUTCFullYear()}` : ""}`;
   }
   return `${day(first)}–${day(last)}`;
 };

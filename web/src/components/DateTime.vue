@@ -833,8 +833,13 @@ export default defineComponent({
           label,
           tooltip: state?.tooltip,
           hint:
-            formatCalendarRailHint(preset.token, store.state.timezone, tooltipNow.value) ??
-            undefined,
+            formatCalendarRailHint(
+              preset.token,
+              store.state.timezone,
+              tooltipNow.value,
+              intlLocale.value,
+              (quarter) => t("common.calendarQuarterShort", { quarter }),
+            ) ?? undefined,
           selected: selectedType.value === "relative" && calendarToken.value === preset.token,
           disabled: state?.disabled ?? false,
         };
@@ -847,7 +852,13 @@ export default defineComponent({
         id: String(index),
         label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
         compact: {
-          label: formatRecentRangeLabel(entry.startUs, entry.endUs, store.state.timezone),
+          label: formatRecentRangeLabel(
+            entry.startUs,
+            entry.endUs,
+            store.state.timezone,
+            Date.now(),
+            intlLocale.value,
+          ),
           duration: formatRecentDuration(entry.startUs, entry.endUs),
         },
         tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),

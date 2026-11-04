@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="date-time-rail"
   >
     <div
-      v-if="recent.length > 0"
+      v-if="recent.length > 0 || !hasCalendar"
       role="group"
       :aria-label="t('common.timeRangeRecent')"
       class="flex flex-col"
@@ -34,7 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("common.timeRangeRecent") }}
       </div>
       <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
-      <div role="list" data-test="date-time-rail-recent-list">
+      <div
+        v-if="recent.length === 0"
+        class="text-text-secondary px-3 pb-1 text-xs"
+        data-test="date-time-rail-recent-empty"
+      >
+        {{ t("common.timeRangeRecentEmpty") }}
+      </div>
+      <div v-else role="list" data-test="date-time-rail-recent-list">
         <div
           v-for="(item, index) in visibleRecent"
           :key="item.id"
@@ -103,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               item.selected
                 ? 'text-button-primary-foreground/70! hover:text-button-primary-foreground! focus-visible:text-button-primary-foreground!'
-                : 'text-text-secondary/60! hover:text-text-heading! focus-visible:text-text-heading!'
+                : 'text-text-secondary! hover:text-text-heading! focus-visible:text-text-heading!'
             "
             @click.stop="removeFocusedRecent(item.id, $event)"
           />
@@ -189,7 +196,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      class="text-text-secondary mt-auto px-3 pt-3 pb-2 text-xs italic"
+      v-if="recent.length > 0 || hasCalendar"
+      class="text-text-secondary mt-auto px-3 pt-3 pb-2 text-xs italic max-sm:hidden"
       data-test="date-time-rail-keys-hint"
     >
       {{ t("common.timeRangeRailKeysHint") }}
@@ -251,6 +259,8 @@ const tabStop = computed(() =>
 );
 
 // The accessible name must contain the visible compact label.
+const hasCalendar = computed(() => props.calendar !== null && props.calendar.length > 0);
+
 const rowName = (item: TimeRangeRailItem) =>
   item.compact ? `${item.compact.label} (${item.label})` : item.label;
 

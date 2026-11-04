@@ -123,6 +123,11 @@ describe("timeRangeRail", () => {
   describe("formatRecentDuration", () => {
     const dur = (seconds: number) => formatRecentDuration(0, seconds * 1_000_000);
 
+    it("reads a range ending at :59 as inclusive, so a whole day is 1d", () => {
+      expect(dur(86_399)).toBe("1d");
+      expect(dur(2 * 86_400 - 1)).toBe("2d");
+    });
+
     it("keeps the two largest non-zero units", () => {
       expect(dur(86_400 + 15 * 60)).toBe("1d 15m");
       expect(dur(2 * 86_400 + 15 * 60)).toBe("2d 15m");

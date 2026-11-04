@@ -872,6 +872,7 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "最近",
     "timeRangeCalendar": "カレンダー",
+    "timeRangeRecentEmpty": "適用した範囲がここに表示されます。",
     "timeRangeRemoveRecent": "最近の範囲から{range}を削除",
     "timeRangeRecentKeysHint": "Delete キーで削除するか、右矢印キーで削除ボタンに移動します。",
     "timeRangeShowMore": "さらに表示",

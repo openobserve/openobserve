@@ -872,6 +872,7 @@
     "calendarQuarterOf": "T{quarter} {year}",
     "timeRangeRecent": "Recientes",
     "timeRangeCalendar": "Calendario",
+    "timeRangeRecentEmpty": "Los rangos que apliques aparecerán aquí.",
     "timeRangeRemoveRecent": "Quitar {range} de los rangos recientes",
     "timeRangeRecentKeysHint": "Pulsa Suprimir para quitarlo, o la flecha derecha para llegar a su botón de quitar.",
     "timeRangeShowMore": "Mostrar más",

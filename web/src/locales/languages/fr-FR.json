@@ -872,6 +872,7 @@
     "calendarQuarterOf": "T{quarter} {year}",
     "timeRangeRecent": "Récentes",
     "timeRangeCalendar": "Calendrier",
+    "timeRangeRecentEmpty": "Les plages que vous appliquez s'afficheront ici.",
     "timeRangeRemoveRecent": "Supprimer {range} des plages récentes",
     "timeRangeRecentKeysHint": "Appuyez sur Suppr pour le supprimer, ou sur la flèche droite pour atteindre son bouton de suppression.",
     "timeRangeShowMore": "Afficher plus",
