@@ -130,7 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </section>
-          <OnboardingStepFooter class="max-md:order-last max-md:px-4 max-md:pb-4" />
+          <OnboardingStepFooter
+            :quiet="!!result"
+            class="max-md:order-last max-md:px-4 max-md:pb-4"
+          />
         </div>
       </div>
     </aside>

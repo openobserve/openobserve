@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The brand panel beside each step: what the option under the pointer or focus gives the user,
      over an example screen of the page it fills. It fills its parent's height; the example screen
-     takes the rest of it and runs off the right and bottom edges, like a screenshot. -->
+     takes the rest of it and shows the whole page. -->
 <template>
   <div
     :class="[
-      'from-onboarding-panel-start to-onboarding-panel-end text-onboarding-panel-text flex h-full min-h-0 flex-col overflow-hidden bg-linear-to-b ps-14 pt-14 max-lg:ps-8 max-lg:pt-10',
-      !example && 'rounded-surface pb-14 max-lg:pb-10',
+      'from-onboarding-panel-start to-onboarding-panel-end text-onboarding-panel-text flex h-full min-h-0 flex-col overflow-hidden bg-linear-to-b ps-14 pt-14 pb-14 max-lg:ps-8 max-lg:pt-10 max-lg:pb-10',
+      !example && 'rounded-surface',
     ]"
     data-test="onboarding-preview"
   >
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :kind="example"
       :row="exampleRow"
       :row-name="preview.title"
-      class="mt-7 min-h-56 flex-1"
+      class="me-14 mt-7 min-h-56 flex-1 max-lg:me-8"
     />
   </div>
 </template>

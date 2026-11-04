@@ -15,14 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- The foot of every step's left column: Skip to app, pinned in view while the column scrolls.
-     It carries the column's bottom gap, since a scroll container's padding would show rows below it. -->
+     It carries the column's bottom gap, since a scroll container's padding would show rows below it.
+     It is the step's primary button, unless the step has its own (`quiet`). -->
 <template>
   <div class="bg-surface-base sticky bottom-0 mt-auto flex justify-end pt-6 pb-5">
     <OButton
-      variant="ghost-muted"
-      size="sm"
+      :variant="quiet ? 'outline' : 'primary'"
       icon-right="arrow-forward"
-      class="-me-2"
       data-test="onboarding-view-skip"
       @click="skip"
     >
@@ -38,6 +37,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import { ONBOARDING_SKIP } from "./onboardingFlow";
+
+defineProps<{ quiet?: boolean }>();
 
 const { t } = useI18nTyped();
 const skip = inject(ONBOARDING_SKIP, () => {});

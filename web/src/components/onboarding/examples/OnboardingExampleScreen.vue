@@ -14,24 +14,27 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- A screenshot of the OpenObserve page an option fills, in a browser window that cuts it off at
-     the bottom. The picture is hidden from screen readers; they get the caption. -->
+<!-- A screenshot of the OpenObserve page an option fills, in a browser window scaled to show the
+     whole page. Every screenshot is 1440 by 900 (8:5), so the window is as wide as the space allows
+     with the 8:5 picture and the title bar fitting the height. The picture is hidden from screen
+     readers; they get the caption. -->
 <template>
   <figure
-    class="flex flex-col"
+    class="[container-type:size] flex flex-col justify-center"
     data-test="onboarding-example"
     :data-kind="kind"
     :data-row="rowShot ? row : undefined"
   >
     <div
       aria-hidden="true"
-      class="bg-surface-base rounded-ss-surface flex min-h-0 flex-1 flex-col overflow-hidden shadow-lg"
+      class="bg-surface-base rounded-surface flex w-[min(100cqw,calc((100cqh_-_1.875rem)_*_1.6))] shrink-0 flex-col overflow-hidden shadow-lg"
       data-test="onboarding-example-frame"
     >
       <div
         class="bg-surface-subtle border-border-subtle flex h-7.5 shrink-0 items-center gap-1.5 border-b px-3"
       >
-        <span v-for="dot in 3" :key="dot" class="bg-border-strong size-2.5 rounded-full" />
+        <!-- close, minimise and maximise, in the colours a browser window uses -->
+        <span v-for="dot in WINDOW_DOTS" :key="dot" class="size-2.5 rounded-full" :class="dot" />
         <span
           class="bg-surface-base text-text-secondary rounded-default text-2xs ms-2.5 px-3 py-0.5"
           >{{ HOST }}</span
@@ -40,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <img
         :src="src"
         alt=""
-        class="min-h-0 w-full flex-1 object-cover object-left-top"
+        class="block aspect-[8/5] w-full"
         data-test="onboarding-example-image"
       />
     </div>
@@ -62,6 +65,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
 import { ROW_SHOTS, type OnboardingExampleKind } from "./onboardingExamples";
+
+const WINDOW_DOTS = ["bg-status-negative", "bg-status-warning-text", "bg-status-positive"];
 
 const props = defineProps<{
   kind: OnboardingExampleKind;
