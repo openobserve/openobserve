@@ -170,6 +170,18 @@
   );
 }
 
+/* At a fractional device pixel ratio the browser blurs a canvas by resampling it; print keeps smoothing since its scale is arbitrary. */
+@utility chart-canvas-pixelated {
+  & canvas {
+    image-rendering: pixelated;
+  }
+  @media print {
+    & canvas {
+      image-rendering: auto;
+    }
+  }
+}
+
 /* Green-to-red scale for the click heat legend; hues mirror the canvas palette in utils/rum/clickHeatmap.ts. */
 @utility bg-heat-legend {
   background-image: linear-gradient(

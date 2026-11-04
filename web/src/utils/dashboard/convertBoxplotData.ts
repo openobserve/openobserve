@@ -15,7 +15,7 @@
 
 import { format as echartsFormat } from "echarts/core";
 import { gt, raw } from "@/types/i18n";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import { formatAxisTickValue } from "./axisTickFormat";
@@ -289,7 +289,7 @@ export const convertBoxplotData = (
           chartPanelRef?.value?.offsetWidth || FALLBACK_PANEL_WIDTH,
           config,
         ),
-        color: chartColor("--color-text-secondary"),
+        color: chartAxisTextColor(),
       },
       splitLine: { show: false },
     },
@@ -297,7 +297,7 @@ export const convertBoxplotData = (
       type: "value",
       scale: true,
       axisLabel: {
-        color: chartColor("--color-text-secondary"),
+        color: chartAxisTextColor(),
         formatter: (value: number) =>
           formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals),
       },
