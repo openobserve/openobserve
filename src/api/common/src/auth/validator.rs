@@ -512,7 +512,7 @@ pub async fn validate_credentials(
     // stubs are accepted — data-read routes are not in the table. `path` (not
     // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
     // `GET /{org}/` stays distinguishable from `/organizations` etc.
-    // §4.2: OpAMP accepts fleet tokens only, which returned above.
+    // OpAMP accepts fleet tokens only, which returned above.
     if ingestion_routes::is_opamp(path) {
         return Ok(TokenValidationResponse::default());
     }
@@ -1539,6 +1539,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -1627,6 +1628,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -2155,6 +2157,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
         assert!(
             oo_validator(&req_data, &plain).await.is_err(),

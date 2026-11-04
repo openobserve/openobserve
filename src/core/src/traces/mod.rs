@@ -80,7 +80,7 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    traces::otel::{OtelIngestionProcessor, is_llm_trace},
+    traces::otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -88,7 +88,7 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const RESERVED_SPAN_FIELDS: [&str; 33] = [
+const RESERVED_SPAN_FIELDS: [&str; 34] = [
     "trace_id",
     "span_id",
     "flags",
@@ -122,6 +122,10 @@ const RESERVED_SPAN_FIELDS: [&str; 33] = [
     crate::db_monitoring::O2_DB_ENV,
     crate::db_monitoring::O2_DB_STMT_CLASS,
     crate::db_monitoring::O2_DB_BATCH_MULTIPLIER,
+    // The ingest pricing marker: any spelling a client sends (`gen_ai.usage.cost_status`,
+    // `gen_ai_usage_cost_status`, …) on any span gets the attr_ prefix, so only the
+    // processor's own value reaches the column.
+    config::meta::model_pricing::COST_STATUS_COLUMN,
     "events",
     "links",
     TIMESTAMP_COL_NAME,
@@ -359,15 +363,18 @@ async fn queue_gen_ai_agent_observations(org_id: &str, mut observations: AgentOb
     .await;
 }
 
-/// Strip client-supplied derived-identity keys (`o2_db_*`, `infer_service_*`)
-/// from a JSON-path record BEFORE re-derivation (design D1 condition 1):
+/// Strip client-supplied derived keys (`o2_db_*`, `infer_service_*`, the ingest pricing
+/// marker) from a JSON-path record BEFORE re-derivation (design D1 condition 1):
 /// `RESERVED_SPAN_FIELDS` protects the OTLP path only — the JSON ingest path
 /// flattens the caller's record keys directly, so a spoofed `o2_db_fingerprint`
 /// (or `infer_service_name`, fixed in the same PR per the design) would land as
 /// a trusted aggregation key. Legitimate values written by a first-pass OTLP
 /// enrichment re-derive identically from the raw `db_*` / peer attributes that
-/// are still on the record (the derivations are deterministic).
+/// are still on the record (the derivations are deterministic). This path does not
+/// price spans, so it never sets `gen_ai_usage_cost_status`; a value on the record is
+/// not ingest's.
 fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
+    record_val.remove(config::meta::model_pricing::COST_STATUS_COLUMN);
     // one key scan instead of 20 map removals: a record almost never carries a derived key
     if !record_val
         .keys()
@@ -873,15 +880,12 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
-    // When ZO_MODEL_PRICING_ENABLED=false, no pricing applies and spans keep only reported costs.
-    static EMPTY_PRICING: std::sync::OnceLock<
-        std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
-    > = std::sync::OnceLock::new();
-    let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
-        crate::db::model_pricing::get_org_pricing_entries(org_id)
-    } else {
-        std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
-    };
+    // When ZO_MODEL_PRICING_ENABLED=false, nothing is priced or marked and spans keep only
+    // reported costs.
+    let org_pricing_entries = config::get_config()
+        .common
+        .model_pricing_enabled
+        .then(|| crate::db::model_pricing::get_org_pricing_entries(org_id));
 
     let gen_ai_agent_mapping_config =
         crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
@@ -967,8 +971,15 @@ pub async fn handle_otlp_request(
                         &service_att_map,
                         scope_name,
                         &events,
-                        &org_pricing_entries,
-                        start_time,
+                        org_pricing_entries.as_deref().map(Vec::as_slice),
+                        SpanContext {
+                            name: &span.name,
+                            start_nanos: start_time,
+                            is_error: span
+                                .status
+                                .as_ref()
+                                .is_some_and(|s| s.code == StatusCode::Error as i32),
+                        },
                         &gen_ai_agent_mapping_config,
                     );
 
@@ -2554,7 +2565,7 @@ mod tests {
     #[test]
     fn test_reserved_span_fields() {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
-        assert_eq!(reserved_span_fields.len(), 33);
+        assert_eq!(reserved_span_fields.len(), 34);
         // All eleven DBM identity columns are reserved (design D1 condition 1).
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
@@ -2978,6 +2989,37 @@ mod tests {
                 "literal {field} must be attr_-prefixed"
             );
         }
+    }
+
+    #[test]
+    fn test_span_attribute_key_blocks_cost_status_spoofing() {
+        // Only the processor's own marker may reach gen_ai_usage_cost_status; a client's
+        // value in any spelling, on any span, keeps its data under an attr_ key.
+        let service_att_map = std::collections::HashMap::new();
+        for raw in [
+            "gen_ai.usage.cost_status",
+            "gen_ai_usage_cost_status",
+            "Gen_AI.Usage.Cost-Status",
+        ] {
+            assert_eq!(attr_key(raw, &service_att_map), format!("attr_{raw}"));
+        }
+    }
+
+    #[test]
+    fn test_strip_client_cost_status_on_json_path() {
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert(
+            config::meta::model_pricing::COST_STATUS_COLUMN.to_string(),
+            json::json!("unpriced"),
+        );
+        record_val.insert("gen_ai_usage_cost".to_string(), json::json!(0.25));
+
+        super::strip_client_supplied_derived_fields(&mut record_val);
+
+        assert!(!record_val.contains_key(config::meta::model_pricing::COST_STATUS_COLUMN));
+        assert!(record_val.contains_key("gen_ai_usage_cost"));
     }
 
     #[test]
@@ -3950,6 +3992,146 @@ mod tests {
         )
         .await;
         assert_eq!(names, ["svc-a", "llm-svc", "unknown_service"]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_processing_sees_span_name_and_error_status() {
+        use arrow::{
+            array::{Array, StringArray},
+            compute::cast,
+            datatypes::DataType,
+        };
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::InstrumentationScope,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span, Status, status::StatusCode},
+        };
+
+        let org_id = "test_llm_span_context_org";
+        let stream = "test_llm_span_context";
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let call_attrs = || {
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv(
+                    "ai.prompt.messages",
+                    r#"[{"role":"user","content":"Say hello to everyone"}]"#,
+                ),
+            ]
+        };
+        let span = |id: u8, name: &str, attributes, status| Span {
+            trace_id: vec![7; 16],
+            span_id: vec![id; 8],
+            name: name.to_string(),
+            start_time_unix_nano: now,
+            end_time_unix_nano: now + 1000,
+            attributes,
+            status,
+            ..Default::default()
+        };
+        let wrapper = span(
+            1,
+            "ai.generateText",
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv("ai.prompt", r#"{"prompt":"Say hello to everyone"}"#),
+                string_kv("ai.response.text", "Hello everyone!"),
+            ],
+            None,
+        );
+        let failed = span(
+            2,
+            "ai.generateText.doGenerate",
+            call_attrs(),
+            Some(Status {
+                code: StatusCode::Error as i32,
+                message: "upstream 500".to_string(),
+            }),
+        );
+        let succeeded = span(3, "ai.generateText.doGenerate", call_attrs(), None);
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![string_kv(super::SERVICE_NAME, "svc")],
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: Some(InstrumentationScope {
+                        name: "ai".to_string(),
+                        ..Default::default()
+                    }),
+                    spans: vec![wrapper, failed, succeeded],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_otlp_request(
+            org_id,
+            request,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        // span_id -> (operation, input tokens, response model)
+        let mut rows = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let column = |name: &str| {
+                entry
+                    .data
+                    .column_by_name(name)
+                    .map(|c| cast(c, &DataType::Utf8).unwrap())
+            };
+            let value = |col: &Option<arrow::array::ArrayRef>, row: usize| {
+                col.as_ref().and_then(|c| {
+                    let c = c.as_any().downcast_ref::<StringArray>().unwrap();
+                    (!c.is_null(row)).then(|| c.value(row).to_string())
+                })
+            };
+            let (span_ids, ops, input_tokens, response_models) = (
+                column("span_id"),
+                column("gen_ai_operation_name"),
+                column("gen_ai_usage_input_tokens"),
+                column("gen_ai_response_model"),
+            );
+            for row in 0..entry.data.num_rows() {
+                rows.insert(
+                    value(&span_ids, row).unwrap(),
+                    (
+                        value(&ops, row),
+                        value(&input_tokens, row)
+                            .map(|v| v.parse::<i64>().unwrap())
+                            .unwrap_or(0),
+                        value(&response_models, row),
+                    ),
+                );
+            }
+        }
+        let rows: Vec<_> = rows.into_values().collect();
+        // The wrapper is recognised by its span name alone and is not estimated.
+        assert_eq!(rows[0].0.as_deref(), Some("invoke_workflow"));
+        assert_eq!(rows[0].1, 0);
+        // The ERROR call without usage gets no estimate and no request-derived response model.
+        assert_eq!(rows[1], (Some("chat".to_string()), 0, None));
+        // The same call without an error status is estimated.
+        assert_eq!(rows[2].0.as_deref(), Some("chat"));
+        assert!(rows[2].1 > 0);
+        assert_eq!(rows[2].2.as_deref(), Some("gpt-4o"));
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

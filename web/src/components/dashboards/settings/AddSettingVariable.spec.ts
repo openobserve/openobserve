@@ -23,7 +23,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import analytics from "@/services/product_analytics";
-import { addVariable, updateVariable } from "../../../utils/commons";
+import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -53,6 +53,7 @@ vi.mock("vue-i18n", () => ({
         "dashboard.queryValues": "Query Values",
         "dashboard.constant": "Constant",
         "dashboard.textbox": "Textbox",
+        "dashboard.date": "Date",
         "dashboard.custom": "Custom",
       };
       return translations[key] || key;
@@ -243,6 +244,122 @@ describe("AddSettingVariable", () => {
       expect(wrapper.find('[data-test="dashboard-variable-textbox-default-value"]').exists()).toBe(
         true,
       );
+
+      // Test date type
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-variable-date-default-value"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should keep a valid YYYY-MM-DD value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "2026-01-31";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("2026-01-31");
+    });
+
+    it("should clear a non-date value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "not a date";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("");
+    });
+  });
+
+  describe("Date variable format", () => {
+    const formatSelect = '[data-test="dashboard-variable-date-format-select"]';
+    const dateForm = (extra: Record<string, unknown> = {}) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "from_date",
+      type: "date",
+      value: "2026-03-08",
+      dateFormat: "dmy",
+      options: [],
+      ...extra,
+    });
+
+    it("shows the format select only for a date variable", async () => {
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
+
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(true);
+
+      wrapper.vm.variableData.type = "textbox";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
+    });
+
+    it("defaults to iso and offers every format with its name", () => {
+      expect(wrapper.vm.variableData.dateFormat).toBe("iso");
+      expect(wrapper.vm.dateFormatOptions.map((o: any) => o.value)).toEqual([
+        "iso",
+        "dmy",
+        "mdy",
+        "epochms",
+        "epochus",
+        "epoch",
+      ]);
+    });
+
+    it("saves dateFormat for a date variable", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm());
+      expect(payload.dateFormat).toBe("dmy");
+      expect(payload.value).toBe("2026-03-08");
+    });
+
+    it("drops it when the variable is not a date", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm({ type: "textbox" }));
+      expect(payload).not.toHaveProperty("dateFormat");
+    });
+
+    it("shows the default when editing a date variable saved without one", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: { list: [{ name: "old_date", type: "date", value: "2026-01-01" }] },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "old_date", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.type).toBe("date");
+      expect(editWrapper.vm.variableData.dateFormat).toBe("iso");
+      editWrapper.unmount();
+    });
+
+    it("keeps the saved format when editing", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: {
+          list: [
+            {
+              name: "d2",
+              type: "date",
+              value: "",
+              dateFormat: "epochus",
+            },
+          ],
+        },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "d2", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.dateFormat).toBe("epochus");
+      editWrapper.unmount();
     });
   });
 

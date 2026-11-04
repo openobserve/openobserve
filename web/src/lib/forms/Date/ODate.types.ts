@@ -33,6 +33,11 @@ export interface DateProps {
   required?: boolean;
   /** Control size */
   size?: DateSize;
+  /**
+   * Position of the label: 'outside' renders above the field (default),
+   * 'inside' renders as a compact floating mini-label inside the field border (size md).
+   */
+  labelPosition?: "inside" | "outside";
   /** HTML id */
   id?: string;
   /** HTML name */

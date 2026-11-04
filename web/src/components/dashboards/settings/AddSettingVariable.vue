@@ -289,6 +289,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-textbox-default-value"
             />
           </div>
+          <div class="mt-3" v-if="variableData.type === 'date'">
+            <OFormDate
+              name="value"
+              :label="t('dashboard.DefaultValue')"
+              clearable
+              data-test="dashboard-variable-date-default-value"
+            />
+          </div>
+          <div class="mt-3 flex flex-col" v-if="variableData.type === 'date'">
+            <OFormSelect
+              name="dateFormat"
+              :label="t('dashboard.dateFormat')"
+              :options="dateFormatOptions"
+              :help-text="t('dashboard.dateFormatHelp')"
+              data-test="dashboard-variable-date-format-select"
+            />
+          </div>
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
@@ -515,6 +532,10 @@ import {
   nextTick,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  DATE_VARIABLE_FORMATS,
+  DEFAULT_DATE_VARIABLE_FORMAT,
+} from "@/utils/dashboard/variables/variablesUtils";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
@@ -531,6 +552,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -562,6 +584,7 @@ export default defineComponent({
     OForm,
     OFormSelect,
     OFormInput,
+    OFormDate,
     OFormSwitch,
     OFormCheckbox,
     OCheckbox,
@@ -596,6 +619,7 @@ export default defineComponent({
         filter: [],
       },
       value: "",
+      dateFormat: DEFAULT_DATE_VARIABLE_FORMAT,
       options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
@@ -673,6 +697,7 @@ export default defineComponent({
         name: fieldView("name"),
         label: fieldView("label"),
         value: fieldView("value"),
+        dateFormat: fieldView("dateFormat"),
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
@@ -856,10 +881,30 @@ export default defineComponent({
         value: "textbox",
       },
       {
+        label: t("dashboard.date"),
+        value: "date",
+      },
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
     ]);
+
+    // Each option shows its format name as written in `${name:<format>}`.
+    const dateFormatLabels = {
+      iso: "dashboard.dateFormatIso",
+      dmy: "dashboard.dateFormatDmy",
+      mdy: "dashboard.dateFormatMdy",
+      epoch: "dashboard.dateFormatEpoch",
+      epochms: "dashboard.dateFormatEpochms",
+      epochus: "dashboard.dateFormatEpochus",
+    } as const satisfies Record<(typeof DATE_VARIABLE_FORMATS)[number], string>;
+    const dateFormatOptions = computed(() =>
+      DATE_VARIABLE_FORMATS.map((format) => ({
+        label: t(dateFormatLabels[format]),
+        value: format,
+      })),
+    );
 
     const filterCycleError: any = ref("");
 
@@ -956,6 +1001,7 @@ export default defineComponent({
           filter: variable.query_data?.filter ?? [],
         },
         value: variable.value ?? "",
+        dateFormat: variable.dateFormat ?? DEFAULT_DATE_VARIABLE_FORMAT,
         options,
         multiSelect: variable.multiSelect ?? false,
         hideOnDashboard: variable.hideOnDashboard ?? false,
@@ -1068,6 +1114,15 @@ export default defineComponent({
     watch(
       () => [variableData.type],
       async () => {
+        // a date variable keeps its value only when it is a valid YYYY-MM-DD
+        // (only write when non-empty: the write re-triggers this watcher)
+        if (
+          variableData.type == "date" &&
+          variableData.value &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(variableData.value))
+        ) {
+          form.setFieldValue("value", "" as never);
+        }
         if (variableData.type == "query_values") {
           // query_data always exists via the schema defaults (no manual init).
 
@@ -1183,6 +1238,7 @@ export default defineComponent({
       delete v.selectedPanels;
 
       if (v.type !== "query_values") delete v.query_data;
+      if (v.type !== "date") delete v.dateFormat;
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
@@ -1647,6 +1703,7 @@ export default defineComponent({
       streamsFilteredOptions,
       fieldsFilteredOptions,
       variableTypes,
+      dateFormatOptions,
       streamTypeUpdated,
       streamUpdated,
       onActivated,

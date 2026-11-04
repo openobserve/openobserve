@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :max="1000000"
               class="ms-2 w-52!"
               :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
+              :aria-label="t('settings.maxSeriesPerQueryLabel')"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -196,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-62.5"
                 model-value=""
                 :placeholder="t('settings.noTextAvailable')"
+                :aria-label="t('settings.customLogoText')"
                 data-test="settings_ent_logo_custom_text_locked"
               >
                 <template v-slot:icon-right>
@@ -211,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OInput
                 class="w-62.5"
+                :aria-label="t('settings.customLogoText')"
                 data-test="settings_ent_logo_custom_text"
                 v-model="customText"
               />
@@ -606,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </i18n-t>
         </label>
         <OInput
+          :aria-label="t('settings.deleteOrganizationTypeToConfirm', { name: deleteOrgName })"
           data-test="general-delete-org-confirm-input"
           v-model="deleteConfirmInput"
           :placeholder="deleteOrgName"

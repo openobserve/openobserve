@@ -396,6 +396,35 @@ describe("OnCallMembers", () => {
       );
     });
 
+    /// R9: a following rotation shares the roster, so the dialog says its person can change.
+    it("says a rotation whose order the remove changes can change who is on call", async () => {
+      const rule = (members: string[]) => ({
+        name: "Base",
+        members,
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      });
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: [
+          ...now,
+          { rotation_id: "r2", rotation_name: "Secondary", rule: "Base", user_email: "bob@o2.ai" },
+        ],
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] },
+          { id: "r2", name: "Secondary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] },
+          { id: "r3", name: "Weekend", shift_rules: [rule(["bob@o2.ai"])] },
+        ],
+      } as any);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dialog-box"]').text()).toBe(
+        "They will no longer be paged for this team. Bob takes over Ana Sharma's current shift in Primary. They also leave Secondary, so who is on call there can change too.",
+      );
+    });
+
     // Before the team name loads, the title names the person alone rather than "from ?".
     it("names only the person while the team name is unknown", async () => {
       const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });

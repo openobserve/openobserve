@@ -223,6 +223,7 @@ onMounted(maybeApplyDefault);
       <OTextarea
         v-if="advancedOpen"
         :model-value="modelValue"
+        :aria-label="t('alerts.composite.advancedExpression')"
         data-test="alerts-composite-expression-advanced"
         :help-text="t('alerts.composite.advancedExpressionHelp')"
         :rows="3"

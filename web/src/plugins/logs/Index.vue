@@ -1748,12 +1748,19 @@ export default defineComponent({
     // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
     async function applyReAppliedQuery() {
       resetRunStateForReapply();
+      const gridAtStart = autoRun.engine.currentGeneration("grid")?.id;
       searchObj.meta.searchApplied = false;
+      // The run-query prompt needs a `hits` array; set before the awaits so an Auto Run search that lands meanwhile keeps its hits.
+      searchObj.data.queryResults.hits = [];
       await getStreamList(true, { fromUrl: true });
       await getFunctions();
       await extractFields();
       refreshData();
-      searchObj.loading = false;
+      const latest = autoRun.engine.currentGeneration("grid");
+      // A search started during the load owns the loading state; its completion or cancel clears it.
+      if (!latest || latest.id === gridAtStart || latest.settled || latest.cancelled) {
+        searchObj.loading = false;
+      }
     }
 
     // Helper function for handling the stream explorer

@@ -12,6 +12,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
   addUsage,
   cleanAttributes,
+  genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
   genAiUsageAttributes,
@@ -25,14 +26,17 @@ import {
   parseRawDiff,
   reviewerFacts,
   sizeReasons,
+  withoutCarriedApproval,
 } from "./src/auto-approve.mjs";
 import {
   ANY_REVIEW_MARKER,
   NOTICE_TAG,
   REVIEW_HEADING,
   REVIEW_TITLE,
+  bodyAtFailedRun,
   bodyAtPassLimit,
   bodyAtReviewedHead,
+  bodyAtUnchangedDiff,
   bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
@@ -43,8 +47,10 @@ import {
   reviewKey,
   reviewPassCount,
   reviewSkipReason,
+  reviewedDiffFingerprint,
   sanitizeReviewBody,
   selectOwnReviewComment,
+  shouldSkipAsUnchangedDiff,
   withPassTag,
 } from "./src/comments.mjs";
 import {
@@ -55,10 +61,11 @@ import {
   selectInlineComments,
 } from "./src/inline.mjs";
 import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
-import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
-import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, runPooled } from "./src/passes.mjs";
+import { OpencodeServer, modelVariantIds, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { stripJsonc } from "./src/jsonc.mjs";
+import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, reviewComplete, runPooled } from "./src/passes.mjs";
 import { MAX_USER_PROMPT_CHARS, fitCoordinatorPrompt } from "./src/coordinator-input.mjs";
-import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
+import { diffFingerprint, fetchPinnedDiff, hunksLocatable, prefixDiffPaths, reviewerDiff, runFile } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
   partialFindingsBlock,
@@ -72,7 +79,7 @@ import {
 } from "./src/report.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
 import { scrubReviewBody, scrubSecrets } from "./src/scrub.mjs";
-import { isReleaseFile, resolveRulesFiles } from "./src/selection.mjs";
+import { isReleaseFile, narrowTier, resolveRulesFiles } from "./src/selection.mjs";
 import { buildImpactContext } from "./src/impact.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -80,7 +87,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ENGINE_DIR is the trusted base-branch checkout; PR_DIR is the PR head, which is data only and never executed.
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR || resolve(__dirname, "../.."));
 const PR_DIR = process.env.PR_DIR ? resolve(process.env.PR_DIR) : "";
-// REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, every tool allowed).
+// REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, file tools and a shell allowlist).
 const OPENCODE_CONFIG = resolveOpencodeConfig(process.env.REVIEW_OPENCODE_CONFIG);
 const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, OPENCODE_CONFIG.file);
 // A same-named PR in another repo reviewed together with this one (the OSS side of an ENT pair).
@@ -95,31 +102,31 @@ const PAIRED = {
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
 // can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
-// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4.1-Flash (max effort) setup, so an
+// currently has a single anthropic leg). Everything defaults to that Claude Sonnet 5.5 (high effort) setup, so an
 // invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
 // what must never name it is the posted PR comment — see redactProviderIdentity.
 //
 // - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
 //   provider/model registered in opencode.jsonc).
-// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
+// - REVIEW_MODEL_VARIANT / REVIEW_COORDINATOR_VARIANT: opencode `variant` (effort) of reviewers / coordinator (coordinator defaults to reviewers').
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
-const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-flash";
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "anthropic-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "claude-sonnet-5-5";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
-const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME
-  || (PROVIDER_ID.toLowerCase().includes("deepseek") ? "deepseek" : PROVIDER_ID);
-// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+const COORDINATOR_VARIANT = process.env.REVIEW_COORDINATOR_VARIANT || MODEL_VARIANT;
+const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME || genAiProviderName(PROVIDER_ID);
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "ANTHROPIC_REVIEW_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
 // posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
 // malformed value must not become the vehicle for leaking anything. This also keeps CodeQL's
 // js/clear-text-logging taint analysis from treating the *name* as the secret (it flags any
 // `...API_KEY...` env read reaching a log).
-const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "ANTHROPIC_REVIEW_API_KEY";
 const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
   ? RAW_API_KEY_VAR_NAME
-  : "DEEPSEEK_API_KEY";
+  : "ANTHROPIC_REVIEW_API_KEY";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
@@ -135,6 +142,8 @@ const REVIEW_INLINE = (process.env.REVIEW_INLINE || "false").toLowerCase() === "
 // Optional ceiling on paid reviews per PR, 0 for none; the count lives in the review comment, so deleting that comment resets it.
 const REVIEW_MAX_PASSES = parseMaxPasses(process.env.REVIEW_MAX_PASSES);
 const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true";
+// A run someone started by hand always reviews, even a diff the last review already read.
+const REVIEW_MANUAL_RUN = process.env.REVIEW_MANUAL_RUN === "true";
 // Anything but an exact known mode is "off": the gate must be opted into.
 const AUTO_APPROVE_MODE = parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
 // Only the workflow's "no open PR on this branch" path sets this; any failed or skipped pairing lookup leaves it unset.
@@ -151,6 +160,11 @@ const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
 const POST_RESERVE_MS = 2 * 60 * 1000;
 const MIN_COORDINATOR_MS = 60 * 1000;
+// A reviewer still running this long before its timeout is interrupted and asked for its findings, which a hard timeout throws away.
+const REVIEWER_WRAP_UP = {
+  ms: 3 * 60 * 1000,
+  text: "Time is up for this review. Do not call any more tools. Reply now with your final output in the exact format your instructions require: a <findings> block with every issue you have already verified, or the no-issues marker if you verified none. Do not report anything you have not checked.",
+};
 // Covers every area of two passes at once (8 reviewers at most); a third pass queues instead of adding to provider rate limits.
 const REVIEWER_CONCURRENCY = 16;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
@@ -255,6 +269,15 @@ const RISK_TIERS = {
     agents: ["security", "correctness", "code-quality", "performance", "documentation"],
     coordinatorAgent: COORDINATOR_AGENT,
   },
+  "test-only": {
+    // qa reviews Playwright only, and is added by CONDITIONAL_AGENTS when those files change.
+    agents: ["correctness", "code-quality"],
+    coordinatorAgent: COORDINATOR_AGENT,
+  },
+  "ci-only": {
+    agents: ["security", "release"],
+    coordinatorAgent: COORDINATOR_AGENT,
+  },
 };
 
 // Agents added on top of the tier's set when the diff touches their domain, regardless of size.
@@ -299,6 +322,20 @@ function ghSilent(args) {
 
 function execErrorText(err) {
   return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
+}
+
+// cat-file reads the raw blob, so the PR's own attributes cannot reshape the base text a hunk is matched against.
+function readBaseFile(path) {
+  const paired = Boolean(PAIRED.dir) && path.startsWith(`${PAIRED.dir}/`);
+  const rel = paired ? path.slice(PAIRED.dir.length + 1) : path;
+  const dir = paired ? resolve(PR_DIR, PAIRED.dir) : PR_DIR;
+  const base = paired ? PAIRED.mergeBase : process.env.MERGE_BASE_SHA;
+  if (!dir || !base) return null;
+  try {
+    return runFile("git", ["-C", dir, "cat-file", "blob", `${base}:${rel}`]);
+  } catch {
+    return null;
+  }
 }
 
 // The API refuses diffs over 20k lines; the workflow fetches the merge base into PR_DIR so the same three-dot diff can be built locally.
@@ -739,9 +776,13 @@ function filterDiff(diff) {
 function assessRiskTier(filteredDiff) {
   const totalLines = filteredDiff.totalAdded + filteredDiff.totalRemoved;
   const fileCount = filteredDiff.files.length;
-  const hasSecurityFiles = filteredDiff.files.some(f => isSecuritySensitiveFile(f.newPath));
+  // A rename's source counts too: moving code out of production or CI removes it from there.
+  const paths = filteredDiff.files.flatMap(f => [f.oldPath, f.newPath]);
+  const hasSecurityFiles = paths.some(isSecuritySensitiveFile);
 
   if (fileCount > 50 || hasSecurityFiles) return "full";
+  const narrow = narrowTier(paths.map(logicalPath));
+  if (narrow) return narrow;
   if (totalLines <= 10 && fileCount <= 20) return "trivial";
   if (totalLines <= 100 && fileCount <= 20) return "lite";
   return "full";
@@ -761,8 +802,8 @@ function selectAgents(tierConfig, filteredDiff) {
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
 // a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
-// the diff, not just the diff text — that repo context is the main quality lever over the
-// old DeepSeek-only approach.
+// the diff, not just the diff text — that repo context is the main quality lever over a
+// diff-only prompt.
 
 const OPENCODE = new OpencodeServer({
   cwd: PR_DIR || ENGINE_DIR,
@@ -782,7 +823,7 @@ async function opencodeClient() {
   const client = await OPENCODE.ensureStarted();
   if (!selfChecks.has(client)) {
     const check = selfCheck(client, reviewOpencodeAgents(), { readOnly: OPENCODE_CONFIG.readOnly }).then(result => {
-      const grant = OPENCODE_CONFIG.readOnly ? "only read/glob/grep allowed" : "every tool allowed (ci-full)";
+      const grant = OPENCODE_CONFIG.readOnly ? "only read/glob/grep allowed" : "file tools and a shell allowlist (ci-full)";
       console.log(`[${isoNow()}] opencode self-check passed: ${result.plugins} built-in plugins, ${grant} for ${result.agents} agents`);
       return result;
     });
@@ -797,11 +838,12 @@ function remainingRunMs() {
 }
 
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
+  const variant = traceOptions.agentKey === "coordinator" ? COORDINATOR_VARIANT : MODEL_VARIANT;
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": "chat",
     "gen_ai.provider.name": GEN_AI_PROVIDER_NAME,
     "gen_ai.request.model": MODEL_ID,
-    "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
+    "gen_ai.request.reasoning_effort": variant || "default",
     "ai.review.operation.name": traceOptions.operationName || "chat",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
@@ -826,12 +868,14 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         const result = await client.prompt({
           agent: agentName,
           model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
-          variant: MODEL_VARIANT,
+          variant,
           system: truncatedSystem,
           text: truncatedUser,
           title: `ai-review:${traceOptions.agentKey || agentName}${traceOptions.pass ? `:pass-${traceOptions.pass}` : ""}`,
           timeoutMs,
+          wrapUp: traceOptions.wrapUp,
         });
+        if (result.wrappedUp) console.warn(`[${isoNow()}] ${agentName}: interrupted near its timeout and asked for its findings`);
         if (result.rejectedPermissions > 0) {
           console.warn(`[${isoNow()}] ${agentName}: rejected ${result.rejectedPermissions} permission request(s)`);
         }
@@ -844,8 +888,9 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
           "ai.review.output.chars": result.text.length,
           "ai.review.attempts": attempt,
           "opencode.permission_rejections": result.rejectedPermissions,
+          "ai.review.wrapped_up": Boolean(result.wrappedUp),
         });
-        return { text: result.text, responseId: result.responseId };
+        return { text: result.text, responseId: result.responseId, wrappedUp: Boolean(result.wrappedUp) };
       } catch (err) {
         failedUsage = addUsage(failedUsage, err?.usage);
         const retry = shouldRetry({
@@ -945,6 +990,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
         agentName: agentDef.name,
         pass,
         operationName: "code_review",
+        wrapUp: REVIEWER_WRAP_UP,
       },
     );
     const text = completion.text;
@@ -964,9 +1010,10 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
       "review.elapsed_seconds": Number(elapsed),
       "review.findings": findings.length,
       "review.raw_text_length": text.length,
+      "review.wrapped_up": completion.wrappedUp,
       "gen_ai.response.id": completion.responseId,
     });
-    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed };
+    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed, wrappedUp: completion.wrappedUp };
   } catch (err) {
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.error(`[${isoNow()}] ${label} FAILED after ${elapsed}s: ${err.message}`);
@@ -1146,6 +1193,10 @@ function noteReviewedHead(prNumber, comment) {
   noteOnComment(prNumber, comment, bodyAtReviewedHead(comment.body, REVIEW_MAX_PASSES));
 }
 
+function noteFailedRun(prNumber, comment, key) {
+  if (comment) noteOnComment(prNumber, comment, bodyAtFailedRun(comment.body, key));
+}
+
 function noteSkippedPush(prNumber, comment, key) {
   noteOnComment(prNumber, comment, bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key));
 }
@@ -1262,6 +1313,34 @@ function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlin
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
+// A variant the config does not declare would fail every session, so the run stops before it claims a pass.
+function variantProblem() {
+  let config;
+  try {
+    config = JSON.parse(stripJsonc(readFileSync(OPENCODE_CONFIG_PATH, "utf-8")));
+  } catch (err) {
+    return `cannot read ${OPENCODE_CONFIG.file}: ${err.message}`;
+  }
+  const known = modelVariantIds(config, PROVIDER_ID, MODEL_ID);
+  const unknown = [...new Set([MODEL_VARIANT, COORDINATOR_VARIANT])].filter(v => v && !known.includes(v));
+  return unknown.length > 0 ? `variant "${unknown.join('", "')}" is not declared for ${MODEL_SLUG} in ${OPENCODE_CONFIG.file} (declared: ${known.join(", ") || "none"})` : "";
+}
+
+// Fetched ahead of the cap check, and only when the comment holds a fingerprint, so a push that changed nothing is skipped even past the cap.
+function unchangedDiffCheck(prNumber, comment) {
+  const force = REVIEW_MANUAL_RUN || REVIEW_IGNORE_PASS_LIMIT || process.env.FORCE_FULL === "true";
+  if (force || !reviewedDiffFingerprint(comment?.body)) return null;
+  try {
+    const fetched = fetchPrDiff(prNumber);
+    const fingerprint = diffFingerprint(fetched.diff);
+    const unchanged = shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned, force }) && hunksLocatable(fetched.diff, readBaseFile);
+    return { fetched, unchanged };
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not fetch the diff to compare with the last review, so it is reviewed: ${execErrorText(err).slice(0, 300)}`);
+    return null;
+  }
+}
+
 function prepareReviewTree(rootSpan) {
   if (!PR_DIR) {
     if (process.env.GITHUB_ACTIONS === "true") throw new Error("PR_DIR is required in CI: the PR must be reviewed from its own sanitized checkout");
@@ -1323,6 +1402,7 @@ async function main() {
       maxPasses: REVIEW_MAX_PASSES,
       ignorePassLimit: REVIEW_IGNORE_PASS_LIMIT,
       forceFull: process.env.FORCE_FULL === "true",
+      manual: REVIEW_MANUAL_RUN,
     });
     const gate = createAutoApproveGate({
       mode: AUTO_APPROVE_MODE,
@@ -1333,6 +1413,15 @@ async function main() {
     });
     // Ahead of the cap skip too: a push the cap leaves unreviewed must still lose the earlier approval.
     if (skipReason !== "already_reviewed") gate.start();
+    const early = skipReason === "already_reviewed" ? null : unchangedDiffCheck(prNumber, existingComment);
+    if (early?.unchanged) {
+      console.log(`[${isoNow()}] PR #${prNumber} skipped (unchanged_diff): ${headKey} changes the same lines the last review read. Dispatch the workflow to review it again.`);
+      const kept = bodyAtUnchangedDiff(existingComment.body, headKey, REVIEW_MAX_PASSES);
+      noteOnComment(prNumber, existingComment, AUTO_APPROVE_MODE === "approve" ? withoutCarriedApproval(kept) : kept);
+      outcome = "skipped";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "unchanged_diff" });
+      return;
+    }
     if (skipReason) {
       console.log(`[${isoNow()}] PR #${prNumber} skipped (${skipReason}): ${headKey || "no head"}, ${passesDone} review(s) so far. Dispatch the workflow with ignore_pass_limit to review again.`);
       if (skipReason === "pass_limit_reached") noteSkippedPush(prNumber, existingComment, headKey);
@@ -1366,7 +1455,14 @@ async function main() {
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
+    const variantError = variantProblem();
+    if (variantError) {
+      outcome = "misconfigured";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "unknown_variant" });
+      noteFailedRun(prNumber, existingComment, headKey);
+      throw new Error(`${variantError}; fix AI_REVIEW_EFFORT or AI_REVIEW_COORDINATOR_EFFORT.`);
+    }
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured, reviewers at "${MODEL_VARIANT || "default"}", coordinator at "${COORDINATOR_VARIANT || "default"}"`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
@@ -1376,7 +1472,7 @@ async function main() {
     let diffPinned = false;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      ({ diff, own: ownDiff, pinned: diffPinned } = fetchPrDiff(prNumber));
+      ({ diff, own: ownDiff, pinned: diffPinned } = early?.fetched ?? fetchPrDiff(prNumber));
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
@@ -1393,7 +1489,10 @@ async function main() {
     const rawFiles = parseDiffFiles(diff);
     const filtered = filterDiff(diff);
     const changedLines = filtered.totalAdded + filtered.totalRemoved;
+    // The unfiltered diff: a lockfile or asset the filter hides still changes what the verdict covers.
+    const fingerprint = diffFingerprint(diff);
     TRACE.endSpan(filterSpan, {
+      "diff.fingerprint": fingerprint,
       "diff.changed_lines": changedLines,
       "diff.filtered_files": filtered.files.length,
       "diff.skipped_files": rawFiles.length - filtered.files.length,
@@ -1651,8 +1750,12 @@ async function main() {
     // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
     const reviewed = completedAgents.length > 0;
     const passes = reviewed ? passesDone + 1 : passesDone;
+    const complete = reviewComplete(passResults, coordinatorResult);
+    // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed.
+    const fullyRead = diff.length <= MAX_DIFF_TOKENS;
+    if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
-    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove) });
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
     TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 

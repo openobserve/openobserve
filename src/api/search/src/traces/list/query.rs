@@ -199,23 +199,32 @@ pub fn build_llm_trace_query(
     };
 
     if validated.has_gen_ai {
+        let usage = |column: &str| validated.usage_sum(column);
         let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
+            format!(
+                "{} as gen_ai_usage_details_total",
+                usage("gen_ai_usage_total_tokens")
+            )
         } else {
-            "0 as gen_ai_usage_details_total"
+            "0 as gen_ai_usage_details_total".to_string()
         };
+        let input_tokens_expr = usage("gen_ai_usage_input_tokens");
+        let output_tokens_expr = usage("gen_ai_usage_output_tokens");
+        let cost_expr = usage("gen_ai_usage_cost");
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            {input_tokens_expr} as gen_ai_usage_details_input, \
+            {output_tokens_expr} as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {cost_expr} as gen_ai_usage_cost_details, \
+            {}, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM {stream_ident}"
+            FROM {stream_ident}",
+            validated.unpriced_selects()
         )
     } else {
         let total_tokens_expr = if validated.has_total_tokens {
@@ -380,6 +389,37 @@ mod tests {
             let sql = build_llm_trace_query("evil\" x", &validated, "count(*) AS span_count");
             assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");
         }
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_sums_only_llm_call_spans() {
+        let mut validated = schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_total_tokens = true;
+        validated.has_operation_name = true;
+        let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
+        let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
+                        ('chat', 'text_completion', 'generate_content', 'embeddings'))";
+        for (column, alias) in [
+            ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
+            ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),
+            ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
+            ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
+        ] {
+            let expected = format!("sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END) as {alias}");
+            assert!(sql.contains(&expected), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_plain_sums_without_operation_name() {
+        let mut validated = schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_total_tokens = true;
+        let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
+        assert!(sql.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input"));
+        assert!(sql.contains("sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output"));
+        assert!(sql.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"));
+        assert!(sql.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
+        assert!(!sql.contains("gen_ai_operation_name"), "{sql}");
     }
 
     #[test]

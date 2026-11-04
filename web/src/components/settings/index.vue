@@ -26,9 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
+    <!-- A section whose API needs online evaluations, on a server with them off. -->
+    <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
+    <div v-else-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
         :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
@@ -71,6 +73,8 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
+import { useOnlineEvalsRouteOff } from "@/composables/shared/useOnlineEvalsGate";
+import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
 
 export default defineComponent({
   name: "AppSettings",
@@ -79,6 +83,7 @@ export default defineComponent({
     ConstrainedPage,
     OPageLayout,
     SectionRail,
+    OnlineEvalsDisabled,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -105,6 +110,7 @@ export default defineComponent({
       alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
+      modelPricingGaps: "model_pricing",
       llmProviders: "llm_providers",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
@@ -136,6 +142,7 @@ export default defineComponent({
       "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
+    const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 
     const slackVisible = computed(() => {
       const edition = buildFeatureGateContext(store.state.zoConfig);
@@ -547,6 +554,7 @@ export default defineComponent({
       isMetaOrg,
       activeSection,
       isConstrainedSection,
+      onlineEvalsRouteOff,
       activeSectionItem,
       sectionGroups,
       handleSettingsRouting,

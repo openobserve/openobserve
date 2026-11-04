@@ -315,6 +315,8 @@ use crate::{
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        openobserve_api_management::request::gen_ai_health::get_data_health,
+        openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
@@ -607,6 +609,18 @@ use crate::{
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_api_management::request::gen_ai_health::DataHealthResponse,
+            openobserve_api_management::request::gen_ai_health::HealthCheck,
+            openobserve_api_management::request::gen_ai_health::ModelUsage,
+            openobserve_api_management::request::gen_ai_health::CheckId,
+            openobserve_api_management::request::gen_ai_health::CheckStatus,
+            openobserve_api_management::request::model_pricing::UnpricedModelsResponse,
+            openobserve_api_management::request::model_pricing::UnpricedModel,
+            openobserve_api_management::request::model_pricing::UnpricedModelMatch,
+            openobserve_api_management::request::gen_ai_health::UnpricedModelRow,
+            config::meta::model_pricing::CostStatus,
+            config::meta::model_pricing::PricingSource,
+            config::meta::model_pricing::PricingTierDefinition,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
             config::meta::dashboards::v1::Dashboard,
@@ -945,6 +959,7 @@ use crate::{
             config::meta::fleet::ValidationFailed,
             config::meta::fleet::AuditEvent,
             config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
             config::meta::fleet::DeliveryState,
             config::meta::fleet::RolloutStart,
             config::meta::fleet::Batching,
@@ -1050,6 +1065,7 @@ use crate::{
         (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
         (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
         (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
         (name = "Groups", description = "User group management"),
         (name = "Keys", description = "Cipher key management (enterprise)"),
         (name = "LLM", description = "LLM model pricing definitions"),
@@ -1173,6 +1189,13 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1313,6 +1336,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::snooze_response,
     openobserve_api_management::request::oncall::test_team_slack_channel,
     openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
     openobserve_api_management::request::oncall::update_ownership_rule,
     openobserve_api_management::request::oncall::update_team,
     openobserve_api_management::request::oncall::who_is_on_call,
@@ -1702,6 +1726,22 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put"),
         ("/api/{org_id}/workflows/{id}/history", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
     ];
 
     /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
@@ -1723,6 +1763,33 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
         ("/api/{org_id}/workflows/{id}/history", "get", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
     ];
 
     const SLACK_OPERATIONS: &[(&str, &str)] = &[
@@ -2157,6 +2224,34 @@ mod tests {
     }
 
     #[test]
+    fn unpriced_models_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/llm/models/unpriced"]["get"];
+        assert_eq!(op["operationId"], "ListUnpricedModels", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/UnpricedModelsResponse"
+        );
+        for code in ["403", "429"] {
+            assert!(op["responses"][code].is_object(), "{code}");
+            assert!(
+                spec["paths"]["/api/{org_id}/gen_ai/data_health"]["get"]["responses"][code]
+                    .is_object(),
+                "data_health {code}"
+            );
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "UnpricedModelsResponse",
+            "UnpricedModel",
+            "UnpricedModelMatch",
+            "UnpricedModelRow",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
     fn fleet_reads_are_documented_with_their_403() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         for path in [
@@ -2533,6 +2628,9 @@ mod tests {
     fn workflows_document_the_statuses_their_handlers_return() {
         let base = "/api/{org_id}/workflows";
         let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
             (base, "get", &["200", "403", "404", "500"]),
@@ -2547,7 +2645,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
@@ -2573,6 +2671,29 @@ mod tests {
                 "/api/{org_id}/workflows/promote/{id}",
                 "post",
                 &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
             ),
         ]);
     }
