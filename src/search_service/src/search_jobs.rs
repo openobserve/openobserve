@@ -40,6 +40,12 @@ use tokio::sync::mpsc;
 
 use crate::grpc_search::{grpc_search, grpc_search_partition};
 
+#[derive(Debug, PartialEq)]
+enum Partitions {
+    Finished,
+    Paused,
+}
+
 // 1. get the oldest job from `search_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
 //    do not have previous run (case 2) in case 2, call search_partition to get all jobs, write to
@@ -108,34 +114,16 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     };
     let offset = req.query.from;
     let partition_jobs = get_partition_jobs(&job.id).await?;
-    let (partition_jobs, mut need) = filter_partition_job(partition_jobs, limit, offset).await?;
+    let (partition_jobs, need) = filter_partition_job(partition_jobs, limit, offset).await?;
 
     // if need <= 0, means all partition jobs are done, but not generate the final result
     if need > 0 {
-        for partition_job in partition_jobs.iter() {
-            // check if the job is still running
-            check_status(id, &job.id, &job.org_id).await?;
-            // not failed: finished partitions stay, and the stale-job reset requeues it
-            if let Some(reason) = job_pause_reason() {
-                log::warn!("[SEARCH JOB {id}] job_id: {}, paused: {reason}", job.id);
-                return Ok(());
-            }
-            let res = run_partition_job(id, &job, partition_job, req.clone(), need).await;
-            let total = match res {
-                Ok(total) => total,
-                Err(e) => {
-                    set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
-                    log::error!(
-                        "[SEARCH JOB {id}] job_id: {}, run_partition_job error: {e}",
-                        job.id
-                    );
-                    return Err(e);
-                }
-            };
-            need -= total;
-            if need <= 0 {
-                break;
-            }
+        let run_one = |partition_job: PartitionJob, need: i64| {
+            let (job, req) = (&job, req.clone());
+            async move { run_partition_job(id, job, &partition_job, req, need).await }
+        };
+        if run_partitions(id, &job, partition_jobs, need, run_one).await? == Partitions::Paused {
+            return Ok(());
         }
     }
 
@@ -162,6 +150,46 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     );
 
     Ok(())
+}
+
+/// Runs the partitions in order until `need` rows are found, unless search is blocked first.
+async fn run_partitions<F, Fut>(
+    id: i64,
+    job: &Job,
+    partition_jobs: Vec<PartitionJob>,
+    mut need: i64,
+    mut run_one: F,
+) -> Result<Partitions, anyhow::Error>
+where
+    F: FnMut(PartitionJob, i64) -> Fut,
+    Fut: std::future::Future<Output = Result<i64, anyhow::Error>>,
+{
+    for partition_job in partition_jobs {
+        // check if the job is still running
+        check_status(id, &job.id, &job.org_id).await?;
+        if let Some(reason) = job_pause_reason() {
+            log::warn!("[SEARCH JOB {id}] job_id: {}, paused: {reason}", job.id);
+            // pending, not failed, so the next claim resumes after the finished partitions
+            set_job_pending(&job.id).await?;
+            return Ok(Partitions::Paused);
+        }
+        let total = match run_one(partition_job, need).await {
+            Ok(total) => total,
+            Err(e) => {
+                set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
+                log::error!(
+                    "[SEARCH JOB {id}] job_id: {}, run_partition_job error: {e}",
+                    job.id
+                );
+                return Err(e);
+            }
+        };
+        need -= total;
+        if need <= 0 {
+            break;
+        }
+    }
+    Ok(Partitions::Finished)
 }
 
 // 1. call search_partition to get all time range
@@ -622,10 +650,14 @@ mod tests {
         assert_eq!(job_pause_reason(), None);
     }
 
+    // the job tests claim every pending job before their own, so they must not interleave
+    static JOBS_TABLE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[tokio::test]
     async fn a_paused_job_resumes_with_its_finished_partitions() {
         use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
+        let _table = JOBS_TABLE.lock().await;
         infra::db_init().await.unwrap();
         infra::table::migrate().await.unwrap();
         let id = submit(
@@ -694,6 +726,78 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_job_paused_between_partitions_goes_back_to_pending_with_the_finished_one() {
+        use std::sync::{Arc, Mutex};
+
+        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+
+        let _table = JOBS_TABLE.lock().await;
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let id = submit(
+            "p1b3-paused-mid",
+            "acme",
+            "u@paused.test",
+            "logs",
+            r#"["logs"]"#,
+            "{}",
+            0,
+            10,
+        )
+        .await
+        .unwrap();
+        let job = loop {
+            let claimed = get_job()
+                .await
+                .unwrap()
+                .expect("the submitted job is pending");
+            if claimed.id == id {
+                break claimed;
+            }
+        };
+        set_partition_num(&id, 2).await.unwrap();
+        submit_partitions(&id, &[[0, 5], [5, 10]]).await.unwrap();
+        let mut partitions = get_partition_jobs(&id).await.unwrap();
+        partitions.sort_by_key(|p| p.partition_id);
+
+        // holding the lock keeps the gate open, since every test that closes it holds the lock
+        let open = Arc::new(tokio::sync::Mutex::new(Some(
+            TEST_STATICS_LOCK.lock().await,
+        )));
+        let closed = Arc::new(tokio::sync::Mutex::new(None));
+        let ran = Arc::new(Mutex::new(Vec::new()));
+        let run_one = |partition: PartitionJob, _need: i64| {
+            let (open, closed, ran, id) = (open.clone(), closed.clone(), ran.clone(), id.clone());
+            async move {
+                ran.lock().unwrap().push(partition.partition_id);
+                set_partition_job_finish(&id, partition.partition_id, "result/paused-mid/0.json")
+                    .await?;
+                drop(open.lock().await.take());
+                *closed.lock().await = Some(close_search_gate_for_tests().await);
+                Ok(1)
+            }
+        };
+        let outcome = run_partitions(1, &job, partitions, 10, run_one).await;
+        let status = get(&id, "acme").await.unwrap().status;
+        let mut state: Vec<(i64, Option<String>)> = get_partition_jobs(&id)
+            .await
+            .unwrap()
+            .iter()
+            .map(|p| (p.partition_id, p.result_path.clone()))
+            .collect();
+        state.sort();
+        drop(closed.lock().await.take());
+
+        assert_eq!(outcome.unwrap(), Partitions::Paused);
+        assert_eq!(*ran.lock().unwrap(), [0], "the second partition never runs");
+        assert_eq!(status, 0, "pending, so a worker claims it again");
+        assert_eq!(
+            state,
+            [(0, Some("result/paused-mid/0.json".to_string())), (1, None)]
+        );
+    }
+
     fn run_body() -> &'static str {
         let source = include_str!("search_jobs.rs");
         let start = source.find("pub async fn run(").unwrap();
@@ -707,21 +811,5 @@ mod tests {
             .find("search_allowed()")
             .expect("run must check the licence");
         assert!(check < body.find("get_job()").unwrap());
-    }
-
-    #[test]
-    fn worker_checks_the_licence_before_each_partition() {
-        let body = run_body();
-        let loop_start = body.find("for partition_job in").unwrap();
-        let pause = loop_start
-            + body[loop_start..]
-                .find("job_pause_reason(")
-                .expect("each partition must check the licence");
-        let run = loop_start + body[loop_start..].find("run_partition_job(").unwrap();
-        assert!(pause < run);
-        assert!(
-            !body[pause..run].contains("set_job_error_message"),
-            "a paused job must not be marked failed"
-        );
     }
 }
