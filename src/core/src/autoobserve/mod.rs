@@ -15,6 +15,7 @@
 
 //! The OSS half of the AutoObserve engine: its ports, and its start-up registration.
 
+pub mod incidents;
 pub mod ports;
 
 use config::{cluster::LOCAL_NODE, utils::time::now_micros};

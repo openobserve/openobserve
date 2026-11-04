@@ -290,7 +290,7 @@ pub fn ports() -> Ports {
         kv: Arc::new(KvAdapter),
         stream_stats: Arc::new(StreamStatsAdapter::default()),
         ai_usage: Arc::new(NoAiUsage),
-        investigation: None,
+        investigation: Some(Arc::new(super::incidents::IncidentInvestigation)),
         triggers: Arc::new(EngineTrigger),
     }
 }
@@ -694,10 +694,13 @@ mod tests {
             cfg.limit.max_file_retention_time,
             cfg.limit.calculate_stats_interval,
         );
-        let orgs = db::schema::list_organizations_from_cache().await.len();
-        assert_eq!(
-            StreamStatsAdapter::default().refresh_us().await,
-            Some(stats_refresh_us(wal, stats, orgs))
+        // Other tests in this binary write streams, so the org count can grow during the call.
+        let before = db::schema::list_organizations_from_cache().await.len();
+        let refresh = StreamStatsAdapter::default().refresh_us().await;
+        let after = db::schema::list_organizations_from_cache().await.len();
+        assert!(
+            (before..=after).any(|orgs| refresh == Some(stats_refresh_us(wal, stats, orgs))),
+            "{refresh:?} for {before}..={after} orgs"
         );
     }
 
@@ -755,9 +758,28 @@ mod tests {
         assert!(matches!(permit, AiPermit::Refused(_)));
     }
 
-    #[test]
-    fn the_ports_leave_investigations_unwired() {
-        assert!(ports().investigation.is_none());
+    #[tokio::test]
+    async fn the_ports_wire_investigations_to_the_incident_path() {
+        use o2_enterprise::enterprise::autoobserve::{
+            contract::{ActionKind, ActionRequest},
+            ports::ActionRefused,
+        };
+
+        let port = ports().investigation.expect("the incident path is wired");
+        let request = ActionRequest {
+            org: "demo-org".into(),
+            entity_type: "stream".into(),
+            entity_id: "logs/checkout".into(),
+            decision_kind: "stream_silence".into(),
+            group_key: String::new(),
+            action: ActionKind::Investigate,
+            signal_at: 1,
+        };
+        let e = port.start(&request).await.unwrap_err();
+        assert!(
+            e.downcast_ref::<ActionRefused>().is_some(),
+            "incidents are off here: {e}"
+        );
     }
 
     /// Deleting a stream drops its cached settings, so the re-created stream is bounded again.
