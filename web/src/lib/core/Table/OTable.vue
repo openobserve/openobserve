@@ -1330,8 +1330,9 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
-    // A leading body row is content of its own, so it paints even with no data rows.
+    // A leading or trailing body row is content of its own, so it paints even with no data rows.
     !slots["body-start"] &&
+    !slots["body-end"] &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
@@ -1756,6 +1757,10 @@ defineExpose({
 
             <template v-if="slots['body-start']" #body-start>
               <slot name="body-start" />
+            </template>
+
+            <template v-if="slots['body-end']" #body-end>
+              <slot name="body-end" />
             </template>
 
             <!-- Section heading row -->

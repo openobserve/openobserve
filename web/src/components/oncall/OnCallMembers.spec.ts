@@ -854,7 +854,7 @@ describe("OnCallMembers", () => {
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
       expect(wrapper.find('[data-test="oncall-members-away-zone"]').text()).toContain(
-        "times in Asia/Kolkata",
+        "Asia/Kolkata",
       );
       await wrapper
         .find('[data-test="oncall-members-away-from-date"] input')

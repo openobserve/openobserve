@@ -784,4 +784,14 @@ describe("OnCallScheduleTimeline", () => {
 
     expect(usersService.orgUsers).toHaveBeenCalledTimes(1);
   });
+
+  // G15: the zone is a small chip, and only for a reader on another clock (specs pin UTC).
+  it("names the team's zone as a chip only when it differs from the reader's", () => {
+    expect(render({ timezone: "UTC" }).find('[data-test="oncall-timeline-zone"]').exists()).toBe(
+      false,
+    );
+    const chip = render({ timezone: "Asia/Kolkata" }).find('[data-test="oncall-timeline-zone"]');
+    expect(chip.text()).toContain("Asia/Kolkata");
+    expect(chip.text()).not.toContain("times in");
+  });
 });

@@ -34,7 +34,11 @@ vi.mock("@/services/users", () => ({
 }));
 
 const stubs = {
-  OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
+  OTag: {
+    name: "OTag",
+    props: ["variant", "type", "value", "label"],
+    template: "<span>{{ label }}<slot /></span>",
+  },
   OTooltip: {
     name: "OTooltip",
     props: ["content"],
@@ -168,10 +172,73 @@ describe("OnCallEscalationLadder", () => {
   it("offers every priority, including the ones that wake nobody", () => {
     const wrapper = render();
 
-    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 steps");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("1 step");
     expect(wrapper.find('[data-test="oncall-ladder-priority-p4"]').text()).toContain(
       "Pages nobody",
     );
+  });
+
+  /// The chip counts the rows the card draws, so a folded repeat is not a step the reader cannot find.
+  it("counts the steps the card draws, folding repeats", () => {
+    const whole = (after: number) => ({
+      after_micros: after,
+      targets: ["the whole team"],
+      recipients: [person()],
+      resolves_to_nobody: false,
+    });
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the on-call"],
+            recipients: [person()],
+            resolves_to_nobody: false,
+          },
+          whole(5 * MICROS_PER_MINUTE),
+          whole(15 * MICROS_PER_MINUTE),
+        ],
+      }),
+    });
+
+    expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("2 steps");
+  });
+
+  /// An unselected priority has no preview, so the policy's steps are folded the same way.
+  it("folds an unselected priority's repeated steps from the policy", () => {
+    const policy = {
+      ...sharedPolicy,
+      rungs: sharedPolicy.rungs.map((rung) =>
+        rung.priority === 2
+          ? {
+              ...rung,
+              steps: [
+                ...oneStep,
+                { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" as const }] },
+                {
+                  after_micros: 15 * MICROS_PER_MINUTE,
+                  targets: [{ kind: "whole_team" as const }],
+                },
+              ],
+            }
+          : rung,
+      ),
+    };
+    const wrapper = render({ priorities: [paging("P1", 2), paging("P2", 3)], policy });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2"]').text()).toContain("2 steps");
+  });
+
+  /// The chips carry the same priority colours the Pages list does.
+  it("draws each chip's priority as the shared priority badge", () => {
+    const wrapper = render();
+    const tag = wrapper
+      .find('[data-test="oncall-ladder-priority-p1"]')
+      .findComponent({ name: "OTag" });
+
+    expect(tag.props("type")).toBe("alertPriority");
+    expect(tag.props("value")).toBe("p1");
   });
 
   it("names each priority's channels once, on its chip", () => {
@@ -180,7 +247,7 @@ describe("OnCallEscalationLadder", () => {
     });
 
     expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain(
-      "Email, SMS, Voice call · 3 steps",
+      "Email, SMS, Voice call · 1 step",
     );
   });
 
@@ -666,7 +733,8 @@ describe("OnCallEscalationLadder", () => {
 
     // Plain text in one fixed column, so every row's "who" starts on the same line.
     expect(times).toEqual(["At once", "After 5 min"]);
-    expect(wrapper.find('[data-test="oncall-ladder-ends-time"]').text()).toBe("After 5 min");
+    // The ending fires with the last step, so it says "Then" rather than repeat that step's delay.
+    expect(wrapper.find('[data-test="oncall-ladder-ends-time"]').text()).toBe("Then");
     // The time column has one fixed width on every row, the ending's included.
     for (const cell of wrapper.findAll(
       '[data-test^="oncall-ladder-rung-time-"], [data-test="oncall-ladder-ends-time"]',
@@ -743,7 +811,8 @@ describe("OnCallEscalationLadder", () => {
     const names = wrapper.findAllComponents({ name: "OnCallPersonName" });
     expect(names.length).toBeGreaterThan(0);
     expect(names[0].props("email")).toBe("ana@o2.ai");
-    expect(names[0].findComponent({ name: "OTooltip" }).props("content")).toBe("ana@o2.ai");
+    // No display name known, so the tooltip carries the address alone, once.
+    expect(names[0].findComponent({ name: "OTooltip" }).text()).toBe("ana@o2.ai");
   });
 
   it("offers no Add a step to a reader who cannot change the policy", () => {

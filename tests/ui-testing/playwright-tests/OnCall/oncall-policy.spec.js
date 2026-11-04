@@ -360,10 +360,10 @@ test.describe('On-call escalation policy editor', {
     await pm.oncallPolicyEditorPage.openTab('delivery');
     await pm.oncallPolicyEditorPage.expectTeamChannelVisible();
     await pm.oncallPolicyEditorPage.expectChannelSilentWarning();
-    const silentSource = await pm.oncallPolicyEditorPage.readChannelSourceText();
-    expect(silentSource.toLowerCase(),
+    const silentSource = await pm.oncallPolicyEditorPage.readChannelSource();
+    expect(silentSource,
       'the screen must attribute the deliberate silence to the team')
-      .toContain('team');
+      .toBe('team');
 
     // None — never set, so the policy's list applies again.
     await pm.oncallPolicyEditorPage.clearTeamChannel();
@@ -382,10 +382,10 @@ test.describe('On-call escalation policy editor', {
       .toEqual([]);
     await pm.oncallPolicyEditorPage.openEditor();
     await pm.oncallPolicyEditorPage.openTab('delivery');
-    const policySource = await pm.oncallPolicyEditorPage.readChannelSourceText();
-    expect(policySource.toLowerCase(),
+    const policySource = await pm.oncallPolicyEditorPage.readChannelSource();
+    expect(policySource,
       'and the screen must now attribute it to the policy instead')
-      .toContain('policy');
+      .toBe('policy');
   });
 
   /**

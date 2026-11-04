@@ -164,6 +164,23 @@ describe("OnCallOwnership", () => {
     expect(wrapper.emitted("rules-loaded")?.[0]).toEqual([1]);
   });
 
+  /// The team tab is the org list filtered, so a row offers the same Test, Edit and Delete.
+  it("opens Test routing from a rule row, seeded with that rule", async () => {
+    const wrapper = render();
+    await settle();
+    await wrapper.find('[data-test="oncall-routing-test-checkout"]').trigger("click");
+    await settle();
+
+    const simulator = wrapper.findComponent({ name: "OnCallRoutingSimulator" });
+    expect(simulator.exists()).toBe(true);
+    expect(simulator.props("seed")).toEqual({ service: "checkout" });
+    simulator.vm.$emit("run", { dimensions: { service: "checkout" }, priority: "P1" });
+    await flushPromises();
+    expect(service.previewRouting).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { dimensions: { service: "checkout" } } }),
+    );
+  });
+
   it("shows the catch-all line only on the default team, pointing at Routing", async () => {
     routingConfig("team_1");
     const wrapper = render();

@@ -26,11 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
       <OText variant="panel-title">{{ t("oncall.teamRecentPages") }}</OText>
-      <!-- Suppressed mid-fetch: "0 in the last 7 days" under a skeleton is an
-           answer, and it is the wrong one. -->
-      <OText v-if="!loading" variant="meta" data-test="oncall-recent-pages-window">
-        {{ windowLabel }}
-      </OText>
       <OButton
         variant="ghost-primary"
         size="xs"
@@ -73,19 +68,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-responder="{ row }">
-        <span
+        <i18n-t
           v-if="row.acked_by && row.acked_at"
+          keypath="oncall.teamAckedByIn"
+          tag="span"
+          scope="global"
           class="text-text-secondary text-sm"
           :data-test="`oncall-recent-pages-responder-${row.id}`"
         >
-          {{
-            t("oncall.teamAckedByIn", {
-              who: raw(nameOf(row.acked_by)),
-              took: raw(formatMicrosDuration(row.acked_at - row.opened_at)),
-            })
-          }}
-          <OTooltip :content="personTooltip(row.acked_by)" />
-        </span>
+          <template #who><OnCallPersonName :email="row.acked_by" /></template>
+          <template #took>{{ raw(formatMicrosDuration(row.acked_at - row.opened_at)) }}</template>
+        </i18n-t>
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
 
@@ -117,19 +110,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { reachedStepOf } from "@/utils/oncall";
 
@@ -142,27 +134,16 @@ const props = withDefaults(
      * Read from the policy rather than per-record, which needs no extra request.
      */
     policy?: OnCallPolicy | null;
-    /** How many days the window covers — the header states it. */
-    windowDays?: number;
     /** How many rows to show before deferring to the full list. */
     limit?: number;
     loading?: boolean;
   }>(),
-  { pages: () => [], policy: null, windowDays: 7, limit: 3, loading: false },
+  { pages: () => [], policy: null, limit: 3, loading: false },
 );
 
 const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
-const { nameOf } = useOrgUserNames();
-
-/// Names can repeat across an org, so the email is one hover away.
-function personTooltip(email: string): I18nText {
-  const name = nameOf(email);
-  return name === email
-    ? raw(email)
-    : t("oncall.personNameWithEmail", { name: raw(name), email: raw(email) });
-}
 const { isMobile } = useBreakpoint();
 
 /// The ladder's steps for this record's priority, earliest first.
@@ -219,16 +200,4 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     size: 160,
   },
 ]);
-
-/// "3 of 6 in the last 7 days" — a truncated list that does not say it is
-/// truncated reads as the whole history of the team.
-const windowLabel = computed<I18nText>(() =>
-  props.pages.length > rows.value.length
-    ? t("oncall.teamRecentPagesWindowOf", {
-        shown: rows.value.length,
-        total: props.pages.length,
-        days: props.windowDays,
-      })
-    : t("oncall.teamRecentPagesWindow", { count: props.pages.length, days: props.windowDays }),
-);
 </script>

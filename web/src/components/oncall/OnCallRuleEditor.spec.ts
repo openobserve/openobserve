@@ -120,18 +120,16 @@ describe("OnCallRuleEditor", () => {
     ]);
   });
 
-  // One unit on every value: a service count beside a trigger count read as two different answers.
-  it("offers known values counted in one unit, triggers in the last 30 days", () => {
+  // Counts exist only for values that needed an owner, so none carries one rather than some.
+  it("offers known values busiest first, with no count on any of them", () => {
     const wrapper = render();
     const options = select(wrapper, "oncall-rule-editor-value-0").props("options") as {
       value: string;
       subLabel?: string;
     }[];
-    expect(options[0]).toMatchObject({ value: "risk-api", subLabel: "6 triggers, last 30 days" });
-    expect(options.find((o) => o.value === "fraud-scorer")?.subLabel).toBe(
-      "3 triggers, last 30 days",
-    );
-    expect(options.find((o) => o.value === "checkout")?.subLabel).toBeUndefined();
+    expect(options[0].value).toBe("risk-api");
+    expect(options.map((o) => o.value)).toContain("checkout");
+    expect(options.every((o) => o.subLabel === undefined)).toBe(true);
   });
 
   it("writes starts with as the engine's trailing *", async () => {
@@ -235,6 +233,35 @@ describe("OnCallRuleEditor", () => {
     expect(fields[0].label).toBe("K8s namespace");
   });
 
+  /// A claim names an owner for one signal: the title says whose, and the outcome says where alerts like it go.
+  it("titles a claim for its team and states where future alerts go", async () => {
+    const wrapper = render({
+      open: false,
+      teamId: "team_2",
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(dialog(wrapper).props("title")).toBe("Claim for Payments");
+    const outcome = wrapper.find('[data-test="oncall-rule-editor-outcome"]').text();
+    expect(outcome).toBe("Future alerts like this go to Payments");
+    expect(outcome).not.toContain("Matches");
+  });
+
+  it("asks for an owner, with no queue count, until a claim has a team", async () => {
+    const wrapper = render({
+      open: false,
+      teamId: "",
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(dialog(wrapper).props("title")).toBe("Give it an owner");
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').exists()).toBe(false);
+  });
+
   // A claim arrives as dimensions; the picker names the signal they came from instead of "Choose…".
   it("names the claimed signal in the start-from picker", async () => {
     const wrapper = render({
@@ -281,7 +308,9 @@ describe("OnCallRuleEditor", () => {
       "On call now: Ana Silva",
     );
     const person = wrapper.findComponent(OnCallPersonName);
-    expect(person.findComponent(OTooltip).props("content")).toBe("Ana Silva (ana@example.com)");
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(person.props("email")).toBe("ana@example.com");
+    expect(person.findComponent(OTooltip).exists()).toBe(true);
   });
 
   it("hides the on-call line when the schedule cannot be read", async () => {

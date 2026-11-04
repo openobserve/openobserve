@@ -173,8 +173,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
+      <!-- On a team's tab the catch-all is this team's last rule, so it reads as the last row rather than as pager chrome. -->
+      <template v-if="catchAll === 'team'" #body-end>
+        <tr data-test="oncall-routing-catch-all-row">
+          <td :colspan="columns.length + 1" class="border-table-row-divider border-b px-4 py-2">
+            <!-- On a phone the row is as wide as every column, so its content wraps within the screen and stays put on scroll. -->
+            <span
+              class="flex flex-wrap items-center gap-2 max-md:sticky max-md:start-4 max-md:max-w-[80vw]"
+              data-test="oncall-routing-catch-all"
+            >
+              <span class="text-text-body text-sm" data-test="oncall-routing-catch-all-team">
+                {{ t("oncall.routingDefaultAlsoGets") }}
+              </span>
+              <OButton
+                v-if="editable"
+                variant="outline"
+                size="xs"
+                icon-left="alt-route"
+                data-test="oncall-routing-catch-all-set"
+                @click="emit('change-default')"
+              >
+                {{ catchAllAction }}
+              </OButton>
+            </span>
+          </td>
+        </tr>
+      </template>
+
       <!-- Where an alert lands once every rule above has failed, said once under the table. -->
-      <template v-if="catchAll" #footer-note>
+      <template v-else-if="catchAll" #footer-note>
         <span class="flex flex-wrap items-center gap-2" data-test="oncall-routing-catch-all">
           <span
             class="text-sm"
@@ -186,16 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-heading font-semibold">{{ defaultTeamName }}</span>
               </template>
             </i18n-t>
-            <template v-else-if="catchAll === 'unset'">
-              {{ t("oncall.routingEverythingElseNobody") }}
-            </template>
-            <template v-else>{{ t("oncall.routingDefaultAlsoGets") }}</template>
+            <template v-else>{{ t("oncall.routingEverythingElseNobody") }}</template>
           </span>
           <OButton
             v-if="editable"
             variant="outline"
             size="xs"
-            :icon-left="teamId ? 'alt-route' : 'edit'"
+            icon-left="edit"
             data-test="oncall-routing-catch-all-set"
             @click="emit('change-default')"
           >

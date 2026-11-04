@@ -39,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         icon-left="manage-search"
-        :active="testerOpen"
+        :active="tester.open.value"
         data-test="oncall-routing-test-signal"
-        @click="openTester()"
+        @click="tester.openTester()"
       >
         {{ t("oncall.routingTestRouting") }}
       </OButton>
@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         icon-left="manage-search"
-        :active="testerOpen"
+        :active="tester.open.value"
         data-test="oncall-routing-test-signal"
-        @click="openTester()"
+        @click="tester.openTester()"
       >
         {{ t("oncall.routingTestRouting") }}
       </OButton>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add="openAdd"
         @edit="openEdit"
         @remove="(rule: OwnershipRuleStats) => (ruleToDelete = rule)"
-        @test="(rule: OwnershipRuleStats) => openTester(rule.dimensions)"
+        @test="(rule: OwnershipRuleStats) => tester.openTester(rule.dimensions)"
         @change-default="defaultTeamCard?.openDialog()"
         @clear-search="clearSearch"
       >
@@ -283,27 +283,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <ODrawer
-      :open="testerOpen"
+      :open="tester.open.value"
       size="lg"
       :title="t('oncall.routingTestRouting')"
       data-test="oncall-routing-tester-drawer"
-      @update:open="(v: boolean) => (testerOpen = v)"
+      @update:open="(v: boolean) => (tester.open.value = v)"
     >
       <OnCallRoutingSimulator
-        :preview="preview"
+        :preview="tester.preview.value"
         :teams="teams"
         :aliases="aliases"
         :catalogue="catalogue"
         :services="services"
         :signals="openSignals"
         :rules="rules"
-        :seed="testerSeed"
-        :loading="testing"
-        :sending="sendingTest"
-        :test-result="testResult"
+        :seed="tester.seed.value"
+        :loading="tester.testing.value"
+        :sending="tester.sending.value"
+        :test-result="tester.testResult.value"
         :can-configure="canConfigure"
-        @run="runPreview"
-        @send-test="sendTestPage"
+        @run="tester.run"
+        @send-test="tester.sendTest"
       />
     </ODrawer>
 
@@ -311,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :open="dialogOpen"
       :rule="editingRule"
       :initial-dimensions="claimingDimensions"
+      :team-id="claimTeamId"
       :teams="teams"
       :aliases="aliases"
       :catalogue="catalogue"
@@ -381,7 +382,6 @@ import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
-import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -403,6 +403,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { useOnCallRoutingTester } from "@/composables/useOnCallRoutingTester";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
@@ -420,7 +421,6 @@ import {
   dismissUnroutedSignalMutation,
   oncallTeamsQuery,
   ownershipStatsQuery,
-  testPageMutation,
   unroutedSignalsQuery,
   updateOwnershipRuleMutation,
 } from "@/services/oncall.queries";
@@ -431,7 +431,6 @@ import type {
   OwnershipRuleStats,
   OwnershipStats,
   RoutingPreview,
-  TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -456,9 +455,8 @@ const teams = ref<OnCallTeam[]>([]);
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
 const aliases = ref<{ id: string; display?: string }[]>([]);
-const preview = ref<RoutingPreview | null>(null);
-/// Who holds the path the rule editor is drafting, as opposed to `preview`,
-/// which belongs to the tester and answers a question the reader asked.
+/// Who holds the path the rule editor is drafting, as opposed to the tester's
+/// preview, which answers a question the reader asked.
 const conflict = ref<RoutingPreview | null>(null);
 
 const loaded = ref(false);
@@ -470,16 +468,10 @@ const signalsError = ref(false);
 // state for a frame before the skeleton loader ever appears.
 const loadingRules = ref(true);
 const loadingSignals = ref(true);
-const testing = ref(false);
-const sendingTest = ref(false);
-const testResult = ref<TestPageResult | null>(null);
 const saving = ref(false);
 
 /// Which list is on screen. `signals` is the queue of paths nothing claims.
 const tab = ref<"rules" | "signals">(route.query.tab === "signals" ? "signals" : "rules");
-const testerOpen = ref(false);
-/// What Test routing opens with: a fresh object each open, so the rows re-seed.
-const testerSeed = ref<Record<string, string> | null>(null);
 
 const dialogOpen = ref(false);
 const editingRule = ref<OwnershipRuleStats | null>(null);
@@ -490,6 +482,12 @@ const claimingSignal = ref<UnroutedSignal | null>(null);
 const claimingDimensions = computed(() =>
   claimingSignal.value ? claimableDimensions(claimingSignal.value.dimensions) : null,
 );
+
+/// The team a defaulted signal already reaches, so claiming it for them is one click; a deleted team is no default.
+const claimTeamId = computed(() => {
+  const id = claimingSignal.value?.defaulted_team_id ?? "";
+  return teams.value.some((team) => team.id === id) ? id : "";
+});
 
 /// A dismissed row is the record, not the worklist.
 const openSignals = computed(() => signals.value.filter((signal) => !signal.dismissed_at));
@@ -549,8 +547,8 @@ const ruleCreate = useMutation(() => createOwnershipRuleMutation(orgId.value));
 const ruleUpdate = useMutation(() => updateOwnershipRuleMutation(orgId.value));
 const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
 const signalDismiss = useMutation(() => dismissUnroutedSignalMutation(orgId.value));
-const testPageWrite = useMutation(() => testPageMutation(orgId.value));
-const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
+const { canConfigure } = useOnCallPermissions();
+const tester = useOnCallRoutingTester({ orgId, signals: openSignals, onError: failed });
 
 /// Cache-first; a force expires the entry before the fetch, so it costs one request, not two.
 async function read<T>(
@@ -894,51 +892,6 @@ async function dismissSignal(signal: UnroutedSignal) {
     await fetchSignals();
   } catch (err) {
     failed(err, t("oncall.unroutedDismissFailed"));
-  }
-}
-
-/// Opens on a real alert shape: the given rule, else the signal that fell through most.
-function openTester(dimensions?: Record<string, string>) {
-  const top = [...openSignals.value].sort((a, b) => b.occurrences - a.occurrences)[0];
-  testerSeed.value = { ...(dimensions ?? (top ? claimableDimensions(top.dimensions) : {})) };
-  preview.value = null;
-  testResult.value = null;
-  testerOpen.value = true;
-}
-
-async function runPreview(query: SimulatorQuery) {
-  testing.value = true;
-  testResult.value = null;
-  try {
-    // Uncached for the same reason as the editor's dry run: the answer belongs to this query alone.
-    const res = await oncallService.previewRouting({
-      org_identifier: orgId.value,
-      data: { dimensions: query.dimensions },
-    });
-    preview.value = res.data;
-  } catch (err) {
-    failed(err, t("oncall.testRoutingFailed"));
-  } finally {
-    testing.value = false;
-  }
-}
-
-/// This one really sends. The simulator above it does not, which is why the
-/// two are separate buttons rather than one control with a mode.
-async function sendTestPage(value: { team_id: string; priority: string }) {
-  sendingTest.value = true;
-  testResult.value = null;
-  try {
-    const res = await testPageWrite.mutateAsync({
-      teamId: value.team_id,
-      priority: Number(value.priority.replace(/^P/i, "")) || undefined,
-    });
-    testResult.value = res.data ?? null;
-  } catch (err) {
-    noteConfigurationDenied(err);
-    failed(err, t("oncall.testPageFailed"));
-  } finally {
-    sendingTest.value = false;
   }
 }
 

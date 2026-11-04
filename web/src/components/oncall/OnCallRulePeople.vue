@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.peopleMore", { count: hidden }) }}
       </span>
       <OButton
-        variant="ghost-primary"
+        variant="outline"
         size="xs"
         icon-left="edit"
         :data-test="`oncall-rule-people-edit-${ruleIndex}`"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
         <OButton
           v-if="rule.members.length"
-          variant="ghost-primary"
+          variant="outline"
           size="xs"
           icon-left="check"
           class="ms-auto"

@@ -273,9 +273,11 @@ describe("OnCallTeams", () => {
 
     const person = wrapper.find('[data-test="oncall-teams-primary-team_1"]');
     expect(person.text()).toContain("Ena Gineer");
-    expect(person.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "Ena Gineer (engineer@example.com)",
-    );
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    const name = wrapper
+      .findAllComponents({ name: "OnCallPersonName" })
+      .find((one) => one.attributes("data-test") === "oncall-teams-primary-team_1");
+    expect(name?.props("email")).toBe("engineer@example.com");
     expect(person.attributes("title")).toBeUndefined();
     queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });

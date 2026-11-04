@@ -585,6 +585,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Replaces the trigger's range text, for a caller that states the range on its own clock; empty keeps the picker's. */
+    triggerText: {
+      type: String,
+      default: "",
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
@@ -1364,6 +1369,7 @@ export default defineComponent({
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
     const triggerLabel = computed(() => {
+      if (props.triggerText) return props.triggerText;
       const showsApplied = !props.autoApply && !menuOpen.value;
       // A calendar label is re-derived so an older period keeps naming the right day after midnight.
       const appliedCalendarLabel =

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="canConfigure"
-          variant="ghost"
+          variant="outline"
           size="sm-action"
           :disabled="saving"
           icon-left="close"

@@ -165,6 +165,7 @@ describe("OnCallOwnershipRules", () => {
   it("states the catch-all under the table on the org list", async () => {
     const wrapper = render({ defaultTeamId: "team_2" });
     await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-row"]').exists()).toBe(false);
     const row = wrapper.find('[data-test="oncall-routing-catch-all"]');
     expect(row.text()).toContain("Everything else");
     expect(row.text()).toContain("Checkout");
@@ -187,9 +188,21 @@ describe("OnCallOwnershipRules", () => {
       "Also gets every alert no team owns",
     );
     expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
+    // The team's last rule, so it is the body's last row and never part of the pager.
+    const body = own.find('[data-test="o2-table-body"]');
+    const rows = body.findAll("tr");
+    expect(rows[rows.length - 1].attributes("data-test")).toBe("oncall-routing-catch-all-row");
+    expect(own.find('[data-test="o2-table-pagination-note"]').exists()).toBe(false);
     const other = render({ teamId: "team_1", defaultTeamId: "team_2" });
     await flushPromises();
     expect(other.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(false);
+  });
+
+  /// The default team with no rule of its own still gets every unowned alert, so that row stands in for an empty table.
+  it("keeps the catch-all row on the default team's tab with no rules", async () => {
+    const wrapper = render({ rules: [], teamId: "team_1", defaultTeamId: "team_1" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-row"]').exists()).toBe(true);
   });
 
   it("filters by search on what the cells read", async () => {

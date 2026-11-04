@@ -69,15 +69,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.calendarToday") }}
       </OButton>
 
-      <!-- The team's zone AND the reader's, because the two are usually
-           different and a handover time is meaningless until you know which. -->
-      <OText
-        variant="meta"
-        class="max-md:order-last max-md:basis-full"
+      <!-- Only when the reader is elsewhere: a handover time is ambiguous only then. -->
+      <OTag
+        v-if="zoneDiffers"
+        variant="default-outline"
+        size="sm"
+        icon="schedule"
         data-test="oncall-timeline-zone"
       >
-        {{ zoneLine }}
-      </OText>
+        {{ raw(timezone) }}
+        <OTooltip side="bottom" :content="zoneLine" />
+      </OTag>
 
       <span class="ms-auto flex flex-wrap items-center gap-2 max-md:ms-0 max-md:w-full">
         <OToggleGroup
@@ -538,9 +540,8 @@ const rangeLabel = computed<I18nText>(() =>
 
 const localZone = computed(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
 
-/// Said the short way when the two zones agree, because "your local time is
-/// 09:59" under a clock reading 09:59 is a sentence that costs a read and
-/// carries nothing.
+const zoneDiffers = computed(() => props.timezone !== localZone.value);
+
 const zoneLine = computed<I18nText>(() =>
   zoneCaption(props.timezone, localZone.value, nowMicros.value, t),
 );

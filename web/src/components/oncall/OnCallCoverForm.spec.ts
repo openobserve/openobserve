@@ -71,6 +71,10 @@ function useStubbedField(name: string) {
   };
 }
 
+/// What the closed When field reads, as the picker is told to print it.
+const fieldText = (wrapper: { findComponent: (s: { name: string }) => any }) =>
+  String(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("trigger-text") ?? "");
+
 const stubs = {
   // Renders the body and exposes the primary click, which is what drives a
   // swap — the cover half submits through OForm instead.
@@ -117,6 +121,7 @@ const stubs = {
     name: "OFormDateTimeRange",
     props: ["name"],
     template: `<span :data-test-field="name" :data-test-type="value?.type">
+      <slot name="above" />
       <button data-test="window-pick" @click="set(PICKED)">{{ error }}</button>
       <button data-test="window-clear" @click="set(undefined)"></button>
     </span>`,
@@ -233,32 +238,38 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     expect(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("label")).toBe("When");
   });
 
-  it("names the clock the reader picked on", async () => {
+  // The closed field states the whole window with times, so nobody opens it just to read it.
+  it("shows the window with its times on the team's clock, naming the zone for a reader elsewhere", async () => {
     const wrapper = renderCover({ viewerTimezone: IST });
     await flushPromises();
 
-    // Whatever ICU calls it — "GMT+5:30" — the point is that SOMETHING names
-    // the offset, since the bare numbers cannot.
-    expect(summaryOf(wrapper)).toContain("GMT+5:30");
+    expect(fieldText(wrapper)).toContain("→");
+    expect(fieldText(wrapper)).toMatch(/\d{2}:\d{2}/);
+    expect(fieldText(wrapper)).toContain("UTC");
   });
 
-  it("also says what the window is on the team's clock", async () => {
-    const wrapper = renderCover({ viewerTimezone: IST });
-    await flushPromises();
-
-    const teamLine = wrapper.find('[data-test="oncall-cover-summary-team-zone"]');
-    expect(teamLine.exists()).toBe(true);
-    expect(teamLine.text()).toContain("UTC");
-  });
-
-  /// One clock, said once. A reader on the team's own timezone has nothing to
-  /// reconcile, and repeating the same range twice reads as two windows.
-  it("says it once when the reader is already on the team's clock", async () => {
+  /// One clock, said once: the summary names who covers, never the window again.
+  it("says the window once, in the field, when the reader is on the team's clock", async () => {
     const wrapper = renderCover({ viewerTimezone: "UTC" });
     await flushPromises();
 
+    expect(fieldText(wrapper)).not.toContain("UTC");
+    expect(summaryOf(wrapper)).toContain("ana@o2.ai covers Platform.");
+    expect(summaryOf(wrapper)).not.toMatch(/\d{2}:\d{2}/);
     expect(wrapper.find('[data-test="oncall-cover-summary-team-zone"]').exists()).toBe(false);
-    expect(summaryOf(wrapper)).toContain("UTC");
+  });
+
+  /// The presets set the same field, so the one whose range it still holds is lit until the reader picks by hand.
+  it("lights the quick range the window matches, and unlights it on a hand-pick", async () => {
+    const wrapper = renderCover();
+    const tonight = () => wrapper.findComponent('[data-test="oncall-cover-preset-tonight"]');
+    await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
+    await flushPromises();
+    expect(tonight().attributes("aria-pressed")).toBe("true");
+
+    await wrapper.find('[data-test="window-pick"]').trigger("click");
+    await flushPromises();
+    expect(tonight().attributes("aria-pressed")).toBe("false");
   });
 });
 
@@ -573,9 +584,7 @@ describe("OnCallCoverForm — taking a cover", () => {
       expect.objectContaining({ label: "Ana", value: "ana@o2.ai", subLabel: "ana@o2.ai" }),
       expect.objectContaining({ label: "Bo Lin", value: "bo@o2.ai", subLabel: "bo@o2.ai" }),
     ]);
-    expect(wrapper.find('[data-test="oncall-cover-currently"]').text()).toBe(
-      "Currently on call: Ana",
-    );
+    expect(wrapper.find('[data-test="oncall-cover-currently"]').exists()).toBe(false);
     const summary = wrapper.find('[data-test="oncall-cover-summary"]');
     expect(summary.text()).toContain("Bo Lin covers Platform");
     expect(summary.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("bo@o2.ai");
@@ -673,19 +682,16 @@ describe("OnCallCoverForm — taking a cover", () => {
   /// The summary read a ref that only the presets and the gap prop ever wrote,
   /// so a range picked by hand left it showing the previous window — the one
   /// element whose whole job is "what this will actually do".
-  it("summarises the window the reader picked, not the one a preset last set", async () => {
+  it("states the window the reader picked, not the one a preset last set", async () => {
     const wrapper = renderCover();
     await flushPromises();
-    // Not "absent then present": the dialog now opens on a window, so what
-    // proves the summary is reading the FIELD is that it follows a hand-pick
-    // away from that opening one.
-    const opening = wrapper.find('[data-test="oncall-cover-summary"]').text();
+    // The dialog opens on a window, so what proves the field label reads the FIELD is that it follows a hand-pick.
+    const opening = fieldText(wrapper);
 
     await wrapper.find('[data-test="window-pick"]').trigger("click");
     await flushPromises();
 
-    const picked = wrapper.find('[data-test="oncall-cover-summary"]').text();
-    expect(picked).not.toBe(opening);
+    expect(fieldText(wrapper)).not.toBe(opening);
     expect(await save(wrapper)).toMatchObject({ start_at: PICKED.from, end_at: PICKED.to });
   });
 

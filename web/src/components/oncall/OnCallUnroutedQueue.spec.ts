@@ -106,8 +106,12 @@ describe("OnCallUnroutedQueue", () => {
     expect(wrapper.text()).toContain("reached no team");
   });
 
-  it("counts the firings, because one is a curiosity and forty is a problem", () => {
-    expect(render().text()).toContain("4 triggers");
+  // The header names the unit and window once, so a cell is the bare count.
+  it("counts the firings as a bare number under one header", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-unrouted-fires-s1"]').text()).toBe("4");
+    expect(wrapper.text()).toContain("Triggers, 30d");
+    expect(wrapper.text()).not.toContain("4 triggers");
   });
 
   it("offers to claim for the team whose screen this is", async () => {

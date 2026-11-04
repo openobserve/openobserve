@@ -227,11 +227,10 @@ describe("OnCallL0Editor", () => {
     }
   });
 
-  // A row is one line: the suppress consequence sits beside its label, not under it.
-  it("keeps the suppress consequence on the label's line", () => {
+  // The switch is the state, so no row carries a second line explaining it.
+  it("labels each permission row with its name alone", () => {
     const wrapper = render();
-    const note = wrapper.find('[data-test="oncall-l0-row-suppress-note"]');
-    expect(note.exists()).toBe(true);
-    expect(note.element.parentElement?.className).not.toContain("flex-col");
+    expect(wrapper.find('[data-test="oncall-l0-row-suppress-note"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-l0-row-suppress"]').text()).not.toContain("advice");
   });
 });

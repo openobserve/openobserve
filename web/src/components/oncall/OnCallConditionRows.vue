@@ -154,9 +154,21 @@ let nextKey = 0;
 
 /// What this org emits or already routes on; the whole vocabulary only when none of that is known.
 const fieldIds = computed<string[]>(() => {
-  const known = routingFieldIds(props.catalogue.present, props.signals, props.rules);
-  return known.length ? known : props.aliases.map((alias) => alias.id);
+  const known = routingFieldIds(props.catalogue.present, props.signals, props.rules).filter(
+    isRoutable,
+  );
+  return known.length ? known : props.aliases.map((alias) => alias.id).filter(isRoutable);
 });
+
+/// Engine bookkeeping (`_timestamp`, the service graph's own columns) is never an alert's identity.
+function isRoutable(name: string): boolean {
+  return (
+    !!name &&
+    !name.startsWith("_") &&
+    !/timestamp$/i.test(name) &&
+    !/^traces_service_graph/i.test(name)
+  );
+}
 
 function rowsFrom(dimensions: Record<string, string>): ConditionRow[] {
   return Object.keys(dimensions)
@@ -222,7 +234,7 @@ const operatorOptions = computed(() => [
   { label: t("oncall.ruleEditorOpStartsWith"), value: "prefix" },
 ]);
 
-/// Known values first, by how many services carry them, then by how often an unowned alert fired with them.
+/// Known values, busiest unowned first, then by how many services carry them.
 function valueOptionsFor(row: ConditionRow) {
   if (!row.name) return [];
   const services = new Map<string, number>(Object.entries(props.catalogue.values[row.name] ?? {}));
@@ -235,23 +247,24 @@ function valueOptionsFor(row: ConditionRow) {
     fired.set(value, (fired.get(value) ?? 0) + signal.occurrences);
   });
   if (row.name === SERVICE_DIMENSION) props.services.forEach((service) => known.add(service.name));
+  // A value a rule already routes on exists, even when discovery never saw it.
+  props.rules.forEach((rule) => {
+    const value = rule.dimensions?.[row.name];
+    if (value && !value.endsWith("*")) known.add(value);
+  });
+  [...known].forEach((value) => {
+    if (!isRoutable(value)) known.delete(value);
+  });
   if (row.value) known.add(row.value);
   const weight = (value: string) => [fired.get(value) ?? 0, services.get(value) ?? 0];
-  return (
-    [...known]
-      .sort((a, b) => {
-        const [fa, sa] = weight(a);
-        const [fb, sb] = weight(b);
-        return fb - fa || sb - sa || a.localeCompare(b);
-      })
-      // Not `subLabelInline`: the stacked layout cuts a long value with a tooltip instead of clipping it.
-      .map((value) => ({ label: raw(value), value, subLabel: firesOf(fired.get(value) ?? 0) }))
-  );
-}
-
-/// One unit on every value, the one Unrouted and the match count speak: alerts in the last 30 days.
-function firesOf(fires: number): I18nText | undefined {
-  return fires ? t("oncall.routingFiresWindow", { count: fires }, fires) : undefined;
+  // No count per value: triggers are only known for unowned alerts, so a routed value would read as silent.
+  return [...known]
+    .sort((a, b) => {
+      const [fa, sa] = weight(a);
+      const [fb, sb] = weight(b);
+      return fb - fa || sb - sa || a.localeCompare(b);
+    })
+    .map((value) => ({ label: raw(value), value }));
 }
 
 function setValue(row: ConditionRow, value: string) {
