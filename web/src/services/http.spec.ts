@@ -57,6 +57,8 @@ vi.mock("@/composables/useAccessStore", () => ({
   currentAccessRouteKey,
   resetAccess: vi.fn(),
 }));
+const { addLicenseDeniedError } = vi.hoisted(() => ({ addLicenseDeniedError: vi.fn() }));
+vi.mock("@/composables/useLicenseDenials", () => ({ addLicenseDeniedError }));
 
 import config from "../aws-exports";
 import store from "../stores";
@@ -186,6 +188,52 @@ describe("attemptTokenRefresh", () => {
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
+  });
+});
+
+describe("response interceptor — license 403 handling", () => {
+  // Builds a real instance and returns the rejection handler it registered.
+  function errorHandler() {
+    const use = vi.fn();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: { request: { use: vi.fn() }, response: { use } },
+    } as any);
+    http();
+    return use.mock.calls[0][1] as (error: unknown) => Promise<unknown>;
+  }
+
+  const forbidden = (data: Record<string, unknown>) => ({
+    response: { status: 403, data },
+    request: { responseURL: "http://localhost:5080/api/org/workflows" },
+    config: { url: "/api/org/workflows" },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    (config as any).isEnterprise = "false";
+  });
+
+  it("sends the missing features of a code 40001 denial to the top bar", async () => {
+    const error = forbidden({ code: 40001, error_detail: "oncall, workflows" });
+    (error.config as Record<string, unknown>).startedAt = 42;
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"], 42);
+    expect(recordForbidden).not.toHaveBeenCalled();
+  });
+
+  it("keeps a plain 403 on the RBAC access toast", async () => {
+    const error = forbidden({ code: 403, message: "Unauthorized Access" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(recordForbidden).toHaveBeenCalledTimes(1);
+    expect(addLicenseDeniedError).not.toHaveBeenCalled();
   });
 });
 

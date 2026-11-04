@@ -15,6 +15,7 @@ import onlineEvalsService, {
 } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 
 export function useOnlineEvalsData() {
   const { t } = useI18nTyped();
@@ -24,9 +25,9 @@ export function useOnlineEvalsData() {
   const scoreConfigVersions = ref<Record<string, ScoreConfig[]>>({});
   const providers = ref<Provider[]>([]);
   const isLoading = ref(false);
-  const jobsForbidden = ref(false);
-  const scorersForbidden = ref(false);
-  const scoreConfigsForbidden = ref(false);
+  const jobsForbidden = ref<ForbiddenState>(false);
+  const scorersForbidden = ref<ForbiddenState>(false);
+  const scoreConfigsForbidden = ref<ForbiddenState>(false);
 
   const applyScoreConfigs = (rows: ScoreConfig[]) => {
     scoreConfigs.value = rows;
@@ -64,15 +65,15 @@ export function useOnlineEvalsData() {
         showError(providerResult.reason, t("onlineEvals.loadError"));
       }
       if (scoreConfigResult.status === "rejected") {
-        scoreConfigsForbidden.value = scoreConfigResult.reason?.response?.status === 403;
+        scoreConfigsForbidden.value = forbiddenState(scoreConfigResult.reason);
         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
       }
       if (scorerResult.status === "rejected") {
-        scorersForbidden.value = scorerResult.reason?.response?.status === 403;
+        scorersForbidden.value = forbiddenState(scorerResult.reason);
         showError(scorerResult.reason, t("onlineEvals.loadError"));
       }
       if (jobResult.status === "rejected") {
-        jobsForbidden.value = jobResult.reason?.response?.status === 403;
+        jobsForbidden.value = forbiddenState(jobResult.reason);
         showError(jobResult.reason, t("onlineEvals.loadError"));
       }
     } finally {

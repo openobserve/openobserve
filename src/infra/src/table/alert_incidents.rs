@@ -601,6 +601,39 @@ pub async fn update_severity(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The titles of the incidents among `ids` in this org; untitled and unknown ids are absent.
+pub async fn titles(
+    org_id: &str,
+    ids: &[String],
+) -> Result<HashMap<String, String>, errors::Error> {
+    titles_with(get_orm_client_ro().await, org_id, ids).await
+}
+
+/// [`titles`] on a given connection.
+pub async fn titles_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    ids: &[String],
+) -> Result<HashMap<String, String>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    Ok(alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::Title)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.is_in(ids.to_vec()))
+        .filter(alert_incidents::Column::Title.is_not_null())
+        .into_tuple::<(String, Option<String>)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .filter_map(|(id, title)| title.map(|t| (id, t)))
+        .collect())
+}
+
 /// List incidents with optional filters
 pub async fn list(
     org_id: &str,
@@ -1816,6 +1849,44 @@ mod tests {
             serde_json::from_value(json);
 
         assert!(result.is_err(), "Should reject malformed JSON");
+    }
+
+    #[tokio::test]
+    async fn titles_answer_only_titled_incidents_of_the_org_in_one_read() {
+        let db = incidents_db().await;
+        let titled = |org: &str, title: Option<&str>| {
+            new_incident(
+                org,
+                "P2",
+                serde_json::json!({}),
+                "service",
+                1,
+                title.map(str::to_string),
+                None,
+            )
+        };
+        let paid = titled("acme", Some("Payments down"))
+            .insert(&db)
+            .await
+            .unwrap();
+        let untitled = titled("acme", None).insert(&db).await.unwrap();
+        let foreign = titled("other", Some("Not yours"))
+            .insert(&db)
+            .await
+            .unwrap();
+        let asked = [
+            paid.id.clone(),
+            untitled.id,
+            foreign.id,
+            "missing".to_string(),
+        ];
+
+        let found = titles_with(&db, "acme", &asked).await.unwrap();
+        assert_eq!(
+            found,
+            HashMap::from([(paid.id, "Payments down".to_string())])
+        );
+        assert!(titles_with(&db, "acme", &[]).await.unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -40,6 +40,8 @@ const treeSpan = (
 export const patternTraceTrees = {
   // Baseline: single root, root service calls one downstream service
   singleRoot: [treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100)],
+  // Root span with a measured duration of 0 calling a 10 ms downstream service
+  zeroDurationRoot: [treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 10)], 0)],
   // Two root spans with distinct services, each with its own downstream call
   multiRootDistinctServices: [
     treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
@@ -62,6 +64,55 @@ export const patternTraceTrees = {
   ],
   // Single root span, single service, no relationships at all
   singleServiceOnly: [treeSpan("a1", "scheduler", "", [], 100)],
+  // Two callers reach the same intermediate service, which calls the same leaf on each branch
+  sharedLeafTwoBranches: [
+    treeSpan(
+      "f1",
+      "frontend",
+      "",
+      [
+        treeSpan("m1", "catalog-rpc", "f1", [treeSpan("l1", "product-catalog", "m1", [], 3)], 8),
+        treeSpan(
+          "c1",
+          "checkout",
+          "f1",
+          [
+            treeSpan(
+              "m2",
+              "catalog-rpc",
+              "c1",
+              [
+                { ...treeSpan("l2", "product-catalog", "m2", [], 1), spanStatus: "ERROR" },
+                treeSpan("l3", "product-catalog", "m2", [], 2),
+              ],
+              4,
+            ),
+          ],
+          20,
+        ),
+      ],
+      100,
+    ),
+  ],
+  // One service called by two parents: a clean 15ms call and a failing 10ms call
+  sharedChildTwoParents: [
+    treeSpan(
+      "f1",
+      "frontend",
+      "",
+      [
+        treeSpan("o1", "order-service", "f1", [treeSpan("d1", "database", "o1", [], 15)], 40),
+        treeSpan(
+          "v1",
+          "inventory-service",
+          "f1",
+          [{ ...treeSpan("d2", "database", "v1", [], 10), spanStatus: "ERROR" }],
+          30,
+        ),
+      ],
+      100,
+    ),
+  ],
 };
 
 export default {

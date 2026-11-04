@@ -16,14 +16,13 @@
 import { describe, expect, it } from "vitest";
 import { ref } from "vue";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
-import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { patternTraceTrees } from "@/test/unit/mockData/traces";
 
-// Runs the same pipeline TraceDetails uses for the Trace Graph tab:
-// traceTree → buildPatternConsolidatedTree → useTracePatternTree.treeData
+// Runs the same pipeline TraceDetails uses for the Trace Graph tab.
 const getTreeData = (traceTree: any[]) => {
   const patterns = ref(buildPatternConsolidatedTree(traceTree));
-  const { treeData } = useTracePatternTree(patterns, ref(false));
+  const { treeData } = useTracePatternTree(patterns, ref(false), ref(buildPathPatterns(traceTree)));
   return treeData.value;
 };
 
@@ -85,8 +84,61 @@ describe("useTracePatternTree", () => {
       expect(treeData[0].children?.map((c) => c.name)).toEqual(["querier"]);
     });
 
+    it("should give a service called by two parents each parent's own latency and errors", () => {
+      const [root] = getTreeData(patternTraceTrees.sharedChildTwoParents);
+      const databaseUnder = (parent: string) =>
+        root.children?.find((c) => c.name === parent)?.children?.find((c) => c.name === "database");
+
+      const viaOrder = databaseUnder("order-service");
+      expect(viaOrder?.value).toBe(15);
+      expect(viaOrder?.metadata?.avg).toBe(15);
+      expect(viaOrder?.errorRate).toBe(0);
+      expect(viaOrder?.metadata?.errorCount).toBe(0);
+
+      const viaInventory = databaseUnder("inventory-service");
+      expect(viaInventory?.value).toBe(10);
+      expect(viaInventory?.metadata?.avg).toBe(10);
+      expect(viaInventory?.errorRate).toBe(100);
+      expect(viaInventory?.metadata?.errorCount).toBe(1);
+    });
+
+    it("should give a leaf reached along two branches each branch's own metrics", () => {
+      const [root] = getTreeData(patternTraceTrees.sharedLeafTwoBranches);
+      const child = (node: any, name: string) => node?.children?.find((c: any) => c.name === name);
+
+      const leafViaFrontend = child(child(root, "catalog-rpc"), "product-catalog");
+      expect(leafViaFrontend?.value).toBe(3);
+      expect(leafViaFrontend?.metadata?.count).toBe(1);
+      expect(leafViaFrontend?.metadata?.errorCount).toBe(0);
+      expect(leafViaFrontend?.errorRate).toBe(0);
+
+      const leafViaCheckout = child(
+        child(child(root, "checkout"), "catalog-rpc"),
+        "product-catalog",
+      );
+      expect(leafViaCheckout?.value).toBe(1.5);
+      expect(leafViaCheckout?.metadata?.count).toBe(2);
+      expect(leafViaCheckout?.metadata?.errorCount).toBe(1);
+      expect(leafViaCheckout?.errorRate).toBe(50);
+    });
+
+    it("should keep the self-pattern metrics on a root service", () => {
+      const [root] = getTreeData(patternTraceTrees.sharedChildTwoParents);
+      expect(root.name).toBe("frontend");
+      expect(root.value).toBe(100);
+      expect(root.metadata?.errorCount).toBe(0);
+    });
+
+    it("should show a measured average of 0 on a node instead of its children's average", () => {
+      const [root] = getTreeData(patternTraceTrees.zeroDurationRoot);
+
+      expect(root.name).toBe("scheduler");
+      expect(root.value).toBe(0);
+      expect(root.metadata?.avg).toBe(0);
+    });
+
     it("should return an empty tree when the pattern map is empty", () => {
-      const { treeData } = useTracePatternTree(ref(new Map()), ref(false));
+      const { treeData } = useTracePatternTree(ref(new Map()), ref(false), ref(new Map()));
 
       expect(treeData.value).toEqual([]);
     });

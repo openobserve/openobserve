@@ -15,17 +15,11 @@
 //
 // @vitest-environment jsdom
 //
-// AIObservabilityShell's rail shows every section on every build — on a true
-// OSS build, everything beyond Monitor's LLM Insights + Sessions renders
-// LOCKED (lock icon + pitch-card tooltip) rather than being hidden, so OSS
-// users can discover the rest of the module instead of never knowing it
-// exists. All of it is still reachable (not a 404): `web/src/composables/
-// router.ts` registers every one of these routes too, each gated with
-// `withFeatureGate` so OSS actually landing on one redirects to the shared
-// locked-feature page instead of breaking.
+// OSS shows non-Monitor sections locked (feature-gated routes), enterprise/cloud unlocked.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick, reactive } from "vue";
 
 let mockIsEnterprise = "false";
 let mockIsCloud = "false";
@@ -40,12 +34,21 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const mockState = reactive<{
+  selectedOrganization: { identifier: string };
+  zoConfig: Record<string, unknown>;
+}>({ selectedOrganization: { identifier: "test-org" }, zoConfig: {} });
 vi.mock("vuex", () => ({
-  useStore: () => ({ state: { selectedOrganization: { identifier: "test-org" } } }),
+  useStore: () => ({ state: mockState }),
 }));
 
+const mockRoute = reactive<{ name: string; query: Record<string, string>; meta: object }>({
+  name: "aiLLMInsights",
+  query: {},
+  meta: {},
+});
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ name: "aiLLMInsights", query: {} }),
+  useRoute: () => mockRoute,
 }));
 
 vi.mock("@/types/i18n", async (importOriginal) => {
@@ -55,7 +58,9 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 
 const SectionRailStub = {
   props: ["groups", "activeKey", "title", "icon", "collapsible", "collapsed"],
-  template: '<div class="section-rail" />',
+  // Rendered item keys, because findComponent loses this stub once the page swaps out.
+  template:
+    '<div class="section-rail"><template v-for="g in groups" :key="g.label"><i v-for="item in g.items" :key="item.key" :data-rail-item="item.key" /></template></div>',
 };
 
 async function mountShell() {
@@ -65,6 +70,9 @@ async function mountShell() {
       stubs: {
         SectionRail: SectionRailStub,
         OPageLayout: { template: '<div><slot name="sidebar" /><slot /></div>' },
+        OEmptyState: { template: "<div />" },
+        OnlineEvalsDisabled: { template: '<div data-test="online-evals-disabled" />' },
+        RouterView: { template: '<div data-test="router-view" />' },
       },
     },
   });
@@ -99,6 +107,10 @@ beforeEach(() => {
   vi.resetModules();
   mockIsEnterprise = "false";
   mockIsCloud = "false";
+  mockState.zoConfig = {};
+  mockRoute.name = "aiLLMInsights";
+  mockRoute.query = {};
+  mockRoute.meta = {};
 });
 
 describe("AIObservabilityShell — OSS builds (isEnterprise and isCloud both false)", () => {
@@ -177,7 +189,29 @@ describe("AIObservabilityShell — OSS builds (isEnterprise and isCloud both fal
   });
 });
 
-describe("AIObservabilityShell — enterprise/cloud builds", () => {
+const ALL_ITEM_KEYS = [
+  "llmInsights",
+  "sessions",
+  "agentGraph",
+  "agentBehavior",
+  "quality",
+  "jobs",
+  "scorers",
+  "scoreConfigs",
+  "prompts",
+  "playground",
+  "experiments",
+  "remoteTasks",
+  "discovery",
+  "queues",
+  "datasets",
+];
+
+describe("AIObservabilityShell — enterprise/cloud builds with online evaluations on", () => {
+  beforeEach(() => {
+    mockState.zoConfig = { version: "v1", online_evals_enabled: true };
+  });
+
   it("shows every group and every item, all unlocked, when isEnterprise is true", async () => {
     mockIsEnterprise = "true";
     const wrapper = await mountShell();
@@ -185,6 +219,7 @@ describe("AIObservabilityShell — enterprise/cloud builds", () => {
     expect(groups.map((g) => g.label)).toEqual(ALL_GROUP_LABELS);
     const monitorKeys = groups[0].items.map((i) => i.key);
     expect(monitorKeys).toEqual(["llmInsights", "sessions", "agentGraph", "agentBehavior"]);
+    expect(itemsOf(wrapper).map((i) => i.key)).toEqual(ALL_ITEM_KEYS);
     expect(itemsOf(wrapper).every((i) => !i.locked)).toBe(true);
   });
 
@@ -200,5 +235,68 @@ describe("AIObservabilityShell — enterprise/cloud builds", () => {
       "agentBehavior",
     ]);
     expect(itemsOf(wrapper).every((i) => !i.locked)).toBe(true);
+  });
+
+  it("renders the page on an evaluation route", async () => {
+    mockIsEnterprise = "true";
+    mockRoute.name = "aiDatasets";
+    mockRoute.meta = { requiresOnlineEvals: true };
+    const wrapper = await mountShell();
+    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(false);
+  });
+});
+
+// O2_EVAL_ENABLED=false: evaluation sections leave the rail and deep links show the disabled state.
+describe("AIObservabilityShell — enterprise/cloud builds with online evaluations off", () => {
+  beforeEach(() => {
+    mockIsEnterprise = "true";
+    mockState.zoConfig = { version: "v1", online_evals_enabled: false };
+  });
+
+  it("lists only Monitor and Prompts — the sections whose APIs do not need evaluations", async () => {
+    const wrapper = await mountShell();
+    expect(groupsOf(wrapper).map((g) => g.label)).toEqual([
+      "aiObservability.sections.monitor",
+      "aiObservability.sections.experiment",
+    ]);
+    expect(itemsOf(wrapper).map((i) => i.key)).toEqual([
+      "llmInsights",
+      "sessions",
+      "agentGraph",
+      "agentBehavior",
+      "prompts",
+    ]);
+  });
+
+  it("renders the disabled state instead of the page on a deep link to an evaluation route", async () => {
+    mockRoute.name = "aiEvaluations";
+    mockRoute.query = { tab: "scorers" };
+    mockRoute.meta = { requiresOnlineEvals: true };
+    const wrapper = await mountShell();
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(false);
+  });
+
+  it("swaps the page for the disabled state and drops the sections when /config turns evaluations off", async () => {
+    mockState.zoConfig = { version: "v1", online_evals_enabled: true };
+    mockRoute.name = "aiExperiments";
+    mockRoute.meta = { requiresOnlineEvals: true };
+    const wrapper = await mountShell();
+    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true);
+    expect(wrapper.find('[data-rail-item="experiments"]').exists()).toBe(true);
+
+    mockState.zoConfig = { version: "v1", online_evals_enabled: false };
+    await nextTick();
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(false);
+    expect(wrapper.find('[data-rail-item="prompts"]').exists()).toBe(true);
+    expect(wrapper.find('[data-rail-item="experiments"]').exists()).toBe(false);
+  });
+
+  it("keeps every section, locked, on OSS — the edition gate applies there, not the flag", async () => {
+    mockIsEnterprise = "false";
+    const wrapper = await mountShell();
+    expect(itemsOf(wrapper).map((i) => i.key)).toEqual(ALL_ITEM_KEYS);
   });
 });

@@ -39,4 +39,28 @@ describe("HomeNoDataState", () => {
       }),
     });
   });
+
+  it("marks the Profiles chip unavailable with a gold lock when continuous profiling is license-locked", async () => {
+    push.mockClear();
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      profiling_enabled: true,
+      features: { continuous_profiling: "locked" },
+    };
+    const wrapper = mount(HomeNoDataState, {
+      props: { tab: "overview" },
+      global: { plugins: [i18n, store] },
+    });
+
+    const chip = wrapper.find('[data-test="home-no-data-profiles-btn"]');
+    expect(chip.attributes("aria-disabled")).toBe("true");
+    const chipComponent = wrapper
+      .findAllComponents({ name: "EmptyStateIngestionChip" })
+      .find((c) => c.attributes("data-test") === "home-no-data-profiles-btn")!;
+    expect(chipComponent.props("unavailable")).toBe(true);
+    expect(chip.find(".lock-chip").exists()).toBe(true);
+    await chip.trigger("click");
+    expect(push).not.toHaveBeenCalled();
+    store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+  });
 });
