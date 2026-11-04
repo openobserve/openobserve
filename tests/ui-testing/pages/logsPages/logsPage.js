@@ -4819,11 +4819,7 @@ export class LogsPage {
         // When the show-query toggle is clicked, it switches to results view
         // Check if we're in results view by looking for the logs table
         const logsTable = this.page.locator('[data-test="logs-search-result-logs-table"]');
-        const isResultsVisible = await logsTable.isVisible();
-
-        if (!isResultsVisible) {
-            throw new Error('Expected results view to be visible after toggling query editor off');
-        }
+        await expect(logsTable, 'Expected results view to be visible after toggling query editor off').toBeVisible({ timeout: 15000 });
 
         testLogger.info('Results view is visible - query editor toggled off successfully');
         return true;
