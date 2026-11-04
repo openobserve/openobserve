@@ -43,8 +43,6 @@ POST /api/{org_id}/traces | second mount of the published POST /api/{org_id}/v1/
 GET /api/{org_id}/v1/opamp | OpAMP agent protocol
 POST /api/{org_id}/v1/opamp | OpAMP agent protocol
 POST /api/{org_id}/v1development/profiles | second mount of POST /api/{org_id}/v1/profiles
-GET /auth/invites | second mount of the published GET /api/invites
-DELETE /auth/invites/{token} | second mount of the published DELETE /api/invites/{token}
 GET /auth/login | browser-only login redirect
 GET /config/ | unauthenticated bootstrap of the browser login page
 GET /config/dex_login | browser-only SSO redirect
