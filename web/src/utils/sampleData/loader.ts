@@ -80,6 +80,8 @@ export interface SampleProgress {
   counts: SampleCounts;
   /** A few of the app log rows the last telemetry batch really sent. */
   logs?: SampleLogLine[];
+  /** Set on an asset step's end when that step failed. */
+  failed?: boolean;
 }
 
 const FEED_LINES = 12;
@@ -288,13 +290,15 @@ export const loadSampleData = async (
   const result: SampleLoadResult = { counts, hours, failedSteps };
   const run = async (step: SampleStepId, fn: () => Promise<void>) => {
     onProgress({ step, fraction: 0, counts });
+    let failed = false;
     try {
       await fn();
     } catch (e) {
       console.warn(`Sample data step "${step}" failed`, e);
       failedSteps.push(step);
+      failed = true;
     }
-    onProgress({ step, fraction: 1, counts });
+    onProgress({ step, fraction: 1, counts, failed });
   };
   await run("functions", () => createFunctions(org));
   await run("pipeline", () => createPipeline(org));

@@ -119,7 +119,7 @@ const onProgress = (p: SampleProgress) => {
     steps.telemetry = p.fraction >= 1 ? "done" : "running";
     return;
   }
-  if (p.fraction === 0) steps[p.step] = "running";
+  steps[p.step] = p.fraction < 1 ? "running" : p.failed ? "failed" : "done";
 };
 
 /** Runs the loader once per app; every surface watching this session sees the same progress. */

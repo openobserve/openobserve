@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import alertsService from "@/services/alerts";
 import commonService from "@/services/common";
 import dashboardService from "@/services/dashboards";
+import jsTransformService from "@/services/jstransform";
 import { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME } from "./catalog";
 import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
 
@@ -221,6 +222,23 @@ describe("loadSampleData", () => {
     expect(sampleWindowHours(undefined)).toBe(4);
     expect(sampleWindowHours(5)).toBe(4);
     expect(sampleWindowHours(720)).toBe(4);
+  });
+
+  it("reports each asset step's end, and whether it failed, as soon as the step ends", async () => {
+    vi.mocked(jsTransformService.create).mockRejectedValueOnce(new Error("down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ends: [string, boolean][] = [];
+    await loadSampleData("acme", 5, (p) => {
+      if (p.step !== "telemetry" && p.fraction === 1) ends.push([p.step, !!p.failed]);
+    });
+    warn.mockRestore();
+    expect(ends).toEqual([
+      ["functions", true],
+      ["pipeline", false],
+      ["dashboards", false],
+      ["alerts", false],
+      ["enrichment", false],
+    ]);
   });
 
   it("still finishes when the window cannot be saved", async () => {

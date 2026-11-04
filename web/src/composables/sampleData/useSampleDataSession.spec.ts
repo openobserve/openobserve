@@ -117,6 +117,31 @@ describe("useSampleDataSession load end", () => {
   });
 });
 
+describe("useSampleDataSession progress", () => {
+  it("settles each asset step as soon as it reports its end", async () => {
+    vi.resetModules();
+    const counts = loaded.counts;
+    mocks.load.mockReset().mockImplementation((_org, vars) => {
+      vars.onProgress({ step: "functions", fraction: 0, counts });
+      vars.onProgress({ step: "functions", fraction: 1, counts });
+      vars.onProgress({ step: "pipeline", fraction: 0, counts });
+      vars.onProgress({ step: "pipeline", fraction: 1, counts, failed: true });
+      vars.onProgress({ step: "dashboards", fraction: 0, counts });
+      return new Promise(() => {});
+    });
+    const session = (await import("./useSampleDataSession")).useSampleDataSession();
+    void session.start("org-a");
+    await flushPromises();
+
+    expect(session.status.value).toBe("loading");
+    expect(session.steps).toMatchObject({
+      functions: "done",
+      pipeline: "failed",
+      dashboards: "running",
+    });
+  });
+});
+
 describe("useSampleDataSession startTourAndShow", () => {
   let session: ReturnType<typeof import("./useSampleDataSession").useSampleDataSession>;
   let resolveTarget: (to: string) => void;
