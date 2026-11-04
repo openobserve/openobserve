@@ -138,16 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default flex min-h-12 items-center gap-3 border-b px-3 py-2 last:border-b-0"
           :data-test="`oncall-l0-row-${row.key}`"
         >
-          <span class="flex min-w-0 flex-1 items-baseline gap-2">
-            <span class="text-text-heading shrink-0 text-sm font-medium">{{ row.label }}</span>
-            <OTruncatedText
-              v-if="row.description"
-              class="text-text-secondary min-w-0 text-xs"
-              :data-test="`oncall-l0-row-${row.key}-note`"
-            >
-              {{ row.description }}
-            </OTruncatedText>
-          </span>
+          <span class="text-text-heading min-w-0 flex-1 text-sm font-medium">{{ row.label }}</span>
           <OSelect
             v-if="row.key === 'promotion' && draft.allow_promotion"
             :model-value="draft.max_promotion_steps"
@@ -178,7 +169,6 @@ import { computed, reactive, watch } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -270,7 +260,6 @@ const permissionRows = computed(
     field: "allow_promotion" | "allow_downgrade" | "allow_suppress";
     switchTest: string;
     label: I18nText;
-    description?: I18nText;
   }[] => [
     {
       key: "promotion",
@@ -284,13 +273,11 @@ const permissionRows = computed(
       switchTest: "allow-downgrade",
       label: t("oncall.l0QuietOne"),
     },
-    // The one consequence worth a visible line: until this is on, Suppress is only advice.
     {
       key: "suppress",
       field: "allow_suppress",
       switchTest: "allow-suppress",
       label: t("oncall.l0AllowSuppress"),
-      description: t("oncall.l0SuppressShort"),
     },
   ],
 );

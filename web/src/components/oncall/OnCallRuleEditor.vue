@@ -158,7 +158,7 @@ const props = withDefaults(
     rule?: OwnershipRuleStats | null;
     /** Pre-filled conditions — a claim arrives with the signal's identity path. */
     initialDimensions?: Record<string, string> | null;
-    /** The default team of a new rule. */
+    /** The default team of a new rule; a claim passes the team the signal already fell to. */
     teamId?: string;
     teams?: { id: string; name: string }[];
     aliases?: { id: string; display?: string }[];
@@ -205,9 +205,18 @@ const seedKey = ref(0);
 const team = ref("");
 const startSignal = ref<string | null>(null);
 
-const title = computed<I18nText>(() =>
-  props.rule ? t("oncall.editOwnershipRule") : t("oncall.newRule"),
+/// A claim arrives with a signal's path and no rule: it names an owner rather than drafting a rule.
+const claiming = computed(
+  () => !props.rule && !!props.initialDimensions && !!Object.keys(props.initialDimensions).length,
 );
+
+const title = computed<I18nText>(() => {
+  if (props.rule) return t("oncall.editOwnershipRule");
+  if (!claiming.value) return t("oncall.newRule");
+  return team.value
+    ? t("oncall.ruleEditorClaimFor", { team: raw(teamNameOf(team.value)) })
+    : t("oncall.ruleEditorClaimTitle");
+});
 
 /// Opening resets the form: one instance serves add, edit and claim.
 watch(
@@ -327,13 +336,11 @@ const outcome = computed<I18nText | "">(() => {
     return t("oncall.ruleEditorContends", { team: other });
   }
   if (team.value) {
-    return t(
-      "oncall.ruleEditorGoesTo",
-      { team: raw(teamNameOf(team.value)), count: matchedCount.value },
-      matchedCount.value,
-    );
+    // A claim is about this one signal, so counting the queue it drains says nothing new.
+    const count = claiming.value ? 0 : matchedCount.value;
+    return t("oncall.ruleEditorGoesTo", { team: raw(teamNameOf(team.value)), count }, count);
   }
-  if (!props.signals.length) return "";
+  if (claiming.value || !props.signals.length) return "";
   return t("oncall.ruleEditorMatches", { count: matchedCount.value }, matchedCount.value);
 });
 

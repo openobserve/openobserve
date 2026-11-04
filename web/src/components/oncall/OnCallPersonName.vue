@@ -17,7 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- A person by display name inside a sentence; the email rides in the tooltip because two people can share a name. -->
 <template>
   <span :data-test="dataTest" :class="truncate ? 'block min-w-0 truncate' : ''">
-    <OTooltip side="bottom" :content="tooltipOf(email)" />
+    <OTooltip side="bottom">
+      <template #content>
+        <span class="flex flex-col" data-test="oncall-person-name-tooltip">
+          <span>{{ name }}</span>
+          <span v-if="showsEmail" class="text-text-secondary font-normal">{{ raw(email) }}</span>
+        </span>
+      </template>
+    </OTooltip>
     <span>{{ name }}</span>
   </span>
 </template>
@@ -35,7 +42,10 @@ const props = withDefaults(
   { dataTest: "oncall-person-name", truncate: false },
 );
 
-const { nameOf, tooltipOf } = useOrgUserNames();
+const { nameOf } = useOrgUserNames();
 
 const name = computed<I18nText>(() => raw(nameOf(props.email)));
+
+/// The same two lines OAvatar's tooltip shows, so a name and its avatar never disagree.
+const showsEmail = computed(() => nameOf(props.email) !== props.email);
 </script>

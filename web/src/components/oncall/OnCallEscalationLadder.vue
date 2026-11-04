@@ -41,7 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-ladder-priority-${group.key}`"
         @click="emit('update:selected', group.selects)"
       >
-        {{ group.label }}
+        <OTag
+          type="alertPriority"
+          :value="group.selects.toLowerCase()"
+          :label="group.label"
+          size="xs"
+        />
         <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
       </OButton>
     </span>
@@ -437,9 +442,24 @@ function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   const channels = channelList(entry.channels, t);
   const parts = channels ? [channels] : [];
   if (folded > 1) return raw([...parts, String(t("oncall.ladderSameLadder"))].join(" · "));
-  parts.push(String(t("oncall.policyChipSteps", { count: entry.rungs }, entry.rungs)));
+  const steps = stepCount(entry);
+  parts.push(String(t("oncall.policyChipSteps", { count: steps }, steps)));
   if (entry.nobody_after_micros) parts.push(formatMicrosDuration(entry.nobody_after_micros));
   return raw(parts.join(" · "));
+}
+
+/// The rows the card draws for this priority, so the chip never counts a step the card folded away.
+function stepCount(entry: TeamRungSummary): number {
+  if (props.preview?.priority === entry.priority && props.preview.rungs.length) {
+    return rungGroups.value.length;
+  }
+  const steps = props.policy?.rungs.find((rung) => rung.priority === numberOf(entry))?.steps;
+  if (!steps?.length) return entry.rungs;
+  const ordered = [...steps].sort((a, b) => a.after_micros - b.after_micros);
+  return ordered.filter(
+    (step, index) =>
+      index === 0 || JSON.stringify(step.targets) !== JSON.stringify(ordered[index - 1].targets),
+  ).length;
 }
 
 const MINUTES_PER_HOUR = 60;
@@ -556,11 +576,8 @@ const headerChannels = computed<Channel[]>(() => {
   return entry?.pages_anyone ? entry.channels : [];
 });
 
-/// When the ladder runs out: the last step's delay.
-const endTime = computed<I18nText>(() => {
-  const last = rungGroups.value[rungGroups.value.length - 1];
-  return delayLabel(last ? last.lastMicros : 0);
-});
+/// The ladder runs out the moment its last step has fired, so a delay here would repeat that step's.
+const endTime = computed<I18nText>(() => t("oncall.ladderEndsThen"));
 
 const silent = computed(() => !props.preview || !props.preview.pages_anyone);
 

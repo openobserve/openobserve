@@ -51,8 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :default-team-id="routingConfig?.default_team_id ?? null"
       :loading="loadingRules"
       :editable="canConfigure"
+      testable
       @add="openAdd"
       @edit="openEdit"
+      @test="(rule: OwnershipRuleStats) => tester.openTester(rule.dimensions)"
       @remove="(rule: OwnershipRuleStats) => (ruleToDelete = rule)"
       @change-default="goToRouting()"
     />
@@ -68,6 +70,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("oncall.teamRoutingUnclaimed", { count: openSignals.length }, openSignals.length) }}
     </OButton>
+
+    <ODrawer
+      :open="tester.open.value"
+      size="lg"
+      :title="t('oncall.routingTestRouting')"
+      data-test="oncall-ownership-tester-drawer"
+      @update:open="(v: boolean) => (tester.open.value = v)"
+    >
+      <OnCallRoutingSimulator
+        :preview="tester.preview.value"
+        :teams="teams"
+        :aliases="aliases"
+        :catalogue="catalogue"
+        :services="services"
+        :signals="openSignals"
+        :rules="rules"
+        :seed="tester.seed.value"
+        :loading="tester.testing.value"
+        :sending="tester.sending.value"
+        :test-result="tester.testResult.value"
+        :can-configure="canConfigure"
+        @run="tester.run"
+        @send-test="tester.sendTest"
+      />
+    </ODrawer>
 
     <OnCallRuleEditor
       :open="editorOpen"
@@ -107,12 +134,14 @@ import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
+import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   dimensionAnalyticsQuery,
@@ -121,6 +150,7 @@ import {
 } from "@/services/service_streams.queries";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { useOnCallRoutingTester } from "@/composables/useOnCallRoutingTester";
 import oncallService from "@/services/oncall";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
@@ -205,6 +235,8 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
       : fallback,
   });
 }
+
+const tester = useOnCallRoutingTester({ orgId, signals: openSignals, onError: failed });
 
 function readable(dimensions: Record<string, string>): string {
   return readableConditions(dimensions, aliases.value, {

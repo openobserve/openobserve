@@ -230,7 +230,6 @@
             <OnCallRecentPages
               :pages="recentPages"
               :policy="policy"
-              :window-days="ACTIVITY_WINDOW_DAYS"
               :loading="pagesLoading"
               @open="openPage"
               @view-all="openOnCallList"

@@ -370,6 +370,30 @@ describe("OnCallPolicyEditor", () => {
     expect(bar.find('[data-test="oncall-policy-priority-1"]').exists()).toBe(true);
   });
 
+  // The chips carry the same priority colours the Pages list does.
+  it("draws each priority chip with the shared priority badge", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const tag = wrapper
+      .find('[data-test="oncall-policy-priority-1"]')
+      .findComponent({ name: "OTag" });
+    expect(tag.attributes("type")).toBe("alertPriority");
+    expect(tag.attributes("value")).toBe("p1");
+  });
+
+  // G15: a team's own channel list is said by the button that reverts it, not a chip.
+  it("labels only an inherited team channel", async () => {
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-channel-source"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-team-channel-clear"]').attributes("variant")).toBe(
+      "outline",
+    );
+  });
+
   /// Reading P3 and pressing Edit has to land on P3. Opening on P1 asks the
   /// reader to re-find the ladder they were already looking at.
   describe("the priority the drawer opens on", () => {
@@ -1304,94 +1328,6 @@ describe("the end of the ladder, as an edit", () => {
     await flushPromises();
 
     expect(endSelect(wrapper).props("modelValue")).toBe("2:stop");
-  });
-});
-
-/// **The ladder said out loud.** The editor is built out of target KINDS and
-/// absolute offsets, neither of which is how anybody describes a policy. The
-/// sentence is the plain reading of what the controls below it add up to, and
-/// it has to track them rather than the last save.
-describe("the ladder as one sentence", () => {
-  beforeEach(() => {
-    __resetOnCallRoutingConfig();
-    vi.clearAllMocks();
-    service.getTeamChannel.mockResolvedValue({
-      data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
-    } as any);
-    service.setPolicy.mockResolvedValue({ data: {} } as any);
-  });
-
-  const threeSteps: OnCallPolicy = {
-    ...policy,
-    rungs: [
-      {
-        priority: 1,
-        steps: [
-          { after_micros: 0, targets: [{ kind: "rotation", rotation_id: "rot_primary" }] },
-          {
-            after_micros: 5 * 60_000_000,
-            targets: [{ kind: "rotation", rotation_id: "rot_second" }],
-          },
-          { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
-        ],
-        channels: ["email"],
-      },
-    ],
-  };
-
-  function renderWith(over: Partial<OnCallPolicy> = {}) {
-    return mount(OnCallPolicyEditor, {
-      props: {
-        teamId: "team_1",
-        policy: { ...threeSteps, ...over },
-        open: true,
-        rotations: [
-          { id: "rot_primary", name: "Primary", shift_rules: [] },
-          { id: "rot_second", name: "Secondary", shift_rules: [] },
-        ],
-      },
-      global: { plugins: [i18n, store], stubs },
-    });
-  }
-
-  it("names every step, when it fires, and how the ladder ends", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    const line = wrapper.find('[data-test="oncall-policy-sentence"]').text();
-    // Each level NAMES its rotation. "The on-call" and "the secondary" were
-    // role words two screens resolved differently, and both were right.
-    expect(line).toContain("Whoever is on call in Primary now");
-    expect(line).toContain("Whoever is on call in Secondary at 5m");
-    expect(line).toContain("The whole team at 15m");
-    expect(line).toContain("then stops");
-  });
-
-  /// A priority with no steps pages nobody. Saying "A P4 pages ." would read
-  /// as a rendering bug rather than as a decision.
-  it("says so plainly when a priority pages nobody", async () => {
-    const wrapper = mount(OnCallPolicyEditor, {
-      props: { teamId: "team_1", policy, open: true, priority: 4 },
-      global: { plugins: [i18n, store], stubs },
-    });
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("pages nobody");
-  });
-
-  it("follows the controls rather than the stored policy", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    wrapper
-      .findComponent('[data-test="oncall-policy-ladder-end-select"]')
-      .vm.$emit("update:modelValue", "1:notify_default_team");
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("hands off");
   });
 });
 

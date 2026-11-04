@@ -38,17 +38,24 @@
       <OButton
         v-for="rung in draft"
         :key="rung.priority"
-        :variant="rung.priority === selected ? 'primary' : 'outline'"
+        :variant="rung.priority === selected ? 'outline-primary' : 'outline'"
         size="xs"
         :data-test="`oncall-policy-priority-${rung.priority}`"
         @click="selected = rung.priority"
       >
-        {{ priorityLabel(rung.priority) }}
-        {{
-          rung.steps.length
-            ? t("oncall.policyChipSteps", { count: rung.steps.length }, rung.steps.length)
-            : t("oncall.reachPagesNobody")
-        }}
+        <OTag
+          type="alertPriority"
+          :value="`p${rung.priority}`"
+          :label="raw(priorityLabel(rung.priority))"
+          size="xs"
+        />
+        <span class="text-2xs text-text-secondary ms-1.5">
+          {{
+            rung.steps.length
+              ? t("oncall.policyChipSteps", { count: rung.steps.length }, rung.steps.length)
+              : t("oncall.reachPagesNobody")
+          }}
+        </span>
       </OButton>
     </div>
 
@@ -110,19 +117,6 @@
               class="flex flex-col gap-4 px-4 pt-3 pb-4"
               data-test="oncall-policy-rung"
             >
-              <!-- The whole ladder as one sentence, before any of the controls. The
-             editor is built out of target KINDS and absolute offsets; this is
-             the plain reading of what they add up to. -->
-              <OBanner
-                variant="info"
-                icon="bolt"
-                dense
-                inline-actions
-                data-test="oncall-policy-sentence"
-              >
-                <OTruncatedText class="block min-w-0">{{ ladderSentence }}</OTruncatedText>
-              </OBanner>
-
               <div class="flex flex-col gap-2">
                 <OText variant="section" as="div">{{ t("oncall.policyStepsSection") }}</OText>
 
@@ -503,23 +497,20 @@
                     data-test="oncall-team-channel-select"
                   />
                 </span>
+                <!-- A team's own list says so through the button that reverts it; only the inherited one needs a label. -->
                 <OTag
-                  v-if="teamChannel"
-                  :variant="channelFromTeam ? 'primary-soft' : 'default-soft'"
+                  v-if="teamChannel && !channelFromTeam"
+                  variant="default-soft"
                   size="xs"
                   data-test="oncall-team-channel-source"
                 >
-                  {{
-                    channelFromTeam
-                      ? t("oncall.teamChannelFromTeam")
-                      : t("oncall.teamChannelFromPolicy")
-                  }}
+                  {{ t("oncall.teamChannelFromPolicy") }}
                 </OTag>
                 <!-- Clearing is its own verb because null and [] are different
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
                   v-if="channelFromTeam"
-                  variant="ghost"
+                  variant="outline"
                   size="sm-action"
                   icon-left="close"
                   data-test="oncall-team-channel-clear"
@@ -609,7 +600,6 @@ import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -887,39 +877,6 @@ const defaultTeamMissing = computed(
     routingConfig.value !== null &&
     !routingConfig.value.default_team_id,
 );
-
-/// The whole selected ladder as one sentence. The editor is built out of
-/// target kinds and absolute offsets; this is what they add up to, said the way
-/// somebody would say it out loud.
-const ladderSentence = computed<I18nText>(() => {
-  const rung = current.value;
-  const priority = raw(priorityLabel(rung?.priority ?? selected.value));
-  if (!rung?.steps.length) return t("oncall.policySentenceNobody", { priority });
-
-  const steps = rung.steps
-    .map((step) => {
-      const who = step.targets
-        .map((target) => describeTarget(target, t, rotationNameOf(target)))
-        .join(", ");
-      return step.after_micros === 0
-        ? t("oncall.policySentenceStepNow", { who: raw(who) })
-        : t("oncall.policySentenceStepAt", {
-            who: raw(who),
-            delay: raw(formatMicrosDuration(step.after_micros)),
-          });
-    })
-    .join(", ");
-
-  const team = routingConfig.value?.default_team_name;
-  const ending =
-    finalAction.value === "notify_default_team"
-      ? team
-        ? t("oncall.policySentenceEndHandOff", { team: raw(team) })
-        : t("oncall.policySentenceEndHandOffUnset")
-      : t("oncall.policySentenceEndStop");
-
-  return t("oncall.policySentence", { priority, steps: raw(steps), ending });
-});
 
 /// The two halves of the ladder's end as one value, because they are one
 /// decision: how many passes, and what happens after the last one.

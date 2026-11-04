@@ -92,6 +92,7 @@ const onDateChange = (field: any, dt: any) => {
           {{ props.description }}
         </div>
       </div>
+      <div v-if="$slots.above" class="mb-2"><slot name="above" /></div>
       <DateTime
         :key="renderKey"
         v-bind="$attrs"

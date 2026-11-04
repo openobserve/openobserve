@@ -86,3 +86,42 @@ describe("OnCallConditionRows value picker", () => {
     expect(searchInput()).toBeNull();
   });
 });
+
+describe("OnCallConditionRows vocabulary", () => {
+  function mountWith(props: Record<string, unknown>) {
+    return mount(OnCallConditionRows, {
+      props: { testPrefix: PREFIX, ...props },
+      global: { plugins: [i18n] },
+    });
+  }
+  const optionsOf = (w: ReturnType<typeof mountWith>, test: string) =>
+    (
+      w
+        .findAllComponents(OSelect)
+        .find((c) => c.attributes("data-test") === test)!
+        .props("options") as { value: string }[]
+    ).map((option) => option.value);
+
+  // A value an existing rule routes on is real even when discovery never reported it.
+  it("offers the values existing rules already route on", () => {
+    const w = mountWith({
+      catalogue: { present: ["service"], values: { service: { checkout: 1 } } },
+      rules: [{ dimensions: { service: "cart-service" } }, { dimensions: { service: "pay-*" } }],
+    });
+    const values = optionsOf(w, `${PREFIX}-value-0`);
+    expect(values).toContain("cart-service");
+    expect(values).not.toContain("pay-*");
+  });
+
+  // The engine's own bookkeeping columns are never an alert's identity, so they are not offered.
+  it("leaves internal fields and values out of the pickers", () => {
+    const w = mountWith({
+      catalogue: {
+        present: ["service", "traces_service_graph_processed_timestamp", "_timestamp"],
+        values: { service: { checkout: 1, traces_service_graph_processed_timestamp: 3 } },
+      },
+    });
+    expect(optionsOf(w, `${PREFIX}-field-0`)).toEqual(["service"]);
+    expect(optionsOf(w, `${PREFIX}-value-0`)).toEqual(["checkout"]);
+  });
+});

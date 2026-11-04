@@ -93,26 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OForm v-else :id="FORM_ID" :form="form" class="flex flex-col gap-5">
-      <div class="flex flex-col gap-1">
-        <OFormSelect
-          name="user_email"
-          :label="t('oncall.coverWho')"
-          :options="memberOptions"
-          searchable
-          required
-          data-test="oncall-cover-who"
-        />
-        <i18n-t
-          v-if="currentHolder"
-          keypath="oncall.coverCurrentlyOnCall"
-          tag="span"
-          scope="global"
-          class="text-input-help-text text-xs"
-          data-test="oncall-cover-currently"
-        >
-          <template #name><OnCallPersonName :email="currentHolder" /></template>
-        </i18n-t>
-      </div>
+      <OFormSelect
+        name="user_email"
+        :label="t('oncall.coverWho')"
+        :options="memberOptions"
+        searchable
+        required
+        data-test="oncall-cover-who"
+      />
 
       <!-- Only when there is a choice to make. A one-rotation team has one
            rotation, and a select with one option is a question with one
@@ -125,26 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-cover-rotation"
       />
 
-      <!-- Presets first, because they are the answer almost every time. -->
-      <div class="flex flex-col gap-2">
-        <OText variant="label">{{ t("oncall.coverQuickRanges") }}</OText>
-        <span class="flex flex-wrap gap-2">
-          <OButton
-            v-for="preset in PRESETS"
-            :key="preset.key"
-            variant="outline"
-            size="xs"
-            :data-test="`oncall-cover-preset-${preset.key}`"
-            @click="applyPreset(preset.key)"
-          >
-            {{ t(preset.labelKey) }}
-          </OButton>
-        </span>
-      </div>
-
-      <!-- Absolute only. A relative period is a question about the past — the
-           picker resolves "Past 30 Minutes" against the moment it is read —
-           and there is no forward-looking reading of it to offer here. -->
+      <!-- Absolute only: a relative period resolves against the moment it is read, and a cover is forward-looking. -->
       <!-- A plain block: straight in the form's flex column, the picker's border stretches past its buttons. -->
       <div>
         <OFormDateTimeRange
@@ -152,20 +121,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('oncall.coverWhen')"
           required
           disable-relative
+          auto-apply
+          :trigger-text="windowLabel"
           data-test="oncall-cover-window"
-        />
+        >
+          <!-- The presets set this same field, so they sit inside it; the one matching the range is lit. -->
+          <template #above>
+            <span class="flex flex-wrap gap-2" data-test="oncall-cover-presets">
+              <OButton
+                v-for="preset in PRESETS"
+                :key="preset.key"
+                :variant="activePreset === preset.key ? 'outline-primary' : 'outline'"
+                size="xs"
+                :aria-pressed="activePreset === preset.key"
+                :data-test="`oncall-cover-preset-${preset.key}`"
+                @click="applyPreset(preset.key)"
+              >
+                {{ t(preset.labelKey) }}
+              </OButton>
+            </span>
+          </template>
+        </OFormDateTimeRange>
       </div>
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
-        <i18n-t keypath="oncall.coverSummary" tag="span" scope="global">
+        <i18n-t keypath="oncall.coverSummaryWho" tag="span" scope="global">
           <template #name><OnCallPersonName :email="summary.who" /></template>
           <template #team>{{ summary.team }}</template>
-          <template #range>{{ summary.range }}</template>
         </i18n-t>
-        <span v-if="teamZoneSummary" class="block" data-test="oncall-cover-summary-team-zone">
-          {{ teamZoneSummary }}
-        </span>
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
       </OBanner>
     </OForm>
@@ -230,7 +214,7 @@ const props = withDefaults(
     members?: OnCallTeamMember[];
     timezone?: string;
     saving?: boolean;
-    /** Who currently holds the shift, so the picker can say who is being relieved. */
+    /** Who currently holds the shift; hosts still pass it, nothing on the form names them. */
     currentHolder?: string | null;
     /**
      * The clock the RANGE CONTROL edits in — the reader's own, which is not
@@ -471,50 +455,45 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
   // with no type is re-read as a relative period and resolved against `now` —
   // which threw the preset away and put the past half hour back.
   form.setFieldValue("window", { type: "absolute", ...ranges[key] });
+  presetApplied = { key, ...ranges[key] };
+  activePreset.value = key;
 }
 
-/// `timeZoneName` is the whole point: the two ends of a handover mean nothing
-/// without the clock they are on, and a UTC team read from IST is off by five
-/// and a half hours with no way to tell from the numbers.
-const formatRange = (micros: number, zone: string) =>
-  formatInZone(micros, zone, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+/// The preset whose range the field still holds; any other edit to the window unlights it.
+const activePreset = ref<string | null>(null);
+let presetApplied: { key: string; from: number; to: number } | null = null;
 
-const summary = computed<{ who: string; team: I18nText; range: I18nText } | null>(() => {
-  const window = windowValue.value;
-  const who = String(userValue.value ?? "");
-  // A half-picked range is not a sentence yet — the picker reports one end at
-  // a time, and "Sat 18:00 – Invalid Date" is worse than nothing. Nor is a
-  // range with nobody against it.
-  if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
-  if (!who) return null;
-  const fmt = (micros: number) => formatRange(micros, props.viewerTimezone);
-  // The person TAKING the shift, not `currentHolder` — whoever is being relieved.
-  return {
-    who,
-    team: raw(props.teamName ?? ""),
-    range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
-  };
+watch(windowValue, (value) => {
+  const applied = presetApplied;
+  activePreset.value =
+    applied && value?.from === applied.from && value?.to === applied.to ? applied.key : null;
 });
 
-/// The same window on the team's clock, and only when that is a different
-/// clock. A cover is agreed in the team's calendar — somebody arranging one
-/// from another office is still handing over the team's night — but the reader
-/// typed their own wall times into the picker, so showing only the team's would
-/// read as the dialog having changed the answer.
-const teamZoneSummary = computed<I18nText | "">(() => {
+/// The field states the window on the team's clock, naming the zone only when the reader is on another one.
+const windowLabel = computed<string>(() => {
   const window = windowValue.value;
-  if (!summary.value) return "";
-  if (props.timezone === props.viewerTimezone) return "";
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
-  const fmt = (micros: number) => formatRange(micros, props.timezone);
-  return t("oncall.coverSummaryTeamZone", {
-    range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
-  });
+  const fmt = (micros: number) =>
+    formatInZone(micros, props.timezone, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      ...(props.timezone === props.viewerTimezone ? {} : { timeZoneName: "short" }),
+    });
+  return `${fmt(window.from)} → ${fmt(window.to)}`;
+});
+
+/// Who takes the shift; the window itself is said once, by the field.
+const summary = computed<{ who: string; team: I18nText } | null>(() => {
+  const window = windowValue.value;
+  const who = String(userValue.value ?? "");
+  // A half-picked range is not a cover yet, nor is a range with nobody against it.
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
+  if (!who) return null;
+  // The person TAKING the shift, not `currentHolder` — whoever is being relieved.
+  return { who, team: raw(props.teamName ?? "") };
 });
 
 /// ── Swap ──────────────────────────────────────────────────────────────────

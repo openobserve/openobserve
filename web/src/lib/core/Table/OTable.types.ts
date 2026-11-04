@@ -716,6 +716,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
   "body-start"?: () => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the last row of the body, above the footer; not measured by virtual scrolling. */
+  "body-end"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */

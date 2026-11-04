@@ -58,9 +58,8 @@ describe("OnCallDeliveryLedger", () => {
     await flushPromises();
     const person = wrapper.find('[data-test="oncall-delivery-recipient-1-0"]');
     expect(person.text()).toBe("Ana Ruiz");
-    expect(person.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "Ana Ruiz (ana@o2.ai)",
-    );
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(person.findComponent({ name: "OTooltip" }).exists()).toBe(true);
   });
 
   it("shows the receipt per send: who, channel, landed or failed", () => {

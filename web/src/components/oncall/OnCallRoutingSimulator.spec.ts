@@ -239,7 +239,8 @@ describe("OnCallRoutingSimulator", () => {
     const ana = wrapper
       .findAllComponents(OnCallPersonName)
       .find((c) => c.props("email") === "ana@o2.ai");
-    expect(ana!.findComponent(OTooltip).props("content")).toBe("Ana (ana@o2.ai)");
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(ana!.findComponent(OTooltip).exists()).toBe(true);
   });
 
   // The engine's current responder is one person; a first step paging Primary and Secondary wakes both.

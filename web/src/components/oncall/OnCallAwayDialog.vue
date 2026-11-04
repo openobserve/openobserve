@@ -29,10 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-heading text-sm font-medium"
           data-test="oncall-members-away-person"
         />
-      </span>
-      <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
-      <span class="text-text-secondary text-xs" data-test="oncall-members-away-zone">
-        {{ zoneCaption(timezone, localZone, Date.now() * 1000, t) }}
+        <!-- The fields read on the team's clock, so its zone shows only when the reader is elsewhere. -->
+        <OTag
+          v-if="timezone !== localZone"
+          variant="default-outline"
+          size="sm"
+          icon="schedule"
+          class="ms-auto shrink-0"
+          data-test="oncall-members-away-zone"
+        >
+          {{ raw(timezone) }}
+          <OTooltip
+            side="bottom"
+            :content="zoneCaption(timezone, localZone, Date.now() * 1000, t)"
+          />
+        </OTag>
       </span>
       <div class="flex flex-col gap-1">
         <span class="o-input-label text-sm leading-tight font-semibold">
@@ -92,6 +103,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation } from "@tanstack/vue-query";
 
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
@@ -101,6 +113,7 @@ import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { createUnavailabilityMutation } from "@/services/oncall.queries";
 import { raw, useI18nTyped } from "@/types/i18n";

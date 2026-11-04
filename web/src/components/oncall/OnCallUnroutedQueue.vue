@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-unrouted-header"
     >
       <OText variant="panel-title">{{ t("oncall.unroutedTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.unroutedHint") }}</OText>
       <!-- Bulk claim needs a team to claim FOR, so it only renders where the
            host screen supplies one. The org queue claims row by row, because
            "assign everything unowned to one team" is rarely the true intent. -->
@@ -116,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-fires="{ row }">
-        <span class="text-text-body">
-          {{ t("oncall.unroutedFires", { count: row.occurrences }, row.occurrences) }}
+        <span class="text-text-body tabular-nums" :data-test="`oncall-unrouted-fires-${row.id}`">
+          {{ row.occurrences }}
         </span>
       </template>
 
