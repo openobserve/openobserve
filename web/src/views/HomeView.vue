@@ -193,7 +193,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </HomeNoDataState>
           </div>
-          <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
+          <div
+            v-else-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
@@ -204,7 +209,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <!-- Overview tab (no inner card-container — the outer section panel
                already provides the border; avoids a double-bordered card). -->
-          <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <div
+            v-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
 

@@ -200,6 +200,7 @@ export function chartNumber(token: `--${string}`, fallback: number): number {
 
 // Convenience getters used by the dashboard/trace chart converters.
 export const chartTextColor = (): string => chartColor("--color-text-secondary");
+export const chartAxisTextColor = (): string => chartColor("--color-text-body");
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");
