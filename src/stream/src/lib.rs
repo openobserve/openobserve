@@ -341,6 +341,9 @@ pub async fn create_stream(
         );
     }
 
+    // the level of a day is only ever written from the next day on, a body could rewrite the past
+    stream.settings.partition_time_level = Default::default();
+
     // create the stream settings
     let resp = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await?;
     if resp.status() == http::StatusCode::OK {
@@ -2168,6 +2171,34 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_create_stream_ignores_a_partition_time_level_in_the_body() {
+        use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
+        let _ = infra::db::create_table().await;
+        let name = &format!("level_in_create_{}", now_micros());
+        let stream = StreamCreate {
+            fields: Vec::new(),
+            settings: StreamSettings {
+                partition_time_level: StreamPartitionTimeLevel {
+                    dynamic: Some(true),
+                    changes: vec![PartitionTimeLevelChange {
+                        since: 1,
+                        level: PartitionTimeLevel::Daily,
+                    }],
+                },
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let history = settings_test_stream(name).await.partition_time_level;
+        assert!(history.changes.is_empty());
+        // the env list is empty in tests, so this is the stream without a value of its own
+        assert_eq!(history.dynamic, Some(false));
     }
 
     #[tokio::test]
