@@ -475,6 +475,18 @@ mod tests {
     }
 
     #[test]
+    fn an_org_named_v2_ingests_like_any_other_org() {
+        assert_eq!(
+            classify(
+                &Method::POST,
+                "v2/mystream/_json",
+                Some("/api/{org_id}/{stream_name}/_json")
+            ),
+            Some(IngestionKind::Write)
+        );
+    }
+
+    #[test]
     fn data_reads_are_rejected_the_ghsa_bypass() {
         // Data-bearing reads must not classify as ingestion, for any method.
         for route in [
@@ -492,6 +504,29 @@ mod tests {
                     "data read must never classify as ingestion: {method} /{route}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn stream_named_after_es_word_cannot_read_data() {
+        for stream in [
+            "_ingest",
+            "_ilm",
+            "_data_stream",
+            "_index_template",
+            "_license",
+            "_xpack",
+        ] {
+            let path = format!("default/{stream}/traces/latest");
+            assert_eq!(
+                classify(
+                    &Method::GET,
+                    &path,
+                    Some("/api/{org_id}/{stream_name}/traces/latest")
+                ),
+                None,
+                "stream named {stream} must not alias an ES handshake read"
+            );
         }
     }
 

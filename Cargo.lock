@@ -8432,6 +8432,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tonic",
+ "tower",
  "tracing",
  "tracing-opentelemetry",
  "transform",
