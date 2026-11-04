@@ -67,6 +67,27 @@ describe("OSegmentedBar", () => {
     );
   });
 
+  it("paints the track and packs segments flush unless gapped", () => {
+    const plain = mount(OSegmentedBar, { props: { segments: [{ id: "a", pct: 50 }] } });
+    expect(plain.classes()).toContain("bg-border-default");
+    expect(find(plain, "o-segmented-bar-segment-a").classes()).toContain("shrink-0");
+    const gapped = mount(OSegmentedBar, {
+      props: {
+        gapped: true,
+        segments: [
+          { id: "a", pct: 0.5, variant: "logs" },
+          { id: "b", pct: 0 },
+        ],
+      },
+    });
+    expect(gapped.classes()).not.toContain("bg-border-default");
+    expect(gapped.find(".gap-0\\.5").exists()).toBe(true);
+    expect(find(gapped, "o-segmented-bar-segment-a").classes()).toEqual(
+      expect.arrayContaining(["min-w-1", "shrink", "bg-signal-logs"]),
+    );
+    expect(find(gapped, "o-segmented-bar-segment-b").classes()).toContain("hidden");
+  });
+
   it("exposes an image role when labelled and hides itself otherwise", () => {
     const labelled = mount(OSegmentedBar, { props: { segments: [], label: raw("Pods") } });
     expect(labelled.attributes("role")).toBe("img");
@@ -78,7 +99,7 @@ describe("OSegmentedBar", () => {
 
   it("exports one swatch class per variant and the bar paints with the same classes", () => {
     const variants = Object.keys(SEGMENT_SWATCH) as SegmentedBarVariant[];
-    expect(variants).toHaveLength(8);
+    expect(variants).toHaveLength(11);
     const w = mount(OSegmentedBar, {
       props: { segments: variants.map((variant) => ({ id: variant, pct: 1, variant })) },
     });
