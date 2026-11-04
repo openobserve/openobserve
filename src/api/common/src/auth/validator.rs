@@ -518,9 +518,7 @@ pub async fn validate_credentials(
     // merely contains the `traces` segment) leaked protected data. The
     // authoritative ingestion-route table classifies the request by method and
     // exact path shape, so only real writes and the read-only ES handshake
-    // stubs are accepted — data-read routes are not in the table. `path` (not
-    // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
-    // `GET /{org}/` stays distinguishable from `/organizations` etc.
+    // stubs are accepted — data-read routes are not in the table.
     // OpAMP accepts fleet tokens only, which returned above.
     if ingestion_routes::is_opamp(path) {
         return Ok(TokenValidationResponse::default());
@@ -1556,7 +1554,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // This holds structurally — `Splunk` matches no branch in
         // oo_validator_internal and falls through to Unauthorized.
         let req_data = RequestData {
-            route: None,
+            route: Some("/api/{org_id}/_bulk".to_string()),
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -1582,7 +1580,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
     async fn auth_ext_token_without_its_prefix_is_rejected() {
         let now = Utc::now().timestamp();
         let req_data = RequestData {
-            route: None,
+            route: Some("/api/{org_id}/streams".to_string()),
             uri: "/default/streams".parse::<Uri>().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -1612,7 +1610,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let mut headers = HeaderMap::new();
         headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
         let aws = RequestData {
-            route: None,
+            route: Some("/aws/{org_id}/{stream_name}/_kinesis_firehose".to_string()),
             uri: "/default/mystream/_kinesis_firehose"
                 .parse::<Uri>()
                 .unwrap(),
@@ -1628,7 +1626,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .append_pair("API-Key", &encoded)
             .finish();
         let gcp = RequestData {
-            route: None,
+            route: Some("/gcp/{org_id}/{stream_name}/_sub".to_string()),
             uri: format!("/default/mystream/_sub?{query}")
                 .parse::<Uri>()
                 .unwrap(),
@@ -1646,7 +1644,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // A GUID is not an `o2oi_` token and is not a user password, so Basic
         // with it must fail too.
         let req_data = RequestData {
-            route: None,
+            route: Some("/api/{org_id}/_bulk".to_string()),
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -2537,9 +2535,13 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let mut failures = routed_org_failures(&basic, "Basic").await;
         let mut firehose = HeaderMap::new();
         firehose.insert("X-Amz-Firehose-Access-Key", credentials.parse().unwrap());
-        if validator_aws(&post_request("/aws/kv/_kinesis_firehose", firehose))
-            .await
-            .is_ok()
+        if validator_aws(&post_request(
+            "/aws/kv/_kinesis_firehose",
+            "/aws/{org_id}/{stream_name}/_kinesis_firehose",
+            firehose,
+        ))
+        .await
+        .is_ok()
         {
             failures.push("POST /aws/aws/kv/_kinesis_firehose: accepted for org aws".to_string());
         }
@@ -2548,6 +2550,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .finish();
         if validator_gcp(&post_request(
             &format!("/gcp/kv/_sub?{query}"),
+            "/gcp/{org_id}/{stream_name}/_sub",
             HeaderMap::new(),
         ))
         .await
@@ -2563,9 +2566,9 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(failures.is_empty(), "{failures:#?}");
     }
 
-    fn post_request(uri: &str, headers: HeaderMap) -> RequestData {
+    fn post_request(uri: &str, route: &str, headers: HeaderMap) -> RequestData {
         RequestData {
-            route: None,
+            route: Some(route.to_string()),
             uri: uri.parse().unwrap(),
             method: Method::POST,
             headers,
@@ -2574,17 +2577,21 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     // A member of `kv` is served in `kv` and refused by the orgs named like route segments.
     async fn routed_org_failures(auth: &AuthExtractor, scheme: &str) -> Vec<String> {
+        const KV_ROUTE: &str = "/api/{org_id}/kv/{key}";
         let mut failures = vec![];
-        if oo_validator(&post_request("/kv/kv/note", HeaderMap::new()), auth)
-            .await
-            .is_err()
+        if oo_validator(
+            &post_request("/kv/kv/note", KV_ROUTE, HeaderMap::new()),
+            auth,
+        )
+        .await
+        .is_err()
         {
             failures.push(format!(
                 "{scheme} POST /api/kv/kv/note: a member of kv was refused in kv"
             ));
         }
         for (served, uri) in [("api", "/api/kv/note"), ("v2", "/v2/kv/note")] {
-            if oo_validator(&post_request(uri, HeaderMap::new()), auth)
+            if oo_validator(&post_request(uri, KV_ROUTE, HeaderMap::new()), auth)
                 .await
                 .is_ok()
             {
@@ -2711,7 +2718,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         }
         let credentials = base64::encode(&format!("{sso_user}:anything"));
         let req_data = RequestData {
-            route: None,
+            route: Some("/api/{org_id}/streams".to_string()),
             uri: "/default/streams".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
