@@ -28,11 +28,14 @@ use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    // Another kind's names and text are free (a downtime "deploy" <db>), so a JSON body escapes
+    // them as it escapes attributes; plain text such as an SNS message gets them as written.
+    let json_body = ctx.kind != NotificationKind::Alert && !is_email && looks_like_json(tpl);
     let prepared = super::modifiers::prepare_modifiers(
         tpl,
         |field| {
             let placeholder = format!("{{{field}}}");
-            let value = apply_custom_template_plain(&placeholder, ctx, is_email);
+            let value = apply_custom_template_plain(&placeholder, ctx, is_email, json_body);
             (value != placeholder).then_some(value)
         },
         |field| {
@@ -51,22 +54,31 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
         &prepared.template,
         ctx,
         is_email,
+        json_body,
     ))
+}
+
+/// A JSON object or array body; a placeholder such as `{alert_name}` also opens with a brace.
+fn looks_like_json(tpl: &str) -> bool {
+    let mut chars = tpl.trim_start().chars();
+    match chars.next() {
+        Some('[') => true,
+        Some('{') => matches!(chars.find(|c| !c.is_whitespace()), Some('"' | '}')),
+        _ => false,
+    }
 }
 
 pub(crate) fn apply_custom_template_plain(
     tpl: &str,
     ctx: &NotificationContext,
     is_email: bool,
+    escape: bool,
 ) -> String {
     let evaluation_timestamp = ctx.alert_trigger_time;
     let evaluation_timestamp_millis = evaluation_timestamp / 1000;
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let rows_tpl_val: &[Value] = &ctx.rows_tpl_val;
 
-    // Another kind's names and text are free (a downtime "deploy" <db>), so in a JSON body they are
-    // escaped as its attributes are; alerts keep their output byte for byte.
-    let escape = ctx.kind != NotificationKind::Alert && !is_email;
     let esc = |v: &str| -> String {
         if escape {
             format_variable_value(v.to_string())
@@ -568,6 +580,11 @@ mod golden {
         let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
         assert_eq!(json["text"], "Nightly \"deploy\" <db>");
         assert_eq!(json["detail"], "line one\nline two");
+        // A plain text body, such as an SNS message, gets the values as written.
+        assert_eq!(
+            apply_custom_template("{alert_name}: {alert_description}", &ctx, false),
+            "Nightly \"deploy\" <db>: line one\nline two"
+        );
         // An alert keeps the raw insert it always had.
         let alert = NotificationContext {
             alert_name: "cpu high".into(),
