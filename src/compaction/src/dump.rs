@@ -40,7 +40,7 @@ use infra::{
     cluster::get_node_from_consistent_hash,
     errors, file_list as infra_file_list,
     file_list::FileRecord,
-    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_partition_time_level, get_settings},
+    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings},
 };
 use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
@@ -59,6 +59,8 @@ pub struct DumpJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
+    /// A daily job holds the stream against merges until it ends.
+    pub holds_stream: bool,
 }
 
 // compactor dump run steps:
@@ -102,7 +104,6 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // the data is not past its range, need to wait
             continue;
         }
-        let partition_time_level = get_partition_time_level(stream_type);
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()
@@ -118,16 +119,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
         }
-        // the dump removes live rows the sealing merge still reads; a lagging offset only retries
         if level == PartitionTimeLevel::Daily {
-            let (compact_offset, _) =
-                db::compact::files::get_offset(&org_id, stream_type, &stream_name).await;
-            if !is_day_sealed(*offset, compact_offset) {
-                need_release_ids.push(*job_id);
-                continue;
-            }
-        }
-        if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -136,6 +128,14 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             };
             if LOCAL_NODE.name.ne(&node_name) {
                 need_release_ids.push(*job_id); // not this node
+                continue;
+            }
+
+            // the dump removes live rows the sealing merge still reads
+            let (compact_offset, _) =
+                db::compact::files::get_offset(&org_id, stream_type, &stream_name).await;
+            if !is_day_sealed(*offset, compact_offset) {
+                need_release_ids.push(*job_id);
                 continue;
             }
 
@@ -154,6 +154,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             stream_name,
             job_id: *job_id,
             offset: *offset,
+            holds_stream: level == PartitionTimeLevel::Daily,
         });
     }
 
@@ -848,6 +849,7 @@ mod tests {
             stream_name: "test_stream".to_string(),
             job_id: 123,
             offset: 1000000,
+            holds_stream: false,
         };
 
         assert_eq!(job.org_id, "test_org");
@@ -865,6 +867,7 @@ mod tests {
             stream_name: "metric_stream".to_string(),
             job_id: 456,
             offset: 2000000,
+            holds_stream: false,
         };
 
         let cloned = job.clone();
@@ -883,6 +886,7 @@ mod tests {
             stream_name: "trace_stream".to_string(),
             job_id: 1,
             offset: 100,
+            holds_stream: false,
         };
         assert_eq!(job.stream_type, StreamType::Traces);
     }
@@ -895,6 +899,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: 0,
             offset: 0,
+            holds_stream: false,
         };
         assert_eq!(job.job_id, 0);
         assert_eq!(job.offset, 0);
@@ -909,6 +914,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: 99,
             offset: -1,
+            holds_stream: false,
         };
         assert_eq!(job.offset, -1);
     }
@@ -921,6 +927,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: i64::MAX,
             offset: i64::MAX,
+            holds_stream: false,
         };
         assert_eq!(job.job_id, i64::MAX);
         assert_eq!(job.offset, i64::MAX);
@@ -935,6 +942,7 @@ mod tests {
             stream_name: "original_stream".to_string(),
             job_id: 1,
             offset: 100,
+            holds_stream: false,
         };
         let mut cloned = original.clone();
         cloned.job_id = 999;
@@ -1804,6 +1812,7 @@ mod tests {
                 stream_name: "stream".to_string(),
                 job_id: 1,
                 offset: 0,
+                holds_stream: false,
             };
             let formatted = format!("{}/{}/{}", job.org_id, job.stream_type, job.stream_name);
             assert!(

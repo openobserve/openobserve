@@ -354,6 +354,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             stream_name,
             job_id: job.id,
             offset: job.offsets,
+            holds_stream: partition_time_level == PartitionTimeLevel::Daily,
         });
     }
 
