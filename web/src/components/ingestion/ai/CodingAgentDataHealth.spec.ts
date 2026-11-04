@@ -12,6 +12,17 @@ vi.mock("@/services/gen-ai-data-health.service", () => ({
   getDataHealth: (...args: unknown[]) => getDataHealth(...args),
 }));
 
+// Model Pricing and GenAI Agent Mapping are enterprise/cloud settings; OSS locks them.
+let mockIsEnterprise = "true";
+vi.mock("@/aws-exports", () => ({
+  default: {
+    get isEnterprise() {
+      return mockIsEnterprise;
+    },
+    isCloud: "false",
+  },
+}));
+
 import CodingAgentDataHealth from "./CodingAgentDataHealth.vue";
 
 const NOW = Date.UTC(2026, 10, 3, 10, 0, 0);
@@ -61,6 +72,7 @@ const q = (id: string) => wrapper.find(`[data-test="${id}"]`);
 const state = () => q("ai-coding-agent-health").attributes("data-state");
 
 beforeEach(() => {
+  mockIsEnterprise = "true";
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
 });
@@ -161,6 +173,28 @@ describe("CodingAgentDataHealth", () => {
       start_time: String(START_US),
       end_time: String(NOW * 1000),
     });
+  });
+
+  it("offers no fix for a setting OSS locks, and keeps the docs fix", async () => {
+    mockIsEnterprise = "false";
+    getDataHealth.mockResolvedValue({
+      data: {
+        checked_at: NOW * 1000,
+        checks: [
+          { id: "unpriced_models", status: "error", affected: 1, total: 2, model_count: 1 },
+          { id: "missing_agent_identity", status: "warning", affected: 1, total: 2 },
+          passing("zero_duration_spans", 2),
+          { id: "missing_session_id", status: "warning", affected: 1, total: 2 },
+        ],
+      },
+    });
+    mountHealth();
+    await flushPromises();
+    expect(q("llm-data-health-card-unpriced_models").attributes("data-status")).toBe("error");
+    expect(q("llm-data-health-fix-unpriced_models").exists()).toBe(false);
+    expect(q("llm-data-health-fix-missing_agent_identity").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Copy link for an admin");
+    expect(q("llm-data-health-fix-missing_session_id").exists()).toBe(true);
   });
 
   it("opens a sample trace in the checked window", async () => {

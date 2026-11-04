@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { DataHealthCheck } from "@/services/gen-ai-data-health.service";
 import { formatTokens } from "@/utils/llmUtils";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { fixTarget, type TimeWindow } from "./llmDataTrust.utils";
 import { useDataHealthText } from "./composables/useDataHealthText";
 
@@ -48,14 +49,19 @@ const router = useRouter();
 const store = useStore();
 const { label, detail, truncatedNote, fixLabel, statusLabel } = useDataHealthText();
 
-const target = computed(() =>
-  fixTarget(
+// OSS locks Model Pricing and GenAI Agent Mapping, so those checks offer no fix there.
+const target = computed(() => {
+  const to = fixTarget(
     props.check.id,
     props.stream,
     store.state.selectedOrganization?.identifier ?? "",
     props.checkedWindow,
-  ),
-);
+  );
+  const locked =
+    to.kind === "route" &&
+    !checkFeatureAccess(to.feature, buildFeatureGateContext(store.state.zoConfig)).allowed;
+  return locked ? null : to;
+});
 
 const badgeVariant = computed(() => {
   if (props.check.status === "error") return "error-soft" as const;
@@ -65,6 +71,7 @@ const badgeVariant = computed(() => {
 
 function openFix() {
   const to = target.value;
+  if (!to) return;
   if (to.kind === "route") {
     emit("leave");
     router.push(to.to);
@@ -76,6 +83,7 @@ function openFix() {
 /** For users who cannot open the setting themselves: a link an admin can follow. */
 async function copyFixLink() {
   const to = target.value;
+  if (!to) return;
   const href =
     to.kind === "route"
       ? new URL(router.resolve(to.to).href, window.location.origin).toString()
@@ -134,7 +142,7 @@ function shortTraceId(id: string): string {
         {{ raw(shortTraceId(id)) }}
       </button>
     </div>
-    <div v-if="check.status !== 'pass'" class="flex flex-wrap items-center gap-2 pt-1">
+    <div v-if="check.status !== 'pass' && target" class="flex flex-wrap items-center gap-2 pt-1">
       <OButton
         variant="primary"
         size="xs"
