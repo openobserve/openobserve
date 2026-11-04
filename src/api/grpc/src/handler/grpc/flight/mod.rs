@@ -173,20 +173,26 @@ impl FlightService for FlightServiceImpl {
                 Status::internal(e.to_string())
             })?;
 
-        // used for EXPLAIN ANALYZE to collect metrics after stream is done
-        let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
-            plan: plan.clone(),
-            build_profile: profile::build_profile,
-        });
-
-        // Get the peak memory usage from the memory pool
-        // Note: We get peak memory after stream execution, so we pass it via a shared reference
-        let peak_memory = get_peak_memory_from_ctx(&ctx);
-
-        // used for super cluster follower leader to get information from follower node
-        let scan_stats_ref = get_scan_stats(&plan);
-        let peak_memory_ref = get_peak_memory(&plan);
+        // The plan has a remote scan only when this node calls other nodes itself.
         let partial_err_ref = get_partial_err(&plan);
+        let custom_messages = [
+            Some(PreCustomMessage::ScanStats(scan_stats)),
+            get_scan_stats(&plan).map(PreCustomMessage::ScanStatsRef),
+            req.search_info.is_analyze.then(|| {
+                PreCustomMessage::Metrics(MetricsInfo {
+                    plan: plan.clone(),
+                    build_profile: profile::build_profile,
+                })
+            }),
+            Some(PreCustomMessage::PeakMemoryRef(get_peak_memory_from_ctx(
+                &ctx,
+            ))),
+            get_peak_memory(&plan).map(PreCustomMessage::PeakMemoryRef),
+            partial_err_ref
+                .clone()
+                .map(PreCustomMessage::PartialErrRefEarly),
+            partial_err_ref.map(PreCustomMessage::PartialErrRef),
+        ];
 
         // One stream per output partition so they encode in parallel
         let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
@@ -202,15 +208,7 @@ impl FlightService for FlightServiceImpl {
                 .with_is_super(is_super_cluster)
                 .with_defer_lock(lock)
                 .with_start(start)
-                .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
-                .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
-                .with_custom_message(PreCustomMessage::Metrics(metrics))
-                .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
-                .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
-                .with_custom_message(PreCustomMessage::PartialErrRefEarly(
-                    partial_err_ref.clone(),
-                ))
-                .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
+                .with_custom_messages(custom_messages.into_iter().flatten())
                 .build(streams, span);
 
         let stream = async_stream::stream! {

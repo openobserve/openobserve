@@ -62,8 +62,11 @@ impl FlightEncoderStreamBuilder {
         }
     }
 
-    pub fn with_custom_message(mut self, message: PreCustomMessage) -> Self {
-        self.custom_messages.push(message);
+    pub fn with_custom_messages(
+        mut self,
+        messages: impl IntoIterator<Item = PreCustomMessage>,
+    ) -> Self {
+        self.custom_messages.extend(messages);
         self
     }
 
@@ -459,9 +462,9 @@ mod tests {
     }
 
     #[test]
-    fn test_builder_with_custom_message() {
+    fn test_builder_with_custom_messages() {
         let msg = PreCustomMessage::ScanStats(ScanStats::new());
-        let b = make_builder().with_custom_message(msg);
+        let b = make_builder().with_custom_messages([msg]);
         assert_eq!(b.custom_messages.len(), 1);
     }
 

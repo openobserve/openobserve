@@ -124,20 +124,20 @@ pub struct Metrics {
     pub profile: Option<ProfileNode>,
 }
 
-/// the CustomMessage is not ready, so we need to use this struct to store
-/// the scan stats, and send it to the client when the scan stats is ready
+/// A custom message for the flight stream; the shared references are read only when it is encoded.
 pub enum PreCustomMessage {
+    /// This node's own scan stats, known before execution.
     ScanStats(ScanStats),
-    // use for super cluster follower leader
-    ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
-    // physical plan, is_super_cluster
-    Metrics(Option<MetricsInfo>),
-    // use for storing memory pool reference to extract peak later
-    PeakMemoryRef(Option<Arc<AtomicUsize>>),
-    // sent before first batch (early signal for fast-failing nodes)
-    PartialErrRefEarly(Option<Arc<Mutex<String>>>),
-    // sent after all batches (final accumulated value)
-    PartialErrRef(Option<Arc<Mutex<String>>>),
+    /// What a remote scan in this plan collects from the nodes it calls.
+    ScanStatsRef(Arc<Mutex<ScanStats>>),
+    /// The plan to send back as a profile for EXPLAIN ANALYZE.
+    Metrics(MetricsInfo),
+    /// The peak of this node's memory pool, or of the nodes a remote scan in this plan calls.
+    PeakMemoryRef(Arc<AtomicUsize>),
+    /// Errors of the remote scan's calls, sent before the first batch so fast failures show early.
+    PartialErrRefEarly(Arc<Mutex<String>>),
+    /// The same errors, sent again after the last batch.
+    PartialErrRef(Arc<Mutex<String>>),
 }
 
 pub struct MetricsInfo {
@@ -159,24 +159,15 @@ impl PreCustomMessage {
     pub fn get_custom_message(&self) -> Option<CustomMessage> {
         match self {
             PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(*stats)),
-            PreCustomMessage::ScanStatsRef(stats_ref) => stats_ref
-                .as_ref()
-                .map(|stats| CustomMessage::ScanStats(*stats.lock())),
-            PreCustomMessage::Metrics(metrics_ref) => metrics_ref
-                .as_ref()
-                .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
-            PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
-                .as_ref()
-                .map(|peak| CustomMessage::PeakMemory(peak.load(Ordering::Relaxed))),
-            PreCustomMessage::PartialErrRefEarly(ref_opt)
-            | PreCustomMessage::PartialErrRef(ref_opt) => ref_opt.as_ref().and_then(|r| {
-                let err = r.lock().clone();
-                if err.is_empty() {
-                    None
-                } else {
-                    Some(CustomMessage::PartialErr(err))
-                }
-            }),
+            PreCustomMessage::ScanStatsRef(stats) => Some(CustomMessage::ScanStats(*stats.lock())),
+            PreCustomMessage::Metrics(info) => Some(CustomMessage::Metrics(collect_metrics(info))),
+            PreCustomMessage::PeakMemoryRef(peak) => {
+                Some(CustomMessage::PeakMemory(peak.load(Ordering::Relaxed)))
+            }
+            PreCustomMessage::PartialErrRefEarly(err) | PreCustomMessage::PartialErrRef(err) => {
+                let err = err.lock().clone();
+                (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
+            }
         }
     }
 }
@@ -249,17 +240,16 @@ mod tests {
         let pre_msg = PreCustomMessage::ScanStats(scan_stats);
         assert!(pre_msg.is_early_emit());
 
-        // Test ScanStatsRef variant with Some
+        // Test ScanStatsRef variant
         let stats_ref = Arc::new(Mutex::new(scan_stats));
-        let pre_msg = PreCustomMessage::ScanStatsRef(Some(stats_ref));
-        assert!(pre_msg.is_early_emit());
-
-        // Test ScanStatsRef variant with None
-        let pre_msg = PreCustomMessage::ScanStatsRef(None);
+        let pre_msg = PreCustomMessage::ScanStatsRef(stats_ref);
         assert!(pre_msg.is_early_emit());
 
         // Test Metrics variant (should be false)
-        let pre_msg = PreCustomMessage::Metrics(None);
+        let pre_msg = PreCustomMessage::Metrics(MetricsInfo {
+            plan: create_test_execution_plan(),
+            build_profile: test_profile,
+        });
         assert!(!pre_msg.is_early_emit());
     }
 
@@ -284,7 +274,7 @@ mod tests {
         let scan_stats = create_test_scan_stats();
         let stats_ref = Arc::new(Mutex::new(scan_stats));
 
-        let pre_msg = PreCustomMessage::ScanStatsRef(Some(stats_ref));
+        let pre_msg = PreCustomMessage::ScanStatsRef(stats_ref);
         let custom_msg = pre_msg.get_custom_message().unwrap();
 
         match custom_msg {
@@ -297,13 +287,6 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_get_custom_message_scan_stats_ref_none() {
-        let pre_msg = PreCustomMessage::ScanStatsRef(None);
-        let custom_msg = pre_msg.get_custom_message();
-        assert!(custom_msg.is_none());
-    }
-
-    #[test]
     fn test_pre_custom_message_get_custom_message_metrics() {
         let plan = create_test_execution_plan();
         let metrics_info = MetricsInfo {
@@ -311,7 +294,7 @@ mod tests {
             build_profile: test_profile,
         };
 
-        let pre_msg = PreCustomMessage::Metrics(Some(metrics_info));
+        let pre_msg = PreCustomMessage::Metrics(metrics_info);
         let custom_msg = pre_msg.get_custom_message().unwrap();
 
         match custom_msg {
@@ -326,10 +309,19 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_get_custom_message_metrics_none() {
-        let pre_msg = PreCustomMessage::Metrics(None);
-        let custom_msg = pre_msg.get_custom_message();
-        assert!(custom_msg.is_none());
+    fn test_pre_custom_message_skips_empty_partial_err() {
+        let err = Arc::new(Mutex::new(String::new()));
+        assert!(
+            PreCustomMessage::PartialErrRef(err.clone())
+                .get_custom_message()
+                .is_none()
+        );
+
+        *err.lock() = "node down".to_string();
+        match PreCustomMessage::PartialErrRefEarly(err).get_custom_message() {
+            Some(CustomMessage::PartialErr(err)) => assert_eq!(err, "node down"),
+            _ => panic!("Expected PartialErr variant"),
+        }
     }
 
     #[test]
