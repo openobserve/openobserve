@@ -269,7 +269,7 @@ fn route_below_mount<'a>(route: &'a str, path: &str) -> Option<&'a str> {
     (!mount.contains('{')).then_some(below)
 }
 
-/// Classify by the matched route template, never the caller-chosen path; no route, no match.
+/// Classify by the full `MatchedPath`; `path` only aligns its mount. Absent or misaligned: None.
 pub fn classify(method: &Method, path: &str, route: Option<&str>) -> Option<IngestionKind> {
     let route = route_below_mount(route?, path)?;
     let method = method.as_str();

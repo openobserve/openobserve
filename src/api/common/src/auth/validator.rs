@@ -517,7 +517,7 @@ pub async fn validate_credentials(
     // method, so `GET /{org}/{stream}/traces/latest` (a data-read route that
     // merely contains the `traces` segment) leaked protected data. The
     // authoritative ingestion-route table classifies the request by method and
-    // exact path shape, so only real writes and the read-only ES handshake
+    // matched route template, so only real writes and the read-only ES handshake
     // stubs are accepted — data-read routes are not in the table.
     // OpAMP accepts fleet tokens only, which returned above.
     if ingestion_routes::is_opamp(path) {
