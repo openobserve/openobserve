@@ -847,6 +847,8 @@ describe("CustomChartRenderer", () => {
 
     it("pixel-snaps its canvases only while the ratio is fractional", async () => {
       display = fakeDevicePixelRatio(1.25);
+      const painter = fakeCanvasPainter(1.25);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
       const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
@@ -861,6 +863,21 @@ describe("CustomChartRenderer", () => {
       display.setRatio(1.5);
       await flushPromises();
       expect(pixelated()).toBe(true);
+    });
+
+    it("stays smooth at a fractional ratio its echarts-gl canvas could not be re-rasterized at", async () => {
+      display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      display.setRatio(1.5);
+      await flushPromises();
+
+      expect(painter.dpr).toBe(1);
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
     });
 
     it("re-rasterizes the instance in place when the window changes display", async () => {
