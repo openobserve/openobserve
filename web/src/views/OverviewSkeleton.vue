@@ -33,9 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   imply a quantity we don't know yet.
 -->
 <template>
-  <section class="mb-5" :data-test="`overview-skeleton-${section}`">
+  <section :data-test="`overview-skeleton-${section}`">
     <!-- Every real section carries a title + count chip + View all -->
-    <div class="mb-2 flex items-center justify-between ps-1">
+    <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
       <div class="flex items-center gap-2">
         <OSkeleton class="h-4 w-28" />
         <OSkeleton class="h-4 w-6" />
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- INCIDENTS: joined rows inside one bordered container -->
     <div
       v-if="section === 'incidents'"
-      class="border-border-default rounded-default flex flex-col overflow-hidden border border-[0.0625em]"
+      class="border-border-default rounded-surface flex flex-col overflow-hidden border border-[0.0625em]"
     >
       <div
         v-for="i in 2"
         :key="i"
-        class="bg-surface-base border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0"
+        class="bg-surface-panel border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="h-4 w-8 shrink-0" />
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="i in 4"
           :key="i"
-          class="rounded-default border-border-default bg-surface-base flex max-w-40 min-w-40 shrink-0 grow-0 basis-40 flex-col gap-2 border border-[0.0625em] px-3.5 py-3"
+          class="rounded-default border-border-default bg-surface-panel flex max-w-40 min-w-40 shrink-0 grow-0 basis-40 flex-col gap-2 border border-[0.0625em] px-3.5 py-3"
         >
           <OSkeleton class="h-4 max-w-[7em]" />
           <OSkeleton class="h-3 max-w-[4.5em]" />
@@ -75,12 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- ANOMALIES: free-standing rows, gap-separated -->
-    <div v-else-if="section === 'anomalies'" class="flex flex-col gap-1.5">
+    <div
+      v-else-if="section === 'anomalies'"
+      class="border-border-default rounded-surface bg-surface-panel flex flex-col overflow-hidden border border-[0.0625em]"
+    >
       <div
         v-for="i in 2"
         :key="i"
-        class="rounded-default border-border-default bg-surface-base flex items-center gap-3 border border-[0.0625em] px-3.5 py-2.5"
+        class="border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="h-4 max-w-[24em]" />
@@ -90,12 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- RECENT EVENTS: joined compact rows -->
     <div
       v-else
-      class="border-border-default rounded-default bg-surface-base flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
+      class="border-border-default rounded-surface bg-surface-panel flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
     >
       <div
         v-for="i in 3"
         :key="i"
-        class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 last:border-b-0"
+        class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
         <OSkeleton class="h-4 w-12 shrink-0" />
         <OSkeleton class="h-3 w-[7.5em] shrink-0" />

@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, atomic::AtomicUsize};
+use std::sync::Arc;
 
 use arrow_schema::SchemaRef;
 use config::{
-    meta::{
-        inverted_index::IndexOptimizeMode,
-        search::{ScanStats, SearchEventType},
-    },
+    meta::{inverted_index::IndexOptimizeMode, search::SearchEventType},
     utils::rand::generate_random_string,
 };
 use datafusion::{
@@ -35,14 +32,13 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::{Metrics, RemoteScanMetrics};
+use flight::common::{RemoteScanMetrics, RemoteScanState};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;
-use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
-use super::node::RemoteScanNode;
+use super::{node::RemoteScanNode, profile::NodeProfileRecorder};
 use crate::datafusion::{
     distributed_plan::{
         codec::get_physical_extension_codec,
@@ -60,10 +56,7 @@ pub struct RemoteScanExec {
     remote_scan_node: RemoteScanNode,
     partitions: usize,
     cache: Arc<PlanProperties>,
-    pub scan_stats: Arc<Mutex<ScanStats>>,
-    pub peak_memory: Arc<AtomicUsize>,
-    pub partial_err: Arc<Mutex<String>>,
-    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
+    pub state: RemoteScanState,
     pub enrich_mode_node_idx: usize,
     pub metrics: ExecutionPlanMetricsSet,
 }
@@ -101,29 +94,10 @@ impl RemoteScanExec {
             remote_scan_node,
             partitions: output_partitions,
             cache,
-            scan_stats: Arc::new(Mutex::new(ScanStats::default())),
-            partial_err: Arc::new(Mutex::new(String::new())),
-            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
-            peak_memory: Arc::new(AtomicUsize::new(0)),
+            state: RemoteScanState::default(),
             enrich_mode_node_idx,
             metrics: ExecutionPlanMetricsSet::new(),
         })
-    }
-
-    pub fn scan_stats(&self) -> Arc<Mutex<ScanStats>> {
-        self.scan_stats.clone()
-    }
-
-    pub fn partial_err(&self) -> Arc<Mutex<String>> {
-        self.partial_err.clone()
-    }
-
-    pub fn cluster_metrics(&self) -> Arc<Mutex<Vec<Metrics>>> {
-        self.cluster_metrics.clone()
-    }
-
-    pub fn peak_memory(&self) -> Arc<AtomicUsize> {
-        self.peak_memory.clone()
     }
 
     /// The input plan bytes exactly as every follower receives them.
@@ -131,23 +105,8 @@ impl RemoteScanExec {
         &self.remote_scan_node.search_infos.plan
     }
 
-    pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
-        self.scan_stats = scan_stats;
-        self
-    }
-
-    pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
-        self.partial_err = partial_err;
-        self
-    }
-
-    pub fn with_cluster_metrics(mut self, cluster_metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
-        self.cluster_metrics = cluster_metrics;
-        self
-    }
-
-    pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
-        self.peak_memory = peak_memory;
+    pub fn with_state(mut self, state: RemoteScanState) -> Self {
+        self.state = state;
         self
     }
 
@@ -254,10 +213,7 @@ impl ExecutionPlan for RemoteScanExec {
             return Ok(self);
         }
         let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
-            .with_scan_stats(self.scan_stats.clone())
-            .with_partial_err(self.partial_err.clone())
-            .with_cluster_metrics(self.cluster_metrics.clone())
-            .with_peak_memory(self.peak_memory.clone())
+            .with_state(self.state.clone())
             .with_metrics(self.metrics.clone());
         Ok(Arc::new(remote_scan))
     }
@@ -273,10 +229,7 @@ impl ExecutionPlan for RemoteScanExec {
             partition,
             partition == self.enrich_mode_node_idx,
             self.input.schema().clone(),
-            self.scan_stats(),
-            self.partial_err(),
-            self.cluster_metrics(),
-            self.peak_memory(),
+            self.state.clone(),
             baseline_metrics,
         );
         let stream = futures::stream::once(fut).try_flatten();
@@ -297,12 +250,15 @@ async fn get_remote_batch(
     partition: usize,
     enrich_mode: bool,
     schema: SchemaRef,
-    scan_stats: Arc<Mutex<ScanStats>>,
-    partial_err: Arc<Mutex<String>>,
-    cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
-    peak_memory: Arc<AtomicUsize>,
+    state: RemoteScanState,
     metrics: RemoteScanMetrics,
 ) -> Result<SendableRecordBatchStream> {
+    let RemoteScanState {
+        scan_stats,
+        peak_memory,
+        partial_err,
+        node_profiles,
+    } = state;
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
@@ -335,6 +291,12 @@ async fn get_remote_batch(
         }
     }
 
+    let mut recorder = if remote_scan_node.search_infos.is_analyze {
+        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
+    } else {
+        NodeProfileRecorder::default()
+    };
+
     let empty_stream = EmptyStream::new(
         &trace_id,
         schema.clone(),
@@ -351,6 +313,7 @@ async fn get_remote_batch(
         && !enrich_mode
         && remote_scan_node.is_file_list_empty(partition)
     {
+        recorder.mark_skipped();
         return Ok(get_empty_stream(empty_stream));
     }
 
@@ -412,9 +375,9 @@ async fn get_remote_batch(
         .with_is_querier(is_querier)
         .with_scan_stats(scan_stats)
         .with_partial_err(partial_err.clone())
-        .with_cluster_metrics(cluster_metrics)
         .with_peak_memory(peak_memory)
-        .with_start_time(start);
+        .with_start_time(start)
+        .with_node_profile(recorder);
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
@@ -529,7 +492,7 @@ mod tests {
     #[test]
     fn test_remote_scan_exec_partial_err_empty() {
         let exec = make_remote_exec();
-        assert!(exec.partial_err().lock().is_empty());
+        assert!(exec.state.partial_err.lock().is_empty());
     }
 
     #[test]
@@ -541,11 +504,11 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_scan_exec_with_partial_err() {
-        let exec = make_remote_exec();
-        let new_err = Arc::new(parking_lot::Mutex::new("pre-set".to_string()));
-        let exec = exec.with_partial_err(new_err.clone());
-        assert_eq!(*exec.partial_err().lock(), "pre-set");
+    fn test_remote_scan_exec_with_state() {
+        let state = RemoteScanState::default();
+        *state.partial_err.lock() = "pre-set".to_string();
+        let exec = make_remote_exec().with_state(state);
+        assert_eq!(*exec.state.partial_err.lock(), "pre-set");
     }
 
     #[test]

@@ -64,6 +64,7 @@ const ROUTER_PREFIXES: &[(&str, &str)] = &[
     ("oncall_routes", "/api"),
     ("fleet_router", "/api"),
     ("slack_routes", "/api"),
+    ("service_streams_routes", "/api"),
     ("es_compat_routes", "/api"),
     ("workflow_hook_routes", ""),
 ];

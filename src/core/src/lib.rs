@@ -57,6 +57,7 @@ pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
+pub mod overview;
 pub mod pipeline;
 pub mod profiles;
 pub mod prompts;

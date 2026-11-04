@@ -15,11 +15,11 @@
 
 use std::{collections::VecDeque, pin::Pin, task::Poll};
 
-use arrow::ipc::writer::IpcWriteOptions;
+use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
-use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
+use flight::{common::NodeMessages, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
@@ -30,12 +30,10 @@ use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEnc
 
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
-pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
+pub(super) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct FlightEncoderStreamBuilder {
-    options: IpcWriteOptions,
-    max_flight_data_size: usize,
-    custom_messages: Vec<PreCustomMessage>,
+    node_messages: NodeMessages,
     // query context
     trace_id: String,
     is_super: bool,
@@ -45,26 +43,15 @@ pub struct FlightEncoderStreamBuilder {
 }
 
 impl FlightEncoderStreamBuilder {
-    pub(crate) fn new(
-        options: IpcWriteOptions,
-        max_flight_data_size: usize,
-        session_guard: SessionGuard,
-    ) -> Self {
+    pub(crate) fn new(session_guard: SessionGuard, node_messages: NodeMessages) -> Self {
         Self {
-            options,
-            max_flight_data_size,
-            custom_messages: vec![],
+            node_messages,
             trace_id: String::new(),
             is_super: false,
             defer_lock: None,
             session_guard: Some(session_guard),
             start: std::time::Instant::now(),
         }
-    }
-
-    pub fn with_custom_message(mut self, message: PreCustomMessage) -> Self {
-        self.custom_messages.push(message);
-        self
     }
 
     pub fn with_trace_id(mut self, trace_id: String) -> Self {
@@ -98,12 +85,12 @@ impl FlightEncoderStreamBuilder {
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
         let _ = child_span.set_parent(span.context());
+        let options = write_options();
 
         let (source, tasks) = if partitions.len() == 1 {
             // one partition: no parallelism to gain, poll inline (no task, no channel)
             let inner = partitions.into_iter().next().unwrap();
-            let stream =
-                PartitionEncoderStream::new(inner, self.options.clone(), self.max_flight_data_size);
+            let stream = PartitionEncoderStream::new(inner, options.clone());
             (FlightSource::Inline(Box::new(stream)), JoinSet::new())
         } else {
             // one task per partition, merged over the channel
@@ -112,11 +99,7 @@ impl FlightEncoderStreamBuilder {
             let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
             for inner in partitions {
                 let tx = tx.clone();
-                let mut stream = PartitionEncoderStream::new(
-                    inner,
-                    self.options.clone(),
-                    self.max_flight_data_size,
-                );
+                let mut stream = PartitionEncoderStream::new(inner, options.clone());
                 tasks.spawn(async move {
                     while let Some(item) = stream.next().await {
                         let is_err = item.is_err();
@@ -134,9 +117,9 @@ impl FlightEncoderStreamBuilder {
 
         FlightEncoderStream {
             source,
-            encoder: FlightDataEncoder::new(self.options, self.max_flight_data_size),
+            encoder: FlightDataEncoder::new(options, MAX_FLIGHT_DATA_SIZE),
             queue: VecDeque::new(),
-            custom_messages: self.custom_messages,
+            node_messages: self.node_messages,
             first_data: true,
             done: false,
             ctx: StreamContext {
@@ -167,7 +150,7 @@ pub struct FlightEncoderStream {
     /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
-    custom_messages: Vec<PreCustomMessage>,
+    node_messages: NodeMessages,
     first_data: bool,
     done: bool,
     /// query context + resources consumed by the stream's `Drop` teardown.
@@ -232,31 +215,20 @@ impl EventLog {
 }
 
 impl FlightEncoderStream {
-    fn encode_custom_messages(&mut self) -> Result<(), FlightError> {
-        let custom_messages = std::mem::take(&mut self.custom_messages);
-        for message in custom_messages.into_iter() {
-            if let Some(message) = message.get_custom_message() {
-                let flight_data = self.encoder.encode_custom(&message)?;
-                self.queue.push_back(flight_data);
-            }
+    /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
+    fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
+        let mut messages = Vec::new();
+        if self.first_data {
+            messages.extend(self.node_messages.first());
         }
-        Ok(())
-    }
-
-    fn encode_early_emit_messages(&mut self) -> Result<(), FlightError> {
-        let custom_messages = std::mem::take(&mut self.custom_messages);
-        let mut remainder_messages = Vec::new();
-        for message in custom_messages.into_iter() {
-            if message.is_early_emit() {
-                if let Some(message) = message.get_custom_message() {
-                    let flight_data = self.encoder.encode_custom(&message)?;
-                    self.queue.push_back(flight_data);
-                }
-            } else {
-                remainder_messages.push(message);
-            }
+        if at_end {
+            messages.extend(self.node_messages.last());
         }
-        self.custom_messages = remainder_messages;
+        self.first_data = false;
+        for message in messages {
+            let flight_data = self.encoder.encode_custom(&message)?;
+            self.queue.push_back(flight_data);
+        }
         Ok(())
     }
 
@@ -318,14 +290,10 @@ impl Stream for FlightEncoderStream {
             // 4. pull the next encoded FlightData from the partition encoder(s)
             match this.poll_source(cx) {
                 Poll::Ready(Some(Ok(group))) => {
-                    // before the first data, emit early-emit custom messages
-                    if this.first_data {
-                        this.first_data = false;
-                        if !this.custom_messages.is_empty()
-                            && let Err(e) = this.encode_early_emit_messages()
-                        {
-                            return this.fail(e);
-                        }
+                    if this.first_data
+                        && let Err(e) = this.encode_node_messages(false)
+                    {
+                        return this.fail(e);
                     }
                     // enqueue the whole group so the chunk's dictionary and records stay contiguous
                     this.queue.extend(group);
@@ -345,7 +313,7 @@ impl Stream for FlightEncoderStream {
                     if !this.ctx.tasks.is_empty() {
                         return Poll::Pending;
                     }
-                    if let Err(e) = this.encode_custom_messages() {
+                    if let Err(e) = this.encode_node_messages(true) {
                         return this.fail(e);
                     }
                     this.done = true;
@@ -393,27 +361,30 @@ impl Drop for FlightEncoderStream {
     }
 }
 
+fn write_options() -> IpcWriteOptions {
+    IpcWriteOptions::default()
+        .try_with_compression(Some(CompressionType::ZSTD))
+        // Cannot fail: compression only needs IPC metadata V5, which is the default.
+        .expect("default IPC options accept compression")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use arrow::{
-        array::{Int32Array, RecordBatch},
-        ipc::writer::IpcWriteOptions,
-    };
+    use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-    use flight::common::PreCustomMessage;
+    use flight::common::{CustomMessage, NodeRole};
     use futures::TryStreamExt;
 
     use super::*;
 
     fn make_builder() -> FlightEncoderStreamBuilder {
         FlightEncoderStreamBuilder::new(
-            IpcWriteOptions::default(),
-            4096,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
     }
 
@@ -424,7 +395,6 @@ mod tests {
         assert!(!b.is_super);
         assert!(b.defer_lock.is_none());
         assert!(b.session_guard.is_some());
-        assert!(b.custom_messages.is_empty());
     }
 
     #[test]
@@ -458,11 +428,53 @@ mod tests {
         let _ = b.start;
     }
 
-    #[test]
-    fn test_builder_with_custom_message() {
-        let msg = PreCustomMessage::ScanStats(ScanStats::new());
-        let b = make_builder().with_custom_message(msg);
-        assert_eq!(b.custom_messages.len(), 1);
+    fn follower_messages() -> NodeMessages {
+        NodeMessages {
+            scan_stats: ScanStats::new(),
+            peak_memory: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            profile: None,
+            role: NodeRole::Follower,
+        }
+    }
+
+    async fn message_kinds(partition: SendableRecordBatchStream) -> Vec<&'static str> {
+        let fds: Vec<FlightData> = make_builder()
+            .build(vec![partition], tracing::Span::none())
+            .try_collect()
+            .await
+            .unwrap();
+        fds.iter()
+            .map(
+                |fd| match config::utils::json::from_slice(&fd.app_metadata) {
+                    Ok(CustomMessage::ScanStats(_)) => "ScanStats",
+                    Ok(CustomMessage::PeakMemory(_)) => "PeakMemory",
+                    Ok(_) => "other",
+                    Err(_) => "data",
+                },
+            )
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_node_messages_surround_the_batches() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1, 2]))])
+                .unwrap();
+        let with_rows: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::iter(vec![Ok(batch)]),
+        ));
+        let kinds = message_kinds(with_rows).await;
+        assert_eq!(kinds.first(), Some(&"ScanStats"));
+        assert_eq!(kinds.last(), Some(&"PeakMemory"));
+        assert!(kinds[1..kinds.len() - 1].iter().all(|kind| *kind == "data"));
+
+        let empty: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema,
+            futures::stream::empty(),
+        ));
+        assert_eq!(message_kinds(empty).await, ["ScanStats", "PeakMemory"]);
     }
 
     #[test]
@@ -503,13 +515,9 @@ mod tests {
             make_partition(total / 2..total),
         ];
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(partitions, tracing::Span::none());
 
@@ -518,6 +526,7 @@ mod tests {
         let dicts = std::collections::HashMap::new();
         let mut decoded: Vec<i32> = fds
             .iter()
+            .filter(|fd| fd.app_metadata.is_empty())
             .flat_map(|fd| {
                 let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
                     .unwrap();
@@ -562,9 +571,8 @@ mod tests {
         ));
 
         let stream = FlightEncoderStreamBuilder::new(
-            IpcWriteOptions::default(),
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(vec![ok_partition, panic_partition], tracing::Span::none());
 
@@ -676,13 +684,9 @@ mod tests {
         let id_base_1 = n_per_partition;
         let partitions = vec![make_partition(0, 0), make_partition(1, id_base_1)];
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(partitions, tracing::Span::none());
         let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
@@ -749,13 +753,9 @@ mod tests {
             futures::stream::iter(batches.into_iter().map(Ok)),
         ));
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(vec![inner], tracing::Span::none());
 
@@ -767,6 +767,7 @@ mod tests {
         let dicts = std::collections::HashMap::new();
         let decoded: Vec<i32> = fds
             .iter()
+            .filter(|fd| fd.app_metadata.is_empty())
             .flat_map(|fd| {
                 let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
                     .unwrap();

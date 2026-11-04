@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    extract::{DefaultBodyLimit, FromRequestParts, MatchedPath, Path, RawPathParams, Request},
     http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
@@ -33,8 +33,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, service_accounts, short_url, slack, slos,
-    sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
+    slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -67,8 +67,7 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers,
-        service_streams, workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -326,6 +325,14 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
     None
 }
 
+/// The route template axum matched, which a caller cannot shape the way it shapes the path.
+pub(crate) fn matched_route(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|route| route.as_str().to_owned())
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -337,6 +344,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     // Extract auth info from request (synchronous now, no await)
@@ -409,6 +417,7 @@ pub async fn aws_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_aws(&req_data).await {
@@ -431,6 +440,7 @@ pub async fn gcp_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_gcp(&req_data).await {
@@ -453,6 +463,7 @@ pub async fn rum_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_rum(&req_data).await {
@@ -475,6 +486,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     let (mut parts, body) = request.into_parts();
@@ -702,20 +714,16 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    let ingestion_path = if path.starts_with("api/") {
-        path.split_once("api/")
-            .map(|(_, rest)| rest)
-            .unwrap_or(&path)
-    } else {
-        &path
-    };
-
     let (audit_org, after_org) = audit_org_and_next(&path_columns);
 
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
+            || common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                &path,
+                matched_route(&request).as_deref(),
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = if audit_org == "organizations" {
@@ -1284,9 +1292,10 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    // Downtimes and Slack live in their own tables to keep this function under the line limit.
+    // Downtimes, Slack and service streams live in their own tables to keep this function under the line limit.
     let mut router =
         public_dashboard_admin_routes(Router::new().merge(downtime_routes()).merge(slack_routes()));
+    router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1344,6 +1353,7 @@ pub fn service_routes() -> Router {
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
+        .route("/{org_id}/overview", get(organization::org::org_overview))
         .route("/{org_id}/ingest/recent_rejections", get(ingest_rejections::recent_rejections))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
@@ -1979,10 +1989,7 @@ pub fn service_routes() -> Router {
 
             // Service streams
             .route("/{org_id}/service_streams", get(service_streams::list_services))
-            .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
-            .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
         router = ai_chat_routes(router);
 
@@ -2355,6 +2362,15 @@ pub fn service_routes() -> Router {
                 response
             }
         }))
+}
+
+/// Registered in both builds so OSS answers the handlers' 403 enterprise-only stub, not a 404.
+#[rustfmt::skip]
+fn service_streams_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
+        .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
+        .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
 }
 
 /// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
@@ -3227,6 +3243,42 @@ mod tests {
                 .unwrap();
             let json: Value = serde_json::from_slice(&bytes).unwrap();
             assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_streams_routes_answer_403_not_404_in_the_oss_build() {
+        let routes = [
+            (
+                Method::GET,
+                "/default/service_streams/_analytics",
+                Body::empty(),
+            ),
+            (
+                Method::POST,
+                "/default/service_streams/_correlate",
+                Body::from(
+                    r#"{"source_stream":"s","source_type":"logs","available_dimensions":{}}"#,
+                ),
+            ),
+            (
+                Method::DELETE,
+                "/default/service_streams/_reset",
+                Body::empty(),
+            ),
+        ];
+        for (method, uri, body) in routes {
+            let what = format!("{method} {uri}");
+            let req = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("user_id", "root@example.com")
+                .header("content-type", "application/json")
+                .body(body)
+                .unwrap();
+            let response = service_streams_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
         }
     }
 
@@ -5043,6 +5095,14 @@ mod tests {
     }
 
     #[test]
+    fn service_streams_routes_are_merged_unconditionally_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(".merge(service_streams_routes())"),
+            "service_routes() must merge service_streams_routes() outside the enterprise block"
+        );
+    }
+
+    #[test]
     fn metric_usage_route_is_registered_in_service_routes() {
         assert!(
             service_routes_registrations().contains(
@@ -5572,6 +5632,67 @@ mod tests {
                 .unwrap();
             let status = app.clone().oneshot(req).await.unwrap().status();
             assert_eq!(status, expected, "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_ingestion_token_is_judged_by_the_route_each_auth_layer_matched() {
+        let org = "route_wiring_org";
+        let token = "o2oi_route_wiring";
+        common::infra::config::ORGANIZATIONS.write().await.insert(
+            org.to_string(),
+            common::meta::organization::Organization {
+                identifier: org.to_string(),
+                name: org.to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+        );
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{org}/{token}"), "wiring-token".to_string());
+        let credentials = config::utils::base64::encode(&format!("collector@example.com:{token}"));
+        let app = Router::new().nest(
+            "/o2",
+            Router::new()
+                .nest("/api", service_routes())
+                .merge(other_service_routes()),
+        );
+        for (uri, header, accepted) in [
+            (format!("/o2/api/{org}/_bulk"), "Authorization", true),
+            (format!("/o2/api/{org}/kv/_json"), "Authorization", false),
+            (
+                format!("/o2/api/{org}/streams/_sub"),
+                "Authorization",
+                false,
+            ),
+            (
+                format!("/o2/aws/{org}/s/_kinesis_firehose"),
+                "X-Amz-Firehose-Access-Key",
+                true,
+            ),
+            (
+                format!("/o2/gcp/{org}/s/_sub?API-Key={credentials}"),
+                "",
+                true,
+            ),
+        ] {
+            let mut req = Request::builder().method(Method::POST).uri(&uri);
+            if header == "Authorization" {
+                req = req.header(header, format!("Basic {credentials}"));
+            } else if !header.is_empty() {
+                req = req.header(header, &credentials);
+            }
+            let status = app
+                .clone()
+                .oneshot(req.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status();
+            assert_eq!(
+                status != StatusCode::UNAUTHORIZED,
+                accepted,
+                "POST {uri}: {status}"
+            );
         }
     }
 
