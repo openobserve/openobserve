@@ -4,7 +4,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // No `Eq`: `alert_budget_per_day` is f64, which has no total equality.
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "anomaly_detection_config")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
