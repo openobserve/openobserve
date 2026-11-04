@@ -318,13 +318,19 @@ pub struct ReservedRename {
     pub to: String,
 }
 
-/// Main seeded only `o2_default_content`, so any other reserved name in the default org is a user
-/// row.
-const SHIPPED_SEEDS: [&str; 2] = [DEFAULT_TEMPLATE_NAME, "o2_default_content"];
+/// Main seeded only `o2_default_content`, so a migration treats any other reserved name as a user
+/// row, `o2_default` included.
+pub const MIGRATION_SEEDS: [&str; 1] = ["o2_default_content"];
+/// After the migrations the seeder owns `o2_default`, so a boot rename leaves it alone.
+pub const BOOT_SEEDS: [&str; 2] = [DEFAULT_TEMPLATE_NAME, "o2_default_content"];
+/// System setting holding the renames a migration made, whose ownership tuples boot still moves.
+pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
+/// The templates name column is varchar(256).
+const NAME_MAX_CHARS: usize = 256;
 
-/// A shipped seed row: the default org, one of the seeded names, Content.
-fn is_shipped_seed(org: &str, name: &str, kind: &str) -> bool {
-    org == DEFAULT_ORG && SHIPPED_SEEDS.contains(&name) && kind == TemplateKind::Content.to_string()
+/// A shipped seed row: the default org, one of `seeds`, Content.
+fn is_shipped_seed(seeds: &[&str], org: &str, name: &str, kind: &str) -> bool {
+    org == DEFAULT_ORG && seeds.contains(&name) && kind == TemplateKind::Content.to_string()
 }
 
 /// A name only the system may use: `o2_default` or anything under `o2_default_`.
@@ -334,7 +340,10 @@ pub fn is_reserved_default_name(name: &str) -> bool {
 
 /// Renames user rows named `o2_default` or under `o2_default_` to `user_{name}` and moves their
 /// references.
-pub async fn rename_reserved_collisions<C>(db: &C) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
+pub async fn rename_reserved_collisions<C>(
+    db: &C,
+    seeds: &[&str],
+) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
 where
     C: ConnectionTrait + sea_orm::TransactionTrait,
 {
@@ -345,7 +354,7 @@ where
         .await?
         .into_iter()
         .filter(|m| is_reserved_default_name(&m.name))
-        .filter(|m| !is_shipped_seed(&m.org, &m.name, &m.kind))
+        .filter(|m| !is_shipped_seed(seeds, &m.org, &m.name, &m.kind))
         .collect();
     // Other orgs first, so a reference left on the old name afterwards reads the default row.
     rows.sort_by_key(|m| (m.org == DEFAULT_ORG, m.org.clone(), m.name.clone()));
@@ -376,7 +385,12 @@ async fn free_name<C: ConnectionTrait>(
     org: &str,
     name: &str,
 ) -> Result<String, sea_orm::DbErr> {
-    let base = format!("user_{name}");
+    // Room for `user_` and a `_n` suffix, so the longest candidate still fits the column.
+    let kept: String = name
+        .chars()
+        .take(NAME_MAX_CHARS - "user_".len() - 6)
+        .collect();
+    let base = format!("user_{kept}");
     let mut candidate = base.clone();
     let mut n = 1;
     while name_taken(db, org, &candidate).await? {
@@ -455,6 +469,86 @@ fn rename_in_value(value: &mut serde_json::Value, from: &str, to: &str) -> bool 
         }
     }
     changed
+}
+
+/// Appends `renames` to the pending list boot reads to move their ownership tuples.
+pub async fn record_pending_renames<C: ConnectionTrait>(
+    db: &C,
+    renames: &[ReservedRename],
+) -> Result<(), sea_orm::DbErr> {
+    use super::entity::system_settings;
+
+    if renames.is_empty() {
+        return Ok(());
+    }
+    let existing = pending_row(db).await?;
+    let mut list = existing
+        .as_ref()
+        .and_then(|row| row.setting_value.as_array().cloned())
+        .unwrap_or_default();
+    list.extend(
+        renames
+            .iter()
+            .map(|r| serde_json::json!({"org": r.org, "from": r.from, "to": r.to})),
+    );
+    let now = chrono::Utc::now().timestamp_micros();
+    match existing {
+        Some(row) => {
+            let mut active: system_settings::ActiveModel = row.into();
+            active.setting_value = Set(serde_json::Value::Array(list));
+            active.updated_at = Set(now);
+            active.update(db).await?;
+        }
+        None => {
+            system_settings::ActiveModel {
+                scope: Set("system".to_string()),
+                setting_key: Set(RENAMES_PENDING_KEY.to_string()),
+                setting_value: Set(serde_json::Value::Array(list)),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+/// Reads and clears the renames a migration recorded.
+pub async fn take_pending_renames<C: ConnectionTrait>(
+    db: &C,
+) -> Result<Vec<ReservedRename>, sea_orm::DbErr> {
+    let Some(row) = pending_row(db).await? else {
+        return Ok(Vec::new());
+    };
+    let field = |v: &serde_json::Value, k: &str| v[k].as_str().unwrap_or_default().to_string();
+    let renames = row
+        .setting_value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|v| ReservedRename {
+            org: field(v, "org"),
+            from: field(v, "from"),
+            to: field(v, "to"),
+        })
+        .filter(|r| !r.from.is_empty() && !r.to.is_empty())
+        .collect();
+    row.delete(db).await?;
+    Ok(renames)
+}
+
+async fn pending_row<C: ConnectionTrait>(
+    db: &C,
+) -> Result<Option<super::entity::system_settings::Model>, sea_orm::DbErr> {
+    use super::entity::system_settings;
+
+    system_settings::Entity::find()
+        .filter(system_settings::Column::Scope.eq("system"))
+        .filter(system_settings::Column::SettingKey.eq(RENAMES_PENDING_KEY))
+        .one(db)
+        .await
 }
 
 /// Folds the retired default rows into `o2_default`, moves every reference to it and drops the
@@ -988,7 +1082,7 @@ mod tests {
         .await
         .unwrap();
 
-        let renames = rename_reserved_collisions(&db).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
 
         assert_eq!(
             renames,
@@ -1062,7 +1156,12 @@ mod tests {
         );
 
         // A second boot finds nothing left under the prefix that is not a seed.
-        assert!(rename_reserved_collisions(&db).await.unwrap().is_empty());
+        assert!(
+            rename_reserved_collisions(&db, &BOOT_SEEDS)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -1071,7 +1170,7 @@ mod tests {
         insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
         insert_row(&db, DEFAULT_ORG, "user_o2_default_anomaly", false, "custom").await;
 
-        let renames = rename_reserved_collisions(&db).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
 
         assert_eq!(
             renames,
@@ -1108,7 +1207,7 @@ mod tests {
         let before = body_for(&db, "o2_default_mine").await;
         assert_eq!(before, "shared body");
 
-        let renames = rename_reserved_collisions(&db).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
 
         assert_eq!(
             renames,
@@ -1188,7 +1287,7 @@ mod tests {
         let mine = row_id(&db, DEFAULT_ORG, "o2_default_incident").await;
         insert_destination(&db, "mine-dest", &mine).await;
 
-        rename_reserved_collisions(&db).await.unwrap();
+        rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
         retire_default_templates(&db).await.unwrap();
 
         assert_eq!(
@@ -1294,5 +1393,80 @@ mod tests {
 
         // A second boot finds nothing left to fold.
         assert!(retire_default_templates(&db).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_user_row_named_o2_default_survives_both_migrations_with_its_tuples_queued() {
+        let db = retire_db().await;
+        ActiveModel {
+            id: Set(ider::uuid()),
+            org: Set(DEFAULT_ORG.to_string()),
+            name: Set(DEFAULT_TEMPLATE_NAME.to_string()),
+            is_default: Set(true),
+            r#type: Set("http".to_string()),
+            body: Set("mine".to_string()),
+            title: Set(None),
+            kind: Set("content".to_string()),
+            applies_to: Set("[]".to_string()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
+        insert_alert(&db, "alerts", "acme", "mine-alert", DEFAULT_TEMPLATE_NAME).await;
+        let mine = row_id(&db, DEFAULT_ORG, DEFAULT_TEMPLATE_NAME).await;
+
+        // Migration 137 then 143, as an upgrade from main runs them.
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+            .await
+            .unwrap();
+        record_pending_renames(&db, &renames).await.unwrap();
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+            .await
+            .unwrap();
+        record_pending_renames(&db, &renames).await.unwrap();
+        retire_default_templates(&db).await.unwrap();
+
+        assert_eq!(
+            names(&db, DEFAULT_ORG).await,
+            vec!["o2_default", "user_o2_default"]
+        );
+        let kept = get_org_model(&db, DEFAULT_ORG, "user_o2_default")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((kept.id, kept.body), (mine, "mine".to_string()));
+        assert_eq!(
+            alert_template(&db, "alerts", "mine-alert").await.as_deref(),
+            Some("user_o2_default")
+        );
+        // Boot moves the tuples once, then the list is gone.
+        let pending = take_pending_renames(&db).await.unwrap();
+        assert_eq!(
+            pending,
+            vec![ReservedRename {
+                org: DEFAULT_ORG.to_string(),
+                from: DEFAULT_TEMPLATE_NAME.to_string(),
+                to: "user_o2_default".to_string(),
+            }]
+        );
+        assert!(take_pending_renames(&db).await.unwrap().is_empty());
+        // The seeder's own o2_default is a seed at boot.
+        assert!(
+            rename_reserved_collisions(&db, &BOOT_SEEDS)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_long_reserved_name_is_cut_to_fit_the_column() {
+        let db = reference_db().await;
+        let long = format!("o2_default_{}", "x".repeat(245));
+        insert_row(&db, "acme", &long, false, "custom").await;
+        let renames = rename_reserved_collisions(&db, &BOOT_SEEDS).await.unwrap();
+        assert!(renames[0].to.starts_with("user_o2_default_x"));
+        assert!(renames[0].to.chars().count() <= 250, "{}", renames[0].to);
     }
 }

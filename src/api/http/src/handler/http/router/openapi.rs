@@ -341,6 +341,7 @@ use crate::{
         openobserve_api_management::request::downtimes::update_downtime,
         openobserve_api_management::request::downtimes::cancel_downtime,
         openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::test_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
         openobserve_api_management::request::fleet::list_collectors,

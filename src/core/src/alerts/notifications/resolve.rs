@@ -279,12 +279,20 @@ fn substitute_with(
 
     let mut out = input.to_string();
 
-    for (name, value) in scalar_vars(ctx) {
-        scan_and_replace_var(&mut out, name, |len| esc(&truncate(value, len)));
-    }
-
+    // Before scalar_vars and kind blanking, so a `{token}` in an inserted alert name stays literal.
     for (name, value) in extra_scalar_vars(ctx) {
         scan_and_replace_var(&mut out, name, |len| esc(&truncate(&value, len)));
+    }
+
+    // One template serves every kind, so another kind's variable reads blank and its field hides.
+    for name in super::examples::kind_variables() {
+        if !in_ctx_tier(name, ctx) {
+            scan_and_replace_var(&mut out, name, |_| String::new());
+        }
+    }
+
+    for (name, value) in scalar_vars(ctx) {
+        scan_and_replace_var(&mut out, name, |len| esc(&truncate(value, len)));
     }
 
     for (key, values) in ctx.row_columns.iter() {
@@ -304,11 +312,6 @@ fn substitute_with(
         for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
             scan_and_replace_var(&mut out, &name, |len| esc(&truncate(&value, len)));
         }
-    }
-
-    // One template serves every kind, so another kind's variable reads blank and its field hides.
-    for name in super::examples::kind_variables() {
-        scan_and_replace_var(&mut out, name, |_| String::new());
     }
 
     // Only tokens confirmed unknown from the ORIGINAL input are marker-
@@ -343,6 +346,13 @@ fn is_known_var(name: &str, ctx: &NotificationContext) -> bool {
             .any(|(n, _)| n == name);
     }
     false
+}
+
+/// Whether `name` is filled by the row, context-attribute or metadata tier of `ctx`.
+fn in_ctx_tier(name: &str, ctx: &NotificationContext) -> bool {
+    ctx.row_columns.iter().any(|(k, _)| k == name)
+        || ctx.context_attributes.iter().any(|(k, _)| k == name)
+        || ctx.metadata.iter().any(|(k, _)| k == name)
 }
 
 /// Make a substituted value inert as markdown SOURCE.
@@ -1160,5 +1170,41 @@ mod tests {
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
         }
+    }
+
+    #[test]
+    fn alert_name_with_token_renders_literally_in_content_title() {
+        use config::meta::alerts::content_spec::ContentSpec;
+
+        let spec = ContentSpec {
+            title: "{alert_name}".into(),
+            ..Default::default()
+        };
+        for name in ["cpu-{notification_kind}", "x {check_name}"] {
+            let ctx = NotificationContext {
+                alert_name: name.into(),
+                ..fixture_ctx()
+            };
+            let r = resolve_content(&spec, &ctx, "slack");
+            assert_eq!(r.title, name);
+            assert!(r.unknown_variables.is_empty());
+        }
+    }
+
+    #[test]
+    fn kind_variable_from_context_attribute_still_fills() {
+        use config::meta::alerts::content_spec::ContentSpec;
+
+        let spec = ContentSpec {
+            title: "{check_name} ({check_type})".into(),
+            ..Default::default()
+        };
+        let ctx = NotificationContext {
+            kind: NotificationKind::Synthetics,
+            context_attributes: vec![("check_name".into(), "Homepage".into())],
+            ..fixture_ctx()
+        };
+        let r = resolve_content(&spec, &ctx, "slack");
+        assert_eq!(r.title, "Homepage ()");
     }
 }

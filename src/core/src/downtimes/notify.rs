@@ -210,6 +210,71 @@ async fn send(
     (summarize(&results), templates)
 }
 
+/// The started message to `requested` (or every destination of the row), one result each.
+pub async fn send_test(
+    row: &Downtime,
+    window: DowntimeWindow,
+    requested: &[String],
+    now: i64,
+) -> Vec<config::meta::downtimes::DowntimeTestResult> {
+    use config::meta::downtimes::DowntimeTestResult;
+
+    use crate::alerts::notifications::notify::{NotifyError, notify};
+
+    let due = DueEvent::of_window(NotificationEvent::Started, window);
+    let counts = super::match_counts(row).await.ok();
+    let vars = variables(
+        row,
+        due.event,
+        &due.window,
+        counts.as_ref(),
+        &get_config().common.web_url,
+    );
+    let ctx = downtime_context(row, &due, now, vars);
+    let mut results = Vec::new();
+    for name in test_destinations(row, requested) {
+        let mut ctx = ctx.clone();
+        let sent = notify(&row.org, &name, &[], None, &mut ctx).await;
+        results.push(match sent {
+            Ok(_) => DowntimeTestResult {
+                destination: name,
+                ok: true,
+                unsupported: false,
+                error: None,
+            },
+            Err(NotifyError::Skipped(reason)) => DowntimeTestResult {
+                destination: name,
+                ok: false,
+                unsupported: true,
+                error: Some(reason.as_str().to_string()),
+            },
+            Err(e) => {
+                log::warn!(
+                    "[DOWNTIMES] test send of {}/{} to {name} failed: {e}",
+                    row.org,
+                    row.id
+                );
+                DowntimeTestResult {
+                    error: Some(outcome_summary(&e)),
+                    destination: name,
+                    ok: false,
+                    unsupported: false,
+                }
+            }
+        });
+    }
+    results
+}
+
+/// Only the row's own destinations take a test, so the endpoint cannot post anywhere else.
+fn test_destinations(row: &Downtime, requested: &[String]) -> Vec<String> {
+    let own = destinations_of(row);
+    if requested.is_empty() {
+        return own;
+    }
+    own.into_iter().filter(|d| requested.contains(d)).collect()
+}
+
 /// One part per destination; a skip is named but only a real error fails the event.
 fn summarize(
     results: &[(
@@ -664,6 +729,20 @@ mod tests {
                 skipped: vec![],
             },
         }
+    }
+
+    #[test]
+    fn a_test_send_reaches_only_the_rows_own_destinations() {
+        let mut r = row(None);
+        r.notifications = Some(
+            serde_json::from_value(serde_json::json!({"destinations": ["slack-oncall", "hook"]}))
+                .unwrap(),
+        );
+        assert_eq!(test_destinations(&r, &[]), vec!["slack-oncall", "hook"]);
+        assert_eq!(
+            test_destinations(&r, &["hook".into(), "elsewhere".into()]),
+            vec!["hook"]
+        );
     }
 
     #[test]

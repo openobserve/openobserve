@@ -15,7 +15,6 @@
 
 import { keepPreviousData, mutationOptions, queryOptions } from "@tanstack/vue-query";
 import downtimes from "./downtimes";
-import destination from "./alert_destination";
 import type {
   DowntimeDetail,
   DowntimeListItem,
@@ -37,7 +36,7 @@ import { sloKeys } from "./slos.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { dbmHttpError } from "@/utils/dbm/format";
-import { DOWNTIME_TEMPLATE, type TestDestination } from "@/utils/downtimes/notifyTest";
+import type { TestDestination } from "@/utils/downtimes/notifyTest";
 
 export interface DowntimeTestResult {
   destination: string;
@@ -240,37 +239,23 @@ export const moveDowntimesMutation = (org: string) =>
     meta: { invalidates: [downtimeKeys.all(org)], silentError: true },
   });
 
-// The server renders every template kind, so a Content spec is never posted as a raw body.
-const sendTestTo = async (org: string, dest: TestDestination): Promise<DowntimeTestResult> => {
-  try {
-    const res = (
-      await destination.testSend({
-        org_identifier: org,
-        destination_name: dest.name,
-        data: { template_name: dest.template || DOWNTIME_TEMPLATE, kind: "downtime" },
-      })
-    ).data;
-    return {
-      destination: dest.name,
-      ok: !!res?.success,
-      error: res?.success ? undefined : res?.message,
-    };
-  } catch (err: unknown) {
-    return {
-      destination: dest.name,
-      ok: false,
-      error: dbmHttpError(err).serverMessage ?? (err instanceof Error ? err.message : undefined),
-    };
-  }
-};
-
+// The server sends through the path a real start uses, so the test reads the same body.
 export const sendDowntimeTestMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: {
+    mutationFn: async (vars: {
       downtime: DowntimeDetail;
       destinations: TestDestination[];
       url: string;
-    }): Promise<DowntimeTestResult[]> =>
-      Promise.all(vars.destinations.map((dest) => sendTestTo(org, dest))),
+    }): Promise<DowntimeTestResult[]> => {
+      const d = vars.downtime;
+      const names = vars.destinations.map((dest) => dest.name);
+      try {
+        return (await downtimes.test(org, d.id, names, d.folder_id)).data;
+      } catch (err: unknown) {
+        const error =
+          dbmHttpError(err).serverMessage ?? (err instanceof Error ? err.message : undefined);
+        return names.map((destination) => ({ destination, ok: false, error }));
+      }
+    },
     meta: { silentError: true },
   });

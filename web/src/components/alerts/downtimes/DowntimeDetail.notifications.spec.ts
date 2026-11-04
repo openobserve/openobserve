@@ -18,6 +18,7 @@ vi.mock("@/services/downtimes", () => ({
     update: vi.fn(),
     cancel: vi.fn(),
     extend: vi.fn(),
+    test: vi.fn(),
     remove: vi.fn(),
     move: vi.fn(),
     preview: vi.fn(),
@@ -181,35 +182,18 @@ describe("DowntimeDetail notifications tab", () => {
     wrapper.unmount();
   });
 
-  it("sends o2_default through the server render with the downtime sample", async () => {
-    const wrapper = await mountDetail();
-    await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
-    await flushPromises();
-    expect(destination.testSend).toHaveBeenCalledTimes(1);
-    const [{ data }] = vi.mocked(destination.testSend).mock.calls[0] as any;
-    expect(data).toEqual({ template_name: "o2_default", kind: "downtime" });
-    expect(destination.test).not.toHaveBeenCalled();
-    wrapper.unmount();
-  });
-
-  it("sends a destination's own template by name through the server render", async () => {
-    vi.mocked(destination.list).mockResolvedValue({
-      data: [
-        {
-          name: "slack-oncall",
-          type: "http",
-          url: "https://hooks.example.com",
-          method: "post",
-          template: "play_downtime_card",
-        },
-      ],
+  it("sends the test through the server's live path to the row's destinations", async () => {
+    vi.mocked(downtimes.test).mockResolvedValue({
+      data: [{ destination: "slack-oncall", ok: true }],
     } as any);
     const wrapper = await mountDetail();
     await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
     await flushPromises();
-    const [{ data }] = vi.mocked(destination.testSend).mock.calls[0] as any;
-    expect(data).toEqual({ template_name: "play_downtime_card", kind: "downtime" });
+    expect(downtimes.test).toHaveBeenCalledTimes(1);
+    const [org, id, names] = vi.mocked(downtimes.test).mock.calls[0] as any;
+    expect([org, id, names]).toEqual(["default", DETAIL.id, ["slack-oncall"]]);
     expect(destination.test).not.toHaveBeenCalled();
+    expect(destination.testSend).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

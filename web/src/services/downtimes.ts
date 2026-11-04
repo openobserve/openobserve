@@ -295,6 +295,12 @@ const downtimes = {
     http().post(`${one(org, id)}/cancel`, undefined, inFolder(folder)),
   extend: (org: string, id: string, body: ExtendDowntimeRequest, folder?: string) =>
     http().post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder)),
+  test: (org: string, id: string, destinations: string[], folder?: string) =>
+    http().post<{ destination: string; ok: boolean; unsupported?: boolean; error?: string }[]>(
+      `${one(org, id)}/test`,
+      { destinations },
+      inFolder(folder),
+    ),
   remove: (org: string, id: string, folder?: string) =>
     http().delete(one(org, id), inFolder(folder)),
   move: (org: string, downtimeIds: string[], dstFolderId: string, folder?: string) =>

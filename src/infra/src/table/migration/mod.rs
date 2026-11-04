@@ -262,6 +262,7 @@ mod m20261210_000001_add_oncall_policy_template;
 mod m20261211_000001_add_templates_to_downtime_notifications;
 mod m20261212_000001_add_templates_to_oncall_response_events;
 mod m20261213_000001_retire_compiled_default_templates;
+mod m20261214_000001_templates_columns_to_text;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -826,6 +827,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261211_000001_add_templates_to_downtime_notifications::Migration),
             Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
             Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
+            Box::new(m20261214_000001_templates_columns_to_text::Migration),
         ]
     }
 }
@@ -943,6 +945,7 @@ mod tests {
             "m20261212_000001_add_templates_to_oncall_response_events",
         ),
         (143, "m20261213_000001_retire_compiled_default_templates"),
+        (144, "m20261214_000001_templates_columns_to_text"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1084,6 +1087,10 @@ mod tests {
             (
                 "m20261210_000001_add_oncall_policy_template",
                 "m20261213_000001_retire_compiled_default_templates",
+            ),
+            (
+                "m20261212_000001_add_templates_to_oncall_response_events",
+                "m20261214_000001_templates_columns_to_text",
             ),
             (
                 "m20260923_000001_create_ai_chat_sessions",

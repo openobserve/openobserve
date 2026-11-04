@@ -24,8 +24,12 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
+        use crate::table::templates::{
+            MIGRATION_SEEDS, record_pending_renames, rename_reserved_collisions,
+        };
         // A user row named o2_default moves aside before the retired rows take the name.
-        crate::table::templates::rename_reserved_collisions(db).await?;
+        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS).await?;
+        record_pending_renames(db, &renames).await?;
         for r in crate::table::templates::retire_default_templates(db).await? {
             log::info!("[TEMPLATES] retired template '{}' into '{}'", r.from, r.to);
         }

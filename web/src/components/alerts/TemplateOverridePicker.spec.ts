@@ -158,6 +158,45 @@ describe("TemplateOverridePicker", () => {
     expect(resolve.mock.calls[0][0].query).toMatchObject({ action: "add", applies_to: "anomaly" });
     expect(open).toHaveBeenCalled();
     open.mockRestore();
+    w.unmount();
+  });
+
+  it("reloads the templates when the user returns after opening Create template", async () => {
+    list.mockResolvedValue({ data: [] } as any);
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const w = await mountPicker();
+    const callsBefore = list.mock.calls.length;
+
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+    expect(list.mock.calls.length).toBe(callsBefore);
+
+    await w.find('[data-test="template-override-create"]').trigger("click");
+    list.mockResolvedValue({ data: [{ name: "fresh", kind: "content", applies_to: [] }] } as any);
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+
+    const org = store.state.selectedOrganization.identifier;
+    expect(list.mock.calls.slice(callsBefore).map(([args]) => args)).toEqual(
+      expect.arrayContaining([
+        { org_identifier: org, applies_to: "anomaly" },
+        { org_identifier: org },
+      ]),
+    );
+    const options = select(w).props("options") as any[];
+    expect(options.map((o) => String(o.label))).toEqual(["Content", "fresh"]);
+
+    const callsAfter = list.mock.calls.length;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+    expect(list.mock.calls.length).toBeGreaterThan(callsAfter);
+
+    w.unmount();
+    const callsUnmounted = list.mock.calls.length;
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+    expect(list.mock.calls.length).toBe(callsUnmounted);
+    open.mockRestore();
   });
 
   it("disables the select on 403 and keeps the stored value", async () => {

@@ -615,6 +615,24 @@ pub struct ExtendDowntimeRequest {
     pub version: Option<i64>,
 }
 
+/// Which of the downtime's destinations a test send reaches; empty means all of them.
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct DowntimeTestRequest {
+    #[serde(default)]
+    pub destinations: Vec<String>,
+}
+
+/// One destination's test send; `unsupported` is a destination the shared path skips for downtimes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct DowntimeTestResult {
+    pub destination: String,
+    pub ok: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unsupported: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 /// The row that now ends later: the extended one-time row, or the follow-up of a recurring one.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct ExtendDowntimeResponse {

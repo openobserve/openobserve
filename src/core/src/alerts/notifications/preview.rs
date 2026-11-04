@@ -237,8 +237,20 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         NotificationKind::Alert => synthetic_context(level),
         kind => {
             let mut ctx = super::examples::example_context(kind, level == Some(AlertLevel::Ok));
-            if level.is_some() {
-                ctx.level = level;
+            if let Some(level) = level {
+                ctx.level = Some(level);
+                // On-call's alert_level is a priority and synthetics/downtime leave it blank.
+                if [
+                    AlertLevel::Critical,
+                    AlertLevel::Warning,
+                    AlertLevel::Ok,
+                    AlertLevel::NoData,
+                ]
+                .iter()
+                .any(|l| l.as_str() == ctx.alert_level)
+                {
+                    ctx.alert_level = level.as_str().into();
+                }
             }
             ctx
         }
@@ -566,5 +578,28 @@ mod tests {
         // A missing or empty severity previews as Critical, so the sample Level is never blank.
         assert_eq!(payloads[0], payloads[1]);
         assert_eq!(payloads[1], payloads[2]);
+    }
+
+    #[test]
+    fn severity_picker_drives_example_level_fields() {
+        let spec = ContentSpec {
+            title: "L:{alert_level} {alert_level_label}".into(),
+            ..sample_spec()
+        };
+        for (kind, expected) in [
+            (NotificationKind::Anomaly, "L:warning Warning"),
+            (NotificationKind::OnCall, "L:P2 P2"),
+            (NotificationKind::Synthetics, "L:"),
+        ] {
+            let req = PreviewRequest {
+                definition: spec.clone(),
+                channel: "slack".into(),
+                severity: Some("warning".into()),
+                sample: None,
+                kind,
+            };
+            let resp = preview(&req).unwrap();
+            assert_eq!(resp.preview_model.title.trim(), expected, "{kind:?}");
+        }
     }
 }

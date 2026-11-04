@@ -23,8 +23,13 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let renames =
-            crate::table::templates::rename_reserved_collisions(manager.get_connection()).await?;
+        use crate::table::templates::{
+            MIGRATION_SEEDS, record_pending_renames, rename_reserved_collisions,
+        };
+        let db = manager.get_connection();
+        let renames = rename_reserved_collisions(db, &MIGRATION_SEEDS).await?;
+        // The ownership tuples live outside the meta store, so boot moves them.
+        record_pending_renames(db, &renames).await?;
         for r in renames {
             log::info!(
                 "[TEMPLATES] renamed reserved template '{}' in org {} to '{}'",

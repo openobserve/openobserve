@@ -401,10 +401,18 @@ pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<St
 /// Moves user rows out of the reserved prefix and tells every node's cache.
 pub async fn rename_reserved_collisions()
 -> Result<Vec<table::templates::ReservedRename>, TemplateError> {
-    let renames =
-        table::templates::rename_reserved_collisions(infra::db::get_orm_client_rw().await)
-            .await
-            .map_err(infra::errors::Error::from)?;
+    let db = infra::db::get_orm_client_rw().await;
+    // A migration renamed these before any cache or tuple store was up, so only the tuples move.
+    for r in &table::templates::take_pending_renames(db)
+        .await
+        .map_err(infra::errors::Error::from)?
+    {
+        disown_old_name(r).await?;
+        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
+    }
+    let renames = table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS)
+        .await
+        .map_err(infra::errors::Error::from)?;
     for r in &renames {
         infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
             .await?;

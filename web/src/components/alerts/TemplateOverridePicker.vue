@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
@@ -283,10 +283,11 @@ const willUse = computed(() => {
 });
 
 // Each read is optional: a failure (or a 403) leaves the line out rather than guessing.
-const loadResolution = async () => {
+const loadResolution = async (fresh = false) => {
   const org = store.state.selectedOrganization.identifier;
+  const templatesOptions = fresh ? { ...templatesQuery(org), staleTime: 0 } : templatesQuery(org);
   const [templatesList, destinationList] = await Promise.all([
-    queryClient.fetchQuery(templatesQuery(org)).catch(() => null),
+    queryClient.fetchQuery(templatesOptions).catch(() => null),
     queryClient.fetchQuery(destinationsQuery(org, "alert")).catch(() => []),
   ]);
   allTemplates.value = Array.isArray(templatesList) ? templatesList : null;
@@ -297,8 +298,8 @@ const loadResolution = async () => {
   }));
 };
 
-const load = async () => {
-  state.value = "loading";
+const loadTemplates = async (silent: boolean) => {
+  if (!silent) state.value = "loading";
   try {
     const res = await templateService.list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -308,15 +309,33 @@ const load = async () => {
     templates.value = list.filter((tpl) => !tpl.isPrebuilt);
     state.value = templates.value.length ? "ready" : "empty";
   } catch (e: any) {
-    state.value = e?.response?.status === 403 ? "forbidden" : "error";
+    // A failed background reload keeps the list the user is already looking at.
+    if (!silent) state.value = e?.response?.status === 403 ? "forbidden" : "error";
   }
 };
+
+const load = () => loadTemplates(false);
 
 const onSelect = (value: unknown) => {
   emit("update:modelValue", typeof value === "string" && value ? value : null);
 };
 
+// Set once "Create template" opened the editor in another tab, so a return to this tab reloads.
+const createOpened = ref(false);
+let refreshing = false;
+
+const refreshAfterCreate = async () => {
+  if (!createOpened.value || refreshing || document.visibilityState === "hidden") return;
+  refreshing = true;
+  try {
+    await Promise.all([loadTemplates(true), loadResolution(true)]);
+  } finally {
+    refreshing = false;
+  }
+};
+
 const openCreate = () => {
+  createOpened.value = true;
   const route = router.resolve({
     name: "alertTemplates",
     query: {
@@ -335,9 +354,17 @@ watch(
     void loadResolution();
   },
 );
+const onReturn = () => void refreshAfterCreate();
+
 onMounted(() => {
   void load();
   void loadResolution();
+  window.addEventListener("focus", onReturn);
+  document.addEventListener("visibilitychange", onReturn);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("focus", onReturn);
+  document.removeEventListener("visibilitychange", onReturn);
 });
 
 defineExpose({ load });
