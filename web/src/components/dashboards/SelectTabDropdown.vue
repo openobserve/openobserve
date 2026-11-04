@@ -79,6 +79,11 @@ export default defineComponent({
         return typeof value === "string" || value === null;
       },
     },
+    /** Selected when the dashboard has it; otherwise the first tab is. */
+    preferredTabId: {
+      type: String,
+      default: null,
+    },
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -107,12 +112,8 @@ export default defineComponent({
         value: tab.tabId,
       }));
 
-      // select first tab
-      if (tabList?.value?.length > 0) {
-        selectedTab.value = tabList?.value[0]?.value ?? null;
-      } else {
-        selectedTab.value = null;
-      }
+      const preferred = tabList.value?.find((tab: any) => tab.value === props.preferredTabId);
+      selectedTab.value = preferred?.value ?? tabList.value?.[0]?.value ?? null;
 
       emit("tab-list-updated");
     });

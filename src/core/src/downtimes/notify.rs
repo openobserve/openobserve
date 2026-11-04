@@ -31,6 +31,8 @@ pub const LOG_LIMIT: u64 = 50;
 /// How often the notifier ticks; a start one tick back is already behind every healthy checkpoint.
 pub const TICK_INTERVAL_SECS: u64 = 30;
 pub const RESULT_OK: &str = "ok";
+/// A failed send's stored outcome when it carries no HTTP status.
+pub const RESULT_FAILED: &str = "delivery failed";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DueEvent {
@@ -149,12 +151,13 @@ fn destinations_of(row: &Downtime) -> Vec<String> {
 }
 
 fn log_entry(row: DowntimeNotification) -> DowntimeNotificationLogEntry {
+    let destinations: Vec<String> = serde_json::from_value(row.destinations).unwrap_or_default();
     DowntimeNotificationLogEntry {
         window_start: row.window_start,
         event: row.event,
         sent_at: row.sent_at,
-        destinations: serde_json::from_value(row.destinations).unwrap_or_default(),
-        result: row.result,
+        result: row.result.map(|r| safe_result(r, &destinations)),
+        destinations,
         templates: row
             .templates
             .and_then(|v| serde_json::from_value(v).ok())
@@ -191,6 +194,15 @@ async fn send(
                 template_source: outcome.template_source.clone(),
             });
         }
+        if let Err(e) = &sent {
+            // The full error stays in the server log; folder readers see only its summary.
+            log::warn!(
+                "[DOWNTIMES] {} notification of {}/{} to {name} failed: {e}",
+                due.event.as_str(),
+                row.org,
+                row.id
+            );
+        }
         results.push((name.as_str(), sent.map(|_| ())));
     }
     (summarize(&results), templates)
@@ -212,7 +224,7 @@ fn summarize(
         .iter()
         .map(|(name, r)| match r {
             Ok(()) => format!("{name}: {RESULT_OK}"),
-            Err(e) => format!("{name}: {e}"),
+            Err(e) => format!("{name}: {}", outcome_summary(e)),
         })
         .collect::<Vec<_>>()
         .join("; ");
@@ -220,6 +232,40 @@ fn summarize(
         .iter()
         .any(|(_, r)| matches!(r, Err(e) if !matches!(e, NotifyError::Skipped(_))));
     if failed { Err(summary) } else { Ok(summary) }
+}
+
+/// One destination's stored outcome: its HTTP status or skip reason, never the reply body.
+fn outcome_summary(e: &crate::alerts::notifications::notify::NotifyError) -> String {
+    use crate::alerts::notifications::notify::NotifyError;
+
+    match e {
+        NotifyError::Rejected { status, .. } => format!("HTTP {status}"),
+        NotifyError::Skipped(_) => e.to_string(),
+        _ => RESULT_FAILED.to_string(),
+    }
+}
+
+/// A stored outcome in the status-only format, else [RESULT_FAILED] so an older row never shows a
+/// reply body.
+fn safe_result(result: String, destinations: &[String]) -> String {
+    let safe_part = |part: &str| {
+        part.split_once(": ").is_some_and(|(name, outcome)| {
+            destinations.iter().any(|d| d == name)
+                && (outcome == RESULT_OK
+                    || outcome == RESULT_FAILED
+                    || outcome.strip_prefix("skipped: ").is_some_and(|r| {
+                        !r.is_empty() && r.bytes().all(|b| b.is_ascii_alphanumeric())
+                    })
+                    || outcome.strip_prefix("HTTP ").is_some_and(|code| {
+                        code.len() == 3 && code.bytes().all(|b| b.is_ascii_digit())
+                    }))
+        })
+    };
+    if result == RESULT_OK || result.split("; ").all(safe_part) {
+        result
+    } else {
+        RESULT_FAILED.to_string()
+    }
 }
 
 /// The shared path's context for one downtime event; platforms are skipped, so it has no key.
@@ -632,12 +678,74 @@ mod tests {
                 ("slack", Ok(())),
                 ("hook", Err(NotifyError::Transport("refused".into())))
             ]),
-            Err("slack: ok; hook: refused".to_string())
+            Err("slack: ok; hook: delivery failed".to_string())
         );
     }
 
     #[test]
     fn counts_are_empty_when_unknown() {
         assert_eq!(counts_phrase(&row(None), None), "");
+    }
+
+    #[test]
+    fn a_failed_send_stores_its_status_never_the_reply_body() {
+        use crate::alerts::notifications::notify::NotifyError;
+        let rejected = NotifyError::Rejected {
+            status: 500,
+            body: "token=abc".into(),
+        };
+        assert!(
+            rejected.to_string().contains("token=abc"),
+            "the server log keeps the body"
+        );
+        assert_eq!(
+            summarize(&[("hook", Err(rejected))]),
+            Err("hook: HTTP 500".to_string())
+        );
+        assert_eq!(
+            outcome_summary(&NotifyError::DestinationNotFound("hook".into())),
+            RESULT_FAILED
+        );
+    }
+
+    #[test]
+    fn an_older_row_with_a_reply_body_is_redacted_on_read() {
+        let dests = vec!["hook".to_string(), "mail".to_string()];
+        let legacy = "hook: sent error status: 500 Internal Server Error, err: token=abc";
+        assert_eq!(safe_result(legacy.to_string(), &dests), RESULT_FAILED);
+        assert_eq!(safe_result("ok".to_string(), &dests), "ok");
+        let current = "hook: HTTP 500; mail: delivery failed";
+        assert_eq!(safe_result(current.to_string(), &dests), current);
+        let mixed = "hook: ok; mail: skipped: PlatformNotForKind";
+        assert_eq!(safe_result(mixed.to_string(), &dests), mixed);
+        assert_eq!(
+            safe_result("hook: skipped: no: body".to_string(), &dests),
+            RESULT_FAILED
+        );
+        // A name the row never sent to, or a status that is not three digits, is not ours.
+        assert_eq!(
+            safe_result("other: HTTP 500".to_string(), &dests),
+            RESULT_FAILED
+        );
+        assert_eq!(
+            safe_result("hook: HTTP 5000".to_string(), &dests),
+            RESULT_FAILED
+        );
+    }
+
+    #[test]
+    fn the_log_entry_never_returns_an_older_reply_body() {
+        let entry = log_entry(DowntimeNotification {
+            id: "n1".to_string(),
+            org: "acme".to_string(),
+            downtime_id: "d1".to_string(),
+            window_start: 1,
+            event: "started".to_string(),
+            sent_at: 1,
+            destinations: serde_json::json!(["hook"]),
+            result: Some("hook: sent error status: 401, err: secret".to_string()),
+            templates: None,
+        });
+        assert_eq!(entry.result.as_deref(), Some(RESULT_FAILED));
     }
 }

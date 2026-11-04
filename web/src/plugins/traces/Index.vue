@@ -331,14 +331,13 @@ import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
-import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -705,18 +704,7 @@ function buildSearch(reuseLastWindow = false) {
     let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
-      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-      whereClause = parseSpanKindWhereClause(
+      whereClause = resolveTracesFilter(
         whereClause,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
@@ -868,13 +856,11 @@ const updateFieldValues = (data) => {
 
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
-  const streamName = searchObj.data.stream.selectedStream.value;
-  let filter = searchObj.data.editorValue.trim();
-  const filterParseResult = parseDurationWhereClause(filter, tracesParser.value, streamName);
-  if (typeof filterParseResult === "string") {
-    filter = filterParseResult;
-  }
-  return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
+  return resolveTracesFilter(
+    searchObj.data.editorValue,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 }
 
 // Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
@@ -1469,10 +1455,14 @@ function generateHistogramData() {
 
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
-async function loadPageData() {
+/** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
+async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
   pageLoaded = false;
-  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
+  const query = router.currentRoute.value.query;
+  // The header switch re-keys the page before the router may have left the old org's URL.
+  const urlFromLeftOrg = !!leftOrg && (query.org_identifier ?? leftOrg) === leftOrg;
+  const streamFromUrl = !urlFromLeftOrg && typeof query.stream === "string";
   // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
   // A newer restore wins over one a left load never acted on.
   const landing = takeRecentLanding("traces") ?? pendingLanding;
@@ -1559,10 +1549,9 @@ function stopInFlightRequests() {
 async function initializePage() {
   const generation = pageGeneration;
   pageLoaded = false;
-  if (
-    searchObj.organizationIdentifier &&
-    searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
-  ) {
+  const lastOrg = searchObj.organizationIdentifier;
+  const leftOrg = lastOrg && lastOrg !== store.state.selectedOrganization.identifier ? lastOrg : "";
+  if (leftOrg) {
     resetSearchObj();
   }
   restoreUrlQueryParams();
@@ -1574,7 +1563,7 @@ async function initializePage() {
   await loadTracesParser().catch((e) => console.error("Failed to load the traces parser", e));
   if (generation !== pageGeneration) return;
   if (!searchObj.loading) {
-    await loadPageData();
+    await loadPageData({ leftOrg });
   } else {
     searchObj.loadingStream = false;
     pendingUrlPage = null;
@@ -1642,9 +1631,10 @@ onActivated(async () => {
   }
 
   if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
+    const leftOrg = searchObj.organizationIdentifier;
     resetSearchObj();
     restoreUrlQueryParams();
-    await loadPageData();
+    await loadPageData({ leftOrg });
     if (left()) return;
     reloaded = true;
   }
