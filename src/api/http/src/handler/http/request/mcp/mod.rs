@@ -490,8 +490,12 @@ pub async fn oauth_authorization_server_metadata() -> Response {
 /// Mirrors the UI's `sso_enabled`, so discovery never advertises OAuth the UI hides.
 #[cfg(feature = "enterprise")]
 async fn oauth_discovery_available() -> bool {
-    o2_dex::config::get_config().dex_enabled
-        && !o2_enterprise::enterprise::license::block_feature_for_report_failure().await
+    oauth_discovery_open(o2_dex::config::get_config().dex_enabled).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn oauth_discovery_open(dex_enabled: bool) -> bool {
+    dex_enabled && !o2_enterprise::enterprise::license::block_feature_for_report_failure().await
 }
 
 #[cfg(feature = "enterprise")]
@@ -918,29 +922,40 @@ mod tests {
         )
         .await;
         set_last_reported_timestamp_for_tests(&held, now - 86_400_000_000i64);
+        let dex_enabled = o2_dex::config::get_config().dex_enabled;
+        let mut seen = Vec::new();
         for active in [true, false] {
             replace_license_for_tests(
                 &held,
                 Some(("grace".into(), report_grace_license(now, active))),
             )
             .await;
-            let expected = if active && o2_dex::config::get_config().dex_enabled {
+            seen.push((
+                active,
+                oauth_discovery_open(true).await,
+                oauth_discovery_open(false).await,
+                oauth_authorization_server_metadata().await.status(),
+                oauth_protected_resource_metadata(Path("api/default/mcp".into()))
+                    .await
+                    .status(),
+            ));
+        }
+        // restored before asserting, so a failure here leaves no state for other tests
+        replace_license_for_tests(&held, previous).await;
+        set_last_reported_timestamp_for_tests(&held, previous_ts);
+        for (active, with_dex, without_dex, server, resource) in seen {
+            assert_eq!(with_dex, active, "grace active: {active}");
+            assert!(!without_dex, "grace active: {active}");
+            let expected = if active && dex_enabled {
                 StatusCode::OK
             } else {
                 StatusCode::NOT_FOUND
             };
             assert_eq!(
-                oauth_authorization_server_metadata().await.status(),
-                expected
-            );
-            assert_eq!(
-                oauth_protected_resource_metadata(Path("api/default/mcp".into()))
-                    .await
-                    .status(),
-                expected
+                (server, resource),
+                (expected, expected),
+                "grace active: {active}"
             );
         }
-        replace_license_for_tests(&held, previous).await;
-        set_last_reported_timestamp_for_tests(&held, previous_ts);
     }
 }
