@@ -482,7 +482,7 @@ pub async fn around_v1(
     #[cfg(feature = "enterprise")]
     {
         // the request's SQL or filter may read streams other than the one it names
-        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -618,7 +618,7 @@ pub async fn around_v2(
     #[cfg(feature = "enterprise")]
     {
         // the request's SQL or filter may read streams other than the one it names
-        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -736,7 +736,7 @@ pub async fn values(
     #[cfg(feature = "enterprise")]
     {
         // the request's SQL or filter may read streams other than the one it names
-        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(

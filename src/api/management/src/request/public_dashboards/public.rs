@@ -448,11 +448,8 @@ fn server_error() -> Response {
 
 /// A closed licence search gate serves the viewer nothing, warm results included; meta passes.
 fn search_refused(org: &str) -> Option<Response> {
-    if org == config::META_ORG_ID {
-        return None;
-    }
     // The gate's own message names the licence id, which an anonymous viewer must not see.
-    search_service::check_search_allowed(org, None)
+    search_service::check_org_search_allowed(org)
         .err()
         .map(|_| too_many_requests(READ_WINDOW))
 }

@@ -1088,6 +1088,17 @@ pub fn check_search_allowed(
     Ok(())
 }
 
+/// The gate for a handler whose request may read streams it does not name.
+#[inline]
+pub fn check_org_search_allowed(org_id: &str) -> Result<(), Error> {
+    // the meta org passes as it does on the gated routes, where operators diagnose the gate
+    #[cfg(feature = "enterprise")]
+    if org_id == META_ORG_ID {
+        return Ok(());
+    }
+    check_search_allowed(org_id, None)
+}
+
 pub fn is_operational_stream(stream: &str) -> bool {
     OPERATIONAL_STREAMS.contains(&stream)
 }
@@ -1549,5 +1560,29 @@ mod tests {
         assert!(
             check_search_allowed("acme", Some(("synthetics_results", StreamType::Logs))).is_err()
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_org_wide_gate_passes_only_the_meta_org_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(check_org_search_allowed(META_ORG_ID).is_ok());
+        let refused = check_org_search_allowed("acme").unwrap_err().to_string();
+        assert!(
+            refused.starts_with("Error# Search is temporarily disabled"),
+            "{refused}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_org_wide_gate_passes_every_org_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(check_org_search_allowed("acme").is_ok());
+        assert!(check_org_search_allowed(META_ORG_ID).is_ok());
     }
 }

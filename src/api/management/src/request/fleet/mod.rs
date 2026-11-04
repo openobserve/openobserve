@@ -1638,7 +1638,7 @@ pub async fn get_pipelines(
     #[cfg(feature = "enterprise")]
     {
         // Fleet routes are outside the gated group, so this PromQL search checks the licence here.
-        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e);
         }
         let user_id = &user_email.user_id;
@@ -2964,8 +2964,12 @@ mod tests {
     }
 
     async fn pipelines_as(user_id: &str) -> Response {
+        pipelines_in(ORG, user_id).await
+    }
+
+    async fn pipelines_in(org: &str, user_id: &str) -> Response {
         get_pipelines(
-            Path(ORG.to_string()),
+            Path(org.to_string()),
             Query(FlowQuery { window: None }),
             Headers(UserEmail {
                 user_id: user_id.to_string(),
@@ -2996,6 +3000,25 @@ mod tests {
             ) && message.ends_with("Please contact your administrator."),
             "{message}"
         );
+    }
+
+    #[tokio::test]
+    async fn meta_org_pipelines_reach_the_fleet_check_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "meta@fleet-fleets-handlers.test";
+        seed_member(
+            custom,
+            config::meta::user::UserRole::User,
+            config::META_ORG_ID,
+        );
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_in(config::META_ORG_ID, custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, config::META_ORG_ID);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

@@ -115,10 +115,7 @@ async fn experiment_body(
 
 /// Scores come from search, so while it is blocked the list renders without them.
 fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
-    // the meta org is never blocked, as on the gated routes
-    requested.unwrap_or(false)
-        && (org_id == config::META_ORG_ID
-            || search_service::check_search_allowed(org_id, None).is_ok())
+    requested.unwrap_or(false) && search_service::check_org_search_allowed(org_id).is_ok()
 }
 
 fn experiment_error_response(error: ExperimentError) -> Response {

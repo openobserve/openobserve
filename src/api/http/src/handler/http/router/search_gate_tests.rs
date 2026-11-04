@@ -675,8 +675,10 @@ fn every_search_call_site_is_classified() {
     for (file, _, class) in SEARCH_CALLERS {
         match class {
             Caller::InHandler => {
+                let text = caller_source(file);
                 assert!(
-                    caller_source(file).contains("check_search_allowed("),
+                    text.contains("check_search_allowed(")
+                        || text.contains("check_org_search_allowed("),
                     "{file}"
                 )
             }
