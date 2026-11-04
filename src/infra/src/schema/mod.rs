@@ -549,25 +549,17 @@ pub fn get_stream_setting_bloom_filter_fields<T: std::borrow::Borrow<StreamSetti
 pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
     stream_type: StreamType,
-    created_at: Option<i64>,
     fields: &[String],
     distinct_fields_updated_at: i64,
 ) -> i64 {
     if fields.is_empty() {
         return 0;
     }
-    let created_at = match created_at {
-        Some(created_at) => created_at,
-        None => {
-            log::warn!("created_at not found in schema metadata");
-            Utc::now().timestamp_micros()
-        }
-    };
     let default_updated_at = match settings {
         Some(settings) if settings.borrow().index_updated_at > 0 => {
             settings.borrow().index_updated_at
         }
-        _ => created_at,
+        _ => BASE_TIME.timestamp_micros(),
     };
     fields
         .iter()
@@ -1453,7 +1445,6 @@ mod tests {
     fn test_get_stream_setting_index_updated_at_for_distinct_fields() {
         use config::meta::stream::DistinctField;
 
-        let created_at = 1_700_000_000_000_000;
         let added_ts = 1_755_000_000_000_000;
         let settings = StreamSettings {
             index_updated_at: 1_750_000_000_000_000,
@@ -1469,7 +1460,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1480,7 +1470,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             cutoff,
         );
@@ -1494,7 +1483,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_both),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1508,7 +1496,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_disabled),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1518,7 +1505,6 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_updated_at_for_fields() {
         let base_time = BASE_TIME.timestamp_micros();
-        let created_at = 1_700_000_000_000_000;
         let mut stream_settings = StreamSettings {
             index_updated_at: 1_750_000_000_000_000,
             ..Default::default()
@@ -1530,58 +1516,37 @@ mod tests {
 
         // no referenced fields -> no cutoff
         let fields = Vec::new();
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 0);
 
         // a field with its own entry uses it
         let fields = vec!["user_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // a field without an entry falls back to the stream-level value
         let fields = vec!["level".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_750_000_000_000_000);
 
         // multiple fields use the max
         let fields = vec!["user_id".to_string(), "level".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
-        // None settings falls back to created_at
+        // None settings falls back to BASE_TIME
         let fields = vec!["user_id".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
-        assert_eq!(result, created_at);
+        assert_eq!(result, base_time);
 
         // default-enabled index fields always resolve to BASE_TIME, even with an entry
         stream_settings
@@ -1589,19 +1554,13 @@ mod tests {
             .insert("trace_id".to_string(), 1_760_000_000_000_000);
         let settings = Some(stream_settings);
         let fields = vec!["trace_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, base_time);
         let fields = vec!["service_name".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1609,13 +1568,8 @@ mod tests {
 
         // a default field combined with a configured field still uses the max
         let fields = vec!["trace_id".to_string(), "user_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // metrics streams have no built-in default index fields, so the field's own entry wins
@@ -1623,7 +1577,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &settings,
             StreamType::Metrics,
-            Some(created_at),
             &fields,
             0,
         );

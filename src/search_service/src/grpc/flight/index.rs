@@ -82,7 +82,11 @@ pub(super) fn optimizer_physical_plan(
     let index_optimizer_rule_ref = Arc::new(Mutex::new(index_mode));
     let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
 
-    let fts_fields: HashSet<String> = settings.fts_fields.iter().cloned().collect();
+    // files written before a field joined FTS have none of its terms in `_all`
+    let fts_fields: HashSet<String> = settings
+        .fts_fields_indexed_since(time_range.0)
+        .cloned()
+        .collect();
     let index_rule = IndexRule::new(
         index_fields.clone(),
         fts_fields,
@@ -170,6 +174,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use config::{meta::stream::StreamSettings, utils::time::BASE_TIME};
     use datafusion::{
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
         prelude::SessionConfig,
@@ -250,6 +255,25 @@ mod tests {
     }
 
     async fn plan_with_index(sql: &str, use_index: bool) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
+        let settings = StreamSearchSettings {
+            index_fields: vec!["service".to_string()],
+            fts_fields: vec!["message".to_string()],
+            ..Default::default()
+        };
+        let index_info = IndexInfo {
+            skip_index: !use_index,
+            ..Default::default()
+        };
+        let start_time = BASE_TIME.timestamp_micros();
+        plan_with_settings(sql, (start_time, start_time + 100), &settings, &index_info).await
+    }
+
+    async fn plan_with_settings(
+        sql: &str,
+        time_range: (i64, i64),
+        settings: &StreamSearchSettings,
+        index_info: &IndexInfo,
+    ) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("service", DataType::Utf8, false),
@@ -269,18 +293,30 @@ mod tests {
             &ctx,
             &schema,
             StreamType::Logs,
-            (0, 100),
-            &StreamSearchSettings {
-                index_fields: vec!["service".to_string()],
-                fts_fields: vec!["message".to_string()],
-                ..Default::default()
-            },
-            &IndexInfo {
-                skip_index: !use_index,
-                ..Default::default()
-            },
+            time_range,
+            settings,
+            index_info,
         )
         .unwrap()
+    }
+
+    fn settings_with_fts_added_at(
+        field_added_at: Option<i64>,
+        index_updated_at: i64,
+    ) -> StreamSearchSettings {
+        StreamSearchSettings {
+            settings: Some(StreamSettings {
+                index_updated_at,
+                index_fields_updated_at: field_added_at
+                    .map(|added_at| ("message".to_string(), added_at))
+                    .into_iter()
+                    .collect(),
+                ..Default::default()
+            }),
+            index_fields: vec!["service".to_string()],
+            fts_fields: vec!["message".to_string()],
+            ..Default::default()
+        }
     }
 
     fn plan_text(plan: &Arc<dyn ExecutionPlan>) -> String {
@@ -308,6 +344,49 @@ mod tests {
         );
         assert!(index.use_inverted_index());
         assert_eq!(index.mode, None);
+        assert!(plan_text(&plan).contains("LIKE %timeout%"));
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_like_needs_fts_field_older_than_query() {
+        let sql = "SELECT count(*) FROM default WHERE message LIKE '%timeout%'";
+        let start = BASE_TIME.timestamp_micros() + 100;
+        for (field_added_at, index_updated_at, uses_index) in [
+            (None, 0, true),
+            (Some(start - 1), 0, true),
+            (Some(start), 0, true),
+            (Some(start + 1), 0, false),
+            (None, start, true),
+            (None, start + 1, false),
+            (Some(start), start + 1, true),
+            (Some(start + 1), start, false),
+        ] {
+            let settings = settings_with_fts_added_at(field_added_at, index_updated_at);
+            let (plan, index) =
+                plan_with_settings(sql, (start, start + 100), &settings, &IndexInfo::default())
+                    .await;
+            assert_eq!(
+                index.condition.is_some(),
+                uses_index,
+                "{field_added_at:?} {index_updated_at}"
+            );
+            assert!(plan_text(&plan).contains("LIKE %timeout%"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_late_fts_field_keeps_other_conditions() {
+        let sql = "SELECT * FROM default WHERE service = 'auth' AND message LIKE '%timeout%'";
+        let start = BASE_TIME.timestamp_micros() + 100;
+        let settings = settings_with_fts_added_at(Some(start + 1), 0);
+        let (plan, index) =
+            plan_with_settings(sql, (start, start + 100), &settings, &IndexInfo::default()).await;
+        assert_eq!(
+            index.condition,
+            Some(IndexCondition {
+                conditions: vec![Condition::Equal("service".to_string(), "auth".to_string(),)],
+            })
+        );
         assert!(plan_text(&plan).contains("LIKE %timeout%"));
     }
 

@@ -997,6 +997,8 @@ fn parse_simple_multi_stream_request(
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
+        #[serde(default = "search::default_use_index")]
+        use_index: bool,
     }
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
@@ -1046,7 +1048,7 @@ fn parse_simple_multi_stream_request(
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
         skip_wal: false,
-        use_index: true,
+        use_index: simple_req.use_index,
         regions: vec![],
         clusters: vec![],
         search_type: None,
@@ -1571,7 +1573,23 @@ mod tests {
     use openobserve_api_common::extractors::Headers;
     use openobserve_core::auth::UserEmail;
 
-    use super::around_multi;
+    use super::{around_multi, parse_simple_multi_stream_request};
+
+    #[test]
+    fn test_parse_simple_multi_stream_request_use_index() {
+        let body = |extra: &str| {
+            format!(
+                r#"{{"query":{{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}}{extra}}}"#
+            )
+        };
+        assert!(
+            parse_simple_multi_stream_request(body("").as_bytes())
+                .unwrap()
+                .use_index
+        );
+        let req = parse_simple_multi_stream_request(body(r#","use_index":false"#).as_bytes());
+        assert!(!req.unwrap().use_index);
+    }
 
     #[test]
     fn multi_stream_checks_each_query_after_decoding_it() {

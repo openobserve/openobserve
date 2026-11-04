@@ -196,6 +196,8 @@ impl Sql {
                 "only SELECT queries are supported".to_string(),
             )));
         }
+        // read before track_total_hits wraps DISTINCT and UNION in an unhinted outer SELECT
+        let no_index_hint = has_no_index_hint(&statement);
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -330,7 +332,6 @@ impl Sql {
         let final_schemas = finalize_schemas(&used_schemas);
 
         let is_complex = is_complex_query_stmt(&statement);
-        let no_index_hint = has_no_index_hint(&statement);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -631,5 +632,38 @@ mod tests {
             .pop()
             .unwrap();
         assert!(parse_no_index_hint(&statement.to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_no_index_hint_with_track_total_hits() {
+        let schema = arrow_schema::Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("log", arrow_schema::DataType::Utf8, true),
+        ]);
+        infra::db_init().await.unwrap();
+        infra::schema::merge(
+            "no_index_hint_test",
+            "t",
+            StreamType::Logs,
+            &schema,
+            Some(1752660674351000),
+        )
+        .await
+        .unwrap();
+        for sql in [
+            "SELECT /*+ NO_INDEX */ DISTINCT log FROM t",
+            "SELECT /*+ NO_INDEX */ log FROM t UNION ALL SELECT log FROM t",
+        ] {
+            let query = proto::cluster_rpc::SearchQuery {
+                sql: sql.to_string(),
+                size: 10,
+                track_total_hits: true,
+                ..Default::default()
+            };
+            let sql = Sql::new(&query, "no_index_hint_test", StreamType::Logs, None)
+                .await
+                .unwrap();
+            assert!(sql.no_index_hint, "{}", sql.sql);
+        }
     }
 }
