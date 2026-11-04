@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, atomic::AtomicUsize};
+use std::sync::Arc;
 
 use arrow_schema::SchemaRef;
 use config::{
-    meta::{
-        inverted_index::IndexOptimizeMode,
-        search::{ScanStats, SearchEventType},
-    },
+    meta::{inverted_index::IndexOptimizeMode, search::SearchEventType},
     utils::rand::generate_random_string,
 };
 use datafusion::{
@@ -35,17 +32,13 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::RemoteScanMetrics;
+use flight::common::{RemoteScanMetrics, RemoteScanState};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;
-use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
-use super::{
-    node::RemoteScanNode,
-    profile::{NodeProfileRecorder, NodeProfiles},
-};
+use super::{node::RemoteScanNode, profile::NodeProfileRecorder};
 use crate::datafusion::{
     distributed_plan::{
         codec::get_physical_extension_codec,
@@ -63,12 +56,9 @@ pub struct RemoteScanExec {
     remote_scan_node: RemoteScanNode,
     partitions: usize,
     cache: Arc<PlanProperties>,
-    pub scan_stats: Arc<Mutex<ScanStats>>,
-    pub peak_memory: Arc<AtomicUsize>,
-    pub partial_err: Arc<Mutex<String>>,
+    pub state: RemoteScanState,
     pub enrich_mode_node_idx: usize,
     pub metrics: ExecutionPlanMetricsSet,
-    pub node_profiles: NodeProfiles,
 }
 
 impl RemoteScanExec {
@@ -104,25 +94,10 @@ impl RemoteScanExec {
             remote_scan_node,
             partitions: output_partitions,
             cache,
-            scan_stats: Arc::new(Mutex::new(ScanStats::default())),
-            partial_err: Arc::new(Mutex::new(String::new())),
-            peak_memory: Arc::new(AtomicUsize::new(0)),
+            state: RemoteScanState::default(),
             enrich_mode_node_idx,
             metrics: ExecutionPlanMetricsSet::new(),
-            node_profiles: NodeProfiles::default(),
         })
-    }
-
-    pub fn scan_stats(&self) -> Arc<Mutex<ScanStats>> {
-        self.scan_stats.clone()
-    }
-
-    pub fn partial_err(&self) -> Arc<Mutex<String>> {
-        self.partial_err.clone()
-    }
-
-    pub fn peak_memory(&self) -> Arc<AtomicUsize> {
-        self.peak_memory.clone()
     }
 
     /// The input plan bytes exactly as every follower receives them.
@@ -130,28 +105,13 @@ impl RemoteScanExec {
         &self.remote_scan_node.search_infos.plan
     }
 
-    pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
-        self.scan_stats = scan_stats;
-        self
-    }
-
-    pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
-        self.partial_err = partial_err;
-        self
-    }
-
-    pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
-        self.peak_memory = peak_memory;
+    pub fn with_state(mut self, state: RemoteScanState) -> Self {
+        self.state = state;
         self
     }
 
     pub fn with_metrics(mut self, metrics: ExecutionPlanMetricsSet) -> Self {
         self.metrics = metrics;
-        self
-    }
-
-    pub fn with_node_profiles(mut self, node_profiles: NodeProfiles) -> Self {
-        self.node_profiles = node_profiles;
         self
     }
 
@@ -253,11 +213,8 @@ impl ExecutionPlan for RemoteScanExec {
             return Ok(self);
         }
         let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
-            .with_scan_stats(self.scan_stats.clone())
-            .with_partial_err(self.partial_err.clone())
-            .with_peak_memory(self.peak_memory.clone())
-            .with_metrics(self.metrics.clone())
-            .with_node_profiles(self.node_profiles.clone());
+            .with_state(self.state.clone())
+            .with_metrics(self.metrics.clone());
         Ok(Arc::new(remote_scan))
     }
 
@@ -272,11 +229,8 @@ impl ExecutionPlan for RemoteScanExec {
             partition,
             partition == self.enrich_mode_node_idx,
             self.input.schema().clone(),
-            self.scan_stats(),
-            self.partial_err(),
-            self.peak_memory(),
+            self.state.clone(),
             baseline_metrics,
-            self.node_profiles.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -296,12 +250,15 @@ async fn get_remote_batch(
     partition: usize,
     enrich_mode: bool,
     schema: SchemaRef,
-    scan_stats: Arc<Mutex<ScanStats>>,
-    partial_err: Arc<Mutex<String>>,
-    peak_memory: Arc<AtomicUsize>,
+    state: RemoteScanState,
     metrics: RemoteScanMetrics,
-    node_profiles: NodeProfiles,
 ) -> Result<SendableRecordBatchStream> {
+    let RemoteScanState {
+        scan_stats,
+        peak_memory,
+        partial_err,
+        node_profiles,
+    } = state;
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
@@ -535,7 +492,7 @@ mod tests {
     #[test]
     fn test_remote_scan_exec_partial_err_empty() {
         let exec = make_remote_exec();
-        assert!(exec.partial_err().lock().is_empty());
+        assert!(exec.state.partial_err.lock().is_empty());
     }
 
     #[test]
@@ -547,11 +504,11 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_scan_exec_with_partial_err() {
-        let exec = make_remote_exec();
-        let new_err = Arc::new(parking_lot::Mutex::new("pre-set".to_string()));
-        let exec = exec.with_partial_err(new_err.clone());
-        assert_eq!(*exec.partial_err().lock(), "pre-set");
+    fn test_remote_scan_exec_with_state() {
+        let state = RemoteScanState::default();
+        *state.partial_err.lock() = "pre-set".to_string();
+        let exec = make_remote_exec().with_state(state);
+        assert_eq!(*exec.state.partial_err.lock(), "pre-set");
     }
 
     #[test]

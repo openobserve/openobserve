@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    collections::BTreeMap,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use arrow::array::RecordBatch;
@@ -35,7 +38,7 @@ use datafusion::{
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::profile::ProfileNode;
+use crate::profile::{ProfileNode, RemoteNodeProfile};
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
@@ -168,17 +171,23 @@ pub enum NodeRole {
     /// Scans the data itself.
     Follower,
     /// A super cluster's cluster leader, which passes the query on to its own followers.
-    ClusterLeader(RemoteScanRefs),
+    ClusterLeader(RemoteScanState),
 }
 
-/// What a cluster leader's remote scan collects from the followers it calls.
-pub struct RemoteScanRefs {
+/// Per-partition profiles of one remote scan, keyed by partition.
+pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
+
+/// What a remote scan collects from the nodes it calls, shared by every copy of the scan.
+#[derive(Debug, Clone, Default)]
+pub struct RemoteScanState {
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub peak_memory: Arc<AtomicUsize>,
     pub partial_err: Arc<Mutex<String>>,
+    /// Filled only for EXPLAIN ANALYZE.
+    pub node_profiles: NodeProfiles,
 }
 
-impl RemoteScanRefs {
+impl RemoteScanState {
     fn partial_err(&self) -> Option<CustomMessage> {
         let err = self.partial_err.lock().clone();
         (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
@@ -278,13 +287,13 @@ mod tests {
 
     #[test]
     fn test_cluster_leader_also_sends_what_its_remote_scan_collected() {
-        let remote = RemoteScanRefs {
+        let remote = RemoteScanState {
             scan_stats: Arc::new(Mutex::new(ScanStats {
                 files: 3,
                 ..Default::default()
             })),
             peak_memory: Arc::new(AtomicUsize::new(7)),
-            partial_err: Arc::new(Mutex::new(String::new())),
+            ..Default::default()
         };
         let partial_err = remote.partial_err.clone();
         let messages = NodeMessages {

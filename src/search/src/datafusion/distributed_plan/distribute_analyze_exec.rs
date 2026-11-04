@@ -39,20 +39,14 @@ use crate::datafusion::distributed_plan::{
     display::DisplayableExecutionPlan, profile::build_profile,
 };
 
-/// query EXPLAIN ANALYZE in distributed mode
-/// the output recordbatch's schema is
-/// phase: current we have three phase
-/// node: the ip or partition id
-/// plan: plan with metrics
-/// profile: the structured profile as JSON on the first row, only when requested
-/// remote rows are rendered from the same profile, one per node that sent back its plan
-#[derive(Debug)]
+/// EXPLAIN ANALYZE across nodes: one text row per node that ran a plan, phase = its depth.
+#[derive(Debug, Clone)]
 pub struct DistributeAnalyzeExec {
     /// Control how much extra to print
     verbose: bool,
     /// If statistics should be displayed
     show_statistics: bool,
-    /// Whether to add the `profile` column
+    /// Adds the `profile` column, the whole profile as JSON on the first row.
     profile: bool,
     /// The input plan (the plan being analyzed)
     pub input: Arc<dyn ExecutionPlan>,
@@ -62,7 +56,6 @@ pub struct DistributeAnalyzeExec {
 }
 
 impl DistributeAnalyzeExec {
-    /// Create a new AnalyzeExec
     pub fn new(
         verbose: bool,
         show_statistics: bool,
@@ -88,6 +81,63 @@ impl DistributeAnalyzeExec {
             schema,
             cache,
         }
+    }
+
+    fn output_batch(
+        &self,
+        profile: &QueryProfile,
+        duration: std::time::Duration,
+    ) -> Result<RecordBatch> {
+        let mut phase_builder = Int32Builder::new();
+        let mut address_builder = StringBuilder::with_capacity(1, 1024);
+        let mut name_builder = StringBuilder::with_capacity(1, 1024);
+        let mut plan_builder = StringBuilder::with_capacity(1, 1024);
+
+        phase_builder.append_value(0);
+        address_builder.append_value(&profile.node_address);
+        name_builder.append_value(&profile.node_name);
+        let annotated_plan = DisplayableExecutionPlan::new(self.input.as_ref())
+            .indent(self.verbose)
+            .to_string();
+        plan_builder.append_value(annotated_plan);
+
+        let mut remote_rows = Vec::new();
+        collect_remote_rows(&profile.plan, 1, &mut remote_rows);
+        for (stage, node, plan) in remote_rows {
+            phase_builder.append_value(stage);
+            address_builder.append_value(&node.node_address);
+            name_builder.append_value(&node.node_name);
+            plan_builder.append_value(plan.to_text());
+        }
+
+        if self.verbose {
+            phase_builder.append_value(0);
+            address_builder.append_value("Output Rows");
+            name_builder.append_value("");
+            plan_builder.append_value(profile.output_rows.to_string());
+
+            phase_builder.append_value(0);
+            address_builder.append_value("Duration");
+            name_builder.append_value("");
+            plan_builder.append_value(format!("{duration:?}"));
+        }
+
+        let rows = phase_builder.len();
+        let mut columns: Vec<ArrayRef> = vec![
+            Arc::new(phase_builder.finish()),
+            Arc::new(address_builder.finish()),
+            Arc::new(name_builder.finish()),
+            Arc::new(plan_builder.finish()),
+        ];
+        if self.profile {
+            let json =
+                serde_json::to_string(profile).map_err(|e| DataFusionError::External(e.into()))?;
+            columns.push(Arc::new(StringArray::from_iter(
+                std::iter::once(Some(json)).chain(std::iter::repeat_n(None, rows - 1)),
+            )));
+        }
+
+        RecordBatch::try_new(Arc::clone(&self.schema), columns).map_err(DataFusionError::from)
     }
 
     /// This function creates the cache object that stores the plan properties such as schema,
@@ -161,11 +211,8 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
         // Create future that computes the final output
         let start = std::time::Instant::now();
-        let captured_input = Arc::clone(&self.input);
-        let captured_schema = Arc::clone(&self.schema);
-        let verbose = self.verbose;
-        let emit_profile = self.profile;
         let start_us = now_micros();
+        let exec = self.clone();
 
         let mut stream = execute_stream(self.input.clone(), context.clone())?;
         let output = async move {
@@ -183,16 +230,9 @@ impl ExecutionPlan for DistributeAnalyzeExec {
                 start_us,
                 end_us: now_micros(),
                 output_rows: total_rows,
-                plan: build_profile(captured_input.as_ref()),
+                plan: build_profile(exec.input.as_ref()),
             };
-            create_output_batch(
-                verbose,
-                emit_profile,
-                &profile,
-                duration,
-                captured_input,
-                captured_schema,
-            )
+            exec.output_batch(&profile, duration)
         };
 
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -200,67 +240,6 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             futures::stream::once(output),
         )))
     }
-}
-
-fn create_output_batch(
-    verbose: bool,
-    emit_profile: bool,
-    profile: &QueryProfile,
-    duration: std::time::Duration,
-    input: Arc<dyn ExecutionPlan>,
-    schema: SchemaRef,
-) -> Result<RecordBatch> {
-    let mut phase_builder = Int32Builder::new();
-    let mut address_builder = StringBuilder::with_capacity(1, 1024);
-    let mut name_builder = StringBuilder::with_capacity(1, 1024);
-    let mut plan_builder = StringBuilder::with_capacity(1, 1024);
-
-    phase_builder.append_value(0); // Phase 0 for the main plan
-    address_builder.append_value(LOCAL_NODE.get_grpc_addr());
-    name_builder.append_value(LOCAL_NODE.get_name());
-
-    let annotated_plan = DisplayableExecutionPlan::new(input.as_ref())
-        .indent(verbose)
-        .to_string();
-    plan_builder.append_value(annotated_plan);
-
-    let mut remote_rows = Vec::new();
-    collect_remote_rows(&profile.plan, 1, &mut remote_rows);
-    for (stage, node, plan) in remote_rows {
-        phase_builder.append_value(stage);
-        address_builder.append_value(&node.node_address);
-        name_builder.append_value(&node.node_name);
-        plan_builder.append_value(plan.to_text());
-    }
-
-    if verbose {
-        phase_builder.append_value(0); // Phase 0 for the main plan
-        address_builder.append_value("Output Rows");
-        name_builder.append_value("");
-        plan_builder.append_value(profile.output_rows.to_string());
-
-        phase_builder.append_value(0); // Phase 0 for the main plan
-        address_builder.append_value("Duration");
-        name_builder.append_value("");
-        plan_builder.append_value(format!("{duration:?}"));
-    }
-
-    let rows = phase_builder.len();
-    let mut columns: Vec<ArrayRef> = vec![
-        Arc::new(phase_builder.finish()),
-        Arc::new(address_builder.finish()),
-        Arc::new(name_builder.finish()),
-        Arc::new(plan_builder.finish()),
-    ];
-    if emit_profile {
-        let json =
-            serde_json::to_string(profile).map_err(|e| DataFusionError::External(e.into()))?;
-        columns.push(Arc::new(StringArray::from_iter(
-            std::iter::once(Some(json)).chain(std::iter::repeat_n(None, rows - 1)),
-        )));
-    }
-
-    RecordBatch::try_new(schema, columns).map_err(DataFusionError::from)
 }
 
 /// Lists, depth first, each remote node that sent back its plan, with its stage below the leader.

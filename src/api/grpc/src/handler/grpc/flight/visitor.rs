@@ -19,7 +19,7 @@ use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion},
     physical_plan::ExecutionPlan,
 };
-use flight::common::{NodeRole, RemoteScanRefs};
+use flight::common::NodeRole;
 use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
 pub use search::datafusion::plan_metrics::get_peak_memory_from_ctx;
 
@@ -30,11 +30,7 @@ pub fn node_role(plan: &Arc<dyn ExecutionPlan>) -> NodeRole {
         let Some(remote_scan) = node.downcast_ref::<RemoteScanExec>() else {
             return Ok(TreeNodeRecursion::Continue);
         };
-        role = NodeRole::ClusterLeader(RemoteScanRefs {
-            scan_stats: remote_scan.scan_stats(),
-            peak_memory: remote_scan.peak_memory(),
-            partial_err: remote_scan.partial_err(),
-        });
+        role = NodeRole::ClusterLeader(remote_scan.state.clone());
         Ok(TreeNodeRecursion::Stop)
     });
     role

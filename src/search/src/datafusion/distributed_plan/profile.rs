@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::fmt;
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
@@ -24,15 +24,11 @@ use datafusion::physical_plan::{
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
-    common::{Metrics, RemoteScanMetrics},
+    common::{Metrics, NodeProfiles, RemoteScanMetrics},
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
-use parking_lot::Mutex;
 
 use super::remote_scan_exec::RemoteScanExec;
-
-/// Per-partition profiles of one remote scan, keyed by partition.
-pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
 
 /// One remote node as the leader sees it, published to its scan on drop; the default records
 /// nothing.
@@ -95,8 +91,6 @@ impl Drop for NodeProfileRecorder {
     }
 }
 
-/// Profile of an executed plan; a remote scan carries its nodes' plans, as its local children never
-/// ran.
 /// A plan node's own line, exactly as EXPLAIN prints it.
 struct PlanDetail<'a>(&'a dyn ExecutionPlan);
 
@@ -106,11 +100,18 @@ impl fmt::Display for PlanDetail<'_> {
     }
 }
 
+/// Profile of an executed plan; a remote scan lists the nodes it called, as its children never ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let inputs = match plan.downcast_ref::<RemoteScanExec>() {
-        Some(remote) => {
-            ProfileInputs::Remote(remote.node_profiles.lock().values().cloned().collect())
-        }
+        Some(remote) => ProfileInputs::Remote(
+            remote
+                .state
+                .node_profiles
+                .lock()
+                .values()
+                .cloned()
+                .collect(),
+        ),
         None => ProfileInputs::Children(
             plan.children()
                 .into_iter()
@@ -130,7 +131,6 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// One entry per metric name in first-seen order, so related metrics stay adjacent.
 /// Aggregates and orders the metrics the same way the text plan does, so `display` matches it.
 fn convert_metrics(metrics: &MetricsSet) -> Vec<ProfileMetric> {
     metrics
@@ -138,24 +138,23 @@ fn convert_metrics(metrics: &MetricsSet) -> Vec<ProfileMetric> {
         .sorted_for_display()
         .timestamps_removed()
         .iter()
-        .filter_map(|metric| {
+        .map(|metric| {
             let value = metric.value();
-            let (kind, number, total) = metric_value(value)?;
-            Some(ProfileMetric {
+            let (kind, number, total) = metric_value(value);
+            ProfileMetric {
                 name: value.name().to_string(),
                 kind,
                 value: number,
                 total,
                 display: value.to_string(),
-            })
+            }
         })
         .collect()
 }
 
-fn metric_value(value: &MetricValue) -> Option<(MetricKind, u64, Option<u64>)> {
+fn metric_value(value: &MetricValue) -> (MetricKind, u64, Option<u64>) {
     let as_u64 = |v: usize| v as u64;
-    Some(match value {
-        MetricValue::StartTimestamp(_) | MetricValue::EndTimestamp(_) => return None,
+    match value {
         MetricValue::OutputRows(c)
         | MetricValue::SpillCount(c)
         | MetricValue::OutputBatches(c)
@@ -183,8 +182,11 @@ fn metric_value(value: &MetricValue) -> Option<(MetricKind, u64, Option<u64>)> {
             as_u64(ratio_metrics.part()),
             Some(as_u64(ratio_metrics.total())),
         ),
-        MetricValue::Custom { .. } => (MetricKind::Other, as_u64(value.as_usize()), None),
-    })
+        // Timestamps never get here: convert_metrics removes them first.
+        MetricValue::Custom { .. }
+        | MetricValue::StartTimestamp(_)
+        | MetricValue::EndTimestamp(_) => (MetricKind::Other, as_u64(value.as_usize()), None),
+    }
 }
 
 #[cfg(test)]
@@ -364,7 +366,7 @@ mod tests {
         };
         let remote = RemoteScanExec::new(empty(), node).unwrap();
         drop(NodeProfileRecorder::start(
-            remote.node_profiles.clone(),
+            remote.state.node_profiles.clone(),
             0,
             &TestNode,
         ));
