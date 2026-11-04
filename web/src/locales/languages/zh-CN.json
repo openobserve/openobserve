@@ -25599,6 +25599,8 @@
     "noteAdded": "备注已添加",
     "addNoteFailed": "无法添加备注",
     "activitySendNote": "发送备注",
+    "activityShowMore": "显示更多",
+    "activityShowLess": "收起",
     "activityScrollToTop": "滚动到顶部",
     "activityScrollToBottom": "滚动到底部",
     "activityNotedPrefix": "已备注",

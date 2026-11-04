@@ -25599,6 +25599,8 @@
     "noteAdded": "Nota adicionada",
     "addNoteFailed": "Não foi possível adicionar a nota",
     "activitySendNote": "Enviar nota",
+    "activityShowMore": "Mostrar mais",
+    "activityShowLess": "Mostrar menos",
     "activityScrollToTop": "Deslocar para o topo",
     "activityScrollToBottom": "Deslocar para o fim",
     "activityNotedPrefix": "anotou",

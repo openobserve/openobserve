@@ -25599,6 +25599,8 @@
     "noteAdded": "Not eklendi",
     "addNoteFailed": "Not eklenemedi",
     "activitySendNote": "Notu gönder",
+    "activityShowMore": "Daha fazla göster",
+    "activityShowLess": "Daha az göster",
     "activityScrollToTop": "En üste git",
     "activityScrollToBottom": "En alta git",
     "activityNotedPrefix": "not ekledi",

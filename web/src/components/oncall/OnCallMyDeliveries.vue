@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- What has been sent to the reader: the open pages that still need them, then the history grouped by alert. -->
 <template>
-  <div class="flex flex-col gap-5" data-test="oncall-my-deliveries">
+  <div
+    class="flex min-h-0 flex-col gap-5 max-xl:flex-none xl:flex-1"
+    data-test="oncall-my-deliveries"
+  >
     <OEmptyState
       v-if="loadError !== null"
       size="inline"
@@ -31,22 +34,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <section
         v-if="openRows.length"
-        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border xl:max-h-1/2 xl:min-h-0"
         data-test="oncall-my-needs-you"
       >
-        <div class="flex min-h-12 items-center px-4 py-2">
+        <div class="flex min-h-12 shrink-0 items-center px-4 py-2">
           <OText variant="card-title" as="h2">{{ t("oncall.myNeedsYouTitle") }}</OText>
         </div>
+        <!-- Basis auto, not 0: the card is sized by its rows up to its cap, so a zero basis would collapse it. -->
         <OTable
+          class="xl:min-h-0 xl:flex-auto"
           :data="openRows"
           :columns="openColumns"
           row-key="response_id"
           :frame="false"
           :show-global-filter="false"
-          pagination="none"
+          :pagination="openRows.length > openPageSize ? 'client' : 'none'"
+          :page-size="openPageSize"
+          :current-page="openPage"
           table-id="oncall-my-needs-you"
           data-test="oncall-my-needs-you-table"
-          @row-click="openPage"
+          @row-click="openResponse"
+          @update:current-page="openPage = $event"
+          @update:page-size="openPageSize = $event"
         >
           <template #cell-priority="{ row }">
             <OTag type="alertPriority" :value="`p${row.priority}`" size="sm" />
@@ -95,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section
-        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border xl:min-h-0 xl:flex-1"
         data-test="oncall-my-history"
       >
-        <div class="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
+        <div class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
           <OText variant="card-title" as="h2">{{ t("oncall.myHistoryTitle") }}</OText>
           <OTag
             v-if="unread"
@@ -137,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           v-if="historyRows.length || loading"
           ref="oTableRef"
+          class="xl:min-h-0 xl:flex-1"
           :data="historyRows"
           :columns="historyColumns"
           row-key="key"
@@ -149,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           table-id="oncall-my-deliveries"
           data-test="oncall-my-deliveries-table"
-          @row-click="(row: HistoryRow) => openPage(row.latest)"
+          @row-click="(row: HistoryRow) => openResponse(row.latest)"
           @update:current-page="currentPage = $event"
           @update:page-size="pageSize = $event"
         >
@@ -372,20 +382,24 @@ const savedView = useListViewState("oncall-my-deliveries", {
   unreadOnly: false,
   currentPage: 1,
   pageSize: 20,
+  openPageSize: 20,
 });
 const unreadOnly = ref(savedView.unreadOnly);
 const currentPage = ref(savedView.currentPage);
 const pageSize = ref(savedView.pageSize);
 const oTableRef = ref<any>(null);
+const openPage = ref(1);
+const openPageSize = ref(savedView.openPageSize);
 
 watch(unreadOnly, () => {
   currentPage.value = 1;
 });
-watch([unreadOnly, currentPage, pageSize], () => {
+watch([unreadOnly, currentPage, pageSize, openPageSize], () => {
   Object.assign(savedView, {
     unreadOnly: unreadOnly.value,
     currentPage: currentPage.value,
     pageSize: pageSize.value,
+    openPageSize: openPageSize.value,
   });
 });
 // The inbox loads after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
@@ -627,7 +641,7 @@ async function acknowledge(row: MyDelivery) {
   }
 }
 
-function openPage(row: MyDelivery) {
+function openResponse(row: MyDelivery) {
   router.push({
     name: "onCallResponseDetail",
     params: { responseId: row.response_id },

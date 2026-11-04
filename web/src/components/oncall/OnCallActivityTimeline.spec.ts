@@ -162,4 +162,63 @@ describe("OnCallActivityTimeline", () => {
     expect(text).toContain("14:37");
     expect(text).toContain("14:39 · +2m");
   });
+  /// The agent's paragraph is held to three lines with a way to read the rest; generated lines are not.
+  it("clamps the AI verdict line and leaves the other lines whole", async () => {
+    const verdict: OnCallResponseEvent = {
+      kind: "ai_verdict",
+      at: OPENED + 300_000_000,
+      actor: "o2-sre",
+      body: "The alert fired because the test stream carries synthetic data. ".repeat(8),
+    };
+    const wrapper = mount(OnCallActivityTimeline, {
+      props: { events: [...events, verdict], commentText: "", openedAt: OPENED },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    const clamped = wrapper.findAll('[data-test="oncall-clamped-text-body"]');
+    expect(clamped).toHaveLength(1);
+    expect(clamped[0].text()).toContain("synthetic data");
+    expect(clamped[0].classes()).toContain("line-clamp-3");
+  });
+
+  describe("pinned feed", () => {
+    const at = (n: number): OnCallResponseEvent => ({
+      kind: "note",
+      at: OPENED + n * 1_000_000,
+      actor: "ana@o2.ai",
+      body: `note ${n}`,
+    });
+    async function pinned() {
+      const wrapper = mount(OnCallActivityTimeline, {
+        props: { events: [at(1)], commentText: "", openedAt: OPENED, pinComposer: true },
+        global: { plugins: [i18n, store] },
+      });
+      await flushPromises();
+      const feed = wrapper.find(".overflow-y-auto").element as HTMLElement;
+      Object.defineProperty(feed, "scrollHeight", { configurable: true, value: 1000 });
+      Object.defineProperty(feed, "clientHeight", { configurable: true, value: 200 });
+      return { wrapper, feed };
+    }
+
+    it("follows a new event when the reader is at the newest line", async () => {
+      const { wrapper, feed } = await pinned();
+      feed.scrollTop = 800;
+      feed.dispatchEvent(new Event("scroll"));
+      await wrapper.setProps({ events: [at(1), at(2)] });
+      await flushPromises();
+
+      expect(feed.scrollTop).toBe(1000);
+    });
+
+    it("leaves a reader scrolled up into the history where they are", async () => {
+      const { wrapper, feed } = await pinned();
+      feed.scrollTop = 100;
+      feed.dispatchEvent(new Event("scroll"));
+      await wrapper.setProps({ events: [at(1), at(2)] });
+      await flushPromises();
+
+      expect(feed.scrollTop).toBe(100);
+    });
+  });
 });

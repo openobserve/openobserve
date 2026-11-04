@@ -592,6 +592,59 @@ describe("OnCallMyDeliveries", () => {
     );
   });
 
+  describe("needs you pager", () => {
+    const open = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        delivery({ event_id: `ev_${i}`, response_id: `resp_${i}`, at: AT + i }),
+      );
+    const needsYou = (wrapper: ReturnType<typeof render>) =>
+      wrapper.findComponent('[data-test="oncall-my-needs-you-table"]');
+
+    it("hides the pager while every open page fits", async () => {
+      answer(open(20));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(needsYou(wrapper).attributes("pagination")).toBe("none");
+    });
+
+    it("pages the open pages once they outgrow one page", async () => {
+      answer(open(21));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(needsYou(wrapper).attributes("pagination")).toBe("client");
+      expect(needsYou(wrapper).props("pageSize")).toBe(20);
+    });
+
+    it("keeps the chosen page size for the next visit", async () => {
+      answer(open(21));
+      const wrapper = render();
+      await flushPromises();
+      needsYou(wrapper).vm.$emit("update:pageSize", 50);
+      await flushPromises();
+
+      const saved = useListViewState("oncall-my-deliveries", {}) as Record<string, unknown>;
+      expect(saved.openPageSize).toBe(50);
+    });
+
+    it("pages through the open pages in the real table", async () => {
+      answer(open(25));
+      const { OTable: _table, ...rest } = stubs;
+      const wrapper = mount(OnCallMyDeliveries, {
+        global: { plugins: [i18n, store], stubs: rest },
+      });
+      await flushPromises();
+
+      const card = wrapper.find('[data-test="oncall-my-needs-you"]');
+      expect(card.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
+      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/1\D+20\D+25/);
+      await card.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+      await flushPromises();
+      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/21\D+25\D+25/);
+    });
+  });
+
   describe("list view state", () => {
     const defaults = { unreadOnly: false, currentPage: 1, pageSize: 20 };
 

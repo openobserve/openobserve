@@ -25599,6 +25599,8 @@
     "noteAdded": "메모가 추가되었습니다",
     "addNoteFailed": "메모를 추가하지 못했습니다",
     "activitySendNote": "메모 보내기",
+    "activityShowMore": "더 보기",
+    "activityShowLess": "간단히 보기",
     "activityScrollToTop": "맨 위로 이동",
     "activityScrollToBottom": "맨 아래로 이동",
     "activityNotedPrefix": "메모 남김",

@@ -25594,6 +25594,8 @@
     "noteAdded": "備註已新增",
     "addNoteFailed": "無法新增備註",
     "activitySendNote": "傳送備註",
+    "activityShowMore": "顯示更多",
+    "activityShowLess": "收合",
     "activityScrollToTop": "捲動至頂端",
     "activityScrollToBottom": "捲動至底部",
     "activityNotedPrefix": "已備註",

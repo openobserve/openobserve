@@ -25599,6 +25599,8 @@
     "noteAdded": "Đã thêm ghi chú",
     "addNoteFailed": "Không thể thêm ghi chú",
     "activitySendNote": "Gửi ghi chú",
+    "activityShowMore": "Xem thêm",
+    "activityShowLess": "Thu gọn",
     "activityScrollToTop": "Cuộn lên đầu",
     "activityScrollToBottom": "Cuộn xuống cuối",
     "activityNotedPrefix": "đã ghi chú",

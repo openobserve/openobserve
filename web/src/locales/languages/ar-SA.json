@@ -25599,6 +25599,8 @@
     "noteAdded": "تمت إضافة الملاحظة",
     "addNoteFailed": "تعذر إضافة الملاحظة",
     "activitySendNote": "إرسال ملاحظة",
+    "activityShowMore": "عرض المزيد",
+    "activityShowLess": "عرض أقل",
     "activityScrollToTop": "التمرير إلى الأعلى",
     "activityScrollToBottom": "التمرير إلى الأسفل",
     "activityNotedPrefix": "دوّن",

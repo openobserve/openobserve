@@ -108,7 +108,7 @@ const stubs = {
     // `title-trail` carries the state tags and `subtitle` the team/firing/
     // opened line, both of which are assertions of their own.
     template:
-      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
+      "<div><div data-test='stub-subtitle'><slot name='subtitle' /></div><div data-test='stub-title-trail'><slot name='title-trail' /></div><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
   },
   OTooltip: {
     name: "OTooltip",
@@ -631,6 +631,39 @@ describe("OnCallResponseDetail", () => {
     expect(acked.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("ana@acme.io");
   });
 
+  /// A long ladder line beside the title ran under the header actions, so it reads on the subtitle line.
+  it("says how far the page has climbed on the subtitle line, not beside the title", async () => {
+    const wrapper = await renderWith();
+    const phrase = wrapper.find('[data-test="stub-subtitle"] [data-test="oncall-response-phrase"]');
+    expect(phrase.exists()).toBe(true);
+    expect(phrase.classes()).toContain("min-w-0");
+    expect(
+      wrapper.find('[data-test="stub-title-trail"] [data-test="oncall-response-phrase"]').exists(),
+    ).toBe(false);
+  });
+
+  /// The title row holds only state and priority; an exhausted ladder is said in words on the subtitle line.
+  it("says nobody answered on the subtitle line, not as a chip beside the title", async () => {
+    service.escalationProgress.mockResolvedValue({
+      data: {
+        fired: [{ after_micros: 0, at: 1, targets: ["ana@acme.io"], reached: ["ana@acme.io"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+      },
+    } as any);
+    const wrapper = await renderWith();
+    const words = wrapper.find(
+      '[data-test="stub-subtitle"] [data-test="oncall-response-phrase-exhausted"]',
+    );
+    expect(words.text()).toContain("Nobody answered");
+    const trail = wrapper.find('[data-test="stub-title-trail"]');
+    expect(trail.findAllComponents({ name: "OTag" })).toHaveLength(2);
+    expect(trail.find('[data-test="oncall-response-title-trail"]').classes()).toContain(
+      "overflow-hidden",
+    );
+  });
+
   describe("an Unacknowledge the server cannot apply", () => {
     const held = () => ({
       state: "acknowledged",
@@ -1048,8 +1081,7 @@ describe("OnCallResponseDetail", () => {
       });
 
       const tag = wrapper.find('[data-test="oncall-response-liaison-tag"]');
-      const tooltip = tag.element.nextElementSibling;
-      expect(tooltip?.textContent).toContain("one chase");
+      expect(tag.text()).toContain("one chase");
     });
 
     it("leaves an owner record with no liaison language at all", async () => {

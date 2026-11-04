@@ -30,10 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-activity-people"
     @pointerover="onPointerOver"
     @pointerout="onPointerOut"
+    @scroll.capture="onFeedScroll"
   >
+    <!-- Pinned: from lg the host gives the feed the panel's height and it scrolls inside; below lg the page scrolls and the note box sticks to its foot. -->
     <ActivityTimeline
       ref="timelineRef"
-      :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
+      :class="pinComposer ? 'lg:min-h-0 lg:flex-1' : ''"
+      :composer-class="
+        pinComposer
+          ? 'max-lg:bg-surface-base max-lg:sticky max-lg:bottom-0 max-lg:z-10 max-lg:pb-2'
+          : ''
+      "
       :events="visibleEvents"
       :submitting="submitting"
       :show-scroll-buttons="showScrollButtons"
@@ -61,8 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test-scroll-bottom="oncall-response-activity-scroll-bottom"
       data-test-comment-input="oncall-response-note-input"
       data-test-comment-send="oncall-response-note-submit"
-      @submit="$emit('submit')"
-    />
+      @submit="onSubmit"
+    >
+      <template #inline-text="{ event, html }">
+        <OnCallClampedText v-if="CLAMPED_KINDS.includes(event.kind)" :html="html" />
+        <span v-else class="text-text-body text-sm" v-html="html" />
+      </template>
+    </ActivityTimeline>
     <OTooltip
       :anchor="personAnchor"
       :open="!!personAnchor"
@@ -78,6 +90,7 @@ import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OnCallClampedText from "@/components/oncall/OnCallClampedText.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -139,6 +152,8 @@ const { nameOf } = useOrgUserNames();
 const currentUserId = computed(() => nameOf(String(store.state.userInfo?.email ?? "")) || "User");
 
 const HUMAN_KINDS: ResponseEventKind[] = ["ack", "handoff", "note"];
+/// The agent's free text runs to a paragraph; every other line is one generated sentence.
+const CLAMPED_KINDS: ResponseEventKind[] = ["ai_verdict", "rca"];
 
 const visibleEvents = computed(() => {
   const merged = mergeTimelineEvents(props.events);
@@ -156,11 +171,25 @@ const formatRelativeTime = (at: number): string =>
 
 const timelineRef = ref<{ scrollToBottom: () => void } | null>(null);
 
-// Chat order: the newest line sits just above the note box, so a pinned feed opens scrolled to it.
+// Chat order: the newest line sits just above the note box; a reader scrolled up into the history stays where they are.
+const followNewest = ref(true);
+const BOTTOM_SLACK = 8;
+
+function onFeedScroll(e: Event) {
+  const el = e.target;
+  if (!(el instanceof HTMLElement)) return;
+  followNewest.value = el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_SLACK;
+}
+
+function onSubmit() {
+  followNewest.value = true;
+  emit("submit");
+}
+
 watch(
   () => visibleEvents.value.length,
   async () => {
-    if (!props.pinComposer) return;
+    if (!props.pinComposer || !followNewest.value) return;
     await nextTick();
     timelineRef.value?.scrollToBottom();
   },

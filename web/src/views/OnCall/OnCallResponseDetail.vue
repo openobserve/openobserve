@@ -75,27 +75,25 @@
             </template>
           </i18n-t>
         </OTruncatedText>
-      </span>
-    </template>
-
-    <!-- The two facts a responder needs before anything else ride the title,
-         rather than sitting in a metadata grid below the fold. -->
-    <template #title-trail>
-      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
-      <template v-if="response && lgUp">
-        <!-- The title is the one that ellipsises; the state facts beside it never shrink under it. -->
-        <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
-          <OTag type="oncallResponseState" :value="response.state" size="sm" />
-          <OTooltip v-if="closedAfter" :content="closedAfter" />
-        </span>
-        <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <!-- A closed page's state tag already says it, and an acknowledged one names its holder in the subtitle. -->
+        <!-- A closed page's state tag already says it, and an acknowledged one names its holder just before. -->
         <span
-          v-if="isOpenState && response.state !== 'acknowledged'"
-          class="shrink-0"
+          v-if="lgUp && isOpenState && response.state !== 'acknowledged'"
+          class="flex min-w-0 shrink-[100] items-center gap-1"
           data-test="oncall-response-phrase"
         >
+          <span v-if="headerPhraseKind !== 'unknown'" class="shrink-0">{{ raw("·") }}</span>
+          <!-- Words, not the list's chip: the title row keeps only state and priority. -->
+          <OTruncatedText
+            v-if="headerPhraseKind === 'nobodyAnswered'"
+            class="text-status-error-text min-w-0"
+            :tooltip="t('oncall.ladderExhausted')"
+            data-test="oncall-response-phrase-exhausted"
+          >
+            {{ t("oncall.state_exhausted") }}
+          </OTruncatedText>
           <OnCallEscalationCell
+            v-else
+            class="min-w-0"
             :response-id="response.id"
             :record="response"
             :progress="escalation"
@@ -104,18 +102,34 @@
             :reached-step="headerReachedStep"
           />
         </span>
-        <!-- Why this team is looking at somebody else's outage, said where the
-             state is said rather than halfway down the page. -->
-        <OTag
-          v-if="isImpacted"
-          class="shrink-0"
-          variant="info-outline"
-          size="sm"
+        <!-- Why this team is looking at somebody else's outage, said with the page's other facts. -->
+        <span
+          v-if="lgUp && isImpacted"
+          class="text-status-info-text inline-flex shrink-[100] items-center gap-1 truncate"
           data-test="oncall-response-liaison-tag"
         >
-          {{ t("oncall.liaisonTag") }}
-        </OTag>
-        <OTooltip v-if="isImpacted" side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+          {{ raw("·") }} {{ t("oncall.liaisonTag") }}
+          <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+        </span>
+      </span>
+    </template>
+
+    <!-- The two facts a responder needs before anything else ride the title,
+         rather than sitting in a metadata grid below the fold. -->
+    <template #title-trail>
+      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
+      <template v-if="response && lgUp">
+        <!-- The title ellipsises first; clipping here means the chips can never paint under the actions. -->
+        <span
+          class="flex min-w-0 shrink-[0.01] items-center gap-3.25 overflow-hidden"
+          data-test="oncall-response-title-trail"
+        >
+          <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
+          <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        </span>
       </template>
     </template>
 
@@ -212,7 +226,7 @@
         </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canSnooze && lgUp">
+        <ODropdown v-if="canSnooze && inlineVerbs">
           <template #trigger>
             <OButton
               variant="outline"
@@ -236,7 +250,7 @@
         </ODropdown>
 
         <!-- Not on an unrouted page: the server refuses it there, and Hand off is the next step. -->
-        <span v-if="lgUp && canEscalate" class="inline-flex">
+        <span v-if="inlineVerbs && canEscalate" class="inline-flex">
           <OButton
             variant="outline"
             size="sm"
@@ -251,7 +265,7 @@
         </span>
 
         <OButton
-          v-if="lgUp"
+          v-if="inlineVerbs"
           variant="outline"
           size="sm"
           data-test="oncall-response-handoff-btn"
@@ -268,7 +282,7 @@
            something larger routinely arrives after it was closed. Hidden once
            an incident exists, because the rail links to it from then on. -->
       <OButton
-        v-if="response && !response.incident_id && lgUp"
+        v-if="response && !response.incident_id && inlineVerbs"
         variant="outline"
         size="sm"
         data-test="oncall-response-promote-btn"
@@ -304,8 +318,8 @@
         </OButton>
       </template>
 
-      <!-- Below lg the row holds claiming and closing; the verbs used less often share one menu so the header stays two rows. -->
-      <ODropdown v-if="response && !lgUp && hasMoreActions" side="bottom" align="end">
+      <!-- Until the row has room beside a readable title it holds claiming and closing; the verbs used less often share one menu. -->
+      <ODropdown v-if="response && !inlineVerbs && hasMoreActions" side="bottom" align="end">
         <template #trigger>
           <OButton
             variant="outline"
@@ -358,11 +372,8 @@
     </template>
 
     <template v-if="response">
-      <!-- OPageLayout keeps the body a fixed column (`scroll` off) so a table
-           can own its own scroller. This page is a document, so the body is
-           the scroller — without it the activity thread was clipped at the
-           fold with no way to reach the rest. -->
-      <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <!-- From lg the panels scroll inside and the page never does, so the note box stays on screen; below lg the body is the scroller. -->
+      <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
         <div
           v-if="!lgUp"
           class="mb-3 flex flex-wrap items-center gap-2"
@@ -482,19 +493,26 @@
           data-test="oncall-response-stats"
         />
 
-        <div class="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
-          <div class="flex flex-col gap-4 lg:col-span-2">
+        <div
+          class="grid flex-1 grid-cols-1 gap-4 lg:min-h-0 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)]"
+        >
+          <div class="flex flex-col gap-4 lg:col-span-2 lg:min-h-0">
             <!-- Renders nothing until a verdict event exists (§G.7) — the
                  default deployment has no agent and must not show an
                  analysis panel that sits empty forever. -->
-            <OnCallVerdictCard :events="events" />
+            <OnCallVerdictCard class="shrink-0" :events="events" />
 
-            <OCard variant="glass" data-test="oncall-response-tabs">
-              <OCardSection role="body" dense>
-                <OTabPanels v-model="activeDetailTab">
-                  <OTabPanel name="activity">
-                    <div data-test="oncall-response-activity">
-                      <div v-if="systemActivityCount" class="flex justify-end pt-2">
+            <!-- Visible below lg so the note box can stick to the scrolling body's foot. -->
+            <OCard
+              variant="glass"
+              class="max-lg:overflow-visible lg:min-h-0 lg:flex-1"
+              data-test="oncall-response-tabs"
+            >
+              <OCardSection role="body" dense class="flex flex-col">
+                <OTabPanels v-model="activeDetailTab" class="flex min-h-0 flex-1 flex-col">
+                  <OTabPanel name="activity" content-class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex min-h-0 flex-1 flex-col" data-test="oncall-response-activity">
+                      <div v-if="systemActivityCount" class="flex shrink-0 justify-end pt-2">
                         <OButton
                           variant="ghost"
                           size="sm"
@@ -533,7 +551,10 @@
                   </OTabPanel>
 
                   <!-- The receipt behind the ladder's claims. -->
-                  <OTabPanel name="deliveries">
+                  <OTabPanel
+                    name="deliveries"
+                    content-class="lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+                  >
                     <div data-test="oncall-response-deliveries">
                       <OnCallDeliveryLedger
                         :records="deliveries"
@@ -544,7 +565,7 @@
                   </OTabPanel>
 
                   <!-- The history behind the rail's one-line summary. -->
-                  <OTabPanel name="causes">
+                  <OTabPanel name="causes" content-class="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                     <div data-test="oncall-response-causes">
                       <OnCallPriorCauses
                         :groups="priorCauses"
@@ -561,7 +582,7 @@
                   </OTabPanel>
 
                   <!-- The working behind the verdict card's one sentence. -->
-                  <OTabPanel name="report">
+                  <OTabPanel name="report" content-class="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                     <div data-test="oncall-response-report">
                       <OnCallReportCard :report="report" :loading="reportLoading" />
                     </div>
@@ -571,7 +592,7 @@
             </OCard>
           </div>
 
-          <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto">
             <!-- An unrouted page has no rotation to read, so there is no one to list. -->
             <OnCallWhoIsOn
               v-if="response.team_id"
@@ -932,6 +953,7 @@ import {
   isUnresolved,
   formatOnCallInstant,
   isDeletedTeam,
+  pagePhrase,
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
@@ -942,10 +964,21 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
+// Every verb inline takes about 56rem, which below this leaves the title a few letters wide.
+const INLINE_VERBS_QUERY = "(min-width: 96rem)";
 
 const { t } = useI18nTyped();
 const { nameOf, tooltipOf } = useOrgUserNames();
 const { lgUp } = useBreakpoint();
+const inlineVerbsMql =
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(INLINE_VERBS_QUERY)
+    : null;
+const wideHeader = ref(inlineVerbsMql?.matches ?? true);
+const onWideHeader = (e: MediaQueryListEvent) => (wideHeader.value = e.matches);
+inlineVerbsMql?.addEventListener?.("change", onWideHeader);
+onBeforeUnmount(() => inlineVerbsMql?.removeEventListener?.("change", onWideHeader));
+const inlineVerbs = computed(() => lgUp.value && wideHeader.value);
 const nowMicros = useOnCallClock();
 const store = useStore();
 const route = useRoute();
@@ -1218,6 +1251,20 @@ const headerReachedStep = computed(() =>
     policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps,
     response.value?.reached_rung_micros,
   ),
+);
+
+/// The subtitle's separator waits for a phrase, so an unanswered ladder leaves no dangling dot.
+const headerPhraseKind = computed(() =>
+  response.value
+    ? pagePhrase({
+        record: response.value,
+        progress: escalation.value,
+        progressLoaded: escalationLoaded.value,
+        totalRungs: totalRungs.value,
+        reachedStep: headerReachedStep.value,
+        nowMicros: nowMicros.value,
+      }).kind
+    : "unknown",
 );
 
 // The same progress decides the header tag; the time is the last step's, which the record's flag lags.

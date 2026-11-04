@@ -25599,6 +25599,8 @@
     "noteAdded": "メモを追加しました",
     "addNoteFailed": "メモを追加できませんでした",
     "activitySendNote": "メモを送信",
+    "activityShowMore": "さらに表示",
+    "activityShowLess": "表示を減らす",
     "activityScrollToTop": "最上部へスクロール",
     "activityScrollToBottom": "最下部へスクロール",
     "activityNotedPrefix": "メモを追加しました",
