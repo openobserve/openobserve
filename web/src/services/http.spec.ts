@@ -349,3 +349,46 @@ describe("403 handling", () => {
     },
   );
 });
+
+describe("401 handling", () => {
+  let onRejected: (error: any) => Promise<any>;
+  const unauthorized = (requestConfig: Record<string, unknown>) => ({
+    response: { status: 401, data: {} },
+    request: { responseURL: "http://localhost:5080/api/acme/s/_json" },
+    config: { url: "/api/acme/s/_json", ...requestConfig },
+  });
+
+  beforeEach(() => {
+    vi.mocked(store.dispatch).mockClear();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
+      },
+    } as any);
+    http();
+  });
+
+  afterEach(() => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+  });
+
+  it.each([
+    ["self-hosted", () => {}],
+    ["cloud", () => ((config as any).isCloud = "true")],
+    [
+      "enterprise SSO",
+      () => {
+        (config as any).isEnterprise = "true";
+        (store.state as any).zoConfig.sso_enabled = true;
+      },
+    ],
+  ])("on %s, keeps the session when the request's own credential is refused", async (_, setUp) => {
+    setUp();
+    const error = unauthorized({ keepSessionOn401: true });
+    await expect(onRejected(error)).rejects.toBe(error);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+});

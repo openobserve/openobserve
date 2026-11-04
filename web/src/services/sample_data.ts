@@ -39,6 +39,9 @@ const ingestAuth = async (org: string) => {
   return { Authorization: `Basic ${b64EncodeStandard(`${name}:${secret}`)}` };
 };
 
+// a refused ingest credential fails the load; it says nothing about the signed-in session
+const keepSession = { keepSessionOn401: true };
+
 export interface SampleDataState {
   status: "none" | "loaded";
   start_time?: number;
@@ -58,9 +61,13 @@ const sampleData = {
     }),
   deleteState: (org: string) => http().delete(`/api/${org}/sample_data`),
   ingestLogs: async (org: string, stream: string, rows: unknown[]) =>
-    http({ headers: await ingestAuth(org) }).post(`/api/${org}/${stream}/_json`, rows),
+    http({ headers: await ingestAuth(org) }).post(`/api/${org}/${stream}/_json`, rows, keepSession),
   ingestMetrics: async (org: string, rows: unknown[]) =>
-    http({ headers: await ingestAuth(org) }).post(`/api/${org}/ingest/metrics/_json`, rows),
+    http({ headers: await ingestAuth(org) }).post(
+      `/api/${org}/ingest/metrics/_json`,
+      rows,
+      keepSession,
+    ),
   ingestTraces: async (org: string, stream: string, payload: unknown) =>
     http({
       headers: {
@@ -68,7 +75,7 @@ const sampleData = {
         "Content-Type": "application/json",
         "stream-name": stream,
       },
-    }).post(`/api/${org}/v1/traces`, payload),
+    }).post(`/api/${org}/v1/traces`, payload, keepSession),
 };
 
 export default sampleData;

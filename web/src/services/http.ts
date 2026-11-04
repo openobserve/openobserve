@@ -33,6 +33,8 @@ declare module "axios" {
     skipAccessToast?: boolean;
     /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
+    /** The request carries its own credential, so a 401 refuses that credential and leaves the session alone. */
+    keepSessionOn401?: boolean;
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
     startedAt?: number;
@@ -137,6 +139,7 @@ const http = ({ headers } = {} as any) => {
           case 400:
             break;
           case 401:
+            if (error.config?.keepSessionOn401) break;
             if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
               expireSession(store);
             }
