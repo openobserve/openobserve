@@ -34,8 +34,7 @@
         </div>
       </template>
 
-      <!-- Name, why this row matters, and the address underneath it. The three
-           badges are mutually exclusive on purpose: a person has one headline. -->
+      <!-- The state badges are mutually exclusive on purpose: a person has one headline. -->
       <template #cell-person="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5 py-1">
           <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -72,8 +71,6 @@
         />
       </template>
 
-      <!-- The bar is the whole point: an uneven rota is invisible as a column
-           of numbers and obvious as a column of bars. -->
       <template #cell-pages="{ row, value }">
         <ODataBarCell
           :value="row.pages"
@@ -127,9 +124,9 @@
           >
             <OTooltip side="bottom" :content="t('oncall.awayMark')" />
           </OButton>
-          <!-- A held slot, so Remove lines up on every row whether or not this one offers Mark away. -->
           <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           <OButton
+            v-if="canConfigure"
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete-outline"
@@ -140,7 +137,7 @@
           >
             <OTooltip side="bottom" :content="t('oncall.removeMember')" />
           </OButton>
-          <ODropdown side="bottom" align="end">
+          <ODropdown v-if="canConfigure || mayMarkAway(row.user_email)" side="bottom" align="end">
             <template #trigger>
               <OButton
                 icon-left="more-vert"
@@ -171,6 +168,7 @@
               <span>{{ t("oncall.awayMark") }}</span>
             </ODropdownItem>
             <ODropdownItem
+              v-if="canConfigure"
               icon-left="delete-outline"
               variant="destructive"
               class="md:hidden"
@@ -188,6 +186,7 @@
           size="hero"
           preset="no-oncall-members"
           :filtered="!!memberFilter"
+          :hide-action="!canConfigure && !memberFilter"
           data-test="oncall-members-empty"
           @action="(id) => (id === 'clear-filters' ? (memberFilter = '') : focusMemberPicker())"
         />
@@ -346,6 +345,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, listInLocale, rotationMembers } from "@/utils/oncall";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -371,7 +371,7 @@ const props = withDefaults(
     reachability?: TeamReachability | null;
     /** Pages carried per person, for the magnitude bars. */
     load?: TeamLoad | null;
-    /** May change on-call configuration. Hides the away actions when false. */
+    /** May change on-call configuration; off hides adding, removing and booking somebody else's absence. */
     canConfigure?: boolean;
   }>(),
   {
@@ -504,14 +504,14 @@ async function removeAbsence(absence: Unavailability) {
     // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.awayRemoveFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.awayRemoveFailed"),
     });
   }
 }
@@ -526,8 +526,6 @@ type MemberState = "on_call" | "next" | "rostered" | "idle";
 interface MemberRow extends OnCallTeamMember {
   /** Display name, or the email when the org has no name on file. */
   name: string;
-  /** Rendered under the name — omitted when the name IS the email. */
-  subtitle: string;
   state: MemberState;
   rotation: string | null;
   away: Unavailability | null;
@@ -573,7 +571,6 @@ const rows = computed<MemberRow[]>(() => {
     return {
       ...m,
       name,
-      subtitle: name === email ? "" : email,
       state,
       rotation,
       away: awayOf(email),
@@ -725,11 +722,10 @@ function openAddDialog() {
   fallbackEmails.value = "";
   addOpen.value = true;
 }
-/** Whichever of OSelect/OInput is currently mounted in the toolbar. Both
- * expose `focus()` (OSelect also opens its dropdown), so the empty state's
- * action can land the cursor there without a dialog of its own. */
 const memberPickerRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null);
+// Every road into the add dialog passes here, so a reader who cannot write members never reaches a form that 403s.
 function focusMemberPicker() {
+  if (!props.canConfigure) return;
   openAddDialog();
   void nextTick(() => memberPickerRef.value?.focus());
 }
@@ -797,8 +793,7 @@ const pendingEmails = computed(() => {
     .filter(Boolean);
 });
 
-/** "Ana Sharma (ana@o2.ai)" when a name exists, the email otherwise. */
-/** Just the name for the table — the email is already on the line below it. */
+/** The display name, or the email when the org has none on file. */
 function nameOf(email: string): string {
   const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
@@ -837,10 +832,11 @@ async function commitMembers(emails: string[]) {
     addOpen.value = false;
     emit("changed");
     await reportPlacement(emails, before);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.addMemberFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.addMemberFailed"),
     });
   } finally {
     adding.value = false;
@@ -946,10 +942,11 @@ async function confirmRemoveMember() {
     await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
     await reportOnCallAfterRemove(member.user_email);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.removeMemberFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.removeMemberFailed"),
     });
   }
 }

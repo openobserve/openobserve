@@ -46,7 +46,6 @@
       />
     </template>
 
-    <!-- On a phone these sit behind one menu, so the team name keeps the title row. -->
     <template #actions-overflow>
       <!-- A cover is a shift handed to a person, so it needs a roster to hand
            it to: on a team with nobody in it this would open on an empty
@@ -76,9 +75,7 @@
 
     <!-- Attached to the header, as on the Incident page; only once there is a team to show. -->
     <template v-if="loaded && !oncallUnavailable && !teamNotFound && !loadError" #header-tabs>
-      <!-- What the team HAS been doing, then the chain that decides it: when each
-             person is on, what happens if nobody answers, what reaches the team at
-             all, and finally who the people are. -->
+      <!-- What the team has been doing first, then the chain that decides it, then who the people are. -->
       <OTabs v-model="activeTab" align="left" class="flex-1" data-test="oncall-team-tabs">
         <OTab
           name="overview"
@@ -86,7 +83,6 @@
           icon="format-list-bulleted"
           data-test="oncall-team-tab-overview"
         />
-        <!-- The default slot drops `label` and `icon`, so these tabs size their icon as the `icon` prop would. -->
         <OTab name="schedule" data-test="oncall-team-tab-schedule">
           <OIcon name="calendar-month" size="sm" class="shrink-0" />
           <span>{{ t("oncall.schedule") }}</span>
@@ -129,7 +125,12 @@
         <OTab name="members" data-test="oncall-team-tab-members">
           <OIcon name="group-work" size="sm" class="shrink-0" />
           <span>{{ t("oncall.members") }}</span>
-          <OTag v-if="memberCount" type="countChip" value="neutral">
+          <OTag
+            v-if="memberCount"
+            type="countChip"
+            value="neutral"
+            data-test="oncall-team-tab-members-count"
+          >
             {{ memberCount }}
           </OTag>
         </OTab>
@@ -174,11 +175,6 @@
     <OnCallTeamDetailSkeleton v-else-if="!loaded" />
 
     <template v-else>
-      <!-- What needs doing about this team, above the tabs that do it. The
-           dry run of a P1 that used to sit here restated the Escalation tab a
-           click away; what survives is the part that names a problem.
-           No OContent wrapper here: with nothing to show, the component
-           renders nothing, and its own inset only applies when it does. -->
       <OnCallTeamAttention
         :risks="configRisks"
         :timezone="team?.timezone ?? 'UTC'"
@@ -190,7 +186,6 @@
         @recheck="recheckInsights"
       />
 
-      <!-- `scroll` alone left the escalation policy clipped, and `grow` alone never shrinks below content without `min-h-0`, which is what lets Covers' `sticky bottom-0` below pin itself. -->
       <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
           <!-- Two blocks in one column. The demo read as a wall: five sortable
@@ -352,7 +347,6 @@
               :can-configure="canConfigure"
               :on-call-now="onCallNow"
               @edit="openPolicyEditor"
-              @open-members="activeTab = 'members'"
               @send-test="testPageOpen = true"
             />
 
@@ -575,6 +569,7 @@ import {
   upcomingShifts,
   winningRule,
 } from "@/utils/oncall";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -842,10 +837,10 @@ async function readForEdit<T>(
   try {
     assign(await read<T>(options, true));
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.editorReadFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.editorReadFailed"),
     });
     return false;
   }
@@ -860,6 +855,10 @@ const refreshScheduleForEdit = () =>
       liveRotationIds: new Set((value?.rotations ?? []).map((rotation) => rotation.id)),
     });
   });
+
+function loadFailureOf(err: unknown): string {
+  return serverMessageOf(err) ?? (err instanceof Error ? err.message : "");
+}
 
 async function fetchAll(force = false) {
   loadError.value = null;
@@ -880,24 +879,24 @@ async function fetchAll(force = false) {
 
   // The org-level list exists in every on-call build regardless of this team id, so only its failure means the feature is unavailable.
   if (teamsSettled.status === "rejected") {
-    const err: any = teamsSettled.reason;
+    const err: unknown = teamsSettled.reason;
     if (isOnCallUnavailable(err)) {
       oncallUnavailable.value = true;
       return;
     }
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
   if (teamSettled.status === "rejected") {
-    const err: any = teamSettled.reason;
+    const err: unknown = teamSettled.reason;
     // The probe above already confirmed on-call is available, so a 404 on this query alone means the team id was deleted.
-    if (err?.response?.status === 404) {
+    if (statusOf(err) === 404) {
       teamNotFound.value = true;
       dropTeamDrafts();
       return;
     }
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
@@ -907,12 +906,12 @@ async function fetchAll(force = false) {
     policySettled.status === "rejected" ||
     onCallSettled.status === "rejected"
   ) {
-    const err: any = (
+    const err: unknown = (
       [memberSettled, scheduleSettled, policySettled, onCallSettled].find(
         (settled) => settled.status === "rejected",
       ) as PromiseRejectedResult
     ).reason;
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
@@ -993,8 +992,7 @@ async function fetchPages(force = false) {
   }
 }
 
-/// Priorities whose ladder wakes nobody — the count the escalation tab badges.
-/// P4–P5 page nobody by default, so only a silent P1–P3 is a finding.
+/// Priorities whose ladder wakes nobody; P4–P5 page nobody by default, so only a silent P1–P3 is a finding.
 const silentPriorities = computed(
   () =>
     (overview.value?.rungs ?? []).filter(
@@ -1080,14 +1078,14 @@ async function sendTestPage() {
         }),
       });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.testPageFailed"),
     });
   }
 }
@@ -1133,12 +1131,12 @@ async function fetchSegments(force = false) {
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (readId !== latestSegmentsRead) return;
     segments.value = [];
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.timelineLoadFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.timelineLoadFailed"),
     });
   } finally {
     if (readId === latestSegmentsRead) segmentsLoading.value = false;
@@ -1209,16 +1207,16 @@ async function deleteRotation() {
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
     dropRotationDrafts({ org: orgId.value, teamId: teamId.value, rotationId: id });
     await onScheduleSaved();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     // The server's own sentence: it refuses a save that would leave two
     // rotations equally in force, and which two is the whole story.
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.laneDeleteFailed"),
     });
   }
 }
@@ -1379,12 +1377,12 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
     await refreshCoverage();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     const reason =
-      err?.response?.status === 403
+      statusOf(err) === 403
         ? t("oncall.configDenied")
-        : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
+        : raw(serverMessageOf(err)) || t("oncall.coverSaveFailed");
     // Nothing was written, so the server's own sentence is the whole story.
     if (!firstId) {
       toast({ variant: "error", message: reason });
@@ -1443,7 +1441,7 @@ async function saveCover(value: {
     // params at all, so a successful save reported " covers  · ".
     toast({ variant: "success", message: coverSavedMessage(value) });
     await refreshCoverage();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     // Two of the server's sentences are worth showing verbatim, and both name
     // the thing that is wrong: a 409 says who already covers that window, and
@@ -1452,9 +1450,9 @@ async function saveCover(value: {
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.coverSaveFailed"),
     });
   } finally {
     coverSaving.value = false;

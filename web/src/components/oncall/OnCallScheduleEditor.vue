@@ -214,7 +214,7 @@
                 <!-- A status icon before the name; the rare actions sit in the trailing menu. -->
                 <OIcon
                   v-if="ruleTabIcon(rule, ruleIndex)"
-                  :name="ruleTabIcon(rule, ruleIndex) as any"
+                  :name="ruleTabIcon(rule, ruleIndex)"
                   size="sm"
                   class="shrink-0"
                   :data-test="`oncall-schedule-rule-tab-icon-${ruleIndex}`"
@@ -459,6 +459,8 @@ import {
   stopChoices,
   stopConsequence,
 } from "@/utils/oncall";
+import { serverMessageOf } from "@/utils/slackLink";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 const props = defineProps<{
   teamId: string;
@@ -911,7 +913,7 @@ function ruleHasProblem(rule: ShiftRule): boolean {
   return !rule.members.length || !!priorityClashFor(rule);
 }
 
-function ruleTabIcon(rule: ShiftRule, index: number): string | undefined {
+function ruleTabIcon(rule: ShiftRule, index: number): IconName | undefined {
   if (ruleHasProblem(rule)) return "error-outline";
   if (ruleUsage(index)?.kind === "never-used") return "warning-amber";
   if (isRetired(rule)) return "pause-circle-filled";
@@ -1150,10 +1152,10 @@ async function save(): Promise<boolean> {
     // The parent's schedule is a ref: invalidation expires it, it never repaints it.
     emit("saved");
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.saveScheduleFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.saveScheduleFailed"),
     });
     return false;
   } finally {

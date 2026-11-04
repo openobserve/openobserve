@@ -14,23 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The AI SRE triage gate, per team (C11 — the l0_json block; I19-I24 — `off`).
-
-  Each row offers only the modes the server accepts for it (P1 parallel/off,
-  P2-P3 gate/parallel/off, P4+P5 only/off), so the options list is the validation.
-
-  The "AI triage" switch above the rows is a convenience, not a fifth field:
-  it writes `off` to all four rows (or the published defaults back) and stores
-  nothing of its own — flipping it reads back as "on" the moment any row is
-  not `off`.
-
-  The budget is a list of durations rather than a free number: the server
-  refuses anything outside 30-600s instead of clamping, and every value an
-  operator can pick from a list is one the server will take. A stored value
-  outside the range is still OFFERED — a select must never hold a value that is
-  not one of its own options — and reported as invalid so the parent blocks Save.
--->
+<!-- The AI SRE triage gate per team: each row offers only the modes the server accepts, so the options list is the validation. -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-l0-editor">
     <div class="flex flex-col gap-2">
@@ -71,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- The closed select names the mode only; its sentence is read in the open list. -->
               <template #trigger="{ value }">{{ modeLabel(value as L0Mode) }}</template>
-              <!-- What each mode does lives in its own item, so the row carries no sentence beside the select. -->
               <OSelectItem
                 v-for="option in optionsFor(row.field)"
                 :key="option.value"
@@ -87,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <!-- The wait applies only where a row holds the page; shown once, under every row. -->
+        <!-- The wait applies only where a row holds the page. -->
         <div class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2">
           <span class="flex w-24 shrink-0 items-center gap-1">
             <OText variant="label">{{ t("oncall.l0WaitAtMost") }}</OText>
@@ -130,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OIcon>
       </span>
 
-      <!-- Label left, switch on the row's right edge and centred on it, the same column on every row. -->
       <div class="border-border-default rounded-surface flex flex-col border">
         <div
           v-for="row in permissionRows"
@@ -317,7 +299,7 @@ function optionsFor(field: keyof L0Policy["mode"]) {
   }));
 }
 
-/// L13: this editor knows the L0 config, not the team's ladder, so `only` must not claim nobody is paged.
+/// This editor knows the L0 config, not the team's ladder, so `only` must not claim nobody is paged.
 function modeSentence(mode: L0Mode): I18nText {
   switch (mode) {
     case "gate":

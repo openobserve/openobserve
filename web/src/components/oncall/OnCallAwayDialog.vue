@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
 
-      <!-- Absolute only, as Cover a shift: an absence is forward-looking, and a plain block keeps the picker's border to its buttons. -->
+      <!-- Absolute only, as Cover a shift: an absence is forward-looking. -->
       <div>
         <OFormDateTimeRange
           name="window"

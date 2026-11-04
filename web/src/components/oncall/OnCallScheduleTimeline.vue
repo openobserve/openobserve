@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- The only place a template is the main road: a team with nothing to replace. -->
     <OEmptyState
-      v-else-if="!tracks.length"
+      v-else-if="!rotationTracks.length"
       size="block"
       preset="no-oncall-schedule"
       data-test="oncall-timeline-empty"

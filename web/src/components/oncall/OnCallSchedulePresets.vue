@@ -96,7 +96,14 @@
               />
               <span v-else class="flex items-center gap-1">
                 <OText variant="body-strong">{{ row.title }}</OText>
-                <OIcon v-if="row.help" name="info" size="sm" class="text-icon-color cursor-pointer">
+                <OIcon
+                  v-if="row.help"
+                  name="info"
+                  size="sm"
+                  :label="row.help || undefined"
+                  tabindex="0"
+                  class="text-icon-color cursor-pointer"
+                >
                   <OTooltip :content="row.help" side="right" />
                 </OIcon>
               </span>

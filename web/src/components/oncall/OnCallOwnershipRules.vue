@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-match="{ row }">
-        <!-- One line per row: the chips that fit, and "+N" naming every condition. -->
         <OnCallFitChips
           :items="conditionsOf(row)"
           :tooltip="conditionsTip(row)"
@@ -177,7 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="catchAll === 'team'" #body-end>
         <tr data-test="oncall-routing-catch-all-row">
           <td :colspan="columns.length + 1" class="border-table-row-divider border-b px-4 py-2">
-            <!-- On a phone the row is as wide as every column, so its content wraps within the screen and stays put on scroll. -->
             <span
               class="flex flex-wrap items-center gap-2 max-md:sticky max-md:start-4 max-md:max-w-[80vw]"
               data-test="oncall-routing-catch-all"
@@ -200,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </tr>
       </template>
 
-      <!-- Where an alert lands once every rule above has failed, said once under the table. -->
+      <!-- Where an alert lands once every rule above has failed. -->
       <template v-else-if="catchAll" #footer-note>
         <span class="flex flex-wrap items-center gap-2" data-test="oncall-routing-catch-all">
           <span
@@ -243,8 +241,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             size="block"
             preset="no-oncall-rules"
+            :hide-action="!editable"
             data-test="oncall-ownership-empty"
-            @action="emit('add')"
+            @action="onEmptyAction"
           />
         </template>
       </template>
@@ -347,7 +346,6 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
   {
     id: "match",
     header: t("oncall.ownershipMatch"),
-    // Wide enough for the longest field name and a readable value, so a cut chip never shows a field alone.
     size: 260,
     minSize: 220,
     // Search matches what the chips read, not the stored `k=v` path.
@@ -498,6 +496,7 @@ function onEmptyAction(id?: string) {
     emit("clear-search");
     return;
   }
-  emit("add");
+  // A reader who cannot write routing gets no editor that would only answer 403.
+  if (props.editable) emit("add");
 }
 </script>

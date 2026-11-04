@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- Two fixed slots, so Edit and Delete line up on every row; the default is set from the Edit drawer. -->
+      <!-- The default is set from the Edit drawer, so the row offers no action of its own for it. -->
       <template #cell-actions="{ row }">
         <div v-if="canConfigure" class="flex items-center justify-center gap-1">
           <OButton
@@ -371,6 +371,7 @@ import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { dropScheduleDrafts, useScheduleDraftTimes } from "@/components/oncall/scheduleDrafts";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -593,7 +594,7 @@ async function fetchTeams(force = false) {
     await fetchOnCallNow(force);
     loadError.value = null;
     notAvailable.value = false;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Feature-off (404) and OSS (403 "Not Supported") are the same calm fact,
     // not an error: nothing failed and there is nothing to retry. §G.8.1 —
     // the teams list IS the capability probe.
@@ -603,7 +604,7 @@ async function fetchTeams(force = false) {
     }
     // The state, not a toast: a toast evaporates and leaves "no teams" on
     // screen, which reads as an unconfigured org rather than a failed read.
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = serverMessageOf(err) ?? (err instanceof Error ? err.message : "");
   } finally {
     loading.value = false;
   }
@@ -645,14 +646,14 @@ async function deleteTeam() {
     // Unforced: the mutation expired the scope, so this read reaches the server
     // and repaints the rows this page holds in its own ref.
     await fetchTeams();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.deleteTeamFailed"),
     });
   }
 }
