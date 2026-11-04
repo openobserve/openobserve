@@ -296,7 +296,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&body).unwrap();
         let title = value["blocks"][0]["text"]["text"].as_str().unwrap();
         assert!(
-            title.ends_with("|[TEST] 🔴 Sample CPU alert is firing>*"),
+            title.ends_with("|[TEST] 🔴 Sample CPU alert firing>*"),
             "{title}"
         );
         let fields = value["blocks"][2]["fields"].to_string();

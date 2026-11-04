@@ -463,7 +463,7 @@ async fn move_tuples(r: &table::templates::ReservedRename) -> Result<(), Templat
     if unowned {
         orgs.push(r.org.clone());
     }
-    db::authz::rename_object(&orgs, "templates", &r.from, &r.to)
+    db::authz::rename_object(&orgs, "templates", &r.from, &r.to, r.org == DEFAULT_ORG)
         .await
         .map_err(|e| TemplateError::InfraError(infra::errors::Error::Message(e.to_string())))?;
     // A row with no tuple on its old name still needs an owner on the new one.

@@ -530,8 +530,12 @@ fn apply_incident_to_context(
     ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
     ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
     ctx.episode_id = Some(incident_id.to_string());
-    // Level shows the incident severity; `ctx.level` stays the alert's enum for the dot.
+    // Level, the dot and show_when follow the incident severity, as an on-call priority does.
     ctx.alert_level = severity.to_string();
+    ctx.level = Some(match severity {
+        "P1" | "P2" => config::meta::alerts::level::AlertLevel::Critical,
+        _ => config::meta::alerts::level::AlertLevel::Warning,
+    });
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -4629,6 +4633,10 @@ mod tests {
         assert_eq!(ctx.alert_url, incident_url);
         assert_eq!(ctx.incident_id, "inc-1");
         assert_eq!(ctx.alert_level, "P2");
+        assert_eq!(
+            ctx.level,
+            Some(config::meta::alerts::level::AlertLevel::Critical)
+        );
 
         let content = resolve_content(
             &compiled_default_content(),

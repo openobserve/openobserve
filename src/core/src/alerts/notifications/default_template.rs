@@ -55,7 +55,7 @@ const FIELDS: [(&str, &str); 17] = [
 /// Terminal fallback, infallible by construction (asserted by test).
 pub fn compiled_default_content() -> ContentSpec {
     ContentSpec {
-        title: "{status_dot} {alert_name} is {alert_status}".into(),
+        title: "{status_dot} {alert_name} {alert_status}".into(),
         title_overrides: Default::default(),
         body: "{alert_description}".into(),
         fields: FIELDS

@@ -286,10 +286,12 @@ fn substitute_with(
         };
         match var_value(name, ctx) {
             Some(value) => out.push_str(&esc(&truncate(&value, len))),
-            None => {
+            // Only a name that looks like a variable is marked; other braced text stays as typed.
+            None if is_ident(name) => {
                 out.push_str(UNMATCHED_MARKER);
                 unknown.push(name.to_string());
             }
+            None => out.push_str(&at[..token_len]),
         }
         rest = &at[token_len..];
     }
@@ -298,19 +300,27 @@ fn substitute_with(
 }
 
 /// `{name}` or `{name:N}` at the start of `at`: the name, the length (0 for whole) and the token
-/// length; the same grammar `scan_unmatched` reads.
+/// length. Any name without braces counts, since a row column or label such as `http-status` is a
+/// key too.
 fn parse_token(at: &str) -> Option<(&str, usize, usize)> {
     let end = at.find('}')?;
     let inner = &at[1..end];
+    if inner.contains('{') {
+        return None;
+    }
     let (name, len) = match inner.split_once(':') {
         Some((name, n)) => (name, n.parse::<usize>().ok()?),
         None => (inner, 0),
     };
-    let is_ident = !name.is_empty()
+    (!name.is_empty()).then_some((name, len, end + 1))
+}
+
+/// The grammar `scan_unmatched` reads: what an author meant as a variable.
+fn is_ident(name: &str) -> bool {
+    !name.is_empty()
         && name
             .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
-    is_ident.then_some((name, len, end + 1))
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.')
 }
 
 /// Make a substituted value inert as markdown SOURCE.
@@ -1139,6 +1149,17 @@ mod tests {
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
         }
+    }
+
+    #[test]
+    fn a_hyphenated_row_column_fills_and_other_braced_text_stays() {
+        let ctx = NotificationContext {
+            row_columns: vec![("http-status".into(), vec!["503".into()])],
+            ..fixture_ctx()
+        };
+        let (out, unknown) = substitute_raw("{http-status} {not a var} {nope}", &ctx);
+        assert_eq!(out, format!("503 {{not a var}} {UNMATCHED_MARKER}"));
+        assert_eq!(unknown, vec!["nope".to_string()]);
     }
 
     #[test]

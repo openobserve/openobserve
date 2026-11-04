@@ -463,7 +463,7 @@ fn variables(
     ]
 }
 
-/// The window's state as the title reads it: `{name} is started`.
+/// The window's state as the title reads it: `{name} started`.
 fn state_word(event: NotificationEvent) -> &'static str {
     match event {
         NotificationEvent::Started => "started",
@@ -793,7 +793,7 @@ mod tests {
         );
         let ctx = downtime_context(&row(None), &due(NotificationEvent::Started), 7, vars);
         let content = resolve_content(&compiled_default_content(), &ctx, "slack");
-        assert_eq!(content.title, "🔵 Nightly \"deploy\" <db> is started");
+        assert_eq!(content.title, "🔵 Nightly \"deploy\" <db> started");
         let labels: Vec<&str> = content.fields.iter().map(|(l, _)| l.as_str()).collect();
         assert_eq!(labels, ["Event", "Window", "Muted", "Time"]);
         assert_eq!(content.fields[0].1, "Started");
@@ -809,7 +809,7 @@ mod tests {
         else {
             panic!("email renders a message");
         };
-        assert!(subject.contains("is started"), "{subject}");
+        assert!(subject.ends_with("started"), "{subject}");
         assert!(
             html.contains("Nightly &quot;deploy&quot; &lt;db&gt;"),
             "{html}"

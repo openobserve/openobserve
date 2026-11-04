@@ -72,13 +72,15 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
-/// Moves the tuples `orgs` hold on `from` to `to`: ownership and role grants, failing loudly.
+/// Moves the tuples `orgs` hold on `from` to `to`: ownership and role grants, failing loudly;
+/// `every_role` also moves other orgs' grants on a shared default org object.
 #[cfg(feature = "enterprise")]
 pub async fn rename_object(
     orgs: &[String],
     obj_type: &str,
     from: &str,
     to: &str,
+    every_role: bool,
 ) -> Result<(), anyhow::Error> {
     if !o2_openfga::config::get_config().enabled {
         return Ok(());
@@ -89,7 +91,7 @@ pub async fn rename_object(
     ) else {
         return Ok(());
     };
-    o2_openfga::authorizer::authz::rename_object(orgs, &old, &new).await
+    o2_openfga::authorizer::authz::rename_object(orgs, &old, &new, every_role).await
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -98,6 +100,7 @@ pub async fn rename_object(
     _obj_type: &str,
     _from: &str,
     _to: &str,
+    _every_role: bool,
 ) -> Result<(), anyhow::Error> {
     Ok(())
 }

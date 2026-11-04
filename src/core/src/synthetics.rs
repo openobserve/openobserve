@@ -215,14 +215,17 @@ fn state_word(n: &CheckNotification) -> &'static str {
 /// The synthetics variables (Backend section B2) plus `check_title`, today's subject line.
 #[cfg(feature = "enterprise")]
 fn synthetics_attributes(n: &CheckNotification) -> Vec<(String, String)> {
+    // A card field, so it reads like the other labels; check_status keeps the raw value.
     let label = if n.recovery {
-        "recovered"
+        "Recovered"
     } else if n.degraded {
-        "degraded"
+        "Degraded"
     } else if n.flaky {
-        "flaky"
+        "Flaky"
+    } else if n.status == "warning" {
+        "Warning"
     } else {
-        n.status.as_str()
+        "Failing"
     };
     [
         ("check_id", n.check_id.clone()),
@@ -1287,7 +1290,7 @@ fn location_down_context(
         context_attributes: vec![
             ("check_name".to_string(), loc.label.clone()),
             ("check_status".to_string(), "down".to_string()),
-            ("check_status_label".to_string(), "down".to_string()),
+            ("check_status_label".to_string(), "Down".to_string()),
             ("check_target".to_string(), loc.region.clone()),
             ("check_type".to_string(), "private_location".to_string()),
             (

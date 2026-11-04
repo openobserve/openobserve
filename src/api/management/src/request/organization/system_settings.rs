@@ -45,6 +45,13 @@ fn is_reserved_key(key: &str) -> bool {
         .starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX)
 }
 
+/// Keys of the retired org default templates level; nothing reads them, so they read as absent.
+const RETIRED_KEYS: [&str; 2] = ["default_templates", "default_alert_template"];
+
+fn is_retired_key(key: &str) -> bool {
+    RETIRED_KEYS.contains(&key.trim())
+}
+
 fn reserved_key_response() -> Response {
     MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
 }
@@ -132,6 +139,9 @@ pub async fn get_setting(
         && !may_access_user_settings(&org_id, &user_email.user_id, subject).await
     {
         return foreign_user_response();
+    }
+    if is_retired_key(&key) {
+        return MetaHttpResponse::not_found("Setting not found");
     }
 
     match system_settings::get_resolved(Some(&org_id), user_id, &key).await {
@@ -221,6 +231,11 @@ pub async fn set_org_setting(
     }
     if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
         return response;
+    }
+    if is_retired_key(&payload.setting_key) {
+        return MetaHttpResponse::bad_request(
+            "This setting is retired: a template applies through an override or its destination",
+        );
     }
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {
@@ -389,6 +404,13 @@ mod tests {
         assert!(is_reserved_key(" PROMPT_SETTINGS/default"));
         assert!(!is_reserved_key("gen_ai_agent_mapping"));
         assert!(!is_reserved_key("my_prompt_settings/default"));
+    }
+
+    #[test]
+    fn the_org_default_template_keys_are_retired() {
+        assert!(is_retired_key("default_templates"));
+        assert!(is_retired_key(" default_alert_template"));
+        assert!(!is_retired_key("default_templates_v2"));
     }
 
     #[tokio::test]

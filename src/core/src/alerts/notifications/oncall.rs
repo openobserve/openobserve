@@ -135,7 +135,7 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
     }
 }
 
-/// The page's state as the title reads it: `{subject} is paged`.
+/// The page's state as the title reads it: `{subject} paged`.
 fn state_word(n: &OnCallNotification) -> &'static str {
     match (n.stage, n.event) {
         (_, NotificationEvent::Resolved) => "acknowledged",

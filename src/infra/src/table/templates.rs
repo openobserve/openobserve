@@ -323,14 +323,32 @@ pub struct ReservedRename {
 pub const MIGRATION_SEEDS: [&str; 1] = ["o2_default_content"];
 /// After the migrations the seeder owns `o2_default`, so a boot rename leaves it alone.
 pub const BOOT_SEEDS: [&str; 2] = [DEFAULT_TEMPLATE_NAME, "o2_default_content"];
+/// The per-kind rows an earlier build of this release seeded with `is_default` false; a user row
+/// saved in the default org always has it true, so the flag tells the two apart.
+pub const BRANCH_KIND_SEEDS: [&str; 4] = [
+    "o2_default_incident",
+    "o2_default_anomaly",
+    "o2_default_synthetics",
+    "o2_default_on_call",
+];
 /// System setting holding the renames a migration made, whose ownership tuples boot still moves.
 pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
 /// The templates name column is varchar(256).
 const NAME_MAX_CHARS: usize = 256;
 
-/// A shipped seed row: the default org, one of `seeds`, Content.
-fn is_shipped_seed(seeds: &[&str], org: &str, name: &str, kind: &str) -> bool {
-    org == DEFAULT_ORG && seeds.contains(&name) && kind == TemplateKind::Content.to_string()
+/// A shipped seed row: the default org, one of `seeds` or a branch kind seed, Content.
+fn is_shipped_seed(seeds: &[&str], m: &Model) -> bool {
+    m.org == DEFAULT_ORG
+        && m.kind == TemplateKind::Content.to_string()
+        && (seeds.contains(&m.name.as_str()) || is_branch_kind_seed(m))
+}
+
+/// A per-kind row an earlier build seeded, which the fold retires instead of renaming.
+fn is_branch_kind_seed(m: &Model) -> bool {
+    m.org == DEFAULT_ORG
+        && !m.is_default
+        && m.kind == TemplateKind::Content.to_string()
+        && BRANCH_KIND_SEEDS.contains(&m.name.as_str())
 }
 
 /// A name only the system may use: `o2_default` or anything under `o2_default_`.
@@ -354,7 +372,7 @@ where
         .await?
         .into_iter()
         .filter(|m| is_reserved_default_name(&m.name))
-        .filter(|m| !is_shipped_seed(seeds, &m.org, &m.name, &m.kind))
+        .filter(|m| !is_shipped_seed(seeds, m))
         .collect();
     // Other orgs first, so a reference left on the old name afterwards reads the default row.
     rows.sort_by_key(|m| (m.org == DEFAULT_ORG, m.org.clone(), m.name.clone()));
@@ -476,43 +494,12 @@ pub async fn record_pending_renames<C: ConnectionTrait>(
     db: &C,
     renames: &[ReservedRename],
 ) -> Result<(), sea_orm::DbErr> {
-    use super::entity::system_settings;
-
     if renames.is_empty() {
         return Ok(());
     }
-    let existing = pending_row(db).await?;
-    let mut list = existing
-        .as_ref()
-        .and_then(|row| row.setting_value.as_array().cloned())
-        .unwrap_or_default();
-    list.extend(
-        renames
-            .iter()
-            .map(|r| serde_json::json!({"org": r.org, "from": r.from, "to": r.to})),
-    );
-    let now = chrono::Utc::now().timestamp_micros();
-    match existing {
-        Some(row) => {
-            let mut active: system_settings::ActiveModel = row.into();
-            active.setting_value = Set(serde_json::Value::Array(list));
-            active.updated_at = Set(now);
-            active.update(db).await?;
-        }
-        None => {
-            system_settings::ActiveModel {
-                scope: Set("system".to_string()),
-                setting_key: Set(RENAMES_PENDING_KEY.to_string()),
-                setting_value: Set(serde_json::Value::Array(list)),
-                created_at: Set(now),
-                updated_at: Set(now),
-                ..Default::default()
-            }
-            .insert(db)
-            .await?;
-        }
-    }
-    Ok(())
+    let mut list = pending_renames(db).await?;
+    list.extend(renames.iter().cloned());
+    set_pending_renames(db, &list).await
 }
 
 /// The renames whose tuples are still to move, oldest first; the list stays until it is replaced.
@@ -537,15 +524,47 @@ pub async fn pending_renames<C: ConnectionTrait>(
         .collect())
 }
 
-/// Replaces the pending list with `left`; an empty list removes the row.
+/// Replaces the pending list with `left` in one statement, so a stop never drops it.
 pub async fn set_pending_renames<C: ConnectionTrait>(
     db: &C,
     left: &[ReservedRename],
 ) -> Result<(), sea_orm::DbErr> {
-    if let Some(row) = pending_row(db).await? {
-        row.delete(db).await?;
+    use super::entity::system_settings;
+
+    let existing = pending_row(db).await?;
+    if left.is_empty() {
+        if let Some(row) = existing {
+            row.delete(db).await?;
+        }
+        return Ok(());
     }
-    record_pending_renames(db, left).await
+    let value = serde_json::Value::Array(
+        left.iter()
+            .map(|r| serde_json::json!({"org": r.org, "from": r.from, "to": r.to}))
+            .collect(),
+    );
+    let now = chrono::Utc::now().timestamp_micros();
+    match existing {
+        Some(row) => {
+            let mut active: system_settings::ActiveModel = row.into();
+            active.setting_value = Set(value);
+            active.updated_at = Set(now);
+            active.update(db).await?;
+        }
+        None => {
+            system_settings::ActiveModel {
+                scope: Set("system".to_string()),
+                setting_key: Set(RENAMES_PENDING_KEY.to_string()),
+                setting_value: Set(value),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 async fn pending_row<C: ConnectionTrait>(
@@ -573,9 +592,12 @@ where
     let txn = db.begin().await?;
     let mut retired: Vec<Model> = Entity::find()
         .filter(Column::Org.eq(DEFAULT_ORG))
-        .filter(Column::Name.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(Column::Name.is_in(RETIRED_DEFAULT_NAMES.into_iter().chain(BRANCH_KIND_SEEDS)))
         .all(&txn)
-        .await?;
+        .await?
+        .into_iter()
+        .filter(|m| RETIRED_DEFAULT_NAMES.contains(&m.name.as_str()) || is_branch_kind_seed(m))
+        .collect();
     // The alert default's row becomes o2_default, so a destination bound to it keeps its id.
     retired.sort_by_key(|m| m.name != "o2_default_content");
     let mut target = get_org_model(&txn, DEFAULT_ORG, DEFAULT_TEMPLATE_NAME)
@@ -607,7 +629,12 @@ where
             to: DEFAULT_TEMPLATE_NAME.to_string(),
         });
     }
-    point_names_at_default(&txn).await?;
+    let kind_seeds: Vec<String> = moved
+        .iter()
+        .filter(|r| BRANCH_KIND_SEEDS.contains(&r.from.as_str()))
+        .map(|r| r.from.clone())
+        .collect();
+    point_names_at_default(&txn, &kind_seeds).await?;
     system_settings::Entity::delete_many()
         .filter(system_settings::Column::Scope.eq("org"))
         .filter(system_settings::Column::SettingKey.is_in(POINTER_KEYS))
@@ -618,7 +645,15 @@ where
 }
 
 /// Every override that names a retired default names `o2_default` instead, in every org.
-async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_orm::DbErr> {
+async fn point_names_at_default<C: ConnectionTrait>(
+    db: &C,
+    kind_seeds: &[String],
+) -> Result<(), sea_orm::DbErr> {
+    let names: Vec<String> = RETIRED_DEFAULT_NAMES
+        .iter()
+        .map(|n| n.to_string())
+        .chain(kind_seeds.iter().cloned())
+        .collect();
     use sea_orm::sea_query::Expr;
 
     use super::entity::{
@@ -627,7 +662,7 @@ async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_or
 
     alerts::Entity::update_many()
         .col_expr(alerts::Column::Template, Expr::value(DEFAULT_TEMPLATE_NAME))
-        .filter(alerts::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(alerts::Column::Template.is_in(names.clone()))
         .exec(db)
         .await?;
     alert_composites::Entity::update_many()
@@ -635,7 +670,7 @@ async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_or
             alert_composites::Column::Template,
             Expr::value(DEFAULT_TEMPLATE_NAME),
         )
-        .filter(alert_composites::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(alert_composites::Column::Template.is_in(names.clone()))
         .exec(db)
         .await?;
     anomaly_detection_config::Entity::update_many()
@@ -643,7 +678,7 @@ async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_or
             anomaly_detection_config::Column::Template,
             Expr::value(DEFAULT_TEMPLATE_NAME),
         )
-        .filter(anomaly_detection_config::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(anomaly_detection_config::Column::Template.is_in(names.clone()))
         .exec(db)
         .await?;
     synthetics_checks::Entity::update_many()
@@ -651,7 +686,7 @@ async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_or
             synthetics_checks::Column::Template,
             Expr::value(DEFAULT_TEMPLATE_NAME),
         )
-        .filter(synthetics_checks::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(synthetics_checks::Column::Template.is_in(names.clone()))
         .exec(db)
         .await?;
     oncall_policies::Entity::update_many()
@@ -659,7 +694,7 @@ async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_or
             oncall_policies::Column::Template,
             Expr::value(DEFAULT_TEMPLATE_NAME),
         )
-        .filter(oncall_policies::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .filter(oncall_policies::Column::Template.is_in(names.clone()))
         .exec(db)
         .await?;
     Ok(())
@@ -1284,7 +1319,8 @@ mod tests {
     #[tokio::test]
     async fn a_user_row_named_like_a_kind_default_survives_both_migrations() {
         let db = retire_db().await;
-        insert_row(&db, DEFAULT_ORG, "o2_default_incident", false, "content").await;
+        // A row saved through the API in the default org always has is_default set.
+        insert_row(&db, DEFAULT_ORG, "o2_default_incident", true, "content").await;
         insert_alert(
             &db,
             "alerts",
@@ -1314,6 +1350,38 @@ mod tests {
             Some("user_o2_default_incident")
         );
         assert_eq!(destination_template(&db, "mine-dest").await, Some(mine));
+    }
+
+    #[tokio::test]
+    async fn a_kind_row_an_earlier_build_seeded_is_retired_not_renamed() {
+        let db = retire_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_anomaly", false, "content").await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_synthetics", true, "content").await;
+        insert_alert(&db, "alerts", "acme", "seed-alert", "o2_default_anomaly").await;
+        let seed = row_id(&db, DEFAULT_ORG, "o2_default_anomaly").await;
+        insert_destination(&db, "seed-dest", &seed).await;
+
+        let renames = rename_reserved_collisions(&db, &MIGRATION_SEEDS)
+            .await
+            .unwrap();
+        retire_default_templates(&db).await.unwrap();
+
+        // Only the row a user saved moves aside; the seeded one folds into o2_default.
+        assert_eq!(
+            renames.iter().map(|r| r.from.as_str()).collect::<Vec<_>>(),
+            vec!["o2_default_synthetics"]
+        );
+        assert_eq!(
+            names(&db, DEFAULT_ORG).await,
+            vec!["o2_default", "user_o2_default_synthetics"]
+        );
+        let target = row_id(&db, DEFAULT_ORG, "o2_default").await;
+        assert_eq!(destination_template(&db, "seed-dest").await, Some(target));
+        assert_eq!(
+            alert_template(&db, "alerts", "seed-alert").await.as_deref(),
+            Some("o2_default")
+        );
     }
 
     #[tokio::test]

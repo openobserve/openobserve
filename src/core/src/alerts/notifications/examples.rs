@@ -343,7 +343,7 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
         (
             "[OpenObserve Synthetics] ✅ checkout API has RECOVERED",
             "checkout API has recovered",
-            "recovered",
+            "Recovered",
             "us-east-1, eu-west-1 recovered",
             "",
         )
@@ -351,7 +351,7 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
         (
             "[OpenObserve Synthetics] 🔴 checkout API is FAILED",
             "checkout API is failing\nconnection timed out after 10s",
-            "failed",
+            "Failing",
             "1 of 2 failed: us-east-1",
             "connection timed out after 10s",
         )
@@ -613,7 +613,7 @@ mod tests {
             title
                 .as_str()
                 .unwrap()
-                .contains("🔴 error rate on web-logs is firing")
+                .contains("🔴 error rate on web-logs firing")
         );
     }
 
@@ -632,12 +632,7 @@ mod tests {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_SYNTHETICS).unwrap();
         assert_eq!(example(NotificationKind::Synthetics), want);
         let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
-        assert!(
-            title
-                .as_str()
-                .unwrap()
-                .contains("🔴 checkout API is failing")
-        );
+        assert!(title.as_str().unwrap().contains("🔴 checkout API failing"));
     }
 
     #[test]
@@ -646,7 +641,7 @@ mod tests {
         assert_eq!(example(NotificationKind::OnCall), want);
         let firing = want["slack_firing"].to_string();
         assert!(
-            firing.contains("[P2] High error rate on web-logs — checkout is paged"),
+            firing.contains("[P2] High error rate on web-logs — checkout paged"),
             "{firing}"
         );
         assert!(firing.contains("Acknowledge"));
