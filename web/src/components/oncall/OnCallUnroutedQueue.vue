@@ -104,29 +104,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Identity only: pod names and status codes are evidence about one firing, not what a rule pins. -->
       <template #cell-path="{ row }">
-        <span
-          class="flex w-full max-w-full min-w-0 flex-wrap items-center gap-1"
+        <OnCallFitChips
+          :items="pathChips(row)"
+          :tooltip="pathChipsText(row)"
           :data-test="`oncall-unrouted-path-${row.id}`"
         >
-          <ODimensionChip
-            v-for="chip in pathChips(row).shown"
-            :key="chip.name"
-            :dim-key="chip.name"
-            :key-label="chip.label"
-            :value="chip.value"
-          />
-          <OTag
-            v-if="pathChips(row).hidden.length"
-            type="countChip"
-            value="neutral"
-            size="sm"
-            class="cursor-help"
-            :data-test="`oncall-unrouted-path-more-${row.id}`"
-          >
-            <OTooltip side="bottom" :content="hiddenChipsText(row)" />
-            {{ t("oncall.unroutedPathMore", { count: pathChips(row).hidden.length }) }}
-          </OTag>
-        </span>
+          <template #item="{ item }">
+            <ODimensionChip :dim-key="item.name" :key-label="item.label" :value="item.value" />
+          </template>
+        </OnCallFitChips>
       </template>
 
       <template #cell-fires="{ row }">
@@ -251,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 
+import OnCallFitChips from "@/components/oncall/OnCallFitChips.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -274,7 +261,6 @@ import {
 } from "@/utils/oncall";
 
 /// Beyond this a row grows taller than the rest; the remainder sits behind "+N".
-const PATH_CHIPS_SHOWN = 3;
 
 export interface UnroutedFilters {
   landing?: "default_team" | "nobody";
@@ -337,9 +323,12 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
   {
     id: "path",
     header: t("oncall.unroutedPath"),
+    size: 280,
+    minSize: 220,
     sortable: false,
     hideable: true,
     accessorFn: (row: UnroutedSignal) => routablePathOf(row),
+    meta: { cellOverflowTooltip: false },
   },
   {
     id: "fires",
@@ -414,16 +403,15 @@ function routablePathOf(signal: UnroutedSignal): string {
 
 function pathChips(signal: UnroutedSignal) {
   const dims = claimableDimensions(signal.dimensions);
-  const chips = Object.keys(dims)
+  return Object.keys(dims)
     .sort()
     .map((name) => ({ name, label: fieldLabel(name), value: dims[name] }));
-  return { shown: chips.slice(0, PATH_CHIPS_SHOWN), hidden: chips.slice(PATH_CHIPS_SHOWN) };
 }
 
-function hiddenChipsText(signal: UnroutedSignal): I18nText {
+function pathChipsText(signal: UnroutedSignal): I18nText {
   return raw(
     pathChips(signal)
-      .hidden.map((chip) => `${chip.label} ${chip.value}`)
+      .map((chip) => `${chip.label} ${chip.value}`)
       .join(" · "),
   );
 }

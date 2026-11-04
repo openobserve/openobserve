@@ -155,18 +155,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </span>
 
-      <span v-if="preview.team_id" class="flex">
+      <span v-if="preview.team_id" class="flex" data-test="oncall-simulator-send-test-wrap">
         <OButton
           variant="outline"
           size="sm"
           icon-left="notifications-active"
           :loading="sending"
-          :disabled="!canConfigure"
+          :disabled="!canConfigure || pagesNobody"
           data-test="oncall-simulator-send-test"
           @click="sendTest(preview.team_id)"
         >
           {{ t("oncall.simulatorSendTest") }}
         </OButton>
+        <OTooltip
+          v-if="pagesNobody"
+          side="bottom"
+          :content="t('oncall.simulatorSendTestNobody', { priority: raw(priority) })"
+        />
       </span>
 
       <div
@@ -511,6 +516,9 @@ function wakesFromResponder(): { emails: string[]; channels: string } | null {
     .join(", ");
   return { emails: [person.user_email], channels };
 }
+
+/// A test page at a priority whose ladder pages nobody would only report that, so the button waits for a priority that pages.
+const pagesNobody = computed(() => !!ladderEntry.value && !ladderEntry.value.pages_anyone);
 
 const responderNote = computed<I18nText>(() => {
   if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");

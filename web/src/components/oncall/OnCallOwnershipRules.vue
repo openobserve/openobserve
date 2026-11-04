@@ -321,6 +321,9 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
   {
     id: "match",
     header: t("oncall.ownershipMatch"),
+    // Wide enough for the longest field name and a readable value, so a cut chip never shows a field alone.
+    size: 260,
+    minSize: 220,
     // Search matches what the chips read, not the stored `k=v` path.
     accessorFn: (row: OwnershipRuleStats) =>
       conditionsOf(row)

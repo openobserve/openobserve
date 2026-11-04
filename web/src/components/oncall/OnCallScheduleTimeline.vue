@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- A template rewrites the first rotation, so it can only build a new one while there is none. -->
-        <ODropdown v-if="!rotations.length" align="end">
+        <!-- A template rewrites the first rotation, so once one exists the menu says so. -->
+        <ODropdown align="end">
           <template #trigger>
             <OButton
               variant="outline"
@@ -111,11 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            icon-left="dashboard-customize"
+            :icon-left="rotations.length ? 'restart-alt' : 'dashboard-customize'"
             data-test="oncall-timeline-add-template"
             @select="emit('presets')"
           >
-            {{ t("oncall.addRotationFromTemplate") }}
+            {{
+              rotations.length ? t("oncall.presetsStartOver") : t("oncall.addRotationFromTemplate")
+            }}
           </ODropdownItem>
           <ODropdownItem
             icon-left="edit"
@@ -125,16 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.addRotationFromScratch") }}
           </ODropdownItem>
         </ODropdown>
-        <OButton
-          v-else
-          variant="outline"
-          size="sm-action"
-          icon-left="add"
-          data-test="oncall-timeline-add"
-          @click="emit('add')"
-        >
-          {{ t("oncall.addRotation") }}
-        </OButton>
       </span>
     </div>
 
@@ -221,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
-                  icon-left="more-horiz"
+                  icon-left="more-vert"
                   :aria-label="t('oncall.laneMore', { name: track.label })"
                   :data-test="`oncall-lane-menu-${track.key}`"
                 />

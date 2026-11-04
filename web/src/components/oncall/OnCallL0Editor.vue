@@ -138,9 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default flex min-h-12 items-center gap-3 border-b px-3 py-2 last:border-b-0"
           :data-test="`oncall-l0-row-${row.key}`"
         >
-          <span class="flex min-w-0 flex-1 flex-col">
-            <span class="text-text-heading text-sm font-medium">{{ row.label }}</span>
-            <OTruncatedText v-if="row.description" class="text-text-secondary text-xs">
+          <span class="flex min-w-0 flex-1 items-baseline gap-2">
+            <span class="text-text-heading shrink-0 text-sm font-medium">{{ row.label }}</span>
+            <OTruncatedText
+              v-if="row.description"
+              class="text-text-secondary min-w-0 text-xs"
+              :data-test="`oncall-l0-row-${row.key}-note`"
+            >
               {{ row.description }}
             </OTruncatedText>
           </span>

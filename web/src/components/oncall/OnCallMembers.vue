@@ -753,14 +753,12 @@ const userOptions = computed(() =>
       subLabelInline: true,
       searchText: `${name} ${u.email}`.toLowerCase(),
     };
-    // An inline email row has no room for a badge, so a row already on the team trades its email for "On team".
+    // The inline row draws no badge, so "on team" rides beside the email that tells two namesakes apart.
     return memberEmails.value.has(u.email.toLowerCase())
       ? {
           ...option,
-          subLabel: undefined,
+          subLabel: t("oncall.membersOnTeamEmail", { email: raw(u.email) }),
           disabled: true,
-          badge: t("oncall.membersOnTeamBadge"),
-          badgeMuted: true,
         }
       : option;
   }),

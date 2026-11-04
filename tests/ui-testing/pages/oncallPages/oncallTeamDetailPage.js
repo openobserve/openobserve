@@ -136,7 +136,6 @@ export class OnCallTeamDetailPage {
       policyNoDefaultWarning: '[data-test="oncall-policy-no-default-warning"]',
       policyDestinations: '[data-test="oncall-policy-destinations"]',
       policyDestinationsWarning: '[data-test="oncall-policy-destinations-warning"]',
-      policyLadderEnd: '[data-test="oncall-policy-ladder-end"]',
 
       // Routing tab (internally "ownership").
       ownership: '[data-test="oncall-ownership"]',

@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown v-if="canConfigure" side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-horiz"
+                icon-left="more-vert"
                 variant="ghost"
                 size="icon-sm"
                 :loading="settingDefaultTeamId === row.id"

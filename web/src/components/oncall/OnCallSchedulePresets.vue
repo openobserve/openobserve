@@ -216,7 +216,7 @@
 
         <OButton
           v-if="addable"
-          variant="ghost"
+          variant="outline"
           size="sm-action"
           icon-left="add"
           class="self-start"

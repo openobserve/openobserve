@@ -79,7 +79,7 @@ export class OnCallCoveragePage {
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
       scheduleAnswer: '[data-test="oncall-schedule-answer"]',
-      answerNobody: '[data-test="oncall-answer-nobody-hint"]',
+      answerNobody: '[data-test="oncall-answer-nobody"]',
 
       // absences, which live on the members tab
       membersTable: '[data-test="oncall-members-table"]',

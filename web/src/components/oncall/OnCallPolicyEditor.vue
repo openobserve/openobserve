@@ -120,7 +120,7 @@
                 inline-actions
                 data-test="oncall-policy-sentence"
               >
-                <OTruncatedText class="min-w-0">{{ ladderSentence }}</OTruncatedText>
+                <OTruncatedText class="block min-w-0">{{ ladderSentence }}</OTruncatedText>
               </OBanner>
 
               <div class="flex flex-col gap-2">
@@ -353,22 +353,17 @@
                   <div class="border-border-default flex flex-col gap-1 border-t px-3 py-2">
                     <div class="flex flex-wrap items-center gap-2">
                       <OText variant="label">{{ t("oncall.policyWhenStepsRunOut") }}</OText>
-                      <span class="w-64">
+                      <span class="w-80 max-md:w-full">
                         <OSelect
                           :model-value="ladderEnd"
                           :options="ladderEndOptions"
+                          :searchable="false"
                           size="sm"
                           data-test="oncall-policy-ladder-end-select"
                           @update:model-value="(v: unknown) => setLadderEnd(String(v))"
                         />
                       </span>
                     </div>
-                    <!-- The option label cannot name the org's catch-all team; this
-                   line can, and that is the difference between "hands off" and
-                   "hands off to Platform". -->
-                    <OText variant="meta" data-test="oncall-policy-ladder-end">
-                      {{ ladderEndLine }}
-                    </OText>
                     <!-- §G.9 #9: notify_default_team with nobody nominated is
                    indistinguishable from stop — the ladder ends silently while
                    the policy reads as having a safety net. Said HERE, where the
@@ -394,7 +389,7 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                   <OButton
-                    variant="ghost-primary"
+                    variant="outline"
                     size="sm-action"
                     icon-left="add"
                     :data-test="`oncall-policy-add-step-${current.priority}`"
@@ -427,9 +422,6 @@
                   />
                 </div>
                 <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
-                  <OText variant="meta" data-test="oncall-policy-channels-hint">
-                    {{ t("oncall.policyChannelsHintShort") }}
-                  </OText>
                   <OText v-if="emailLocked" variant="meta" data-test="oncall-policy-email-locked">
                     {{ t("oncall.policyEmailLockedBySlack") }}
                   </OText>
@@ -896,21 +888,6 @@ const defaultTeamMissing = computed(
     !routingConfig.value.default_team_id,
 );
 
-/// What actually happens when the steps run out, from the policy itself —
-/// the static "decided by the repeat and final action" told the author to go
-/// find out. `repeat_count` 1 means the ladder runs once; there is no zero.
-const ladderEndLine = computed(() => {
-  const repeats = repeatCount.value;
-  const hands = finalAction.value === "notify_default_team";
-  if (hands) {
-    const team = routingConfig.value?.default_team_name;
-    return team
-      ? t("oncall.policyEndsHandsTo", { count: repeats, team: raw(team) }, repeats)
-      : t("oncall.policyEndsHandsToUnset", { count: repeats }, repeats);
-  }
-  return t("oncall.policyEndsStops", { count: repeats }, repeats);
-});
-
 /// The whole selected ladder as one sentence. The editor is built out of
 /// target kinds and absolute offsets; this is what they add up to, said the way
 /// somebody would say it out loud.
@@ -957,7 +934,13 @@ const ladderEndOptions = computed(() => [
     value: `${n}:stop`,
   })),
   ...[1, 2, 3, 4, 5].map((n) => ({
-    label: t("oncall.policyEndOptionHandOff", { count: n }, n),
+    label: routingConfig.value?.default_team_name
+      ? t(
+          "oncall.policyEndOptionHandOffTo",
+          { count: n, team: raw(routingConfig.value.default_team_name) },
+          n,
+        )
+      : t("oncall.policyEndOptionHandOff", { count: n }, n),
     value: `${n}:notify_default_team`,
   })),
 ]);
