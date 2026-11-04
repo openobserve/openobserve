@@ -209,61 +209,43 @@ describe("bar gauge items", () => {
     ]);
   });
 
-  it("keeps a blank group name blank behind an (empty) label when the panel has a label field", () => {
-    const gauges = {
-      series: [
-        { type: "gauge", min: 0, max: 50, data: [{ name: "", value: 88 }] },
-        { type: "gauge", min: 0, max: 50, data: [{ name: "api", value: 7 }] },
+  it("names an empty group (empty) so Series formatting lists it, while drilldown keeps the blank value", async () => {
+    const data = [
+      { x_axis_1: "api", y_axis_1: 7 },
+      { x_axis_1: "", y_axis_1: 88 },
+    ];
+    const overrides = {
+      override_config: [
+        {
+          field: { matchBy: "series", value: "(empty)" },
+          config: [
+            { type: "display_name", value: "No container" },
+            { type: "series_color", value: "#123456" },
+          ],
+        },
       ],
     };
-    const items = barGaugeItems(gauges, sqlPanel("bar-gauge", {}, {}, fixedRange));
-    expect(items.map((item) => [item.name, item.label])).toEqual([
-      ["", "(empty)"],
-      ["api", "api"],
+    const options = await viaPanel(sqlPanel("bar-gauge", overrides, {}, fixedRange), [data]);
+    const [bar] = bars(options);
+    expect(bar.data.map((d: any) => [d.name, d.rawName])).toEqual([
+      ["(empty)", ""],
+      ["api", undefined],
     ]);
-    const unlabelled = barGaugeItems(gauges, sqlPanel("bar-gauge", {}, { x: [] }));
-    expect(unlabelled.find((item) => item.value === 88)).toMatchObject({
-      name: "Requests",
-      label: "Requests",
+    expect(getLegendSeriesNames(options, "bar-gauge")).toEqual(["(empty)", "api"]);
+    expect(options.yAxis.axisLabel.formatter("(empty)", 0)).toBe("No container");
+    expect(bar.data[0].itemStyle.color.colorStops.at(-1).color).toBe("#123456");
+    expect(barGaugeDrilldownSeries({ name: "(empty)", data: bar.data[0] })).toEqual({
+      __name: "",
+      __value: 88,
+      __axisValue: "",
     });
-  });
 
-  it("orders bars by name when no query sorts, whatever order the rows came back in", () => {
-    const gauge = (name: string, value: number) => ({
-      type: "gauge",
-      min: 0,
-      max: 100,
-      data: [{ name, value }],
-    });
-    const names = (series: any[], panel: any) =>
-      barGaugeItems({ series }, panel).map((item) => item.name);
-    const first = [gauge("pod-10", 5), gauge("pod-2", 90), gauge("api", 40)];
-    const second = [gauge("api", 40), gauge("pod-2", 90), gauge("pod-10", 5)];
-    const unsorted = sqlPanel("bar-gauge");
-    expect(names(first, unsorted)).toEqual(["api", "pod-2", "pod-10"]);
-    expect(names(second, unsorted)).toEqual(["api", "pod-2", "pod-10"]);
-
-    const builderSort = sqlPanel("bar-gauge", {}, { y: [{ ...yField, sortBy: "DESC" }] });
-    expect(names(first, builderSort)).toEqual(["pod-10", "pod-2", "api"]);
-    const custom = sqlPanel("bar-gauge");
-    custom.queries[0].customQuery = true;
-    expect(names(first, custom)).toEqual(["api", "pod-2", "pod-10"]);
-    custom.queries[0].query = "SELECT a FROM t GROUP BY a\n ORDER  BY y_axis_1 DESC";
-    expect(names(first, custom)).toEqual(["pod-10", "pod-2", "api"]);
-    expect(names(first, promPanel("bar-gauge"))).toEqual(["pod-10", "pod-2", "api"]);
-  });
-
-  it("places a value on its own range, clamped to the track, and drills down with the real value", () => {
-    expect(barGaugeFraction(500, 0, 1000)).toBe(0.5);
-    expect(barGaugeFraction(-4184, -39912, 48088)).toBeCloseTo(35728 / 88000);
-    expect(barGaugeFraction(2000, 0, 1000)).toBe(1);
-    expect(barGaugeFraction(-5, 0, 1000)).toBe(0);
-    expect(barGaugeFraction(null, 0, 1000)).toBe(0);
-    expect(barGaugeDrilldownSeries({ name: "api", value: 0.5, data: { rawValue: 500 } })).toEqual({
-      __name: "api",
-      __value: 500,
-      __axisValue: "api",
-    });
+    const plain = await viaPanel(sqlPanel("bar-gauge", {}, {}, fixedRange), [data]);
+    expect(plain.yAxis.axisLabel.formatter("(empty)", 0)).toBe("(empty)");
+    const unlabelled = await viaPanel(sqlPanel("bar-gauge", {}, { x: [] }, fixedRange), [
+      [{ y_axis_1: 5 }],
+    ]);
+    expect(bars(unlabelled)[0].data[0].name).toBe("Requests");
   });
 
   it("labels a panel with a label field but no rows by its value field, not as an empty group", () => {
@@ -274,27 +256,20 @@ describe("bar gauge items", () => {
     expect(items[0]).toMatchObject({ name: "Requests", label: "Requests" });
   });
 
-  it("shows (empty) for a whitespace name and applies a display name set on the empty series", () => {
-    const gauges = {
-      series: [
-        { type: "gauge", min: 0, max: 50, data: [{ name: "  ", value: 3 }] },
-        { type: "gauge", min: 0, max: 50, data: [{ name: "", value: 4 }] },
-      ],
-    };
-    expect(barGaugeItems(gauges, sqlPanel("bar-gauge")).map((item) => item.label)).toEqual([
-      "(empty)",
-      "(empty)",
+  it("names a whitespace-only group (empty) too, keeping its own value for drilldown", async () => {
+    const options = await viaPanel(sqlPanel("bar-gauge", {}, {}, fixedRange), [
+      [{ x_axis_1: "  ", y_axis_1: 3 }],
     ]);
-    const renamed = {
-      override_config: [
-        {
-          field: { matchBy: "series", value: "" },
-          config: [{ type: "display_name", value: "No container" }],
-        },
-      ],
-    };
-    const labels = barGaugeItems(gauges, sqlPanel("bar-gauge", renamed)).map((item) => item.label);
-    expect(labels).toContain("No container");
+    expect(bars(options)[0].data[0]).toMatchObject({ name: "(empty)", rawName: "  " });
+    expect(getLegendSeriesNames(options, "bar-gauge")).toEqual(["(empty)"]);
+  });
+
+  it("labels a whitespace name (empty) so the bar is never blank", () => {
+    const items = barGaugeItems(
+      { series: [{ type: "gauge", min: 0, max: 50, data: [{ name: "  ", value: 3 }] }] },
+      sqlPanel("bar-gauge"),
+    );
+    expect(items[0]).toMatchObject({ name: "  ", label: "(empty)" });
   });
 
   it("finds only a top-level ORDER BY, so a sort inside a subquery, window, literal or comment still gets name order", () => {
@@ -346,6 +321,45 @@ describe("bar gauge items", () => {
       "9",
       "10",
     ]);
+  });
+
+  it("places a value on its own range, clamped to the track, and drills down with the real value", () => {
+    expect(barGaugeFraction(500, 0, 1000)).toBe(0.5);
+    expect(barGaugeFraction(-4184, -39912, 48088)).toBeCloseTo(35728 / 88000);
+    expect(barGaugeFraction(2000, 0, 1000)).toBe(1);
+    expect(barGaugeFraction(-5, 0, 1000)).toBe(0);
+    expect(barGaugeFraction(null, 0, 1000)).toBe(0);
+    expect(barGaugeDrilldownSeries({ name: "api", data: { rawValue: null } }).__value).toBe("");
+    expect(barGaugeDrilldownSeries({ name: "api", data: { rawValue: 500 } })).toEqual({
+      __name: "api",
+      __value: 500,
+      __axisValue: "api",
+    });
+  });
+
+  it("orders bars by name when no query sorts, whatever order the rows came back in", () => {
+    const gauge = (name: string, value: number) => ({
+      type: "gauge",
+      min: 0,
+      max: 100,
+      data: [{ name, value }],
+    });
+    const names = (series: any[], panel: any) =>
+      barGaugeItems({ series }, panel).map((item) => item.name);
+    const first = [gauge("pod-10", 5), gauge("pod-2", 90), gauge("api", 40)];
+    const second = [gauge("api", 40), gauge("pod-2", 90), gauge("pod-10", 5)];
+    const unsorted = sqlPanel("bar-gauge");
+    expect(names(first, unsorted)).toEqual(["api", "pod-2", "pod-10"]);
+    expect(names(second, unsorted)).toEqual(["api", "pod-2", "pod-10"]);
+
+    const builderSort = sqlPanel("bar-gauge", {}, { y: [{ ...yField, sortBy: "DESC" }] });
+    expect(names(first, builderSort)).toEqual(["pod-10", "pod-2", "api"]);
+    const custom = sqlPanel("bar-gauge");
+    custom.queries[0].customQuery = true;
+    expect(names(first, custom)).toEqual(["api", "pod-2", "pod-10"]);
+    custom.queries[0].query = "SELECT a FROM t GROUP BY a\n ORDER  BY y_axis_1 DESC";
+    expect(names(first, custom)).toEqual(["pod-10", "pod-2", "api"]);
+    expect(names(first, promPanel("bar-gauge"))).toEqual(["pod-10", "pod-2", "api"]);
   });
 
   it("returns no series when there are no dials", () => {
@@ -500,12 +514,13 @@ describe("bar gauge through convertPanelData", () => {
     ]);
     const [bar] = bars(options);
     expect(bar.data.map((d: any) => [d.name, d.value])).toEqual([
-      ["", 88 / 40000],
+      ["(empty)", 88 / 40000],
       ["alpha", 0.1],
       ["zeta", 35000 / 40000],
       ["Requests", 0.5],
     ]);
-    expect(options.yAxis.axisLabel.formatter("", 0)).toBe("(empty)");
+    expect(options.yAxis.axisLabel.formatter("(empty)", 0)).toBe("(empty)");
+    expect(bar.data[0].rawName).toBe("");
     expect(valueLabels(options).label.formatter({ dataIndex: 3 })).toBe("500");
   });
 
@@ -671,6 +686,28 @@ describe("bar gauge through convertPanelData", () => {
     expect(getLegendSeriesNames(options, "bar-gauge")).toEqual(["/a", "/b", "/c", "/d"]);
     const prom = await viaPanel(promPanel("bar-gauge"), promData());
     expect(getLegendSeriesNames(prom, "bar-gauge")).toEqual(["api", "web", "db", "cache"]);
+  });
+
+  it("lists every bar, (empty) included, when converted into a detached panel as Series formatting does", async () => {
+    const data = [
+      { x_axis_1: "api", y_axis_1: 7 },
+      { x_axis_1: "", y_axis_1: 88 },
+    ];
+    for (const type of ["bar-gauge", "gauge"]) {
+      const result: any = await convertPanelData(
+        sqlPanel(type, {}, {}, fixedRange),
+        [data],
+        store,
+        { value: document.createElement("div") },
+        null,
+        { value: [] },
+        {},
+        { height: "100%", width: "100%" },
+        { value: [] },
+        false,
+      );
+      expect(getLegendSeriesNames(result.options, type).sort()).toEqual(["(empty)", "api"]);
+    }
   });
 
   it("PromQL: one bar per series with its legend name and latest value", async () => {

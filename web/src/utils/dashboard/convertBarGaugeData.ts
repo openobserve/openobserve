@@ -19,6 +19,7 @@ import { escapeHtml } from "@/utils/html";
 import { colorToRgba } from "./colorPalette";
 import { getFieldLabel } from "./fieldLabel";
 import { calculateWidthText } from "./chartDimensionUtils";
+import { GAUGE_EMPTY_GROUP_NAME } from "./gaugeDial";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
 import {
   echartsPaletteColor,
@@ -46,13 +47,14 @@ const BAR_CATEGORY_GAP = "30%";
 const VERTICAL_LABEL_GAP = 4;
 const VERTICAL_LABEL_MIN = 24;
 const FALLBACK_PANEL_WIDTH = 800;
-const EMPTY_NAME_LABEL = "(empty)";
 
 /** One bar: a reduced series value on its own min..max range, in the colour the gauge converter gave it. */
 export interface BarGaugeItem {
   name: string;
   /** The series display-name override, else the name; thresholds and drilldown keep matching `name`. */
   label: string;
+  /** The row's own label value when `name` stands in for it, so drilldowns filter on what the data holds. */
+  rawName?: string;
   value: number | null;
   min: number;
   max: number;
@@ -65,6 +67,35 @@ export interface BarGaugeBand {
   from: number;
   to: number;
   color: string;
+}
+
+/** The parts of a panel query the bar gauge reads: its value field name and whether it orders its own rows. */
+interface BarGaugeQuery {
+  customQuery?: boolean;
+  query?: string;
+  fields?: { x?: BarGaugeField[]; y?: BarGaugeField[] };
+}
+
+interface BarGaugeField {
+  alias?: string;
+  sortBy?: string | null;
+  isDerived?: boolean;
+}
+
+/** A gauge dial as the gauge converters build it, tagged with its query by the multi-query merge. */
+interface GaugeDial {
+  type?: string;
+  silent?: boolean;
+  min?: unknown;
+  max?: unknown;
+  _queryIndex?: number;
+  data?: {
+    name?: unknown;
+    rawName?: string;
+    value?: unknown;
+    detail?: { formatter?: (value: number) => unknown };
+    itemStyle?: { color?: string };
+  }[];
 }
 
 const toNumber = (value: unknown): number | null => {
@@ -89,11 +120,11 @@ const hasTopLevelOrderBy = (sql: string): boolean => {
 };
 
 // Derived builder fields never reach ORDER BY, so their sortBy orders nothing.
-const queryHasSort = (query: any): boolean =>
+const queryHasSort = (query: BarGaugeQuery | undefined): boolean =>
   query?.customQuery
     ? hasTopLevelOrderBy(String(query?.query ?? ""))
     : [...(query?.fields?.x ?? []), ...(query?.fields?.y ?? [])].some(
-        (field: any) => field?.sortBy && !field?.isDerived,
+        (field) => !!field?.sortBy && !field?.isDerived,
       );
 
 const compareNames = (a: string, b: string): number => {
@@ -115,11 +146,13 @@ export const barGaugeFraction = (value: number | null, min: number, max: number)
 };
 
 /** The drilldown variables of a clicked bar, carrying its real value rather than the 0..1 fill it is drawn at. */
-export const barGaugeDrilldownSeries = (params: any) => ({
-  __name: params?.name,
-  __value: params?.data?.rawValue,
-  __axisValue: params?.name,
-});
+export const barGaugeDrilldownSeries = (params: {
+  name?: string;
+  data?: { rawName?: string; rawValue?: number | null };
+}) => {
+  const name = params?.data?.rawName ?? params?.name;
+  return { __name: name, __value: params?.data?.rawValue ?? "", __axisValue: name };
+};
 
 /** The panel as a gauge for the gauge converters, with each query's unset range resolved to auto. */
 export const barGaugeSchemaAsGauge = (panelSchema: any) => ({
@@ -134,20 +167,20 @@ export const barGaugeSchemaAsGauge = (panelSchema: any) => ({
 
 /** The bars behind gauge options: one per dial, named by its label or else its query's value field. */
 export const barGaugeItems = (gaugeOptions: any, panelSchema: any): BarGaugeItem[] => {
-  const queries: any[] = panelSchema?.queries ?? [];
+  const queries: BarGaugeQuery[] = panelSchema?.queries ?? [];
   const promql = panelSchema?.queryType === "promql";
   const fallbackNames = queries.map((query) => {
     const yField = query?.fields?.y?.[0];
     return getFieldLabel(yField, panelSchema?.config, query?.customQuery) || yField?.alias || "";
   });
   const noValue = String(panelSchema?.config?.no_value_replacement ?? "");
-  const series: any[] = Array.isArray(gaugeOptions?.series) ? gaugeOptions.series : [];
+  const series: GaugeDial[] = Array.isArray(gaugeOptions?.series) ? gaugeOptions.series : [];
   const overrides = createSeriesOverrideLookup(panelSchema?.config);
   // Silent gauges are the display-name title overlays the gauge overrides add, not dials.
   const dials = series
     .filter((gauge) => gauge?.type === "gauge" && !gauge.silent && gauge?.data?.[0])
     .map((gauge) => {
-      const item = gauge.data[0];
+      const item = gauge.data?.[0] ?? {};
       const queryIndex = gauge._queryIndex ?? 0;
       const value = toNumber(item.value);
       const formatter = item.detail?.formatter;
@@ -157,17 +190,15 @@ export const barGaugeItems = (gaugeOptions: any, panelSchema: any): BarGaugeItem
           : typeof formatter === "function"
             ? String(formatter(value))
             : String(value);
-      // A blank name with a value is an empty group; without a label field, or with no rows at all, it is the value field.
-      const hasLabelField = !promql && queries[queryIndex]?.fields?.x?.length > 0;
-      const blankIsGroup = hasLabelField && value !== null;
-      const name =
-        String(item.name ?? "") || (blankIsGroup ? "" : (fallbackNames[queryIndex] ?? ""));
+      // Only an unlabelled dial is blank here: no label field, no rows, or a PromQL legend that resolved to nothing.
+      const name = String(item.name ?? "") || (fallbackNames[queryIndex] ?? "");
       const shown = String(overrides.displayName(name));
       return {
         queryIndex,
         item: {
           name,
-          label: shown.trim() ? shown : EMPTY_NAME_LABEL,
+          label: shown.trim() ? shown : GAUGE_EMPTY_GROUP_NAME,
+          rawName: item.rawName,
           value,
           min: toNumber(gauge.min) ?? 0,
           max: toNumber(gauge.max) ?? 100,
@@ -316,7 +347,8 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any, panelWi
     data: items.map((item, index) => ({
       name: item.name,
       value: barGaugeFraction(item.value, item.min, item.max),
-      rawValue: item.value ?? item.min,
+      rawName: item.rawName,
+      rawValue: item.value,
       itemStyle: {
         color: lcd
           ? "transparent"
