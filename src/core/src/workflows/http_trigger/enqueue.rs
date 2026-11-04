@@ -102,6 +102,8 @@ pub fn hook_audit_message(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     }
 }
 
@@ -128,6 +130,8 @@ pub fn reveal_audit_message(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     }
 }
 
