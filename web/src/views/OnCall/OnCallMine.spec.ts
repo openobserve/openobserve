@@ -520,13 +520,13 @@ describe("OnCallMine", () => {
     expect(wrapper.find('[data-test="oncall-mine-shifts-toggle"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Show all");
 
-    // The fold is marked below the frame, never over a row; once reached its line empties but keeps its height.
+    // The fold is marked inside the fixed frame, so the loaded card keeps the skeleton's height; it goes once reached.
     const more = () => wrapper.find('[data-test="oncall-mine-shifts-more"]');
     expect(more().text()).toBe("115 more");
-    expect(frame().find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(false);
+    expect(frame().find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(true);
+    expect(more().classes()).toEqual(expect.arrayContaining(["absolute", "pointer-events-none"]));
     await scroller.trigger("scroll");
-    expect(more().exists()).toBe(true);
-    expect(more().text()).toBe("");
+    expect(more().exists()).toBe(false);
     // Off duty holds no seat, so no team here needs the who-is-on-call read.
     expect(service.whoIsOnCall).not.toHaveBeenCalled();
   });
@@ -624,5 +624,23 @@ describe("OnCallMine", () => {
     expect(row.find('[data-test="oncall-mine-row-menu-team_1"]').exists()).toBe(true);
     expect(row.find('[data-test="oncall-mine-cover-team_1-menu"]').exists()).toBe(true);
     expect(row.find('[data-test="oncall-mine-test-page-team_1-menu"]').exists()).toBe(true);
+  });
+
+  /// Off duty leaves one action, so the phone row shows it directly instead of a menu of one.
+  it("shows the test page as its own button on a phone row that is off duty", async () => {
+    viewport.mobile = true;
+    service.myOnCall.mockResolvedValue({
+      data: {
+        on_call_now: false,
+        teams: [{ team_id: "team_1", team_name: "Payments", on_call_now: false, on_call: [] }],
+      },
+    } as any);
+    const wrapper = mount(OnCallMine, { global: { plugins: [i18n, store], stubs } });
+    await flushPromises();
+
+    const row = wrapper.find('[data-test="oncall-mine-shift-row-team_1"]');
+    expect(row.find('[data-test="oncall-mine-row-menu-team_1"]').exists()).toBe(false);
+    await row.find('[data-test="oncall-mine-test-page-team_1"]').trigger("click");
+    expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("modelValue")).toBe(true);
   });
 });

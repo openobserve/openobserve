@@ -29,8 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template v-else>
+      <!-- Reserved while loading when the last visit had open pages, so the history below does not jump when they arrive. -->
       <section
-        v-if="openRows.length"
+        v-if="openRows.length || (loading && lastHadOpen)"
         class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
         data-test="oncall-my-needs-you"
       >
@@ -46,6 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="openColumns"
           row-key="response_id"
           :frame="false"
+          :loading="loading && !openRows.length"
+          :skeleton-rows="PAGE_ROWS"
           :show-global-filter="false"
           :pagination="openPaged ? 'client' : 'none'"
           :page-size="openPageSize"
@@ -83,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :empty-label="raw('—')"
             />
           </template>
-          <template #cell-actions="{ row }">
+          <template #cell-row-actions="{ row }">
             <div class="flex items-center justify-center">
               <OButton
                 v-if="isEscalating(row.response_state)"
@@ -367,6 +370,36 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const nowMicros = useOnCallClock();
 
 const rows = ref<MyDelivery[]>([]);
+
+const needsYouKey = computed(
+  () =>
+    `oncall-my-needs-you:${orgId.value}:${String(store.state.userInfo?.email ?? "").toLowerCase()}`,
+);
+
+type OpenShape = "none" | "flat" | "paged";
+
+function readOpenShape(): OpenShape {
+  try {
+    const stored = window.localStorage.getItem(needsYouKey.value);
+    return stored === "flat" || stored === "paged" ? stored : "none";
+  } catch {
+    return "none";
+  }
+}
+
+/// How the last load's open pages looked, kept across reloads so the skeleton matches what is likely to arrive.
+const lastOpenShape = ref<OpenShape>(readOpenShape());
+const lastHadOpen = computed(() => lastOpenShape.value !== "none");
+
+function rememberOpenShape(shape: OpenShape) {
+  lastOpenShape.value = shape;
+  try {
+    if (shape === "none") window.localStorage.removeItem(needsYouKey.value);
+    else window.localStorage.setItem(needsYouKey.value, shape);
+  } catch {
+    // Storage refused the write (private mode): the reservation lasts for this visit only.
+  }
+}
 const unread = ref(0);
 const loading = ref(false);
 const marking = ref(false);
@@ -473,7 +506,11 @@ const historyRows = computed<HistoryRow[]>(() => {
 
 /// The pager shows once a second page exists, and stays while a larger size is chosen so it can be undone.
 const paged = (rows: number, size: number) => rows > PAGE_ROWS || size !== PAGE_ROWS;
-const openPaged = computed(() => paged(openRows.value.length, openPageSize.value));
+const openPaged = computed(() =>
+  openRows.value.length || !loading.value
+    ? paged(openRows.value.length, openPageSize.value)
+    : lastOpenShape.value === "paged",
+);
 const historyPaged = computed(() => paged(historyRows.value.length, pageSize.value));
 
 const openColumns = computed<OTableColumnDef<MyDelivery>[]>(() => [
@@ -488,14 +525,13 @@ const openColumns = computed<OTableColumnDef<MyDelivery>[]>(() => [
   { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
   { id: "team", header: t("oncall.team"), size: 160, sortable: false },
   { id: "at", header: t("oncall.myDeliveriesSent"), size: 120, sortable: false },
+  // Not `isAction`: a pinned column draws a divider that reads as a stray border on a table with nothing to scroll past.
   {
-    id: "actions",
+    id: "row-actions",
     header: t("oncall.actions"),
-    isAction: true,
-    pinned: "right",
     sortable: false,
     size: 64,
-    meta: { align: "center", actionCount: 1 },
+    meta: { align: "center" },
   },
 ]);
 
@@ -514,7 +550,6 @@ const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
   { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
   { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 104, sortable: false },
   { id: "at", header: t("oncall.myDeliveriesWhen"), size: 176, sortable: false },
-  // Not `isAction`: that pins the column, and its divider reads as a stray border on a table this narrow.
   {
     id: "row-actions",
     header: t("oncall.actions"),
@@ -561,6 +596,10 @@ async function fetchDeliveries(force = false) {
     );
     if (readId !== latestDeliveriesRead) return;
     rows.value = data?.deliveries ?? [];
+    if (!unreadOnly.value) {
+      if (!openRows.value.length) rememberOpenShape("none");
+      else rememberOpenShape(openPaged.value ? "paged" : "flat");
+    }
     // Pages, not sends: one page that reached the reader on three channels is one unread.
     setUnread(new Set(rows.value.filter(countsAsUnread).map((row) => row.response_id)).size);
     loadedOnce = true;

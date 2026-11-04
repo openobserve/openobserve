@@ -18,7 +18,9 @@ import { describe, expect, it } from "vitest";
 
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
+import { formatTimestampInTimezone } from "@/utils/date";
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -53,7 +55,7 @@ function delivery(overrides: Partial<DeliveryRecord>): DeliveryRecord {
 function render(props: Record<string, unknown> = {}) {
   return mount(OnCallWhoIsOn, {
     props: { positions: [] as OnCallPosition[], deliveries: [], ...props },
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -204,6 +206,43 @@ describe("OnCallWhoIsOn", () => {
     });
     expect(wrapper.text()).toContain("yuki@o2.ai");
     expect(wrapper.text()).toContain("(5d)");
+    expect(wrapper.find('[data-test="oncall-who-is-on-handover-at"]').text()).toBe(
+      formatTimestampInTimezone(fiveDaysMicros, "EEE, MMM d, HH:mm", store.state.timezone),
+    );
+  });
+
+  /// Without a next holder the row still says when, not only how long.
+  it("states the handover time when nobody is known to take it", () => {
+    const handoverAt = (Date.now() + 2 * 60 * 60 * 1000) * 1000;
+    const wrapper = render({
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+      ],
+      handoverAt,
+    });
+    const row = wrapper.find('[data-test="oncall-who-is-on-handover"]');
+    expect(row.find('[data-test="oncall-who-is-on-handover-at"]').text()).not.toBe("");
+    expect(row.text()).not.toContain("→");
+  });
+
+  /// A long address is cut inside the card, with the full name and email in its tooltip.
+  it("truncates the acknowledger with the real person name component", () => {
+    const wrapper = mount(OnCallWhoIsOn, {
+      props: {
+        positions: [],
+        ackedBy: "oncall_testassist_1103_vteam@example.com",
+        teamDeleted: true,
+      },
+      global: { plugins: [i18n, store], stubs: { ...stubs, OnCallPersonName: false } },
+    });
+    expect(wrapper.find('[data-test="oncall-who-is-on-acked-by"]').classes()).toEqual(
+      expect.arrayContaining(["block", "min-w-0", "truncate"]),
+    );
   });
 
   /// A closed record is history. The roster it is given was resolved as of the

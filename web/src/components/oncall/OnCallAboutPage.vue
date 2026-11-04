@@ -30,15 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <ODescriptionList dense>
+      <ODescriptionList dense label-width="narrow">
         <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
              asks "why me". The winning rule draws as the same key|value chips
              the routing tab draws it with, not a hand-built equation, so a
              dimension reads the same wherever it appears. -->
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
-          <span class="flex flex-col items-start gap-1">
-            <span data-test="oncall-about-routing-reason">
+          <span class="flex min-w-0 flex-col items-start gap-1">
+            <span class="max-w-full wrap-anywhere" data-test="oncall-about-routing-reason">
               <!-- Unrecognised wording: show the record's team, not the server's prose. -->
               <OTag
                 v-if="fallbackRouted && teamDeleted"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="(note, index) in routingNotes"
               :key="index"
-              class="text-text-secondary text-xs"
+              class="text-text-secondary max-w-full text-xs wrap-anywhere"
               :data-test="`oncall-about-routing-note-${index}`"
             >
               {{ raw(note) }}

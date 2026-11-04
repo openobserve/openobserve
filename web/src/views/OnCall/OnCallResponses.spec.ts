@@ -738,16 +738,15 @@ describe("OnCallResponses", () => {
       expect(service.escalationProgress).not.toHaveBeenCalled();
     });
 
-    /// One request per page and no bulk endpoint: past the cap the list says so
-    /// rather than leaving a blank cell that reads as "nothing has fired".
-    it("caps how many ladders it loads, and says that it did", async () => {
+    /// One request per page and no bulk endpoint; a row past the cap speaks for itself, so the footer stays quiet.
+    it("caps how many ladders it loads without a footer note about it", async () => {
       const many = Array.from({ length: 30 }, (_, i) =>
         page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
       );
       const wrapper = await withPages(many);
 
       expect(service.escalationProgress).toHaveBeenCalledTimes(25);
-      expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(false);
     });
 
     /// Rows past the cap have no progress: the record's own step, or no claim, never "Not paged yet".

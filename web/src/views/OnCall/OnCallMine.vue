@@ -175,7 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </span>
               </div>
-              <ODropdown side="bottom" align="end">
+              <!-- Off duty leaves only the test page, and a menu of one is a button. -->
+              <ODropdown v-if="canCover(row)" side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     variant="ghost"
@@ -187,7 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <ODropdownItem
-                  v-if="canCover(row)"
                   icon-left="person-add"
                   :data-test="`oncall-mine-cover-${row.team_id}-menu`"
                   @select="openCover(row)"
@@ -202,13 +202,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("oncall.mineTestTeam", { team: raw(row.team_name) }) }}
                 </ODropdownItem>
               </ODropdown>
+              <OButton
+                v-else
+                variant="ghost"
+                size="icon-sm"
+                :loading="testingId === row.team_id"
+                :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
+                :data-test="`oncall-mine-test-page-${row.team_id}`"
+                @click="askTestPage(row.team_id)"
+              >
+                <OIcon name="campaign" size="sm" aria-hidden="true" />
+                <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
+              </OButton>
             </div>
           </div>
 
           <!-- Scroll events do not bubble, so the frame listens in the capture phase to the table's own scroller. -->
           <div
             v-else
-            class="h-55.5 shrink-0"
+            class="relative h-55.5 shrink-0"
             data-test="oncall-mine-shifts-frame"
             @scroll.capture="onShiftsScroll"
           >
@@ -307,22 +319,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTable>
-          </div>
-          <!-- Below the rows, never over them; the line keeps its height once scrolled so the card does not jump. -->
-          <div
-            v-if="!isMobile && loaded && shiftRows.length > SHIFTS_SKELETON_ROWS"
-            class="border-border-default flex h-7 shrink-0 items-center justify-center gap-1 border-t"
-            data-test="oncall-mine-shifts-more"
-          >
-            <OText
-              v-if="shiftsBelow > 0"
-              variant="meta"
-              as="span"
-              class="inline-flex items-center gap-1"
+            <!-- Over the last row's lower edge, inside the frame, so the card is the skeleton's height once loaded. -->
+            <div
+              v-if="loaded && shiftsBelow > 0"
+              class="from-surface-base pointer-events-none absolute inset-x-0 bottom-0 flex h-12 items-end justify-center bg-linear-to-t from-40% to-transparent pb-1.5"
+              data-test="oncall-mine-shifts-more"
             >
-              <OIcon name="expand-more" size="sm" aria-hidden="true" />
-              {{ t("oncall.mineShiftsMore", { count: shiftsBelow }, shiftsBelow) }}
-            </OText>
+              <OText
+                variant="meta"
+                as="span"
+                class="bg-surface-base border-border-default inline-flex items-center gap-1 rounded-full border px-2 shadow-xs"
+              >
+                <OIcon name="expand-more" size="sm" aria-hidden="true" />
+                {{ t("oncall.mineShiftsMore", { count: shiftsBelow }, shiftsBelow) }}
+              </OText>
+            </div>
           </div>
         </section>
 

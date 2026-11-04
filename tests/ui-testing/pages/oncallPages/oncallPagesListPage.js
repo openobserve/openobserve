@@ -70,7 +70,6 @@ export class OnCallPagesListPage {
       error: '[data-test="oncall-responses-error"]',
       unavailable: '[data-test="oncall-responses-unavailable"]',
       truncated: '[data-test="oncall-responses-truncated"]',
-      escalationCapped: '[data-test="oncall-escalation-capped"]',
       responderNobody: '[data-test="oncall-responder-nobody"]',
       onCallNowGap: '[data-test="oncall-oncallnow-gap"]',
 

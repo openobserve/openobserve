@@ -117,6 +117,7 @@ describe("OnCallMyDeliveries", () => {
     vi.clearAllMocks();
     queryClient.clear();
     resetListViewState();
+    window.localStorage.clear();
     answer([]);
     service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 0 } } as any);
     service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
@@ -274,6 +275,57 @@ describe("OnCallMyDeliveries", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-my-needs-you"]').exists()).toBe(false);
+    });
+
+    const NEEDS_YOU_KEY = "oncall-my-needs-you:default:example@gmail.com";
+
+    /// The card holds its place through the first read when the last visit had open pages.
+    it("reserves its card while loading when the last visit had open pages", async () => {
+      window.localStorage.setItem(NEEDS_YOU_KEY, "flat");
+      service.myDeliveries.mockReturnValue(new Promise(() => {}));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-my-needs-you"]').exists()).toBe(true);
+      expect(
+        wrapper.findAll('[data-test="oncall-my-needs-you-table"] [data-test="row"]'),
+      ).toHaveLength(0);
+    });
+
+    it("drops the reservation once a load has nothing open", async () => {
+      window.localStorage.setItem(NEEDS_YOU_KEY, "paged");
+      answer([delivery({ response_state: "resolved" })]);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-my-needs-you"]').exists()).toBe(false);
+      expect(window.localStorage.getItem(NEEDS_YOU_KEY)).toBe(null);
+    });
+
+    it("remembers open pages for the next visit's skeleton", async () => {
+      answer([delivery({ response_state: "triggered" })]);
+      render();
+      await flushPromises();
+      expect(window.localStorage.getItem(NEEDS_YOU_KEY)).toBe("flat");
+    });
+
+    /// A pinned column draws a divider; a table with nothing to scroll past keeps its actions unpinned.
+    it("does not pin the actions column", async () => {
+      answer([delivery({ response_state: "triggered" })]);
+      const { OTable: _table, ...realTable } = stubs;
+      const wrapper = mount(OnCallMyDeliveries, {
+        global: { plugins: [i18n, store], stubs: realTable },
+      });
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await flushPromises();
+
+      const card = wrapper.find('[data-test="oncall-my-needs-you"]');
+      expect(card.find('[data-test="oncall-my-needs-you-ack-resp_1"]').exists()).toBe(true);
+      const sticky = card
+        .findAll("td, th")
+        .filter((cell) => (cell.attributes("style") ?? "").includes("sticky"));
+      expect(sticky).toHaveLength(0);
     });
   });
 
