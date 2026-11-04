@@ -80,7 +80,12 @@ describe("TemplateOverridePicker", () => {
     } as any);
     listDestinations.mockResolvedValue({
       data: [
-        { name: "hook", type: "http", template: "alert_only" },
+        {
+          name: "hook",
+          type: "http",
+          template: "alert_only",
+          metadata: { payload_format: "rendered" },
+        },
         { name: "mail", type: "email", template: "prebuilt_email" },
       ],
     } as any);
@@ -98,6 +103,47 @@ describe("TemplateOverridePicker", () => {
       "hook: alert_only (this override)",
       "mail: Built-in Synthetics message (built in)",
     ]);
+  });
+
+  it("names the legacy JSON payload for a generic webhook with only the built-in message", async () => {
+    list.mockResolvedValue({
+      data: [{ name: "card", kind: "content", type: "http", applies_to: [] }],
+    } as any);
+    listDestinations.mockResolvedValue({
+      data: [
+        { name: "hook", type: "http" },
+        { name: "slack", type: "http", destination_type_name: "slack" },
+      ],
+    } as any);
+    const w = await mountPicker({ kind: "anomaly", destinations: ["hook", "slack"] });
+
+    expect(w.findAll('[data-test="template-override-will-use-row"]').map((r) => r.text())).toEqual([
+      "hook: the kind's own JSON payload (generic webhook)",
+      "slack: Built-in Anomaly message (built in)",
+    ]);
+
+    await w.setProps({ modelValue: "card" });
+    expect(w.find('[data-test="template-override-will-use"]').text()).toBe(
+      "Will use: card (this override)",
+    );
+  });
+
+  it("keeps the built-in message on a generic webhook set to rendered, and for alerts", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content", applies_to: [] }] } as any);
+    listDestinations.mockResolvedValue({
+      data: [{ name: "hook", type: "http", metadata: { payload_format: "rendered" } }],
+    } as any);
+    const w = await mountPicker({ kind: "downtime", destinations: ["hook"] });
+    expect(w.find('[data-test="template-override-will-use"]').text()).toBe(
+      "Will use: Built-in Downtime message (built in)",
+    );
+
+    listDestinations.mockResolvedValue({ data: [{ name: "hook", type: "http" }] } as any);
+    queryClient.clear();
+    const alert = await mountPicker({ kind: "alert", destinations: ["hook"] });
+    expect(alert.find('[data-test="template-override-will-use"]').text()).toBe(
+      "Will use: Built-in Alert message (built in)",
+    );
   });
 
   it("reads no org default setting and never names one in the Will use line", async () => {

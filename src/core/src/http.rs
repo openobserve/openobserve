@@ -68,6 +68,7 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
+            | AlertError::AlertTemplateNotForAlert { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
             // trigger-condition validations.

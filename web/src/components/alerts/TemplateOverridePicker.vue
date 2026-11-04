@@ -157,6 +157,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import {
   kindLabelKey,
   resolveEffectiveTemplate,
+  sendsLegacyPayload,
   templateFitsTransport,
   type NotificationKind,
   type ResolvableTemplate,
@@ -169,6 +170,8 @@ interface FormDestination {
   name: string;
   type?: string;
   template?: string | null;
+  destination_type_name?: string | null;
+  metadata?: Record<string, string> | null;
 }
 
 const props = withDefaults(
@@ -235,6 +238,8 @@ const formDestinations = computed<FormDestination[]>(() =>
       name: given.name,
       type: given.type ?? known?.type,
       template: given.template ?? known?.template ?? null,
+      destination_type_name: given.destination_type_name ?? known?.destination_type_name ?? null,
+      metadata: given.metadata ?? known?.metadata ?? null,
     };
   }),
 );
@@ -264,6 +269,13 @@ const willUseByDestination = computed(() => {
       destination: d,
       templates: templatesList,
     });
+    if (sendsLegacyPayload({ kind: props.kind, destination: d, source })) {
+      return {
+        destination: d.name,
+        key: "|legacy",
+        label: t("alerts.templateOverride.sourceLegacyPayload"),
+      };
+    }
     const template = name ?? t("alerts.templateOverride.builtIn", { kind: kindLabel.value });
     return {
       destination: d.name,
@@ -295,6 +307,8 @@ const loadResolution = async (fresh = false) => {
     name: d.name,
     type: d.type,
     template: d.template ?? null,
+    destination_type_name: d.destination_type_name ?? null,
+    metadata: d.metadata ?? null,
   }));
 };
 

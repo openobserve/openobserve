@@ -532,10 +532,12 @@ fn apply_incident_to_context(
     ctx.episode_id = Some(incident_id.to_string());
     // Level, the dot and show_when follow the incident severity, as an on-call priority does.
     ctx.alert_level = severity.to_string();
-    ctx.level = Some(match severity {
-        "P1" | "P2" => config::meta::alerts::level::AlertLevel::Critical,
-        _ => config::meta::alerts::level::AlertLevel::Warning,
-    });
+    // P4 is informational, so it gets no level rather than a warning dot.
+    ctx.level = match severity {
+        "P1" | "P2" => Some(config::meta::alerts::level::AlertLevel::Critical),
+        "P3" => Some(config::meta::alerts::level::AlertLevel::Warning),
+        _ => None,
+    };
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -4637,6 +4639,19 @@ mod tests {
             ctx.level,
             Some(config::meta::alerts::level::AlertLevel::Critical)
         );
+        for (severity, level) in [
+            (
+                "P1",
+                Some(config::meta::alerts::level::AlertLevel::Critical),
+            ),
+            ("P3", Some(config::meta::alerts::level::AlertLevel::Warning)),
+            ("P4", None),
+            ("", None),
+        ] {
+            let mut other = NotificationContext::default();
+            super::apply_incident_to_context(&mut other, "inc-2", "e", "t", severity, "s", "u");
+            assert_eq!(other.level, level, "{severity}");
+        }
 
         let content = resolve_content(
             &compiled_default_content(),

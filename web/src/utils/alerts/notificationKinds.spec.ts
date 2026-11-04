@@ -17,10 +17,13 @@ import { describe, expect, it } from "vitest";
 import i18n from "@/locales";
 import {
   inferAppliesTo,
+  isGenericWebhook,
   resolveEffectiveTemplate,
+  sendsLegacyPayload,
   sentTemplatesText,
   templateFitsTransport,
   type ResolvableTemplate,
+  type TemplateSource,
 } from "./notificationKinds";
 
 describe("inferAppliesTo with a length or modifiers", () => {
@@ -142,5 +145,76 @@ describe("sentTemplatesText", () => {
         t,
       ),
     ).toBe("slack: card (org default), hook: something_new");
+  });
+});
+
+describe("sendsLegacyPayload (the server's legacy_body)", () => {
+  const hook = { type: "http" };
+
+  it("keeps the kind's JSON on a generic webhook with only the built-in message", () => {
+    for (const kind of ["anomaly", "synthetics", "on_call", "downtime"] as const) {
+      expect(sendsLegacyPayload({ kind, destination: hook, source: "compiled" })).toBe(true);
+    }
+  });
+
+  it("renders once a user template applies, and never for alerts or incidents", () => {
+    expect(sendsLegacyPayload({ kind: "anomaly", destination: hook, source: "explicit" })).toBe(
+      false,
+    );
+    expect(sendsLegacyPayload({ kind: "anomaly", destination: hook, source: "destination" })).toBe(
+      false,
+    );
+    expect(sendsLegacyPayload({ kind: "alert", destination: hook, source: "compiled" })).toBe(
+      false,
+    );
+    expect(sendsLegacyPayload({ kind: "incident", destination: hook, source: "compiled" })).toBe(
+      false,
+    );
+  });
+
+  it("follows payload_format over the template source", () => {
+    const legacy = (payload_format: string, source: TemplateSource) =>
+      sendsLegacyPayload({
+        kind: "anomaly",
+        destination: { type: "http", metadata: { payload_format } },
+        source,
+      });
+    expect(legacy("rendered", "compiled")).toBe(false);
+    expect(legacy("legacy", "explicit")).toBe(true);
+    expect(legacy("", "compiled")).toBeUndefined();
+  });
+
+  it("leaves named channels, Jira, email, SNS and Slack app destinations out", () => {
+    for (const destination of [
+      { type: "http", destination_type_name: "slack" },
+      { type: "http", destination_type_name: "pagerduty" },
+      { type: "http", destination_type_name: "jira" },
+      { type: "http", metadata: { render_format: "teams_adaptivecard" } },
+      { type: "email" },
+      { type: "sns" },
+      { type: "slack_app" },
+      {},
+    ]) {
+      expect(sendsLegacyPayload({ kind: "anomaly", destination, source: "compiled" })).toBe(false);
+    }
+  });
+
+  it("treats custom-like types and a webhook render_format as generic webhooks", () => {
+    expect(isGenericWebhook({ type: "http", destination_type_name: "openobserve" })).toBe(true);
+    expect(isGenericWebhook({ type: "http", destination_type_name: "splunk" })).toBe(true);
+    expect(
+      isGenericWebhook({
+        type: "http",
+        destination_type_name: "slack",
+        metadata: { render_format: "webhook" },
+      }),
+    ).toBe(true);
+    expect(
+      isGenericWebhook({
+        type: "http",
+        destination_type_name: "custom",
+        metadata: { render_format: "auto" },
+      }),
+    ).toBe(true);
   });
 });

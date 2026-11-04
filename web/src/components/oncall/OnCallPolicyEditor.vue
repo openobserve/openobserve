@@ -497,7 +497,7 @@
               </div>
 
               <div
-                v-if="webhookEnabled"
+                v-if="templateEnabled"
                 class="flex flex-wrap items-start gap-2"
                 data-test="oncall-policy-template"
               >
@@ -508,7 +508,7 @@
                   <TemplateOverridePicker
                     kind="on_call"
                     :model-value="templateOverride"
-                    :destinations="selectedDestinationTypes"
+                    :destinations="templateDestinations"
                     @update:model-value="templateOverride = $event"
                   />
                 </div>
@@ -763,9 +763,6 @@ const destinations = ref<string[]>([]);
 const templateOverride = ref<string | null>(null);
 // Destination name -> transport, for the mail banner and the picker's fit warning.
 const destinationTypes = ref<Record<string, string>>({});
-const selectedDestinationTypes = computed(() =>
-  destinations.value.map((name) => ({ name, type: destinationTypes.value[name] })),
-);
 const mailDestinations = computed(() =>
   destinations.value.filter((name) =>
     ["email", "sns"].includes(destinationTypes.value[name] ?? ""),
@@ -846,6 +843,24 @@ const teamChannelDirty = computed(() =>
     : JSON.stringify([...teamChannelDraft.value].sort()) !==
       JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
 );
+
+// The policy's list stands while the team has none of its own, as team_channel does on the server.
+const roomDestinations = computed(() =>
+  channelBackToPolicy.value || (teamChannel.value?.source === "policy" && !teamChannelDirty.value)
+    ? destinations.value
+    : teamChannelDraft.value,
+);
+
+// Room posts render with the policy's template too, so the picker shows without a webhook rung.
+const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.value.length > 0);
+
+const templateDestinations = computed(() => {
+  const paged = webhookEnabled.value ? destinations.value : [];
+  return [...new Set([...paged, ...roomDestinations.value])].map((name) => ({
+    name,
+    type: destinationTypes.value[name],
+  }));
+});
 
 // Picking a destination after "Use the policy's list" makes the list the team's own again.
 watch(teamChannelDraft, (draft) => {

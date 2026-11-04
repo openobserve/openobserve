@@ -13682,7 +13682,8 @@
       "sourceOrgDefault": "org default",
       "sourceCompiled": "built in",
       "sourcePlatformResolve": "platform resolve",
-      "sourceLegacy": "legacy payload"
+      "sourceLegacy": "legacy payload",
+      "sourceLegacyPayload": "the kind's own JSON payload (generic webhook)"
     }
   },
   "alert_dependencies": {

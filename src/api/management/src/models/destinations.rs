@@ -29,6 +29,7 @@ use utoipa::ToSchema;
 const PLAIN_METADATA_KEYS: &[&str] = &[
     "prebuilt_type",
     "render_format",
+    "payload_format",
     "setup_method",
     "slack_team_id",
     "slack_team_name",

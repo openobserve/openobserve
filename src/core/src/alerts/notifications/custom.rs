@@ -35,7 +35,9 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
         tpl,
         |field| {
             let placeholder = format!("{{{field}}}");
-            let value = apply_custom_template_plain(&placeholder, ctx, is_email, json_body);
+            // A modifier escapes its own output for a non-email body, so it starts from the raw
+            // value.
+            let value = apply_custom_template_plain(&placeholder, ctx, is_email, false);
             (value != placeholder).then_some(value)
         },
         |field| {
@@ -79,9 +81,13 @@ pub(crate) fn apply_custom_template_plain(
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let rows_tpl_val: &[Value] = &ctx.rows_tpl_val;
 
+    // Alerts never set the email hint, so their email bodies keep the raw insert.
+    let html = is_email && ctx.render_hints.escape_email_attributes;
     let esc = |v: &str| -> String {
         if escape {
-            format_variable_value(v.to_string())
+            json_string_contents(v)
+        } else if html {
+            html_escape(v)
         } else {
             v.to_string()
         }
@@ -542,6 +548,16 @@ impl VarValue<'_> {
     }
 }
 
+/// format_variable_value leaves some control characters raw, which breaks a JSON body.
+fn json_string_contents(value: &str) -> String {
+    let quoted = serde_json::to_string(value).unwrap_or_default();
+    quoted
+        .strip_prefix('"')
+        .and_then(|q| q.strip_suffix('"'))
+        .unwrap_or_default()
+        .to_string()
+}
+
 fn html_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -580,6 +596,19 @@ mod golden {
         let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
         assert_eq!(json["text"], "Nightly \"deploy\" <db>");
         assert_eq!(json["detail"], "line one\nline two");
+        let ctl = NotificationContext {
+            alert_name: "esc \u{1b}[31m red".into(),
+            alert_description: "col\tcol \u{1} \u{7f}".into(),
+            ..ctx.clone()
+        };
+        let body = apply_custom_template(
+            r#"{"text":"{alert_name}","detail":"{alert_description}"}"#,
+            &ctl,
+            false,
+        );
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["text"], "esc \u{1b}[31m red");
+        assert_eq!(json["detail"], "col\tcol \u{1} \u{7f}");
         // A plain text body, such as an SNS message, gets the values as written.
         assert_eq!(
             apply_custom_template("{alert_name}: {alert_description}", &ctx, false),
@@ -593,6 +622,26 @@ mod golden {
         assert_eq!(
             apply_custom_template(r#"{"text":"{alert_name}"}"#, &alert, false),
             r#"{"text":"cpu high"}"#
+        );
+    }
+
+    #[test]
+    fn a_synthetics_email_body_html_escapes_the_scalars() {
+        let mut ctx = NotificationContext {
+            kind: NotificationKind::Synthetics,
+            alert_name: "API <prod>".into(),
+            ..Default::default()
+        };
+        ctx.render_hints.escape_email_attributes = true;
+        assert_eq!(
+            apply_custom_template("<h2>{alert_name}</h2>", &ctx, true),
+            "<h2>API &lt;prod&gt;</h2>"
+        );
+        // Without the hint, as for every alert, the insert stays raw.
+        ctx.render_hints.escape_email_attributes = false;
+        assert_eq!(
+            apply_custom_template("<h2>{alert_name}</h2>", &ctx, true),
+            "<h2>API <prod></h2>"
         );
     }
 

@@ -240,6 +240,9 @@ pub enum AlertError {
     #[error("Alert template {template} not found")]
     AlertTemplateNotFound { template: String },
 
+    #[error("validation error: template '{template}' does not apply to alert")]
+    AlertTemplateNotForAlert { template: String },
+
     #[error(
         "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
     )]
@@ -689,6 +692,57 @@ impl SloSourceEffect {
 }
 
 /// Validates the alert and prepares it before it is written to the database.
+/// Reserved templates stay allowed so existing alerts keep saving; a user template must apply.
+fn check_alert_template(name: &str, template: &Template) -> Result<(), AlertError> {
+    if crate::alerts::notifications::default_template::is_reserved_template_name(&template.name)
+        || template
+            .applies_to_kind(config::meta::alerts::notification_kind::NotificationKind::Alert)
+    {
+        return Ok(());
+    }
+    Err(AlertError::AlertTemplateNotForAlert {
+        template: name.to_string(),
+    })
+}
+
+#[cfg(test)]
+mod check_alert_template_tests {
+    use config::meta::{alerts::notification_kind::NotificationKind, destinations::Template};
+
+    use super::{AlertError, check_alert_template};
+
+    fn tpl(name: &str, applies_to: Vec<NotificationKind>) -> Template {
+        Template {
+            name: name.to_string(),
+            applies_to,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_user_template_that_excludes_alert_is_refused() {
+        let t = tpl("ops-card", vec![NotificationKind::Anomaly]);
+        let err = check_alert_template("ops-card", &t).unwrap_err();
+        assert!(matches!(err, AlertError::AlertTemplateNotForAlert { .. }));
+        assert_eq!(
+            err.to_string(),
+            "validation error: template 'ops-card' does not apply to alert"
+        );
+    }
+
+    #[test]
+    fn a_user_template_for_alert_or_every_kind_is_allowed() {
+        assert!(check_alert_template("a", &tpl("a", vec![NotificationKind::Alert])).is_ok());
+        assert!(check_alert_template("b", &tpl("b", vec![])).is_ok());
+    }
+
+    #[test]
+    fn a_reserved_template_is_allowed_whatever_its_applies_to() {
+        let t = tpl("prebuilt_default", vec![NotificationKind::Anomaly]);
+        assert!(check_alert_template("prebuilt_default", &t).is_ok());
+    }
+}
+
 fn prepared_alert_name(route_name: &str, body_name: &str) -> String {
     let name = if body_name.trim().is_empty() {
         route_name
@@ -817,13 +871,13 @@ async fn prepare_alert(
     // Validate alert-level template if specified
     if let Some(ref template_name) = alert.template
         && !template_name.is_empty()
-        && db::alerts::templates::get(org_id, template_name)
-            .await
-            .is_err()
     {
-        return Err(AlertError::AlertTemplateNotFound {
-            template: template_name.clone(),
-        });
+        let template = db::alerts::templates::get(org_id, template_name)
+            .await
+            .map_err(|_| AlertError::AlertTemplateNotFound {
+                template: template_name.clone(),
+            })?;
+        check_alert_template(template_name, &template)?;
     }
 
     for dest in alert.destinations.iter() {

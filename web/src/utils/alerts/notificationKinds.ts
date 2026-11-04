@@ -155,3 +155,62 @@ export function resolveEffectiveTemplate(input: {
   }
   return { name: null, source: "compiled" };
 }
+
+const LEGACY_PAYLOAD_KINDS: readonly NotificationKind[] = [
+  "anomaly",
+  "synthetics",
+  "on_call",
+  "downtime",
+];
+const NAMED_RENDER_FORMATS = [
+  "slack",
+  "teams_adaptivecard",
+  "teams_messagecard",
+  "discord",
+  "pagerduty",
+  "opsgenie",
+  "servicenow",
+];
+const NAMED_DESTINATION_TYPES = [
+  "slack",
+  "teams",
+  "discord",
+  "pagerduty",
+  "opsgenie",
+  "servicenow",
+];
+
+/** A destination as the list endpoint returns it, with the fields that pick its channel format. */
+export interface PayloadDestination {
+  type?: string;
+  destination_type_name?: string | null;
+  metadata?: Record<string, string> | null;
+}
+
+/** Mirrors the server's `derive_channel_format` falling through to the generic Webhook format. */
+export function isGenericWebhook(destination: PayloadDestination): boolean {
+  const name = destination.destination_type_name ?? "";
+  // Jira refuses these kinds before the legacy route is reached.
+  if (destination.type !== "http" || name === "jira") return false;
+  const renderFormat = destination.metadata?.render_format;
+  if (renderFormat === "webhook") return true;
+  if (renderFormat && NAMED_RENDER_FORMATS.includes(renderFormat)) return false;
+  return !NAMED_DESTINATION_TYPES.includes(name);
+}
+
+/** Mirrors the server's `legacy_body`; undefined when a redacted `payload_format` hides it. */
+export function sendsLegacyPayload(input: {
+  kind: NotificationKind;
+  destination: PayloadDestination;
+  source: TemplateSource;
+}): boolean | undefined {
+  const { kind, destination, source } = input;
+  if (!LEGACY_PAYLOAD_KINDS.includes(kind) || !isGenericWebhook(destination)) return false;
+  const metadata = destination.metadata ?? {};
+  const format = metadata.payload_format;
+  if (format === "legacy") return true;
+  if (format === "rendered") return false;
+  // The list endpoint blanks non-plain metadata for readers without PUT, so blank is unknown.
+  if ("payload_format" in metadata && !format) return undefined;
+  return source === "compiled";
+}
