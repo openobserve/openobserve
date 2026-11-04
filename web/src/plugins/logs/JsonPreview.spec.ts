@@ -1070,6 +1070,51 @@ describe("JsonPreview Component", () => {
         expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
         expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
         expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).attributes("disabled")).not.toBe("true");
+      });
+
+      it("disables the button with a lock and hides the picker while traces is locked", async () => {
+        store.state.zoConfig.features = { traces: "locked" };
+        try {
+          traceWrapper = mount(JsonPreview, {
+            props: { value: recordWithTraceId, mode: "sidebar" },
+            global: {
+              plugins: [i18n],
+              provide: { store },
+              stubs: {
+                AppTabs: true,
+                CodeQueryEditor: true,
+                ODialog: ODialogStub,
+                OButton: {
+                  props: { disabled: Boolean, iconLeft: String },
+                  template:
+                    '<button :disabled="disabled" :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+                },
+                OTooltip: { template: "<div><slot /></div>" },
+                ODropdown: true,
+                ODropdownItem: true,
+                ODropdownSeparator: true,
+                OSelect: true,
+                OIcon: true,
+                OInput: true,
+                OSpinner: true,
+                LogsHighLighting: true,
+                ChunkedContent: true,
+                EqualIcon: true,
+                NotEqualIcon: true,
+              },
+            },
+          });
+          await flushPromises();
+          const btn = traceWrapper.find(viewTraceBtnSelector);
+          expect(btn.attributes("disabled")).toBeDefined();
+          expect(btn.attributes("data-icon")).toBe("lock");
+          expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+          await btn.trigger("click");
+          expect(traceWrapper.emitted("view-trace")).toBeUndefined();
+        } finally {
+          delete store.state.zoConfig.features;
+        }
       });
 
       it("should hide the stream picker and the button when hideViewTrace is true", async () => {
@@ -1198,6 +1243,60 @@ describe("JsonPreview Component", () => {
         expect(mockGetStreams).not.toHaveBeenCalled();
         expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
       });
+    });
+  });
+
+  describe("View Related under a license lock", () => {
+    const mountRelated = () =>
+      mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: {
+              props: { disabled: Boolean },
+              template:
+                '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+            },
+            OTooltip: { template: "<div><slot /></div>" },
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: { props: ["name"], template: '<i :data-icon="name" />' },
+            OInput: true,
+            OSpinner: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    afterEach(() => {
+      store.state.zoConfig = { ai_enabled: true };
+    });
+
+    it("renders the button disabled with a lock, skips the probe and emits nothing on click", async () => {
+      store.state.zoConfig = {
+        ai_enabled: true,
+        service_streams_enabled: true,
+        features: { correlation: "locked" },
+      };
+      const related = mountRelated();
+      await flushPromises();
+      const btn = related.find('[data-test="log-correlation-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(related.find('[data-test="log-correlation-btn-lock"]').exists()).toBe(true);
+      await btn.trigger("click");
+      expect(related.emitted("show-correlation")).toBeUndefined();
+      related.unmount();
     });
   });
 });

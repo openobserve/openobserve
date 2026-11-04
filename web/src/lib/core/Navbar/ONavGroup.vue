@@ -65,8 +65,10 @@ import {
 import type { Point } from "./hoverIntent";
 import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
   checkFeatureAccess,
   buildFeatureGateContext,
@@ -115,6 +117,10 @@ const flyoutStyle = ref<Record<string, string>>({});
 // Shared with ONavbar, which applies the same gates when deciding whether a
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
+const { featureName, featureNames } = useFeatureNames();
+
+const licenseState = (c: SubnavChild) =>
+  c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
 
 // A child shows when its route is registered and custom_hide_menus doesn't
 // name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
@@ -127,13 +133,16 @@ const visibleChildren = computed<SubnavChild[]>(() =>
   props.children
     .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
     .flatMap((c): SubnavChild[] => {
-      if (!c.gate) return [{ ...c, locked: false }];
-      if (isFeatureKey(c.gate)) {
+      if (c.gate && isFeatureKey(c.gate)) {
         const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
         if (!access.visible) return [];
         if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
-        return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
       }
+      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
+      const license = licenseState(c);
+      if (license === "hidden") return [];
+      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
+      if (!c.gate) return [{ ...c, locked: false }];
       return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
     }),
 );
@@ -147,6 +156,19 @@ const visibleChildren = computed<SubnavChild[]>(() =>
 // inert. Collapsing groups reach this too — every child hidden means the tile
 // has nothing left to offer.
 const hasVisibleChildren = computed(() => visibleChildren.value.length > 0);
+
+// One free child keeps the tile unlocked; only a tile whose every destination is license-locked shows the lock.
+const tileLicenseLocked = computed(
+  () =>
+    hasVisibleChildren.value &&
+    visibleChildren.value.every((c) => !!c.feature && licenseState(c) === "locked"),
+);
+
+const tileLockedLabel = computed<I18nText | undefined>(() => {
+  if (!tileLicenseLocked.value) return undefined;
+  const keys = [...new Set(visibleChildren.value.map((c) => c.feature as string))];
+  return t("featureLock.headerLocked", { feature: raw(featureNames(keys)) });
+});
 
 /**
  * Blocks, not a flat row list, so the grouping is real to assistive tech.
@@ -334,6 +356,16 @@ function itemDescriptionId(child: SubnavChild, prefix = ""): string {
 
 function childDataTest(child: SubnavChild): string {
   return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
+}
+
+function childRowTestId(child: SubnavChild): string {
+  if (child.locked) return `${childDataTest(child)}-locked`;
+  return child.licenseLocked ? `${childDataTest(child)}-license-lock` : childDataTest(child);
+}
+
+function childLockedLabel(child: SubnavChild): I18nText {
+  const feature = child.feature ? (featureName(child.feature) ?? child.feature) : "";
+  return t("featureLock.headerLocked", { feature: raw(feature) });
 }
 
 function tileElement(): HTMLElement | null {
@@ -610,7 +642,7 @@ function onFlyoutKeydown(event: KeyboardEvent) {
 const markRailNavigation = inject(RailNavigationMarkKey, null);
 
 // Keyboard choice (detail 0) returns focus to the tile; a mouse choice leaves it to the page.
-function onChildClick(event: MouseEvent, child: SubnavChild & { locked?: boolean }) {
+function onChildClick(event: MouseEvent, child: SubnavChild) {
   if (child.locked) {
     event.preventDefault();
     close();
@@ -653,6 +685,8 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
+      :license-locked="tileLicenseLocked"
+      :license-locked-label="tileLockedLabel"
       @click="onLinkClick"
       @keydown="onTileKeydown"
     />
@@ -666,6 +700,8 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
+      :license-locked="tileLicenseLocked"
+      :license-locked-label="tileLockedLabel"
       @click="onTriggerClick"
       @keydown="onTileKeydown"
     />
@@ -707,7 +743,7 @@ function onChildMouseenter(event: MouseEvent) {
                  not rendering it at all stops navigation. -->
             <component
               :is="child.locked ? 'div' : 'router-link'"
-              :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
+              :data-test="childRowTestId(child)"
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
               :tabindex="child.locked ? 0 : undefined"
@@ -732,14 +768,15 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-tight">{{ childLabel(child) }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(child) || child.locked"
+                v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                 name="lock"
                 size="xs"
                 class="ms-auto shrink-0"
-                :class="child.locked ? 'text-warning-600' : 'text-text-secondary'"
+                :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
                 :data-test="`${childDataTest(child)}-lock`"
                 aria-hidden="true"
               />
+              <span v-if="child.licenseLocked" class="sr-only">{{ childLockedLabel(child) }}</span>
               <span
                 v-if="isChildPaywalled(child)"
                 :id="itemDescriptionId(child, 'inline-')"
@@ -753,11 +790,7 @@ function onChildMouseenter(event: MouseEvent) {
         <template v-else>
           <component
             :is="block.child.locked ? 'div' : 'router-link'"
-            :data-test="
-              block.child.locked
-                ? `${childDataTest(block.child)}-locked`
-                : childDataTest(block.child)
-            "
+            :data-test="childRowTestId(block.child)"
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
             :tabindex="block.child.locked ? 0 : undefined"
@@ -783,14 +816,23 @@ function onChildMouseenter(event: MouseEvent) {
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
             <BetaBadge v-if="block.child.beta" size="xs" />
             <OIcon
-              v-if="isChildPaywalled(block.child) || block.child.locked"
+              v-if="
+                isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
+              "
               name="lock"
               size="xs"
               class="ms-auto shrink-0"
-              :class="block.child.locked ? 'text-warning-600' : 'text-text-secondary'"
+              :class="
+                block.child.locked || block.child.licenseLocked
+                  ? 'lock-chip'
+                  : 'text-text-secondary'
+              "
               :data-test="`${childDataTest(block.child)}-lock`"
               aria-hidden="true"
             />
+            <span v-if="block.child.licenseLocked" class="sr-only">{{
+              childLockedLabel(block.child)
+            }}</span>
             <span
               v-if="isChildPaywalled(block.child)"
               :id="itemDescriptionId(block.child, 'inline-')"
@@ -864,7 +906,7 @@ function onChildMouseenter(event: MouseEvent) {
                    before onChildClick's preventDefault). -->
               <component
                 :is="child.locked ? 'div' : 'router-link'"
-                :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
+                :data-test="childRowTestId(child)"
                 role="menuitem"
                 :to="child.locked ? undefined : childTo(child)"
                 :tabindex="child.locked ? 0 : undefined"
@@ -893,14 +935,17 @@ function onChildMouseenter(event: MouseEvent) {
                 <span class="leading-none">{{ childLabel(child) }}</span>
                 <BetaBadge v-if="child.beta" size="xs" />
                 <OIcon
-                  v-if="isChildPaywalled(child) || child.locked"
+                  v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                   name="lock"
                   size="xs"
                   class="ms-auto shrink-0"
-                  :class="child.locked ? 'text-warning-600' : 'text-text-secondary'"
+                  :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
                   :data-test="`${childDataTest(child)}-lock`"
                   aria-hidden="true"
                 />
+                <span v-if="child.licenseLocked" class="sr-only">{{
+                  childLockedLabel(child)
+                }}</span>
                 <span
                   v-if="isChildPaywalled(child)"
                   :id="itemDescriptionId(child)"
@@ -914,11 +959,7 @@ function onChildMouseenter(event: MouseEvent) {
           <template v-else>
             <component
               :is="block.child.locked ? 'div' : 'router-link'"
-              :data-test="
-                block.child.locked
-                  ? `${childDataTest(block.child)}-locked`
-                  : childDataTest(block.child)
-              "
+              :data-test="childRowTestId(block.child)"
               role="menuitem"
               :to="block.child.locked ? undefined : childTo(block.child)"
               :tabindex="block.child.locked ? 0 : undefined"
@@ -949,14 +990,23 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-none">{{ childLabel(block.child) }}</span>
               <BetaBadge v-if="block.child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(block.child) || block.child.locked"
+                v-if="
+                  isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
+                "
                 name="lock"
                 size="xs"
                 class="ms-auto shrink-0"
-                :class="block.child.locked ? 'text-warning-600' : 'text-text-secondary'"
+                :class="
+                  block.child.locked || block.child.licenseLocked
+                    ? 'lock-chip'
+                    : 'text-text-secondary'
+                "
                 :data-test="`${childDataTest(block.child)}-lock`"
                 aria-hidden="true"
               />
+              <span v-if="block.child.licenseLocked" class="sr-only">{{
+                childLockedLabel(block.child)
+              }}</span>
               <span
                 v-if="isChildPaywalled(block.child)"
                 :id="itemDescriptionId(block.child)"

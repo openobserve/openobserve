@@ -5,6 +5,7 @@ import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
 import { computed, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -26,6 +27,8 @@ const emit = defineEmits<SwitchEmits>();
 
 defineSlots<SwitchSlots>();
 
+const isDisabled = useLockedDisabled(() => props.disabled);
+
 // ── Local state — immediate visual feedback ────────────────────────────────
 const internalValue = ref(props.modelValue);
 
@@ -43,7 +46,7 @@ const isChecked = computed((): boolean => {
 });
 
 function toggle() {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   const next = !isChecked.value;
   let emitValue: typeof props.modelValue;
   if (props.checkedValue !== undefined || props.uncheckedValue !== undefined) {
@@ -111,7 +114,7 @@ onMounted(() =>
     :class="[
       'inline-flex items-center gap-2',
       labelPosition === 'left' ? 'flex-row-reverse' : 'flex-row',
-      disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+      isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
     ]"
     @click="toggle"
   >
@@ -125,7 +128,7 @@ onMounted(() =>
       :aria-labelledby="hasLabel ? labelId : undefined"
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :tabindex="inputTabindex"
       v-bind="controlAttrs"
       :class="[
@@ -136,12 +139,12 @@ onMounted(() =>
            ON       → primary FILLED track + white thumb (high contrast)
            OFF      → transparent track + primary outline + primary thumb
            DISABLED → transparent + grey dashed outline + grey thumb */
-        props.disabled
+        isDisabled
           ? 'border-switch-disabled-border border-dashed bg-transparent'
           : isChecked
             ? 'bg-switch-track-on border-switch-border'
             : 'border-switch-border-off bg-transparent',
-        props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
         'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
@@ -152,11 +155,7 @@ onMounted(() =>
           'block rounded-full',
           'transition-transform duration-200',
           currentSizes.thumb,
-          props.disabled
-            ? 'bg-switch-disabled-thumb'
-            : isChecked
-              ? 'bg-white'
-              : 'bg-switch-thumb-off',
+          isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : 'bg-switch-thumb-off',
           isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
         ]"
       />
@@ -167,7 +166,7 @@ onMounted(() =>
       :id="labelId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight select-none',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
