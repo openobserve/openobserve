@@ -99,7 +99,12 @@ import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type {
+  AlertFieldPatch,
+  AlertPrefill,
+  AlertPrefillWarning,
+} from "@/ts/interfaces/alertPrefill";
+import { CALIBRATION_PREFILL } from "@/utils/alerts/alertEditHandoff";
 import {
   forecastModeFields,
   parseForecastAlertPromql,
@@ -1943,6 +1948,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
   };
 
+  /** Writes a calibration patch into the loaded form field by field; unlike `resetForm` it keeps the baseline. */
+  const applyFieldPatch = (patch: AlertFieldPatch): void => {
+    if (patch.pendingPeriodSecs) {
+      const minutes = patch.pendingPeriodSecs.to / 60;
+      const settings = step4Ref.value as {
+        pendingPeriodUnit?: "minutes" | "hours";
+        onPendingPeriodUnitChange?: (unit: string) => void;
+      } | null;
+      let unit =
+        settings?.pendingPeriodUnit ?? pendingPeriodDisplay({ pending_period_sec: minutes }).mode;
+      // An hours field cannot show a part-hour suggestion as a whole number, so it switches to minutes.
+      if (unit === "hours" && minutes % 60 !== 0) {
+        settings?.onPendingPeriodUnitChange?.("minutes");
+        unit = "minutes";
+      }
+      setF("pending_period_sec", minutes);
+      setF("_ui.pendingPeriod", unit === "hours" ? minutes / 60 : minutes);
+    }
+    if (patch.keepFiringForSecs) setF("keep_firing_for", patch.keepFiringForSecs.to);
+    if (patch.silenceMinutes) setF("trigger_condition.silence", patch.silenceMinutes.to);
+    if (patch.destinations) setF("destinations", [...patch.destinations.to]);
+  };
+
   // ── Wizard Navigation (kept for anomaly) ────────────────────────────────
 
   const goToStep2 = async () => {
@@ -2572,7 +2600,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const data: any = { ...defaultAlertValue(), ...cloneDeep(props.modelValue) };
 
     const route = router.currentRoute.value;
-    const hasPrefill = !!route.query.prefill;
+    // A calibration handoff edits the loaded alert after the draft guard starts; it never seeds a new one.
+    const hasPrefill = !!route.query.prefill && route.query.prefill !== CALIBRATION_PREFILL;
 
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
@@ -2953,6 +2982,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
                 } else {
                   activeTab.value = "condition";
                 }
+              },
+            });
+          }
+          if ((newVal as any).keepFiringForFieldRef) {
+            focusManager.registerField("keep_firing_for", {
+              ref: (newVal as any).keepFiringForFieldRef,
+              onBeforeFocus: () => {
+                activeTab.value = "condition";
               },
             });
           }
@@ -3386,6 +3423,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     jsonEditorData,
     saveAlertJson,
     applyAlertPrefill,
+    applyFieldPatch,
     handleSave,
     queryModesWithContent,
     saveModeChoices,

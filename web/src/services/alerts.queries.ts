@@ -84,10 +84,19 @@ export const alertDependenciesQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertDetailQuery = (org: string, id: string) =>
+export const alertDetailQuery = (
+  org: string,
+  id: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: alertKeys.detail(org, id),
-    queryFn: async () => (await alerts.get_by_alert_id(org, id)).data,
+    queryFn: async () =>
+      (
+        await (options
+          ? alerts.get_by_alert_id(org, id, undefined, options)
+          : alerts.get_by_alert_id(org, id))
+      ).data,
     staleTime: LIVE_STALE_TIME,
   });
 

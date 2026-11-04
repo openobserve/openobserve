@@ -159,6 +159,8 @@ export interface EditorDraftController {
   hasUnsavedChanges: () => boolean;
   /** Not-kept fields of a continued draft that are still blank; the editor's Save should wait for them. */
   pendingReentries: () => string[];
+  /** Makes a change the user did not type count as unsaved, by taking the baseline before it runs. */
+  applyProgrammaticChange: (change: () => void | Promise<void>) => Promise<void>;
   readonly storageAvailable: boolean;
   readonly state: EditorDraftDialogState;
   chooseRestore: (choice: EditorDraftRestoreChoice) => void;
@@ -624,6 +626,14 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     if (baselineJson === null) addBaselineListeners();
   };
 
+  const applyProgrammaticChange = async (change: () => void | Promise<void>) => {
+    if (started && baselineJson === null) {
+      baselineJson = currentJson();
+      removeBaselineListeners();
+    }
+    await change();
+  };
+
   const markSaved = () => {
     notKept.value = { paths: [], labels: {} };
     discardSessionDraft();
@@ -807,6 +817,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     hasUnsavedChanges,
     pendingReentries: () =>
       blankRedactedPaths(options.snapshot(), notKept.value.paths, notKept.value.labels),
+    applyProgrammaticChange,
     storageAvailable,
     state,
     chooseRestore,
