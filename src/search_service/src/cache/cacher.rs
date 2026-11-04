@@ -1181,7 +1181,6 @@ mod tests {
             timezone: None,
             sorted_by_time: true,
             sampling_config: None,
-            no_index_hint: false,
         };
 
         let result = get_ts_col_order_by(&sql, "_timestamp", false);
@@ -1229,7 +1228,6 @@ mod tests {
             timezone: None,
             sorted_by_time: true,
             sampling_config: None,
-            no_index_hint: false,
         };
 
         let (ts_col, is_descending) = get_ts_col_order_by(&sql, "_timestamp", false).unwrap();

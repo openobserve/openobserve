@@ -390,7 +390,6 @@ mod tests {
             timezone: None,
             sorted_by_time: false,
             sampling_config: None,
-            no_index_hint: false,
         }
     }
 

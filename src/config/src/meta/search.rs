@@ -70,7 +70,7 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
-    /// Set to false to skip the inverted index for this query, like `SELECT /*+ NO_INDEX */`.
+    /// Set to false to skip the inverted index for this query.
     #[serde(default = "default_use_index")]
     #[schema(default = true)]
     pub use_index: bool,
@@ -1351,7 +1351,7 @@ pub struct MultiStreamRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
-    /// Set to false to skip the inverted index for every query, like `SELECT /*+ NO_INDEX */`.
+    /// Set to false to skip the inverted index for every query.
     #[serde(default = "default_use_index")]
     #[schema(default = true)]
     pub use_index: bool,

@@ -164,7 +164,6 @@ mod tests {
                 timezone: None,
                 sorted_by_time: false,
                 sampling_config: None,
-                no_index_hint: false,
             },
             is_complex_query: is_complex,
             ts_column: ts_column.map(str::to_string),

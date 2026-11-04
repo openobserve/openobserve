@@ -163,11 +163,10 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+    request.set_use_index(in_req.use_index);
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
-    // followers only see the request, and the NO_INDEX hint lives in the SQL
-    request.set_use_index(in_req.use_index && !meta.no_index_hint);
 
     // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
     let registration = SEARCH_SERVER.register_leader(

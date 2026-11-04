@@ -3,7 +3,7 @@
 A LIKE on a full-text-search field is answered by the `_all` field as a superset
 and re-checked by the original predicate; on a secondary index field it is the
 same exact substring lookup as `str_match()`. Either way the rows must equal a plain scan, which
-`SELECT /*+ NO_INDEX */` and the `use_index=false` request field force.
+the `use_index=false` request field forces.
 """
 from __future__ import annotations
 
@@ -100,10 +100,8 @@ def test_like_matches_scan_with_and_without_index(
     stream, start = seeded_stream
     expected = sum(1 for message, service in ROWS if matches(message, service))
     sql = f'SELECT count(*) AS n FROM "{stream}" WHERE {where}'
-    no_index_sql = f'SELECT /*+ NO_INDEX */ count(*) AS n FROM "{stream}" WHERE {where}'
 
     assert _count(client, sql, start=start) == expected
-    assert _count(client, no_index_sql, start=start) == expected
     assert _count(client, sql, start=start, use_index=False) == expected
 
 
