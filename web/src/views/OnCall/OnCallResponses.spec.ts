@@ -23,6 +23,7 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
+import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -380,6 +381,42 @@ describe("OnCallResponses", () => {
     await flushPromises();
     return wrapper;
   }
+
+  /// The rows are the screen; team context and the checklist only fill cells and a bar around them.
+  it("renders the rows before the team context and checklist reads answer", async () => {
+    const teams = deferredReply();
+    const context = deferredReply();
+    const gaps = deferredReply();
+    service.listTeams.mockImplementation(() => teams.promise);
+    service.teamContext.mockImplementation(() => context.promise);
+    service.coverageGaps.mockImplementation(() => gaps.promise);
+    service.listResponses.mockResolvedValue(axiosReply([page()]));
+    const wrapper = render();
+    await flushPromises();
+
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("loading")).toBe(false);
+    expect(table.props("data")).toHaveLength(1);
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+
+    teams.answer([team]);
+    context.answer({ teams: [] });
+    gaps.answer({ at: 0, total: 0, teams: [] });
+    await flushPromises();
+    expect(table.props("data")).toHaveLength(1);
+  });
+
+  it("keeps the skeleton on an empty list until setup answers", async () => {
+    const teams = deferredReply();
+    service.listTeams.mockImplementation(() => teams.promise);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+
+    teams.answer([team]);
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
+  });
 
   /// The state counts the section headings carry — the only counts on the
   /// screen now that the P1/Mine/Unrouted tiles are gone.
@@ -1051,6 +1088,16 @@ describe("OnCallResponses", () => {
       });
       afterEach(() => window.localStorage.clear());
 
+      it("asks the missing bulk read once per load, not again for the checklist", async () => {
+        service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
+        service.listResponses.mockResolvedValue(axiosReply([page()]));
+        render();
+        await flushPromises();
+
+        expect(service.teamContext).toHaveBeenCalledTimes(1);
+        expect(service.getPolicy).toHaveBeenCalledTimes(1);
+      });
+
       it("falls back to the team's own policy read", async () => {
         service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
         const wrapper = render();
@@ -1098,8 +1145,8 @@ describe("OnCallResponses", () => {
       resetOnCallPolicyReviewed();
     });
 
-    /// Setup must never read as all-good from the shift chip while pages cannot reach anyone yet.
-    it("hides the shift chip while setup is unfinished", async () => {
+    /// Being on call is a fact about the reader, so an unfinished setup never hides it.
+    it("shows the shift chip while setup is unfinished", async () => {
       const viewer = store.state.userInfo.email;
       service.listTeams.mockResolvedValue(axiosReply([team]));
       answerTeams(
@@ -1113,7 +1160,50 @@ describe("OnCallResponses", () => {
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "OnCallSetupChecklist" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(true);
+    });
+
+    it("keeps the shift chip after the setup bar is dismissed", async () => {
+      resetOnCallSetupDismissed();
+      const viewer = store.state.userInfo.email;
+      service.listTeams.mockResolvedValue(axiosReply([team]));
+      service.listOwnershipRules.mockResolvedValue(axiosReply([]));
+      service.listResponses.mockResolvedValue(
+        axiosReply([
+          {
+            id: "resp_1",
+            org_id: "default",
+            subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+            team_id: null,
+            priority: 1,
+            state: "triggered",
+            responder_role: "owner",
+            title: "checkout_failing",
+            opened_at: 1_700_000_000_000_000,
+            acked_by: null,
+            acked_at: null,
+            closed_at: null,
+          },
+        ]),
+      );
+      answerTeams(
+        () => ({
+          on_call: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: viewer }],
+          schedule: null,
+        }),
+        [team.id],
+      );
+      const wrapper = mountTracked(OnCallResponses, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OnCallSetupChecklist: false } },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-setup-dismiss"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(true);
+      resetOnCallSetupDismissed();
     });
 
     /// A server without the coverage-gap endpoint used to read as "zero gaps",

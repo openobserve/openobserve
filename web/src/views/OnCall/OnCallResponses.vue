@@ -27,9 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <!-- Whether the reader is themselves on call, beside the buttons rather
            than in the body: it qualifies the whole screen, not one section. -->
-      <!-- Hidden while setup is unfinished: a green shift chip there would read as all-good when pages cannot reach anyone yet. -->
       <OnCallShiftBanner
-        v-if="myShift && !isMobile && !showChecklist"
+        v-if="myShift && !isMobile"
         :user-email="viewerEmail"
         :rotation="myShift.rotation"
         :team-name="myShift.teamName"
@@ -60,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          naming the next undone step, over a list that stays fully usable. -->
     <!-- A phone header has no room for the banner, so it leads the body instead. -->
     <OnCallShiftBanner
-      v-if="myShift && isMobile && !showChecklist"
+      v-if="myShift && isMobile"
       class="mx-page-edge mt-2 shrink-0"
       :user-email="viewerEmail"
       :rotation="myShift.rotation"
@@ -95,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="visibleRows"
       :columns="columns"
       row-key="rowKey"
-      :loading="loading || !setupLoaded"
+      :loading="loading || (!setupLoaded && !responses.length)"
       :streaming="backgroundLoading"
       :error="loadError"
       :forbidden="forbidden"
@@ -1141,7 +1140,7 @@ const statusOptions = computed(() => {
     { value: "all", label: t("oncall.all"), count: total([...SECTION_ORDER]) },
   ];
   // A count before the list has answered would read as "nothing here".
-  const counted = setupLoaded.value && !loading.value;
+  const counted = loaded.value && !loading.value;
   // An open-only fetch never asked for resolved pages, so a tab showing them has no count yet, not zero.
   const known = (tab: FilterTab) => includeResolved.value || !tabShows(tab, "resolved");
   return tabs.map((tab) => ({
@@ -1965,6 +1964,8 @@ async function someTeamWouldPage(
 // The newest row-context read: one started for rows a filter has since replaced must not overwrite the maps.
 let latestRowContextRead = 0;
 let rowContextRead: Promise<void> = Promise.resolve();
+/// Every chunk of the last bulk read failed, so asking it again for the checklist would fail the same way.
+let teamContextUnavailable = false;
 
 /// Team context for the row teams and the viewer's, and the ladder of the oldest open pages: one request each, sent together.
 async function fetchRowContext(force = false) {
@@ -1981,7 +1982,10 @@ async function fetchRowContext(force = false) {
   const [context, progress] = await Promise.allSettled([
     Promise.allSettled(
       teamChunks.map((ids, i) => readQuery(teamContextQuery(orgId.value, ids, i === 0), force)),
-    ).then((reads) => reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []))),
+    ).then((reads) => {
+      teamContextUnavailable = reads.every((r) => r.status === "rejected");
+      return reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    }),
     wanted.length
       ? readQuery(responsesProgressQuery(orgId.value, wanted), force)
       : Promise.resolve([]),
@@ -1999,6 +2003,10 @@ async function fetchPolicyPresence(force = false) {
     return;
   }
   const chunks = chunkIds(teams.value.map((team) => team.id));
+  if (teamContextUnavailable) {
+    setup.value.hasPolicy = chunks.length ? await anyTeamPolicy(chunks.flat(), force) : false;
+    return;
+  }
   const reads = await Promise.allSettled(
     chunks.map((ids) => readQuery(teamContextQuery(orgId.value, ids, false), force)),
   );
@@ -2203,7 +2211,7 @@ watch(
 );
 // The first load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
 watch(
-  () => loaded.value && setupLoaded.value,
+  loaded,
   (ready) => {
     if (!ready) return;
     setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
