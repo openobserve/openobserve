@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ step.state === "done" && step.doneLabel ? step.doneLabel : step.title }}
           </OTruncatedText>
           <OTruncatedText
-            v-if="step.state !== 'done'"
+            v-if="step.state !== 'done' && step.body"
             class="text-text-secondary text-xs max-md:line-clamp-2 max-md:whitespace-normal"
             :data-test="`oncall-setup-body-${step.key}`"
           >
@@ -126,16 +126,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.setupStepChange") }}
           </OButton>
-          <OButton
-            v-else
-            :variant="step.state === 'active' ? 'primary' : 'outline'"
-            size="sm"
-            :loading="step.key === 'test' && testing"
-            :data-test="`oncall-setup-cta-${step.key}`"
-            @click="step.act()"
-          >
-            <OIcon :name="step.icon" size="sm" />{{ step.cta }}
-          </OButton>
+          <template v-else>
+            <OButton
+              v-if="step.markDone"
+              variant="ghost"
+              size="sm"
+              icon-left="check"
+              :data-test="`oncall-setup-mark-done-${step.key}`"
+              @click="step.markDone()"
+            >
+              {{ t("oncall.setupStepMarkDone") }}
+            </OButton>
+            <OButton
+              :variant="step.state === 'active' ? 'primary' : 'outline'"
+              size="sm"
+              :loading="step.key === 'test' && testing"
+              :data-test="`oncall-setup-cta-${step.key}`"
+              @click="step.act()"
+            >
+              <OIcon :name="step.icon" size="sm" />{{ step.cta }}
+            </OButton>
+          </template>
         </template>
       </div>
     </div>
@@ -178,6 +189,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { useOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import { testPageMutation } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
@@ -189,8 +201,8 @@ const props = withDefaults(
     hasTeam: boolean;
     /** Some team's schedule would actually resolve to a person. */
     hasStaffedRotation: boolean;
-    /** Some team has an escalation policy with at least one step. */
-    hasPolicy: boolean;
+    /** Some team has an escalation policy; `null` when no read could answer. */
+    hasPolicy: boolean | null;
     /** An ownership rule, or an alert bound to a team. */
     hasRouting: boolean;
     /** The org already has pages, so the checklist is one bar over the list rather than the screen. */
@@ -222,6 +234,7 @@ const expanded = ref(false);
 const setupDismissed = useOnCallSetupDismissed();
 const dismissed = computed(() => props.dismissible && setupDismissed.dismissed.value);
 const dismiss = setupDismissed.dismiss;
+const policyReviewed = useOnCallPolicyReviewed(() => props.firstTeamId);
 const testConfirmOpen = ref(false);
 const testing = ref(false);
 // The test page leaves no record on the server, so "it landed" is only known for this visit.
@@ -245,7 +258,7 @@ interface ChecklistStep {
   title: I18nText;
   /** What a done step reads as on its one line, when it has more to say than its title. */
   doneLabel?: I18nText;
-  body: I18nText;
+  body?: I18nText;
   cta: I18nText;
   /** The step's own verb, so each button reads as the action it takes. */
   icon: IconName;
@@ -254,7 +267,11 @@ interface ChecklistStep {
   act: () => void;
   /** Look at what was already done, never the create form for it. */
   review: () => void;
+  /** Only for a step whose done-ness is the reader's judgement, not a fact the server holds. */
+  markDone?: () => void;
 }
+
+type StepDef = Omit<ChecklistStep, "name" | "state"> & { unknown?: boolean };
 
 function openTeams() {
   router.push({ name: "onCallTeams", query: orgQuery.value });
@@ -267,6 +284,11 @@ function openTeamTab(tab: string) {
     params: { teamId: props.firstTeamId, tab },
     query: orgQuery.value,
   });
+}
+
+function reviewEscalation() {
+  policyReviewed.markReviewed();
+  openTeamTab("escalation");
 }
 
 function openRouting() {
@@ -298,7 +320,8 @@ async function sendTestPage() {
 }
 
 const steps = computed<ChecklistStep[]>(() => {
-  const defs = [
+  const policyDone = props.hasPolicy === true || policyReviewed.reviewed.value;
+  const defs: StepDef[] = [
     {
       key: "team",
       title: t("oncall.setupStep1Title"),
@@ -328,12 +351,14 @@ const steps = computed<ChecklistStep[]>(() => {
     {
       key: "policy",
       title: t("oncall.setupStep3Title"),
-      body: t("oncall.setupStep3Body"),
       cta: t("oncall.setupStep3Cta"),
       icon: "trending-up" as IconName,
-      done: props.hasPolicy,
-      act: () => openTeamTab("escalation"),
-      review: () => openTeamTab("escalation"),
+      done: policyDone,
+      // Neither read answered, so the step is neither owed nor done: it is left out rather than guessed.
+      unknown: !policyDone && props.hasPolicy === null,
+      act: reviewEscalation,
+      review: reviewEscalation,
+      markDone: policyReviewed.markReviewed,
     },
     {
       key: "routing",
@@ -357,10 +382,12 @@ const steps = computed<ChecklistStep[]>(() => {
     },
   ];
 
-  const firstUndone = defs.findIndex((def) => !def.done);
+  const shown = defs.filter((def) => !def.unknown);
+  const firstUndone = shown.findIndex((def) => !def.done);
 
-  return defs.map((def, index) => ({
+  return shown.map((def, index) => ({
     ...def,
+    markDone: def.done ? undefined : def.markDone,
     name: index + 1,
     state: (def.done ? "done" : index === firstUndone ? "active" : "todo") as StepState,
   }));

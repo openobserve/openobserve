@@ -22,6 +22,7 @@ import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -44,6 +45,7 @@ vi.mock("@/services/oncall", () => ({
     snoozeResponse: vi.fn(),
     unsnoozeResponse: vi.fn(),
     teamContext: vi.fn(),
+    getPolicy: vi.fn(),
     escalationProgressBatch: vi.fn(),
     getResponse: vi.fn(),
     myOnCall: vi.fn(),
@@ -1018,6 +1020,64 @@ describe("OnCallResponses", () => {
         include_mine: false,
       });
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    describe("when the bulk team read is missing", () => {
+      const notFound = Object.assign(new Error("404"), { response: { status: 404 } });
+
+      beforeEach(() => {
+        resetOnCallPolicyReviewed();
+        window.localStorage.clear();
+        service.listTeams.mockResolvedValue({ data: [team] } as any);
+        service.teamContext.mockRejectedValue(notFound);
+      });
+      afterEach(() => window.localStorage.clear());
+
+      it("falls back to the team's own policy read", async () => {
+        service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+        const wrapper = render();
+        await flushPromises();
+
+        expect(service.getPolicy).toHaveBeenCalledWith({
+          org_identifier: "default",
+          team_id: "team_1",
+        });
+        expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      });
+
+      /// Neither read answered, so the step is unknown rather than owed.
+      it("leaves the step unknown when the fallback fails too", async () => {
+        service.getPolicy.mockRejectedValue(notFound);
+        service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 1, teams: [team] } } as any);
+        const wrapper = render();
+        await flushPromises();
+
+        const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+        expect(checklist.props("hasPolicy")).toBeNull();
+        expect(wrapper.find('[data-test="oncall-setup-step-policy"]').exists()).toBe(false);
+      });
+
+      it("hides the checklist when the unknown step is all that is left", async () => {
+        service.getPolicy.mockRejectedValue(notFound);
+        const wrapper = render();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      });
+    });
+
+    /// Reviewing the escalation from the checklist is the step, whatever the server says.
+    it("counts a reviewed escalation as done", async () => {
+      window.localStorage.setItem(`oncall-setup-policy-reviewed:default:${team.id}`, "1");
+      resetOnCallPolicyReviewed();
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      answerTeams(() => ({ on_call: [], schedule: null }));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      window.localStorage.clear();
+      resetOnCallPolicyReviewed();
     });
 
     /// Setup must never read as all-good from the shift chip while pages cannot reach anyone yet.

@@ -40,6 +40,7 @@ import { useStore } from "vuex";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { useOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import {
   coverageGapsQuery,
@@ -71,12 +72,18 @@ const { dismissed } = useOnCallSetupDismissed();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
 const teams = ref<OnCallTeam[]>([]);
-const facts = ref({
+const facts = ref<{
+  hasTeam: boolean;
+  hasStaffedRotation: boolean;
+  hasPolicy: boolean | null;
+  hasRouting: boolean;
+}>({
   hasTeam: false,
   hasStaffedRotation: false,
   hasPolicy: false,
   hasRouting: false,
 });
+const { reviewed: policyReviewed } = useOnCallPolicyReviewed(() => teams.value[0]?.id);
 /// Set only once every read answered: a fact that failed to load is not a step left undone.
 const known = ref(false);
 
@@ -86,7 +93,7 @@ const unfinished = computed(
     !(
       facts.value.hasTeam &&
       facts.value.hasStaffedRotation &&
-      facts.value.hasPolicy &&
+      (policyReviewed.value || facts.value.hasPolicy !== false) &&
       facts.value.hasRouting
     ),
 );
@@ -106,15 +113,21 @@ async function read<T>(
   return queryClient.fetchQuery(options as any) as Promise<T>;
 }
 
-/// One answering policy is enough, so teams are asked in turn rather than all at once.
-async function anyPolicy(org: string, teamList: OnCallTeam[], force: boolean) {
+/// One answering policy is enough, so teams are asked in turn; `null` when a team that might have one could not be read.
+async function anyPolicy(
+  org: string,
+  teamList: OnCallTeam[],
+  force: boolean,
+): Promise<boolean | null> {
+  let unread = false;
   for (const team of teamList) {
-    const policy = await read<OnCallPolicy | null>(teamPolicyQuery(org, team.id), force).catch(
-      () => null,
-    );
-    if (policy) return true;
+    try {
+      if (await read<OnCallPolicy | null>(teamPolicyQuery(org, team.id), force)) return true;
+    } catch {
+      unread = true;
+    }
   }
-  return false;
+  return unread ? null : false;
 }
 
 async function load(force = false) {

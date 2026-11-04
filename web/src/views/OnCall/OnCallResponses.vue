@@ -854,6 +854,7 @@ import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.v
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -896,6 +897,7 @@ import {
   snoozeResponseMutation,
   unsnoozeResponseMutation,
   teamContextQuery,
+  teamPolicyQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 
@@ -1079,7 +1081,13 @@ const bulkResolveNote = ref("");
 
 // Only after the first fetch, so the checklist never flashes while loading.
 const loaded = ref(false);
-const setup = ref({
+const setup = ref<{
+  hasTeam: boolean;
+  hasStaffedRotation: boolean;
+  /** `null` when neither the bulk nor the per-team read could answer. */
+  hasPolicy: boolean | null;
+  hasRouting: boolean;
+}>({
   hasTeam: false,
   hasStaffedRotation: false,
   hasPolicy: false,
@@ -1093,6 +1101,7 @@ const setup = ref({
 const setupLoaded = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const { reviewed: policyReviewed } = useOnCallPolicyReviewed(() => teams.value[0]?.id);
 /// Lowercased to compare with `acked_by`, which the server normalises on a
 /// handoff but not necessarily on a self-acknowledgement.
 const viewerEmail = computed(() => String(store.state.userInfo?.email ?? "").toLowerCase());
@@ -1190,7 +1199,7 @@ const showChecklist = computed(
     !(
       setup.value.hasTeam &&
       setup.value.hasStaffedRotation &&
-      setup.value.hasPolicy &&
+      (policyReviewed.value || setup.value.hasPolicy !== false) &&
       setup.value.hasRouting
     ),
 );
@@ -2008,15 +2017,32 @@ async function fetchPolicyPresence(force = false) {
     setup.value.hasPolicy = true;
     return;
   }
+  const chunks = chunkIds(teams.value.map((team) => team.id));
   const reads = await Promise.allSettled(
-    chunkIds(teams.value.map((team) => team.id)).map((ids) =>
+    chunks.map((ids) =>
       read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, false), force),
     ),
   );
   // The server creates the default ladder on first read, so a policy that answers is one that pages.
-  setup.value.hasPolicy = reads.some(
-    (r) => r.status === "fulfilled" && r.value.some((team) => !!team.policy),
-  );
+  if (reads.some((r) => r.status === "fulfilled" && r.value.some((team) => !!team.policy))) {
+    setup.value.hasPolicy = true;
+    return;
+  }
+  const unread = chunks.filter((_, i) => reads[i].status === "rejected").flat();
+  setup.value.hasPolicy = unread.length ? await anyTeamPolicy(unread, force) : false;
+}
+
+/// The bulk read is newer than some servers, so a failed one falls back to each team's own policy read; `null` when a team stays unread.
+async function anyTeamPolicy(teamIds: string[], force: boolean): Promise<boolean | null> {
+  let unread = false;
+  for (const teamId of teamIds) {
+    try {
+      if (await read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, teamId), force)) return true;
+    } catch {
+      unread = true;
+    }
+  }
+  return unread ? null : false;
 }
 
 function chunkIds(ids: string[]): string[][] {

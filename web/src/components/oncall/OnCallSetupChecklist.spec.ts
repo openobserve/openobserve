@@ -21,6 +21,7 @@ import { flushPromises } from "@vue/test-utils";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import store from "@/test/unit/helpers/store";
 
@@ -225,6 +226,109 @@ describe("OnCallSetupChecklist", () => {
 
     expect(wrapper.find('[data-test="oncall-setup-cta-team"]').exists()).toBe(false);
   });
+  describe("the escalation step", () => {
+    const ready = { hasTeam: true, hasStaffedRotation: true, firstTeamId: "team_1" };
+    const reviewedKey = () =>
+      `oncall-setup-policy-reviewed:${store.state.selectedOrganization.identifier}:team_1`;
+
+    beforeEach(() => {
+      resetOnCallPolicyReviewed();
+      window.localStorage.clear();
+    });
+
+    it("is done when a team has a policy", () => {
+      const wrapper = render({ ...ready, hasPolicy: true });
+      expect(wrapper.find('[data-test="oncall-setup-step-policy"]').attributes("data-state")).toBe(
+        "done",
+      );
+    });
+
+    /// G15: the title says enough, and the button names the screen it opens.
+    it("reads Review escalation with no sub-line", () => {
+      const wrapper = render(ready);
+      expect(wrapper.find('[data-test="oncall-setup-cta-policy"]').text()).toBe(
+        "Review escalation",
+      );
+      expect(wrapper.find('[data-test="oncall-setup-body-policy"]').exists()).toBe(false);
+    });
+
+    /// Reviewing is the step; a returning reader must find it ticked.
+    it("is done once reviewed, and stays done on the next mount", async () => {
+      const wrapper = render(ready);
+      await wrapper.find('[data-test="oncall-setup-cta-policy"]').trigger("click");
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({ params: { teamId: "team_1", tab: "escalation" } }),
+      );
+      expect(window.localStorage.getItem(reviewedKey())).toBe("1");
+
+      resetOnCallPolicyReviewed();
+      const again = render(ready);
+      expect(again.find('[data-test="oncall-setup-step-policy"]').attributes("data-state")).toBe(
+        "done",
+      );
+      expect(again.find('[data-test="oncall-setup-progress"]').text()).toContain("3 of 5");
+    });
+
+    it("can be marked done without leaving the page, then Change opens escalation", async () => {
+      const wrapper = render(ready);
+      await wrapper.find('[data-test="oncall-setup-mark-done-policy"]').trigger("click");
+
+      expect(push).not.toHaveBeenCalled();
+      expect(window.localStorage.getItem(reviewedKey())).toBe("1");
+      expect(wrapper.find('[data-test="oncall-setup-step-policy"]').attributes("data-state")).toBe(
+        "done",
+      );
+      expect(wrapper.find('[data-test="oncall-setup-mark-done-policy"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="oncall-setup-change-policy"]').trigger("click");
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({ params: { teamId: "team_1", tab: "escalation" } }),
+      );
+      expect(window.localStorage.getItem(reviewedKey())).toBe("1");
+    });
+
+    /// Only this step is the reader's call; the others are facts the server holds.
+    it("offers Mark as done on no other step", () => {
+      const wrapper = render();
+      expect(
+        wrapper
+          .findAll('[data-test^="oncall-setup-mark-done-"]')
+          .map((b) => b.attributes("data-test")),
+      ).toEqual(["oncall-setup-mark-done-policy"]);
+    });
+
+    /// Reviewing one team says nothing about another.
+    it("keeps the review per team", () => {
+      window.localStorage.setItem(reviewedKey(), "1");
+      const wrapper = render({ ...ready, firstTeamId: "team_2" });
+      expect(
+        wrapper.find('[data-test="oncall-setup-step-policy"]').attributes("data-state"),
+      ).not.toBe("done");
+    });
+
+    /// No read answered: the step is neither next nor counted.
+    it("is left out while the policy is unknown", () => {
+      const wrapper = render({ ...ready, hasPolicy: null });
+
+      expect(wrapper.find('[data-test="oncall-setup-step-policy"]').exists()).toBe(false);
+      expect(states(wrapper)).toEqual(["done", "done", "active", "todo"]);
+      expect(wrapper.find('[data-test="oncall-setup-progress"]').text()).toContain("2 of 4");
+      expect(wrapper.find('[data-test="oncall-setup-step-routing"]').attributes("data-state")).toBe(
+        "active",
+      );
+    });
+
+    it("shows as done when unknown but reviewed", () => {
+      window.localStorage.setItem(reviewedKey(), "1");
+      resetOnCallPolicyReviewed();
+      const wrapper = render({ ...ready, hasPolicy: null });
+      expect(wrapper.find('[data-test="oncall-setup-step-policy"]').attributes("data-state")).toBe(
+        "done",
+      );
+    });
+  });
+
   describe("hiding the compact bar", () => {
     beforeEach(() => {
       resetOnCallSetupDismissed();

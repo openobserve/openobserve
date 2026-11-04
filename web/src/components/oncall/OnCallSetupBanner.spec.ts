@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
@@ -77,6 +78,7 @@ describe("OnCallSetupBanner", () => {
     vi.clearAllMocks();
     queryClient.clear();
     resetOnCallSetupDismissed();
+    resetOnCallPolicyReviewed();
     window.localStorage.clear();
   });
   afterEach(() => window.localStorage.clear());
@@ -169,6 +171,46 @@ describe("OnCallSetupBanner", () => {
         name: "onCallTeams",
         query: expect.objectContaining({ action: "add" }),
       }),
+    );
+  });
+
+  /// No policy read answered: the step is unknown, so it is not what the bar asks for next.
+  it("skips the escalation step when no policy can be read", async () => {
+    answer();
+    service.coverageGaps.mockResolvedValue({ data: { total: 1 } } as any);
+    service.getPolicy.mockRejectedValue(new Error("down"));
+    const wrapper = await render();
+
+    expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toContain(
+      "Add members and who's on first",
+    );
+    expect(wrapper.find('[data-test="oncall-setup-expand"]').text()).toContain("1 of 4");
+  });
+
+  /// Unknown is not owed: with every other step done the bar stays away.
+  it("stays away when only the unknown escalation step is left", async () => {
+    answer({ rules: [{ rule_id: "r1" }] });
+    service.getPolicy.mockRejectedValue(new Error("down"));
+    const wrapper = await render();
+
+    expect(wrapper.find('[data-test="oncall-setup-banner-host"]').exists()).toBe(false);
+  });
+
+  /// Opening escalation from the expanded list ticks the step, and the bar moves on.
+  it("moves past the escalation step once it is reviewed", async () => {
+    answer();
+    service.getPolicy.mockResolvedValue({ data: null } as any);
+    const wrapper = await render();
+    expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toContain(
+      "Check how they're woken",
+    );
+
+    await wrapper.find('[data-test="oncall-setup-bar-cta-policy"]').trigger("click");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { teamId: "team_1", tab: "escalation" } }),
+    );
+    expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toBe(
+      "Next: Send alerts to this team",
     );
   });
 });
