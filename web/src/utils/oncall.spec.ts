@@ -29,6 +29,7 @@ import {
   apiErrorStatus,
   CHANNEL_WAKES,
   fieldLabel,
+  literalDimensions,
   readableConditions,
   routingFieldIds,
   PRIORITY_TONE,
@@ -2738,6 +2739,13 @@ describe("routing field helpers", () => {
         [{ dimensions: { region: "eu", service: "b" } }],
       ),
     ).toEqual(["service", "environment", "region"]);
+  });
+
+  it("reads a rule as one concrete alert, a starts with value as its prefix", () => {
+    expect(literalDimensions({ service: "pay*", "k8s-namespace": "prod" })).toEqual({
+      service: "pay",
+      "k8s-namespace": "prod",
+    });
   });
 
   it("reads conditions as prose, a trailing star as starts with", () => {

@@ -150,6 +150,7 @@ export class OnCallRoutingPage {
   conditionOp(index) { return `[data-test="oncall-rule-editor-op-${index}"]`; }
   conditionValue(index) { return `[data-test="oncall-rule-editor-value-${index}"]`; }
   conditionRemove(index) { return `[data-test="oncall-rule-editor-remove-${index}"]`; }
+  conditionPickValue(index) { return `[data-test="oncall-rule-editor-pick-value-${index}"]`; }
 
   unroutedPath(signalId) { return `[data-test="oncall-unrouted-path-${signalId}"]`; }
   unroutedNobody(signalId) { return `[data-test="oncall-unrouted-nobody-${signalId}"]`; }
@@ -315,6 +316,33 @@ export class OnCallRoutingPage {
    * `o-dialog-primary-btn` — scoped to the editor's own panel, which ODialog
    * stamps with the consumer's `data-test` precisely so this scoping works.
    */
+  /** Repoint an existing condition row at another field, which empties its value. */
+  async changeConditionField(index, name) {
+    await this.selectOption(this.conditionField(index), name);
+  }
+
+  async removeCondition(index) {
+    await this.page.locator(this.conditionRemove(index)).click();
+  }
+
+  getSaveRuleButton() {
+    return this.page.locator(`${this.locators.ruleEditor} [data-test="o-dialog-primary-btn"]`);
+  }
+
+  async cancelRule() {
+    await this.page
+      .locator(`${this.locators.ruleEditor} [data-test="o-dialog-secondary-btn"]`)
+      .click();
+    await expect(this.page.locator(this.locators.ruleEditor)).toBeHidden({ timeout: 20000 });
+  }
+
+  /** A row naming a field with no value blocks Save, on the row and in the footer. */
+  async expectConditionNeedsValue(index) {
+    await expect(this.page.locator(this.conditionPickValue(index))).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.locators.ruleEditorSaveProblem)).toBeVisible();
+    await expect(this.getSaveRuleButton()).toBeDisabled();
+  }
+
   async saveRule() {
     await this.page
       .locator(`${this.locators.ruleEditor} [data-test="o-dialog-primary-btn"]`)

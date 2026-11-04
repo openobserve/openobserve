@@ -188,10 +188,17 @@ describe("OnCallRoutingSimulator", () => {
     expect(select(wrapper, "oncall-simulator-start").props("modelValue")).toBe("rule:r1");
   });
 
-  it("uses the same condition rows as the rule editor", () => {
+  // A test describes one real alert, and no alert carries a literal trailing star.
+  it("uses the rule editor's rows with only is, reading a prefix seed as its literal value", async () => {
     const wrapper = render({ seed: { service: "checkout-*" } });
     expect(wrapper.findComponent({ name: "OnCallConditionRows" }).exists()).toBe(true);
-    expect(select(wrapper, "oncall-simulator-op-0").props("modelValue")).toBe("prefix");
+    expect(wrapper.find('[data-test="oncall-simulator-op-0"]').text()).toBe("is");
+    expect(select(wrapper, "oncall-simulator-op-0")).toBeUndefined();
+    await flushPromises();
+    vi.advanceTimersByTime(400);
+    expect(wrapper.emitted("run")?.at(-1)?.[0]).toMatchObject({
+      dimensions: { service: "checkout-" },
+    });
   });
 
   it("answers in one line by name: team, who is woken now, and the next new person", async () => {
