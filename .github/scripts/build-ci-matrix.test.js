@@ -158,6 +158,23 @@ test("selection refuses to run for non-pull_request events", () => {
   );
 });
 
+test("only-shards emits exactly the named shards and dies on an unknown name", () => {
+  const only = (list, extra = []) =>
+    JSON.parse(
+      execFileSync("node", [SCRIPT, BASE, "--only-shards", list, ...extra], {
+        encoding: "utf8",
+        env: { ...process.env, GITHUB_EVENT_NAME: "workflow_dispatch" },
+        stdio: ["ignore", "pipe", "pipe"],
+      })
+    ).include.map((s) => s.testfolder);
+  assert.deepStrictEqual(only(" RUM-Token, Org ,RUM-Token"), ["Org", "RUM-Token"]);
+  assert.strictEqual(only("").length, FULL_COUNT);
+  assert.throws(() => only("RUM-Token,No-Such-Shard"), /names no runnable shard: No-Such-Shard/);
+  const changed = path.join(TMP, "only-changed.txt");
+  fs.writeFileSync(changed, "web/src/app.ts\n");
+  assert.throws(() => only("Org", ["--select-for-changes", changed]), /cannot be combined/);
+});
+
 test("config errors die eagerly, even when the changed file is global", () => {
   const shard = { testfolder: "X", actual_folder: "X", run_files: ["a.spec.js"] };
   const goodPaths = { folder_paths: { X: ["web/x/**"] }, global_paths: ["web/global/**"] };

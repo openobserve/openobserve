@@ -40,11 +40,25 @@ use crate::alerts::lifecycle;
 const CAN_ACT_SHOWN: usize = 2;
 const ON_CALL_SHOWN: usize = 3;
 
-/// What the caller wants to do; Ack and Mute share one rule (Δ2).
+/// What the caller wants to do; every act shares one rule (Δ2) and a refusal names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Act {
     Ack,
+    Unack,
+    TakeOver,
+    Resolve,
     Mute,
+}
+
+impl From<Verb> for Act {
+    fn from(verb: Verb) -> Self {
+        match verb {
+            Verb::Acknowledge => Self::Ack,
+            Verb::TakeOver => Self::TakeOver,
+            Verb::Unack | Verb::HandOff => Self::Unack,
+            Verb::Resolve => Self::Resolve,
+        }
+    }
 }
 
 /// Which part of the rule let the actor in.
@@ -197,8 +211,16 @@ pub struct PageCover {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordWrite {
     Claim,
-    Move { from: String },
-    Clear { holder: String },
+    Move {
+        from: String,
+    },
+    Clear {
+        holder: String,
+    },
+    /// A clear that writes only while `holder` still holds the record.
+    Release {
+        holder: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -332,6 +354,9 @@ pub fn refusal(
         .collect();
     let (code, verb) = match act {
         Act::Ack => (RefusalCode::AckRefused, "acknowledge"),
+        Act::Unack => (RefusalCode::AckRefused, "unacknowledge"),
+        Act::TakeOver => (RefusalCode::AckRefused, "take over"),
+        Act::Resolve => (RefusalCode::AckRefused, "resolve"),
         Act::Mute => (RefusalCode::MuteRefused, "mute"),
     };
     let message = if facts.fga_enabled {
@@ -396,6 +421,34 @@ pub fn plan(f: &PlanFacts) -> AckPlan {
     match f.verb {
         Verb::Acknowledge | Verb::TakeOver => plan_hold(f),
         Verb::Unack | Verb::HandOff | Verb::Resolve => plan_release(f),
+    }
+}
+
+/// Clears each record `f.actor`, the leaver, holds and leaves every page to its release. [pure]
+pub fn plan_leaver_release(f: &PlanFacts) -> AckPlan {
+    let writes: Vec<(AckRecord, RecordWrite)> = f
+        .records
+        .iter()
+        .filter_map(|r| {
+            r.holder
+                .as_ref()
+                .filter(|h| same(h, &f.actor))
+                .map(|h| (r.record.clone(), RecordWrite::Release { holder: h.clone() }))
+        })
+        .collect();
+    AckPlan {
+        answer: if writes.is_empty() {
+            Answer::NotHeld
+        } else {
+            Answer::Changed
+        },
+        writes,
+        pages: f
+            .pages
+            .iter()
+            .map(|p| (p.response_id.clone(), PageStep::Leave))
+            .collect(),
+        still_paging: vec![],
     }
 }
 
@@ -578,6 +631,41 @@ pub fn page_cover(subject: &config::meta::oncall::SubjectRef, closed_at: i64) ->
             closed_at,
         }),
         config::meta::oncall::SubjectType::Incident => None,
+    }
+}
+
+/// Clears, as the engine, what the leaver holds. [weak: cleared stays cleared; a retry ends it]
+#[cfg(feature = "enterprise")]
+pub async fn release_leaver(p: &Problem, leaver: &str) -> Result<(), AckError> {
+    use o2_enterprise::enterprise::oncall::escalation::ENGINE_ACTOR;
+
+    // A release verb, so a named group is read even when it no longer fires.
+    let g = gather(p, Verb::HandOff, leaver).await?;
+    let plan = plan_leaver_release(&g.facts);
+    carry_out(p, &g, &plan, ENGINE_ACTOR, AckSource::Oncall)
+        .await
+        .map(|_| ())
+}
+
+/// [`release_leaver`] on each released page's problem; a failure is logged. [no-fail]
+#[cfg(feature = "enterprise")]
+pub async fn release_leaver_pages(org_id: &str, response_ids: &[String], leaver: &str) {
+    for response_id in response_ids {
+        let released = match problem_of_page(org_id, response_id).await {
+            Ok(p) => release_leaver(&p, leaver).await,
+            Err(e) => Err(e),
+        };
+        match released {
+            Ok(()) => {}
+            Err(AckError::NotFound) => {
+                log::info!(
+                    "[ALERT_ACK] page {response_id} has no alert or incident left to release"
+                )
+            }
+            Err(e) => log::error!(
+                "[ALERT_ACK] page {response_id}: the acks {leaver} held could not be released: {e:?}"
+            ),
+        }
     }
 }
 
@@ -1556,7 +1644,7 @@ fn ordered_views(
 fn status_after(write: &RecordWrite) -> IncidentStatus {
     match write {
         RecordWrite::Claim | RecordWrite::Move { .. } => IncidentStatus::Acknowledged,
-        RecordWrite::Clear { .. } => IncidentStatus::Open,
+        RecordWrite::Clear { .. } | RecordWrite::Release { .. } => IncidentStatus::Open,
     }
 }
 
@@ -1632,6 +1720,18 @@ async fn write_firing(
             reopen_silence(target, group_key, started, now).await;
             (row, AckAction::Unack, None)
         }
+        RecordWrite::Release { holder } => {
+            let held = AlertAck {
+                acked_by: holder.clone(),
+                ..ack(None)
+            };
+            // Someone else's ack landed since the read: theirs stands.
+            let Some(row) = db::alerts::alert_acks::unack_held(&held, actor, now).await? else {
+                return Ok((None, false));
+            };
+            reopen_silence(target, group_key, started, now).await;
+            (row, AckAction::Unack, None)
+        }
     };
     record_event(target, group_key, actor, action, source, from);
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, Some(group_key)).await;
@@ -1663,7 +1763,7 @@ async fn write_incident(
             alert_incidents::take_over_acknowledgement(org_id, incident_id, from, actor).await?,
             IncidentEvent::acknowledged(actor),
         ),
-        RecordWrite::Clear { holder } => (
+        RecordWrite::Clear { holder } | RecordWrite::Release { holder } => (
             alert_incidents::unacknowledge(org_id, incident_id, holder).await?,
             match verb {
                 Verb::Resolve => IncidentEvent::ack_ended_by_page_resolve(actor),
@@ -2466,6 +2566,126 @@ mod tests {
             assert_eq!(got.pages, pages, "{name}");
             assert_eq!(got.still_paging, still_paging, "{name}");
             assert_eq!(got.answer, answer, "{name}");
+        }
+    }
+
+    fn released(r: &HeldRecord) -> (AckRecord, RecordWrite) {
+        let holder = r.holder.clone().unwrap_or_default();
+        (r.record.clone(), RecordWrite::Release { holder })
+    }
+
+    #[test]
+    fn a_leaver_release_clears_only_the_leavers_records_and_leaves_every_page() {
+        let (bo, ana) = (Some("Bo@acme.io"), Some("ana@acme.io"));
+        let pages = || vec![page("p1", bo), page("p2", None), leftover("old", ana)];
+        let cases: Vec<(&str, Vec<HeldRecord>, Vec<HeldRecord>)> = vec![
+            (
+                "the incident only",
+                vec![incident(bo), firing("", None, false)],
+                vec![incident(bo)],
+            ),
+            (
+                "the alerts only",
+                vec![
+                    incident(None),
+                    firing("g1", bo, false),
+                    firing("g2", bo, false),
+                ],
+                vec![firing("g1", bo, false), firing("g2", bo, false)],
+            ),
+            (
+                "both",
+                vec![incident(bo), firing("", bo, false)],
+                vec![incident(bo), firing("", bo, false)],
+            ),
+            (
+                "nothing",
+                vec![incident(None), firing("", None, false)],
+                vec![],
+            ),
+            (
+                "a mix with another holder",
+                vec![
+                    incident(ana),
+                    firing("g1", bo, false),
+                    firing("g2", ana, true),
+                ],
+                vec![firing("g1", bo, false)],
+            ),
+        ];
+        for (name, records, cleared) in cases {
+            let got = plan_leaver_release(&facts_for(Verb::HandOff, records, pages()));
+            assert_eq!(
+                got.writes,
+                cleared.iter().map(released).collect::<Vec<_>>(),
+                "{name}"
+            );
+            assert!(
+                got.pages.iter().all(|(_, step)| *step == PageStep::Leave),
+                "{name}: {:?}",
+                got.pages
+            );
+            assert_eq!(got.pages.len(), 3, "{name}");
+            let answer = if cleared.is_empty() {
+                Answer::NotHeld
+            } else {
+                Answer::Changed
+            };
+            assert_eq!(got.answer, answer, "{name}");
+        }
+    }
+
+    #[test]
+    fn after_a_leaver_release_a_plain_ack_holds_the_page_the_incident_and_the_alert() {
+        let bo = Some("bo@acme.io");
+        let records = vec![incident(bo), firing("", bo, false)];
+        let release = plan_leaver_release(&facts_for(Verb::HandOff, records.clone(), vec![]));
+        let after: Vec<HeldRecord> = records
+            .into_iter()
+            .map(|r| HeldRecord {
+                holder: (!release.writes.iter().any(|(rec, _)| *rec == r.record))
+                    .then(|| r.holder.clone())
+                    .flatten(),
+                ..r
+            })
+            .collect();
+        let ack = plan(&PlanFacts {
+            actor: "cy@acme.io".into(),
+            ..facts_for(Verb::Acknowledge, after, vec![page("p1", None)])
+        });
+        assert_eq!(
+            ack.writes,
+            vec![claim(&incident(None)), claim(&firing("", None, false))]
+        );
+        assert_eq!(
+            ack.pages,
+            vec![(
+                "p1".to_string(),
+                PageStep::Stop {
+                    by: "cy@acme.io".into()
+                }
+            )]
+        );
+        assert_eq!(ack.answer, Answer::Changed);
+    }
+
+    #[test]
+    fn a_refusal_names_the_verb_it_refused() {
+        for (act, verb) in [
+            (Act::Ack, "acknowledge"),
+            (Act::Unack, "unacknowledge"),
+            (Act::TakeOver, "take over"),
+            (Act::from(Verb::TakeOver), "take over"),
+            (Act::from(Verb::Unack), "unacknowledge"),
+            (Act::from(Verb::Resolve), "resolve"),
+        ] {
+            let r = refusal(act, &facts(Some(UserRole::Viewer)), &[]);
+            assert_eq!(r.code, RefusalCode::AckRefused, "{verb}");
+            assert!(
+                r.message.ends_with(&format!("can {verb} it")),
+                "{verb}: {}",
+                r.message
+            );
         }
     }
 

@@ -2359,6 +2359,64 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
+
+    it("switches a pinned cell's background instantly, in step with its row", () => {
+      const cols: OTableColumnDef<TestRow>[] = [
+        { id: "id", header: "ID", accessorKey: "id" },
+        { id: "actions", header: "", isAction: true },
+      ];
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: cols, selection: "multiple", selectedIds: ["2"] },
+      });
+      const pinnedCell = (row: number) =>
+        wrapper.find(`[data-test="o2-table-row-${row}"] [data-test="o2-table-cell-actions"]`);
+      expect(pinnedCell(0).classes()).toContain("group-hover/row:bg-table-row-hover-bg");
+      expect(pinnedCell(1).classes()).toContain("bg-table-row-selected-bg");
+      for (const row of [0, 1]) {
+        const motion = pinnedCell(row)
+          .classes()
+          .filter((c) => /(^|:)(transition|duration-)/.test(c));
+        expect(motion).toEqual([]);
+      }
+    });
+
+    it("paints a pinned cell with its row's active, striped and keyboard-focus backgrounds", () => {
+      const cols: OTableColumnDef<TestRow>[] = [
+        { id: "id", header: "ID", accessorKey: "id" },
+        { id: "actions", header: "", isAction: true },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: cols,
+          striped: true,
+          activeRowIndex: 2,
+          onRowClick: vi.fn(),
+        },
+      });
+      const pinnedCell = (row: number) =>
+        wrapper
+          .find(`[data-test="o2-table-row-${row}"] [data-test="o2-table-cell-actions"]`)
+          .classes();
+      expect(pinnedCell(2)).toContain("bg-table-row-selected-bg");
+      expect(pinnedCell(2)).not.toContain("group-hover/row:bg-table-row-hover-bg");
+      expect(pinnedCell(1)).toContain("bg-table-row-striped-bg");
+      expect(pinnedCell(1)).not.toContain("bg-table-cell-bg");
+      expect(pinnedCell(0)).toContain("bg-table-cell-bg");
+      expect(pinnedCell(0)).toContain("group-focus-visible/row:bg-table-row-hover-bg");
+    });
+
+    it("leaves keyboard-focus fill off a pinned cell whose row cannot take focus", () => {
+      const cols: OTableColumnDef<TestRow>[] = [
+        { id: "id", header: "ID", accessorKey: "id" },
+        { id: "actions", header: "", isAction: true },
+      ];
+      wrapper = mount(OTable, { props: { data: makeRows(2), columns: cols } });
+      const pinned = wrapper.find(
+        '[data-test="o2-table-row-0"] [data-test="o2-table-cell-actions"]',
+      );
+      expect(pinned.classes()).not.toContain("group-focus-visible/row:bg-table-row-hover-bg");
+    });
   });
 
   // ── Highlighting ────────────────────────────────────────────
