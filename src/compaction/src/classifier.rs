@@ -91,7 +91,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         for (stream_type, streams) in &stream_types {
             if stream_type.support_dynamic_partition() {
-                classify_streams(&org_id, *stream_type, streams, window, now).await;
+                classify_streams(&org_id, *stream_type, streams, window).await;
             }
         }
     }
@@ -104,13 +104,12 @@ async fn classify_streams(
     stream_type: StreamType,
     streams: &[String],
     window: ClassifyWindow,
-    now: i64,
 ) {
     for stream_name in streams {
         if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
             continue;
         }
-        if let Err(e) = classify_stream(org_id, stream_type, stream_name, window, now).await {
+        if let Err(e) = classify_stream(org_id, stream_type, stream_name, window).await {
             log::error!(
                 "[COMPACTOR] classify [{org_id}/{stream_type}/{stream_name}] failed, the next run retries: {e}"
             );
@@ -123,7 +122,6 @@ async fn classify_stream(
     stream_type: StreamType,
     stream_name: &str,
     window: ClassifyWindow,
-    now: i64,
 ) -> Result<(), anyhow::Error> {
     let settings = get_settings(org_id, stream_name, stream_type)
         .await
@@ -167,7 +165,11 @@ async fn classify_stream(
     if !get_stream_setting_dynamic_partition(stream_type, Some(&settings)) {
         return Ok(());
     }
-    if settings.partition_time_level.set_level(target, now) {
+    // a run can pass midnight, and an effect day taken from its start may have begun
+    if settings
+        .partition_time_level
+        .set_level(target, now_micros())
+    {
         schema::save_stream_settings(org_id, stream_name, stream_type, settings).await?;
         log::info!("[COMPACTOR] classify [{org_id}/{stream_type}/{stream_name}] moves to {target}");
     }
