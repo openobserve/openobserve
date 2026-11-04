@@ -328,6 +328,13 @@ describe("OnCallMine", () => {
     expect(data.end_at).toBeGreaterThan(data.start_at);
   });
 
+  it("centres the shift row's actions under the Actions header", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const button = wrapper.find('[data-test="oncall-mine-test-page-team_1"]').element;
+    expect(button.parentElement!.classList).toContain("justify-center");
+  });
+
   it("sends the team test page after a confirm", async () => {
     service.testPage.mockResolvedValue({
       data: {

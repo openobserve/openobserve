@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
               </template>
               <template #cell-row-actions="{ row }">
-                <div class="flex items-center justify-end">
+                <div class="flex items-center justify-center">
                   <OButton
                     v-if="canCover(row)"
                     variant="ghost"
@@ -662,7 +662,7 @@ const shiftColumns = computed<OTableColumnDef<ShiftRow>[]>(() => [
     header: t("oncall.actions"),
     sortable: false,
     size: 96,
-    meta: { align: "right" },
+    meta: { align: "center" },
   },
 ]);
 
