@@ -3014,39 +3014,35 @@ mod tests {
 
     #[tokio::test]
     async fn the_audit_trail_is_not_licence_gated_while_search_is_blocked() {
-        use o2_enterprise::enterprise::{
-            common::auditor::AUDIT_STREAM, license::close_search_gate_for_tests,
-        };
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::{self_reporting::usage::AUDIT_STREAM, stream::StreamType};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-        let custom = "audit@fleet-fleets-handlers.test";
-        seed_member(custom, config::meta::user::UserRole::User, ORG);
-        openfga_on(&[], None);
-        let gate = close_search_gate_for_tests().await;
-        let exempt = search_service::check_search_allowed(
+        let (org, _) = audit_org("licence").await;
+        // without an audit schema the read returns before it searches
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("http_method", DataType::Utf8, true),
+            Field::new("http_path", DataType::Utf8, true),
+            Field::new("user_email", DataType::Utf8, true),
+        ]);
+        let now = config::utils::time::now_micros();
+        infra::schema::merge(
             config::META_ORG_ID,
-            Some((AUDIT_STREAM, config::meta::stream::StreamType::Logs)),
-        );
-        let customer = search_service::check_search_allowed(ORG, None);
-        let res = list_audit(
-            Path(ORG.to_string()),
-            Query(AuditQuery {
-                from: None,
-                to: None,
-            }),
-            Headers(UserEmail {
-                user_id: custom.to_string(),
-            }),
+            AUDIT_STREAM,
+            StreamType::Logs,
+            &schema,
+            Some(now),
         )
-        .await;
+        .await
+        .unwrap();
+        let gate = close_search_gate_for_tests().await;
+        let customer = search_service::check_search_allowed(&org, None);
+        let res = list_audit(Path(org), Query(AuditQuery::default()), root()).await;
         drop(gate);
-        openfga_off();
-        forget(custom, ORG);
-        assert!(exempt.is_ok(), "the audit search runs on an exempt stream");
-        assert!(customer.is_err());
-        assert_eq!(
-            res.status(),
-            StatusCode::FORBIDDEN,
-            "the fleet check answers, not the licence"
-        );
+        assert!(customer.is_err(), "the org's own searches are blocked");
+        let status = res.status();
+        let body = body_text(res).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
     }
 }
