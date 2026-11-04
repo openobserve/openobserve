@@ -48,6 +48,15 @@ pub(super) fn merged_by_day(files: &[FileKey]) -> bool {
     files.iter().any(day_output)
 }
 
+/// Hour 00's own files: the day job merges them hourly when it leaves the day as it is.
+pub(super) fn hour_00_files(files: &[FileKey]) -> Vec<FileKey> {
+    files
+        .iter()
+        .filter(|f| hour_of(f) == Some("00") && !day_output(f))
+        .cloned()
+        .collect()
+}
+
 /// Batches of one partition of the day, all written to `DD/00`; none when the day stays as it is.
 pub(super) fn plan_day(
     files: Vec<FileKey>,
@@ -86,8 +95,11 @@ pub(super) fn plan_day(
 
 /// A file of `DD/00` reaching past its hour; no file reaches past its day.
 fn day_output(file: &FileKey) -> bool {
-    file.key.split('/').nth(HOUR_SEGMENT) == Some("00")
-        && file.meta.max_ts % day_micros(1) >= hour_micros(1)
+    hour_of(file) == Some("00") && file.meta.max_ts % day_micros(1) >= hour_micros(1)
+}
+
+fn hour_of(file: &FileKey) -> Option<&str> {
+    file.key.split('/').nth(HOUR_SEGMENT)
 }
 
 fn should_merge_day(files: &[FileKey], max_file_size: usize) -> bool {
@@ -307,5 +319,21 @@ mod tests {
         assert_eq!(legacy[0].0.len(), 2);
         assert_eq!(indexed[0].0.len(), 24);
         assert!(matches!(indexed[0].1, MergeMode::MetricsIndexed));
+    }
+
+    /// Hour 00's own files, without the outputs of a merged day.
+    #[test]
+    fn test_hour_00_files_leaves_out_the_day_outputs() {
+        let mut files = day("logs", "f", MB);
+        files.push(file("logs", 0, "small", MB));
+        let mut merged = file("logs", 0, "merged", GB);
+        merged.meta.max_ts = hour_micros(24) - 1;
+        files.push(merged);
+        let hour_00 = hour_00_files(&files);
+        let names: Vec<&str> = hour_00
+            .iter()
+            .map(|f| f.key.rsplit('/').next().unwrap())
+            .collect();
+        assert_eq!(names, vec!["f0.parquet", "small.parquet"]);
     }
 }

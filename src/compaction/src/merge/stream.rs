@@ -33,7 +33,7 @@ use tokio::{
 };
 
 use super::{
-    dynamic::{day_prefix, plan_day},
+    dynamic::{day_prefix, hour_00_files, merged_by_day, plan_day},
     job::{JobScope, job_range_end, job_scope},
     plan::{BatchLimits, PlannedBatch, plan_batches},
 };
@@ -451,13 +451,24 @@ fn plan_partition(
         );
     }
     let day_files = files.len();
+    // a day left as it is still gets hour 00's hourly merge, like any other hour's job
+    let hour_00 = (!merged_by_day(&files)).then(|| hour_00_files(&files));
     let batches = plan_day(files, mode, limits);
     if !batches.is_empty() {
         log::info!(
             "[COMPACTOR] merge_by_stream [{stream}] dynamic merge of {day_files} files into {prefix}"
         );
+        return batches;
     }
-    batches
+    match hour_00 {
+        Some(files) if !files.is_empty() => plan_batches(
+            sort_by_strategy(files, limits.strategy),
+            mode,
+            limits,
+            stream,
+        ),
+        _ => Vec::new(),
+    }
 }
 
 /// The order the hourly planner groups files in.
@@ -580,6 +591,50 @@ mod tests {
         assert_eq!(result[0].key, "file1.parquet");
         assert_eq!(result[1].key, "file2.parquet");
         assert_eq!(result[2].key, "file3.parquet");
+    }
+
+    /// The day job leaves a large day alone but still merges hour 00's own files hourly.
+    #[test]
+    fn test_plan_partition_day_job_merges_hour_00_of_a_day_left_alone() {
+        use config::{meta::stream::MergeStrategy, utils::time::hour_micros};
+        let gb: i64 = 1024 * 1024 * 1024;
+        let strategy = MergeStrategy::FileTime;
+        let limits = BatchLimits {
+            strategy: &strategy,
+            max_file_size: (2 * gb) as usize,
+            max_group_files: 10000,
+            is_incremental: false,
+            merge_max_original_size: 2 * gb * 95 / 100,
+        };
+        let hour = |h: i64, name: &str, size: i64| {
+            create_file_key(
+                &format!("files/o/logs/s/2026/09/30/{h:02}/{name}.parquet"),
+                hour_micros(h),
+                hour_micros(h + 1) - 1,
+                size,
+            )
+        };
+        let prefix = "files/o/logs/s/2026/09/30/00";
+        let plan = |files| {
+            plan_partition(
+                JobScope::DynamicDay,
+                files,
+                &MergeMode::Classic,
+                &limits,
+                "o/logs/s",
+                prefix,
+            )
+        };
+        let mut files: Vec<FileKey> = (0..24).map(|h| hour(h, "big", gb)).collect();
+        files.extend((0..3).map(|i| hour(0, &format!("small{i}"), 1024)));
+        let batches = plan(files);
+        let planned: Vec<&FileKey> = batches.iter().flat_map(|(files, _)| files).collect();
+        assert_eq!(planned.len(), 4);
+        assert!(planned.iter().all(|f| f.key.contains("/30/00/")));
+        // a merged day keeps its single late file where it is
+        let mut merged = hour(0, "merged", 12 * gb);
+        merged.meta.max_ts = hour_micros(24) - 1;
+        assert!(plan(vec![merged, hour(5, "late", 1024)]).is_empty());
     }
 
     // Test helper function creation
