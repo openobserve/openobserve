@@ -31,7 +31,6 @@ import {
   SAMPLE_FOLDER_NAME,
   SAMPLE_FUNCTIONS,
   SAMPLE_METRICS,
-  SAMPLE_OVERVIEW_TITLE,
   SAMPLE_PIPELINE,
   SAMPLE_STREAMS,
 } from "./catalog";
@@ -100,9 +99,6 @@ const feedOf = (rows: Record<string, string | number | boolean>[]): SampleLogLin
 
 export interface SampleLoadResult {
   counts: SampleCounts;
-  hours: number;
-  dashboardFolderId?: string;
-  overviewDashboardId?: string;
   failedSteps: SampleStepId[];
 }
 
@@ -214,15 +210,12 @@ const createDashboards = async (org: string, range: SampleWindow) => {
       .map(toSearchHit)
       .map((hit: { title: string; dashboardId: string }) => [hit.title, hit.dashboardId]),
   );
-  let overviewId: string | undefined;
   for (const dash of sampleDashboards(range)) {
     // a reload moves the window, and a kept dashboard would still query the old one
     const oldId = idByTitle.get(dash.title);
     if (oldId) await ignoreMissing(() => dashboardService.delete(org, oldId, folderId));
-    const res = await dashboardService.create(org, dash, folderId);
-    if (dash.title === SAMPLE_OVERVIEW_TITLE) overviewId = toSearchHit(res.data).dashboardId;
+    await dashboardService.create(org, dash, folderId);
   }
-  return { folderId, overviewId };
 };
 
 const createIfMissing = async (fn: () => Promise<unknown>) => {
@@ -287,7 +280,7 @@ export const loadSampleData = async (
   const hours = sampleWindowHours(ingestAllowedUptoHours);
   const failedSteps: SampleStepId[] = [];
   let counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
-  const result: SampleLoadResult = { counts, hours, failedSteps };
+  const result: SampleLoadResult = { counts, failedSteps };
   const run = async (step: SampleStepId, fn: () => Promise<void>) => {
     onProgress({ step, fraction: 0, counts });
     let failed = false;
@@ -316,11 +309,7 @@ export const loadSampleData = async (
     console.warn("Sample data window was not saved", e);
   }
 
-  await run("dashboards", async () => {
-    const { folderId, overviewId } = await createDashboards(org, telemetry.window);
-    result.dashboardFolderId = folderId;
-    result.overviewDashboardId = overviewId;
-  });
+  await run("dashboards", () => createDashboards(org, telemetry.window));
   await run("alerts", () => createAlerts(org));
   await run("enrichment", () => createEnrichmentTable(org));
   return result;

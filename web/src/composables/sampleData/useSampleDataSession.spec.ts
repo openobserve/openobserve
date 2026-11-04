@@ -36,7 +36,7 @@ vi.mock("@/services/sample_data.queries", async (importOriginal) => {
   };
 });
 
-const loaded = { counts: { logs: 10, spans: 2, metrics: 3 }, hours: 4, failedSteps: [] };
+const loaded = { counts: { logs: 10, spans: 2, metrics: 3 }, failedSteps: [] };
 
 describe("useSampleDataSession remove", () => {
   let session: ReturnType<typeof import("./useSampleDataSession").useSampleDataSession>;
@@ -91,7 +91,6 @@ describe("useSampleDataSession remove", () => {
     await session.remove("org-a");
 
     expect(session.status.value).toBe("idle");
-    expect(session.result.value).toBeUndefined();
     expect(session.counts.logs).toBe(0);
   });
 });

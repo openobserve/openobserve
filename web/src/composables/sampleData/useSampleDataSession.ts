@@ -22,7 +22,6 @@ import { loadSampleDataMutation, removeSampleDataMutation } from "@/services/sam
 import {
   SAMPLE_STEPS,
   type SampleCounts,
-  type SampleLoadResult,
   type SampleLogLine,
   type SampleProgress,
   type SampleStepId,
@@ -51,7 +50,6 @@ type OrgFlag = (typeof ORG_FLAGS)[number];
 const status = ref<SampleLoadStatus>("idle");
 const loadingOrg = ref("");
 const error = ref<string | null>(null);
-const result = ref<SampleLoadResult>();
 const telemetryFraction = ref(0);
 const counts = reactive<SampleCounts>({ logs: 0, spans: 0, metrics: 0 });
 const steps = reactive<Record<SampleStepId, SampleStepStatus>>(
@@ -124,10 +122,9 @@ const onProgress = (p: SampleProgress) => {
 
 /** Runs the loader once per app; every surface watching this session sees the same progress. */
 const start = async (org: string, ingestAllowedUptoHours?: number) => {
-  if (status.value === "loading") return result.value;
+  if (status.value === "loading") return;
   resetProgress();
   error.value = null;
-  result.value = undefined;
   loadingOrg.value = org;
   status.value = "loading";
   try {
@@ -136,7 +133,6 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
     for (const id of SAMPLE_STEPS) {
       if (id !== "telemetry") steps[id] = res.failedSteps.includes(id) ? "failed" : "done";
     }
-    result.value = res;
     status.value = "loaded";
     return res;
   } catch (e: any) {
@@ -156,10 +152,9 @@ const remove = async (org: string) => {
   }
   const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
   const keptFunctions = await observer.mutate();
-  // the progress and result belong to the last load's org; a load running elsewhere keeps them
+  // the progress belongs to the last load's org; a load running elsewhere keeps it
   if (loadingOrg.value === org) {
     resetProgress();
-    result.value = undefined;
     status.value = "idle";
   }
   for (const flag of ORG_FLAGS) setOrgFlag(flag, org, false);
@@ -237,7 +232,6 @@ export const useSampleDataSession = () => ({
   status,
   loadingOrg,
   error,
-  result,
   counts,
   recentLogs,
   steps,

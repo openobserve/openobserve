@@ -127,7 +127,7 @@ describe("loadSampleData", () => {
       data: { partialSuccess: { rejectedSpans: "2", errorMessage: "Too old data" } },
     });
     const res = await loadSampleData("acme", 5, () => {});
-    expect(res.counts).toEqual({ logs: 2, spans: 1, metrics: 1 });
+    expect(res).toEqual({ counts: { logs: 2, spans: 1, metrics: 1 }, failedSteps: [] });
   });
 
   it("fails with the server's message when the server accepted nothing", async () => {
