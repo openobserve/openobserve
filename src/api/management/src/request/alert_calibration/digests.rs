@@ -46,6 +46,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use super::{
     deployment_disabled, error_response,
+    suggestions::offer_destination_suggestions,
     visibility::{
         PROBE_CAP, SumColumns, on_settled_columns, probe, scoped_records, scoped_runs,
         visible_search,
@@ -283,8 +284,12 @@ pub async fn get_run_records(
     };
     if visibility == AlertVisibility::Org {
         let search = |sql| search_hits(org_id, sql, start_time, end_time, run.size);
-        let hits = records_rechecked(sql, recheck, search).await;
-        return respond(org_id, hits, columns);
+        let hits = rows(
+            org_id,
+            records_rechecked(sql, recheck, search).await,
+            columns,
+        );
+        return settled(with_suggestions(org_id, user_id, &visibility, hits).await);
     }
     let run = &run;
     let search = |sql| search_page(org_id, sql, start_time, end_time, run.size);
@@ -292,7 +297,13 @@ pub async fn get_run_records(
         let filters =
             record_filters(run, written.markers()).map_err(MetaHttpResponse::bad_request)?;
         let hits = scoped_records(run, &visibility, written, filters, search).await;
-        rows(org_id, hits, Columns::Run)
+        with_suggestions(
+            org_id,
+            user_id,
+            &visibility,
+            rows(org_id, hits, Columns::Run),
+        )
+        .await
     };
     let columns = || digest_columns(org_id);
     let planned = match checked_columns(org_id, &schema).await {
@@ -668,6 +679,18 @@ fn rows(
             Err(MetaHttpResponse::internal_error(e))
         }
     }
+}
+
+/// The stream stores no destination name, so a suggestion is found here, per reader (P8a-R2a).
+async fn with_suggestions(
+    org_id: &str,
+    user_id: &str,
+    visibility: &AlertVisibility,
+    hits: Result<Vec<Value>, Response>,
+) -> Result<Vec<Value>, Response> {
+    let mut hits = hits?;
+    offer_destination_suggestions(org_id, user_id, visibility, &mut hits).await;
+    Ok(hits)
 }
 
 /// The planner reads the schema again, so a run read seen without kind re-checks its rows.

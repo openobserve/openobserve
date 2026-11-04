@@ -398,4 +398,98 @@ describe("AlertCalibrationFindingCard", () => {
       expect(unknown.find(`[data-test="alert-calibration-finding-${block}"]`).exists()).toBe(false);
     }
   });
+
+  it("renders the no-destination advice and candidate rows, and nothing extra for a plain record", () => {
+    const review = { type: "review_alert", alert_id: "a1", focus: "settings" };
+    const noDestination = (overrides: Partial<FindingRecord>) =>
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "no_destination",
+        severity: "High",
+        tier: "A",
+        title: "ops_quiet fired 5 times and has no destination attached now",
+        alert_id: "a1",
+        alert_name: "ops_quiet",
+        finding_id: "f1",
+        actions: undefined,
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_nodestination_firings: 5,
+        evidence_nodestination_creates_incident: false,
+        advice: "add_destination",
+        insight_actions: JSON.stringify([review]),
+        ...overrides,
+      });
+    const actionRows = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper
+        .findAll('[data-test^="alert-calibration-finding-action-"]')
+        .filter((row) => !row.attributes("data-test")?.endsWith("-button"))
+        .map((row) => [row.attributes("data-test"), row.text()]);
+    const advice = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper.find('[data-test="alert-calibration-finding-advice"]').text();
+
+    const suggested = mountCard(
+      noDestination({
+        advice: "attach_folder_destination",
+        insight_actions: JSON.stringify([
+          {
+            type: "apply_suggestion",
+            alert_id: "a1",
+            patch: [{ field: "destinations", from: [], to: ["ops-pager"] }],
+          },
+          review,
+        ]),
+        evidence_nodestination_candidate: "ops-pager",
+        evidence_nodestination_candidate_alerts: 3,
+      }),
+    );
+    expect(suggested.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Firings",
+      "Delivered through incidents",
+      "Suggested destination",
+      "Enabled alerts in this folder using it",
+    ]);
+    expect(suggested.findAll("dd").map((dd) => dd.text())).toEqual(["5", "No", "ops-pager", "3"]);
+    expect(advice(suggested)).toContain(
+      "Other enabled alerts in this folder send to the suggested destination.",
+    );
+    expect(actionRows(suggested)).toEqual([
+      ["alert-calibration-finding-action-apply_suggestion", "Apply suggestion"],
+      ["alert-calibration-finding-action-review_alert", "Review settings"],
+    ]);
+
+    const redacted = mountCard(noDestination({}));
+    expect(redacted.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Firings",
+      "Delivered through incidents",
+    ]);
+    expect(advice(redacted)).toContain(
+      "Add a destination in Edit Alert, or confirm this alert is meant to notify no one.",
+    );
+    expect(actionRows(redacted)).toEqual([
+      ["alert-calibration-finding-action-review_alert", "Review settings"],
+    ]);
+
+    const v1 = mountCard(
+      finding({
+        rule_id: "no_destination",
+        severity: "High",
+        title: "ops_quiet fired 5 times and has no destination attached now",
+        alert_id: "a1",
+        alert_name: "ops_quiet",
+        actions: "AttachDestination",
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_nodestination_firings: 5,
+        evidence_nodestination_creates_incident: false,
+      }),
+    );
+    expect(v1.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Firings",
+      "Delivered through incidents",
+    ]);
+    expect(v1.find('[data-test="alert-calibration-finding-advice"]').exists()).toBe(false);
+    expect(actionRows(v1).map(([test]) => test)).toEqual([
+      "alert-calibration-finding-action-AttachDestination",
+    ]);
+  });
 });

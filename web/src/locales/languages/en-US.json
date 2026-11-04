@@ -11507,7 +11507,9 @@
       "field": "Field",
       "label": "Label",
       "lastDataAt": "Last data",
-      "checkedAt": "Checked"
+      "checkedAt": "Checked",
+      "suggestedDestination": "Suggested destination",
+      "folderAlertsUsingIt": "Enabled alerts in this folder using it"
     },
     "actions": {
       "raiseThreshold": "Raise threshold",
@@ -11541,7 +11543,9 @@
       "checkMissingField": "Check the field the query filters on: none of its streams has it.",
       "checkIgnoredLabel": "Check the label the query matches on: PromQL ignores it, so every series is watched.",
       "checkFilterValues": "Check the query's filter values: no rows matched them in the searched window.",
-      "confirmQuietSource": "Confirm whether this source is expected to be quiet before changing the alert."
+      "confirmQuietSource": "Confirm whether this source is expected to be quiet before changing the alert.",
+      "attachFolderDestination": "Other enabled alerts in this folder send to the suggested destination. It is a likely receiver, not a confirmed one: check it, or confirm this alert is meant to notify no one.",
+      "addDestination": "Add a destination in Edit Alert, or confirm this alert is meant to notify no one."
     },
     "limitation": {
       "quietSource": "A quiet source can be a batch or cron job that is idle by design.",
