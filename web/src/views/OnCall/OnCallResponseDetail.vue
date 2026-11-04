@@ -539,12 +539,20 @@
             <OnCallVerdictCard :events="events" />
 
             <!-- Not clipped, or the note box could not stick to the scrolling body's foot. -->
-            <OCard variant="glass" class="overflow-visible" data-test="oncall-response-tabs">
-              <OCardSection role="body" dense>
+            <!-- Fills the column so a short feed still puts the note box at the viewport's foot. -->
+            <OCard
+              variant="glass"
+              class="overflow-visible lg:flex-1"
+              data-test="oncall-response-tabs"
+            >
+              <OCardSection role="body" dense class="lg:flex lg:flex-col">
                 <!-- Unclipped, or it becomes the note box's sticky container instead of the page. -->
-                <OTabPanels v-model="activeDetailTab" class="overflow-visible!">
-                  <OTabPanel name="activity">
-                    <div data-test="oncall-response-activity">
+                <OTabPanels
+                  v-model="activeDetailTab"
+                  class="overflow-visible! lg:flex lg:flex-1 lg:flex-col"
+                >
+                  <OTabPanel name="activity" content-class="lg:flex lg:flex-1 lg:flex-col">
+                    <div data-test="oncall-response-activity" class="lg:flex lg:flex-1 lg:flex-col">
                       <div v-if="systemActivityCount" class="flex justify-end pt-2">
                         <OButton
                           variant="ghost"

@@ -2,7 +2,8 @@
 
 import type { I18nText } from "@/types/i18n";
 
-import type { InjectionKey } from "vue";
+import type { Component, InjectionKey } from "vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { FieldWidth } from "../Input/OInput.types";
 
 export type { SelectHeaderRowEmits, SelectHeaderRowProps } from "./OSelectHeaderRow.types";
@@ -247,6 +248,12 @@ export interface SelectItemProps {
   label?: I18nText;
   /** Prevents selection */
   disabled?: boolean;
+  /** Registry icon shown before the label */
+  icon?: IconName;
+  /** Raw Vue component shown before the label; wins over `icon` */
+  iconComponent?: Component;
+  /** Keeps a blank icon-sized slot when this item has no icon so labels align with iconned siblings */
+  reserveIconSpace?: boolean;
 }
 
 export interface SelectItemSlots {

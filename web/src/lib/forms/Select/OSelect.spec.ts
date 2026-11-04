@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 describe("OSelect", () => {
   let wrapper: VueWrapper;
@@ -688,6 +689,44 @@ describe("OSelect", () => {
       await flushPromises();
       expect(trigger.attributes("aria-expanded")).toBe("true");
       expect(document.body.textContent).toContain("1 day ago");
+    });
+  });
+
+  describe("simple (non-searchable) mode option icons", () => {
+    const options = [
+      { label: "Firing", value: "firing", icon: "warning" },
+      { label: "Resolved", value: "resolved", icon: "check-circle" },
+      { label: "All", value: "all" },
+    ];
+
+    const openSimple = async (props: Record<string, unknown>) => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { searchable: false, options, "data-test": "status", ...props },
+      });
+      await wrapper.find('button[role="combobox"]').trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      return Array.from(document.body.querySelectorAll<HTMLElement>('[data-test="status-option"]'));
+    };
+
+    it("shows each option's icon and a spacer for an iconless option when icon-key is set", async () => {
+      const rows = await openSimple({ iconKey: "icon" });
+      expect(rows).toHaveLength(3);
+      const icons = wrapper.findAllComponents(OIcon).filter((c) => c.props("size") === "sm");
+      expect(icons.map((c) => c.props("name"))).toEqual(
+        expect.arrayContaining(["warning", "check-circle"]),
+      );
+      expect(rows[0].querySelector("[aria-hidden='true']")).not.toBeNull();
+      expect(rows[2].querySelector(":scope > span.size-4")).not.toBeNull();
+    });
+
+    it("renders options without icons or spacers when icon-key is absent", async () => {
+      const rows = await openSimple({});
+      expect(rows).toHaveLength(3);
+      for (const row of rows) {
+        expect(row.querySelector(":scope > span.size-4")).toBeNull();
+        expect(row.classList.contains("gap-2")).toBe(false);
+      }
     });
   });
 });

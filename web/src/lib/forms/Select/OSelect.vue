@@ -17,6 +17,7 @@ import {
 import OSelectItem from "./OSelectItem.vue";
 import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -69,7 +70,7 @@ type NormalizedOption = {
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
-  icon?: string;
+  icon?: IconName;
   /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
@@ -261,7 +262,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
-    icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
+    icon: typeof rawIcon === "string" && rawIcon ? (rawIcon as IconName) : undefined,
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
@@ -2258,6 +2259,9 @@ const fieldWidthClass = computed(() => {
                 :value="opt.value"
                 :label="opt.label"
                 :disabled="opt.disabled || opt.expandable"
+                :icon="opt.icon"
+                :icon-component="opt.iconComponent"
+                :reserve-icon-space="!!iconKey"
               />
             </template>
 

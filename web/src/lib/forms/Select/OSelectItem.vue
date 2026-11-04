@@ -10,10 +10,16 @@ import {
 import { SelectItem, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
+  icon: undefined,
+  iconComponent: undefined,
+  reserveIconSpace: false,
 });
+
+const hasIconSlot = computed(() => !!props.iconComponent || !!props.icon || props.reserveIconSpace);
 
 defineSlots<SelectItemSlots>();
 
@@ -50,6 +56,7 @@ onUnmounted(() => {
     :data-test-label="props.label"
     :class="[
       'relative flex w-full items-center',
+      hasIconSlot && 'gap-2',
       'py-1.5 ps-3 pe-3 text-sm',
       'text-select-item-text rounded-default',
       'cursor-pointer outline-none select-none',
@@ -59,6 +66,10 @@ onUnmounted(() => {
       'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
     ]"
   >
+    <!-- Outside SelectItemText so the trigger, which mirrors the item text, does not repeat the icon. -->
+    <component :is="props.iconComponent" v-if="props.iconComponent" class="size-4 shrink-0" />
+    <OIcon v-else-if="props.icon" :name="props.icon" size="sm" class="shrink-0" />
+    <span v-else-if="props.reserveIconSpace" class="size-4 shrink-0" />
     <!-- reka renders SelectItemText as a bare span, which cannot shrink without min-w-0. -->
     <SelectItemText class="min-w-0 flex-1">
       <slot>
