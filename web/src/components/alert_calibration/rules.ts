@@ -23,6 +23,8 @@ export interface EvidenceField {
   column: `evidence_${string}`;
   labelKey: I18nKey;
   format: EvidenceFormat;
+  /** Written only by some records, so a record without it shows no row rather than a dash. */
+  optional?: true;
 }
 
 export interface LagListField {
@@ -109,6 +111,18 @@ export const RULE_META: Record<RuleId, RuleMeta> = {
         column: "evidence_nodestination_creates_incident",
         labelKey: "alertCalibration.evidence.deliveredThroughIncidents",
         format: "boolean",
+      },
+      {
+        column: "evidence_nodestination_candidate",
+        labelKey: "alertCalibration.evidence.suggestedDestination",
+        format: "text",
+        optional: true,
+      },
+      {
+        column: "evidence_nodestination_candidate_alerts",
+        labelKey: "alertCalibration.evidence.folderAlertsUsingIt",
+        format: "count",
+        optional: true,
       },
     ],
   },
@@ -299,7 +313,9 @@ export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): Evidenc
   (record.schema_version ?? 1) >= 2 &&
   isNotWorkingPattern(record.pattern)
     ? PATTERN_EVIDENCE[record.pattern].filter((field) => record[field.column] != null)
-    : RULE_META[record.rule_id].evidence;
+    : RULE_META[record.rule_id].evidence.filter(
+        (field) => !field.optional || record[field.column] != null,
+      );
 
 /** Version 2 reports a broken alert under `failure`; historical runs keep their legacy label (M2). */
 export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
@@ -307,13 +323,15 @@ export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
     ? "alertCalibration.rules.notWorking"
     : RULE_META[rule].labelKey;
 
-/** The advice codes a `failure` finding carries (ENT not_working.rs `advice`), in AutoObserve's words. */
+/** The advice codes findings carry (ENT not_working.rs `advice`, no_destination.rs `ADVICE_*`). */
 export const ADVICE_LABEL: Record<string, I18nKey> = {
   check_missing_stream: "alertCalibration.advice.checkMissingStream",
   check_missing_field: "alertCalibration.advice.checkMissingField",
   check_ignored_label: "alertCalibration.advice.checkIgnoredLabel",
   check_filter_values: "alertCalibration.advice.checkFilterValues",
   confirm_quiet_source: "alertCalibration.advice.confirmQuietSource",
+  attach_folder_destination: "alertCalibration.advice.attachFolderDestination",
+  add_destination: "alertCalibration.advice.addDestination",
 };
 
 /** Limitation codes (ENT not_working.rs `LIMIT_*`). */

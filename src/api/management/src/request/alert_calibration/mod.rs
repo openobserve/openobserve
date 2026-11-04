@@ -17,6 +17,7 @@
 
 pub mod config;
 pub mod digests;
+mod suggestions;
 mod visibility;
 
 use axum::response::{IntoResponse, Response};
