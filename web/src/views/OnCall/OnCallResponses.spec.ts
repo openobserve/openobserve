@@ -19,7 +19,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
-import incidentsService from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
@@ -44,9 +43,8 @@ vi.mock("@/services/oncall", () => ({
     resolveResponse: vi.fn(),
     snoozeResponse: vi.fn(),
     unsnoozeResponse: vi.fn(),
-    getPolicy: vi.fn(),
-    getSchedule: vi.fn(),
-    escalationProgress: vi.fn(),
+    teamContext: vi.fn(),
+    escalationProgressBatch: vi.fn(),
     getResponse: vi.fn(),
   },
 }));
@@ -62,10 +60,6 @@ vi.mock("@/services/users", () => ({
 
 vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn() },
-}));
-
-vi.mock("@/services/incidents", () => ({
-  default: { get: vi.fn() },
 }));
 
 const push = vi.fn();
@@ -92,7 +86,6 @@ vi.mock("@/composables/useBreakpoint", async () => {
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
-const incidents = vi.mocked(incidentsService);
 
 // Every `mount()` in this file — across all three top-level `describe`s —
 // stays alive as a real, reactive component instance unless something
@@ -271,6 +264,33 @@ function render() {
   return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
 }
 
+/// What a team answers by default: "answered, with nothing in it".
+const emptyTeam = { policy: { rungs: [] }, on_call: [], schedule: null };
+
+/// The team-context read answers `facts(id)` for each asked team, plus `mine` when `include_mine` is set; `undefined` is a team the server left out.
+function answerTeams(facts: (teamId: string) => object | undefined, mine: string[] = []) {
+  service.teamContext.mockImplementation((async ({ team_ids, include_mine }: any) => {
+    const ids = [...new Set([...team_ids, ...(include_mine ? mine : [])])];
+    const teams = ids.flatMap((id) => {
+      const answer = facts(id);
+      return answer ? [{ team_id: id, ...answer }] : [];
+    });
+    return { data: { teams } };
+  }) as any);
+}
+
+/// The batch ladder read answers `progress(id)` for each asked id; `undefined` is an id the server left out.
+function answerProgress(progress: (responseId: string) => object | undefined) {
+  service.escalationProgressBatch.mockImplementation((async ({ response_ids }: any) => ({
+    data: {
+      progress: response_ids.flatMap((id: string) => {
+        const answer = progress(id);
+        return answer ? [{ response_id: id, ...answer }] : [];
+      }),
+    },
+  })) as any);
+}
+
 describe("OnCallResponses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -290,11 +310,8 @@ describe("OnCallResponses", () => {
     // The ladder, the policy behind its denominator, and the expanded row's
     // events. Every one of them degrades a single cell rather than the page,
     // so the default is "answered, with nothing in it".
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
@@ -469,10 +486,8 @@ describe("OnCallResponses", () => {
       service.listTeams.mock.calls.length +
       service.coverageGaps.mock.calls.length +
       service.listOwnershipRules.mock.calls.length +
-      service.getPolicy.mock.calls.length +
-      service.whoIsOnCall.mock.calls.length +
-      service.getSchedule.mock.calls.length +
-      service.escalationProgress.mock.calls.length;
+      service.teamContext.mock.calls.length +
+      service.escalationProgressBatch.mock.calls.length;
 
     const first = await withPages([page()]);
     const afterFirst = cachedCalls();
@@ -494,23 +509,17 @@ describe("OnCallResponses", () => {
     expect(service.listTeams).toHaveBeenCalledTimes(2);
   });
 
-  // Incident titles and the destination check are other modules' cache entries; only Refresh forces them.
-  it("serves incident titles and the destination check from the cache, and forces both on refresh", async () => {
-    incidents.get.mockResolvedValue({ data: { title: "Checkout down" } } as any);
-
-    const first = await withPages([page({ incident_id: "inc_1" })]);
-    expect(incidents.get).toHaveBeenCalledTimes(1);
+  // The destination check is another module's cache entry; only Refresh forces it.
+  it("serves the destination check from the cache, and forces it on refresh", async () => {
+    const first = await withPages([page()]);
     expect(destinations.list).toHaveBeenCalledTimes(1);
     first.unmount();
 
-    const second = await withPages([page({ incident_id: "inc_1" })]);
-    expect(incidents.get).toHaveBeenCalledTimes(1);
+    const second = await withPages([page()]);
     expect(destinations.list).toHaveBeenCalledTimes(1);
-    expect(second.text()).toContain("Checkout down");
 
     await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
     await flushPromises();
-    expect(incidents.get).toHaveBeenCalledTimes(2);
     expect(destinations.list).toHaveBeenCalledTimes(2);
   });
 
@@ -552,15 +561,13 @@ describe("OnCallResponses", () => {
     });
 
     it("keeps an exhausted-ladder page in the ringing run until somebody claims it", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
-          fired: [{ after_micros: 0, at: 1, targets: [] }],
-          next_targets: [],
-          next_at: null,
-          exhausted: true,
-          stopped_because: "the ladder is exhausted — nobody acknowledged",
-        },
-      } as any);
+      answerProgress(() => ({
+        fired: [{ after_micros: 0, at: 1, targets: [] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+        stopped_because: "the ladder is exhausted — nobody acknowledged",
+      }));
       const wrapper = await withPages([page({ id: "resp_1" })]);
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
@@ -574,9 +581,10 @@ describe("OnCallResponses", () => {
     /// ladder at all, so `exhausted` never even gets a chance to be true.
     /// Same fix has to cover this path too, or the bug just moves.
     it("keeps a zero-rung priority in the ringing run until somebody claims it", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: { rungs: [{ priority: 1, steps: [], channels: [] }] },
-      } as any);
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: { rungs: [{ priority: 1, steps: [], channels: [] }] },
+      }));
       const wrapper = await withPages([page({ id: "resp_1" })]);
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
@@ -601,16 +609,13 @@ describe("OnCallResponses", () => {
 
     /// R11: a page whose ladder stopped has a team but pages nobody, so it is not counted as paging.
     it("does not count a page whose ladder stopped as still paging", async () => {
-      service.escalationProgress.mockImplementation((({ response_id }: { response_id: string }) =>
-        Promise.resolve({
-          data: {
-            fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
-            next_targets: [],
-            next_at: null,
-            exhausted: false,
-            stopped_because: response_id === "b" ? "the owning team was deleted" : undefined,
-          },
-        })) as any);
+      answerProgress((id) => ({
+        fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: false,
+        stopped_because: id === "b" ? "the owning team was deleted" : undefined,
+      }));
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       const text = wrapper.find(ringingHeader).text();
@@ -624,7 +629,7 @@ describe("OnCallResponses", () => {
 
     /// F4: a deleted team pages nobody, so a page past the progress cap is counted and phrased as such.
     it("counts and phrases a page whose team was deleted as not paged, without its progress", async () => {
-      service.escalationProgress.mockRejectedValue({ response: { status: 500, data: {} } });
+      service.escalationProgressBatch.mockRejectedValue({ response: { status: 500, data: {} } });
       const wrapper = await withPages([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_gone" }, "al_pay"),
@@ -685,20 +690,19 @@ describe("OnCallResponses", () => {
   });
 
   describe("the escalation ladder", () => {
-    it("loads the ladder for open pages and passes it to the cell", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
-          fired: [{ after_micros: 0, at: 1, targets: ["the on-call"] }],
-          next_targets: ["the next on-call"],
-          next_at: (Date.now() + 60_000) * 1000,
-          exhausted: false,
-        },
-      } as any);
-      const wrapper = await withPages([page()]);
+    it("loads the ladder for open pages in one read and passes it to the cell", async () => {
+      answerProgress(() => ({
+        fired: [{ after_micros: 0, at: 1, targets: ["the on-call"] }],
+        next_targets: ["the next on-call"],
+        next_at: (Date.now() + 60_000) * 1000,
+        exhausted: false,
+      }));
+      const wrapper = await withPages([page(), page({ id: "resp_2" }, "al_pay")]);
 
-      expect(service.escalationProgress).toHaveBeenCalledWith({
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledWith({
         org_identifier: "default",
-        response_id: "resp_1",
+        response_ids: ["resp_1", "resp_2"],
       });
       expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("progress")).toEqual(
         expect.objectContaining({ next_targets: ["the next on-call"] }),
@@ -709,25 +713,28 @@ describe("OnCallResponses", () => {
     /// request per row spent on an answer nobody reads.
     it("does not ask for the ladder of a page that is already closed", async () => {
       await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
-      expect(service.escalationProgress).not.toHaveBeenCalled();
+      expect(service.escalationProgressBatch).not.toHaveBeenCalled();
     });
 
-    /// One request per page and no bulk endpoint: past the cap the list says so
-    /// rather than leaving a blank cell that reads as "nothing has fired".
+    /// Past the route's cap the list says so rather than leaving a blank cell that reads as "nothing has fired".
     it("caps how many ladders it loads, and says that it did", async () => {
-      const many = Array.from({ length: 30 }, (_, i) =>
+      const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
       );
       const wrapper = await withPages(many);
 
-      expect(service.escalationProgress).toHaveBeenCalledTimes(25);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+      const asked = service.escalationProgressBatch.mock.calls[0][0].response_ids;
+      expect(asked).toHaveLength(200);
+      expect(asked).not.toContain("resp_200");
       expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
     });
 
-    /// Rows past the cap have no progress: the record's own step, or no claim, never "Not paged yet".
-    it("says what it can for rows past the cap, without claiming they were not paged", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
+    /// Rows the server left out have no progress: the record's own step, or no claim, never "Not paged yet".
+    it("says what it can for rows without an answer, without claiming they were not paged", async () => {
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: {
           rungs: [
             {
               priority: 1,
@@ -740,48 +747,51 @@ describe("OnCallResponses", () => {
             },
           ],
         },
-      } as any);
-      const many = Array.from({ length: 30 }, (_, i) =>
-        page(
-          {
-            id: `resp_${i}`,
-            opened_at: 1_700_000_000_000_000 + i,
-            ...(i === 29 ? { reached_rung_micros: 300_000_000 } : {}),
-          },
-          `al_${i}`,
-        ),
+      }));
+      answerProgress((id) =>
+        id === "resp_0"
+          ? { fired: [], next_targets: [], next_at: null, exhausted: false }
+          : undefined,
       );
-      const wrapper = await withPages(many);
+      const wrapper = await withPages([
+        page({ id: "resp_0", opened_at: 1_700_000_000_000_000 }, "al_0"),
+        page({ id: "resp_1", opened_at: 1_700_000_000_000_001 }, "al_1"),
+        page(
+          { id: "resp_2", opened_at: 1_700_000_000_000_002, reached_rung_micros: 300_000_000 },
+          "al_2",
+        ),
+      ]);
       const cell = (id: string) =>
         wrapper.find(`[data-test="oncall-escalation-cell-${id}"]`).text();
 
       expect(cell("resp_0")).toBe("Not paged yet");
-      expect(cell("resp_29")).toBe("Paging step 2 of 3");
-      expect(cell("resp_28")).toBe("");
+      expect(cell("resp_2")).toBe("Paging step 2 of 3");
+      expect(cell("resp_1")).toBe("");
 
       const table = wrapper.findComponent({ name: "OTable" });
       const escalation = (table.props("columns") as any[]).find((c) => c.id === "escalation");
       const rowFor = (id: string) => (table.props("data") as any[]).find((r) => r.latest.id === id);
-      expect(escalation.accessorFn(rowFor("resp_29"))).toBe(2);
+      expect(escalation.accessorFn(rowFor("resp_2"))).toBe(2);
     });
 
-    /// An empty 200 body is not an answer: the row makes no claim rather than "Not paged yet".
-    it("makes no claim for a row whose progress came back empty", async () => {
-      service.escalationProgress.mockResolvedValue({ data: null } as any);
+    /// A failed ladder read is not an answer: the row makes no claim rather than "Not paged yet".
+    it("makes no claim for a row when the ladder read fails", async () => {
+      service.escalationProgressBatch.mockRejectedValue(new Error("down"));
       const wrapper = await withPages([page()]);
 
       expect(wrapper.find('[data-test="oncall-escalation-cell-resp_1"]').text()).toBe("");
     });
 
     it("takes the rung total for the row's priority from the team's policy", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: {
           rungs: [
             { priority: 1, steps: [{}, {}, {}], channels: [] },
             { priority: 2, steps: [{}], channels: [] },
           ],
         },
-      } as any);
+      }));
       const wrapper = await withPages([page({ priority: 1 })]);
 
       expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("totalRungs")).toBe(3);
@@ -899,9 +909,10 @@ describe("OnCallResponses", () => {
 
     /// The channels shown are the policy's — what WOULD be used, not what happened.
     it("shows the channels the page would go out on", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "webhook"] }] },
-      } as any);
+      answerTeams(() => ({
+        ...emptyTeam,
+        policy: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "webhook"] }] },
+      }));
       const wrapper = await withPages([page({ priority: 1 })]);
 
       expect(wrapper.find('[data-test$="-email"]').exists()).toBe(true);
@@ -1291,13 +1302,11 @@ describe("OnCallResponses", () => {
 
   /// One signal: the ladder's own progress, which the "nobody answered" tag and the ladder text both read.
   it("tags nobody answered from the ladder's progress, before the record's flag lands", async () => {
-    service.escalationProgress.mockImplementation(async ({ response_id }: any) => ({
-      data: {
-        fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
-        next_targets: [],
-        next_at: null,
-        exhausted: response_id === "resp_done",
-      },
+    answerProgress((id) => ({
+      fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+      next_targets: [],
+      next_at: null,
+      exhausted: id === "resp_done",
     }));
     const wrapper = await withPages([
       page({ id: "resp_done", exhausted_at: null }, "al_done"),
@@ -1425,12 +1434,10 @@ describe("OnCallResponses", () => {
     const mineBtn = '[data-test="oncall-responses-mine-btn"]';
 
     async function withMyShift(rows: Record<string, unknown>[]) {
-      service.whoIsOnCall.mockImplementation(({ team_id }: any) =>
-        Promise.resolve({
-          data:
-            team_id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
-        } as any),
-      );
+      answerTeams((id) => ({
+        ...emptyTeam,
+        on_call: id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
+      }));
       return withPages(rows);
     }
 
@@ -1570,46 +1577,52 @@ describe("OnCallResponses", () => {
         shift_micros,
         anchor_micros: 0,
       });
-      service.getSchedule.mockResolvedValue({
-        data: {
-          id: "sch_1",
-          org_id: "default",
-          team_id: "team_1",
-          timezone: "UTC",
-          created_at: 0,
-          updated_at: 0,
-          rotations: [
-            {
-              id: "rot_weekly",
-              name: "Primary",
-              shift_rules: [rule(["ana@o2.ai"], 604_800_000_000)],
-            },
-            {
-              id: "rot_hourly",
-              name: "Secondary",
-              shift_rules: [rule(["example@gmail.com"], 3_600_000_000)],
-            },
-          ],
-        },
-      } as any);
-      service.whoIsOnCall.mockResolvedValue({
-        data: [
-          {
-            rotation_id: "rot_weekly",
-            rotation_name: "Primary",
-            rule: "Base",
-            user_email: "ana@o2.ai",
-          },
-          {
-            rotation_id: "rot_hourly",
-            rotation_name: "Secondary",
-            rule: "Base",
-            user_email: "example@gmail.com",
-          },
-        ],
-      } as any);
+      // The viewer's team has no row on screen: only `include_mine` brings it into the answer.
+      answerTeams(
+        (id) =>
+          id === "team_1"
+            ? {
+                ...emptyTeam,
+                schedule: {
+                  id: "sch_1",
+                  org_id: "default",
+                  team_id: "team_1",
+                  timezone: "UTC",
+                  created_at: 0,
+                  updated_at: 0,
+                  rotations: [
+                    {
+                      id: "rot_weekly",
+                      name: "Primary",
+                      shift_rules: [rule(["ana@o2.ai"], 604_800_000_000)],
+                    },
+                    {
+                      id: "rot_hourly",
+                      name: "Secondary",
+                      shift_rules: [rule(["example@gmail.com"], 3_600_000_000)],
+                    },
+                  ],
+                },
+                on_call: [
+                  {
+                    rotation_id: "rot_weekly",
+                    rotation_name: "Primary",
+                    rule: "Base",
+                    user_email: "ana@o2.ai",
+                  },
+                  {
+                    rotation_id: "rot_hourly",
+                    rotation_name: "Secondary",
+                    rule: "Base",
+                    user_email: "example@gmail.com",
+                  },
+                ],
+              }
+            : emptyTeam,
+        ["team_1"],
+      );
       try {
-        const wrapper = await withPages([page()]);
+        const wrapper = await withPages([page({ team_id: "team_other" })]);
 
         const banner = wrapper.findComponent({ name: "OnCallShiftBanner" });
         expect(banner.props("rotation")).toBe("Secondary");
@@ -1618,6 +1631,120 @@ describe("OnCallResponses", () => {
       } finally {
         now.mockRestore();
       }
+    });
+  });
+
+  describe("request fan-out", () => {
+    const position = (email: string) => ({
+      rotation_id: "r",
+      rotation_name: "Primary",
+      rule: "Base",
+      user_email: email,
+    });
+    const shownOnCall = (wrapper: VueWrapper) =>
+      wrapper.findAllComponents({ name: "OUserCell" }).map((c) => c.props("value"));
+    const pickTeam = (wrapper: VueWrapper, teamId: string) =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((node) => node.attributes("data-test") === "oncall-responses-team-filter")!
+        .vm.$emit("update:modelValue", teamId);
+
+    it("names an incident from the row's title, and the id when the row has none", async () => {
+      const wrapper = await withPages([
+        page({ id: "a", incident_id: "inc_1", incident_title: "Checkout down" }),
+        page({ id: "b", incident_id: "inc_2" }, "al_b"),
+      ]);
+
+      const chips = wrapper.findAll('[data-test^="oncall-row-incident-"]').map((c) => c.text());
+      expect(chips.sort()).toEqual(["Checkout down", "inc_2"]);
+    });
+
+    it("reads every team's context in one request, for the row teams and the viewer's", async () => {
+      service.listTeams.mockResolvedValue({
+        data: [team, { ...team, id: "team_2", name: "Payments" }],
+      } as any);
+      service.listResponses.mockResolvedValue({
+        data: [page(), page({ id: "b", team_id: "team_2" }, "al_b"), page({ id: "c" }, "al_c")],
+      } as any);
+      render();
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.teamContext).toHaveBeenCalledWith({
+        org_identifier: "default",
+        team_ids: ["team_1", "team_2"],
+        include_mine: true,
+      });
+      expect(service.whoIsOnCall).not.toHaveBeenCalled();
+    });
+
+    it("splits row teams past the route's cap across context reads, asking for the viewer's once", async () => {
+      answerTeams((id) => ({ ...emptyTeam, on_call: [position(`${id}@o2.ai`)] }));
+      const many = Array.from({ length: 205 }, (_, i) =>
+        page({ id: `resp_${i}`, team_id: `team_${i}` }, `al_${i}`),
+      );
+      const wrapper = await withPages(many);
+
+      const calls = service.teamContext.mock.calls.map(([args]: any) => args);
+      expect(calls.map((c: any) => [c.team_ids.length, c.include_mine])).toEqual([
+        [200, true],
+        [5, false],
+      ]);
+      expect(shownOnCall(wrapper)).toContain("team_204@o2.ai");
+    });
+
+    it("shows the on-call cell from the context answer", async () => {
+      answerTeams(() => ({ ...emptyTeam, on_call: [position("ana@o2.ai")] }));
+      const wrapper = await withPages([page()]);
+
+      expect(shownOnCall(wrapper)).toEqual(["ana@o2.ai"]);
+    });
+
+    it("forces the context and ladder reads on refresh", async () => {
+      const wrapper = await withPages([page()]);
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+
+      await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(2);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends the context and ladder reads together, without waiting for the teams list", async () => {
+      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      render();
+      await flushPromises();
+
+      expect(service.teamContext).toHaveBeenCalledTimes(1);
+      expect(service.escalationProgressBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the newer context read when an older one answers last", async () => {
+      let answerOld!: (value: unknown) => void;
+      service.teamContext.mockImplementation((({ team_ids }: { team_ids: string[] }) =>
+        team_ids.includes("team_1")
+          ? new Promise((resolve) => (answerOld = resolve))
+          : Promise.resolve({
+              data: {
+                teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("new@o2.ai")] }],
+              },
+            })) as any);
+      const wrapper = await withPages([page()]);
+      service.listResponses.mockResolvedValue({
+        data: [page({ id: "n", team_id: "team_new" }, "al_new")],
+      } as any);
+      pickTeam(wrapper, "team_new");
+      await flushPromises();
+
+      answerOld({
+        data: { teams: [{ team_id: "team_new", ...emptyTeam, on_call: [position("old@o2.ai")] }] },
+      });
+      await flushPromises();
+
+      expect(shownOnCall(wrapper)).toEqual(["new@o2.ai"]);
     });
   });
 
@@ -2015,11 +2142,8 @@ describe("OnCallResponses — the rows' own fields", () => {
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
     destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
@@ -2199,11 +2323,8 @@ describe("OnCallResponses — filtering by cause", () => {
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
     destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.getSchedule.mockResolvedValue({ data: null } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
+    answerTeams(() => emptyTeam);
+    answerProgress(() => ({ fired: [], next_targets: [], next_at: null, exhausted: false }));
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
