@@ -241,6 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <ODropdownItem
             icon-left="restart-alt"
+            :disabled="row.status === 'offline'"
+            :description="row.status === 'offline' ? t('fleet.collectors.restartOffline') : null"
             :data-test="`fleet-collectors-row-restart-${row.id}`"
             @select="actions.restart([row])"
           >
@@ -274,12 +276,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #selection-actions>
         <OButton
+          v-if="restartableRows.length"
           variant="outline"
           size="sm"
           icon-left="restart-alt"
           :loading="actions.restarting.value"
           data-test="fleet-collectors-bulk-restart"
-          @click="actions.restart(selectedRows)"
+          @click="actions.restart(restartableRows)"
         >
           {{ t("fleet.collectors.restart") }}
         </OButton>
@@ -678,6 +681,7 @@ const selectedRows = computed(() => {
   const ids = new Set(selectedIds.value);
   return tableRows.value.filter((c) => ids.has(c.id));
 });
+const restartableRows = computed(() => selectedRows.value.filter((c) => c.status !== "offline"));
 
 function openRename(row: CollectorRow) {
   renameTarget.value = row;

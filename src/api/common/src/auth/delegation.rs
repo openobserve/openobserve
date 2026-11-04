@@ -150,6 +150,7 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("oncall"), Lit("incidents"), Param, Lit("responses")], GET),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("unsnooze")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
     v1(&[Param, Lit("ai"), Lit("chat")], POST),
     v1(&[Param, Lit("ai"), Lit("chat_stream")], POST),
@@ -708,6 +709,7 @@ mod tests {
         );
         for reason in [
             DisabledReason::Edition,
+            DisabledReason::License,
             DisabledReason::Flag,
             DisabledReason::MasterKey,
             DisabledReason::SuperCluster,
@@ -715,6 +717,7 @@ mod tests {
             // A new reason must join this list: the match stops compiling until it does.
             match reason {
                 DisabledReason::Edition
+                | DisabledReason::License
                 | DisabledReason::Flag
                 | DisabledReason::MasterKey
                 | DisabledReason::SuperCluster => {}
@@ -1001,6 +1004,7 @@ mod tests {
             (Method::GET, "acme/oncall/teams/t1/on-call"),
             (Method::POST, "acme/oncall/responses/r1/acknowledge"),
             (Method::POST, "acme/oncall/responses/r1/snooze"),
+            (Method::POST, "acme/oncall/responses/r1/unsnooze"),
             (Method::POST, "acme/oncall/responses/r1/resolve"),
             (Method::POST, "acme/ai/chat_stream"),
             (Method::POST, "acme/ai/confirm/s1"),

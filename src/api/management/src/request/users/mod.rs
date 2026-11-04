@@ -704,6 +704,8 @@ pub async fn authentication(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let mut resp = SignInResponse::default();
@@ -919,6 +921,8 @@ pub async fn get_presigned_url(
                 trace_id: None,
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         };
         audit(audit_message).await;
     }
@@ -961,6 +965,8 @@ pub async fn get_auth(
                 trace_id: None,
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         };
 
         let (name, password) = {

@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
@@ -338,6 +339,26 @@ describe("SelectFolderDropdown", () => {
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
       expect(wrapper.vm.selectedFolder).toBe("brand-new");
+    });
+  });
+
+  describe("disabled prop", () => {
+    it("locks the folder select and the new-folder button when disabled", () => {
+      const wrapper = createWrapper({ disabled: true }, store, router);
+
+      expect(wrapper.findComponent(OSelect).props("disabled")).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-folder-move-new-add"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("leaves both controls enabled by default", () => {
+      const wrapper = createWrapper({}, store, router);
+
+      expect(wrapper.findComponent(OSelect).props("disabled")).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-folder-move-new-add"]').attributes("disabled"),
+      ).toBeUndefined();
     });
   });
 

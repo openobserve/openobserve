@@ -1,4 +1,4 @@
-import { reviewerFinished, shortName } from "./confidence.mjs";
+import { reviewerCompleted, reviewerFinished, shortName } from "./confidence.mjs";
 
 export const DEFAULT_COLD_PASSES = 2;
 export const MAX_COLD_PASSES = 3;
@@ -43,8 +43,9 @@ export async function runPooled(items, limit, worker) {
 
 function mergeArea(group) {
   const finished = group.filter(reviewerFinished);
+  const completed = finished.filter(reviewerCompleted);
   const ran = group.filter(r => !r.skipped);
-  const base = finished[0] ?? ran[0] ?? group[0];
+  const base = completed[0] ?? finished[0] ?? ran[0] ?? group[0];
   const covered = finished.length > 0;
   return {
     agentKey: base.agentKey,
@@ -58,6 +59,8 @@ function mergeArea(group) {
     skipped: group.every(r => r.skipped),
     fullDiff: base.fullDiff,
     parsed: covered,
+    // Only an uninterrupted pass completes an area; wrapped-up output still counts as findings.
+    wrappedUp: covered && completed.length === 0,
     passes: group.length,
     passesFinished: finished.length,
     passResults: group,
@@ -76,6 +79,12 @@ export function mergePassResults(passResults) {
 
 export function lostPasses(results) {
   return results.filter(r => !r.skipped && r.passesFinished > 0 && r.passesFinished < r.passes);
+}
+
+// Only a review with every pass finished in time and a real coordinator merge may let the next push with the same diff skip.
+export function reviewComplete(passResults, coordinatorResult) {
+  if (!coordinatorResult || coordinatorResult.fallback) return false;
+  return passResults.every(r => r.skipped || reviewerCompleted(r));
 }
 
 // Written by code like the failed-reviewers line, so a reader learns an area got less scrutiny than the rest.

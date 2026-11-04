@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="tabItem.name"
               :label="tabItem.label"
               :suffix-icon="tabItem.locked ? 'lock' : undefined"
+              :tooltip="tabItem.locked ? correlationLockedReason : undefined"
             />
           </template>
         </OTabs>
@@ -147,27 +148,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              stays reachable from every tab. JsonPreview is told to hide its own
              copy via `hide-view-trace`. -->
         <div
-          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+          v-if="
+            showViewTraceBtn && (tracesLocked || tracesStreams.length || isTracesStreamsLoading)
+          "
           class="flex shrink-0 items-center gap-2"
         >
-          <OSelect
-            data-test="log-detail-view-trace-stream-select"
-            v-model="searchObj.meta.selectedTraceStream"
-            :options="tracesStreams"
-            class="w-40! shrink-0"
-            :loading="isTracesStreamsLoading"
-            :disabled="isTracesStreamsLoading"
-            size="sm"
-          />
-          <OButton
-            data-test="log-detail-view-trace-btn"
-            size="xs"
-            variant="outline"
-            icon-left="account-tree"
-            :disabled="pageLoading"
-            @click="viewTrace"
-            >{{ t("search.viewTrace") }}</OButton
-          >
+          <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+            <span class="inline-flex">
+              <OButton
+                data-test="log-detail-view-trace-btn"
+                size="xs"
+                variant="outline"
+                icon-left="lock"
+                disabled
+                >{{ t("search.viewTrace") }}</OButton
+              >
+            </span>
+          </OTooltip>
+          <template v-else>
+            <OSelect
+              data-test="log-detail-view-trace-stream-select"
+              v-model="searchObj.meta.selectedTraceStream"
+              :options="tracesStreams"
+              class="w-40! shrink-0"
+              :loading="isTracesStreamsLoading"
+              :disabled="isTracesStreamsLoading"
+              size="sm"
+            />
+            <OButton
+              data-test="log-detail-view-trace-btn"
+              size="xs"
+              variant="outline"
+              icon-left="account-tree"
+              :disabled="pageLoading"
+              @click="viewTrace"
+              >{{ t("search.viewTrace") }}</OButton
+            >
+          </template>
         </div>
         <OSwitch
           v-show="tab === 'table'"
@@ -401,8 +418,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Logs Tab Panel (Custom Component) -->
         <OTabPanel name="correlated-logs" stretch>
+          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <CorrelatedLogsTable
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -444,8 +462,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel name="correlated-metrics" stretch>
+          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <TelemetryCorrelationDashboard
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
@@ -486,8 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Correlated Traces Tab Panel -->
         <OTabPanel name="correlated-traces" stretch>
+          <LicenseDeniedState v-if="correlationLicenseLocked" :features="['correlation']" />
           <TelemetryCorrelationDashboard
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="traces"
             :shortcuts-active="tab === 'correlated-traces'"
@@ -655,6 +675,8 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -704,6 +726,7 @@ export default defineComponent({
     ChunkedContent,
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
+    LicenseDeniedState,
     OButton,
     OSelect,
     ODropdown,
@@ -849,6 +872,8 @@ export default defineComponent({
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
 
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
@@ -880,6 +905,8 @@ export default defineComponent({
       tracesStreams,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       setViewTraceBtn: setViewTraceBtnFor,
     } = useViewTraceAction(t, searchObj);
 
@@ -922,6 +949,7 @@ export default defineComponent({
           Object.keys(newRowData).length > 0 &&
           tab.value.startsWith("correlated-") &&
           correlationAccess.value.allowed &&
+          !correlationLicenseLocked.value &&
           !props.correlationProps
         ) {
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
@@ -949,6 +977,7 @@ export default defineComponent({
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
       if (
         isCorrelationTab &&
+        !correlationLicenseLocked.value &&
         !props.correlationProps &&
         oldTab !== undefined &&
         rowData.value &&
@@ -1063,7 +1092,7 @@ export default defineComponent({
         },
       ];
       if (serviceStreamsEnabled.value) {
-        const locked = !correlationAccess.value.allowed;
+        const locked = !correlationAccess.value.allowed || correlationLicenseLocked.value;
         tabs.push(
           {
             name: "correlated-logs",
@@ -1116,7 +1145,7 @@ export default defineComponent({
     // order whenever the set of available tabs changes — keeping the user's
     // order and appending anything new.
     watch(
-      () => availableTabs.value.map((t) => t.name).join(","),
+      () => availableTabs.value.map((t) => `${t.name}:${!!t.locked}`).join(","),
       () => {
         const merged: DetailTab[] = [];
         tabOrder.value.forEach((t) => {
@@ -1424,6 +1453,8 @@ export default defineComponent({
       tracesStreams,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       hasAggregationQuery,
       canSearchAroundStream,
       scopeHighlightQuery,
@@ -1440,6 +1471,8 @@ export default defineComponent({
       detailSearchQuery,
       serviceStreamsEnabled,
       correlationAccess,
+      correlationLicenseLocked,
+      correlationLockedReason,
       onTabChange,
       tabOrder,
       onTabReorder,

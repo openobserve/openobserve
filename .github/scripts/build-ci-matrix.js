@@ -18,6 +18,8 @@
  *       emitted. With an overlay manifest, a sibling smoke_config.ent.json (same dir as
  *       the overlay) refines selection for ENT shards — folder_paths and path lists
  *       concatenate onto the base smoke config, core_shards/always_run replace it.
+ *   ... --only-shards <a,b>                             # manual run: emit only these testfolders;
+ *       an unknown name dies, an empty list emits the full matrix.
  *
  * The base (OSS tests/ui-testing/ci-matrix/ci_matrix.json) is the ONLY place shared shards are
  * listed. ENT never re-lists shared specs — its overlay (ci_matrix.ent.json) carries
@@ -197,9 +199,18 @@ if (selectIdx !== -1) {
   if (!changedFilesPath) die("--select-for-changes requires a path to a changed-files list");
   args.splice(selectIdx, 2);
 }
+const onlyIdx = args.indexOf("--only-shards");
+let onlyShards = null;
+if (onlyIdx !== -1) {
+  if (args[onlyIdx + 1] === undefined) die("--only-shards requires a comma-separated list of testfolder names");
+  onlyShards = [...new Set(args[onlyIdx + 1].split(",").map((s) => s.trim()).filter(Boolean))];
+  args.splice(onlyIdx, 2);
+  if (onlyShards.length === 0) onlyShards = null;
+}
+if (onlyShards && changedFilesPath) die("--only-shards and --select-for-changes cannot be combined");
 const [basePath, overlayPath] = args;
 if (!basePath) {
-  die("usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>]");
+  die("usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt> | --only-shards <a,b>]");
 }
 
 const base = readJson(basePath);
@@ -358,6 +369,15 @@ if (changedFilesPath) {
   } else {
     log(`smoke: falling back to full matrix (${runnable.length} shards)`);
   }
+}
+if (onlyShards) {
+  // A typo must fail the run, never quietly run fewer shards than were asked for.
+  const unknown = onlyShards.filter((f) => !runnable.some((s) => s.testfolder === f));
+  if (unknown.length) {
+    die(`--only-shards names no runnable shard: ${unknown.join(", ")} (known: ${runnable.map((s) => s.testfolder).join(", ")})`);
+  }
+  emitted = runnable.filter((s) => onlyShards.includes(s.testfolder));
+  log(`only-shards: ${emitted.length}/${runnable.length} shards — ${emitted.map((s) => s.testfolder).join(", ")}`);
 }
 
 // Emit ONLY the fields the CI matrix consumes — disabled/_comment/notes are stripped,

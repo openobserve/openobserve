@@ -664,6 +664,36 @@ pub async fn snooze(
     .await
 }
 
+/// Ends a snooze at `now`, giving the ladder's clock back the quiet that was not used.
+pub async fn unsnooze(org_id: &str, id: &str, now: i64) -> Result<Option<Response>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let anchor = config::meta::oncall::response::unsnoozed_ladder_anchor(
+        existing.ladder_anchor,
+        existing.opened_at,
+        existing.snoozed_until,
+        now,
+    );
+    save(
+        org_id,
+        id,
+        vec![
+            (
+                oncall_responses::Column::SnoozedUntil,
+                Expr::value(Option::<i64>::None),
+            ),
+            (oncall_responses::Column::LadderAnchor, Expr::value(anchor)),
+        ],
+    )
+    .await
+}
+
 /// Writes a new severity onto an open record.
 ///
 /// The severity is what SLO reporting, digests and the post-incident review

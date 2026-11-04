@@ -17,7 +17,7 @@ import type { FleetPipeline } from "@/services/fleet";
 import { ratio } from "./flowIssues";
 import type { Telemetry } from "./flowTypes";
 
-export type MapColumn = "fleet" | "receiver" | "exporter" | "destination" | "sink";
+export type MapColumn = "fleet" | "receiver" | "destination" | "sink";
 
 export interface MapNode {
   id: string;
@@ -30,6 +30,8 @@ export interface MapNode {
   dropped: number;
   refused: number;
   queue: number | null;
+  failedRatio: number;
+  droppedRatio: number;
   pipelines: string[];
   x: number;
   y: number;
@@ -57,9 +59,12 @@ export interface PipelineMap {
   edges: MapEdge[];
 }
 
-const COLUMNS: MapColumn[] = ["fleet", "receiver", "exporter", "destination"];
+const COLUMNS: MapColumn[] = ["fleet", "receiver", "destination"];
 const MIN_COLUMN_GAP = 168;
 const PAD = 16;
+// The last column has no neighbour, so its failure branch and the label after it need their own room.
+const BRANCH_ROOM = 168;
+const BRANCH_REACH = 40;
 export const MIN_WIDTH = 1.5;
 export const MAX_WIDTH = 8;
 
@@ -99,6 +104,8 @@ class MapBuilder {
       dropped: 0,
       refused: 0,
       queue: null,
+      failedRatio: 0,
+      droppedRatio: 0,
       pipelines: [],
       x: 0,
       y: 0,
@@ -121,24 +128,17 @@ class MapBuilder {
     if (!n.pipelines.includes(p.id)) n.pipelines.push(p.id);
   }
 
-  addExporters(p: FleetPipeline) {
+  addDestinations(p: FleetPipeline) {
     for (const ex of p.exporters) {
-      const en = this.node(`e:${p.fleet}|${ex.name}`, "exporter", p.fleet, ex.name);
-      this.touch(en, p);
-      en.rate = addRate(en.rate, ex.rate);
-      en.failed += ex.failed;
-      en.dropped += ex.dropped;
-      en.queue = maxRate(en.queue, ex.queue);
       const dn = this.node(`d:${ex.destination}`, "destination", p.fleet, ex.destination);
       this.touch(dn, p);
       dn.rate = addRate(dn.rate, ex.rate);
-      const ed = this.edge(
-        `ed:${p.fleet}|${ex.name}|${ex.destination}|${p.signal}`,
-        en.id,
-        dn.id,
-        p,
-      );
-      ed.rate = addRate(ed.rate, ex.rate);
+      dn.failed += ex.failed;
+      dn.dropped += ex.dropped;
+      dn.queue = maxRate(dn.queue, ex.queue);
+      // Per exporter, because a destination is shared and a busy healthy fleet must not dilute a failing one.
+      dn.failedRatio = Math.max(dn.failedRatio, ratio(ex.failed, ex.rate));
+      dn.droppedRatio = Math.max(dn.droppedRatio, ratio(ex.dropped, ex.rate));
     }
   }
 
@@ -156,31 +156,31 @@ class MapBuilder {
       fr.rate = maxRate(fr.rate, r.rate);
       const share = receiverShare(p, r.rate);
       for (const ex of p.exporters) {
-        const id = `re:${p.fleet}|${r.name}|${ex.name}|${p.signal}`;
-        const re = this.edge(id, rn.id, `e:${p.fleet}|${ex.name}`, p);
-        re.rate = addRate(re.rate, ex.rate === null ? null : ex.rate * share);
+        const id = `rd:${p.fleet}|${r.name}|${ex.destination}|${p.signal}`;
+        const rd = this.edge(id, rn.id, `d:${ex.destination}`, p);
+        rd.rate = addRate(rd.rate, ex.rate === null ? null : ex.rate * share);
       }
     }
   }
 
   addBranches() {
-    for (const en of [...this.nodes.values()].filter((n) => n.column === "exporter")) {
-      if (en.failed <= 0 && en.dropped <= 0) continue;
-      const failed = en.failed > 0;
-      const sink = this.node(`x:${en.id}`, "sink", en.fleet, en.name);
-      sink.pipelines = [...en.pipelines];
-      sink.rate = failed ? en.failed : en.dropped;
-      const signal = [...this.edges.values()].find((e) => e.target === en.id)?.signal ?? "logs";
-      this.edges.set(`br:${en.id}`, {
-        id: `br:${en.id}`,
-        source: en.id,
+    for (const dn of [...this.nodes.values()].filter((n) => n.column === "destination")) {
+      if (dn.failed <= 0 && dn.dropped <= 0) continue;
+      const failed = dn.failed > 0;
+      const sink = this.node(`x:${dn.id}`, "sink", dn.fleet, dn.name);
+      sink.pipelines = [...dn.pipelines];
+      sink.rate = failed ? dn.failed : dn.dropped;
+      const signal = [...this.edges.values()].find((e) => e.target === dn.id)?.signal ?? "logs";
+      this.edges.set(`br:${dn.id}`, {
+        id: `br:${dn.id}`,
+        source: dn.id,
         target: sink.id,
         signal,
         rate: sink.rate,
-        pipelines: [...en.pipelines],
+        pipelines: [...dn.pipelines],
         branch: {
           kind: failed ? "failed" : "dropped",
-          ratio: ratio(failed ? en.failed : en.dropped, en.rate),
+          ratio: failed ? dn.failedRatio : dn.droppedRatio,
         },
       });
     }
@@ -188,8 +188,9 @@ class MapBuilder {
 }
 
 function place(nodes: MapNode[], layout: MapLayout) {
+  const room = nodes.some((n) => n.column === "sink") ? BRANCH_ROOM : 0;
   const gap = Math.max(
-    (layout.width - 2 * PAD - layout.nodeWidth) / (COLUMNS.length - 1),
+    (layout.width - 2 * PAD - layout.nodeWidth - room) / (COLUMNS.length - 1),
     MIN_COLUMN_GAP,
   );
   const columns = COLUMNS.map((c) => nodes.filter((n) => n.column === c));
@@ -206,19 +207,19 @@ function place(nodes: MapNode[], layout: MapLayout) {
   for (const sink of nodes.filter((n) => n.column === "sink")) {
     const from = byId.get(sink.id.slice(2));
     if (!from) continue;
-    sink.x = from.x + layout.nodeWidth / 2 + gap / 2;
+    sink.x = from.x + layout.nodeWidth + BRANCH_REACH;
     sink.y = from.y + layout.row * 0.7;
   }
 }
 
-/** Fleet → receiver → exporter → destination; nodes keep the order of the pipelines they first appear in. */
+/** Fleet → receiver → destination; nodes keep the order of the pipelines they first appear in. */
 export function buildPipelineMap(pipelines: FleetPipeline[], layout: MapLayout): PipelineMap {
   const b = new MapBuilder();
   for (const p of pipelines) {
     const fleetNode = b.node(`f:${p.fleet}`, "fleet", p.fleet, p.fleet);
     b.touch(fleetNode, p);
     fleetNode.rate = addRate(fleetNode.rate, p.out_rate);
-    b.addExporters(p);
+    b.addDestinations(p);
   }
   for (const p of pipelines) b.addReceivers(p, b.node(`f:${p.fleet}`, "fleet", p.fleet, p.fleet));
   b.addBranches();

@@ -49,6 +49,7 @@ import {
 import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
 
 let selectionToken = 0;
 
@@ -152,6 +153,7 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const getRegionInfo = () => {
+    if (featureState(store.state.zoConfig?.features, "super_cluster") === "locked") return;
     searchService.get_regions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};
@@ -456,6 +458,12 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const getQueryData = (isPagination = false, options: QueryDataOptions = {}) => {
+    // Every run funnels here, so a locked signal never loads data whichever trigger started it.
+    const signal = streamTypeFeature(searchObj.data.stream.streamType);
+    if (signal && featureState(store.state.zoConfig?.features, signal) === "locked") {
+      searchObj.loading = false;
+      return undefined;
+    }
     noteGridQuery(options.origin, options.generationId);
     const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
     const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();

@@ -291,7 +291,7 @@ pub(crate) async fn act_on(
     verb: Verb,
     source: AckSource,
 ) -> Response {
-    if let Err(e) = ack::authorize_problem(problem, actor, Act::Ack).await {
+    if let Err(e) = ack::authorize_problem(problem, actor, Act::from(verb)).await {
         return error_response(e);
     }
     match act(problem, actor, verb, source).await {

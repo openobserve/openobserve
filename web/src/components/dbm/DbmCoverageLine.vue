@@ -155,6 +155,8 @@ const props = withDefaults(
      * separate question the response answers via `percentiles_estimated`.
      */
     exactPercentiles?: boolean;
+    /** Some row folds several schemas, so its speeds are its slowest schema's, not its own. */
+    slowestSchemaSpeeds?: boolean;
     /**
      * What these rows ARE. `list` (default) is a ranked table, where the share
      * of total time is the headline claim. `query` is one statement, where that
@@ -172,6 +174,7 @@ const props = withDefaults(
     other: () => [],
     topNSubset: false,
     exactPercentiles: false,
+    slowestSchemaSpeeds: false,
     filterLabel: null,
     subject: "list",
     inline: false,
@@ -411,8 +414,9 @@ const summary = computed<I18nText>(() => {
   // The Overview grain measures every call, so it states exactness plainly
   // rather than borrowing the per-query "heaviest N" sentence.
   if (props.exactPercentiles) {
-    return estimatedSpeeds.value
-      ? t("dbm.coverage.lineExactEstimated")
+    if (estimatedSpeeds.value) return t("dbm.coverage.lineExactEstimated");
+    return props.slowestSchemaSpeeds
+      ? t("dbm.coverage.lineExactSlowestSchema")
       : t("dbm.coverage.lineExact");
   }
   if (otherTime.value <= 0) {

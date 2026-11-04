@@ -37,7 +37,8 @@ import {
 } from "../src/report.mjs";
 import { extractInlineBlock } from "../src/inline.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "../src/sanitize.mjs";
-import { reviewerDiff } from "../src/pr-diff.mjs";
+import { diffFingerprint, hunksLocatable, reviewerDiff } from "../src/pr-diff.mjs";
+import { narrowTier } from "../src/selection.mjs";
 import * as approvalModule from "../src/auto-approve.mjs";
 import * as commentsModule from "../src/comments.mjs";
 import * as confidenceModule from "../src/confidence.mjs";
@@ -114,6 +115,13 @@ test("severityRank orders p0 first and treats legacy words like their mapped lev
 const xmlFinding = (severity, summary, extra = "") => `<finding><category>security</category><severity>${severity}</severity><file>src/a.rs</file><line>3</line><summary>${summary}</summary><description>d</description><suggestion>s</suggestion>${extra}</finding>`;
 const reviewer = (findings, agentName = "Security Reviewer") => ({ agentName, findings: parseFindings(findings.join("\n")) });
 
+test("the fallback calls P1-only findings major concerns, still blocking", () => {
+  const review = buildFallbackReview([reviewer([xmlFinding("p1", "high"), xmlFinding("p2", "mid")])], "full", [], "<!-- ai-code-review -->");
+  assert.match(review, /> \[!CAUTION\]\n> ### ⚠️ Major concerns found\n/);
+  assert.ok(review.includes("#### 🟠 P1 · Major concerns"));
+  assert.equal(review.includes("Blockers"), false);
+});
+
 test("findings are normalized when parsed, and one with no severity is dropped", () => {
   const findings = parseFindings([xmlFinding("Critical", "a"), xmlFinding("P1", "b"), xmlFinding("", "c")].join(""));
   assert.deepEqual(findings.map(f => [f.summary, f.severity]), [["a", "p0"], ["b", "p1"]]);
@@ -128,8 +136,8 @@ test("the fallback groups into P0 to P3 in order, with the caps applied", () => 
   ])];
   const review = buildFallbackReview(results, "full", [], "<!-- ai-code-review -->");
   const at = text => review.indexOf(text);
-  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Blockers"));
-  assert.ok(at("#### 🟠 P1 · Blockers") < at("#### 🟡 P2 · Should fix"));
+  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Major concerns"));
+  assert.ok(at("#### 🟠 P1 · Major concerns") < at("#### 🟡 P2 · Should fix"));
   assert.ok(at("#### 🟡 P2 · Should fix") < at("#### 🔵 P3 · Worth a look"));
   assert.match(review, /> \[!CAUTION\]\n> ### ⛔ Blockers found\n> Automated review .*un-judged\./);
   assert.match(review, /\*\*🔴 P0: 1 · 🟠 P1: 1 · 🟡 P2: 3 · 🔵 P3: 2\*\*/);
@@ -162,8 +170,8 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["clean", {}, "high", ["no blockers; all reviewers finished; tests changed"]],
     ["no production code", { prodChanged: false, testsChanged: false }, "high", ["no blockers; all reviewers finished"]],
     ["p3 alone", { counts: { p3: 2 } }, "high", ["no blockers; all reviewers finished; tests changed"]],
-    ["one blocker", { counts: { p1: 1 } }, "low", ["1 blocker (P0/P1)"]],
-    ["two blockers", { counts: { p0: 1, p1: 1 } }, "low", ["2 blockers (P0/P1)"]],
+    ["one major concern", { counts: { p1: 1 } }, "low", ["1 major concern (P1)"]],
+    ["a blocker and a major concern", { counts: { p0: 1, p1: 1 } }, "low", ["1 blocker (P0)", "1 major concern (P1)"]],
     ["uncounted", { findingsKnown: false }, "low", ["findings could not be counted"]],
     ["security unfinished", { failedReviewers: ["Security Reviewer"] }, "low", ["Security reviewer did not finish"]],
     ["correctness unfinished", { failedReviewers: ["Correctness Reviewer"] }, "low", ["Correctness reviewer did not finish"]],
@@ -175,7 +183,7 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["all failed", { failedReviewers: ["Security Reviewer", "Release Reviewer"], ranCount: 2 }, "low", ["no reviewer finished"]],
     ["none ran", { ranCount: 0 }, "low", ["no reviewer ran"]],
     ["lowest wins, worst first", { counts: { p1: 1, p2: 1 }, testsChanged: false, failedReviewers: ["Release Reviewer"] }, "low",
-      ["1 blocker (P0/P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
+      ["1 major concern (P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
   ];
   for (const [name, change, level, reasons] of table) {
     assert.deepEqual(mergeConfidence({ ...clean, ...change }), { level, reasons }, name);
@@ -469,7 +477,7 @@ test("an approved callout over a visible blocker section or count never approves
   assert.equal(isApprovedReview(`${clean}\n\n**Merge confidence: 🟢 High** — no blockers; all reviewers finished`), true);
   const blocked = [
     `${clean}\n\n#### 🔴 P0 · Blockers\n- \`a.rs:1\` **[Security]** Leaks a token.`,
-    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Blockers\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
+    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Major concerns\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
     `${head}**🔴 P0: 1 · 🟠 P1: 0 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 P0: 0 · 🟠 P1: 2 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 1 blocker · 🟡 0 warnings**`,
@@ -779,7 +787,8 @@ const mainSource = () => {
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
   const fetcher = source.slice(source.indexOf("function fetchPrDiff("), source.indexOf("function pairedPrContext("));
   const notes = source.slice(source.indexOf("function noteOnComment("), source.indexOf("function noteSkippedPush("));
-  return `${fetcher}\n${notes}\n${source.slice(source.indexOf("async function main() {"), source.indexOf("// ─── Entry point"))}\nreturn main;`;
+  const unchanged = source.slice(source.indexOf("function unchangedDiffCheck("), source.indexOf("function prepareReviewTree("));
+  return `${fetcher}\n${notes}\n${unchanged}\n${source.slice(source.indexOf("async function main() {"), source.indexOf("// ─── Entry point"))}\nreturn main;`;
 };
 const cleanCoordinatorOutput = `${commentsModule.REVIEW_HEADING}\n\n> [!TIP]\n> ### ✅ Approved\n> Looks right.\n\n<!-- ai-review-inline [] -->`;
 const finishedReviewer = key => ({ agentKey: key, agentName: `${key} Reviewer`, findings: [], parsed: true, fullDiff: true, error: null });
@@ -787,19 +796,19 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null } = {}) {
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n" } = {}) {
   const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
-  const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: MAIN_HEAD }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
+  const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: head }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
   const scope = {
     ...commentsModule, ...confidenceModule, ...approvalModule, ...reportModule, ...passesModule,
     REVIEW_COLD_PASSES: 2, REVIEWER_CONCURRENCY: 16,
-    process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: MAIN_HEAD, MERGE_BASE_SHA: "c".repeat(40) } },
+    process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: head, MERGE_BASE_SHA: "c".repeat(40), ...(forceFull ? { FORCE_FULL: "true" } : {}) } },
     console: { log: (...args) => run.logs.push(args.join(" ")), warn: noop, error: noop },
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
     findExistingReviewComment: () => ({ comment: existing, ok: true }),
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: false, REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
@@ -920,6 +929,109 @@ test("a push the run stops on before claiming a pass loses the old verdict and k
     assert.equal(commentsModule.reviewPassCount(run.posted), 1);
     assert.equal(commentsModule.reviewedKey(run.posted), PAIRED_MAIN_HEAD);
   }
+});
+
+test("a new head whose diff matches the reviewed one is skipped without a pass, a model call or a claim", async () => {
+  const first = await runMain({ mode: "off" });
+  assert.equal(commentsModule.reviewedDiffFingerprint(first.posted), diffFingerprint(smallRawDiff));
+  const rebased = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD });
+  assert.equal(rebased.error, undefined);
+  assert.ok(rebased.logs.some(line => line.includes("unchanged_diff")));
+  assert.deepEqual(rebased.reviewerCalls, []);
+  assert.equal(rebased.coordinatorCalls, 0);
+  assert.equal(rebased.claims, 0);
+  assert.equal(rebased.updates, 1);
+  assert.equal(commentsModule.reviewedKey(rebased.posted), PAIRED_MAIN_HEAD);
+  assert.equal(commentsModule.reviewPassCount(rebased.posted), 1);
+  assert.match(rebased.posted, /Merge confidence: 🟢 High/);
+});
+
+test("a hand-started run, a changed diff or an unpinned diff is reviewed even after a matching review", async () => {
+  const first = await runMain({ mode: "off" });
+  const existing = { id: 1, body: first.posted };
+  const changed = `${smallRawDiff}+more\n`;
+  for (const run of [
+    await runMain({ mode: "off", existing, head: PAIRED_MAIN_HEAD, manual: true }),
+    await runMain({ mode: "off", existing, head: PAIRED_MAIN_HEAD, rawDiff: changed }),
+    await runMain({ mode: "off", existing, head: PAIRED_MAIN_HEAD, pinned: { "test/repo": false } }),
+  ]) {
+    assert.equal(run.logs.some(line => line.includes("unchanged_diff")), false);
+    assert.equal(run.claims, 1);
+    assert.ok(run.reviewerCalls.length > 0);
+    assert.equal(commentsModule.reviewPassCount(run.posted), 2);
+  }
+});
+
+test("a hand-started, force-full or pass-limit-ignoring run reviews the head the last review already covered", async () => {
+  const first = await runMain({ mode: "off" });
+  const existing = { id: 1, body: first.posted };
+  for (const bypass of [{ manual: true }, { forceFull: true }, { ignorePassLimit: true }]) {
+    const run = await runMain({ mode: "off", existing, ...bypass });
+    assert.equal(run.error, undefined, JSON.stringify(bypass));
+    assert.equal(run.logs.some(line => /already_reviewed|unchanged_diff/.test(line)), false, JSON.stringify(bypass));
+    assert.ok(run.reviewerCalls.length > 0, JSON.stringify(bypass));
+    assert.equal(run.claims, 1, JSON.stringify(bypass));
+  }
+  const automatic = await runMain({ mode: "off", existing });
+  assert.ok(automatic.logs.some(line => line.includes("already_reviewed")));
+  assert.deepEqual(automatic.reviewerCalls, []);
+});
+
+test("reviewers cut short at their soft deadline are not finished, so the verdict is not High and the gate does not approve", async () => {
+  const wrapped = key => ({ ...finishedReviewer(key), wrappedUp: true });
+  for (const results of [[wrapped("security"), wrapped("correctness")], [finishedReviewer("security"), wrapped("correctness")]]) {
+    const run = await runMain({ results });
+    assert.equal(run.error, undefined);
+    assert.equal(run.approvals.length, 0);
+    assert.doesNotMatch(run.posted, /Merge confidence: 🟢 High/);
+    assert.doesNotMatch(run.posted, /all reviewers finished/);
+    assert.doesNotMatch(run.posted, /Auto-approved/);
+    assert.equal(commentsModule.reviewedDiffFingerprint(run.posted), "");
+  }
+  const byPass = (key, pass) => ({ ...finishedReviewer(key), wrappedUp: pass === 2 });
+  const oneCleanPass = await runMain({ byPass });
+  assert.equal(oneCleanPass.approvals.length, 1, "an area with one uninterrupted pass is still reviewed");
+});
+
+test("an invalid effort setting retracts the old verdict and approval line without claiming a pass", async () => {
+  const first = await runMain();
+  assert.match(first.posted, /Merge confidence: 🟢 High/);
+  assert.match(first.posted, /Auto-approved/);
+  const variantError = 'variant "typo" is not declared for test/model in opencode.ci.jsonc (declared: high)';
+  for (const stop of [{ head: PAIRED_MAIN_HEAD, rawDiff: `${smallRawDiff}+more\n` }, { manual: true }]) {
+    const run = await runMain({ existing: { id: 1, body: first.posted }, variantError, ...stop });
+    assert.match(run.error, /variant "typo" is not declared/);
+    assert.equal(run.claims, 0);
+    assert.deepEqual(run.reviewerCalls, []);
+    assert.equal(run.updates, 1);
+    assert.doesNotMatch(run.posted, /High/);
+    assert.doesNotMatch(run.posted, /Auto-approved/);
+    assert.match(run.posted, /the review did not run/);
+    assert.doesNotMatch(run.posted, /typo|test\/model/, "the configuration detail stays in the log");
+    assert.equal(commentsModule.reviewPassCount(run.posted), 1);
+    assert.equal(commentsModule.reviewedKey(run.posted), MAIN_HEAD);
+  }
+});
+
+test("an unchanged diff whose hunk text appears twice in the base is reviewed, as the edit cannot be located", async () => {
+  const first = await runMain({ mode: "off" });
+  const twice = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, baseFile: "old\nx\nold\n" });
+  assert.equal(twice.logs.some(line => line.includes("unchanged_diff")), false);
+  assert.equal(twice.claims, 1);
+  assert.equal(commentsModule.reviewedDiffFingerprint(twice.posted), "", "a review whose edit cannot be located records no fingerprint");
+  const unreadable = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, baseFile: null });
+  assert.equal(unreadable.claims, 1);
+  assert.ok((await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD })).logs.some(line => line.includes("unchanged_diff")));
+});
+
+test("a push that only adds a production asset the noise filter hides is reviewed, not skipped with the old High", async () => {
+  const first = await runMain({ mode: "off" });
+  assert.match(first.posted, /Merge confidence: 🟢 High/);
+  const svg = "diff --git a/web/src/assets/chart.svg b/web/src/assets/chart.svg\nnew file mode 100644\n--- /dev/null\n+++ b/web/src/assets/chart.svg\n@@ -0,0 +1 @@\n+<svg/>\n";
+  const next = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, rawDiff: `${smallRawDiff}${svg}`, keptDiff: smallRawDiff });
+  assert.equal(next.logs.some(line => line.includes("unchanged_diff")), false);
+  assert.equal(next.claims, 1);
+  assert.doesNotMatch(next.posted, /Merge confidence: 🟢 High/);
 });
 
 test("a dangling second block cannot read as a clean count, so the gate refuses", () => {
@@ -1342,4 +1454,46 @@ test("a tilde-fenced or blockquoted report example is not a finished review", ()
     ["Example:\n> quoted\n\n<findings><no-issues>LGTM</no-issues></findings>", true],
   ];
   for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
+});
+
+// The tier table and its chooser are lifted from the runner, which starts a review on import.
+function riskTierFns() {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  const tiers = source.slice(source.indexOf("const COORDINATOR_AGENT"), source.indexOf("// Agents added on top"));
+  const security = source.slice(source.indexOf("function isSecuritySensitiveFile("), source.indexOf("// Scoped to web/src on purpose"));
+  const assess = source.slice(source.indexOf("function assessRiskTier("), source.indexOf("function selectAgents("));
+  return new Function("narrowTier", "logicalPath", `${tiers}\n${security}\n${assess}\nreturn { RISK_TIERS, assessRiskTier };`)(narrowTier, p => p);
+}
+
+test("test-only and CI-only PRs of any size get their narrow reviewer set, unless a path or the file count escalates to full", () => {
+  const { RISK_TIERS, assessRiskTier } = riskTierFns();
+  assert.deepEqual(RISK_TIERS["test-only"].agents, ["correctness", "code-quality"]);
+  assert.deepEqual(RISK_TIERS["ci-only"].agents, ["security", "release"]);
+  const diff = (paths, lines = 500) => ({ files: paths.map(newPath => ({ oldPath: newPath, newPath })), totalAdded: lines, totalRemoved: 0 });
+  assert.equal(assessRiskTier(diff(["tests/ui-testing/playwright-tests/a.spec.js"])), "test-only");
+  assert.equal(assessRiskTier(diff([".github/workflows/ci.yml"], 3)), "ci-only");
+  assert.equal(assessRiskTier(diff(["src/handler/http/auth/tests/login.rs"])), "full", "a security-looking path still escalates");
+  assert.equal(assessRiskTier(diff(Array.from({ length: 51 }, (_, i) => `tests/api-testing/test_${i}.py`))), "full");
+  assert.equal(assessRiskTier(diff(["src/service/search.rs"], 5)), "trivial");
+  assert.equal(assessRiskTier(diff(["src/service/search.rs"], 50)), "lite");
+});
+
+test("an action or workflow under a test-named directory stays ci-only, not test-only", () => {
+  assert.equal(narrowTier([".github/actions/test/action.yml"]), "ci-only");
+  assert.equal(narrowTier([".github/workflows/tests.yml"]), "ci-only");
+});
+
+test("a narrow tier needs both a rename's source and its destination to qualify", () => {
+  const { assessRiskTier } = riskTierFns();
+  const moved = (oldPath, newPath) => ({ files: [{ oldPath, newPath }], totalAdded: 120, totalRemoved: 120 });
+  assert.equal(assessRiskTier(moved("src/service/search.rs", "tests/search.rs")), "full", "moving production code into tests removes it from production");
+  assert.equal(assessRiskTier(moved("scripts/deploy.sh", ".github/workflows/deploy.yml")), "full");
+  assert.equal(assessRiskTier(moved("src/handler/http/auth/login.rs", "src/service/login.rs")), "full", "a security-looking source still escalates");
+  assert.equal(assessRiskTier(moved("tests/a_test.py", "tests/b_test.py")), "test-only");
+});
+
+test("a diff longer than a reviewer reads records no fingerprint, so the next push reviews it", async () => {
+  const big = `diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1,2 @@\n-old\n+new\n+${"x".repeat(160_000)}\n`;
+  const run = await runMain({ mode: "off", rawDiff: big });
+  assert.equal(commentsModule.reviewedDiffFingerprint(run.posted), "");
 });

@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
+            :exploreActions="exploreActions"
             :kiosk="kiosk"
             :layoutMode="layoutMode"
             :data="panels[0] || {}"
@@ -149,6 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
             @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
+            @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
+            @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
           />
         </div>
         <div
@@ -217,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onDeletePanel="onDeletePanel"
                   @onViewPanel="onViewPanel"
                   :viewOnly="viewOnly"
+                  :exploreActions="exploreActions"
                   :kiosk="kiosk"
                   :layoutMode="layoutMode"
                   :data="item"
@@ -256,6 +260,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:runId="updateRunId"
                   @contextmenu="$emit('chart:contextmenu', $event)"
                   @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
+                  @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
+                  @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
                 >
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
@@ -427,6 +433,8 @@ export default defineComponent({
     "variablesManagerReady",
     "sendToAiChat",
     "layoutChange",
+    "exploreCreateAlert",
+    "exploreAddToDashboard",
   ],
   props: {
     viewOnly: {},
@@ -511,6 +519,11 @@ export default defineComponent({
     },
     /** Scales the grid's cell height so every row fits the visible height without scrolling. */
     fitToScreen: {
+      type: Boolean,
+      default: false,
+    },
+    /** Adds a Create alert / Add to dashboard menu to each panel; only takes effect with viewOnly. */
+    exploreActions: {
       type: Boolean,
       default: false,
     },

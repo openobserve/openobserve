@@ -691,13 +691,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
 
+    // Routers serve the hook routes, so the hook node tasks start before the router return.
+    #[cfg(feature = "enterprise")]
+    openobserve_core::workflows::http_trigger::spawn_node_tasks();
+
+    // Routers profile themselves too; without an ingester role they need ZO_SELF_PROFILES_URL.
+    #[cfg(feature = "cpu-profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
-
-    #[cfg(feature = "cpu-profiling")]
-    tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
@@ -1858,6 +1863,26 @@ mod tests {
         assert!(
             kv_watch < router_return,
             "routers serve the PKCE login callback, which reads the KV cache"
+        );
+    }
+
+    #[test]
+    fn self_profiles_are_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let self_profiles = init
+            .find("tokio::task::spawn(openobserve_core::self_profiles::run());")
+            .expect("init() must spawn self_profiles::run()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            self_profiles < router_return,
+            "single-role routers must run the self-profiles loop"
         );
     }
 

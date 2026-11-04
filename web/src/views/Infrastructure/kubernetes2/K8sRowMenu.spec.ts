@@ -15,6 +15,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import K8sRowMenu from "./K8sRowMenu.vue";
 import { readActionsFor, writeActionsFor } from "./k8sActions";
@@ -69,5 +70,39 @@ describe("K8sRowMenu", () => {
     (item("delete") as HTMLElement).click();
     await flushPromises();
     expect(wrapper.emitted("action")).toBeUndefined();
+  });
+
+  const openWithFeatures = async (features: Record<string, string>) => {
+    const store = createStore({ state: { zoConfig: { features } } });
+    const wrapper = mount(K8sRowMenu, {
+      props: { target: pod },
+      global: { plugins: [i18n, store] },
+      attachTo: document.body,
+    });
+    await wrapper.find('[data-test="k8s2-row-menu-trigger"]').trigger("click");
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("locks the traces and metrics hand-offs when their license is locked, keeping logs live", async () => {
+    const wrapper = await openWithFeatures({ traces: "locked", metrics: "locked", logs: "locked" });
+    for (const type of ["traces", "metrics"]) {
+      expect(item(type)?.getAttribute("aria-disabled")).toBe("true");
+      expect(
+        document.body.querySelector(`[data-test="k8s2-row-menu-${type}-license-lock"]`),
+      ).not.toBeNull();
+    }
+    expect(item("logs")?.hasAttribute("aria-disabled")).toBe(false);
+    (item("traces") as HTMLElement).click();
+    await flushPromises();
+    expect(wrapper.emitted("action")).toBeUndefined();
+  });
+
+  it("keeps the hand-offs live when the license enables them", async () => {
+    const wrapper = await openWithFeatures({ traces: "enabled", metrics: "enabled" });
+    expect(document.body.querySelector('[data-test$="-license-lock"]')).toBeNull();
+    (item("metrics") as HTMLElement).click();
+    await flushPromises();
+    expect(wrapper.emitted("action")).toEqual([["metrics", pod]]);
   });
 });

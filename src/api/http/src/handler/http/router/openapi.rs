@@ -959,6 +959,7 @@ use crate::{
             config::meta::fleet::ValidationFailed,
             config::meta::fleet::AuditEvent,
             config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
             config::meta::fleet::DeliveryState,
             config::meta::fleet::RolloutStart,
             config::meta::fleet::Batching,
@@ -1188,6 +1189,13 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1298,6 +1306,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::handoff_response,
     openobserve_api_management::request::oncall::list_coverage_gaps,
     openobserve_api_management::request::oncall::list_deliveries,
+    openobserve_api_management::request::oncall::list_escalation_progress,
     openobserve_api_management::request::oncall::list_members,
     openobserve_api_management::request::oncall::list_my_deliveries,
     openobserve_api_management::request::oncall::list_my_teams,
@@ -1308,6 +1317,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::list_responses_for_incident,
     openobserve_api_management::request::oncall::list_schedule_presets,
     openobserve_api_management::request::oncall::list_team_config_risks,
+    openobserve_api_management::request::oncall::list_team_context,
     openobserve_api_management::request::oncall::list_teams,
     openobserve_api_management::request::oncall::list_unavailability,
     openobserve_api_management::request::oncall::list_unrouted_signals,
@@ -1328,6 +1338,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::snooze_response,
     openobserve_api_management::request::oncall::test_team_slack_channel,
     openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
     openobserve_api_management::request::oncall::update_ownership_rule,
     openobserve_api_management::request::oncall::update_team,
     openobserve_api_management::request::oncall::who_is_on_call,
@@ -1717,6 +1728,22 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put"),
         ("/api/{org_id}/workflows/{id}/history", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
     ];
 
     /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
@@ -1738,6 +1765,33 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
         ("/api/{org_id}/workflows/{id}/history", "get", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
     ];
 
     const SLACK_OPERATIONS: &[(&str, &str)] = &[
@@ -2576,6 +2630,9 @@ mod tests {
     fn workflows_document_the_statuses_their_handlers_return() {
         let base = "/api/{org_id}/workflows";
         let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
             (base, "get", &["200", "403", "404", "500"]),
@@ -2590,7 +2647,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
@@ -2616,6 +2673,29 @@ mod tests {
                 "/api/{org_id}/workflows/promote/{id}",
                 "post",
                 &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
             ),
         ]);
     }
