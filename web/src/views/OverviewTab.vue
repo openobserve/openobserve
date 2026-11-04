@@ -123,6 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverviewSectionError
       v-else-if="showSectionError('incidents')"
       section="incidents"
+      :forbidden="isForbidden(sectionFailure.incidents)"
+      :error="sectionFailure.incidents"
       :title="t('overview.activeIncidents')"
       @retry="() => loadAll(true)"
     />
@@ -306,6 +308,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverviewSectionError
       v-else-if="showSectionError('services')"
       section="services"
+      :forbidden="isForbidden(sectionFailure.services)"
+      :error="sectionFailure.services"
       :title="t('overview.services')"
       @retry="() => loadAll(true)"
     />
@@ -398,6 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverviewSectionError
       v-else-if="showSectionError('anomalies')"
       section="anomalies"
+      :forbidden="isForbidden(sectionFailure.anomalies)"
+      :error="sectionFailure.anomalies"
       :title="t('overview.activeAnomalies')"
       @retry="() => loadAll(true)"
     />
@@ -447,6 +453,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverviewSectionError
       v-else-if="showSectionError('recentEvents')"
       section="recentEvents"
+      :forbidden="isForbidden(sectionFailure.recentEvents)"
+      :error="sectionFailure.recentEvents"
       :title="t('overview.recentEvents')"
       @retry="() => loadAll(true)"
     />

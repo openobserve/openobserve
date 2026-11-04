@@ -841,6 +841,32 @@ describe("OverviewTab", () => {
       expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
     });
 
+    it("should show no-access, not load-error, for the one section that answered 403", async () => {
+      givenEnterprise(false);
+      givenRecentEvents();
+      vi.mocked(anomalyService.list).mockRejectedValue(forbidden());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-anomalies-no-access"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-anomalies-load-error"]').exists()).toBe(false);
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+    });
+
+    it("should keep the section load-error when one section 403s and another fails otherwise", async () => {
+      givenEnterprise(false);
+      vi.mocked(anomalyService.list).mockRejectedValue(forbidden());
+      vi.mocked(incidentsService.list).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-anomalies-no-access"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-incidents-load-error"]').exists()).toBe(true);
+    });
+
     it("should show load-error, not no-access, when 403s mix with other failures and the flag is on", async () => {
       givenEnterprise(true);
       givenEverySectionFails(forbidden);

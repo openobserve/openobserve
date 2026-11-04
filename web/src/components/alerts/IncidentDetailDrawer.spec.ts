@@ -747,6 +747,46 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
+  describe("Alert Details - threshold and silence", () => {
+    const mountWithTriggerCondition = async (triggerCondition: Record<string, unknown>) => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: {
+          ...createIncidentWithAlerts({ id: "test-123" }),
+          alerts: [{ id: "a1", name: "cpu_high", trigger_condition: triggerCondition }],
+        },
+      });
+      wrapper = await createWrapper({}, {}, "test-123");
+      await flushPromises();
+      wrapper.vm.activeTab = "alertTriggers";
+      wrapper.vm.selectedAlertIndex = 0;
+      await nextTick();
+    };
+
+    const detailValue = (field: "threshold" | "silence") =>
+      wrapper.get(`[data-test="incident-alert-${field}"]`).text().replace(/\s+/g, " ").trim();
+
+    it("renders a silence of 0 as 0 min and a threshold of 0 as 0", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 0, period: 5, silence: 0 });
+
+      expect(detailValue("silence")).toBe("0 min");
+      expect(detailValue("threshold")).toBe(">= 0");
+    });
+
+    it("renders a missing silence as N/A with no unit", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 3, period: 5 });
+
+      expect(detailValue("silence")).toBe("N/A");
+      expect(detailValue("threshold")).toBe(">= 3");
+    });
+
+    it("renders a missing threshold as N/A", async () => {
+      await mountWithTriggerCondition({ operator: ">=", period: 5, silence: 30 });
+
+      expect(detailValue("threshold")).toBe(">= N/A");
+      expect(detailValue("silence")).toBe("30 min");
+    });
+  });
+
   describe("Edge Cases", () => {
     it("should handle missing topology context", async () => {
       (incidentsService.get as any).mockResolvedValue({

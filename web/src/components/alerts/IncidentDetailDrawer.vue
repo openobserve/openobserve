@@ -1082,11 +1082,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium"
+                                data-test="incident-alert-threshold"
+                              >
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
-                                  raw("N/A")
+                                  formatThreshold(
+                                    alerts[selectedAlertIndex]?.trigger_condition?.threshold,
+                                  )
                                 }}
                               </span>
                             </div>
@@ -1118,12 +1123,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium"
+                                data-test="incident-alert-silence"
+                              >
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.silence ||
-                                  raw("N/A")
+                                  formatSilence(
+                                    alerts[selectedAlertIndex]?.trigger_condition?.silence,
+                                  )
                                 }}
-                                {{ t("common.min") }}
                               </span>
                             </div>
                           </div>
@@ -2892,6 +2901,14 @@ export default defineComponent({
       return formatSeconds(triggerCondition?.frequency);
     };
 
+    const formatThreshold = (threshold: number | null | undefined) =>
+      typeof threshold === "number" ? String(threshold) : raw("N/A");
+
+    const formatSilence = (silenceInMinutes: number | null | undefined) =>
+      typeof silenceInMinutes === "number"
+        ? t("alerts.incidents.periodMinutes", { minutes: silenceInMinutes })
+        : raw("N/A");
+
     // Transform V1 format conditions (or/and structure) to readable expression
     function transformToExpression(data: any, wrap = true): any {
       if (!data) return null;
@@ -3200,6 +3217,8 @@ export default defineComponent({
       getStatusLabel,
       formatPeriod,
       formatFrequency,
+      formatThreshold,
+      formatSilence,
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
