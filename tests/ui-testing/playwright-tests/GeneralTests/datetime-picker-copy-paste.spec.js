@@ -276,19 +276,21 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
     });
 
     // TC-12
-    test("should show the parse error toast when the clipboard is empty", {
+    test("should say the clipboard is empty when pasting an empty clipboard", {
       tag: ['@datetime-picker', '@all', '@P2']
     }, async () => {
       testLogger.info('Pasting with an empty clipboard');
 
       await pm.dateTimePickerPage.selectRelativePeriod('15-m');
+      const labelBeforePaste = await pm.dateTimePickerPage.getTriggerLabel();
       await pm.dateTimePickerPage.seedClipboard('');
       await pm.dateTimePickerPage.clickPaste();
 
-      await pm.dateTimePickerPage.expectPasteErrorToast();
+      await pm.dateTimePickerPage.expectPasteEmptyToast();
       await pm.dateTimePickerPage.expectRelativePanelActive();
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBeforePaste);
 
-      testLogger.info('Empty clipboard rejected with the parse error toast');
+      testLogger.info('Empty clipboard rejected with the empty-clipboard toast');
     });
   });
 

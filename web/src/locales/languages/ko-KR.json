@@ -850,6 +850,7 @@
     "dateRangeCopied": "날짜 범위가 복사됨",
     "dateRangePasted": "날짜 범위가 붙여넣기됨",
     "dateRangePasteError": "날짜 범위를 구문 분석할 수 없음",
+    "dateRangePasteEmpty": "클립보드가 비어 있습니다. 먼저 날짜 범위를 복사하세요.",
     "dateRangePasteBlocked": "이 브라우저에서 클립보드 읽기가 차단되었습니다. 선택기를 연 상태에서 {shortcut}을 눌러 붙여넣으세요.",
     "pastSecond": "지난 {count}초 | 지난 {count}초",
     "pastMinute": "지난 {count}분 | 지난 {count}분",

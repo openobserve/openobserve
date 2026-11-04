@@ -850,6 +850,7 @@
     "dateRangeCopied": "Date range copied",
     "dateRangePasted": "Date range pasted",
     "dateRangePasteError": "Could not parse date range",
+    "dateRangePasteEmpty": "คลิปบอร์ดว่างเปล่า โปรดคัดลอกช่วงวันที่ก่อน",
     "dateRangePasteBlocked": "This browser blocked reading the clipboard. Press {shortcut} with the picker open to paste.",
     "pastSecond": "Past {count} Second | Past {count} Seconds",
     "pastMinute": "Past {count} Minute | Past {count} Minutes",

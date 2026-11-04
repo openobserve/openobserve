@@ -850,6 +850,7 @@
     "dateRangeCopied": "日付範囲をコピーしました",
     "dateRangePasted": "日付範囲を貼り付けました",
     "dateRangePasteError": "日付範囲を解析できませんでした",
+    "dateRangePasteEmpty": "クリップボードが空です。先に日付範囲をコピーしてください。",
     "dateRangePasteBlocked": "このブラウザではクリップボードの読み取りがブロックされています。ピッカーを開いた状態で {shortcut} を押して貼り付けてください。",
     "pastSecond": "{count} 秒前 | {count} 秒前",
     "pastMinute": "{count} 分前 | {count} 分前",
