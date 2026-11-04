@@ -132,12 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="rbacAccess.allowed ? serviceAccountRolesText(row.email) : rbacAccess.message"
               @click="!rbacAccess.allowed && openUpgradeDialog()"
               >{{ serviceAccountRolesText(row.email) }}
-              <OIcon
-                v-if="!rbacAccess.allowed"
-                name="lock"
-                size="xs"
-                class="text-warning-600 shrink-0"
-              />
+              <OIcon v-if="!rbacAccess.allowed" name="lock" size="xs" class="lock-chip shrink-0" />
             </span>
           </template>
 
@@ -489,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -508,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-warning-600'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -587,6 +582,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -916,7 +912,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = serviceAccountsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => {

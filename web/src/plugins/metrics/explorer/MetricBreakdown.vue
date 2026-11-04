@@ -82,7 +82,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div class="flex-1" />
           <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
+          <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason">
+            <span class="inline-flex shrink-0">
+              <OButton
+                variant="ghost"
+                size="xs"
+                disabled
+                data-test="metrics-breakdown-add-to-dashboard"
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="lock-chip"
+                    size="sm"
+                    data-test="metrics-breakdown-add-to-dashboard-lock"
+                  />
+                </template>
+                {{ t("metrics.explorer.detail.breakdown.addToDashboard") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
+            v-else
             variant="ghost"
             size="xs"
             icon-left="dashboard-customize"
@@ -436,6 +457,8 @@ import MetricOverlayKey from "./MetricOverlayKey.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -576,6 +599,7 @@ export default defineComponent({
     AddToDashboard,
     PanelBar,
     OButton,
+    OIcon,
     OTag,
     OEmptyState,
     OBanner,
@@ -625,6 +649,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
 
     /** The stream the card's default query reads — `_count` for the exp fallback. */
     const valuesStream = computed(() => operandStreamsOf(props.card)[0]);
@@ -1264,6 +1290,8 @@ export default defineComponent({
       dashboardPanel,
       dashboardPanelTitle,
       openAddToDashboard,
+      dashboardsLocked,
+      dashboardsLockedReason,
     };
   },
 });

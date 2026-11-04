@@ -237,6 +237,21 @@ describe("FleetNewRolloutDialog", () => {
     );
   });
 
+  it("shows a phase timeout of 90 s without rounding it up", async () => {
+    vi.mocked(fleet.getSettings).mockResolvedValue({
+      data: {
+        restricted_components: [],
+        target_collector_version: null,
+        fleet_defaults: { ...NO_OVERRIDES, phase_timeout_secs: 90 },
+      },
+    } as any);
+    wrapper = mountDialog({ fleetId: "default", config: "edge", toVersion: 2 });
+    await settlePreview();
+    expect(wrapper.find('[data-test="fleet-new-rollout-dialog-timeout"]').text()).toContain(
+      "1 min 30 s",
+    );
+  });
+
   it("sends start, batching, verify and auto-rollback as the contract body", async () => {
     wrapper = mountDialog({ fleetId: "default", config: "edge", toVersion: 2 });
     await settlePreview();

@@ -2823,6 +2823,70 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     expect(w.find(BUTTON).exists()).toBe(true);
     w.unmount();
   });
+
+  it("skips discovery and shows a disabled locked button when continuous_profiling is locked", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    mockStore.state.zoConfig.features = { continuous_profiling: "locked" };
+    try {
+      const w = await mountWith();
+      expect(mockStreamNameList).not.toHaveBeenCalled();
+      expect(profileCalls()).toHaveLength(0);
+      expect(w.find(BUTTON).attributes("disabled")).toBeDefined();
+      expect(w.find(BUTTON).findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      w.unmount();
+    } finally {
+      delete mockStore.state.zoConfig.features;
+    }
+  });
+});
+
+describe("TraceDetailsSidebar — correlation license lock", () => {
+  const LOGS_TAB = '[data-test="trace-details-sidebar-tabs-correlated-logs"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+    mockFindRelatedTelemetry.mockClear();
+  });
+
+  it("shows locked tabs and LicenseDeniedState without a correlation lookup when locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    const w = mountSidebar({
+      streamName: "default",
+      serviceStreamsEnabled: true,
+      activeTab: "correlated-logs",
+    });
+    await w.setProps({ span: { ...mockSpan, span_id: "another" } });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(
+      w.find('[data-test="trace-details-sidebar-correlated-logs-license-denied"]').exists(),
+    ).toBe(true);
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens View Logs as a plain logs search when correlation is locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await w
+      .find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]')
+      .trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).toHaveBeenCalled();
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps the correlation lookup and unlocked tabs when correlation is enabled", async () => {
+    const w = mountSidebar({ streamName: "default", serviceStreamsEnabled: true });
+    await w.setProps({ activeTab: "correlated-logs" });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(mockFindRelatedTelemetry).toHaveBeenCalled();
+    w.unmount();
+  });
 });
 
 describe("TraceDetailsSidebar — Ask AI about this span", () => {
@@ -2896,6 +2960,37 @@ describe("TraceDetailsSidebar — Ask AI about this span", () => {
     await w.find(ASK_AI).trigger("click");
     const [payload] = w.emitted("sendToAiChat")![0] as [Record<string, any>];
     expect(payload.context.span.operation_p50_us).toBeNull();
+    w.unmount();
+  });
+});
+
+describe("TraceDetailsSidebar — logs license lock", () => {
+  const VIEW_LOGS = '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+  });
+
+  it("disables View Logs with a lock and the logs reason while logs is locked", async () => {
+    mockStore.state.zoConfig.features = { logs: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    const btn = w.find(VIEW_LOGS);
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(w.vm.logsLocked).toBe(true);
+    expect(w.vm.viewLogsTooltipContent).toMatch(/needs logs/i);
+    await btn.trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps View Logs enabled while logs is licensed", async () => {
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    expect(w.vm.logsLocked).toBe(false);
+    expect(w.vm.viewLogsTooltipContent).toBe("View Logs");
     w.unmount();
   });
 });

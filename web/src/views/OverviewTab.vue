@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :forbidden="overviewForbidden"
         :incidents-state="incidentsTile"
         :incidents-total="incidentsTotal"
+        :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
         @retry="() => loadOverview(true)"
         @open="goToAlertList"
         @create="goToAddAlert"
@@ -211,22 +212,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
-    <section v-if="!incidentsAccess.allowed" data-test="overview-incidents-locked">
+    <section
+      v-if="!incidentsAccess.allowed || incidentsLicenseLocked"
+      data-test="overview-incidents-locked"
+    >
       <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
         <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
           {{ t("overview.activeIncidents") }}
         </OText>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-surface hover:border-accent focus-visible:ring-button-ghost-focus-ring flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
-        role="button"
-        tabindex="0"
-        @click="openUpgradeDialog"
-        @keydown.enter="openUpgradeDialog"
-        @keydown.space.prevent="openUpgradeDialog"
+        class="border-border-default bg-surface-subtle rounded-surface focus-visible:ring-button-ghost-focus-ring flex items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+        :class="{ 'hover:border-accent cursor-pointer': !incidentsLicenseLocked }"
+        :role="incidentsLicenseLocked ? undefined : 'button'"
+        :tabindex="incidentsLicenseLocked ? undefined : 0"
+        @click="!incidentsLicenseLocked && openUpgradeDialog()"
+        @keydown.enter="!incidentsLicenseLocked && openUpgradeDialog()"
+        @keydown.space.prevent="!incidentsLicenseLocked && openUpgradeDialog()"
       >
-        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
-        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+        <span class="text-text-secondary text-sm">{{
+          incidentsLicenseLocked ? incidentsLockedReason : incidentsAccess.message
+        }}</span>
       </div>
     </section>
 
@@ -260,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pending="overviewPending"
       :failed="overviewFailed"
       :forbidden="overviewForbidden"
+      :locked-reasons="signalLockedReasons"
       @open="onSignalOpen"
     />
 
@@ -300,14 +308,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</strong>
             </OText>
           </OText>
-          <OButton
-            variant="ghost-primary"
-            size="sm"
-            data-test="overview-services-view-all"
-            @click="goToServiceGraph"
-          >
-            {{ t("overview.viewAll") }}
-          </OButton>
+          <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              :aria-disabled="tracesLock.locked.value || undefined"
+              data-test="overview-services-view-all"
+              @click="goToServiceGraph"
+            >
+              <OIcon
+                v-if="tracesLock.locked.value"
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="overview-services-view-all-lock"
+              />
+              {{ t("overview.viewAll") }}
+            </OButton>
+          </OTooltip>
         </div>
         <div class="relative">
           <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -357,11 +375,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTruncatedText class="text-text-body block flex-1 text-sm">{{
                   svc.label
                 }}</OTruncatedText>
-                <span class="ms-1 inline-flex shrink-0 items-center">
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+                    <OButton
+                      variant="ghost-muted"
+                      size="icon"
+                      disabled
+                      :aria-label="t('traces.servicesCatalog.viewTraces')"
+                      data-test="overview-service-view-traces"
+                    >
+                      <OIcon
+                        name="lock"
+                        class="text-icon-locked"
+                        size="sm"
+                        data-test="overview-service-view-traces-lock"
+                      />
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <span v-else class="ms-1 inline-flex shrink-0 items-center">
                   <OButton
                     variant="ghost-muted"
                     size="icon"
                     :title="t('traces.servicesCatalog.viewTraces')"
+                    data-test="overview-service-view-traces"
                     @click="goToService(svc, $event)"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -430,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </section>
       <OverviewSkeleton
-        v-else-if="incidentsAccess.allowed && isSectionPending('services')"
+        v-else-if="servicesEnabled && isSectionPending('services')"
         section="services"
       />
       <OverviewSectionError
@@ -446,24 +483,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('overview.services')"
       />
 
-      <!-- Locked: Services shares the Incidents license gate — same bundle, no
-           separate upsell story of its own. -->
-      <section v-else-if="!incidentsAccess.allowed" data-test="overview-services-locked">
+      <!-- Locked: Services shares the Incidents gate, and its data comes from traces, so a license without traces locks it too. -->
+      <section
+        v-else-if="!incidentsAccess.allowed || servicesLicenseLocked"
+        data-test="overview-services-locked"
+      >
         <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
           <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
             {{ t("overview.services") }}
           </OText>
         </div>
         <div
-          class="border-border-default bg-surface-subtle rounded-surface hover:border-accent focus-visible:ring-button-ghost-focus-ring flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
-          role="button"
-          tabindex="0"
-          @click="openUpgradeDialog"
-          @keydown.enter="openUpgradeDialog"
-          @keydown.space.prevent="openUpgradeDialog"
+          class="border-border-default bg-surface-subtle rounded-surface focus-visible:ring-button-ghost-focus-ring flex items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+          :class="{ 'hover:border-accent cursor-pointer': !servicesLicenseLocked }"
+          :role="servicesLicenseLocked ? undefined : 'button'"
+          :tabindex="servicesLicenseLocked ? undefined : 0"
+          @click="!servicesLicenseLocked && openUpgradeDialog()"
+          @keydown.enter="!servicesLicenseLocked && openUpgradeDialog()"
+          @keydown.space.prevent="!servicesLicenseLocked && openUpgradeDialog()"
         >
-          <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
-          <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+          <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+          <span class="text-text-secondary text-sm">{{
+            servicesLicenseLocked ? tracesLock.lockedReason.value : incidentsAccess.message
+          }}</span>
         </div>
       </section>
 
@@ -573,6 +615,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :no-checks="anomalyConfigCount === 0"
           :title="t('overview.activeAnomalies')"
         />
+        <section v-else-if="anomalyLocked" data-test="overview-anomalies-locked">
+          <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+              {{ t("overview.activeAnomalies") }}
+            </OText>
+          </div>
+          <div
+            class="border-border-default bg-surface-subtle rounded-surface flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+          >
+            <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+            <span class="text-text-secondary text-sm">{{ anomalyLock.lockedReason.value }}</span>
+          </div>
+        </section>
 
         <!-- RECENT EVENTS (alert firing feed) -->
         <section v-if="recentEvents.length > 0" data-test="overview-recent-events-section">
@@ -683,14 +738,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>{{ t("overview.notMonitoredTitle") }}</template>
       <template #description>{{ t("overview.notMonitoredDesc") }}</template>
       <template #actions>
-        <EmptyStateActionCard
+        <OTooltip
           v-if="showAlertsCard"
-          icon="notifications"
-          :label="t('overview.notMonitoredAlert')"
-          :sublabel="t('overview.notMonitoredAlertDesc')"
-          data-test="overview-not-monitored-alert-card"
-          @click="goToAddAlert"
-        />
+          :content="alertsLock.lockedReason.value"
+          :disabled="!alertsLocked"
+        >
+          <EmptyStateActionCard
+            :icon="alertsLocked ? 'lock' : 'notifications'"
+            :label="t('overview.notMonitoredAlert')"
+            :sublabel="t('overview.notMonitoredAlertDesc')"
+            :unavailable="alertsLocked"
+            data-test="overview-not-monitored-alert-card"
+            @click="goToAddAlert"
+          />
+        </OTooltip>
         <EmptyStateActionCard
           v-if="showAlertsCard && anomalyEnabled"
           icon="auto-awesome"
@@ -699,14 +760,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="overview-not-monitored-anomaly-card"
           @click="goToAnomalies"
         />
-        <EmptyStateActionCard
+        <OTooltip
           v-if="showLogsCard"
-          icon="search"
-          :label="t('overview.emptyActionLogs')"
-          :sublabel="t('overview.emptyActionLogsDesc')"
-          data-test="overview-not-monitored-logs-card"
-          @click="goToLogs"
-        />
+          :content="logsLock.lockedReason.value"
+          :disabled="!logsLock.locked.value"
+        >
+          <EmptyStateActionCard
+            :icon="logsLock.locked.value ? 'lock' : 'search'"
+            :label="t('overview.emptyActionLogs')"
+            :sublabel="t('overview.emptyActionLogsDesc')"
+            :unavailable="logsLock.locked.value"
+            data-test="overview-not-monitored-logs-card"
+            @click="goToLogs"
+          />
+        </OTooltip>
       </template>
     </OEmptyState>
 
@@ -748,6 +815,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -784,6 +852,7 @@ import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePane
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -798,12 +867,38 @@ const router = useRouter();
 // enterprise/cloud bundle as Incidents, with no upsell story of its own.
 const incidentsAccess = useLockedAffordance("incidents");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const alertsLock = useLicenseLock("alerts");
+const alertsLocked = alertsLock.locked;
+const { locked: incidentsFeatureLocked, lockedReason: incidentsLockedReason } =
+  useLicenseLock("incidents");
+const incidentsLicenseLocked = computed(
+  () => incidentsAccess.value.allowed && incidentsFeatureLocked.value,
+);
+const anomalyLock = useLicenseLock("anomaly_detection");
+const anomalyLocked = anomalyLock.locked;
+const logsLock = useLicenseLock("logs");
+const tracesLock = useLicenseLock("traces");
+// Services reads the trace topology, so a license without traces locks it
+const servicesLicenseLocked = computed(
+  () => incidentsAccess.value.allowed && tracesLock.locked.value,
+);
+const servicesEnabled = computed(() => incidentsAccess.value.allowed && !tracesLock.locked.value);
 const isIncidentsEnabled = computed(
-  () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
+  () =>
+    incidentsAccess.value.allowed &&
+    !incidentsFeatureLocked.value &&
+    store.state.zoConfig?.incidents_enabled === true,
 );
 const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
 // a deployment with anomaly detection off answers 403 by design, which is no load failure
-const anomalyEnabled = computed(() => store.state.zoConfig?.anomaly_detection_enabled === true);
+const anomalyEnabled = computed(
+  () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
+);
+// a license-locked signal shows its reason instead of stats, and its page is never opened
+const signalLockedReasons = computed(() => ({
+  ...(logsLock.locked.value ? { logs: logsLock.lockedReason.value } : {}),
+  ...(tracesLock.locked.value ? { traces: tracesLock.lockedReason.value } : {}),
+}));
 
 // ── Date / time picker ───────────────────────────────────────────────────────
 const LS_TIME_KEY = "o2_overview_time";
@@ -956,15 +1051,18 @@ const isForbidden = (err: unknown) => {
   return e?.status === 403 || e?.response?.status === 403;
 };
 const attemptedSections = computed<SectionKey[]>(() => {
-  const keys: SectionKey[] = ["recentEvents"];
+  const keys: SectionKey[] = [];
+  if (!alertsLocked.value) keys.push("recentEvents");
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
-  if (incidentsAccess.value.allowed) keys.push("services");
+  if (servicesEnabled.value) keys.push("services");
   return keys;
 });
 const isFailed = (key: SectionKey) =>
   !!sectionFailure[key] && attemptedSections.value.includes(key);
-const allFailed = computed(() => attemptedSections.value.every(isFailed));
+const allFailed = computed(
+  () => attemptedSections.value.length > 0 && attemptedSections.value.every(isFailed),
+);
 
 type PageState =
   "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
@@ -1009,8 +1107,8 @@ const showSectionForbidden = (key: SectionKey) =>
 const sectionApplies = (key: SectionKey) => {
   if (key === "incidents") return isIncidentsEnabled.value;
   if (key === "anomalies") return anomalyEnabled.value;
-  if (key === "services") return incidentsAccess.value.allowed;
-  return true;
+  if (key === "services") return servicesEnabled.value;
+  return !alertsLocked.value;
 };
 // an empty message needs a settled, successful, applicable section on a page that shows the cards
 const showSectionEmpty = (key: SectionKey) =>
@@ -1168,7 +1266,7 @@ const loadOverview = async (force = false) => {
 };
 
 const incidentsTile = computed<IncidentsTile>(() => {
-  if (!incidentsAccess.value.allowed) return "locked";
+  if (!incidentsAccess.value.allowed || incidentsFeatureLocked.value) return "locked";
   if (!isIncidentsEnabled.value) return "unavailable";
   if (isSectionPending("incidents")) return "loading";
   if (isDenied("incidents") && isFailed("incidents")) return "forbidden";
@@ -1269,6 +1367,11 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
+  if (anomalyLocked.value) {
+    anomalies.value = [];
+    anomalyConfigCount.value = null;
+    return;
+  }
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
@@ -1379,6 +1482,10 @@ const loadAnomalies = async (force = false, current: () => boolean = () => true)
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.recentEvents = null;
+  if (alertsLocked.value) {
+    recentEvents.value = [];
+    return;
+  }
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {
@@ -1478,7 +1585,7 @@ const loadIncidents = async (force = false, current: () => boolean = () => true)
 };
 
 const loadServiceGraph = async (force = false, current: () => boolean = () => true) => {
-  if (!incidentsAccess.value.allowed) return;
+  if (!servicesEnabled.value) return;
   sectionFailure.services = null;
   try {
     graphStream.value = "all";
@@ -1627,6 +1734,8 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
+  // the service panel's View traces emits here too, outside this file's lock markup
+  if (tracesLock.locked.value) return;
   let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -1678,10 +1787,12 @@ const showLogsCard = computed(() => router.hasRoute("logs"));
 const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
 const goToAlertList = () => {
+  if (alertsLocked.value) return;
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
 
 const goToAddAlert = () => {
+  if (alertsLocked.value) return;
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
@@ -1704,6 +1815,7 @@ const onHealthOpen = (destination: OverviewDestination) => {
 };
 
 const onSignalOpen = (signal: OverviewSignal) => {
+  if (signal in signalLockedReasons.value) return;
   router.push({ name: signal, query: { org_identifier: orgId.value } });
 };
 
@@ -1711,6 +1823,7 @@ const onHeadlineSelect = (target: OverviewTarget) => {
   if (target === "firing" || target === "failing" || target === "delivery") goToAlertList();
   else if (target === "pipelines") goToPipelines();
   else if (target === "quiet") goToStreams();
+  else if (incidentsLicenseLocked.value) return;
   else if (incidentsTile.value === "locked") openUpgradeDialog();
   else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
     goToIncidentList();
@@ -1729,10 +1842,12 @@ const goToAnomalies = () => {
 };
 
 const goToLogs = () => {
+  if (logsLock.locked.value) return;
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
+  if (tracesLock.locked.value) return;
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",

@@ -311,6 +311,18 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("does not report success when the refresh fails", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
+      await (wrapper.vm as any).refreshIncidents();
+      await flushPromises();
+      expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 

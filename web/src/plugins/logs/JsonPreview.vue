@@ -29,8 +29,27 @@
           }}</span></span
         ></OButton
       >
+      <OTooltip
+        v-if="showViewRelatedBtn && correlationAccess.allowed && correlationLicense.locked.value"
+        :content="correlationLicense.lockedReason.value"
+      >
+        <span class="inline-flex">
+          <OButton
+            size="xs"
+            variant="outline"
+            class="me-2 mb-1.5"
+            disabled
+            data-test="log-correlation-btn"
+          >
+            <template #icon-left>
+              <OIcon name="lock" class="lock-chip" size="sm" data-test="log-correlation-btn-lock" />
+            </template>
+            {{ t("search.viewRelated") }}
+          </OButton>
+        </span>
+      </OTooltip>
       <OButton
-        v-if="showViewRelatedBtn"
+        v-else-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
@@ -38,40 +57,51 @@
         data-test="log-correlation-btn"
       >
         <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
-        <OIcon
-          v-if="!correlationAccess.allowed"
-          name="lock"
-          size="xs"
-          class="text-warning-600 ms-1"
-        />
+        <OIcon v-if="!correlationAccess.allowed" name="lock" size="xs" class="lock-chip ms-1" />
         <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <!-- Stream picker and its action read as one control, sized to sit level
            with the toolbar buttons above rather than towering over them. -->
       <div
         v-if="
-          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+          !hideViewTrace &&
+          showViewTraceBtn &&
+          (tracesLocked || tracesStreams.length || isTracesStreamsLoading)
         "
         class="mb-1.5 flex items-center gap-2"
       >
-        <OSelect
-          :aria-label="t('search.selectStream')"
-          data-test="log-search-index-list-select-stream"
-          v-model="searchObj.meta.selectedTraceStream"
-          :options="tracesStreams"
-          class="w-auto shrink-0"
-          :loading="isTracesStreamsLoading"
-          :disabled="isTracesStreamsLoading"
-          size="sm"
-        />
-        <OButton
-          data-test="trace-view-logs-btn"
-          size="xs"
-          variant="outline"
-          icon-left="account-tree"
-          @click="redirectToTraces"
-          >{{ t("search.viewTrace") }}</OButton
-        >
+        <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+          <span class="inline-flex">
+            <OButton
+              data-test="trace-view-logs-btn"
+              size="xs"
+              variant="outline"
+              icon-left="lock"
+              disabled
+              >{{ t("search.viewTrace") }}</OButton
+            >
+          </span>
+        </OTooltip>
+        <template v-else>
+          <OSelect
+            :aria-label="t('search.selectStream')"
+            data-test="log-search-index-list-select-stream"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-auto shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="trace-view-logs-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            @click="redirectToTraces"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </template>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="ps-3">
@@ -164,7 +194,7 @@
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
             <template v-if="!aiAssistantAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
           <ODropdownItem
@@ -176,7 +206,7 @@
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
             <template v-if="!regexPatternsAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
         </ODropdown>
@@ -281,6 +311,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -458,6 +489,8 @@ export default {
       filteredTracesStreamOptions,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       getTracesStreams,
       setViewTraceBtn: setViewTraceBtnFor,
       filterStreamFn,
@@ -565,6 +598,7 @@ export default {
       checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
     );
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    const correlationLicense = useLicenseLock("correlation");
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -586,7 +620,7 @@ export default {
           return;
         }
 
-        if (!correlationAccess.value.allowed) {
+        if (!correlationAccess.value.allowed || correlationLicense.locked.value) {
           // Locked — show it locked, but skip the correlation-availability
           // probe entirely: that call hits a backend route an OSS build 403s
           // on, so there's nothing useful to check before unlocking.
@@ -773,6 +807,7 @@ export default {
         openUpgradeDialog();
         return;
       }
+      if (correlationLicense.locked.value) return;
       emit("show-correlation", props.value);
     };
 
@@ -956,7 +991,10 @@ export default {
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       showViewRelatedBtn,
+      correlationLicense,
       correlationAccess,
       aiAssistantAccess,
       regexPatternsAccess,

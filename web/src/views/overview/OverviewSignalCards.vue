@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t(`overview.signals.${card.signal}`)"
         :link-label="t('overview.signals.open')"
         :link-aria-label="t(`overview.signals.openAria.${card.signal}`)"
-        view="ok"
+        :view="lockedReasons?.[card.signal] ? 'locked' : 'ok'"
+        :locked-message="lockedReasons?.[card.signal]"
+        :can-unlock="false"
         @view-all="emit('open', card.signal)"
       >
         <template #lead>
@@ -68,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatEventCount, formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewSection, OverviewStreamsData } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
@@ -86,6 +88,7 @@ const props = defineProps<{
   pending: boolean;
   failed: boolean;
   forbidden?: boolean;
+  lockedReasons?: Partial<Record<OverviewSignal, I18nText>>;
 }>();
 
 const emit = defineEmits<{ open: [signal: OverviewSignal] }>();

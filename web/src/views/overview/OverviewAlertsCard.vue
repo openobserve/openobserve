@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="subtitle"
     :link-label="view === 'empty' ? t('overview.alerts.emptyAction') : t('overview.alerts.viewAll')"
     :view="view"
+    :locked-message="lockedReason"
+    :can-unlock="false"
     @retry="emit('retry')"
     @view-all="view === 'empty' ? emit('create') : emit('open')"
   >
@@ -189,6 +191,7 @@ const props = defineProps<{
   forbidden?: boolean;
   incidentsState?: IncidentsTile;
   incidentsTotal?: number;
+  lockedReason?: I18nText;
 }>();
 
 const emit = defineEmits<{
@@ -210,6 +213,7 @@ const hasIncidents = computed(
 );
 
 const view = computed(() => {
+  if (props.lockedReason) return "locked";
   const base = sectionView(props.section, props);
   return base === "ok" && props.section?.data?.total === 0 ? "empty" : base;
 });

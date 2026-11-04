@@ -481,7 +481,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("panel.downloadAsJSON") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
+              "
+              disabled
+              focusable-unavailable
+              icon-left="lock"
+              :description="goToLogsLockedReason"
+              data-test="dashboard-move-to-logs-module"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               :disabled="props.data.queryType != 'sql'"
               data-test="dashboard-move-to-logs-module"
               @select="onLogPanel"
@@ -752,6 +764,8 @@ import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -1181,6 +1195,15 @@ export default defineComponent({
       return logsUrl;
     };
 
+    const licenseLocks = useLicenseLocks();
+    const goToLogsFeature = computed(() =>
+      streamTypeFeature(props.data?.queries?.[0]?.fields?.stream_type),
+    );
+    const goToLogsLocked = computed(() => licenseLocks.isLocked(goToLogsFeature.value));
+    const goToLogsLockedReason = computed(() =>
+      goToLogsFeature.value ? licenseLocks.lockedReason(goToLogsFeature.value) : raw(""),
+    );
+
     const onLogPanel = async () => {
       const showNotification = showPositiveNotification(
         t("dashboard.panelContainer.redirectingToLogs"),
@@ -1548,6 +1571,8 @@ export default defineComponent({
 
     return {
       props,
+      goToLogsLocked,
+      goToLogsLockedReason,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,

@@ -25,6 +25,11 @@ import mockOverview from "@/test/unit/mockData/overview";
 // Data payloads are wired up per-test in beforeEach so each `it()` owns its
 // own state; the factories below stay data-free to survive vi.mock hoisting.
 
+const upgradeDialogOpen = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useEnterpriseUpgradeDialog", () => ({
+  useEnterpriseUpgradeDialog: () => ({ open: upgradeDialogOpen }),
+}));
+
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -276,6 +281,39 @@ describe("OverviewTab", () => {
     config.isEnterprise = originalFlags.isEnterprise;
     config.isCloud = originalFlags.isCloud;
     vi.clearAllMocks();
+  });
+
+  describe("alerts card under a license lock", () => {
+    it("shows the locked reason and offers no way into alerts while alerts is locked", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { alerts: "locked" } });
+      const push = vi.spyOn(router, "push");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const locked = wrapper.find('[data-test="overview-alerts-locked"]');
+      expect(locked.exists()).toBe(true);
+      expect(locked.text()).toContain("Locked: needs");
+      expect(wrapper.find('[data-test="overview-alerts-view-all"]').exists()).toBe(false);
+      expect(push).not.toHaveBeenCalled();
+      push.mockRestore();
+    });
+  });
+
+  describe("signal cards under a license lock", () => {
+    it("locks the Traces card and keeps Logs open while traces is locked", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { traces: "locked" } });
+      const push = vi.spyOn(router, "push");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-signal-traces-locked"]').text()).toContain(
+        "Locked: needs",
+      );
+      expect(wrapper.find('[data-test="overview-signal-traces-view-all"]').exists()).toBe(false);
+      await wrapper.get('[data-test="overview-signal-logs-view-all"]').trigger("click");
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
+      push.mockRestore();
+    });
   });
 
   describe("loaded with no data", () => {
@@ -647,6 +685,94 @@ describe("OverviewTab", () => {
 
       expect(incidentsService.list).not.toHaveBeenCalled();
       expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("license-locked incidents and anomaly sections", () => {
+    it("renders the locked cards with the reason and no upgrade dialog", async () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: false,
+        anomaly_detection_enabled: false,
+        features: { incidents: "locked", anomaly_detection: "locked" },
+      });
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const incidents = wrapper.find('[data-test="overview-incidents-locked"]');
+      const anomalies = wrapper.find('[data-test="overview-anomalies-locked"]');
+      expect(incidents.exists()).toBe(true);
+      expect(anomalies.exists()).toBe(true);
+      expect(incidents.text()).not.toContain(i18n.global.t("enterpriseFeature.pitch.incidents"));
+      expect(incidents.text()).toContain("Locked: needs");
+    });
+  });
+
+  describe("license-locked alerts and anomaly detection", () => {
+    const lockFeatures = (features: Record<string, string>) =>
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        anomaly_detection_enabled: true,
+        features,
+      });
+
+    it("should request neither alert history nor anomalies when both are locked", async () => {
+      lockFeatures({ alerts: "locked", anomaly_detection: "locked" });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).not.toHaveBeenCalled();
+      expect(anomalyService.list).not.toHaveBeenCalled();
+      expect(anomalyService.getAllHistory).not.toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+    });
+
+    it("should load alert history and anomalies when both are enabled", async () => {
+      lockFeatures({ alerts: "enabled", anomaly_detection: "enabled" });
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalled();
+      expect(anomalyService.list).toHaveBeenCalled();
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+  });
+
+  describe("services under a traces license lock", () => {
+    const SERVICES_LOCKED = '[data-test="overview-services-locked"]';
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: true,
+        features: { traces: "locked" },
+      });
+    });
+
+    it("locks Services with the reason and never requests the topology", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+      expect(wrapper.find(SERVICES_LOCKED).text()).toContain("Locked: needs");
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+    });
+
+    it("does not open the upgrade dialog from the locked Services row", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const row = wrapper.find(SERVICES_LOCKED).find(".rounded-surface");
+      await row.trigger("click");
+
+      expect(row.classes()).not.toContain("cursor-pointer");
+
+      expect(upgradeDialogOpen).not.toHaveBeenCalled();
     });
   });
 
