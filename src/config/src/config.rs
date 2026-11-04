@@ -3394,7 +3394,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_DYNAMIC_PARTITION_STREAM_TYPES",
         default = "",
-        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `partition_time_level` pins a stream to either. Empty disables the classifier; levels already recorded stay in effect."
+        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `dynamic_partition` overrides this per stream; while it is off the level can be set by hand. Levels already recorded stay in effect."
     )]
     pub dynamic_partition_stream_types: String,
     #[env_config(

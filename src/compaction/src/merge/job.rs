@@ -436,7 +436,7 @@ mod tests {
         use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
         let settings = StreamSettings {
             partition_time_level: StreamPartitionTimeLevel {
-                pin: None,
+                dynamic: None,
                 changes: vec![PartitionTimeLevelChange {
                     since: 100,
                     level: PartitionTimeLevel::Daily,

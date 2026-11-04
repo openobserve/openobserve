@@ -21,9 +21,9 @@ use std::{
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
-    TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, DYNAMIC_PARTITION_STREAM_TYPES,
+    ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         self_reporting::usage::INTERNAL_STREAM_NAMES,
@@ -430,6 +430,17 @@ pub fn get_partition_time_level_at(
         .filter(|_| stream_type.support_dynamic_partition())
         .and_then(|settings| settings.partition_time_level.level_at(ts))
         .unwrap_or_else(|| get_partition_time_level(stream_type))
+}
+
+/// Whether the classifier decides the stream's level: its own switch, else its type in the env.
+pub fn get_stream_setting_dynamic_partition(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+) -> bool {
+    stream_type.support_dynamic_partition()
+        && settings
+            .and_then(|settings| settings.partition_time_level.dynamic)
+            .unwrap_or_else(|| DYNAMIC_PARTITION_STREAM_TYPES.contains(&stream_type))
 }
 
 pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSettings>>(
@@ -1856,11 +1867,30 @@ mod tests {
     }
 
     #[test]
+    fn test_get_stream_setting_dynamic_partition() {
+        use config::meta::stream::StreamPartitionTimeLevel;
+        let with = |dynamic| StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic,
+                changes: Vec::new(),
+            },
+            ..Default::default()
+        };
+        let check = get_stream_setting_dynamic_partition;
+        // the env list is empty in tests, so only the stream's own switch turns it on
+        assert!(!check(StreamType::Logs, None));
+        assert!(!check(StreamType::Logs, Some(&with(None))));
+        assert!(!check(StreamType::Logs, Some(&with(Some(false)))));
+        assert!(check(StreamType::Traces, Some(&with(Some(true)))));
+        assert!(!check(StreamType::Profiles, Some(&with(Some(true)))));
+    }
+
+    #[test]
     fn test_get_partition_time_level_at_reads_the_history_of_merged_types() {
         use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
         let daily_from_100 = StreamSettings {
             partition_time_level: StreamPartitionTimeLevel {
-                pin: None,
+                dynamic: None,
                 changes: vec![PartitionTimeLevelChange {
                     since: 100,
                     level: PartitionTimeLevel::Daily,

@@ -739,9 +739,9 @@ pub struct PartitionTimeLevelChange {
 /// A stream's partition level per day; a day's level never changes once the day has begun.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct StreamPartitionTimeLevel {
-    /// Set by hand: the classifier leaves the stream alone.
+    /// The stream's own classifier switch; unset follows `ZO_DYNAMIC_PARTITION_STREAM_TYPES`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pin: Option<PartitionTimeLevel>,
+    pub dynamic: Option<bool>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub changes: Vec<PartitionTimeLevelChange>,
 }
@@ -790,17 +790,6 @@ impl StreamPartitionTimeLevel {
         true
     }
 
-    /// `hourly` or `daily` pins the stream there; `unset` clears the pin and keeps the level.
-    pub fn write_pin(&mut self, level: PartitionTimeLevel, now: i64) {
-        match level {
-            PartitionTimeLevel::Unset => self.pin = None,
-            PartitionTimeLevel::Hourly | PartitionTimeLevel::Daily => {
-                self.pin = Some(level);
-                self.set_level(level, now);
-            }
-        }
-    }
-
     /// Drops what describes only days before `cutoff`; true when something was dropped.
     pub fn prune(&mut self, cutoff: i64) -> bool {
         let before_cutoff = self
@@ -814,7 +803,7 @@ impl StreamPartitionTimeLevel {
     }
 
     fn is_empty(&self) -> bool {
-        self.pin.is_none() && self.changes.is_empty()
+        self.dynamic.is_none() && self.changes.is_empty()
     }
 
     /// Older versions stored a plain string under this key, which means nothing now.
@@ -894,9 +883,12 @@ pub struct UpdateStreamSettings {
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
-    /// `hourly` or `daily` pins the stream, `unset` hands it back to the classifier.
+    /// `hourly` or `daily`, accepted only while the stream's dynamic partition is off.
     #[serde(default)]
     pub partition_time_level: Option<PartitionTimeLevel>,
+    /// Whether the classifier decides the level; a value equal to the env's follows the env.
+    #[serde(default)]
+    pub dynamic_partition: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
     #[serde(default)]
@@ -2554,7 +2546,7 @@ mod tests {
 
     fn level_history(changes: &[(i64, PartitionTimeLevel)]) -> StreamPartitionTimeLevel {
         StreamPartitionTimeLevel {
-            pin: None,
+            dynamic: None,
             changes: changes.iter().map(|&(d, l)| level_change(d, l)).collect(),
         }
     }
@@ -2633,37 +2625,6 @@ mod tests {
     }
 
     #[test]
-    fn test_write_pin_records_a_level_only_when_it_changes() {
-        use PartitionTimeLevel::{Daily, Hourly, Unset};
-        let now = LEVEL_DAY + hour_micros(5);
-
-        let mut history = level_history(&[]);
-        history.write_pin(Daily, now);
-        assert_eq!(history.pin, Some(Daily));
-        assert_eq!(history.changes, vec![level_change(1, Daily)]);
-
-        // already at that level, classified there: only the pin is new
-        let mut history = level_history(&[(0, Daily)]);
-        history.write_pin(Daily, now);
-        assert_eq!(history.pin, Some(Daily));
-        assert_eq!(history.changes, vec![level_change(0, Daily)]);
-
-        // unset hands the stream back at the level it has
-        history.write_pin(Unset, now);
-        assert_eq!(history.pin, None);
-        assert_eq!(history.changes, vec![level_change(0, Daily)]);
-
-        // not pinned: nothing to do
-        let mut history = level_history(&[]);
-        history.write_pin(Unset, now);
-        assert!(history.is_empty());
-
-        history.write_pin(Hourly, now);
-        assert_eq!(history.pin, Some(Hourly));
-        assert!(history.changes.is_empty());
-    }
-
-    #[test]
     fn test_prune_keeps_the_last_change_before_the_cutoff() {
         use PartitionTimeLevel::{Daily, Hourly};
         let changes = [(1, Daily), (3, Hourly), (5, Daily)];
@@ -2698,7 +2659,7 @@ mod tests {
 
         let settings = StreamSettings {
             partition_time_level: StreamPartitionTimeLevel {
-                pin: Some(PartitionTimeLevel::Daily),
+                dynamic: Some(false),
                 changes: vec![level_change(1, PartitionTimeLevel::Daily)],
             },
             ..Default::default()
@@ -2728,6 +2689,9 @@ mod tests {
         let null: UpdateStreamSettings =
             json::from_str(r#"{"partition_time_level": null}"#).unwrap();
         assert_eq!(null.partition_time_level, None);
+        assert_eq!(missing.dynamic_partition, None);
+        let off: UpdateStreamSettings = json::from_str(r#"{"dynamic_partition": false}"#).unwrap();
+        assert_eq!(off.dynamic_partition, Some(false));
         for (text, level) in [
             ("hourly", PartitionTimeLevel::Hourly),
             ("daily", PartitionTimeLevel::Daily),

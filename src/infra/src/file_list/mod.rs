@@ -1522,7 +1522,7 @@ mod tests {
         let change = |since, level| PartitionTimeLevelChange { since, level };
         // the stream is daily for the one day from DAY
         let history = StreamPartitionTimeLevel {
-            pin: None,
+            dynamic: None,
             changes: vec![change(DAY, Daily), change(DAY + day_micros(1), Hourly)],
         };
         for (time_end, expected) in [

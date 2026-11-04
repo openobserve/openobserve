@@ -18,7 +18,7 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use config::{
-    DYNAMIC_PARTITION_MIN_WINDOW_DAYS, DYNAMIC_PARTITION_STREAM_TYPES,
+    DYNAMIC_PARTITION_MIN_WINDOW_DAYS,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -29,10 +29,13 @@ use config::{
 };
 use infra::{
     cluster::get_node_from_consistent_hash,
-    schema::{get_settings, unwrap_stream_created_at},
+    schema::{get_settings, get_stream_setting_dynamic_partition, unwrap_stream_created_at},
 };
 
-/// The UTC day this node has classified its streams for.
+/// Hashes to the one compactor that runs the classifier.
+const CLASSIFIER_NODE_KEY: &str = "dynamic_partition_classifier";
+
+/// The UTC day this node has classified the streams for.
 static LAST_RUN_DAY: AtomicI64 = AtomicI64::new(0);
 
 /// The closed days a run looks at, ending with `newest_day`.
@@ -59,15 +62,20 @@ impl ClassifyWindow {
     }
 }
 
-/// Classifies this node's streams once per UTC day; a restart repeats a run, which changes nothing.
+/// Classifies all streams once per UTC day on one compactor; repeating a run changes nothing.
 pub async fn run() -> Result<(), anyhow::Error> {
-    if DYNAMIC_PARTITION_STREAM_TYPES.is_empty() {
-        return Ok(());
-    }
     let now = now_micros();
     let today = now - now % day_micros(1);
     if LAST_RUN_DAY.load(Ordering::Relaxed) == today {
         return Ok(());
+    }
+    let Some(node_name) =
+        get_node_from_consistent_hash(CLASSIFIER_NODE_KEY, &Role::Compactor, None).await
+    else {
+        return Ok(()); // no compactor node
+    };
+    if LOCAL_NODE.name.ne(&node_name) {
+        return Ok(()); // not this node
     }
     let cfg = get_config();
     let window = ClassifyWindow {
@@ -78,8 +86,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if db::file_list::BLOCKED_ORGS.contains(&org_id) {
             continue;
         }
-        for stream_type in DYNAMIC_PARTITION_STREAM_TYPES.iter() {
-            if let Some(streams) = stream_types.get(stream_type) {
+        for (stream_type, streams) in &stream_types {
+            if stream_type.support_dynamic_partition() {
                 classify_streams(&org_id, *stream_type, streams, window, now).await;
             }
         }
@@ -96,14 +104,7 @@ async fn classify_streams(
     now: i64,
 ) {
     for stream_name in streams {
-        let Some(node_name) =
-            get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
-        else {
-            continue; // no compactor node
-        };
-        if LOCAL_NODE.name.ne(&node_name)
-            || db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None)
-        {
+        if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
             continue;
         }
         if let Err(e) = classify_stream(org_id, stream_type, stream_name, window, now).await {
@@ -124,7 +125,7 @@ async fn classify_stream(
     let settings = get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
-    if settings.partition_time_level.pin.is_some() {
+    if !get_stream_setting_dynamic_partition(stream_type, Some(&settings)) {
         return Ok(());
     }
     // a day retention has deleted reads as empty and would keep a busy stream from moving back
