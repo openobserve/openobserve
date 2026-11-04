@@ -1111,6 +1111,13 @@ async fn handle_oncall_escalation_triggers(
 
     let response_id = trigger.module_key.clone();
     if !oncall::is_enabled() {
+        if oncall::is_unlicensed()
+            && let Err(e) =
+                oncall::escalation::note_unlicensed_pause(&trigger.org, &response_id, now_micros())
+                    .await
+        {
+            log::error!("[ONCALL] could not note the license pause on {response_id}: {e}");
+        }
         // Turned off mid-ladder: drop the job rather than hold a timer nobody will service.
         db::scheduler::delete(
             &trigger.org,
@@ -1527,10 +1534,7 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         let opens_incident = composite_opens_incident(
             has_targets,
-            definition.definition.creates_incident
-                && o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .enabled,
+            definition.definition.creates_incident && crate::alerts::incidents::incidents_enabled(),
         );
         if delivery.should_deliver() && has_targets {
             let notification_alert =
@@ -1661,18 +1665,22 @@ async fn handle_composite_alert_trigger(
 
         // Outside the deliverable branch: a silenced composite never reaches correlation.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled()
-            && !composite_incident_handled
-            && downtime.is_none()
-        {
-            let notification_alert =
-                crate::alerts::composite::notification_alert(&definition.definition);
-            let rows = [composite_notification_row(
-                &definition.definition.expression,
-                evaluated.result,
-                &evaluated.children,
-            )];
-            page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+        if !composite_incident_handled && downtime.is_none() {
+            if o2_enterprise::enterprise::oncall::is_enabled() {
+                let notification_alert =
+                    crate::alerts::composite::notification_alert(&definition.definition);
+                let rows = [composite_notification_row(
+                    &definition.definition.expression,
+                    evaluated.result,
+                    &evaluated.children,
+                )];
+                page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+            }
+            delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
+                delivery_error,
+                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&trigger.org)
+                    .await,
+            );
         }
     }
 
@@ -2514,7 +2522,7 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !cfg.ai.enabled || !cfg.ai.has_agent_target() {
+    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3034,9 +3042,7 @@ pub(crate) async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled;
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
@@ -3072,9 +3078,7 @@ async fn correlate_repeated_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled;
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
     if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
         return;
     }
@@ -4156,9 +4160,7 @@ async fn handle_alert_triggers(
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
-            && o2_enterprise::enterprise::common::config::get_config()
-                .incidents
-                .enabled
+            && crate::alerts::incidents::incidents_enabled()
             && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(
@@ -4219,6 +4221,12 @@ async fn handle_alert_triggers(
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
             }
         }
+        #[cfg(feature = "enterprise")]
+        let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
+            incident_notify_error,
+            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id)
+                .await,
+        );
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -9663,6 +9671,34 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unlicensed_page_is_recorded_in_alert_history() {
+        use o2_enterprise::enterprise::oncall::escalation::UNLICENSED_PAGE_REASON;
+
+        use crate::alerts::alert::with_unlicensed_page_reason;
+
+        assert_eq!(with_unlicensed_page_reason(None, None), None);
+        let mut fired = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        let error = with_unlicensed_page_reason(None, Some(UNLICENSED_PAGE_REASON)).unwrap();
+        let kept = record_incident_notify_failure(&mut fired, error);
+        assert_eq!(kept, RunOutcome::Firing);
+        assert_eq!(fired.status, RunOutcome::NotifyFailed);
+        assert_eq!(fired.error.as_deref(), Some(UNLICENSED_PAGE_REASON));
+
+        let both = with_unlicensed_page_reason(
+            Some("slack: http 500".to_string()),
+            Some(UNLICENSED_PAGE_REASON),
+        );
+        assert_eq!(
+            both.as_deref(),
+            Some(format!("slack: http 500; {UNLICENSED_PAGE_REASON}").as_str())
+        );
     }
 
     const PARK_NOW: i64 = 10_000_000_000;

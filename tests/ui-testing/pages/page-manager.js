@@ -145,6 +145,7 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
+const WorkflowHttpPage = require("./workflowsPages/workflowHttpPage.js");
 const FleetManagerPage = require("./fleetPages/fleetManagerPage.js");
 const FleetFleetsPage = require("./fleetPages/fleetFleetsPage.js");
 const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
@@ -266,6 +267,7 @@ class PageManager {
     // ===== WORKFLOWS (v1) PAGE OBJECT =====
     this.workflowsPage = new WorkflowsPage(page);
     this.workflowFoldersPage = new WorkflowFoldersPage(page);
+    this.workflowHttpPage = new WorkflowHttpPage(page);
 
     // ===== FLEET MANAGEMENT PAGE OBJECTS =====
     this.fleetManagerPage = new FleetManagerPage(page);

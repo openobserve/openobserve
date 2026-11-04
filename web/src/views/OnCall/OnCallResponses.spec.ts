@@ -565,6 +565,9 @@ describe("OnCallResponses", () => {
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+      const header = wrapper.find("[data-test='oncall-section-header-ringing']").text();
+      expect(header).toContain("nobody has acknowledged — these are still paging");
+      expect(header).not.toContain("not being paged");
     });
 
     /// A priority with no rungs configured (P4, by design) never starts a

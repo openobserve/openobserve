@@ -31,6 +31,7 @@ import type {
   FleetSettings,
   FleetToken,
 } from "./fleet";
+import { AUDIT_MODULES, auditKind } from "@/components/fleet/auditKind";
 
 /** The one switch for the in-memory Fleet backend; delete this file once the server serves every endpoint. */
 export const FLEET_MOCK = import.meta.env.VITE_FLEET_MOCK === "true";
@@ -413,6 +414,11 @@ function fail(status: number, message: string, extra: Record<string, unknown> = 
   return new Promise<never>((_, reject) => setTimeout(() => reject(err), LATENCY_MS));
 }
 
+function auditModule(action: string) {
+  const kind = auditKind(action);
+  return kind === "other" ? null : AUDIT_MODULES[kind];
+}
+
 function audit(action: string, target: string) {
   store.audit.unshift({
     id: `a${store.seq++}`,
@@ -786,7 +792,22 @@ export const fleetMock: FleetApi = {
     store.configs = store.configs.filter((x) => x.id !== id);
     return reply(undefined as unknown);
   },
-  listAudit: () => reply({ items: store.audit }),
+  listAudit: (_org, params = {}) => {
+    const from = params.from ?? Date.now() - 30 * DAY;
+    const keyword = params.q?.trim().toLowerCase();
+    const matching = store.audit.filter(
+      (e) =>
+        e.at >= from &&
+        e.at < (params.to ?? Infinity) &&
+        (!params.module || auditModule(e.action) === params.module) &&
+        (!keyword || [e.actor, e.target].some((s) => s.toLowerCase().includes(keyword))),
+    );
+    const offset = params.offset ?? 0;
+    return reply({
+      total: matching.length,
+      items: matching.slice(offset, offset + (params.limit ?? 100)),
+    });
+  },
   listRollouts: () => reply({ items: store.rollouts, total: store.rollouts.length }),
   getRollout: (_org, id) => {
     const r = store.rollouts.find((x) => x.id === id);

@@ -17,6 +17,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/public_dashboards_admin", () => ({
@@ -994,6 +995,44 @@ describe("PublicLinksPanel", () => {
       const cfg = vi.mocked(admin.update).mock.calls[0][3];
       expect(cfg.name).toBe("NOC wall (renamed)");
       expect(cfg.frozen_variables.qns).toBeNull();
+    });
+  });
+
+  describe("date variables", () => {
+    const day = { name: "from_date", type: "date", value: "2026-01-01", dateFormat: "epochus" };
+
+    beforeEach(() => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+    });
+
+    it("edits the default value with the date picker and freezes the picked YYYY-MM-DD", async () => {
+      const w = build(
+        {
+          variablesConfig: { list: [day] },
+          dashboardVariables: { getUrlParams: () => ({ "var-from_date": "2026-02-02" }) },
+        },
+        { VariablesValueSelector: false },
+      );
+      await flushPromises();
+
+      // the link form has date pickers of its own, so find this variable's by its data-test
+      const picker = w
+        .findAllComponents(ODate)
+        .find((it) => it.attributes("data-test") === "variable-selector-from_date")!;
+      expect(picker).toBeTruthy();
+      expect(picker.props("modelValue")).toBe("2026-02-02");
+
+      picker.vm.$emit("update:modelValue", "2026-03-03");
+      await flushPromises();
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "NOC wall");
+      await submit(w);
+      // the stored value stays the raw date, whatever the variable's output format is
+      expect(vi.mocked(admin.create).mock.calls[0]?.[2].frozen_variables).toEqual({
+        from_date: "2026-03-03",
+      });
     });
   });
 

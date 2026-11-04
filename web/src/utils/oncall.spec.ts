@@ -45,6 +45,7 @@ import {
   isShiftRuleValid,
   isSnoozed,
   isDeletedTeam,
+  ladderStopped,
   pagePhrase,
   reachedStepOf,
   pageState,
@@ -513,6 +514,36 @@ describe("isDeletedTeam", () => {
     for (const [teamId, known, expected] of cases) {
       expect(isDeletedTeam(teamId, known), `${teamId} / ${known}`).toBe(expected);
     }
+  });
+});
+
+describe("ladderStopped", () => {
+  const progress = (exhausted: boolean, stopped_because: string | null) =>
+    ({ fired: [], next_targets: [], next_at: null, exhausted, stopped_because }) as any;
+
+  it.each([
+    [
+      "an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      false,
+      false,
+    ],
+    [
+      "a ladder stopped for another reason",
+      progress(false, "the owning team was deleted"),
+      false,
+      true,
+    ],
+    ["a climbing ladder", progress(false, null), false, false],
+    [
+      "a deleted team, even with an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      true,
+      true,
+    ],
+    ["a deleted team with no progress loaded", undefined, true, true],
+  ])("%s", (_name, ladder, teamDeleted, expected) => {
+    expect(ladderStopped(ladder, teamDeleted)).toBe(expected);
   });
 });
 
