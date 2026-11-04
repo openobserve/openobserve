@@ -56,6 +56,11 @@ const rightClick = async (
 };
 
 enableAutoUnmount(afterEach);
+// A click on the hint's × closes it for the tab session, which would leak into the next test.
+afterEach(() => {
+  localStorage.removeItem("o2_flame_zoom_hint_hidden");
+  sessionStorage.removeItem("o2_flame_zoom_hint_closed");
+});
 
 describe("FlameGraphView frame menu", () => {
   it("positions the menu from the pointer relative to the root", async () => {
@@ -813,6 +818,63 @@ describe("FlameGraphView grouped frames", () => {
       await nextTick();
       expect(second.find('[data-test="flame-graph-zoom-hint"]').exists()).toBe(false);
       localStorage.removeItem("o2_flame_zoom_hint_hidden");
+    });
+
+    describe("zoom hint across graphs", () => {
+      const HINT = '[data-test="flame-graph-zoom-hint"]';
+      const mounted = async () => {
+        const wrapper = mountGraph(tree);
+        await flushPromises();
+        await nextTick();
+        return wrapper;
+      };
+      it("keeps the hint closed by × after a view switch, without persisting it for good", async () => {
+        const first = await mounted();
+        await first.get('[data-test="flame-graph-zoom-hint-close"]').trigger("click");
+        await nextTick();
+        expect(first.find(HINT).exists()).toBe(false);
+        first.unmount();
+
+        const next = await mounted();
+        expect(next.find(HINT).exists()).toBe(false);
+        expect(localStorage.getItem("o2_flame_zoom_hint_hidden")).toBeNull();
+      });
+
+      it("shows one hint for two graphs on screen, and × closes it for both", async () => {
+        const callers = await mounted();
+        const callees = await mounted();
+        const hints = () => [callers, callees].filter((graph) => graph.find(HINT).exists());
+        expect(hints()).toHaveLength(1);
+
+        await hints()[0].get('[data-test="flame-graph-zoom-hint-close"]').trigger("click");
+        await nextTick();
+        expect(hints()).toHaveLength(0);
+      });
+
+      it("moves the hint to the graph still on screen when the one showing it goes", async () => {
+        const first = await mounted();
+        const second = await mounted();
+        expect(first.find(HINT).exists()).toBe(true);
+        first.unmount();
+        await nextTick();
+        expect(second.find(HINT).exists()).toBe(true);
+      });
+
+      it("does not show the wheel hint on a device without hover", async () => {
+        const matchMedia = vi.mocked(window.matchMedia);
+        const desktop = matchMedia.getMockImplementation()!;
+        matchMedia.mockImplementation((query: string) =>
+          query === "(hover: none)"
+            ? ({ ...desktop(query), matches: true } as MediaQueryList)
+            : desktop(query),
+        );
+        try {
+          const graph = await mounted();
+          expect(graph.find(HINT).exists()).toBe(false);
+        } finally {
+          matchMedia.mockImplementation(desktop);
+        }
+      });
     });
 
     it("starts a zoomed frame at full width", async () => {

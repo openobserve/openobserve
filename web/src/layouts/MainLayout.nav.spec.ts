@@ -74,6 +74,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
     wrapper = undefined;
     store.state.zoConfig.custom_hide_menus = "";
     store.state.zoConfig.synthetics_enabled = false;
+    store.state.zoConfig.profiling_enabled = false;
   });
 
   const rail = async (): Promise<RailEntry[]> => groupNavLinks(await railItems());
@@ -93,6 +94,23 @@ describe("MainLayout — Product Analytics menu entry", () => {
       link: "/product-analytics",
       name: "productAnalytics",
     });
+  });
+
+  it("places AI Observability after Profiles, not between Traces and Profiles", async () => {
+    store.state.zoConfig.profiling_enabled = true;
+    const names = (await railItems()).map((l) => l.name);
+    expect(names.slice(names.indexOf("traces"), names.indexOf("traces") + 3)).toEqual([
+      "traces",
+      "profiles",
+      "aiObservability",
+    ]);
+  });
+
+  it("places AI Observability right after Traces when Profiles is off", async () => {
+    store.state.zoConfig.profiling_enabled = false;
+    const names = (await railItems()).map((l) => l.name);
+    expect(names).not.toContain("profiles");
+    expect(names[names.indexOf("traces") + 1]).toBe("aiObservability");
   });
 
   it("keeps Reports right after Streams", async () => {
