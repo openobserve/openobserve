@@ -1005,7 +1005,7 @@ export interface EscalationProgress {
   next_targets: string[];
   next_at?: number | null;
   exhausted: boolean;
-  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
+  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved, unrouted, team deleted, or exhausted (check `exhausted`). */
   stopped_because?: string | null;
   /** While the first page is held for AI triage, when the hold ends (micros). */
   held_until_micros?: number | null;
