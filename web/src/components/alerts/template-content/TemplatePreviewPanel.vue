@@ -47,14 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <OSelect
-            v-model="previewKind"
-            :label="t('alert_templates.previewAs')"
-            :options="kindOptions"
-            width="sm"
-            :searchable="false"
-            data-test="template-preview-panel-kind-select"
-          />
-          <OSelect
             v-model="channel"
             :label="t('alert_templates.previewChannel')"
             :options="channelOptions"
@@ -70,6 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="sm"
             :searchable="false"
             data-test="template-preview-panel-severity-select"
+          />
+          <OSelect
+            v-model="previewKind"
+            :label="t('alert_templates.previewKind')"
+            :options="kindOptions"
+            width="sm"
+            :searchable="false"
+            data-test="template-preview-panel-kind-select"
           />
         </div>
       </div>

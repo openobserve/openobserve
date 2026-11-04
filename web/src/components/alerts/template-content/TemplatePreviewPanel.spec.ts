@@ -270,6 +270,38 @@ describe("TemplatePreviewPanel", () => {
     expect(button.text()).toBe("View in OpenObserve");
   });
 
+  it("puts Channel first, Severity next and Kind last in the preview row", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["alert", "synthetics"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const selects = w
+      .find('[data-test="template-preview-panel-channel-select"]')
+      .element.parentElement!.querySelectorAll(":scope > [data-test]");
+    expect(Array.from(selects).map((el) => el.getAttribute("data-test"))).toEqual([
+      "template-preview-panel-channel-select",
+      "template-preview-panel-severity-select",
+      "template-preview-panel-kind-select",
+    ]);
+    const labels = w
+      .findAllComponents({ name: "OSelect" })
+      .slice(0, 3)
+      .map((c) => c.props("label"));
+    expect(labels).toEqual(["Channel", "Severity", "Kind"]);
+    expect(
+      (
+        w
+          .find('[data-test="template-preview-panel-channel-select"]')
+          .findComponent({ name: "OSelect" })
+          .props("options") as any[]
+      ).length,
+    ).toBe(10);
+  });
+
   it("previews as the first selected kind and sends kind on each request", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")

@@ -13805,7 +13805,7 @@
     "appliesToInferred": "Inferred from the variables in the body",
     "appliesToManual": "Chosen by you",
     "appliesToReset": "Reset to inferred",
-    "previewAs": "Preview as",
+    "previewKind": "Kind",
     "previewForbidden": "You do not have permission to preview templates",
     "previewFailed": "Preview failed: {message}",
     "severityFailed": "Failed",

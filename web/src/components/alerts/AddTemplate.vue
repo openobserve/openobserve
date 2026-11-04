@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="w-full pb-3" data-test="add-template-applies-to">
               <OSelect
-                :model-value="appliesTo"
+                :model-value="appliesToSelection"
                 :options="appliesToOptions"
                 labelKey="label"
                 valueKey="value"
@@ -479,8 +479,14 @@ const appliesTo = ref<NotificationKind[]>([]);
 const appliesToMode = ref<"inferred" | "manual">("inferred");
 const appliesToError = ref<string | null>(null);
 const isPrebuiltTemplate = computed(() => !!props.template?.isPrebuilt && !props.isClone);
-const appliesToOptions = computed(() =>
-  NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+// An empty list is stored for every kind; the select shows it as the ticked "All kinds" item.
+const ALL_KINDS = "all_kinds";
+const appliesToOptions = computed(() => [
+  { label: t("alert_templates.appliesToAll"), value: ALL_KINDS },
+  ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
+]);
+const appliesToSelection = computed<string[]>(() =>
+  appliesTo.value.length ? appliesTo.value : [ALL_KINDS],
 );
 const isKind = (k: unknown): k is NotificationKind =>
   NOTIFICATION_KINDS.includes(k as NotificationKind);
@@ -491,7 +497,9 @@ const inferenceSource = computed(() =>
 );
 
 const onAppliesToChange = (value: unknown) => {
-  appliesTo.value = NOTIFICATION_KINDS.filter((k) => Array.isArray(value) && value.includes(k));
+  const picked = Array.isArray(value) ? value : [];
+  const allKindsJustTicked = picked.includes(ALL_KINDS) && appliesTo.value.length > 0;
+  appliesTo.value = allKindsJustTicked ? [] : NOTIFICATION_KINDS.filter((k) => picked.includes(k));
   appliesToMode.value = "manual";
   appliesToError.value = null;
 };

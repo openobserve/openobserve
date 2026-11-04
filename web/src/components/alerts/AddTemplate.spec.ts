@@ -990,6 +990,40 @@ describe("AddTemplate - applies to", () => {
     expect(sent.data.applies_to).toEqual(["anomaly", "on_call"]);
   });
 
+  it("lists All kinds first and ticking it clears the chosen kinds in one click", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    getForm(w).setFieldValue("name", "ops-card");
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
+    expect((appliesTo(w).props("options") as any[])[0]).toEqual({
+      label: "All kinds",
+      value: "all_kinds",
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly", "incident"]);
+    await appliesTo(w).vm.$emit("update:modelValue", ["anomaly", "incident", "all_kinds"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
+
+    await submit(w);
+    expect((templateService.create as any).mock.calls[0][0].data.applies_to).toEqual([]);
+  });
+
+  it("ticking a kind while All kinds is ticked selects that kind alone", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
+
+    await appliesTo(w).vm.$emit("update:modelValue", ["all_kinds", "synthetics"]);
+    await flushPromises();
+    expect(appliesTo(w).props("modelValue")).toEqual(["synthetics"]);
+  });
+
   it("an existing template starts in manual mode with its stored list", async () => {
     const w = await mountComp({
       template: {
@@ -1008,7 +1042,7 @@ describe("AddTemplate - applies to", () => {
     const w = await mountComp({
       template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
     });
-    expect(appliesTo(w).props("modelValue")).toEqual([]);
+    expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);
     expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
       String(i18n.global.t("alert_templates.appliesToInferred")),
     );
