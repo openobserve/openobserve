@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="h-full w-full"
+    :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
@@ -59,6 +60,7 @@ import { useTheme } from "@/composables/useTheme";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
+  isFractionalDevicePixelRatio,
   useDevicePixelRatioChange,
 } from "@/composables/useDevicePixelRatio";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -240,7 +242,11 @@ export default defineComponent({
       { deep: true },
     );
     watch(isDark, () => initChart());
-    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
+    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
+    useDevicePixelRatioChange((ratio) => {
+      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
+      applyDevicePixelRatio(chart, ratio);
+    });
 
     onUnmounted(() => {
       zeroSizeReinitObserver?.disconnect();
@@ -250,7 +256,7 @@ export default defineComponent({
       window.removeEventListener("resize", handleResize);
     });
 
-    return { chartRef, handleMouseOver, handleMouseLeave };
+    return { chartRef, fractionalPixelRatio, handleMouseOver, handleMouseLeave };
   },
 });
 </script>

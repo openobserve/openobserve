@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
+  isFractionalDevicePixelRatio,
   useDevicePixelRatioChange,
   watchDevicePixelRatio,
 } from "./useDevicePixelRatio";
@@ -102,6 +103,18 @@ describe("useDevicePixelRatio", () => {
     expect(display.listenerCount()).toBe(0);
     display.setRatio(1);
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("isFractionalDevicePixelRatio", () => {
+  it("is false at whole ratios and true at scaled or zoomed ones", () => {
+    expect([1, 2, 3].map(isFractionalDevicePixelRatio)).toEqual([false, false, false]);
+    expect([1.25, 1.5, 0.9, 1.100000023841858].map(isFractionalDevicePixelRatio)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
   });
 });
 

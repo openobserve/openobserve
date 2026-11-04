@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :role="label ? 'img' : undefined"
     :aria-label="label || undefined"
     class="chart-container h-full w-full"
+    :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
@@ -87,6 +88,7 @@ import { useTheme } from "@/composables/useTheme";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
+  isFractionalDevicePixelRatio,
   useDevicePixelRatioChange,
 } from "@/composables/useDevicePixelRatio";
 import { chartColor } from "@/utils/chartTheme";
@@ -973,7 +975,11 @@ export default defineComponent({
       (newTheme) => rebuildChart(newTheme === "dark" ? "dark" : "light"),
     );
 
-    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
+    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
+    useDevicePixelRatioChange((ratio) => {
+      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
+      applyDevicePixelRatio(chart, ratio);
+    });
 
     // Repairs a chart that ECharts initialized while the element had no
     // layout size (e.g. mounted mid-splitter/flex settle). In that state
@@ -1244,6 +1250,7 @@ export default defineComponent({
     return {
       chartRef,
       chartId,
+      fractionalPixelRatio,
       hoveredSeriesState,
       handleNativeContextMenu,
       onChartMouseLeave,

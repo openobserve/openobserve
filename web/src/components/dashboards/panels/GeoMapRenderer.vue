@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full w-full p-1.25" data-test="dashboard-geomap-renderer">
-    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
+    <div
+      class="h-full w-full"
+      :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
+      ref="chartRef"
+      id="chart-map"
+    ></div>
   </div>
 </template>
 
@@ -59,6 +64,7 @@ import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
+  isFractionalDevicePixelRatio,
   useDevicePixelRatioChange,
 } from "@/composables/useDevicePixelRatio";
 
@@ -157,7 +163,11 @@ export default defineComponent({
       appliedView = view;
     };
 
-    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
+    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
+    useDevicePixelRatioChange((ratio) => {
+      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
+      applyDevicePixelRatio(chart, ratio);
+    });
 
     onMounted(async () => {
       await nextTick();
@@ -192,7 +202,7 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef };
+    return { chartRef, fractionalPixelRatio };
   },
 });
 </script>

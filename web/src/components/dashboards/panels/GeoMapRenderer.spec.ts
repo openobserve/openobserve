@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
 import { fakeCanvasPainter, fakeDevicePixelRatio } from "@/test/unit/helpers/devicePixelRatioFake";
 
@@ -286,6 +286,30 @@ describe("GeoMapRenderer", () => {
         expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), undefined, {
           devicePixelRatio: 2,
         });
+        expect(wrapper.find("#chart-map").classes()).not.toContain("chart-canvas-pixelated");
+      } finally {
+        display.restore();
+      }
+    });
+
+    it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+      const display = fakeDevicePixelRatio(1.25);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        const pixelated = () =>
+          wrapper.find("#chart-map").classes().includes("chart-canvas-pixelated");
+        expect(pixelated()).toBe(true);
+
+        display.setRatio(2);
+        await flushPromises();
+        expect(pixelated()).toBe(false);
+        display.setRatio(1);
+        await flushPromises();
+        expect(pixelated()).toBe(false);
+        display.setRatio(1.5);
+        await flushPromises();
+        expect(pixelated()).toBe(true);
       } finally {
         display.restore();
       }

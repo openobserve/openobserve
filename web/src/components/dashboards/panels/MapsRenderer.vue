@@ -12,7 +12,12 @@
 
 <template>
   <div class="h-full w-full p-1.25">
-    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
+    <div
+      class="h-full w-full"
+      :class="{ 'chart-canvas-pixelated': fractionalPixelRatio }"
+      ref="chartRef"
+      id="chart-map"
+    ></div>
   </div>
 </template>
 
@@ -27,6 +32,7 @@ import useTheme from "@/composables/useTheme";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
+  isFractionalDevicePixelRatio,
   useDevicePixelRatioChange,
 } from "@/composables/useDevicePixelRatio";
 
@@ -128,7 +134,11 @@ export default defineComponent({
     watch(isDark, () => {
       if (chart) initChart();
     });
-    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
+    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
+    useDevicePixelRatioChange((ratio) => {
+      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
+      applyDevicePixelRatio(chart, ratio);
+    });
 
     onMounted(async () => {
       await nextTick();
@@ -156,7 +166,7 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef };
+    return { chartRef, fractionalPixelRatio };
   },
 });
 </script>

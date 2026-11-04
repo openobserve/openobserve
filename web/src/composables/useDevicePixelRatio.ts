@@ -41,6 +41,9 @@ type LegacyMediaQueryList = Partial<
 export const currentDevicePixelRatio = (): number =>
   (typeof window !== "undefined" && window.devicePixelRatio) || 1;
 
+/** Whether one CSS pixel spans a non-whole number of device pixels (Windows display scaling, browser zoom), where the browser resamples canvases. */
+export const isFractionalDevicePixelRatio = (ratio: number): boolean => !Number.isInteger(ratio);
+
 /** Calls `onChange` with the new ratio each time it changes (display move, browser zoom); returns a stop function. */
 export const watchDevicePixelRatio = (onChange: (ratio: number) => void): (() => void) => {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};

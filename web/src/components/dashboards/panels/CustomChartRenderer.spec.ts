@@ -842,6 +842,25 @@ describe("CustomChartRenderer", () => {
         renderer: "canvas",
         devicePixelRatio: 2,
       });
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+    });
+
+    it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+      display = fakeDevicePixelRatio(1.25);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+      expect(pixelated()).toBe(true);
+
+      display.setRatio(2);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1.5);
+      await flushPromises();
+      expect(pixelated()).toBe(true);
     });
 
     it("re-rasterizes the instance in place when the window changes display", async () => {
