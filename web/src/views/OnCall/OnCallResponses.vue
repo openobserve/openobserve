@@ -233,9 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OSelect
                 v-if="sectionVisibility.resolved"
-                :model-value="causeFilter"
+                :model-value="causeFilter || ANY_CAUSE"
                 :options="causeOptions"
-                :placeholder="t('oncall.causeFilterAny')"
+                :searchable="false"
                 :aria-label="t('oncall.causeFilterLabel')"
                 data-test="oncall-responses-cause-filter"
                 @update:model-value="onCauseFilter"
@@ -995,6 +995,8 @@ function tabShows(tab: FilterTab, section: SectionKey): boolean {
 }
 
 const responses = ref<OnCallResponse[]>([]);
+// Clearing a narrowing must not read the narrowed (possibly empty) rows still in hand as "this org has no pages".
+const responsesNarrowed = ref(false);
 const teams = ref<OnCallTeam[]>([]);
 const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
@@ -1218,6 +1220,7 @@ const serverFiltered = computed(() => teamFilter.value !== "all" || !!causeFilte
 const hasPages = computed(
   () =>
     responses.value.length > 0 ||
+    responsesNarrowed.value ||
     !includeResolved.value ||
     teamFilter.value !== "all" ||
     !!causeFilter.value,
@@ -1439,13 +1442,15 @@ const visibleRows = computed(() =>
   rows.value.filter((row) => sectionVisibility.value[rowSection(row)]),
 );
 
+// Reka's single select rejects an empty-string item value, so "every cause" needs a real one.
+const ANY_CAUSE = "any";
 const causeOptions = computed(() => [
-  { label: t("oncall.causeFilterAny"), value: "" },
+  { label: t("oncall.causeFilterAny"), value: ANY_CAUSE },
   ...RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
 ]);
 
 function onCauseFilter(value: unknown) {
-  causeFilter.value = (value as ResolutionCause) || "";
+  causeFilter.value = value === ANY_CAUSE ? "" : (value as ResolutionCause) || "";
   void fetchResponses();
 }
 
@@ -1906,10 +1911,12 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
   busy.value = true;
   const readId = ++latestResponsesRead;
   try {
-    const options = pagedResponsesQuery(orgId.value, responseFilters());
+    const filters = responseFilters();
+    const options = pagedResponsesQuery(orgId.value, filters);
     const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(options, !!opts.force);
     if (readId !== latestResponsesRead) return;
     responses.value = walk.rows;
+    responsesNarrowed.value = "team_id" in filters || "cause" in filters;
     lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     // From the payload, cache hit included: the cap describes these rows, not this request.
     truncated.value = walk.truncated;

@@ -2397,11 +2397,11 @@ describe("OnCallResponses — filtering by cause", () => {
     expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ cause: "genuine_defect" });
 
     service.listResponses.mockClear();
-    cause(wrapper)!.vm.$emit("update:modelValue", "");
+    cause(wrapper)!.vm.$emit("update:modelValue", "any");
     await flushPromises();
 
     expect(service.listResponses).not.toHaveBeenCalled();
-    expect(cause(wrapper)!.props("modelValue")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("any");
   });
 
   /// Left behind when resolved pages go, it would narrow an open list to
@@ -2424,6 +2424,102 @@ describe("OnCallResponses — filtering by cause", () => {
     expect(cause(wrapper)).toBeUndefined();
 
     await showResolved(wrapper, true);
-    expect(cause(wrapper)!.props("modelValue")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("any");
+  });
+
+  describe("inside the real Filters popover", () => {
+    const panel = () => document.body.querySelector('[data-test="oncall-responses-filters-panel"]');
+    const causeTrigger = () =>
+      document.body.querySelector<HTMLElement>(
+        '[data-test="oncall-responses-filters-panel"] [data-test="oncall-responses-cause-filter"] button[role="combobox"]',
+      );
+
+    async function openReal() {
+      service.listResponses.mockResolvedValue({
+        data: [
+          {
+            id: "resp_1",
+            org_id: "default",
+            subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+            team_id: "team_1",
+            priority: 1,
+            state: "triggered",
+            responder_role: "owner",
+            title: "checkout_failing",
+            opened_at: 1_700_000_000_000_000,
+          },
+        ],
+      } as any);
+      const wrapper = mountTracked(OnCallResponses, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...stubs, OPopover: false, OSelect: false, OButton: false },
+        },
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-responses-filters-btn"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    async function pickCause(label: string) {
+      causeTrigger()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      const option = Array.from(
+        document.body.querySelectorAll<HTMLElement>('[role="option"]'),
+      ).find((el) => el.textContent?.trim() === label);
+      expect(option).toBeDefined();
+      option!.focus();
+      option!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+    }
+
+    it("commits a picked cause, keeps the popover open, and offers no search box", async () => {
+      await openReal();
+      expect(panel()).not.toBeNull();
+
+      service.listResponses.mockClear();
+      causeTrigger()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      expect(document.body.querySelector('[role="listbox"] input')).toBeNull();
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      await pickCause("Dependency failure");
+
+      expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({
+        cause: "dependency_failure",
+      });
+      expect(panel()).not.toBeNull();
+      expect(causeTrigger()!.textContent).toContain("Dependency failure");
+    });
+
+    /// The narrowed answer is empty, so reading it as "no pages" dropped the toolbar and the popover with it.
+    it("clears back to any cause from an empty narrowed list without losing the popover", async () => {
+      await openReal();
+      service.listResponses.mockResolvedValue({ data: [] } as any);
+      await pickCause("Genuine defect");
+      expect(panel()).not.toBeNull();
+
+      await pickCause("Any cause");
+
+      expect(panel()).not.toBeNull();
+      expect(causeTrigger()!.textContent).toContain("Any cause");
+      expect(document.body.querySelectorAll('[data-test="row"]')).toHaveLength(1);
+    });
+
+    it("toggles group by alert from inside the popover", async () => {
+      await openReal();
+      const box = document.body.querySelector<HTMLElement>(
+        '[data-test="oncall-responses-group-toggle"] button[role="checkbox"], [data-test="oncall-responses-group-toggle"][role="checkbox"]',
+      );
+      expect(box).not.toBeNull();
+      const before = box!.getAttribute("aria-checked");
+      box!.click();
+      await flushPromises();
+      expect(box!.getAttribute("aria-checked")).not.toBe(before);
+      expect(panel()).not.toBeNull();
+    });
   });
 });
