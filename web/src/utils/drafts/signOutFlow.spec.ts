@@ -256,6 +256,12 @@ describe("signOutThroughLeaveGuards", () => {
     await expect(signOutThroughLeaveGuards(router, makeStore())).resolves.toBe(true);
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
   });
+
+  it("clears the sample data tour, so the next user does not open it", async () => {
+    localStorage.setItem("o2_sample_tour", JSON.stringify({ org: "acme", index: 2 }));
+    await expect(signOutThroughLeaveGuards(router, makeStore())).resolves.toBe(true);
+    expect(localStorage.getItem("o2_sample_tour")).toBeNull();
+  });
 });
 
 describe("signOutDraftsToConfirm", () => {
