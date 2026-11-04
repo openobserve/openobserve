@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="item.disabled"
             focusable-unavailable
             :aria-pressed="item.selected"
-            :aria-label="item.label"
+            :aria-label="rowName(item)"
             :aria-describedby="recentKeysHintId"
             :description-id="recentKeysHintId"
             @mouseenter="emit('hover')"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="close"
             :data-test="`date-time-rail-recent-${item.id}-remove`"
             tabindex="-1"
-            :aria-label="t('common.timeRangeRemoveRecent', { range: item.label })"
+            :aria-label="t('common.timeRangeRemoveRecent', { range: rowName(item) })"
             @keydown.left.prevent="focusSibling($event, '[data-date-time-rail-recent]')"
             class="absolute! end-1.5 top-1/2 -translate-y-1/2"
             :class="
@@ -245,6 +245,10 @@ const tabStop = computed(() =>
     ? activeKey.value
     : focusOrder.value[0],
 );
+
+// The accessible name must contain the visible compact label.
+const rowName = (item: TimeRangeRailItem) =>
+  item.compact ? `${item.compact.label} (${item.label})` : item.label;
 
 const tabindexFor = (key: string) => (key === tabStop.value ? 0 : -1);
 

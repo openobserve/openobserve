@@ -808,12 +808,12 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(el("date-time-rail-recent-0")?.getAttribute("aria-label")).toBe(
-        "2026/10/08 04:30:00 - 2026/10/08 05:00:00",
+        "Oct 8 (2026/10/08 04:30:00 - 2026/10/08 05:00:00)",
       );
       expect(el("date-time-rail-recent-0")?.textContent).toContain("Oct 8");
       expect(el("date-time-rail-recent-0-duration")?.textContent).toBe("30m");
       expect(el("date-time-rail-recent-1")?.getAttribute("aria-label")).toBe(
-        "2026/10/06 23:30:00 - 2026/10/06 23:59:59",
+        "Oct 6 (2026/10/06 23:30:00 - 2026/10/06 23:59:59)",
       );
       expect(el("date-time-rail-recent-1")?.textContent).toContain("Oct 6");
 
