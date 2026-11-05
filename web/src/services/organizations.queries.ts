@@ -120,8 +120,7 @@ export const adminOrgsQuery = (org: string) =>
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-// The token list re-reads before these resolve: callers copy it into the store
-// and re-arm row buttons that read the row's current state.
+// Callers copy the token list into the store and re-arm row buttons as soon as these resolve.
 export const createIngestionTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; description?: string; splunk_token?: boolean }) =>
