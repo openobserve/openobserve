@@ -7423,8 +7423,21 @@ mod tests {
         infra::db_init().await.expect("meta store");
         infra::table::migrate().await.expect("migrations");
 
+        let org = format!("deadline_{}", now_micros());
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(
+            &org,
+            folder,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .unwrap();
         let mut alert = config::meta::alerts::alert::Alert::default();
-        alert.org_id = format!("deadline_{}", now_micros());
+        alert.org_id = org.clone();
         alert.name = "deadline".to_string();
         alert.id = Some(svix_ksuid::Ksuid::new(None, None));
         alert.destinations = vec!["deadline-dest".to_string()];
@@ -7433,9 +7446,20 @@ mod tests {
                 "group_by": ["host"],
                 "function": "count",
                 "having": {"column": "value", "operator": ">", "value": 1},
+                "multi_alert": true,
             }))
             .unwrap(),
         );
+        // Group rows are written only for a stored alert that still has multi_alert on.
+        let alert = infra::table::alerts::create(
+            infra::db::get_orm_client_rw().await,
+            &org,
+            "default",
+            alert,
+            false,
+        )
+        .await
+        .unwrap();
         let alert_id = alert.id.unwrap().to_string();
         let hosts = ["a", "b"];
         let labels = |host: &str| std::collections::BTreeMap::from([("host".into(), host.into())]);

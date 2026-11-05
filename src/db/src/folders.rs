@@ -666,6 +666,7 @@ mod tests {
     async fn test_alert_folder_holding_a_composite_is_not_deleted() {
         use infra::table::entity::alert_composites;
         use sea_orm::ActiveValue::Set;
+        use svix_ksuid::KsuidLike;
 
         if !meta_store().await {
             return;
@@ -677,7 +678,7 @@ mod tests {
             .await
             .unwrap();
         let composite = alert_composites::ActiveModel {
-            id: Set(format!("{org}_composite")),
+            id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
             org: Set(org.clone()),
             folder_id: Set("holds_composite".to_string()),
             name: Set("composite".to_string()),

@@ -292,7 +292,6 @@ fn failed_recovery_record(alert: &Alert, event: &RecoveryEvent, error: String) -
     let mut data = recovery_record(alert, event);
     data.status = RunOutcome::NotifyFailed;
     data.error = Some(error);
-    data.delivery_attempted = Some(true);
     data
 }
 
@@ -500,7 +499,8 @@ mod tests {
 
         assert_eq!(record.status, RunOutcome::NotifyFailed);
         assert_eq!(record.error.as_deref(), Some("destination rec: gone"));
-        assert_eq!(record.delivery_attempted, Some(true));
+        // The error can also mean a destination that no longer exists, so no send is claimed.
+        assert_eq!(record.delivery_attempted, None);
         assert_eq!(record.key, "a/id");
         assert_eq!(record.org, "o");
         assert_eq!((record.start_time, record.end_time), (5, 7));

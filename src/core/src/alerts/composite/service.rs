@@ -951,12 +951,16 @@ mod tests {
             .await
             .unwrap();
         let conn = infra::db::get_orm_client_rw().await;
-        let mut child = config::meta::alerts::alert::Alert::default();
-        child.name = "child".to_string();
-        let child = infra::table::alerts::create(conn, org, "default", child, false)
-            .await
-            .unwrap();
-        let expression = format!("{{{}}}", child.id.unwrap());
+        let mut children = Vec::new();
+        for name in ["child_a", "child_b"] {
+            let mut child = config::meta::alerts::alert::Alert::default();
+            child.name = name.to_string();
+            let child = infra::table::alerts::create(conn, org, "default", child, false)
+                .await
+                .unwrap();
+            children.push(child.id.unwrap());
+        }
+        let expression = format!("{{{}}} AND {{{}}}", children[0], children[1]);
         common::infra::config::DESTINATIONS.insert(
             format!("{org}/real"),
             Destination {

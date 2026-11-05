@@ -304,6 +304,16 @@ pub(crate) async fn bindings_for(
         NotificationKind::Alert => {
             let (_, alerts) = db::alerts::templates::cached_references(org_id, name).await;
             by.extend(alerts.into_iter().map(|a| format!("alert '{a}'")));
+            let db_conn = infra::db::get_orm_client_ro().await;
+            for (_, composite) in infra::table::alert_composites::names_using_template(
+                db_conn,
+                binding_scope(org_id),
+                name,
+            )
+            .await?
+            {
+                by.push(format!("composite alert '{composite}'"));
+            }
         }
         _ => {}
     }
@@ -864,6 +874,11 @@ mod tests {
             matches!(&refused, Err(TemplateError::DeleteWithBinding(by)) if by.contains("the composite")),
             "{refused:?}"
         );
+        // Narrowing `applies_to` would leave the composite on a template its next save refuses.
+        let bound = bindings_for(&org, &name, NotificationKind::Alert)
+            .await
+            .unwrap();
+        assert_eq!(bound, vec!["composite alert 'the composite'".to_string()]);
     }
 
     #[tokio::test]
