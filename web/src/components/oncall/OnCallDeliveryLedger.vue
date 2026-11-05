@@ -44,7 +44,11 @@
           class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
           :data-test="`oncall-delivery-row-${group.run}-${index}`"
         >
-          <OTag :variant="row.delivered ? 'success-soft' : 'error-soft'" size="sm">
+          <OTag
+            :variant="row.delivered ? 'success-soft' : 'error-soft'"
+            size="sm"
+            data-test="oncall-delivery-status"
+          >
             {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
           </OTag>
           <OnCallPersonName
@@ -52,8 +56,14 @@
             class="text-text-body text-sm"
             :email="row.recipient"
             :data-test="`oncall-delivery-recipient-${group.run}-${index}`"
+            :data-test-email="row.recipient"
           />
-          <OTag v-if="row.channel" variant="default-soft" size="sm">
+          <OTag
+            v-if="row.channel"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-delivery-channel"
+          >
             {{ t(`oncall.channel_${row.channel}`) }}
           </OTag>
           <span
