@@ -353,10 +353,17 @@ export const anomalyModelQuery = (cfg: Record<string, any>): string =>
     cfg.histogram_interval_unit,
   ]);
 
+/** Expected data states: the config is enabled and re-evaluated, and `last_error` holds the reason. */
+export const isAnomalyDataReadinessStatus = (status: unknown): boolean =>
+  status === "waiting_for_data" || status === "not_applicable";
+
 export const anomalySensitivityModel = (cfg: Record<string, any>) => {
   const level = anomalyTrainedK(cfg);
   const invalidated =
-    cfg.sensitivity_model_stale || cfg.current_model_version === 0 || cfg.status === "waiting";
+    cfg.sensitivity_model_stale ||
+    cfg.current_model_version === 0 ||
+    cfg.status === "waiting" ||
+    isAnomalyDataReadinessStatus(cfg.status);
   const available =
     !invalidated &&
     cfg.status === "ready" &&
@@ -367,6 +374,8 @@ export const anomalySensitivityModel = (cfg: Record<string, any>) => {
     | "untrained"
     | "training"
     | "failed"
+    | "waitingForData"
+    | "notApplicable"
     | "retraining"
     | "retrainFailed"
     | "trained"
@@ -380,11 +389,15 @@ export const anomalySensitivityModel = (cfg: Record<string, any>) => {
         ? previous
           ? "retrainFailed"
           : "failed"
-        : available && level !== null
-          ? "trained"
-          : previous
-            ? "unconfirmed"
-            : "untrained";
+        : cfg.status === "waiting_for_data"
+          ? "waitingForData"
+          : cfg.status === "not_applicable"
+            ? "notApplicable"
+            : available && level !== null
+              ? "trained"
+              : previous
+                ? "unconfirmed"
+                : "untrained";
   return { level: previous ? level : null, current: available, state };
 };
 

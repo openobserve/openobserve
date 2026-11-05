@@ -12913,6 +12913,9 @@
       "noDestinationsFound": "Nie znaleziono miejsc docelowych",
       "noDetectionResults": "Brak jeszcze wyników wykrywania w tym zakresie",
       "noFieldsFound": "Nie znaleziono pól",
+      "checkDataNow": "Sprawdź teraz",
+      "checkDataNowTooltip": "Oceń bieżące dane teraz, zamiast czekać na następne automatyczne sprawdzenie.",
+      "dataReadinessReason": "Powód",
       "noticeRetrain": "Automatyczne ponowne trenowanie",
       "noticeRetrainTooltip": "Zapisany model nie mógł zostać odczytany po aktualizacji, więc został odrzucony, a konfiguracja została automatycznie zakolejkowana do ponownego wytrenowania. Nie są wymagane żadne działania; detekcja wznowi się po zakończeniu trenowania.",
       "noticeSkipAbsence": "Ocena braku pozostała w tyle za Oknem wstecznym; przedział, którego nie można już było pobrać, został pominięty i zarejestrowany.",
@@ -12947,6 +12950,8 @@
       "autoUntrainedHelp": "Tryb auto nauczy się poziomu na podstawie Twojej historii.",
       "autoTrainingHelp": "Poziom pojawi się po zakończeniu trenowania.",
       "autoFailedHelp": "Trenowanie nie powiodło się. Brak nauczonego poziomu. Sprawdź błąd trenowania powyżej.",
+      "autoWaitingForDataHelp": "Nadal za mało odpowiednich danych treningowych. Do tego czasu brak wyuczonego poziomu. Detektor pozostaje włączony i jest automatycznie sprawdzany ponownie.",
+      "autoNotApplicableHelp": "Bieżące dane nie pozwalają na utworzenie modelu anomalii. To nie jest błąd. Detektor pozostaje włączony i jest automatycznie sprawdzany ponownie.",
       "autoRetrainingHelp": "Ponowne trenowanie. Wyświetlany jest ostatni nauczony poziom; dostępność modelu nie została potwierdzona.",
       "autoRetrainFailedHelp": "Ponowne trenowanie nie powiodło się. Wyświetlany jest ostatni nauczony poziom; dostępność modelu nie została potwierdzona. Sprawdź błąd trenowania powyżej.",
       "autoUnconfirmedHelp": "Wyświetlany jest ostatni nauczony poziom; aktywny model nie został potwierdzony.",
@@ -23025,7 +23030,9 @@
         "ready": "Gotowy",
         "running": "Uruchomiony",
         "training": "Trening",
-        "waiting": "Oczekuje"
+        "waiting": "Oczekuje",
+        "waitingForData": "Oczekiwanie na dane",
+        "notApplicable": "Nie dotyczy"
       },
       "anomalyStatus": {
         "active": "Aktywny",
@@ -23033,7 +23040,9 @@
         "training": "Trening",
         "failed": "Nieudane",
         "waiting": "Czekające",
-        "disabled": "Wyłączone"
+        "disabled": "Wyłączone",
+        "waitingForData": "Oczekiwanie na dane",
+        "notApplicable": "Nie dotyczy"
       },
       "aiToolsetKind": {
         "skill": "Umiejętność",

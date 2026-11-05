@@ -75,6 +75,8 @@ import {
   anomalyBandWidthPrefill,
   anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
+  isAnomalyDataReadinessStatus,
+  anomalySensitivityModel,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
@@ -1374,6 +1376,46 @@ describe("AnomalyDetectionConfig", () => {
         false,
       );
     });
+  });
+});
+
+describe("data readiness statuses", () => {
+  it.each([
+    ["waiting_for_data", "waitingForData"],
+    ["not_applicable", "notApplicable"],
+  ])("reads %s as a data state, not a failure or a usable model", (status, state) => {
+    expect(isAnomalyDataReadinessStatus(status)).toBe(true);
+    const model = anomalySensitivityModel({
+      status,
+      is_trained: false,
+      current_model_version: 7,
+      band_k: 4.2,
+    });
+    expect(model.state).toBe(state);
+    expect(model.current).toBe(false);
+    expect(model.level).toBeNull();
+  });
+
+  it.each(["failed", "waiting", "ready", "training", undefined])(
+    "does not treat %s as a data state",
+    (status) => {
+      expect(isAnomalyDataReadinessStatus(status)).toBe(false);
+    },
+  );
+
+  it.each([
+    "alerts.anomaly.autoWaitingForDataHelp",
+    "alerts.anomaly.autoNotApplicableHelp",
+    "alerts.anomaly.checkDataNow",
+    "alerts.anomaly.checkDataNowTooltip",
+    "alerts.anomaly.dataReadinessReason",
+    "components.badge.anomalyStatus.waitingForData",
+    "components.badge.anomalyStatus.notApplicable",
+    "components.badge.alertStatus.waitingForData",
+    "components.badge.alertStatus.notApplicable",
+  ])("has the en-US copy %s", (key) => {
+    const text = key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
+    expect(typeof text).toBe("string");
   });
 });
 

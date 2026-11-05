@@ -409,7 +409,8 @@ async fn pk_to_name(pk: Option<&str>) -> String {
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
-/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled".
+/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled", plus the
+/// data-readiness labels "waiting_for_data"/"not_applicable".
 fn status_label(status: i32) -> &'static str {
     o2_enterprise::enterprise::anomaly_detection::types::Status::label(status)
 }
@@ -1055,7 +1056,21 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let updated = active_model.update(db).await?;
+    let mut updated = active_model.update(db).await?;
+
+    // After the save, so the training it queues reads the repaired config.
+    if retryable_change
+        && o2_enterprise::enterprise::anomaly_detection::scheduler::requeue_data_readiness(
+            db,
+            &updated.anomaly_id,
+        )
+        .await?
+    {
+        updated.status =
+            o2_enterprise::enterprise::anomaly_detection::types::Status::Waiting.to_i32();
+        updated.retries = 0;
+        updated.last_error = None;
+    }
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.

@@ -12913,6 +12913,9 @@
       "noDestinationsFound": "Hedef bulunamadı",
       "noDetectionResults": "Bu aralıkta henüz algılama sonucu yok",
       "noFieldsFound": "Alan bulunamadı",
+      "checkDataNow": "Şimdi kontrol et",
+      "checkDataNowTooltip": "Sonraki otomatik kontrolü beklemeden mevcut verileri şimdi yeniden değerlendirin.",
+      "dataReadinessReason": "Neden",
       "noticeRetrain": "Otomatik yeniden eğitme",
       "noticeRetrainTooltip": "Kaydedilen model bir yükseltmeden sonra okunamadı, bu nedenle atıldı ve yapılandırma otomatik olarak yeniden eğitim için kuyruğa alındı. Herhangi bir işlem gerekmez; eğitim tamamlandığında algılama devam eder.",
       "noticeSkipAbsence": "Yokluk değerlendirmesi Geriye Bakış Penceresinin gerisinde kaldı; artık getirilemeyen span atlandı ve kaydedildi.",
@@ -12947,6 +12950,8 @@
       "autoUntrainedHelp": "Otomatik, geçmişinizden bir seviye öğrenecek.",
       "autoTrainingHelp": "Eğitim tamamlandığında seviye görünecek.",
       "autoFailedHelp": "Eğitim başarısız oldu. Henüz öğrenilmiş seviye yok. Yukarıdaki eğitim hatasını inceleyin.",
+      "autoWaitingForDataHelp": "Henüz yeterli uygun eğitim verisi yok. O zamana kadar öğrenilmiş seviye yok. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
+      "autoNotApplicableHelp": "Mevcut veriler bir anomali modelini desteklemiyor. Bu bir hata değildir. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
       "autoRetrainingHelp": "Yeniden eğitiliyor. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı.",
       "autoRetrainFailedHelp": "Yeniden eğitim başarısız oldu. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı. Yukarıdaki eğitim hatasını inceleyin.",
       "autoUnconfirmedHelp": "Son öğrenilen seviye gösteriliyor; etkin bir model doğrulanmadı.",
@@ -23025,7 +23030,9 @@
         "ready": "Hazır",
         "running": "Çalışıyor",
         "training": "Eğitim",
-        "waiting": "Bekliyor"
+        "waiting": "Bekliyor",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "anomalyStatus": {
         "active": "Etkin",
@@ -23033,7 +23040,9 @@
         "training": "Eğitim",
         "failed": "Başarısız",
         "waiting": "Bekliyor",
-        "disabled": "Devre Dışı"
+        "disabled": "Devre Dışı",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "aiToolsetKind": {
         "skill": "Beceri",

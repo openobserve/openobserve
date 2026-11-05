@@ -967,6 +967,8 @@ export default defineComponent({
       untrained: "alerts.anomaly.autoUntrainedHelp",
       training: "alerts.anomaly.autoTrainingHelp",
       failed: "alerts.anomaly.autoFailedHelp",
+      waitingForData: "alerts.anomaly.autoWaitingForDataHelp",
+      notApplicable: "alerts.anomaly.autoNotApplicableHelp",
       retraining: "alerts.anomaly.autoRetrainingHelp",
       retrainFailed: "alerts.anomaly.autoRetrainFailedHelp",
       unconfirmed: "alerts.anomaly.autoUnconfirmedHelp",

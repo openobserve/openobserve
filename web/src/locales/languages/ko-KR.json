@@ -12913,6 +12913,9 @@
       "noDestinationsFound": "대상을 찾을 수 없습니다.",
       "noDetectionResults": "이 범위에 아직 탐지 결과가 없습니다",
       "noFieldsFound": "필드를 찾을 수 없음",
+      "checkDataNow": "지금 확인",
+      "checkDataNowTooltip": "다음 자동 확인을 기다리지 않고 현재 데이터를 지금 다시 평가합니다.",
+      "dataReadinessReason": "사유",
       "noticeRetrain": "자동 재훈련",
       "noticeRetrainTooltip": "업그레이드 후 저장된 모델을 읽을 수 없어 모델이 삭제되고 구성이 자동으로 재훈련 대기열에 추가되었습니다. 필요한 작업은 없으며, 훈련이 완료되면 탐지가 재개됩니다.",
       "noticeSkipAbsence": "결측 등급 산정이 조회 기간보다 뒤처져, 더 이상 가져올 수 없는 구간을 건너뛰고 기록했습니다.",
@@ -12947,6 +12950,8 @@
       "autoUntrainedHelp": "자동 모드는 기록에서 레벨을 학습합니다.",
       "autoTrainingHelp": "학습이 완료되면 레벨이 표시됩니다.",
       "autoFailedHelp": "학습에 실패했습니다. 아직 학습된 레벨이 없습니다. 위의 학습 오류를 확인하세요.",
+      "autoWaitingForDataHelp": "적합한 학습 데이터가 아직 부족합니다. 그때까지 학습된 수준은 없습니다. 탐지기는 활성화된 상태로 유지되며 자동으로 다시 확인됩니다.",
+      "autoNotApplicableHelp": "현재 데이터로는 이상 모델을 만들 수 없습니다. 이는 실패가 아닙니다. 탐지기는 활성화된 상태로 유지되며 자동으로 다시 확인됩니다.",
       "autoRetrainingHelp": "재학습 중입니다. 마지막으로 학습된 레벨이 표시되며, 모델 사용 가능 여부는 확인되지 않았습니다.",
       "autoRetrainFailedHelp": "재학습에 실패했습니다. 마지막으로 학습된 레벨이 표시되며, 모델 사용 가능 여부는 확인되지 않았습니다. 위의 학습 오류를 확인하세요.",
       "autoUnconfirmedHelp": "마지막으로 학습된 레벨이 표시되며, 활성 모델은 확인되지 않았습니다.",
@@ -23025,7 +23030,9 @@
         "ready": "준비",
         "running": "실행 중",
         "training": "학습 중",
-        "waiting": "대기 중"
+        "waiting": "대기 중",
+        "waitingForData": "데이터 대기 중",
+        "notApplicable": "해당 없음"
       },
       "anomalyStatus": {
         "active": "활성",
@@ -23033,7 +23040,9 @@
         "training": "학습 중",
         "failed": "실패",
         "waiting": "대기 중",
-        "disabled": "비활성화됨"
+        "disabled": "비활성화됨",
+        "waitingForData": "데이터 대기 중",
+        "notApplicable": "해당 없음"
       },
       "aiToolsetKind": {
         "skill": "스킬",
