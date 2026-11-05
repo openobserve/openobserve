@@ -38,7 +38,7 @@ use datafusion::{
 /// Implementation of regexp_match
 pub static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        super::REGEX_MATCH_UDF_NAME,
+        crate::datafusion::udf::REGEX_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
         vec![DataType::Utf8, DataType::Utf8],
         DataType::Boolean,
@@ -50,7 +50,7 @@ pub static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 /// Implementation of regexp_not_match
 pub static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        super::REGEX_NOT_MATCH_UDF_NAME,
+        crate::datafusion::udf::REGEX_NOT_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
         vec![DataType::Utf8, DataType::Utf8],
         DataType::Boolean,
