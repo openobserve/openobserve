@@ -20,6 +20,7 @@ ignore = [
   "RUSTSEC-2026-0367", # from zip 0.6 (chromiumoxide_fetcher, unpacks the Chromium download) and zip 3 (utoipa-swagger-ui build script); fix requires zip 9, no upgrade path upstream
   "RUSTSEC-2026-0368", # from zip 0.6/3, same sources as RUSTSEC-2026-0367; only trusted archives are extracted
   "RUSTSEC-2026-0369", # from zip 0.6/3, same sources as RUSTSEC-2026-0367; only trusted archives are extracted
+  "RUSTSEC-2026-0429", # from zip 0.6/3, same sources as RUSTSEC-2026-0367; only trusted archives are extracted; fix requires zip 9
   "RUSTSEC-2026-0391", # from zstd 0.13, used by arrow, parquet, datafusion and tonic; the fix is in zstd 0.14, which they have not adopted
   "RUSTSEC-2026-0398", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14
   "RUSTSEC-2026-0403", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14

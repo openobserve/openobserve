@@ -16,7 +16,7 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatAxisTickValue } from "../../axisTickFormat";
 import { getGridLineStyle } from "../../colorPalette";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { absValue, createSeriesOverrideLookup } from "../../seriesOverrides";
 import { sortTooltipParams } from "../../tooltipSort";
@@ -151,6 +151,7 @@ export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true
     },
     axisLabel: {
       show: config.axis_label !== false,
+      color: chartAxisTextColor(),
       hideOverlap: true,
     },
     splitLine: {
@@ -186,6 +187,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
+      color: chartAxisTextColor(),
       // Add unit formatting to Y-axis labels
       formatter: (value: any) => {
         return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
@@ -204,6 +206,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
     ...(config.axis_width && {
       axisLabel: {
         show: config.axis_label !== false,
+        color: chartAxisTextColor(),
         width: config.axis_width,
         // Preserve unit formatter when axis_width is set
         formatter: (value: any) => {
@@ -227,6 +230,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
     yAxis.nameLocation = "middle";
     yAxis.nameGap = 50; // Default gap, can be made dynamic later
     yAxis.nameTextStyle = {
+      color: chartAxisTextColor(),
       fontWeight: "bold",
       fontSize: 14,
     };
@@ -251,6 +255,7 @@ export function buildCategoryXAxis(categories: string[], panelSchema: any, store
     data: categories,
     axisLabel: {
       show: config.axis_label !== false,
+      color: chartAxisTextColor(),
       rotate: config.axis_label_rotate || 0,
       // hide colliding labels instead of drawing them on top of each other
       hideOverlap: true,
@@ -286,6 +291,7 @@ export function buildCategoryYAxis(categories: string[], panelSchema: any, store
     inverse: true,
     axisLabel: {
       show: config.axis_label !== false,
+      color: chartAxisTextColor(),
       // hide colliding labels instead of drawing them on top of each other
       hideOverlap: true,
     },
@@ -316,6 +322,7 @@ export function buildValueAxis(panelSchema: any, store?: any): any {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
+      color: chartAxisTextColor(),
       // hide colliding labels instead of drawing them on top of each other
       hideOverlap: true,
       // Add unit formatting to value axis labels
