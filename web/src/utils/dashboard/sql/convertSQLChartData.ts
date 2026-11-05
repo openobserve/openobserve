@@ -132,13 +132,31 @@ export const convertSQLChartData = async (
   let isTimeSeriesFlag = false;
 
   // auto SQL: if x axis has time series
-  if (applyAutoSQLTimeSeries(options, panelSchema, store, metadata, hoveredSeriesState)) {
+  if (
+    applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      store,
+      metadata,
+      hoveredSeriesState,
+      resultMetaData,
+    )
+  ) {
     // set timeseries flag as a true
     isTimeSeriesFlag = true;
   }
 
   //custom SQL: check if it is timeseries or not
-  if (applyCustomSQLTimeSeries(options, panelSchema, store, metadata, hoveredSeriesState)) {
+  if (
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      store,
+      metadata,
+      hoveredSeriesState,
+      resultMetaData,
+    )
+  ) {
     // set timeseries flag as a true
     isTimeSeriesFlag = true;
   }

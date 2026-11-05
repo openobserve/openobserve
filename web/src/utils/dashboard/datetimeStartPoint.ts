@@ -1,11 +1,9 @@
-import { differenceInSeconds, subSeconds } from "date-fns";
-
 export const dateBin = (interval: number, date: Date, origin: Date): Date => {
-  const durationSinceOrigin = differenceInSeconds(date, origin);
+  const intervalMs = interval * 1000;
+  const sinceOrigin = date.getTime() - origin.getTime();
 
-  const remainder = durationSinceOrigin % interval;
+  // JavaScript `%` keeps the sign, and a date before the origin must still round down.
+  const remainder = ((sinceOrigin % intervalMs) + intervalMs) % intervalMs;
 
-  const adjustedDate = subSeconds(date, remainder);
-
-  return adjustedDate;
+  return new Date(date.getTime() - remainder);
 };

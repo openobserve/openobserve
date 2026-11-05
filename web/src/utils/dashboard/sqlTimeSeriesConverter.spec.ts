@@ -228,6 +228,16 @@ describe("applyAutoSQLTimeSeries", () => {
     expect(result).toBe(true);
   });
 
+  it("places a histogram bucket with a timezone offset at its true start", () => {
+    const options = makeOptions(["2026-11-04T00:00:00"]);
+    options.series = [{ name: "s1", data: [5] }];
+    const panelSchema = makePanelSchema("bar", false, [makeHistogramField()]);
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null }, [
+      { histogram_offset: -28_800 },
+    ]);
+    expect(options.series[0].data[0][0]).toBe(Date.parse("2026-11-04T08:00:00Z"));
+  });
+
   it("converts series data to [x, y] tuples when timestamp field present", () => {
     const options = makeOptions(["1705320000000", "1705323600000"]);
     options.series = [{ name: "s1", data: [5, 15] }];
@@ -309,6 +319,36 @@ describe("applyCustomSQLTimeSeries", () => {
     });
     expect(result).toBe(true);
     expect(options.xAxis[0].type).toBe("time");
+  });
+
+  it("places a bucket with a timezone offset at its true start, inside the axis range", () => {
+    vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
+    const options = makeOptions(["2026-11-04T00:00:00"]);
+    options.series = [{ name: "s1", data: [5] }];
+    const metadata = makeMetadata();
+    metadata.queries[0].startTime = Date.parse("2026-11-03T00:00:00Z") * 1000;
+    metadata.queries[0].endTime = Date.parse("2026-11-03T20:00:00Z") * 1000;
+    applyCustomSQLTimeSeries(
+      options,
+      makePanelSchema("bar", true),
+      makeStore(),
+      metadata,
+      { value: null },
+      [{ histogram_offset: 19_800 }],
+    );
+    const placed = options.series[0].data[0][0];
+    expect(placed).toBe(Date.parse("2026-11-03T18:30:00Z"));
+    expect(placed).toBeLessThanOrEqual(options.xAxis[0].max);
+  });
+
+  it("keeps the label when the response has no histogram offset", () => {
+    vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
+    const options = makeOptions(["2026-11-04T00:00:00"]);
+    options.series = [{ name: "s1", data: [5] }];
+    applyCustomSQLTimeSeries(options, makePanelSchema("bar", true), makeStore(), makeMetadata(), {
+      value: null,
+    });
+    expect(options.series[0].data[0][0]).toBe(Date.parse("2026-11-04T00:00:00Z"));
   });
 
   it("clears xAxis[0].data after conversion", () => {

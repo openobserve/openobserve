@@ -23,6 +23,10 @@ import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { sortTooltipParams } from "./tooltipSort";
 import { stackTotalRows } from "./stackTotals";
 
+// A histogram label carries the timezone shift, so the bucket start is the label minus the offset.
+const histogramOffsetMs = (resultMetaData: any): number =>
+  (resultMetaData?.[0]?.histogram_offset ?? 0) * 1000;
+
 /**
  * Handles auto SQL time series conversion.
  * Detects histogram / timestamp x-axis fields and converts series data and
@@ -33,6 +37,7 @@ import { stackTotalRows } from "./stackTotals";
  * @param store              - The Vuex store object.
  * @param metadata           - Query metadata (startTime, endTime, queries, timeRangeGap ΓÇª).
  * @param hoveredSeriesState - Ref tracking the currently-hovered series.
+ * @param resultMetaData     - Search response metadata, read for the histogram offset.
  * @returns {boolean}        - true if time-series mode was activated, false otherwise.
  */
 export const applyAutoSQLTimeSeries = (
@@ -41,6 +46,7 @@ export const applyAutoSQLTimeSeries = (
   store: any,
   metadata: any,
   hoveredSeriesState: any,
+  resultMetaData?: any,
 ): boolean => {
   // auto SQL: if x axis has time series
   if (
@@ -85,7 +91,8 @@ export const applyAutoSQLTimeSeries = (
             } else {
               // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                new Date(options.xAxis[0].data[index] + "Z").getTime() -
+                  histogramOffsetMs(resultMetaData) +
                   (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
                 store.state.timezone,
               );
@@ -289,6 +296,7 @@ export const applyAutoSQLTimeSeries = (
  * @param store              - The Vuex store object.
  * @param metadata           - Query metadata (startTime, endTime, queries, timeRangeGap ΓÇª).
  * @param hoveredSeriesState - Ref tracking the currently-hovered series.
+ * @param resultMetaData     - Search response metadata, read for the histogram offset.
  * @returns {boolean}        - true if time-series mode was activated, false otherwise.
  */
 export const applyCustomSQLTimeSeries = (
@@ -297,6 +305,7 @@ export const applyCustomSQLTimeSeries = (
   store: any,
   metadata: any,
   hoveredSeriesState: any,
+  resultMetaData?: any,
 ): boolean => {
   //custom SQL: check if it is timeseries or not
   if (
@@ -324,7 +333,8 @@ export const applyCustomSQLTimeSeries = (
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             // need to consider time range gap
             toZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime() +
+              new Date(options.xAxis[0].data[index] + "Z").getTime() -
+                histogramOffsetMs(resultMetaData) +
                 (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
               store.state.timezone,
             ),

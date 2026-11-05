@@ -416,6 +416,25 @@ describe("applyHeatmapChart histogram time axis", () => {
     expect(ctx.options.series[0].data.map((cell: any) => cell[2])).toEqual([1, "-", "-", 3, "-"]);
   });
 
+  it("builds columns of a bucket with a timezone offset from their true starts", async () => {
+    const { formatDate } = await import("@/utils/dashboard/dateTimeUtils");
+    vi.mocked(formatDate).mockClear();
+    const ctx = histogramContext(
+      [{ x: "2026-11-04T00:00:00", y: "r", z: 3 }],
+      "2026-11-02T00:00:00Z",
+      "2026-11-03T20:00:00Z",
+      86_400,
+    );
+    ctx.resultMetaData = [{ histogram_interval: 86_400, histogram_offset: 19_800 }];
+    applyHeatmapChart(ctx);
+
+    expect(vi.mocked(formatDate).mock.calls.map(([ms]) => ms)).toEqual([
+      Date.parse("2026-11-01T18:30:00Z"),
+      Date.parse("2026-11-02T18:30:00Z"),
+      Date.parse("2026-11-03T18:30:00Z"),
+    ]);
+  });
+
   it("keeps the returned order without a server interval", () => {
     const ctx = histogramContext(
       [

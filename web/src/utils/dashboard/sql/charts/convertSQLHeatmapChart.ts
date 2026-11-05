@@ -220,10 +220,14 @@ export function applyHeatmapChart(ctx: SQLContext): void {
         backgroundColor: chartColor("--color-chart-crosshair-bg"),
       },
     }));
+  // A histogram label carries the timezone shift, so the bucket start is the label minus the offset.
+  const histogramOffsetMs = (ctx.resultMetaData?.[0]?.histogram_offset ?? 0) * 1000;
   if (panelSchema?.queries[0]?.customQuery == false) {
     if (histogramField) {
       xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) =>
-        formatDate(toZonedTime(it + "Z", store.state.timezone)),
+        formatDate(
+          toZonedTime(new Date(it + "Z").getTime() - histogramOffsetMs, store.state.timezone),
+        ),
       );
     }
   } else {
@@ -233,7 +237,9 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     );
     if (isTimeSeries(sample)) {
       xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) =>
-        formatDate(toZonedTime(it + "Z", store.state.timezone)),
+        formatDate(
+          toZonedTime(new Date(it + "Z").getTime() - histogramOffsetMs, store.state.timezone),
+        ),
       );
     }
   }
@@ -372,6 +378,8 @@ function fillHistogramColumns(
 ): { columns: any[]; timesMs: number[] | null } {
   const unchanged = { columns, timesMs: null };
   if (!ctx) return unchanged;
+  // A histogram label carries the timezone shift, so the bucket start is the label minus the offset.
+  const offsetMs = (ctx.resultMetaData?.[0]?.histogram_offset ?? 0) * 1000;
   const intervalMs = Number(ctx.resultMetaData?.[0]?.histogram_interval) * 1000;
   const [startMs, endMs] = queryRangeMs(ctx);
   if (!(intervalMs > 0) || !Number.isFinite(startMs) || !Number.isFinite(endMs)) return unchanged;
@@ -380,7 +388,7 @@ function fillHistogramColumns(
   const byTime = new Map<number, any>();
   let newest = -Infinity;
   for (const value of columns) {
-    const ms = Date.parse(String(value).endsWith("Z") ? String(value) : `${value}Z`);
+    const ms = Date.parse(String(value).endsWith("Z") ? String(value) : `${value}Z`) - offsetMs;
     if (!Number.isFinite(ms)) return unchanged;
     if (!byTime.has(ms)) byTime.set(ms, value);
     if (ms > newest) newest = ms;
@@ -396,7 +404,7 @@ function fillHistogramColumns(
     first = last - (maxColumns - 1) * intervalMs;
   }
   for (let ms = first; ms <= last; ms += intervalMs) {
-    if (!byTime.has(ms)) byTime.set(ms, new Date(ms).toISOString().slice(0, 19));
+    if (!byTime.has(ms)) byTime.set(ms, new Date(ms + offsetMs).toISOString().slice(0, 19));
   }
   const sorted = [...byTime.entries()].sort(([a], [b]) => a - b);
   return { columns: sorted.map(([, value]) => value), timesMs: sorted.map(([ms]) => ms) };
