@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
-    :subtitle="t('oncall.policiesSubtitle')"
     icon="arrow-upward"
     :back="{
       label: t('oncall.backToTeams'),

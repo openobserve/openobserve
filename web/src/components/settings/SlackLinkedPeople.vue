@@ -19,12 +19,16 @@ import { computed, ref } from "vue";
 import { useInfiniteQuery, useMutation } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { deleteLinkMutation, slackLinksQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackAdminLink } from "@/types/slack";
@@ -40,6 +44,7 @@ const emit = defineEmits<{ "update:open": [open: boolean] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
 const links = useInfiniteQuery(() =>
   Object.assign(slackLinksQuery(org.value, props.installationId), {
@@ -81,7 +86,14 @@ const columns = computed<OTableColumnDef<SlackAdminLink>[]>(() => [
   { id: "link_method", header: t("slackApp.people.columnMethod"), size: 160 },
   { id: "created_at", header: t("slackApp.people.columnLinked"), size: 120 },
   { id: "last_used_at", header: t("slackApp.people.columnLastUsed"), size: 120 },
-  { id: "actions", header: raw(""), size: 100, isAction: true },
+  {
+    id: "actions",
+    header: raw(""),
+    size: 100,
+    isAction: true,
+    pinned: "right",
+    meta: { align: "center", actionCount: 1 },
+  },
 ]);
 
 const confirmUnlink = (): void => {
@@ -121,21 +133,54 @@ const confirmUnlink = (): void => {
         <template #cell-link_method="{ row }">
           {{ t(`slackApp.people.method.${row.link_method}`) }}
         </template>
+        <template #cell-user_email="{ row }">
+          <OnCallPersonName
+            class="block min-w-0 truncate"
+            :email="row.user_email"
+            :data-test="`slack-people-person-${row.id}`"
+          />
+        </template>
         <template #cell-created_at="{ row }">
-          <OTimeCell :value="row.created_at" />
+          <OTimeCell :value="row.created_at" :timezone="timezone" :empty-label="raw('—')" />
         </template>
         <template #cell-last_used_at="{ row }">
-          <OTimeCell :value="row.last_used_at" />
+          <OTimeCell :value="row.last_used_at" :timezone="timezone" :empty-label="raw('—')" />
         </template>
         <template #cell-actions="{ row }">
-          <OButton
-            variant="ghost-destructive"
-            size="sm"
-            :data-test="`slack-people-unlink-${row.id}`"
-            @click="askUnlink(row)"
-          >
-            {{ t("slackApp.people.unlink") }}
-          </OButton>
+          <div class="flex items-center justify-end">
+            <OButton
+              variant="ghost-destructive"
+              size="icon-sm"
+              icon-left="link-off"
+              class="max-md:hidden"
+              :aria-label="t('slackApp.people.unlink')"
+              :data-test="`slack-people-unlink-${row.id}`"
+              @click.stop="askUnlink(row)"
+            >
+              <OTooltip side="bottom" :content="t('slackApp.people.unlink')" />
+            </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :aria-label="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  :data-test="`slack-people-${row.id}-menu`"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="link-off"
+                variant="destructive"
+                :data-test="`slack-people-unlink-${row.id}-menu`"
+                @select="askUnlink(row)"
+              >
+                {{ t("slackApp.people.unlink") }}
+              </ODropdownItem>
+            </ODropdown>
+          </div>
         </template>
         <template #error>
           <OEmptyState
@@ -172,7 +217,7 @@ const confirmUnlink = (): void => {
       :title="t('slackApp.people.unlinkTitle', { user: pending?.user_email ?? '' })"
       message-keypath="slackApp.people.unlinkMessage"
       :message-name="pending?.user_email"
-      :ok-label="t('slackApp.people.unlink')"
+      :ok-label="t('slackApp.people.unlinkConfirm')"
       ok-variant="destructive"
       focus-cancel
       @update:ok="confirmUnlink"

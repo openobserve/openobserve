@@ -857,7 +857,7 @@ mod tests {
         let cfg = make_config();
         let scheduler = Scheduler::new(cfg.clone());
         assert_eq!(
-            scheduler.workers.len(),
+            shared_lane_workers(&scheduler),
             cfg.alert_schedule_concurrency as usize
         );
     }
@@ -869,7 +869,16 @@ mod tests {
             ..make_config()
         };
         let scheduler = Scheduler::new(cfg);
-        assert_eq!(scheduler.workers.len(), 1);
+        assert_eq!(shared_lane_workers(&scheduler), 1);
+    }
+
+    // On-call adds its own lanes when enabled, so only the shared lane is sized by the base config.
+    fn shared_lane_workers(scheduler: &Scheduler) -> usize {
+        scheduler
+            .workers
+            .iter()
+            .filter(|worker| worker.module.is_none())
+            .count()
     }
 
     #[test]

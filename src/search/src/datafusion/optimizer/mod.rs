@@ -350,7 +350,7 @@ mod tests {
             physical_optimizer::remote_scan::RemoteScanRule,
         },
         table_provider::empty_table::NewEmptyTable,
-        udf::histogram_udf,
+        udf::time::histogram,
     };
 
     const MINUTE_MICROS: i64 = 60_000_000;
@@ -453,7 +453,7 @@ mod tests {
         let t2 = MemTable::try_new(t2_schema, vec![vec![t2]]).unwrap();
         ctx.register_table("t", Arc::new(t)).unwrap();
         ctx.register_table("t2", Arc::new(t2)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
     }
 
     fn histogram_rule(sql: &Sql) -> Arc<RewriteHistogram> {

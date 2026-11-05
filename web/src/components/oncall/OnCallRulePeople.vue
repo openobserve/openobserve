@@ -30,7 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary"
           aria-hidden="true"
         />
-        <span class="text-sm" :title="member">{{ raw(nameOf(member)) }}</span>
+        <OnCallPersonName
+          :email="member"
+          class="text-sm"
+          :data-test="`oncall-rule-people-name-${ruleIndex}-${position}`"
+        />
         <OTag
           v-if="position === 0 && holder"
           :variant="holder.now ? 'success-soft' : 'default-soft'"
@@ -44,8 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.peopleMore", { count: hidden }) }}
       </span>
       <OButton
-        variant="ghost-primary"
+        variant="outline"
         size="xs"
+        icon-left="edit"
         :data-test="`oncall-rule-people-edit-${ruleIndex}`"
         @click="expanded = true"
       >
@@ -58,11 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta">
           {{ t("oncall.peopleCount", { count: rule.members.length }, rule.members.length) }}
         </OText>
-        <OText variant="meta" class="ms-auto">{{ t("oncall.peopleKeyboardHint") }}</OText>
         <OButton
           v-if="rule.members.length"
-          variant="ghost-primary"
+          variant="outline"
           size="xs"
+          icon-left="check"
+          class="ms-auto"
           :data-test="`oncall-rule-people-done-${ruleIndex}`"
           @click="expanded = false"
         >
@@ -94,7 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('oncall.memberOrderDrag')"
           />
           <span class="text-text-secondary min-w-4 text-xs tabular-nums">{{ position + 1 }}</span>
-          <OUserCell :value="member" />
+          <OnCallPersonName
+            truncate
+            :email="member"
+            class="text-text-body text-sm"
+            :data-test="`oncall-rule-person-name-${ruleIndex}-${position}`"
+          />
           <OTag
             v-if="holder?.email === member"
             :variant="holder.now ? 'success-soft' : 'default-soft'"
@@ -105,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-horiz"
+                icon-left="more-vert"
                 variant="ghost"
                 size="icon-xs-sq"
                 class="ms-auto"
-                :aria-label="t('oncall.peopleMenu', { name: raw(member) })"
+                :aria-label="t('oncall.peopleMenu', { name: raw(nameOf(member)) })"
                 :data-test="`oncall-rule-person-menu-${ruleIndex}-${position}`"
               />
             </template>
@@ -163,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-action"
           :disabled="!addable.length"
+          icon-left="group-add"
           :data-test="`oncall-rule-people-add-all-${ruleIndex}`"
           @click="addEveryone"
         >
@@ -179,7 +191,7 @@ import { VueDraggableNext } from "vue-draggable-next";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -217,7 +229,15 @@ const hidden = computed(() => Math.max(0, line.value.length - LINE_NAMES));
 const addable = computed(() =>
   props.teamMembers
     .filter((email) => !props.rule.members.includes(email))
-    .map((email) => ({ label: raw(email), value: email })),
+    .map((email) => {
+      const name = props.nameOf(email);
+      return {
+        label: raw(name),
+        value: email,
+        subLabel: name === email ? undefined : raw(email),
+        searchText: `${name} ${email}`.toLowerCase(),
+      };
+    }),
 );
 
 // Same rule as the server's save: whoever is on call now stays on call, newcomers go last.

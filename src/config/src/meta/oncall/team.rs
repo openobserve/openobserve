@@ -888,8 +888,7 @@ mod tests {
             ],
             catch_all: None,
         };
-        let rules =
-            super::super::preset::build(&spec, chrono_tz::UTC, ANCHOR, MICROS_PER_WEEK).unwrap();
+        let rules = super::super::preset::build(&spec, ANCHOR, MICROS_PER_WEEK).unwrap();
         assert_eq!(schedule(vec![layered("Primary", rules)]).validate(), Ok(()));
     }
 

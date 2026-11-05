@@ -47,8 +47,11 @@ use super::physical::{
 };
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME, fuzzy_match_udf,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    STR_MATCH_UDF_NAME,
+    fulltext::{
+        fuzzy_match,
+        match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    },
 };
 
 // single condition
@@ -473,7 +476,7 @@ impl Condition {
                 Ok(disjunction(expr_list))
             }
             Condition::FuzzyMatchAll(value, distance) => {
-                let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
+                let fuzzy_expr = Arc::new(fuzzy_match::FUZZY_MATCH_UDF.clone());
                 let term = if cfg.common.utf8_view_enabled {
                     Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {

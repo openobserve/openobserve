@@ -3,6 +3,8 @@
  *
  * Row-level controls interpolate the team **id** (a ksuid), not its name:
  *   oncall-team-edit-<id> / oncall-team-delete-<id> / oncall-teams-primary-gap-<id>
+ * Edit and Delete are icon buttons on the row; there is no row menu. The default
+ * team is set from the Edit drawer's `oncall-team-form-default` switch, on Save.
  * so a spec holds the id its fixture returned rather than searching by text.
  * That is the opposite of the SLO list, whose selectors carry the name.
  *
@@ -65,6 +67,7 @@ export class OnCallTeamsPage {
       formHandover: '[data-test="oncall-team-form-handover"]',
       formSecondary: '[data-test="oncall-team-form-secondary"]',
       formManageLink: '[data-test="oncall-team-form-manage-link"]',
+      formDefault: '[data-test="oncall-team-form-default"]',
 
       // The delete confirmation is a ConfirmDialog, which forwards its own
       // data-test onto the panel so the button below can be scoped to it.
@@ -77,6 +80,8 @@ export class OnCallTeamsPage {
   // Row-scoped selectors are built, not stored, because they carry the team id.
   editButton(teamId) { return `[data-test="oncall-team-edit-${teamId}"]`; }
   deleteButton(teamId) { return `[data-test="oncall-team-delete-${teamId}"]`; }
+  /** Phone only: the row's ⋯, holding `<edit|delete>Button(id)-menu` items. */
+  moreButton(teamId) { return `[data-test="oncall-team-more-${teamId}"]`; }
   primaryGapTag(teamId) { return `[data-test="oncall-teams-primary-gap-${teamId}"]`; }
   /** Any team row, keyed by the id-carrying edit control — used to count rows. */
   anyRow() { return '[data-test^="oncall-team-edit-"]'; }
@@ -102,6 +107,8 @@ export class OnCallTeamsPage {
   getAddButton() { return this.page.locator(this.locators.addButton); }
   getEditButton(teamId) { return this.page.locator(this.editButton(teamId)); }
   getDeleteButton(teamId) { return this.page.locator(this.deleteButton(teamId)); }
+  /** The Edit drawer's switch that makes the team the org's default when the drawer saves. */
+  getFormDefaultSwitch() { return this.page.locator(this.locators.formDefault); }
 
   /** Every rendered team row. `toHaveCount(n)` against this is how a spec counts the list. */
   getRows() { return this.page.locator(this.anyRow()); }

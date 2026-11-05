@@ -49,7 +49,7 @@ use crate::{
         udf::{
             MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
             STR_MATCH_UDF_NAME,
-            match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+            fulltext::match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
         },
     },
     index::{Condition, IndexCondition, like_contains_term},
@@ -373,9 +373,9 @@ mod tests {
     use crate::{
         datafusion::{
             optimizer::physical_optimizer::utils::is_only_timestamp_filter,
-            udf::{
-                match_all_udf::{self, MATCH_ALL_UDF},
-                str_match_udf::{self, STR_MATCH_UDF},
+            udf::fulltext::{
+                match_all::{self, MATCH_ALL_UDF},
+                str_match::{self, STR_MATCH_UDF},
             },
         },
         index::Condition,
@@ -785,8 +785,8 @@ mod tests {
         .unwrap();
 
         let ctx = SessionContext::new();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match::STR_MATCH_UDF.clone());
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
@@ -861,8 +861,8 @@ mod tests {
         .unwrap();
 
         let ctx = SessionContext::new();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match::STR_MATCH_UDF.clone());
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 

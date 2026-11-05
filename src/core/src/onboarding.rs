@@ -18,12 +18,11 @@ use std::sync::{Arc, LazyLock as Lazy};
 
 #[cfg(feature = "cloud")]
 use bytes::Bytes;
-use config::meta::stream::StreamType;
+use config::meta::{self_reporting::usage::is_user_data_stream, stream::StreamType};
 #[cfg(feature = "cloud")]
 use config::{SMTP_CLIENT, get_config, meta::user::UserRole, utils::time::now_micros};
 #[cfg(feature = "cloud")]
 use dashmap::DashSet;
-use infra::schema::is_user_data_stream;
 #[cfg(feature = "cloud")]
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "cloud")]
@@ -126,7 +125,8 @@ impl FirstDataIo for LiveIo {
             StreamType::Profiles,
         ] {
             for name in db::schema::list_streams_from_cache(org_id, kind).await {
-                if !is_user_data_stream(kind, &name) || (kind == stream_type && name == stream_name)
+                if !is_user_data_stream(org_id, &name, kind)
+                    || (kind == stream_type && name == stream_name)
                 {
                     continue;
                 }
@@ -194,7 +194,7 @@ impl FirstDataIo for LiveIo {
 
 /// Called when a write creates a stream; returns at once and does any IO on a spawned task.
 pub fn on_user_stream_created(org_id: &str, stream_type: StreamType, stream_name: &str) {
-    if !is_user_data_stream(stream_type, stream_name) {
+    if !is_user_data_stream(org_id, stream_name, stream_type) {
         return;
     }
     crate::ingestion::rejections::on_user_stream_created(org_id);
@@ -209,7 +209,8 @@ fn spawn_first_data<I: FirstDataIo + 'static>(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Option<tokio::task::JoinHandle<()>> {
-    if !is_user_data_stream(stream_type, stream_name) || FIRST_DATA_SETTLED.contains(org_id) {
+    if !is_user_data_stream(org_id, stream_name, stream_type) || FIRST_DATA_SETTLED.contains(org_id)
+    {
         return None;
     }
     if !FIRST_DATA_IN_FLIGHT.insert(org_id.to_string()) {
@@ -474,6 +475,7 @@ mod tests {
             (StreamType::Logs, "usage"),
             (StreamType::Logs, "_o2_db_stats"),
             (StreamType::Logs, "_anomalies"),
+            (StreamType::Logs, "slo_slices"),
             (StreamType::EnrichmentTables, "geo"),
             (StreamType::Metadata, "app"),
         ] {
@@ -481,7 +483,23 @@ mod tests {
                 spawn_first_data(io.clone(), "first_data_internal", stream_type, name).is_none()
             );
         }
+        assert!(
+            spawn_first_data(io.clone(), config::META_ORG_ID, StreamType::Logs, "errors").is_none()
+        );
         assert_eq!(io.io_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_customer_streams_named_like_o2_streams_start_first_data() {
+        for (org, name) in [
+            ("first_data_customer_errors", "errors"),
+            ("first_data_customer_dbm", "_o2_dbm_server"),
+        ] {
+            let io = Arc::new(StubIo::new(vec![]));
+            let handle = spawn_first_data(io.clone(), org, StreamType::Logs, name).expect(name);
+            handle.await.unwrap();
+            assert!(FIRST_DATA_SETTLED.contains(org), "{name}");
+        }
     }
 
     #[tokio::test]

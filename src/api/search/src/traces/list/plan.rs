@@ -463,6 +463,41 @@ mod tests {
     }
 
     #[test]
+    fn request_sql_names_the_path_stream_and_every_filter_stream() {
+        let subquery = "(SELECT count(*) FROM \"poc_b\" WHERE operation_name = 'x') > 0";
+        for (filter, expected) in [("", vec!["poc_a"]), (subquery, vec!["poc_a", "poc_b"])] {
+            for sort_order in ["asc", "desc"] {
+                let mut query = query();
+                query.insert("filter".to_string(), filter.to_string());
+                query.insert("sort_by".to_string(), "duration".to_string());
+                query.insert("sort_order".to_string(), sort_order.to_string());
+                for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+                    for llm_schema in [
+                        None,
+                        Some(schema_compat::ValidatedLlmSchema::fallback(true)),
+                        Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+                    ] {
+                        let plan = TraceListPlan {
+                            options: TraceListOptions::parse(&query, mode).unwrap(),
+                            sort: TraceSort::parse(&query).unwrap(),
+                            columns: TraceColumns::default(),
+                            llm_schema,
+                            mode,
+                        };
+                        let sql = plan.request("poc_a").query.sql;
+                        let tables = openobserve_core::authz::resolve_sql_tables(&sql)
+                            .unwrap_or_else(|e| panic!("{e}: {sql}"));
+                        let mut names: Vec<_> = tables.iter().map(|t| t.table()).collect();
+                        names.sort();
+                        names.dedup();
+                        assert_eq!(names, expected, "{sql}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn summary_request_drops_the_filter_and_keys_on_the_selected_traces() {
         let ids = ["t1".to_string(), "t2".to_string()];
         for mode in [TraceListMode::Complete, TraceListMode::Streaming] {

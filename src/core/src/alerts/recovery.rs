@@ -184,25 +184,36 @@ async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Opt
     // TODO: a workflow consumer, once a link can carry AlertResolved (see that variant).
 }
 
-/// Whether the scheduler's per-run on-call recovery waits: a window now, or a hold it started.
+/// Whether the scheduler's per-run on-call recovery waits: an open episode's hold, or a window.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now: i64) -> bool {
     let Some(alert_id) = alert.id.map(|id| id.to_string()) else {
         return false;
     };
+    // The episode close resolves the page; a re-fire inside the hold would hit flap dampening.
+    let held = defers_to_episode_close(&alert.query_condition, alert.keep_firing_for)
+        && episode_open(&alert_id).await;
+    // Runs even when held, so a mute record is still kept or forgotten on this clear run.
+    let muted = mute_withholds_oncall(alert, &alert_id, folder_id, now).await;
+    held || muted
+}
+
+/// Whether a window now, or a hold it started, withholds the per-run on-call recovery.
+#[cfg(feature = "enterprise")]
+async fn mute_withholds_oncall(alert: &Alert, alert_id: &str, folder_id: &str, now: i64) -> bool {
     let since = now.saturating_sub(RECORDED_MUTE_GRACE_MICROS);
     if !crate::alerts::downtimes::any_since(&alert.org_id, TargetModule::Alerts, since) {
         // A clear run more than the grace after the window still closes what the mute left open.
         if crate::alerts::downtimes::any_row(&alert.org_id, TargetModule::Alerts)
-            && recorded_downtime(&alert_id).await.is_some()
+            && recorded_downtime(alert_id).await.is_some()
         {
-            forget_recorded_mute(&alert.org_id, &alert_id).await;
+            forget_recorded_mute(&alert.org_id, alert_id).await;
         }
         return false;
     }
-    let recorded = recorded_downtime(&alert_id).await;
+    let recorded = recorded_downtime(alert_id).await;
     let muted_now = downtime_at(alert, folder_id, recorded.as_deref(), now).await;
-    let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(&alert_id).await;
+    let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(alert_id).await;
     let held = recorded.as_deref().is_some_and(|id| {
         let hold = alert.keep_firing_for.saturating_mul(1_000_000);
         crate::alerts::downtimes::had_window(&alert.org_id, id, now.saturating_sub(hold), now)
@@ -216,13 +227,13 @@ pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now
     if let Some(downtime_id) = decision.record {
         crate::alerts::scheduler::handlers::record_last_downtime(
             &alert.org_id,
-            &alert_id,
+            alert_id,
             Some(downtime_id),
         )
         .await;
     }
     if decision.forget {
-        forget_recorded_mute(&alert.org_id, &alert_id).await;
+        forget_recorded_mute(&alert.org_id, alert_id).await;
     }
     decision.withheld
 }
@@ -241,6 +252,15 @@ fn clear_run_oncall<'a>(
         record: muted_now.filter(|_| recorded.is_none() && episode_open),
         forget: recorded.is_some() && !withheld,
     }
+}
+
+/// A single-row alert's `keep_firing_for` hold leaves on-call to the episode close. [pure]
+#[cfg(feature = "enterprise")]
+fn defers_to_episode_close(
+    query: &config::meta::alerts::QueryCondition,
+    keep_firing_for_secs: i64,
+) -> bool {
+    keep_firing_for_secs > 0 && !query.multi_alert_enabled()
 }
 
 /// The Recovered thread reply on every Slack app destination the alert posts to.
@@ -426,7 +446,9 @@ async fn episode_open(alert_id: &str) -> bool {
     {
         Ok(state) => state.is_some_and(|state| state.episode_id.is_some()),
         Err(e) => {
-            log::warn!("[RECOVERY] state of {alert_id} unreadable for the mute record: {e}");
+            log::warn!(
+                "[RECOVERY] state of {alert_id} unreadable, so its episode reads as closed: {e}"
+            );
             false
         }
     }
@@ -611,6 +633,49 @@ mod tests {
             }
         );
         assert!(!clear_run_oncall(None, None, true, false).withheld);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_a_single_row_hold_defers_the_oncall_recovery_to_the_episode_close() {
+        use config::meta::alerts::{
+            AggFunction, Aggregation, Condition, Operator, QueryCondition, QueryType,
+        };
+
+        let single = QueryCondition::default();
+        let grouped = QueryCondition {
+            aggregation: Some(Aggregation {
+                group_by: Some(vec!["host".into()]),
+                function: AggFunction::Count,
+                having: Condition {
+                    column: "zo_sql_val".into(),
+                    operator: Operator::GreaterThan,
+                    value: 0.into(),
+                    ignore_case: false,
+                },
+                warning_value: None,
+                multi_alert: true,
+            }),
+            ..Default::default()
+        };
+        let promql_grouped = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        let cases = [
+            ("single row, held", &single, 300, true),
+            ("single row, no hold", &single, 0, false),
+            ("grouped, held", &grouped, 300, false),
+            ("PromQL grouped, held", &promql_grouped, 300, false),
+        ];
+        for (name, query, keep_firing_for, expected) in cases {
+            assert_eq!(
+                defers_to_episode_close(query, keep_firing_for),
+                expected,
+                "{name}"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]

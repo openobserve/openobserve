@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe("OnCallSlackCard (LN-1)", () => {
-  it("LN-1 names the reader's email and the workspace of their link", async () => {
+  it("LN-1 names the workspace of their link, not the reader's email", async () => {
     vi.mocked(slack.getMyLinks).mockReturnValue(
       ok({ links: [myLink()], slack_serves_org: true }) as any,
     );
@@ -52,12 +52,12 @@ describe("OnCallSlackCard (LN-1)", () => {
     await flushPromises();
 
     expect(slack.getMyLinks).toHaveBeenCalledWith("acme");
-    expect(w.find('[data-test="oncall-slack-linked-link-1"]').text()).toBe(
-      "Linked as ana@acme.example in Acme Corp",
-    );
+    expect(w.find('[data-test="oncall-slack-linked"]').text()).toBe("Acme Corp");
+    expect(w.find('[data-test="oncall-slack-state"]').text()).toBe("Linked");
+    expect(w.text()).not.toContain("ana@acme.example");
   });
 
-  it("LN-1 gives each link its own line", async () => {
+  it("LN-1 names every linked workspace", async () => {
     vi.mocked(slack.getMyLinks).mockReturnValue(
       ok({
         links: [myLink(), myLink({ id: "link-2", team_name: "Beta Inc" })],
@@ -67,10 +67,7 @@ describe("OnCallSlackCard (LN-1)", () => {
     const w = render();
     await flushPromises();
 
-    expect(w.find('[data-test="oncall-slack-linked-link-1"]').text()).toContain("Acme Corp");
-    expect(w.find('[data-test="oncall-slack-linked-link-2"]').text()).toBe(
-      "Linked as ana@acme.example in Beta Inc",
-    );
+    expect(w.find('[data-test="oncall-slack-linked"]').text()).toBe("Acme Corp, Beta Inc");
   });
 
   it("SA-8 says Slack is not set up when no workspace serves the org", async () => {
@@ -78,9 +75,9 @@ describe("OnCallSlackCard (LN-1)", () => {
     const w = render();
     await flushPromises();
 
-    expect(w.find('[data-test="oncall-slack-not-set-up"]').text()).toBe(
-      "Slack is not set up. An admin sets it up in Settings › Slack.",
-    );
+    expect(w.find('[data-test="oncall-slack-state"]').text()).toBe("Not set up");
+    expect(w.find('[data-test="oncall-slack-ask-admin"]').exists()).toBe(true);
+    expect(w.find('[data-test="oncall-slack-settings-link"]').exists()).toBe(false);
     expect(w.find('[data-test="oncall-slack-not-linked"]').exists()).toBe(false);
   });
 
@@ -89,9 +86,8 @@ describe("OnCallSlackCard (LN-1)", () => {
     const w = render();
     await flushPromises();
 
-    expect(w.find('[data-test="oncall-slack-not-linked"]').text()).toBe(
-      "Not linked. Type /o2 link in Slack.",
-    );
+    expect(w.find('[data-test="oncall-slack-not-linked"]').text()).toBe("Type /o2 link in Slack");
+    expect(w.find('[data-test="oncall-slack-state"]').text()).toBe("Not linked");
     expect(w.find("button").exists()).toBe(false);
   });
 
