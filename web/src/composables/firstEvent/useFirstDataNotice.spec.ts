@@ -94,6 +94,26 @@ describe("orgHasUserStreams", () => {
 });
 
 describe("useFirstDataNotice", () => {
+  it("leaves an org with only sample data unmarked, so Home shows the setup state after a Delete", async () => {
+    rows.logs = [userStream("o2_demo_app_logs", NOW * 1000 - HOUR_US)];
+    const { notice } = noticeOf();
+    await flushPromises();
+    expect(notice.visible.value).toBe(false);
+    expect(readFirstDataRecord(ORG)).toMatchObject({ hadData: false, lastVisit: NOW });
+  });
+
+  it("marks an org whose own data arrived beside the sample data, without a banner", async () => {
+    writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
+    rows.logs = [
+      userStream("o2_demo_app_logs", NOW * 1000 - 2 * HOUR_US),
+      userStream("checkout", NOW * 1000 - HOUR_US),
+    ];
+    const { notice } = noticeOf();
+    await flushPromises();
+    expect(notice.visible.value).toBe(false);
+    expect(readFirstDataRecord(ORG)?.hadData).toBe(true);
+  });
+
   it("records the first visit without a banner", async () => {
     rows.logs = [userStream("default", NOW * 1000 - HOUR_US)];
     const { notice } = noticeOf();

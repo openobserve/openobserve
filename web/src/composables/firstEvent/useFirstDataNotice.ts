@@ -226,9 +226,10 @@ export function useFirstDataNotice(
     const now = Date.now();
     const record = readFirstDataRecord(orgId);
     const hasData = source.length > 0;
-    // a user who loaded sample data has already seen data flow; the sample cleanup banner greets their own
+    // the cleanup banner greets their own data; sample data alone leaves Home's setup state for after a Delete
     if (source.some((s) => isSampleStreamName(s.name))) {
-      writeFirstDataRecord(orgId, { ...record, lastVisit: now, hadData: true });
+      const own = source.some((s) => !isSampleStreamName(s.name));
+      writeFirstDataRecord(orgId, { ...record, lastVisit: now, hadData: own || !!record?.hadData });
       return;
     }
     if (!record) {

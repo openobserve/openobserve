@@ -1409,6 +1409,30 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(false);
     });
 
+    it("should show the overview while only sample data is there, and the hero again once it is deleted", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      // what the first-data notice records for an org that holds only sample data
+      localStorage.setItem(
+        firstDataStorageKey(org),
+        JSON.stringify({ lastVisit: Date.now(), hadData: false }),
+      );
+      try {
+        givenStreams({ logs: [{ name: "o2_demo_app_logs", stream_type: "logs" }] });
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(false);
+
+        wrapper.unmount();
+        queryClient.clear();
+        givenStreams(internalOnly);
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(true);
+      } finally {
+        localStorage.removeItem(firstDataStorageKey(org));
+      }
+    });
+
     it("should answer a later load from the cache, never a new request", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
