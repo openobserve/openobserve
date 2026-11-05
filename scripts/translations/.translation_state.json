@@ -13867,7 +13867,7 @@
     "settings": {
       "action": "64cff1319d2fd2cb",
       "actor": "449995c4fe8fab38",
-      "auditDelayHint": "6e133b9dcc390e0f",
+      "auditDelayHint": "2565e270e5ffd874",
       "auditDisabled": "e0d5565ee203cc5e",
       "auditTrail": "c1ada08ce13857e4",
       "fleetDefaults": "92f9ab540e700170",
@@ -16809,6 +16809,8 @@
     "deleteField": "0a73a6065cc27388",
     "docNum": "8d14f6e72de8f18a",
     "docsCount": "c4019e197435e840",
+    "dynamicPartition": "b3c0a7a27d958673",
+    "dynamicPartitionTooltip": "bfa5157b1f267eed",
     "editStream": "ef620621dedefdd9",
     "emptyAws": "59eebdd8d1c707bb",
     "emptyOr": "304d31e4fd1575bd",
@@ -16857,6 +16859,10 @@
     "noFunctionsFound": "b4211882c3835df6",
     "ok": "565339bc4d33d728",
     "otherFieldsSchemaTooltip": "d56f5d69d1f95e2f",
+    "partitionTimeLevel": "8f747f89f1121024",
+    "partitionTimeLevelDaily": "b36c2611dcdfa190",
+    "partitionTimeLevelHourly": "eab0cd8fdf9bccec",
+    "partitionTimeLevelTooltip": "73c956a0a42029ba",
     "performanceFieldsDialog": {
       "addFieldsButton": "1778ffd26449cd3e",
       "ftsCount": "1cd388d56d2cafd1",

@@ -44,6 +44,8 @@ use std::sync::LazyLock;
 use config::{RwAHashMap, get_config, meta::stream::StreamType, utils::time::hour_micros};
 use infra::cluster::get_cached_online_ingester_nodes;
 
+use crate::merge::{job_range, scheduling_level};
+
 /// Pending ingester files an open metrics-index hour holds before they all merge; one round
 /// per this many flushes keeps the hour at a few merge chains at any ingester count.
 pub const OPEN_HOUR_MERGE_FILES: usize = 12;
@@ -90,16 +92,19 @@ pub async fn incr_pending_file(
     let Some(hour) = triggered_hour else {
         return; // not triggered
     };
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let level = scheduling_level(stream_type, settings.as_deref(), hour);
+    let (job_offset, _) = job_range(hour, level);
 
     // enqueue the incremental job; deduped at the DB layer by the unique (stream, offsets)
     // add_job will re-trigger the job if it is already done, so we don't need to check the status
-    if let Err(e) = infra::file_list::add_job(org_id, stream_type, stream_name, hour).await {
+    if let Err(e) = infra::file_list::add_job(org_id, stream_type, stream_name, job_offset).await {
         log::error!(
             "[COMPACTOR:INCREMENTAL] add_job failed for [{org_id}/{stream_type}/{stream_name}] hour {hour}: {e}"
         );
     } else {
         log::debug!(
-            "[COMPACTOR:INCREMENTAL] enqueued incremental merge for [{org_id}/{stream_type}/{stream_name}] hour {hour}"
+            "[COMPACTOR:INCREMENTAL] enqueued incremental merge for [{org_id}/{stream_type}/{stream_name}] offset {job_offset}"
         );
     }
 }

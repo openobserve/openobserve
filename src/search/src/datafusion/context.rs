@@ -61,7 +61,7 @@ impl SearchContextBuilder {
 
     pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
         let analyzer_rules = generate_analyzer_rules(sql);
-        let optimizer_rules = generate_optimizer_rules(sql);
+        let optimizer_rules = generate_optimizer_rules(req, sql);
         let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
         let mut ctx = DataFusionContextBuilder::new()
             .trace_id(&req.trace_id)
