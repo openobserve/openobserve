@@ -28728,6 +28728,13 @@
         "blindUnknownField": "{monitor} filters on {field}, a field its stream doesn't have",
         "blindIgnoredMatcher": "{monitor} matches on {label}, a label no series has, so it watches every series",
         "discovery": "Only {good} of {active} discovered services are usable, so gap rankings are partial",
+        "alertSyntax": "{monitor} has a query that does not parse",
+        "alertTimeout": "{monitor} keeps timing out before it finishes",
+        "alertMemory": "{monitor} keeps running out of memory",
+        "alertOtherError": "{monitor} keeps failing with an error",
+        "alertNotWorkingGeneric": "{monitor} is not working",
+        "alertStreamGone": "{monitor} keeps failing because its stream doesn't exist",
+        "alertFieldGone": "{monitor} keeps failing because a field it uses doesn't exist",
         "other": "I found something this page can't show yet"
       },
       "detail": {
@@ -28736,8 +28743,10 @@
         "services": "Services it matches include {services}.",
         "text": "Engine detail: {detail}",
         "quality": "Discovery is running in {mode} mode.",
-        "none": "The engine sent no more detail."
+        "none": "The engine sent no more detail.",
+        "joined": "{first} {rest}"
       },
+      "analysedAt": "From the calibration run {ago}",
       "neverFired": "Never fired",
       "lastFired": "Last fired {time}",
       "accept": "Accept",

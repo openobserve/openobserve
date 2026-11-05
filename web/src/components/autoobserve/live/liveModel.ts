@@ -218,6 +218,7 @@ export const useLiveAutoObserve = () => {
       t,
       zone.value,
       (suggestions.data.value?.suggestions ?? []).filter((s) => s.status === "proposed"),
+      minute.value * 60_000,
     ),
     total: suggestions.data.value?.total ?? 0,
   }));
