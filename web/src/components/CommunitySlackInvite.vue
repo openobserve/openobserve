@@ -80,9 +80,10 @@ onMounted(() => {
   if (!due) return;
 
   const show = () => {
-    // the onboarding page claims its session, and the welcome wins this visit; the invite stays due for a later one
+    // the onboarding page claims its session, and the welcome or this org's tour wins this visit; the invite stays due for a later one
     if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
     if (session.welcomeOpen.value) return;
+    if (session.tour.value?.org === store.state.selectedOrganization?.identifier) return;
     isOpen.value = true;
     track("community_slack_prompt_shown");
   };

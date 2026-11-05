@@ -312,6 +312,20 @@ describe("CommunitySlackInvite", () => {
     afterEach(() => {
       session.welcomeOpen.value = false;
       session.welcomeDeciding.value = 0;
+      session.tour.value = null;
+    });
+
+    it.each([
+      ["stays closed", "this org", () => store.state.selectedOrganization.identifier, "false"],
+      ["opens", "another org", () => "other-org", "true"],
+    ])("%s while a sample tour runs in %s", async (_name, _where, tourOrg, open) => {
+      setPendingDay2(25);
+      session.tour.value = { org: tourOrg(), index: 1, minimized: false };
+
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(dialogOpen()).toBe(open);
     });
 
     it("stays closed while the welcome is open, until a later visit", async () => {
