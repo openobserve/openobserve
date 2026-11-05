@@ -85,18 +85,6 @@ describe("sampleData ingest credential", () => {
     expect(atob(headers.Authorization.replace("Basic ", ""))).toMatch(/:o2oi_x$/);
   });
 
-  it("keeps the session when the server refuses the ingest credential", async () => {
-    fetchQuery.mockResolvedValue({ data: [{ token: "o2oi_x", enabled: true }] });
-    const client = (http as unknown as ReturnType<typeof vi.fn>)();
-    await sampleData.ingestLogs("acme", "s", [{}]);
-    await sampleData.ingestMetrics("acme", [{}]);
-    await sampleData.ingestTraces("acme", "t", {});
-    expect(client.post).toHaveBeenCalledTimes(3);
-    for (const call of client.post.mock.calls) {
-      expect(call[2]).toEqual({ keepSessionOn401: true, silentForbidden: true });
-    }
-  });
-
   it("fails with the passcode error when there is no org token", async () => {
     const failure = { response: { status: 500 } };
     fetchQuery.mockImplementation(async (query: string) => {

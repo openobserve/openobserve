@@ -461,6 +461,7 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
+import { readPrefill } from "@/components/login/firstSourceOptions";
 import {
   POPULAR_AI_INTEGRATION_ROUTES,
   aiIntegrationByRoute,
@@ -1003,8 +1004,10 @@ const isEmpty = computed<boolean>(
       (hasLoadedOnce.value && !hasData.value && !loading.value)),
 );
 
-// The integration guide the user most likely needs: the one whose docs page they came from.
-const suggestedIntegration = referredAiIntegration([document.referrer]);
+// The integration guide the user most likely needs: the one whose docs page
+// they came from — the signup docs referrer (kept for onboarding until the
+// first login ends), else this page load's own referrer.
+const suggestedIntegration = referredAiIntegration([readPrefill()?.referrer, document.referrer]);
 // The guides AI-docs visitors read most, as one-click chips (minus the suggested one).
 const popularIntegrations = POPULAR_AI_INTEGRATION_ROUTES.map(aiIntegrationByRoute).filter(
   (i): i is NonNullable<typeof i> => !!i && i.routeName !== suggestedIntegration?.routeName,

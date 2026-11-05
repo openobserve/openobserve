@@ -63,9 +63,6 @@ const withFreshAuth = async <T>(
   }
 };
 
-// a refused ingest credential fails the load, not the session; the load reports a 403 itself
-const keepSession = { keepSessionOn401: true, silentForbidden: true };
-
 export interface SampleDataState {
   status: "none" | "loaded";
   start_time?: number;
@@ -95,18 +92,16 @@ const sampleData = {
     return http().delete(`/api/${org}/sample_data`);
   },
   ingestLogs: (org: string, stream: string, rows: unknown[]) =>
-    withFreshAuth(org, (headers) =>
-      http({ headers }).post(`/api/${org}/${stream}/_json`, rows, keepSession),
-    ),
+    withFreshAuth(org, (headers) => http({ headers }).post(`/api/${org}/${stream}/_json`, rows)),
   ingestMetrics: (org: string, rows: unknown[]) =>
     withFreshAuth(org, (headers) =>
-      http({ headers }).post(`/api/${org}/ingest/metrics/_json`, rows, keepSession),
+      http({ headers }).post(`/api/${org}/ingest/metrics/_json`, rows),
     ),
   ingestTraces: (org: string, stream: string, payload: unknown) =>
     withFreshAuth(org, (headers) =>
       http({
         headers: { ...headers, "Content-Type": "application/json", "stream-name": stream },
-      }).post(`/api/${org}/v1/traces`, payload, keepSession),
+      }).post(`/api/${org}/v1/traces`, payload),
     ),
 };
 

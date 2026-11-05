@@ -33,8 +33,6 @@ declare module "axios" {
     skipAccessToast?: boolean;
     /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
-    /** The request carries its own credential, so a 401 refuses that credential and leaves the session alone. */
-    keepSessionOn401?: boolean;
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
     startedAt?: number;
@@ -95,18 +93,6 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
 
-let silentForbiddenStarts = 0;
-
-/** Runs `start` and marks the requests it creates silentForbidden; JS runs it to its first await alone, so no other caller's request is marked. */
-export const withSilentForbidden = <T>(start: () => T): T => {
-  silentForbiddenStarts++;
-  try {
-    return start();
-  } finally {
-    silentForbiddenStarts--;
-  }
-};
-
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
 
@@ -119,7 +105,6 @@ const http = ({ headers } = {} as any) => {
     withCredentials: true,
     baseURL: store.state.API_ENDPOINT,
     headers,
-    silentForbidden: silentForbiddenStarts > 0,
   });
 
   instance.interceptors.request.use((requestConfig) => {
@@ -152,7 +137,6 @@ const http = ({ headers } = {} as any) => {
           case 400:
             break;
           case 401:
-            if (error.config?.keepSessionOn401) break;
             if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
               expireSession(store);
             }
