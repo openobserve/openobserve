@@ -142,7 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="guideEl"
       class="h-full min-w-0 flex-1 overflow-auto px-10 pt-8 pb-12 max-md:h-auto max-md:overflow-visible max-md:px-4 max-md:pt-2 md:max-lg:px-6"
     >
-      <div id="setup-step-run" class="flex w-full flex-col">
+      <!-- The default Run step's target; a card's own steps carry their own ids, its "run" included. -->
+      <div :id="cardSteps.length ? undefined : 'setup-step-run'" class="flex w-full flex-col">
         <!-- The Data sources page's token picker. It stays out of sight until a snippet's token
              button asks for it, since each snippet already names the token it uses.
              The box sets the width: the select fills whatever holds it. -->

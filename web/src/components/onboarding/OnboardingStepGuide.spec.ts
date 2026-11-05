@@ -327,6 +327,13 @@ describe("OnboardingStepGuide", () => {
       host.remove();
     });
 
+    it("leaves the Run step's id to a card that has its own run step", async () => {
+      expect((await mountGuide()).findAll("#setup-step-run")).toHaveLength(1);
+      cardSteps.value = [{ id: "run", title: "Run the collector", done: false, active: true }];
+      // The stub card draws no step roots, so the page's own box must not hold the id either.
+      expect((await mountGuide()).findAll("#setup-step-run")).toHaveLength(0);
+    });
+
     it("on success, marks the check done and shows Explore Your Data in the guide", async () => {
       const w = await mountGuide();
       card(w).vm.$emit("received", metrics);
