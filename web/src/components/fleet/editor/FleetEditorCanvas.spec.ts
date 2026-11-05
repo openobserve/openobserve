@@ -45,7 +45,11 @@ vi.mock("@vue-flow/background", () => ({
   BackgroundVariant: { Dots: "dots" },
 }));
 
-const frames = () => new Promise((resolve) => setTimeout(resolve, 50));
+// Waits on the same two animation frames afterLayout uses, so a loaded runner cannot outrun a fixed delay.
+const frames = () =>
+  new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve))),
+  );
 
 let wrapper: VueWrapper;
 
@@ -70,6 +74,11 @@ beforeEach(() => {
 });
 
 describe("FleetEditorCanvas", () => {
+  it("zooms out as far as the pipeline overview", () => {
+    const floor = Number(wrapper.findComponent({ name: "VueFlow" }).attributes("min-zoom"));
+    expect(floor).toBe(0.01);
+  });
+
   it("fits the graph below the floating toolbar", async () => {
     const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(56);
     await initialize();

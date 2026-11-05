@@ -20,13 +20,15 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use db::authz::{remove_ownership, set_ownership};
+use infra::table::scorers::Scorer;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
-    auth::{UserEmail, is_ofga_object_visible},
+    auth::{UserEmail, UserReads, is_ofga_object_visible},
     llm_evaluations::{
         datasets,
         experiments::{
-            self, ExperimentError, PinnedExperimentScorer, baseline,
+            self, Experiment, ExperimentError, ExperimentScorerRef, ExperimentTaskConfig,
+            PinnedExperimentScorer, baseline,
             dispersion::{self, NormalizationSpans, RowDispersion},
             ingest::{self, IngestError},
             results::{self, ExperimentResultSlot, ExperimentSlotStatus},
@@ -53,13 +55,68 @@ use crate::{
             ExperimentResultRowSortBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
             ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
-            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody, ExperimentTaskBody,
+            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody,
             ExperimentViewResponseBody, ListExperimentsResponseBody,
             RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
             SubmitExperimentRecordsResponseBody,
         },
     },
+    request::scorers::{MAX_SCORERS_PER_REQUEST, authorize_references},
 };
+
+/// The scorers an Experiment pins: named by a request, or kept from a stored Experiment.
+enum ScorerSelection<'a> {
+    Requested(&'a [ExperimentScorerRef]),
+    Pinned(&'a Experiment),
+}
+
+impl ScorerSelection<'_> {
+    fn ids(&self) -> Vec<&str> {
+        match self {
+            Self::Requested(refs) => refs.iter().map(|scorer| scorer.id.as_str()).collect(),
+            Self::Pinned(experiment) => experiment
+                .scorers
+                .iter()
+                .map(|scorer| scorer.id.as_str())
+                .collect(),
+        }
+    }
+
+    async fn definitions(&self, org_id: &str) -> Result<Vec<Scorer>, ExperimentError> {
+        match self {
+            Self::Requested(refs) => Ok(experiments::pin_scorers(org_id, refs).await?.1),
+            Self::Pinned(experiment) => experiments::scorer_definitions(org_id, experiment).await,
+        }
+    }
+}
+
+/// What an Experiment's pinned `global_version` shows as. When the Dataset's
+/// rows cannot be read the pin shows as itself, as it does for a deleted
+/// Dataset; the response describes an action that already happened.
+async fn pinned_write_version(org_id: &str, dataset_id: &str, pin: i64) -> i64 {
+    datasets::pinned_write_version(org_id, dataset_id, pin)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!(
+                "[Experiment] failed to resolve the write version of Dataset {dataset_id} at {pin}: {error}"
+            );
+            pin
+        })
+}
+
+async fn experiment_body(
+    org_id: &str,
+    experiment: experiments::Experiment,
+) -> ExperimentResponseBody {
+    let shown =
+        pinned_write_version(org_id, &experiment.dataset_id, experiment.dataset_version).await;
+    ExperimentResponseBody::new(experiment, shown)
+}
+
+/// Scores come from search, so while it is blocked the list renders without them.
+fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
+    requested.unwrap_or(false) && search_service::check_org_search_allowed(org_id).is_ok()
+}
 
 fn experiment_error_response(error: ExperimentError) -> Response {
     match error {
@@ -304,6 +361,11 @@ fn experiment_result_rows(
                     score_configs,
                 ),
                 p50_latency_ms: aggregate.p50_latency_ms,
+                error_message: aggregate
+                    .failure_causes
+                    .into_iter()
+                    .next()
+                    .map(|cause| cause.message),
                 dispersion: dispersions.remove(&first.row_id).map(Into::into),
             })
         })
@@ -406,51 +468,84 @@ async fn require_experiment_visibility(
     Ok(())
 }
 
-/// The Remote Task reference is the one place an Experiment reaches outside
-/// itself, so the caller must be able to see the Task it names.
-///
-/// Without this, a caller who knows a hidden `name@version` can make the
-/// platform place that Task's credentialed outbound call and can read its output
-/// back through the Experiment results. The Experiment routes authorize the
-/// Experiment alone, so nothing else covers this.
-async fn require_remote_task_visibility(
-    org_id: &str,
-    user_id: &str,
-    task_ref: &str,
-) -> Result<(), Response> {
-    // The OpenFGA object is the head's `entity_id`, not the `name@version` an
-    // Experiment carries, so the reference has to be resolved first. An
-    // unresolvable reference is answered as a denial rather than a 404, so that
-    // a caller cannot use the difference to probe for hidden Tasks.
-    let task = remote_tasks::resolve_task_ref(org_id, task_ref)
-        .await
-        .map_err(|_| MetaHttpResponse::forbidden("Unauthorized Access"))?;
-    let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id,
-        user_id,
-        "GET",
-        "remote_task",
-    )
-    .await
-    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
-    if !is_ofga_object_visible(
-        org_id,
-        "remote_task",
-        &task.entity_id,
-        permitted_objects.as_deref(),
-    ) {
-        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+/// The objects an Experiment reads besides itself and its Remote Task, as `(resource, id)`.
+fn referenced_objects<'a>(
+    dataset_id: &'a str,
+    scorer_ids: &[&'a str],
+    task: &'a ExperimentTaskConfig,
+) -> Vec<(&'static str, &'a str)> {
+    let mut objects = vec![("datasets", dataset_id)];
+    objects.extend(scorer_ids.iter().map(|id| ("scorers", *id)));
+    if let Some((prompt_id, ..)) = task.prompt_ref() {
+        objects.push(("prompts", prompt_id));
     }
-    Ok(())
+    if let Some(provider_id) = task.provider_id() {
+        objects.push(("providers", provider_id));
+    }
+    objects
 }
 
-/// The `task_ref` of a Remote Task request, or `None` for the task types that
-/// never leave the platform.
-fn remote_task_ref(task: &ExperimentTaskBody) -> Option<&str> {
-    match task {
-        ExperimentTaskBody::Remote { task_ref, .. } => Some(task_ref.as_str()),
-        _ => None,
+async fn require_reference_access(
+    org_id: &str,
+    user_id: &str,
+    dataset_id: &str,
+    scorers: ScorerSelection<'_>,
+    task: &ExperimentTaskConfig,
+) -> Result<(), Response> {
+    let scorer_ids = scorers.ids();
+    if matches!(scorers, ScorerSelection::Requested(_))
+        && scorer_ids.len() > MAX_SCORERS_PER_REQUEST
+    {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "At most {MAX_SCORERS_PER_REQUEST} scorers can be named in one request"
+        )));
     }
+    // Unresolvable is a denial, not a 404, so hidden Tasks cannot be probed.
+    let remote_task = match task.remote_task() {
+        Some((task_ref, _)) => Some(
+            remote_tasks::resolve_task_ref(org_id, task_ref)
+                .await
+                .map_err(|_| MetaHttpResponse::forbidden("Unauthorized Access"))?,
+        ),
+        None => None,
+    };
+    let mut objects = referenced_objects(dataset_id, &scorer_ids, task);
+    if let Some(remote_task) = &remote_task {
+        objects.push(("remote_tasks", remote_task.entity_id.as_str()));
+    }
+    let definitions = async {
+        scorers
+            .definitions(org_id)
+            .await
+            .map_err(experiment_error_response)
+    };
+    authorize_references(&objects, &UserReads { org_id, user_id }, definitions).await
+}
+
+async fn require_pinned_reference_access(
+    org_id: &str,
+    user_id: &str,
+    experiment: &Experiment,
+) -> Result<(), Response> {
+    require_reference_access(
+        org_id,
+        user_id,
+        &experiment.dataset_id,
+        ScorerSelection::Pinned(experiment),
+        &experiment.task,
+    )
+    .await
+}
+
+async fn require_stored_reference_access(
+    org_id: &str,
+    experiment_id: &str,
+    user_id: &str,
+) -> Result<(), Response> {
+    let experiment = experiments::get(org_id, experiment_id)
+        .await
+        .map_err(experiment_error_response)?;
+    require_pinned_reference_access(org_id, user_id, &experiment).await
 }
 
 #[utoipa::path(
@@ -467,6 +562,7 @@ fn remote_task_ref(task: &ExperimentTaskBody) -> Option<&str> {
     responses(
         (status = 200, body = inline(ExperimentPreviewResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Dataset or scorer not found", body = ()),
     ),
 )]
@@ -476,13 +572,19 @@ pub async fn preview_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
-    if let Some(task_ref) = remote_task_ref(&body.task)
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    let input: experiments::CreateExperiment = body.into();
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        &input.dataset_id,
+        ScorerSelection::Requested(&input.scorers),
+        &input.task,
+    )
+    .await
     {
         return response;
     }
-    match experiments::preview(&org_id, body.into(), query.sample_size).await {
+    match experiments::preview(&org_id, input, query.sample_size).await {
         Ok(preview) => MetaHttpResponse::json(ExperimentPreviewResponseBody::from(preview)),
         Err(error) => experiment_error_response(error),
     }
@@ -499,6 +601,7 @@ pub async fn preview_experiment(
     responses(
         (status = 200, body = inline(CreateExperimentResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 409, description = "Idempotency conflict", body = ()),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
@@ -508,12 +611,6 @@ pub async fn create_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
-    if let Some(task_ref) = remote_task_ref(&body.task)
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
-    {
-        return response;
-    }
     // Re-serialized rather than hashed from the raw bytes so two encodings of
     // the same request agree on their canonical hash.
     let canonical_request = match serde_json::to_value(&body) {
@@ -523,10 +620,28 @@ pub async fn create_experiment(
             return MetaHttpResponse::internal_error("Internal server error");
         }
     };
-    match experiments::create(&org_id, &user.user_id, body.into(), &canonical_request).await {
+    let input: experiments::CreateExperiment = body.into();
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        &input.dataset_id,
+        ScorerSelection::Requested(&input.scorers),
+        &input.task,
+    )
+    .await
+    {
+        return response;
+    }
+    match experiments::create(&org_id, &user.user_id, input, &canonical_request).await {
         Ok(result) => {
             set_ownership(&org_id, "experiments", Authz::new(&result.experiment.id)).await;
-            MetaHttpResponse::json(CreateExperimentResponseBody::from(result))
+            let shown = pinned_write_version(
+                &org_id,
+                &result.experiment.dataset_id,
+                result.experiment.dataset_version,
+            )
+            .await;
+            MetaHttpResponse::json(CreateExperimentResponseBody::new(result, shown))
         }
         Err(error) => experiment_error_response(error),
     }
@@ -560,15 +675,8 @@ pub async fn list_experiments(
         Ok(list) => list,
         Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
     };
-    // One Dataset query for the whole list — a lookup per experiment would be N+1.
-    let dataset_names: std::collections::HashMap<String, String> = datasets::list(&org_id)
-        .await
-        .map(|list| {
-            list.into_iter()
-                .map(|dataset| (dataset.id, dataset.name))
-                .collect()
-        })
-        .unwrap_or_default();
+    // One names-only Dataset query for the whole list — no per-experiment lookups or aggregates.
+    let dataset_names = datasets::list_names(&org_id).await.unwrap_or_default();
     let dataset_id = query
         .dataset_id
         .as_deref()
@@ -608,7 +716,7 @@ pub async fn list_experiments(
             .collect::<Vec<_>>(),
         Err(error) => return experiment_error_response(error),
     };
-    let include_summary = query.include_summary.unwrap_or(false);
+    let include_summary = summary_wanted(query.include_summary, &org_id);
     let mut summaries = if include_summary {
         summary::load(&experiments).await
     } else {
@@ -624,14 +732,27 @@ pub async fn list_experiments(
     } else {
         Vec::new()
     };
+    // One query for every pin in the list, not one per experiment.
+    let pins: Vec<(String, i64)> = experiments
+        .iter()
+        .map(|experiment| (experiment.dataset_id.clone(), experiment.dataset_version))
+        .collect();
+    let shown_versions = datasets::pinned_write_versions(&org_id, &pins)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!("[Experiment] failed to resolve pinned Dataset write versions: {error}");
+            HashMap::new()
+        });
     MetaHttpResponse::json(ListExperimentsResponseBody {
         list: experiments
             .into_iter()
             .map(|experiment| {
                 let id = experiment.id.clone();
                 let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                let pin = (experiment.dataset_id.clone(), experiment.dataset_version);
+                let shown = shown_versions.get(&pin).copied().unwrap_or(pin.1);
                 ExperimentViewResponseBody {
-                    experiment: ExperimentResponseBody::from(experiment)
+                    experiment: ExperimentResponseBody::new(experiment, shown)
                         .with_dataset_name(dataset_name),
                     summary: include_summary.then(|| {
                         experiment_summary_body(
@@ -801,9 +922,12 @@ pub async fn get_experiment(
         summaries.remove(&experiment.id).unwrap_or_default(),
         &score_configs,
     );
+    let shown =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     MetaHttpResponse::json(ExperimentDetailResponseBody {
         experiment: ExperimentViewResponseBody {
-            experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+            experiment: ExperimentResponseBody::new(experiment, shown)
+                .with_dataset_name(dataset_name),
             summary: Some(summary),
         },
         preview: preview.into(),
@@ -1155,11 +1279,14 @@ pub async fn get_experiment_row(
         .slots
         .first()
         .expect("a resolved Experiment row always contains at least one trial");
+    let dataset_write_version =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     let response = ExperimentRowDetailResponseBody {
         experiment_id: experiment.id,
         snapshot: ExperimentRowSnapshotBody {
             dataset_id: experiment.dataset_id,
             dataset_version: experiment.dataset_version,
+            dataset_write_version,
         },
         navigation: ExperimentRowNavigationBody {
             row_index: row.row_index,
@@ -1203,7 +1330,7 @@ pub async fn get_experiment_row(
 )]
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::cancel(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1238,7 +1365,7 @@ pub async fn set_experiment_baseline(
     }
     match baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
         Ok(change) => MetaHttpResponse::json(ExperimentBaselineResponseBody {
-            experiment: ExperimentResponseBody::from(change.experiment),
+            experiment: experiment_body(&org_id, change.experiment).await,
             previous_baseline_id: change.previous_baseline_id,
         }),
         Err(error) => experiment_error_response(error),
@@ -1273,7 +1400,7 @@ pub async fn clear_experiment_baseline(
         return response;
     }
     match baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1337,18 +1464,27 @@ pub async fn delete_experiment(
     ),
     responses(
         (status = 200, description = "Failed Experiment returned to running", body = ExperimentResponseBody),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible"),
         (status = 404, description = "Experiment not found"),
         (status = 409, description = "Invalid or concurrent lifecycle transition"),
     )
 )]
-pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
+pub async fn retry_experiment(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        require_stored_reference_access(&org_id, &experiment_id, &user.user_id).await
+    {
+        return response;
+    }
     match openobserve_core::llm_evaluations::experiments::runner::retry_failed_experiment(
         &org_id,
         &experiment_id,
     )
     .await
     {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1371,7 +1507,7 @@ pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, Strin
     responses(
         (status = 202, description = "Selected slot retry queued"),
         (status = 400, description = "Invalid idempotency key"),
-        (status = 403, description = "Experiment is not accessible"),
+        (status = 403, description = "Experiment or one of its references is not accessible"),
         (status = 404, description = "Experiment, row, or trial not found"),
         (status = 409, description = "Experiment lifecycle, active slot retry, or idempotency conflict"),
     )
@@ -1385,6 +1521,11 @@ pub async fn retry_experiment_slot(
 
     if let Err(response) =
         require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+    {
+        return response;
+    }
+    if let Err(response) =
+        require_stored_reference_access(&org_id, &experiment_id, &user.user_id).await
     {
         return response;
     }
@@ -1435,6 +1576,7 @@ pub async fn retry_experiment_slot(
     responses(
         (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
         (status = 400, description = "Invalid Experiment definition after overrides", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Experiment, Dataset or scorer not found"),
         (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
@@ -1445,27 +1587,34 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
-    // The clone reaches whichever Remote Task it ends up pinning — the source's
-    // when the request overrides nothing, the override's when it does.
-    // Checking only at create would leave clone as the way around that check.
+    // Overrides fall back to the source's pins, so check what the clone will actually reference.
     let source = match experiments::get(&org_id, &experiment_id).await {
         Ok(source) => source,
         Err(error) => return experiment_error_response(error),
     };
-    let effective_task_ref = match body.task.as_ref() {
-        Some(task) => remote_task_ref(task),
-        None => source.task.remote_task().map(|(task_ref, _)| task_ref),
+    let overrides: experiments::CloneExperimentOverrides = body.into();
+    let scorers = match &overrides.scorers {
+        Some(refs) => ScorerSelection::Requested(refs),
+        None => ScorerSelection::Pinned(&source),
     };
-    if let Some(task_ref) = effective_task_ref
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        overrides
+            .dataset_id
+            .as_deref()
+            .unwrap_or(&source.dataset_id),
+        scorers,
+        overrides.task.as_ref().unwrap_or(&source.task),
+    )
+    .await
     {
         return response;
     }
-    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.into()).await {
+    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, overrides).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
-            MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
+            MetaHttpResponse::json(experiment_body(&org_id, experiment).await)
         }
         Err(error) => experiment_error_response(error),
     }
@@ -1494,6 +1643,10 @@ pub async fn clone_experiment(
         (status = 400, description = "Invalid page size", body = ()),
         (status = 404, description = "Experiment not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_experiment_slots(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -1547,6 +1700,10 @@ pub async fn list_experiment_slots(
         (status = 404, description = "Experiment not found", body = ()),
         (status = 409, description = "The Experiment is sealed and a submitted part is new or changed", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn submit_experiment_records(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -1584,6 +1741,10 @@ pub async fn submit_experiment_records(
         (status = 404, description = "Experiment not found", body = ()),
         (status = 409, description = "Slots are still missing a terminal execution record", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn finalize_experiment(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -1595,7 +1756,7 @@ pub async fn finalize_experiment(
         return response;
     }
     match ingest::finalize(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => ingest_error_response(error),
     }
 }
@@ -1639,6 +1800,7 @@ mod tests {
             output: None,
             score_summaries: Vec::new(),
             p50_latency_ms: None,
+            error_message: None,
             dispersion: Some(crate::models::experiments::ExperimentRowDispersionBody {
                 row_id,
                 logical_id: format!("case-{row_index}"),
@@ -1768,63 +1930,194 @@ mod tests {
         ));
     }
 
-    /// The guard that decides whether the Remote Task check runs at all. If this
-    /// ever returned `None` for a Remote Task, `create_experiment` would go back
-    /// to reaching any Task in the org without a permission check, and no other
-    /// test would notice.
+    /// Dropping an object from this list would let an Experiment pin it unchecked.
     #[test]
-    fn only_a_remote_task_carries_a_reference_that_needs_checking() {
+    fn every_dataset_scorer_prompt_and_provider_an_experiment_reads_is_checked() {
+        let prompt_ref = ExperimentTaskConfig::PromptRef {
+            id: "prompt-1".to_string(),
+            version: 2,
+            provider_id: "provider-1".to_string(),
+            params_overrides: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::Remote {
-                task_ref: "grader@3".to_string(),
-                overrides: None,
-            }),
-            Some("grader@3")
+            referenced_objects("dataset-1", &["scorer-1", "scorer-2"], &prompt_ref),
+            vec![
+                ("datasets", "dataset-1"),
+                ("scorers", "scorer-1"),
+                ("scorers", "scorer-2"),
+                ("prompts", "prompt-1"),
+                ("providers", "provider-1"),
+            ]
         );
+        let inline = ExperimentTaskConfig::InlinePrompt {
+            messages: vec![],
+            provider_id: "provider-1".to_string(),
+            model: None,
+            params: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::Sdk {
-                task_fingerprint: "abc".to_string(),
-                config: serde_json::json!({}),
-            }),
-            None
+            referenced_objects("dataset-1", &[], &inline),
+            vec![("datasets", "dataset-1"), ("providers", "provider-1")]
         );
+        let remote = ExperimentTaskConfig::Remote {
+            task_ref: "grader@3".to_string(),
+            overrides: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::InlinePrompt {
-                messages: vec![],
-                provider_id: "provider-1".to_string(),
-                model: None,
-                params: None,
-            }),
-            None
+            referenced_objects("dataset-1", &[], &remote),
+            vec![("datasets", "dataset-1")]
+        );
+        let sdk = ExperimentTaskConfig::Sdk {
+            task_fingerprint: "sha256:abc".to_string(),
+            config: serde_json::json!({}),
+        };
+        assert_eq!(
+            referenced_objects("dataset-1", &[], &sdk),
+            vec![("datasets", "dataset-1")]
         );
     }
 
-    /// The Remote Task check keys on the head `entity_id`, so it has to accept
-    /// the same grant shapes the Remote Task list already accepts.
-    #[test]
-    fn remote_task_visibility_accepts_exact_or_org_wildcard_and_rejects_other_tasks() {
-        let exact = vec!["remote_task:task-1".to_string()];
-        let wildcard = vec!["remote_task:_all_acme".to_string()];
-        let other = vec!["remote_task:task-2".to_string()];
+    fn judge_scorer(provider_id: &str) -> Scorer {
+        let body: crate::models::scorers::ScorerRequestBody =
+            serde_json::from_value(serde_json::json!({
+                "name": "judge",
+                "scorer": {"type": "llm_judge", "template": "t", "params": {"provider_id": provider_id}}
+            }))
+            .unwrap();
+        body.into()
+    }
 
-        assert!(is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&exact)
-        ));
-        assert!(is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&wildcard)
-        ));
-        assert!(!is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&other)
-        ));
+    fn unknown_user() -> String {
+        format!("{}@example.com", config::ider::uuid())
+    }
+
+    fn inline_task() -> ExperimentTaskConfig {
+        ExperimentTaskConfig::InlinePrompt {
+            messages: vec![],
+            provider_id: "provider-1".to_string(),
+            model: None,
+            params: None,
+        }
+    }
+
+    struct DeniesResource(&'static str);
+
+    impl openobserve_core::auth::ReadCheck for DeniesResource {
+        async fn can_read(&self, resource: &str, _: &str) -> bool {
+            resource != self.0
+        }
+    }
+
+    #[tokio::test]
+    async fn an_llm_judge_scorer_s_own_provider_must_be_readable() {
+        let definitions = vec![judge_scorer("judge-provider")];
+        let denied = authorize_references(
+            &[("datasets", "dataset-1"), ("scorers", "scorer-1")],
+            &DeniesResource("providers"),
+            async { Ok(definitions.clone()) },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+
+        assert!(
+            authorize_references(
+                &[("datasets", "dataset-1")],
+                &DeniesResource("none"),
+                async { Ok(definitions.clone()) },
+            )
+            .await
+            .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scorer_the_caller_cannot_read_is_never_loaded() {
+        let loaded = std::cell::Cell::new(false);
+        let denied = authorize_references(
+            &[("scorers", "scorer-1")],
+            &DeniesResource("scorers"),
+            async {
+                loaded.set(true);
+                Ok(vec![judge_scorer("judge-provider")])
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+        assert!(!loaded.get());
+    }
+
+    #[tokio::test]
+    async fn naming_more_scorers_than_the_maximum_is_refused_before_any_check() {
+        let refs: Vec<ExperimentScorerRef> = (0..=MAX_SCORERS_PER_REQUEST)
+            .map(|i| ExperimentScorerRef {
+                id: format!("scorer-{i}"),
+                version: None,
+            })
+            .collect();
+        let task = inline_task();
+        let user = unknown_user();
+        let too_many = require_reference_access(
+            "org1",
+            &user,
+            "dataset-1",
+            ScorerSelection::Requested(&refs),
+            &task,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(too_many.status().as_u16(), 400);
+
+        let at_limit = require_reference_access(
+            "org1",
+            &user,
+            "dataset-1",
+            ScorerSelection::Requested(&refs[..MAX_SCORERS_PER_REQUEST]),
+            &task,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(at_limit.status().as_u16(), 403);
+    }
+
+    #[tokio::test]
+    async fn a_retry_rechecks_the_stored_experiment_s_references() {
+        let experiment = Experiment {
+            id: "experiment-1".to_string(),
+            org_id: "org1".to_string(),
+            name: "e".to_string(),
+            description: None,
+            dataset_id: "dataset-1".to_string(),
+            dataset_version: 1,
+            dataset_filter: None,
+            task: inline_task(),
+            scorers: vec![PinnedExperimentScorer {
+                id: "scorer-1".to_string(),
+                version: 1,
+            }],
+            trial_count: 1,
+            metadata: None,
+            status: experiments::ExperimentStatus::Failed,
+            status_reason: None,
+            deadline_at: 0,
+            completed_at: None,
+            lifecycle_version: 0,
+            retry_count: 0,
+            scores_settled_at: None,
+            idempotency_key: None,
+            is_baseline: false,
+            prompt_id: None,
+            prompt_name: None,
+            prompt_version: None,
+            prompt_content_hash: None,
+            created_by: "owner@example.com".to_string(),
+            created_at: 0,
+        };
+        let denied = require_pinned_reference_access("org1", &unknown_user(), &experiment)
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
     }
 
     #[test]
@@ -1895,5 +2188,24 @@ mod tests {
                 .to_string()
                 .contains('7')
         );
+    }
+
+    #[tokio::test]
+    async fn summary_follows_the_request_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(summary_wanted(Some(true), "acme"));
+        assert!(!summary_wanted(None, "acme"));
+        assert!(!summary_wanted(Some(false), "acme"));
+    }
+
+    #[tokio::test]
+    async fn summary_is_skipped_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(!summary_wanted(Some(true), "acme"));
+        assert!(summary_wanted(Some(true), config::META_ORG_ID));
     }
 }

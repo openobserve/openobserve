@@ -58,7 +58,7 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
 /**
  * Computes the top-level `start` (microseconds) + tz_offset from the schedule.
  * NOTE: for "Schedule Now" this also writes the browser timezone back onto
- * `check.schedule.timezone` (pre-existing behavior the browser flow relies on).
+ * `check.schedule.timezone`, except over a cron schedule's own chosen zone.
  */
 function computeStart(check: BrowserCheck): { start: number; tz_offset: number } {
   const { schedule, tz_offset } = check;
@@ -83,7 +83,7 @@ function computeStart(check: BrowserCheck): { start: number; tz_offset: number }
   const min = String(now.getMinutes()).padStart(2, "0");
   const browserTz = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const converted = convertDateToTimestamp(`${dd}-${mm}-${yyyy}`, `${hh}:${min}`, browserTz);
-  check.schedule.timezone = browserTz;
+  if (schedule.type !== "cron" || !schedule.timezone) check.schedule.timezone = browserTz;
   return { start: converted.timestamp, tz_offset: converted.offset ?? tz_offset ?? 0 };
 }
 
@@ -130,6 +130,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     cooldown_mins: cooldownMins ?? 0,
 
     destinations: notifications.destinations,
+    template: check.template ?? null,
 
     variables: (variables ?? []).map(({ id: _id, name, value, secure, example }) => ({
       name,
@@ -258,6 +259,7 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
     cooldown_mins: check.cooldownMins ?? 0,
 
     destinations: check.notifications.destinations,
+    template: check.template ?? null,
 
     variables: (check.variables ?? []).map(({ name, value, secure, example }) => ({
       name,
@@ -378,6 +380,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     wait_before_retry_secs,
     alert_if_fails,
     cooldown_mins,
+    template,
     target,
     folder_id,
     variables,
@@ -408,6 +411,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     notifications: {
       destinations: destinations ?? [],
     },
+    template: (template as string | null | undefined) ?? null,
 
     retries: retries ?? 0,
     waitBeforeRetrySecs: wait_before_retry_secs ?? 5,

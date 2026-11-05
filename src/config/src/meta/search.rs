@@ -52,7 +52,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     pub query: Query,
@@ -70,6 +70,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    /// Set to false to skip the inverted index for this query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -78,8 +82,31 @@ pub struct Request {
     pub agent_options: Option<AgentOptions>,
 }
 
+impl Default for Request {
+    fn default() -> Self {
+        Self {
+            query: Query::default(),
+            encoding: RequestEncoding::default(),
+            regions: Vec::new(),
+            clusters: Vec::new(),
+            timeout: 0,
+            search_type: None,
+            search_event_context: None,
+            use_cache: false,
+            use_index: default_use_index(),
+            clear_cache: false,
+            local_mode: None,
+            agent_options: None,
+        }
+    }
+}
+
 pub fn default_use_cache() -> bool {
     get_config().common.result_cache_enabled
+}
+
+pub fn default_use_index() -> bool {
+    true
 }
 
 /// Agent-oriented response options. When absent the response is unchanged, so
@@ -151,24 +178,32 @@ impl std::fmt::Display for RequestEncoding {
     }
 }
 
+// `Default` turns every option off; callers still set `sql`, the time range and `size`.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchQuery)]
 pub struct Query {
     pub sql: String,
+    // Unix microseconds; `Default` leaves both ends at 0, so always set the range.
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
     pub from: i64,
+    // `QUERY_WITH_NO_LIMIT`: no cap; other `<= 0`: `query_default_limit`; `Default`: 10.
     #[serde(default = "default_size")]
     pub size: i64,
+    /// For `SELECT *` on streams wider than `quick_mode_num_fields`, reads only some columns.
     #[serde(default)]
     pub quick_mode: bool,
+    /// Turns the query into a `count(*)` of matching rows; also skips the cache and streaming.
     #[serde(default)]
     pub track_total_hits: bool,
+    /// Set when the SQL calls a saved VRL function, which makes the result hits get flattened.
     #[serde(default)]
     pub uses_zo_fn: bool,
+    /// Base64-encoded VRL program applied to the result hits.
     #[serde(default)]
     pub query_fn: Option<String>,
+    /// Not read by the search path; skipping the WAL is controlled by `feature_query_skip_wal`.
     #[serde(default)]
     pub skip_wal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -178,17 +213,21 @@ pub struct Query {
     /// Takes precedence over sampling_config if both are provided
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sampling_ratio: Option<f64>,
-    // streaming output
+    /// Set with `streaming_id` by the streaming search endpoints; other callers leave both unset.
     #[serde(default)]
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    /// Seconds; 0 uses the SQL `histogram()` interval, falling back to one from the time range.
     #[serde(default)]
     pub histogram_interval: i64,
     /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
     /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
+    #[serde(default)]
+    pub analyze_profile: bool,
 }
 
 fn default_size() -> i64 {
@@ -214,6 +253,7 @@ impl Default for Query {
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         }
     }
 }
@@ -745,21 +785,10 @@ impl SearchHistoryRequest {
         let search_req = Request {
             query: Query {
                 sql,
-                from: 0,
                 size: self.size,
                 start_time: self.start_time,
                 end_time: self.end_time,
-                quick_mode: false,
-                track_total_hits: false,
-                uses_zo_fn: false,
-                query_fn: None,
-                skip_wal: false,
-                sampling_config: None,
-                sampling_ratio: None,
-                streaming_output: false,
-                streaming_id: None,
-                histogram_interval: 0,
-                timezone: None,
+                ..Default::default()
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -768,6 +797,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: default_use_cache(),
+            use_index: default_use_index(),
             clear_cache: false,
             local_mode: None,
             agent_options: None,
@@ -1323,6 +1353,10 @@ pub struct MultiStreamRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    /// Set to false to skip the inverted index for every query.
+    #[serde(default = "default_use_index")]
+    #[schema(default = true)]
+    pub use_index: bool,
     #[serde(default)]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
@@ -1403,12 +1437,7 @@ impl MultiStreamRequest {
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
                     skip_wal: self.skip_wal,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -1417,6 +1446,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
+                use_index: self.use_index,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -2865,6 +2895,7 @@ mod tests {
             uses_zo_fn: true,
             query_fn: Some("global_fn".to_string()),
             skip_wal: true,
+            use_index: false,
             regions: vec!["region1".to_string()],
             clusters: vec!["cluster1".to_string()],
             search_type: Some(SearchEventType::UI),
@@ -2875,6 +2906,7 @@ mod tests {
 
         let query_reqs = request.to_query_req();
         assert_eq!(query_reqs.len(), 2);
+        assert!(query_reqs.iter().all(|req| !req.use_index));
 
         // Check first query
         let first_req = &query_reqs[0];
@@ -3807,6 +3839,23 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("sampling_ratio"));
         assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
+    }
+
+    #[test]
+    fn test_request_use_index_defaults_true() {
+        let body = r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1}}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
+        assert!(Request::default().use_index);
+
+        let body =
+            r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1},"use_index":false}"#;
+        let req: Request = serde_json::from_str(body).unwrap();
+        assert!(!req.use_index);
+
+        let body = r#"{"sql":["SELECT * FROM t"],"start_time":0,"end_time":1}"#;
+        let req: MultiStreamRequest = serde_json::from_str(body).unwrap();
+        assert!(req.use_index);
     }
 
     #[test]

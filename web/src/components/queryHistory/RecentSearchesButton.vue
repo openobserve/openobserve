@@ -15,98 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover
+  <OButton
     v-if="enabled"
-    v-model:open="open"
-    side="bottom"
-    align="end"
+    variant="outline"
+    size="icon-toolbar"
+    icon-left="manage-search"
     :aria-label="t('recentSearches.title')"
-    @open-auto-focus="focusList"
-    @pointer-down-outside="keepForDetails"
-    @focus-outside="keepForDetails"
+    :data-test="dataTest"
+    @click="emit('view-all', null)"
   >
-    <template #trigger>
-      <OButton
-        variant="outline"
-        size="icon-toolbar"
-        icon-left="history"
-        v-bind="$attrs"
-        :aria-label="t('recentSearches.title')"
-        :data-test="dataTest"
-        @keydown="onTriggerKeydown"
-      >
-        <OTooltip :content="t('recentSearches.title')" />
-      </OButton>
-    </template>
-    <RecentSearchesPopover
-      ref="popoverRef"
-      :source="source"
-      :active="open"
-      :examples="examples"
-      @run="(entry, when) => close(() => emit('run', entry, when))"
-      @load="(entry, when) => close(() => emit('load', entry, when))"
-      @view-all="(status) => close(() => emit('view-all', status))"
-      @example="(query) => close(() => emit('example', query))"
-      @close="open = false"
-    />
-  </OPopover>
+    <OTooltip :content="t('recentSearches.title')" />
+  </OButton>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
-import type { HistorySource, HistoryStatus, QueryHistoryEntry } from "@/services/query_history";
-import type { RestoreTime } from "@/utils/queryHistory/recentSearches";
-import RecentSearchesPopover from "./RecentSearchesPopover.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import type { HistoryStatus } from "@/services/query_history";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-// OPopover renders no element of its own, so a caller's class and attributes go on the trigger.
-defineOptions({ inheritAttrs: false });
-
-withDefaults(
-  defineProps<{
-    source: HistorySource;
-    examples?: string[];
-    dataTest?: string;
-  }>(),
-  { examples: () => [], dataTest: "recent-searches-btn" },
-);
+withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "recent-searches-btn" });
 
 const emit = defineEmits<{
-  run: [entry: QueryHistoryEntry, when: RestoreTime];
-  load: [entry: QueryHistoryEntry, when: RestoreTime];
   "view-all": [status: HistoryStatus | null];
-  example: [query: string];
 }>();
 
 const { t } = useI18nTyped();
 const { enabled } = useRecentSearches();
-const open = ref(false);
-const popoverRef = ref<InstanceType<typeof RecentSearchesPopover> | null>(null);
-
-// Focus can stay on the clock button after opening, and the list's keys must still reach the rows.
-const onTriggerKeydown = (event: KeyboardEvent) => {
-  if (open.value && popoverRef.value?.handleOutsideKey(event)) event.preventDefault();
-};
-
-// The details pane is teleported outside the popover's content, so reka counts a click in it as outside.
-const keepForDetails = (event: Event) => {
-  const original = (event as CustomEvent<{ originalEvent?: Event }>).detail?.originalEvent;
-  const target = (original?.target ?? event.target) as Node | null;
-  if (popoverRef.value?.ownsNode(target)) event.preventDefault();
-};
-
-// OPopover would focus the info button, where Enter opens nothing and the hovered row never runs.
-const focusList = (event: Event) => {
-  event.preventDefault();
-  popoverRef.value?.focusRoot();
-};
-
-const close = (then: () => void) => {
-  open.value = false;
-  then();
-};
 </script>

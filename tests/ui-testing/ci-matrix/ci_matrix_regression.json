@@ -11,7 +11,11 @@
       "logs-stream-type-scope.spec.js",
       "logs-14376-int64-precision.spec.js",
       "logs-stream-selector.spec.js",
-      "logs-table-stream-switch.spec.js"
+      "logs-table-stream-switch.spec.js",
+      "logs-internal-streams.spec.js",
+      "logs-11966-value-multiselect-quotes.spec.js",
+      "logs-explain-sql-mode.spec.js",
+      "logs-3322-field-filter-similar-names.spec.js"
     ],
     "disabled": []
   },
@@ -58,9 +62,11 @@
     "browser": "chrome",
     "run_files": [
       "dashboard-regression.spec.js",
+      "dashboard-2188-gauge-edit-layout.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
-      "dashboard-14479-variable-name-prefix.spec.js"
+      "dashboard-14479-variable-name-prefix.spec.js",
+      "dashboard-3127-shortcut-behind-drawer.spec.js"
     ],
     "disabled": []
   },
@@ -92,6 +98,7 @@
     "browser": "chrome",
     "run_files": [
       "traces-regression.spec.js",
+      "traces-12603-refresh-and-placeholder.spec.js",
       "traces-bugs.spec.js",
       "traces-filter-reset.spec.js",
       "traces-share-url.spec.js",
@@ -105,7 +112,11 @@
       "traces-15189-saved-views-more-menu.spec.js",
       "traces-15222-string-replay-flag.spec.js",
       "traces-15248-llm-session-reply.spec.js",
-      "traces-15269-services-catalog-state.spec.js"
+      "traces-15269-services-catalog-state.spec.js",
+      "traces-15477-open-trace-new-tab.spec.js",
+      "traces-ent3126-dag-controls-dark.spec.js",
+      "traces-1578-apply-search-same-field.spec.js",
+      "traces-3126-catalog-health-badge.spec.js"
     ],
     "disabled": []
   },
@@ -212,7 +223,12 @@
       "rum-15190-paths-build-funnel.spec.js",
       "rum-15230-paths-drawer-user.spec.js",
       "rum-15304-overview-synthetic-counts.spec.js",
-      "rum-15269-list-view-state.spec.js"
+      "rum-15269-list-view-state.spec.js",
+      "rum-3268-session-link-no-nan.spec.js",
+      "rum-3268-heatmap-no-view-id.spec.js",
+      "rum-3268-trace-duration-skew.spec.js",
+      "rum-3268-no-widen-at-30d.spec.js",
+      "rum-3268-analytics-header-1200.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
@@ -225,7 +241,8 @@
     "browser": "chrome",
     "run_files": [
       "synthetics-15269-list-state.spec.js",
-      "synthetics-15060-full-text-on-hover.spec.js"
+      "synthetics-15060-full-text-on-hover.spec.js",
+      "synthetics-ent2691-destination-delete-guard.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",

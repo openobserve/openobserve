@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   different?") and answered it nowhere, so the difference read as arbitrary.
 
   Now ONE signal carries the meaning: a warning-toned chip, shaped like the
-  query-language chip beside it, reading "Not ingested: <stream>". It gets a row
-  of its own so the stream name survives at card width. The dashed border and
+  query-language chip, reading "Not ingested" at the end of the stream line it
+  refers to, so the stream it names is the one printed beside it. The dashed border and
   the opacity dim are both gone — the border only ever meant anything by
   comparison with a solid one, which is precisely what made it unreadable, and
   the dim faded the description people need in order to judge the alert. Neither
@@ -43,20 +43,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Not a button any more: a control nested in role="button" is invalid for keyboard and AT. -->
   <article
-    class="rounded-default bg-surface-base flex h-full cursor-pointer flex-col gap-2 border p-3"
-    :class="
+    class="rounded-default bg-surface-base flex h-full flex-col gap-2 border p-3"
+    :class="[
+      licenseLockedReason ? 'cursor-not-allowed' : 'cursor-pointer',
       selected
         ? 'border-accent ring-accent/40 ring-2'
-        : 'border-border-default hover:border-border-strong'
-    "
+        : licenseLockedReason
+          ? 'border-border-default'
+          : 'border-border-default hover:border-border-strong',
+    ]"
+    :aria-disabled="licenseLockedReason ? 'true' : undefined"
     :data-test="`alert-library-card-${entry.id}`"
     :data-selected="selected ? 'true' : 'false'"
-    @click="emit('open')"
+    @click="!licenseLockedReason && emit('open')"
   >
     <div class="flex items-start gap-2">
       <OCheckbox
         size="sm"
         :model-value="selected"
+        :disabled="!!licenseLockedReason"
         :aria-label="t('alert_library.selectAlert', { title: entry.title })"
         class="mt-0.5 shrink-0"
         :data-test="`alert-library-select-${entry.id}`"
@@ -64,8 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <h3 class="min-w-0 flex-1 text-sm leading-snug font-medium">
         <button
+          :id="titleId"
           type="button"
-          class="text-text-heading focus-visible:ring-accent/40 rounded-default cursor-pointer text-left outline-none focus-visible:ring-2"
+          :disabled="!!licenseLockedReason"
+          class="text-text-heading focus-visible:ring-accent/40 rounded-default text-left outline-none focus-visible:ring-2 enabled:cursor-pointer disabled:cursor-not-allowed"
           :data-test="`alert-library-card-title-${entry.id}`"
           @click.stop="emit('open')"
         >
@@ -85,56 +92,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ entry.description }}
     </OTruncatedText>
 
-    <div class="mt-auto flex flex-col gap-1 pt-1">
-      <div class="flex items-center gap-1.5">
-        <!-- Neutral because most alerts are PromQL: colouring the query language
-             would colour the norm. -->
-        <OTag
-          variant="default-soft"
-          :label="queryTypeLabelText"
-          data-test="alert-library-card-query-type"
-        />
-        <OTag
-          v-if="isAnomaly"
-          type="alertType"
-          value="anomaly_detection"
-          :label="t('alert_library.alertTypeAnomaly')"
-          data-test="alert-library-card-anomaly"
-        />
-        <OTag
-          v-if="locked"
-          variant="default-soft"
-          icon="lock"
-          :label="t('alert_library.enterprise')"
-          :title="t('alert_library.enterpriseHint')"
-          data-test="alert-library-card-enterprise"
-        />
-
-        <!-- Available: the stream is quiet provenance, tucked opposite the tag. -->
-        <OTruncatedText
-          v-if="ready"
-          class="text-text-secondary text-2xs flex-1 text-right font-mono"
-          >{{ entry.stream }}</OTruncatedText
-        >
-      </div>
-
-      <!-- Unavailable: the same chip shape as the query language, on a row of
-           its own — stream names run past 40 characters, and squeezed beside
-           the other chip this one would truncate to nothing, naming the very
-           thing it exists to name.
-
-           The CHIP is neutral and only its icon carries the warning colour.
-           A filled amber chip was right in principle and wrong in practice:
-           959 of 1242 alerts are not ingested on a typical org, so twelve amber
-           blocks landed on every screen and the colour became the page's
-           background rather than a signal — loudest in dark mode, where the
-           warning hue sits at full chroma against near-black. One small amber
-           mark per card says the same thing and lets the text stay readable. -->
+    <div
+      v-if="entry.stream || !ready"
+      class="flex min-w-0 items-center gap-1.5"
+      data-test="alert-library-card-stream"
+    >
+      <template v-if="entry.stream">
+        <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
+        <OTruncatedText class="text-text-secondary text-2xs min-w-0 flex-1 font-mono">{{
+          entry.stream
+        }}</OTruncatedText>
+      </template>
+      <!-- The CHIP is neutral and only its icon carries the warning colour: most alerts are not ingested on a typical org. -->
       <OTag
         v-if="!ready"
         variant="warning-quiet"
-        class="max-w-full min-w-0 self-start"
-        :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
+        class="shrink-0"
+        :title="
+          entry.stream ? t('alert_library.notIngestedHint', { stream: entry.stream }) : undefined
+        "
         data-test="alert-library-card-needs-data"
       >
         <template #icon>
@@ -145,8 +121,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-library-card-needs-data-mark"
           />
         </template>
-        <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
+        {{ t("alert_library.statNeedsData") }}
       </OTag>
+    </div>
+
+    <div class="mt-auto flex items-center gap-1.5 pt-1">
+      <!-- Neutral because most alerts are PromQL: colouring the query language would colour the norm. -->
+      <OTag
+        variant="default-soft"
+        :label="queryTypeLabelText"
+        data-test="alert-library-card-query-type"
+      />
+      <OTag
+        v-if="isAnomaly"
+        type="alertType"
+        value="anomaly_detection"
+        :label="t('alert_library.alertTypeAnomaly')"
+        data-test="alert-library-card-anomaly"
+      />
+      <OTooltip v-if="licenseLockedReason" :content="licenseLockedReason">
+        <span class="inline-flex" data-test="alert-library-card-license-locked">
+          <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+        </span>
+      </OTooltip>
+      <OTag
+        v-else-if="locked"
+        variant="default-soft"
+        icon="lock"
+        :label="t('alert_library.enterprise')"
+        :title="t('alert_library.enterpriseHint')"
+        data-test="alert-library-card-enterprise"
+      />
+
+      <!-- Locked cards open the upsell instead, so they offer nothing to act on here. -->
+      <div v-if="!locked && !licenseLockedReason" class="ms-auto flex shrink-0 items-center gap-2">
+        <!-- The editor prefill speaks the scheduled alert shape only. -->
+        <OButton
+          v-if="!isAnomaly"
+          variant="outline"
+          size="icon-sm"
+          icon-left="edit"
+          :aria-label="t('alert_library.drawer.customize')"
+          :aria-describedby="titleId"
+          :data-test="`alert-library-card-customize-${entry.id}`"
+          @click.stop="emit('customize')"
+        >
+          <OTooltip :content="t('alert_library.card.customizeTooltip')" />
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="add"
+          :title="t('alert_library.drawer.install')"
+          :aria-describedby="titleId"
+          :data-test="`alert-library-card-add-${entry.id}`"
+          @click.stop="emit('install')"
+        >
+          {{ t("common.add") }}
+        </OButton>
+      </div>
     </div>
   </article>
 </template>
@@ -155,11 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
@@ -171,11 +206,15 @@ const props = defineProps<{
   selected?: boolean;
   /** An anomaly alert this build is not entitled to; the gallery turns its clicks into the upsell. */
   locked?: boolean;
+  /** Set when the license, not the edition, locks this alert; the card shows a lock with this reason. */
+  licenseLockedReason?: I18nText;
 }>();
 
 const emit = defineEmits<{
   (e: "open"): void;
   (e: "update:selected", value: boolean): void;
+  (e: "install"): void;
+  (e: "customize"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -185,4 +224,6 @@ const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
 const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
 const isAnomaly = computed(() => alertTypeOf(props.entry) === "anomaly");
+// Every card repeats the same two button labels, so each is described by its own card's title.
+const titleId = computed(() => `alert-library-card-title-id-${props.entry.id}`);
 </script>

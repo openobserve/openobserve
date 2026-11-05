@@ -13,7 +13,7 @@ import { raw, type I18nText } from "@/types/i18n";
 //   <OTimeCell :value="row.timestamp" unit="ms" :timezone="store.state.timezone" />
 
 import { computed } from "vue";
-import { formatDistanceStrict } from "date-fns";
+import { getIntlLocale } from "@/locales";
 import { formatInTimeZone } from "date-fns-tz";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -43,9 +43,21 @@ const props = withDefaults(
     relativeCutoffDays?: number;
     /** Current epoch ms for the relative text; pass a ticking clock (useNow) to keep "x ago" current. */
     now?: number;
+    /** date-fns pattern for a shorter "absolute" display; the full datetime then shows on hover. */
+    format?: string;
   }>(),
   { unit: "auto", mode: "relative", emptyLabel: raw("—"), relativeCutoffDays: 30 },
 );
+
+// Largest unit first, so a span reads in the largest unit it reaches.
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["year", 365 * 86_400_000],
+  ["month", 30 * 86_400_000],
+  ["day", 86_400_000],
+  ["hour", 3_600_000],
+  ["minute", 60_000],
+  ["second", 1000],
+];
 
 /** Normalise any supported input to epoch milliseconds, or null if invalid. */
 const epochMs = computed<number | null>(() => {
@@ -118,7 +130,9 @@ const relative = computed(() => {
   const now = props.now ?? Date.now();
   const ageMs = Math.abs(now - epochMs.value);
   if (ageMs <= props.relativeCutoffDays * 86_400_000) {
-    return formatDistanceStrict(new Date(epochMs.value), now, { addSuffix: true });
+    const diff = epochMs.value - now;
+    const [unit, size] = RELATIVE_UNITS.find(([, ms]) => ageMs >= ms) ?? RELATIVE_UNITS[5];
+    return new Intl.RelativeTimeFormat(getIntlLocale()).format(Math.round(diff / size), unit);
   }
   return prettyDate.value;
 });
@@ -141,21 +155,34 @@ const dateOnly = computed(() => {
   }
 });
 
+const formatted = computed(() => {
+  if (epochMs.value === null || !props.format) return null;
+  try {
+    return formatInTimeZone(new Date(epochMs.value), zone.value, props.format);
+  } catch {
+    return absolute.value;
+  }
+});
+
 const display = computed(() => {
-  if (props.mode === "absolute") return absolute.value;
+  if (props.mode === "absolute") return props.format ? formatted.value : absolute.value;
   if (props.mode === "date") return dateOnly.value;
   return relative.value;
 });
 
 /**
- * Whether to OFFER the hover tooltip — RELATIVE mode only, revealing the full
- * absolute datetime (absolute/date cells already show it, so they get none).
+ * Whether to OFFER the hover tooltip — relative mode, or absolute mode shortened
+ * by `format`, revealing the full absolute datetime (the others already show it).
  * This decision is deliberately cheap: it does NOT format the absolute string.
  * The string is built lazily in the #content slot below, which the (lazy)
  * OTooltip only renders on hover — so a cell that is merely scrolled past in a
  * long/virtualized table never runs the timezone formatter.
  */
-const showAbsoluteTooltip = computed(() => props.mode === "relative" && epochMs.value !== null);
+const showAbsoluteTooltip = computed(
+  () =>
+    epochMs.value !== null &&
+    (props.mode === "relative" || (props.mode === "absolute" && !!props.format)),
+);
 </script>
 
 <template>

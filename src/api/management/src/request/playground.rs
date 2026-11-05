@@ -26,7 +26,7 @@ use db::authz::set_ownership;
 use futures::StreamExt;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
-    auth::{UserEmail, is_ofga_object_visible},
+    auth::{ReadCheck, UserEmail, UserReads, first_unreadable, is_ofga_object_visible},
     llm_evaluations::{
         experiments::runner::render_prompt,
         playground::{self, PlaygroundError},
@@ -46,6 +46,7 @@ use crate::{
         PlaygroundScoreResponseBody, PlaygroundSnapshotResponseBody,
         SharePlaygroundSnapshotRequestBody,
     },
+    request::scorers::{MAX_SCORERS_PER_REQUEST, judge_provider_ids},
 };
 
 /// FGA object type for everything under `/playground`.
@@ -135,21 +136,15 @@ async fn require_provider_visibility(
     provider_id: &str,
     user_id: &str,
 ) -> Result<(), Response> {
-    match openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "provider",
-    )
-    .await
+    if (UserReads { org_id, user_id })
+        .can_read("providers", provider_id)
+        .await
     {
-        Ok(permitted) => {
-            if is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref()) {
-                Ok(())
-            } else {
-                Err(MetaHttpResponse::forbidden(
-                    "Not allowed to use this provider",
-                ))
-            }
-        }
-        Err(error) => Err(MetaHttpResponse::forbidden(error.to_string())),
+        Ok(())
+    } else {
+        Err(MetaHttpResponse::forbidden(
+            "Not allowed to use this provider",
+        ))
     }
 }
 
@@ -160,52 +155,38 @@ async fn require_scorer_visibility(
     scorer_ids: &[String],
     user_id: &str,
 ) -> Result<(), Response> {
-    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "scorer",
-    )
-    .await
-    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
-
-    if let Some(hidden_id) = scorer_ids.iter().find(|scorer_id| {
-        !is_ofga_object_visible(org_id, "scorer", scorer_id, permitted.as_deref())
-    }) {
-        return Err(MetaHttpResponse::not_found(format!(
-            "Scorer '{hidden_id}' not found"
+    if scorer_ids.len() > MAX_SCORERS_PER_REQUEST {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "At most {MAX_SCORERS_PER_REQUEST} scorers can be named in one request"
         )));
     }
-    Ok(())
+    let scorers: Vec<_> = scorer_ids
+        .iter()
+        .map(|id| ("scorers", id.as_str()))
+        .collect();
+    match first_unreadable(&scorers, &UserReads { org_id, user_id }).await {
+        Some((_, hidden_id)) => Err(MetaHttpResponse::not_found(format!(
+            "Scorer '{hidden_id}' not found"
+        ))),
+        None => Ok(()),
+    }
 }
 
-/// Confirm the caller may use every provider referenced by an LLM judge
-/// scorer. The permission lookup is shared across the whole batch.
+/// Confirm the caller may use every provider referenced by an LLM judge scorer.
 async fn require_scorer_provider_visibility(
     org_id: &str,
     scorers: &[infra::table::scorers::Scorer],
     user_id: &str,
 ) -> Result<(), Response> {
-    let provider_ids = scorers
-        .iter()
-        .filter(|scorer| scorer.scorer_type == infra::table::scorers::ScorerType::LlmJudge)
-        .filter_map(|scorer| scorer.params.get("provider_id").and_then(Value::as_str))
-        .collect::<std::collections::HashSet<_>>();
-    if provider_ids.is_empty() {
-        return Ok(());
-    }
-
-    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "provider",
-    )
-    .await
-    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
-
-    if provider_ids.iter().any(|provider_id| {
-        !is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref())
-    }) {
-        return Err(MetaHttpResponse::forbidden(
+    let providers: Vec<_> = judge_provider_ids(scorers)
+        .map(|id| ("providers", id))
+        .collect();
+    match first_unreadable(&providers, &UserReads { org_id, user_id }).await {
+        Some(_) => Err(MetaHttpResponse::forbidden(
             "Not allowed to use a provider configured by this scorer",
-        ));
+        )),
+        None => Ok(()),
     }
-    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -291,11 +272,11 @@ fn sse(payload: &Value) -> bytes::Bytes {
 
 /// Resolve a provider that belongs to this organization.
 async fn load_provider(org_id: &str, provider_id: &str) -> Result<PreparedProvider, Response> {
-    let provider = match infra::table::providers::get(provider_id).await {
-        Ok(Some(provider)) if provider.org_id == org_id => provider,
+    let provider = match infra::table::providers::get(org_id, provider_id).await {
+        Ok(Some(provider)) => provider,
         // A provider in another organization is reported as absent rather than
         // forbidden, so its existence cannot be probed.
-        Ok(_) => return Err(MetaHttpResponse::not_found("Provider not found")),
+        Ok(None) => return Err(MetaHttpResponse::not_found("Provider not found")),
         Err(error) => {
             log::error!("[Playground] failed to load provider {provider_id}: {error}");
             return Err(MetaHttpResponse::internal_error("Internal server error"));
@@ -613,6 +594,7 @@ pub async fn run_playground_cell(
     request_body(content = inline(PlaygroundScoreRequestBody)),
     responses(
         (status = 200, body = inline(PlaygroundScoreResponseBody)),
+        (status = 400, description = "Too many scorers named", body = ()),
         (status = 403, description = "A scorer provider is not visible to the caller", body = ()),
         (status = 404, description = "A referenced scorer does not exist", body = ()),
         (status = 500, description = "Scorer resolution failed", body = ()),
@@ -748,5 +730,49 @@ mod tests {
             Some("I should look up this order.")
         );
         assert_eq!(rendered[1].tool_call_id.as_deref(), Some("call_1"));
+    }
+
+    fn unknown_user() -> String {
+        format!("{}@example.com", config::ider::uuid())
+    }
+
+    #[tokio::test]
+    async fn providers_and_scorers_are_checked_per_object_whatever_list_filtering_says() {
+        let user = unknown_user();
+        let denied = require_provider_visibility("org1", "provider-1", &user)
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+
+        let hidden = require_scorer_visibility("org1", &["scorer-1".to_string()], &user)
+            .await
+            .unwrap_err();
+        assert_eq!(hidden.status().as_u16(), 404);
+
+        let body: crate::models::scorers::ScorerRequestBody = serde_json::from_value(json!({
+            "name": "judge",
+            "scorer": {"type": "llm_judge", "template": "t", "params": {"provider_id": "provider-1"}}
+        }))
+        .unwrap();
+        let denied = require_scorer_provider_visibility("org1", &[body.into()], &user)
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+    }
+
+    #[tokio::test]
+    async fn naming_more_scorers_than_the_maximum_is_refused_before_any_check() {
+        let ids: Vec<String> = (0..=MAX_SCORERS_PER_REQUEST)
+            .map(|i| format!("scorer-{i}"))
+            .collect();
+        let resp = require_scorer_visibility("org1", &ids, &unknown_user())
+            .await
+            .unwrap_err();
+        assert_eq!(resp.status().as_u16(), 400);
+        let resp =
+            require_scorer_visibility("org1", &ids[..MAX_SCORERS_PER_REQUEST], &unknown_user())
+                .await
+                .unwrap_err();
+        assert_eq!(resp.status().as_u16(), 404);
     }
 }

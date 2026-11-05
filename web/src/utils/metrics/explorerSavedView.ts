@@ -28,6 +28,7 @@ const VIEW_STATE_KEYS = [
   "labels",
   "show_empty",
   "sort",
+  "usage",
   "view",
   "mode",
   "period",

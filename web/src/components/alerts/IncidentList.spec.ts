@@ -24,6 +24,8 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       list: vi.fn(),
       updateStatus: vi.fn(),
+      acknowledge: vi.fn(),
+      unacknowledge: vi.fn(),
       triggerRca: vi.fn(),
     },
   });
@@ -42,6 +44,7 @@ vi.mock("@/utils/date", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // acknowledgeIncident awaits a confirm dialog that only resolves via user
 // interaction with a rendered provider — unmocked, the call hangs until timeout.
@@ -64,6 +67,7 @@ import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -188,6 +192,8 @@ describe("IncidentList.vue", () => {
     });
 
     (incidentsService.updateStatus as any).mockResolvedValue({});
+    (incidentsService.acknowledge as any).mockResolvedValue({});
+    (incidentsService.unacknowledge as any).mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -305,6 +311,18 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("does not report success when the refresh fails", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
+      await (wrapper.vm as any).refreshIncidents();
+      await flushPromises();
+      expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 
@@ -431,15 +449,62 @@ describe("IncidentList.vue", () => {
       await flushPromises();
     });
 
-    it("acknowledgeIncident calls updateStatus with acknowledged", async () => {
+    it("acknowledgeIncident goes through the one-ack route", async () => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
       const incident = (wrapper.vm as any).allIncidents[0];
       await (wrapper.vm as any).acknowledgeIncident(incident);
       await flushPromises();
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        incident.id,
-        "acknowledged",
-      );
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("default", incident.id);
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+      // The one ack also wrote the alert rows and the pages, so their reads drop too.
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: oncallKeys.responsesAll("default") });
+      invalidate.mockRestore();
+    });
+
+    it("toasts the incident and the teams its acknowledge stopped paging", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        data: {},
+        ack: {
+          changed: true,
+          acks: [],
+          oncall: {
+            acknowledged: ["p1"],
+            still_paging: [],
+            stopped: [{ response_id: "p1", team: "Payments" }],
+          },
+          other_groups_unacked: 0,
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "success",
+        message: `Acknowledged incident ${incident.title} · paging stopped for Payments`,
+      });
+    });
+
+    it("shows who can act when the acknowledge is refused", async () => {
+      (incidentsService.acknowledge as any).mockRejectedValue({
+        response: {
+          status: 403,
+          data: {
+            code: "ack_refused",
+            message: "m",
+            rule: "role",
+            on_call: [{ email: "bo@acme.io", team: "sre" }],
+            can_act: [],
+          },
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "error",
+        title: "You can't acknowledge this.",
+        message: "On call: bo@acme.io",
+      });
     });
 
     it("resolveIncident calls updateStatus with resolved", async () => {
@@ -874,7 +939,8 @@ describe("IncidentList.vue", () => {
       listMock.mockResolvedValue({
         data: { incidents: [createIncident({ id: "1", rca: liveRca() })], total: 1 },
       });
-      const pushSpy = vi.spyOn(router, "push");
+      // No call-through: a real navigation lazy-loads the app's route pages, which took over 5 s on a loaded runner.
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       wrapper = createWrapper();
       await flushPromises();
 
@@ -889,7 +955,7 @@ describe("IncidentList.vue", () => {
           query: expect.objectContaining({ tab: "incidentAnalysis" }),
         }),
       );
-      await router.push({ query: {} });
+      pushSpy.mockRestore();
     });
 
     it("RR-34: one live row on the current page refetches after 30 s", async () => {

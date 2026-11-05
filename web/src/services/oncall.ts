@@ -33,6 +33,7 @@ import type {
   PresetDescriptor,
   OnCallPosition,
   OnCallTeam,
+  OnCallTeamContext,
   OnCallTeamMember,
   L0Policy,
   PolicyFinalAction,
@@ -49,6 +50,7 @@ import type {
   DeliveryLedger,
   EscalateResult,
   EscalationProgress,
+  EscalationProgressEntry,
   MyDeliveries,
   MyDeliveriesRead,
   MyOnCall,
@@ -59,6 +61,8 @@ import type {
   TelephonyView,
   TelephonyStatus,
   OrgTelephonyView,
+  SetTeamChannelBody,
+  TeamSlackTestResult,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -203,6 +207,20 @@ const oncall = {
       at === undefined ? undefined : { params: { at } },
     ),
 
+  /// Policy, rotation and schedule for many teams in one read; `include_mine` adds the caller's teams.
+  teamContext: ({
+    org_identifier,
+    team_ids,
+    include_mine,
+  }: {
+    org_identifier: string;
+    team_ids: string[];
+    include_mine: boolean;
+  }) =>
+    http().get<{ teams: OnCallTeamContext[] }>(`/api/${org_identifier}/oncall/teams/context`, {
+      params: { team_ids: team_ids.join(","), include_mine },
+    }),
+
   getPolicy: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallPolicy>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
@@ -227,6 +245,8 @@ const oncall = {
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
       l0?: L0Policy;
+      /** Template override; null clears it. */
+      template?: string | null;
     };
   }) =>
     http()
@@ -379,11 +399,23 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { destinations: string[] | null };
+    data: SetTeamChannelBody;
   }) =>
     http().put<TeamChannel>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
       data,
+    ),
+
+  /// RO-6: one plain message to the team's Slack channel; the answer says what to fix.
+  testTeamSlackChannel: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+  }) =>
+    http().post<TeamSlackTestResult>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/slack/test`,
     ),
 
   /// Org-scoped, deliberately not per team. All three params optional; both
@@ -454,16 +486,31 @@ const oncall = {
     data: { oncall_team?: string; dimensions: Record<string, string> };
   }) => http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
-  /// Claims the page and stops the ladder.
+  /// Acknowledges the page's problem, which stops every page of it; `take_over` moves someone else's.
   acknowledgeResponse: ({
+    org_identifier,
+    response_id,
+    take_over,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    take_over?: boolean;
+  }) =>
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+      ...(take_over ? [{ take_over }] : []),
+    ),
+
+  /// Clears the acknowledgement of the page's problem; the pages it stopped restart at step 1.
+  unacknowledgeResponse: ({
     org_identifier,
     response_id,
   }: {
     org_identifier: string;
     response_id: string;
   }) =>
-    http().post<OnCallResponse>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unacknowledge`,
     ),
 
   /// Quiets the page for a while WITHOUT claiming it — the record stays open
@@ -480,6 +527,18 @@ const oncall = {
     http().post<OnCallResponse>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/snooze`,
       { minutes },
+    ),
+
+  /// Ends a snooze now; the ladder continues from the step it paused on.
+  unsnoozeResponse: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unsnooze`,
     ),
 
   addNote: ({
@@ -557,6 +616,19 @@ const oncall = {
   }) =>
     http().get<EscalationProgress>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalation`,
+    ),
+
+  /// Where the ladder has got to for many records in one read; an unreadable id is left out.
+  escalationProgressBatch: ({
+    org_identifier,
+    response_ids,
+  }: {
+    org_identifier: string;
+    response_ids: string[];
+  }) =>
+    http().get<{ progress: EscalationProgressEntry[] }>(
+      `/api/${org_identifier}/oncall/responses/escalation`,
+      { params: { response_ids: response_ids.join(",") } },
     ),
 
   /// What previous firings of this subject turned out to be, grouped by cause.

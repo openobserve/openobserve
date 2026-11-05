@@ -218,6 +218,23 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
     expect(ctx.options.series[0].percentPrecision).toBe(2);
   });
 
+  it.each([
+    [2, 14.4, "14.40%"],
+    [0, 52, "52%"],
+    [3, 7.25, "7.250%"],
+  ])("labels a slice with %i fixed decimals, as the legend does", (decimals, percent, label) => {
+    const ctx = contextWithDecimals(decimals);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].label.formatter({ name: "slice-0", percent })).toBe(label);
+  });
+
+  it("hides colliding and sliver labels", () => {
+    const ctx = contextWithDecimals(2);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].labelLayout).toEqual({ hideOverlap: true });
+    expect(ctx.options.series[0].minShowLabelAngle).toBe(3);
+  });
+
   // ECharts' percent rounding never ends on these values at precision 14.
   const loopingValues = [3, 5, 7, 11, 13, 17, 19];
 

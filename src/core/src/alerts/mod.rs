@@ -55,6 +55,8 @@ pub mod destinations;
 pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
+pub mod incident_title;
+#[cfg(feature = "enterprise")]
 pub mod incidents;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
@@ -547,6 +549,7 @@ impl QueryConditionExt for QueryCondition {
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
+                use_index: true,
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
             };
@@ -581,21 +584,11 @@ impl QueryConditionExt for QueryCondition {
             let req = config::meta::search::Request {
                 query: config::meta::search::Query {
                     sql: sql.clone(),
-                    from: 0,
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    quick_mode: false,
-                    track_total_hits: false,
-                    uses_zo_fn: false,
                     query_fn: encode_query_fn,
-                    skip_wal: false,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -604,6 +597,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                use_index: true,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -628,13 +622,7 @@ impl QueryConditionExt for QueryCondition {
         // 1. Vec<Map<String, Value>> - for normal alert
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
-            Ok(mut v) => {
-                // Check if function error is only query limit default error
-                if is_permissable_function_error(&v.function_error) {
-                    v.function_error.clear();
-                    v.is_partial = false;
-                }
-
+            Ok(v) => {
                 // the search request doesn't via cache layer, so need report usage separately
                 http_report_metrics(
                     req_start,
@@ -645,14 +633,7 @@ impl QueryConditionExt for QueryCondition {
                     &SearchEventType::Alerts.to_string(),
                     "",
                 );
-                if v.is_partial {
-                    return Err(anyhow::anyhow!(
-                        "Partial response: {}",
-                        v.function_error.join(", ")
-                    ));
-                } else {
-                    v
-                }
+                complete_response(v)?
             }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
@@ -892,7 +873,7 @@ async fn check_query_streams(
 
         if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
             let max_query_range = settings.max_query_range;
-            if max_query_range > 0 && period > max_query_range * 60 {
+            if max_query_range > 0 && period > max_query_range.saturating_mul(60) {
                 return Err(anyhow::anyhow!(
                     "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
                 ));
@@ -920,22 +901,12 @@ async fn run_alert_count_query(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: config::meta::alerts::level::count_query_sql(sql),
-            from: 0,
             // COUNT(*) over a subquery yields exactly one row.
             size: 1,
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -944,6 +915,7 @@ async fn run_alert_count_query(
         search_type,
         search_event_context,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -957,6 +929,12 @@ async fn run_alert_count_query(
         Some(RoleGroup::Background),
     )
     .await?;
+    alert_count(resp)
+}
+
+/// The exact count and its query time from a COUNT(*) response. [pure]
+fn alert_count(resp: config::meta::search::Response) -> Result<(f64, i64), anyhow::Error> {
+    let resp = complete_response(resp)?;
     let count = resp
         .hits
         .first()
@@ -964,6 +942,23 @@ async fn run_alert_count_query(
         .and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|i| i as f64)))
         .ok_or_else(|| anyhow::anyhow!("alert count query returned no zo_alert_count column"))?;
     Ok((count, resp.took as i64))
+}
+
+/// The response with its permissible function errors cleared, or Err if it is still partial. [pure]
+fn complete_response(
+    mut resp: config::meta::search::Response,
+) -> Result<config::meta::search::Response, anyhow::Error> {
+    if is_permissable_function_error(&resp.function_error) {
+        resp.function_error.clear();
+        resp.is_partial = false;
+    }
+    if resp.is_partial {
+        return Err(anyhow::anyhow!(
+            "Partial response: {}",
+            resp.function_error.join(", ")
+        ));
+    }
+    Ok(resp)
 }
 
 #[async_trait]
@@ -1906,6 +1901,37 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn a_count_from_a_partial_response_is_refused_unless_its_errors_are_permissible() {
+        let resp = |is_partial: bool, function_error: &[&str], hits: Vec<Value>| {
+            config::meta::search::Response {
+                took: 7,
+                hits,
+                is_partial,
+                function_error: function_error.iter().map(|e| e.to_string()).collect(),
+                ..Default::default()
+            }
+        };
+        let counted = || vec![serde_json::json!({ "zo_alert_count": 3 })];
+        let cases = [
+            ("complete", resp(false, &[], counted()), Some((3.0, 7))),
+            (
+                "permissible partial",
+                resp(true, &[search::CAPPED_RESULTS_MSG], counted()),
+                Some((3.0, 7)),
+            ),
+            (
+                "node failed",
+                resp(true, &["node ingester-2 returned 503"], counted()),
+                None,
+            ),
+            ("missing column", resp(false, &[], vec![]), None),
+        ];
+        for (name, resp, expected) in cases {
+            assert_eq!(alert_count(resp).ok(), expected, "{name}");
+        }
+    }
 
     #[tokio::test]
     async fn test_condition_group_to_sql_simple() {

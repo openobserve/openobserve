@@ -47,6 +47,7 @@ use crate::{
         openobserve_api_management::request::organization::org::rename_org,
         openobserve_api_management::request::organization::assume_service_account::assume_service_account,
         openobserve_api_management::request::organization::org::org_summary,
+        openobserve_api_management::request::organization::org::org_overview,
         openobserve_api_management::request::organization::org::get_user_passcode,
         openobserve_api_management::request::organization::org::update_user_passcode,
         openobserve_api_management::request::organization::org::get_user_rumtoken,
@@ -94,6 +95,7 @@ use crate::{
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
         openobserve_api_search::promql::query_range_get,
+        openobserve_api_search::promql::query_exemplars_get,
         openobserve_api_search::promql::metadata,
         openobserve_api_search::promql::series_get,
         openobserve_api_search::promql::labels_get,
@@ -169,6 +171,8 @@ use crate::{
         openobserve_api_management::request::alerts::enable_alert,
         openobserve_api_management::request::alerts::ack::ack_alert,
         openobserve_api_management::request::alerts::ack::unack_alert,
+        openobserve_api_management::request::alerts::ack::ack_incident,
+        openobserve_api_management::request::alerts::ack::unack_incident,
         openobserve_api_management::request::alerts::ack::list_alert_acks,
         openobserve_api_management::request::alerts::mute::mute_alert,
         openobserve_api_management::request::alerts::mute::extend_alert_mute,
@@ -208,6 +212,7 @@ use crate::{
         openobserve_api_management::request::alerts::destinations::save_destination,
         openobserve_api_management::request::alerts::destinations::update_destination,
         openobserve_api_management::request::alerts::destinations::delete_destination,
+        openobserve_api_management::request::alerts::destinations::jira_setup,
         kv::get,
         kv::set,
         kv::delete,
@@ -259,17 +264,21 @@ use crate::{
         openobserve_api_management::request::dashboards::reports_history::get_report_history,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
+        openobserve_api_management::request::authz::fga::delete_role_bulk,
         openobserve_api_management::request::authz::fga::get_roles,
         openobserve_api_management::request::authz::fga::update_role,
         openobserve_api_management::request::authz::fga::get_role_permissions,
         openobserve_api_management::request::authz::fga::get_all_role_permissions,
+        openobserve_api_management::request::authz::fga::get_roles_for_user,
         openobserve_api_management::request::authz::fga::get_roles_for_all_users,
         openobserve_api_management::request::authz::fga::get_users_with_role,
         openobserve_api_management::request::authz::fga::create_group,
         openobserve_api_management::request::authz::fga::update_group,
+        openobserve_api_management::request::authz::fga::get_groups_for_user,
         openobserve_api_management::request::authz::fga::get_groups,
         openobserve_api_management::request::authz::fga::get_group_details,
         openobserve_api_management::request::authz::fga::delete_group,
+        openobserve_api_management::request::authz::fga::delete_group_bulk,
         keys::save,
         keys::get,
         keys::list,
@@ -305,14 +314,18 @@ use crate::{
         service_streams::correlate_streams,
         service_streams::get_identity_config,
         service_streams::save_identity_config,
+        service_streams::reset_services,
         gen_ai::clear_agent_registry,
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        openobserve_api_management::request::gen_ai_health::get_data_health,
+        openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
+        openobserve_api_management::request::metrics_usage::get_org_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -332,6 +345,7 @@ use crate::{
         openobserve_api_management::request::downtimes::update_downtime,
         openobserve_api_management::request::downtimes::cancel_downtime,
         openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::test_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
         openobserve_api_management::request::fleet::list_collectors,
@@ -453,6 +467,135 @@ use crate::{
         rum_analytics::delete_funnel,
         rum_analytics::get_app_settings,
         rum_analytics::put_app_settings,
+        openobserve_api_ingest::request::logs::ingest::handle_gcp_request,
+        openobserve_api_ingest::request::logs::ingest::handle_kinesis_request,
+        openobserve_api_ingest::request::logs::ingest::hec,
+        openobserve_api_ingest::request::logs::ingest::otlp_logs_write,
+        openobserve_api_ingest::request::metrics::ingest::otlp_metrics_write,
+        openobserve_api_ingest::request::profiles::ingest::otlp_profiles_write,
+        openobserve_api_management::request::alerts::delete_alert_bulk,
+        openobserve_api_management::request::alerts::destinations::delete_destination_bulk,
+        openobserve_api_management::request::alerts::destinations::list_prebuilt_destinations,
+        openobserve_api_management::request::alerts::destinations::test_destination,
+        openobserve_api_management::request::alerts::destinations::test_send,
+        openobserve_api_management::request::alerts::external_events::ingest_events,
+        openobserve_api_management::request::alerts::external_events::ingest_events_url_token,
+        openobserve_api_management::request::alerts::incident_integrations::create_integration,
+        openobserve_api_management::request::alerts::incident_integrations::delete_integration,
+        openobserve_api_management::request::alerts::incident_integrations::list_integration_senders,
+        openobserve_api_management::request::alerts::incident_integrations::list_integrations,
+        openobserve_api_management::request::alerts::incident_integrations::rotate_integration_token,
+        openobserve_api_management::request::alerts::incident_integrations::set_integration_enabled,
+        openobserve_api_management::request::alerts::incident_integrations::update_integration,
+        openobserve_api_management::request::alerts::incidents::get_external_alert_payload,
+        openobserve_api_management::request::alerts::incidents::get_incident_events,
+        openobserve_api_management::request::alerts::incidents::post_incident_comment,
+        openobserve_api_management::request::alerts::list_alert_group_transitions,
+        openobserve_api_management::request::alerts::list_alert_groups,
+        openobserve_api_management::request::alerts::templates::delete_template_bulk,
+        openobserve_api_management::request::alerts::templates::preview_template,
+        openobserve_api_management::request::authz::fga::get_resources,
+        openobserve_api_management::request::dashboards::delete_dashboard_bulk,
+        openobserve_api_management::request::dashboards::reports::delete_report_bulk,
+        openobserve_api_management::request::model_pricing::create,
+        openobserve_api_management::request::model_pricing::delete,
+        openobserve_api_management::request::model_pricing::get,
+        openobserve_api_management::request::model_pricing::get_built_in,
+        openobserve_api_management::request::model_pricing::list,
+        openobserve_api_management::request::model_pricing::refresh_built_in,
+        openobserve_api_management::request::model_pricing::test_model_match,
+        openobserve_api_management::request::model_pricing::update,
+        openobserve_api_management::request::organization::ingestion_tokens::create_ingestion_token,
+        openobserve_api_management::request::organization::ingestion_tokens::enable_disable_ingestion_token,
+        openobserve_api_management::request::organization::ingestion_tokens::list_ingestion_tokens,
+        openobserve_api_management::request::organization::org::cluster_info,
+        openobserve_api_management::request::organization::org::list_org_cleanup_tasks,
+        openobserve_api_management::request::organization::org::node_list,
+        openobserve_api_management::request::organization::org::resurrect_org_deletion,
+        openobserve_api_management::request::organization::org::retry_org_cleanup,
+        openobserve_api_management::request::organization::settings::delete_logo,
+        openobserve_api_management::request::organization::settings::delete_logo_text,
+        openobserve_api_management::request::organization::settings::set_logo_text,
+        openobserve_api_management::request::organization::settings::upload_logo,
+        openobserve_api_management::request::public_dashboards::admin::create,
+        openobserve_api_management::request::public_dashboards::admin::delete,
+        openobserve_api_management::request::public_dashboards::admin::get,
+        openobserve_api_management::request::public_dashboards::admin::list,
+        openobserve_api_management::request::public_dashboards::admin::list_org,
+        openobserve_api_management::request::public_dashboards::admin::pause,
+        openobserve_api_management::request::public_dashboards::admin::refresh,
+        openobserve_api_management::request::public_dashboards::admin::resume,
+        openobserve_api_management::request::public_dashboards::admin::take_over,
+        openobserve_api_management::request::public_dashboards::admin::update,
+        openobserve_api_management::request::public_dashboards::settings::get,
+        openobserve_api_management::request::public_dashboards::settings::put,
+        openobserve_api_management::request::public_dashboards::status::batch,
+        openobserve_api_management::request::public_dashboards::status::link,
+        openobserve_api_management::request::service_accounts::delete_bulk,
+        openobserve_api_management::request::sourcemaps::delete,
+        openobserve_api_management::request::sourcemaps::list,
+        openobserve_api_management::request::sourcemaps::list_values,
+        openobserve_api_management::request::sourcemaps::translate_stacktrace,
+        openobserve_api_management::request::sourcemaps::upload_maps,
+        openobserve_api_management::request::status::zo_config,
+        openobserve_api_management::request::status_pages::admin::add_notice_update,
+        openobserve_api_management::request::status_pages::admin::create_domain,
+        openobserve_api_management::request::status_pages::admin::create_notice,
+        openobserve_api_management::request::status_pages::admin::create_page,
+        openobserve_api_management::request::status_pages::admin::delete_domain,
+        openobserve_api_management::request::status_pages::admin::delete_notice,
+        openobserve_api_management::request::status_pages::admin::delete_page,
+        openobserve_api_management::request::status_pages::admin::get_page,
+        openobserve_api_management::request::status_pages::admin::list_domains,
+        openobserve_api_management::request::status_pages::admin::list_notice_updates,
+        openobserve_api_management::request::status_pages::admin::list_page_notices,
+        openobserve_api_management::request::status_pages::admin::list_pages,
+        openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::preview,
+        openobserve_api_management::request::status_pages::admin::rotate_slug,
+        openobserve_api_management::request::status_pages::admin::set_components,
+        openobserve_api_management::request::status_pages::admin::update_notice,
+        openobserve_api_management::request::status_pages::admin::update_page,
+        openobserve_api_management::request::status_pages::admin::verify_domain,
+        openobserve_api_management::request::status_pages::public::badge,
+        openobserve_api_management::request::status_pages::public::feed,
+        openobserve_api_management::request::status_pages::public::snapshot,
+        openobserve_api_management::request::stream::delete_stream_cache,
+        openobserve_api_management::request::stream::delete_stream_data_by_time_range,
+        openobserve_api_management::request::stream::get_delete_stream_data_status,
+        openobserve_api_management::request::stream::update_fields,
+        openobserve_api_management::request::synthetics::create_agent_token,
+        openobserve_api_management::request::synthetics::create_location,
+        openobserve_api_management::request::synthetics::delete_location,
+        openobserve_api_management::request::synthetics::delete_synthetics_bulk,
+        openobserve_api_management::request::synthetics::get_artifact,
+        openobserve_api_management::request::synthetics::get_location,
+        openobserve_api_management::request::synthetics::list_agent_tokens,
+        openobserve_api_management::request::synthetics::presign_artifacts,
+        openobserve_api_management::request::synthetics::rotate_agent_token,
+        openobserve_api_management::request::synthetics::set_agent_token_enabled,
+        openobserve_api_management::request::synthetics::update_location,
+        openobserve_api_management::request::users::authentication,
+        openobserve_api_management::request::users::decline_invitation,
+        openobserve_api_management::request::users::delete_bulk,
+        openobserve_api_management::request::users::get_presigned_url,
+        openobserve_api_management::request::users::list_invitations,
+        openobserve_api_management::request::users::list_roles,
+        openobserve_api_pipelines::request::enrichment_table::get_all_enrichment_table_statuses,
+        openobserve_api_pipelines::request::functions::delete_function_bulk,
+        openobserve_api_pipelines::request::pipeline::delete_pipeline_bulk,
+        openobserve_api_search::promql::format_query_post,
+        openobserve_api_search::promql::labels_post,
+        openobserve_api_search::promql::query_exemplars_post,
+        openobserve_api_search::promql::query_post,
+        openobserve_api_search::promql::query_range_post,
+        openobserve_api_search::promql::series_post,
+        openobserve_api_search::search::multi_streams::_search_partition_multi,
+        openobserve_api_search::search::multi_streams::around_multi,
+        openobserve_api_search::search::multi_streams::search_multi,
+        openobserve_api_search::search::multi_streams::search_multi_stream,
+        openobserve_api_search::search::result_schema,
+        openobserve_api_search::traces::get_latest_traces_stream,
     ),
     components(
         schemas(
@@ -472,6 +615,18 @@ use crate::{
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_api_management::request::gen_ai_health::DataHealthResponse,
+            openobserve_api_management::request::gen_ai_health::HealthCheck,
+            openobserve_api_management::request::gen_ai_health::ModelUsage,
+            openobserve_api_management::request::gen_ai_health::CheckId,
+            openobserve_api_management::request::gen_ai_health::CheckStatus,
+            openobserve_api_management::request::model_pricing::UnpricedModelsResponse,
+            openobserve_api_management::request::model_pricing::UnpricedModel,
+            openobserve_api_management::request::model_pricing::UnpricedModelMatch,
+            openobserve_api_management::request::gen_ai_health::UnpricedModelRow,
+            config::meta::model_pricing::CostStatus,
+            config::meta::model_pricing::PricingSource,
+            config::meta::model_pricing::PricingTierDefinition,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
             config::meta::dashboards::v1::Dashboard,
@@ -538,6 +693,7 @@ use crate::{
             config::meta::alerts::auto_investigate::BudgetCheck,
             config::meta::alerts::level::AlertLevel,
             config::meta::alerts::ack::AckResponse,
+            config::meta::alerts::ack::ProblemAckRequest,
             config::meta::alerts::ack::UnackRequest,
             config::meta::alerts::ack::UnackResponse,
             config::meta::alerts::ack::AckListResponse,
@@ -645,6 +801,7 @@ use crate::{
             config::meta::downtimes::NotificationEvents,
             config::meta::downtimes::NotificationEvent,
             config::meta::downtimes::DowntimeNotificationLogEntry,
+            config::meta::downtimes::DowntimeNotificationTemplate,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -712,6 +869,7 @@ use crate::{
             meta::user::UserList,
             meta::user::UserResponse,
             meta::user::SignInResponse,
+            meta::user::SignInUser,
             meta::organization::OrgSummary,
             meta::organization::StreamSummary,
             meta::organization::PipelineSummary,
@@ -808,6 +966,7 @@ use crate::{
             config::meta::fleet::ValidationFailed,
             config::meta::fleet::AuditEvent,
             config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
             config::meta::fleet::DeliveryState,
             config::meta::fleet::RolloutStart,
             config::meta::fleet::Batching,
@@ -904,6 +1063,36 @@ use crate::{
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
         (name = "Security", description = "Built-in OCSF mapping packs for security sources"),
+        (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
+        (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
+        (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
+        (name = "Azure Marketplace", description = "Azure Marketplace subscription linking (cloud)"),
+        (name = "Billings", description = "Subscriptions, invoices and billing groups (cloud)"),
+        (name = "Datasets", description = "LLM evaluation datasets (enterprise)"),
+        (name = "Discovery", description = "Discovery of LLM evaluation entities (enterprise)"),
+        (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
+        (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
+        (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
+        (name = "Groups", description = "User group management"),
+        (name = "Keys", description = "Cipher key management (enterprise)"),
+        (name = "LLM", description = "LLM model pricing definitions"),
+        (name = "License", description = "License management (enterprise)"),
+        (name = "MCP", description = "Model Context Protocol server"),
+        (name = "OnCall", description = "On-call teams, schedules, routing and pages (enterprise)"),
+        (name = "Pipelines", description = "Pipeline management"),
+        (name = "Providers", description = "LLM provider configuration (enterprise)"),
+        (name = "Public Dashboards", description = "Public links to dashboards"),
+        (name = "RePattern", description = "Regular expression patterns for sensitive data redaction (enterprise)"),
+        (name = "Reports", description = "Report management"),
+        (name = "Resources", description = "Resources available for role permissions"),
+        (name = "Roles", description = "Role management"),
+        (name = "ScoreConfigs", description = "Score configurations for LLM evaluation (enterprise)"),
+        (name = "Scorers", description = "LLM evaluation scorers (enterprise)"),
+        (name = "ServiceAccounts", description = "Service account management"),
+        (name = "Sourcemaps", description = "Source map upload and stack trace translation"),
+        (name = "Status Pages", description = "Public status pages, notices and custom domains"),
+        (name = "Templates", description = "Alert notification templates"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -1008,6 +1197,203 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
+    crate::handler::http::request::ratelimit::api_modules,
+    openobserve_api_management::request::ai::chat::cancel,
+    openobserve_api_management::request::ai::chat::chat,
+    openobserve_api_management::request::ai::chat::chat_stream,
+    openobserve_api_management::request::ai::chat::confirm_action,
+    openobserve_api_management::request::ai::chat::feedback,
+    openobserve_api_management::request::ai::chats::delete,
+    openobserve_api_management::request::ai::chats::delete_all,
+    openobserve_api_management::request::ai::chats::get,
+    openobserve_api_management::request::ai::chats::list,
+    openobserve_api_management::request::ai::chats::rename,
+    openobserve_api_management::request::ai::shares::create,
+    openobserve_api_management::request::ai::shares::fork,
+    openobserve_api_management::request::ai::shares::get_shared,
+    openobserve_api_management::request::ai::shares::list_for_chat,
+    openobserve_api_management::request::ai::shares::list_mine,
+    openobserve_api_management::request::ai::shares::revoke,
+    openobserve_api_management::request::ai::shares::update,
+    openobserve_api_management::request::ai::toolsets::create,
+    openobserve_api_management::request::ai::toolsets::delete,
+    openobserve_api_management::request::ai::toolsets::get,
+    openobserve_api_management::request::ai::toolsets::list,
+    openobserve_api_management::request::ai::toolsets::update,
+    openobserve_api_management::request::annotation_queues::archive_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::clear_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::create_annotation_queue,
+    openobserve_api_management::request::annotation_queues::delete_annotation_queue,
+    openobserve_api_management::request::annotation_queues::enqueue_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::get_annotation_queue,
+    openobserve_api_management::request::annotation_queues::get_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::list_annotation_queue_item_reviews,
+    openobserve_api_management::request::annotation_queues::list_annotation_queue_items,
+    openobserve_api_management::request::annotation_queues::list_annotation_queues,
+    openobserve_api_management::request::annotation_queues::review_annotation_queue_item,
+    openobserve_api_management::request::annotation_queues::update_annotation_queue,
+    openobserve_api_management::request::annotations::annotate_target,
+    openobserve_api_management::request::datasets::create_dataset,
+    openobserve_api_management::request::datasets::delete_dataset,
+    openobserve_api_management::request::datasets::delete_dataset_item,
+    openobserve_api_management::request::datasets::get_dataset,
+    openobserve_api_management::request::datasets::get_dataset_item_versions,
+    openobserve_api_management::request::datasets::get_dataset_snapshot_rows,
+    openobserve_api_management::request::datasets::import_dataset_items,
+    openobserve_api_management::request::datasets::list_dataset_items,
+    openobserve_api_management::request::datasets::list_datasets,
+    openobserve_api_management::request::datasets::push_annotation_queue_item_to_dataset,
+    openobserve_api_management::request::datasets::push_dataset_item,
+    openobserve_api_management::request::datasets::update_dataset,
+    openobserve_api_management::request::datasets::update_dataset_item,
+    openobserve_api_management::request::datasets::upsert_dataset_items,
+    openobserve_api_management::request::discovery::list_discovery_items,
+    openobserve_api_management::request::domain_management::get_domain_management_config,
+    openobserve_api_management::request::domain_management::set_domain_management_config,
+    openobserve_api_management::request::eval_jobs::activate_eval_job,
+    openobserve_api_management::request::eval_jobs::archive_eval_job,
+    openobserve_api_management::request::eval_jobs::create_eval_job,
+    openobserve_api_management::request::eval_jobs::delete_eval_job,
+    openobserve_api_management::request::eval_jobs::get_eval_job,
+    openobserve_api_management::request::eval_jobs::list_eval_jobs,
+    openobserve_api_management::request::eval_jobs::manual_eval_job,
+    openobserve_api_management::request::eval_jobs::pause_eval_job,
+    openobserve_api_management::request::eval_jobs::resume_eval_job,
+    openobserve_api_management::request::eval_jobs::update_eval_job,
+    openobserve_api_management::request::experiments::finalize_experiment,
+    openobserve_api_management::request::experiments::list_experiment_slots,
+    openobserve_api_management::request::experiments::submit_experiment_records,
+    openobserve_api_management::request::keys::delete_bulk,
+    openobserve_api_management::request::license::get_license_info,
+    openobserve_api_management::request::license::refresh_license_limits,
+    openobserve_api_management::request::license::rotate_license_key,
+    openobserve_api_management::request::license::store_license,
+    openobserve_api_management::request::oncall::acknowledge_response,
+    openobserve_api_management::request::oncall::add_member,
+    openobserve_api_management::request::oncall::add_note,
+    openobserve_api_management::request::oncall::apply_schedule_preset,
+    openobserve_api_management::request::oncall::cause_analytics,
+    openobserve_api_management::request::oncall::confirm_contact_code,
+    openobserve_api_management::request::oncall::confirm_recovery,
+    openobserve_api_management::request::oncall::create_override,
+    openobserve_api_management::request::oncall::create_ownership_rule,
+    openobserve_api_management::request::oncall::create_team,
+    openobserve_api_management::request::oncall::create_unavailability,
+    openobserve_api_management::request::oncall::delete_contact,
+    openobserve_api_management::request::oncall::delete_override,
+    openobserve_api_management::request::oncall::delete_ownership_rule,
+    openobserve_api_management::request::oncall::delete_team,
+    openobserve_api_management::request::oncall::delete_telephony,
+    openobserve_api_management::request::oncall::delete_unavailability,
+    openobserve_api_management::request::oncall::dismiss_unrouted_signal,
+    openobserve_api_management::request::oncall::escalate_response,
+    openobserve_api_management::request::oncall::get_contact,
+    openobserve_api_management::request::oncall::get_escalation_preview,
+    openobserve_api_management::request::oncall::get_escalation_progress,
+    openobserve_api_management::request::oncall::get_policy,
+    openobserve_api_management::request::oncall::get_prior_causes,
+    openobserve_api_management::request::oncall::get_resolved_schedule,
+    openobserve_api_management::request::oncall::get_response,
+    openobserve_api_management::request::oncall::get_response_history,
+    openobserve_api_management::request::oncall::get_response_report,
+    openobserve_api_management::request::oncall::get_routing_config,
+    openobserve_api_management::request::oncall::get_schedule,
+    openobserve_api_management::request::oncall::get_team,
+    openobserve_api_management::request::oncall::get_team_channel,
+    openobserve_api_management::request::oncall::get_team_load,
+    openobserve_api_management::request::oncall::get_team_overview,
+    openobserve_api_management::request::oncall::get_team_reachability,
+    openobserve_api_management::request::oncall::get_telephony,
+    openobserve_api_management::request::oncall::get_telephony_status,
+    openobserve_api_management::request::oncall::handoff_response,
+    openobserve_api_management::request::oncall::list_coverage_gaps,
+    openobserve_api_management::request::oncall::list_deliveries,
+    openobserve_api_management::request::oncall::list_escalation_progress,
+    openobserve_api_management::request::oncall::list_members,
+    openobserve_api_management::request::oncall::list_my_deliveries,
+    openobserve_api_management::request::oncall::list_my_teams,
+    openobserve_api_management::request::oncall::list_overrides,
+    openobserve_api_management::request::oncall::list_ownership_rule_stats,
+    openobserve_api_management::request::oncall::list_ownership_rules,
+    openobserve_api_management::request::oncall::list_responses,
+    openobserve_api_management::request::oncall::list_responses_for_incident,
+    openobserve_api_management::request::oncall::list_schedule_presets,
+    openobserve_api_management::request::oncall::list_team_config_risks,
+    openobserve_api_management::request::oncall::list_team_context,
+    openobserve_api_management::request::oncall::list_teams,
+    openobserve_api_management::request::oncall::list_unavailability,
+    openobserve_api_management::request::oncall::list_unrouted_signals,
+    openobserve_api_management::request::oncall::mark_deliveries_read,
+    openobserve_api_management::request::oncall::preview_resolved_schedule,
+    openobserve_api_management::request::oncall::preview_routing,
+    openobserve_api_management::request::oncall::promote_to_incident,
+    openobserve_api_management::request::oncall::put_telephony,
+    openobserve_api_management::request::oncall::remove_member,
+    openobserve_api_management::request::oncall::resolve_response,
+    openobserve_api_management::request::oncall::send_contact_code,
+    openobserve_api_management::request::oncall::send_test_page,
+    openobserve_api_management::request::oncall::set_contact,
+    openobserve_api_management::request::oncall::set_policy,
+    openobserve_api_management::request::oncall::set_routing_config,
+    openobserve_api_management::request::oncall::set_schedule,
+    openobserve_api_management::request::oncall::set_team_channel,
+    openobserve_api_management::request::oncall::snooze_response,
+    openobserve_api_management::request::oncall::test_team_slack_channel,
+    openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
+    openobserve_api_management::request::oncall::update_ownership_rule,
+    openobserve_api_management::request::oncall::update_team,
+    openobserve_api_management::request::oncall::who_is_on_call,
+    openobserve_api_management::request::organization::storage::get,
+    openobserve_api_management::request::organization::storage::save,
+    openobserve_api_management::request::organization::storage::update,
+    openobserve_api_management::request::providers::create_provider,
+    openobserve_api_management::request::providers::delete_provider,
+    openobserve_api_management::request::providers::get_provider,
+    openobserve_api_management::request::providers::list_providers,
+    openobserve_api_management::request::providers::test_provider_config,
+    openobserve_api_management::request::providers::update_provider,
+    openobserve_api_management::request::quality::get_quality_timeline,
+    openobserve_api_management::request::quality::list_quality_scores,
+    openobserve_api_management::request::quality::list_quality_summaries,
+    openobserve_api_management::request::score_configs::create_score_config,
+    openobserve_api_management::request::score_configs::delete_score_config,
+    openobserve_api_management::request::score_configs::ensure_score_config,
+    openobserve_api_management::request::score_configs::get_score_config,
+    openobserve_api_management::request::score_configs::list_score_config_versions,
+    openobserve_api_management::request::score_configs::list_score_configs,
+    openobserve_api_management::request::score_configs::update_score_config,
+    openobserve_api_management::request::scorers::create_scorer,
+    openobserve_api_management::request::scorers::delete_scorer,
+    openobserve_api_management::request::scorers::get_scorer,
+    openobserve_api_management::request::scorers::list_scorer_versions,
+    openobserve_api_management::request::scorers::list_scorers,
+    openobserve_api_management::request::scorers::preview_llm_judge_output_schema,
+    openobserve_api_management::request::scorers::test_scorer,
+    openobserve_api_management::request::scorers::update_scorer,
+    openobserve_api_management::request::synthetics::agent_setup,
+    openobserve_api_management::request::users::service_accounts::exchange_token,
+    openobserve_api_pipelines::request::re_pattern::delete,
+    openobserve_api_pipelines::request::re_pattern::delete_bulk,
+    openobserve_api_pipelines::request::re_pattern::get,
+    openobserve_api_pipelines::request::re_pattern::get_built_in_patterns,
+    openobserve_api_pipelines::request::re_pattern::list,
+    openobserve_api_pipelines::request::re_pattern::save,
+    openobserve_api_pipelines::request::re_pattern::test,
+    openobserve_api_pipelines::request::re_pattern::update,
+    openobserve_api_search::search::query_manager::cancel_query,
+    openobserve_api_search::search::query_manager::query_status,
+    openobserve_api_search::search::search_inspector::get_search_profile,
+    openobserve_core::traces::agent_signals::api::compare_agent_versions,
+    openobserve_core::traces::agent_signals::api::get_agent_signals,
+    openobserve_core::traces::service_graph::api::get_edge_history,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1023,6 +1409,47 @@ struct EnterpriseExperimentApiDoc;
 #[openapi(paths(
     openobserve_api_management::request::organization::org::get_paid_overage_status,
     openobserve_api_management::request::organization::org::set_paid_overage_status,
+    openobserve_api_management::request::alerts::slack_oauth::exchange,
+    openobserve_api_management::request::alerts::slack_oauth::start,
+    openobserve_api_management::request::cloud::aws_marketplace::activation_status,
+    openobserve_api_management::request::cloud::aws_marketplace::link_subscription,
+    openobserve_api_management::request::cloud::azure_marketplace::link_subscription,
+    openobserve_api_management::request::cloud::billings::create_billing_portal_session,
+    openobserve_api_management::request::cloud::billings::create_checkout_session,
+    openobserve_api_management::request::cloud::billings::get_ai_usage,
+    openobserve_api_management::request::cloud::billings::list_invoices,
+    openobserve_api_management::request::cloud::billings::list_subscription,
+    openobserve_api_management::request::cloud::billings::process_session_detail,
+    openobserve_api_management::request::cloud::billings::unsubscribe,
+    openobserve_api_management::request::cloud::org_usage::get_org_usage,
+    openobserve_api_management::request::org_domains::approve_request,
+    openobserve_api_management::request::org_domains::delete_linked_domain,
+    openobserve_api_management::request::org_domains::get_linked_domain,
+    openobserve_api_management::request::org_domains::link_domain,
+    openobserve_api_management::request::org_domains::list_requests,
+    openobserve_api_management::request::org_domains::raise_request,
+    openobserve_api_management::request::org_domains::reject_request,
+    openobserve_api_management::request::org_domains::verify_domain,
+    openobserve_api_management::request::organization::billing_group::accept,
+    openobserve_api_management::request::organization::billing_group::check_members,
+    openobserve_api_management::request::organization::billing_group::check_membership,
+    openobserve_api_management::request::organization::billing_group::invite,
+    openobserve_api_management::request::organization::billing_group::leave_group,
+    openobserve_api_management::request::organization::billing_group::list_invites,
+    openobserve_api_management::request::organization::billing_group::reject,
+    openobserve_api_management::request::organization::billing_group::remove_member,
+    openobserve_api_management::request::organization::org::accept_org_invite,
+    openobserve_api_management::request::organization::org::all_organizations,
+    openobserve_api_management::request::organization::org::create_external_contract,
+    openobserve_api_management::request::organization::org::delete_org_invite,
+    openobserve_api_management::request::organization::org::enable_org_storage,
+    openobserve_api_management::request::organization::org::extend_external_contract,
+    openobserve_api_management::request::organization::org::extend_trial_period,
+    openobserve_api_management::request::organization::org::generate_org_invite,
+    openobserve_api_management::request::organization::org::get_org_invites,
+    openobserve_api_management::request::organization::org::initiate_org_deletion,
+    openobserve_api_management::request::organization::org::revoke_external_contract,
+    openobserve_api_management::request::organization::org::set_quota_usage_limit,
 ))]
 struct CloudQuotaApiDoc;
 
@@ -1066,6 +1493,24 @@ impl Modify for SecurityAddon {
         components.add_security_scheme(
             "BasicAuth",
             SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
+        );
+        components.add_security_scheme(
+            "FirehoseAccessKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "X-Amz-Firehose-Access-Key",
+                    "base64 of user:password",
+                ),
+            )),
+        );
+        components.add_security_scheme(
+            "GcpApiKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Query(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "API-Key",
+                    "base64 of user:password",
+                ),
+            )),
         );
     }
 }
@@ -1243,7 +1688,10 @@ mod tests {
     const ROUTER_SOURCE: &str = include_str!("mod.rs");
 
     #[cfg(feature = "enterprise")]
-    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+    const SERVICE_ROUTES_SIGNATURE: &str = "fn service_route_table(";
+
+    #[cfg(feature = "enterprise")]
+    const SEARCH_ROUTES_SIGNATURE: &str = "fn search_routes_with(";
 
     #[cfg(feature = "enterprise")]
     const HTTP_METHODS: &[&str] = &[
@@ -1291,6 +1739,22 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put"),
         ("/api/{org_id}/workflows/{id}/history", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
     ];
 
     /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
@@ -1312,6 +1776,33 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
         ("/api/{org_id}/workflows/{id}/history", "get", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
     ];
 
     const SLACK_OPERATIONS: &[(&str, &str)] = &[
@@ -1428,13 +1919,18 @@ mod tests {
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
+        router_fn_body(SERVICE_ROUTES_SIGNATURE)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn router_fn_body(signature: &str) -> &'static str {
         let start = ROUTER_SOURCE
-            .find(SERVICE_ROUTES_SIGNATURE)
-            .expect("the router must define service_routes()");
-        let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
+            .find(signature)
+            .unwrap_or_else(|| panic!("the router must define {signature}"));
+        let after_signature = &ROUTER_SOURCE[start + signature.len()..];
         let end = after_signature
             .find("\n}\n")
-            .expect("service_routes() must end at a column-0 close brace");
+            .unwrap_or_else(|| panic!("{signature} must end at a column-0 close brace"));
         &after_signature[..end]
     }
 
@@ -1533,7 +2029,13 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
-        let live = normalize(&strip_comments(service_routes_body()));
+        // The licence-gated search routes are a separate group that service_routes() merges in.
+        let routes = [
+            service_routes_body(),
+            router_fn_body(SEARCH_ROUTES_SIGNATURE),
+        ]
+        .concat();
+        let live = normalize(&strip_comments(&routes));
         let mut routes = BTreeSet::new();
         for call in live.split(".route(").skip(1) {
             let Some(arguments) = balanced_arguments(call) else {
@@ -1644,7 +2146,11 @@ mod tests {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let paths = spec["paths"].as_object().unwrap();
         let mut documented = Vec::new();
-        for (path, item) in paths.iter().filter(|(p, _)| p.contains("/slack/")) {
+        // Slack destination OAuth and an on-call team's Slack test belong to their own modules.
+        let is_slack_app = |p: &str| {
+            p.contains("/slack/") && !p.contains("/destinations/slack/") && !p.contains("/oncall/")
+        };
+        for (path, item) in paths.iter().filter(|(p, _)| is_slack_app(p)) {
             for (method, op) in item.as_object().unwrap() {
                 documented.push((method.clone(), path.clone()));
                 assert_eq!(op["x-o2-ratelimit"]["module"], "Slack", "{method} {path}");
@@ -1714,6 +2220,19 @@ mod tests {
     }
 
     #[test]
+    fn promql_exemplars_is_published_with_its_error_codes() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/prometheus/api/v1/query_exemplars"]["get"];
+        assert_eq!(op["operationId"], "PrometheusQueryExemplars");
+        for status in ["200", "400", "403", "429", "500"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "query_exemplars {status}"
+            );
+        }
+    }
+
+    #[test]
     fn recent_rejections_path_and_schemas_are_registered() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let op = &spec["paths"]["/api/{org_id}/ingest/recent_rejections"]["get"];
@@ -1749,6 +2268,34 @@ mod tests {
     }
 
     #[test]
+    fn unpriced_models_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/llm/models/unpriced"]["get"];
+        assert_eq!(op["operationId"], "ListUnpricedModels", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/UnpricedModelsResponse"
+        );
+        for code in ["403", "429"] {
+            assert!(op["responses"][code].is_object(), "{code}");
+            assert!(
+                spec["paths"]["/api/{org_id}/gen_ai/data_health"]["get"]["responses"][code]
+                    .is_object(),
+                "data_health {code}"
+            );
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "UnpricedModelsResponse",
+            "UnpricedModel",
+            "UnpricedModelMatch",
+            "UnpricedModelRow",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
     fn fleet_reads_are_documented_with_their_403() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         for path in [
@@ -1764,6 +2311,26 @@ mod tests {
             spec["paths"]["/api/{org_id}/fleet/collectors/{id}"]["get"]["responses"]["404"]
                 .is_object()
         );
+    }
+
+    #[test]
+    fn fga_bulk_deletes_and_per_user_lookups_are_published() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/roles/bulk", "delete"),
+            ("/api/{org_id}/groups/bulk", "delete"),
+            ("/api/{org_id}/users/{user_email}/roles", "get"),
+            ("/api/{org_id}/users/{user_email}/groups", "get"),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert!(op.is_object(), "{method} {path} missing");
+            // OSS stubs answer 403 before any validation, so only enterprise can return 400.
+            assert_eq!(
+                op["responses"]["400"].is_object(),
+                cfg!(feature = "enterprise"),
+                "{method} {path}"
+            );
+        }
     }
 
     #[test]
@@ -1878,6 +2445,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
@@ -2104,13 +2672,16 @@ mod tests {
     fn workflows_document_the_statuses_their_handlers_return() {
         let base = "/api/{org_id}/workflows";
         let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
-            (base, "get", &["200", "403", "500"]),
+            (base, "get", &["200", "403", "404", "500"]),
             (
                 "/api/v2/{org_id}/workflows/move",
                 "patch",
-                &["200", "400", "403", "500"],
+                &["200", "400", "403", "404", "500"],
             ),
             (by_id, "delete", &["200", "400", "404", "500"]),
             (by_id, "put", &["200", "400", "500"]),
@@ -2118,7 +2689,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
@@ -2144,6 +2715,29 @@ mod tests {
                 "/api/{org_id}/workflows/promote/{id}",
                 "post",
                 &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
             ),
         ]);
     }

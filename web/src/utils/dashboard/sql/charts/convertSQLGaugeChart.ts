@@ -23,6 +23,7 @@ import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOv
 import { buildValueMappingCache, lookupDisplayedValueMapping } from "../../tableConfigUtils";
 import {
   alignGaugeValueFonts,
+  GAUGE_EMPTY_GROUP_NAME,
   gaugeAutoRange,
   gaugeEndLabels,
   gaugeValueText,
@@ -112,7 +113,10 @@ export function applyGaugeChart(ctx: SQLContext): void {
   const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
 
   options.series = gaugeData.map((it: any, index: any) => {
-    const name = gaugeNames[index] ?? "";
+    const rawName = gaugeNames[index] ?? "";
+    // Overrides, colours and the series list need a key for an empty group; drilldowns keep the blank value.
+    const name =
+      String(rawName).trim() === "" && xAxisValue.length > 0 ? GAUGE_EMPTY_GROUP_NAME : rawName;
     const unit = seriesOverrides.unitArgs(name);
     const mapping = lookupDisplayedValueMapping(it, mappingCache, unit.decimals);
     const gauge: any = {
@@ -138,6 +142,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
         {
           // gauge name may have or may not have
           name,
+          ...(name !== rawName ? { rawName } : {}),
           value: it,
           detail: {
             formatter: (value: unknown) => gaugeValueText(value, mapping, unit),
@@ -149,7 +154,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
               (seriesOverrides.get(name)?.color ??
                 getSeriesColor(
                   panelSchema?.config?.color,
-                  gaugeNames[index] ?? "",
+                  name,
                   [it],
                   chartMin,
                   chartMax,

@@ -5,7 +5,8 @@
  *   "Routing rule permanently shadowed: surfaced above the table, not only as a
  *    per-row pill."
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * SHADOWING IS THE SERVER'S VERDICT. Deciding that rule A is shadowed means
  * comparing every rule against every other, including rules a team-scoped
@@ -67,6 +68,7 @@ const {
   deleteTeamExpectingStatus,
 } = require('../utils/oncall-seed-ext.js');
 const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { DEFAULT_TEAM_LOCK, acquireOrgLock } = require('../utils/oncall-org-lock.js');
 
 const PREFIX = 'e2e_oncall_routing';
 
@@ -143,7 +145,9 @@ test.describe('On-call routing rules', {
 
   test('the routing page loads with both tabs', {
     tag: ['@P0', '@smoke'],
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    // With no team the screen draws its "create a team" empty state instead of the tabs.
+    await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_smoke`) });
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectPageVisible();
@@ -231,7 +235,7 @@ test.describe('On-call routing rules', {
   test('§11.4 the team routing tab notes the overlap on the row itself', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const { broad, narrow } = await seedOverlappingRules(page, testInfo);
+    const { broad, narrow, broadTeam, narrowTeam } = await seedOverlappingRules(page, testInfo);
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
     // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
@@ -258,7 +262,9 @@ test.describe('On-call routing rules', {
     const note = await pm.oncallRoutingPage.readRuleNote(ruleId);
     testLogger.info('§11.4 team-tab overlap note', { ruleId, note });
     expect(note ?? '', 'a rule that cannot bite gets a line of its own').not.toBe('');
-    expect(note, 'the note is about specificity, not about traffic').toMatch(/overlap/i);
+    const claimant = owningTeamId === broadTeam.id ? narrowTeam : broadTeam;
+    expect(note, 'the note is about specificity, not about traffic: it names the team whose rule takes the pages')
+      .toBe(`Also claimed by ${claimant.name}`);
   });
 
   // ------------------------------------------------- Tier 1 (TS-12, TS-13, TS-14)
@@ -302,10 +308,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.selectTab('rules');
     await pm.oncallRoutingPage.openRuleEditor();
     await pm.oncallRoutingPage.chooseRuleTeam(f.team.id, f.team.name);
-    // The editor opens on the scope picker, which offers claims built from
-    // dimensions the org has already seen; a freshly-seeded service is not one,
-    // so the rule is written on the dimension builder behind it.
-    await pm.oncallRoutingPage.useAdvancedRuleScope();
+    // A freshly-seeded service is not a known value yet, so it is typed into the row's value picker.
     await pm.oncallRoutingPage.addCondition('service', f.service);
     await pm.oncallRoutingPage.saveRule();
 
@@ -384,7 +387,7 @@ test.describe('On-call routing rules', {
    * endpoint validates, and weakening it to assert the 200 would pin the defect
    * as correct.
    */
-  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — W-03: POST /oncall/ownership accepts {"totally_made_up_dim":"x"} with 200, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — the API stores it with 200. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_w03`) });
@@ -443,6 +446,40 @@ test.describe('On-call routing rules', {
       pm.oncallRoutingPage.getRuleHealth(ruleId),
       'the verdict must be on screen with nothing clicked',
     ).toBeVisible({ timeout: 30000 });
+  });
+
+  test('an edited rule never loses a condition whose value was emptied', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
+    const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_edit`) });
+    const rule = await createOwnershipRule(page, {
+      teamId: team.id,
+      dimensions: { namespace: `${service}_ns`, service },
+    });
+    // A second rule guarantees `region` is offered as a field whatever discovery has seen.
+    await createOwnershipRule(page, { teamId: team.id, dimensions: { region: `${service}_eu` } });
+
+    await pm.oncallRoutingPage.goto(ORG);
+    await pm.oncallRoutingPage.expectAvailable();
+    await pm.oncallRoutingPage.selectTab('rules');
+    await pm.oncallRoutingPage.openRuleEditorFor(rule.id);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+
+    // Rows are sorted by field, so row 0 is namespace.
+    await pm.oncallRoutingPage.changeConditionField(0, 'region', 'Region');
+    await pm.oncallRoutingPage.expectConditionNeedsValue(0);
+
+    await pm.oncallRoutingPage.removeCondition(0);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+    await pm.oncallRoutingPage.saveRule();
+
+    // The removed row took namespace with it; the emptied region must not ride along as "".
+    await expect.poll(
+      async () => (await listOwnershipRules(page, team.id))
+        .find((one) => (one.id ?? one.rule_id) === rule.id)?.dimensions,
+      { timeout: 60000, intervals: [1000], message: 'the edited rule never saved as service alone' },
+    ).toEqual({ service });
   });
 
   /**
@@ -507,11 +544,7 @@ test.describe('On-call routing rules', {
 
     // The screen has to show it, not just the API.
     //
-    // The ORG routing screen draws `OnCallOwnershipRules` (the stats table,
-    // keyed `oncall-rule-team-{id}`). `oncall-routing-row-{id}` belongs to
-    // `OnCallRoutingList`, which only the TEAM's own routing tab renders — so
-    // asking for it here was asking the wrong component for a row it never
-    // draws, on a screen that was otherwise fine.
+    // The org page and the team tab draw the same list, keyed `oncall-rule-team-{id}`.
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectOrgRuleRowVisible(rule.id);
@@ -591,6 +624,28 @@ test.describe('On-call routing rules', {
    * they are at least good citizens of the org they borrow.
    */
   test.describe.serial('org default team', () => {
+    let releaseLock = null;
+    let priorDefault = null;
+    let restoreDefault = false;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+      releaseLock = await acquireOrgLock(DEFAULT_TEAM_LOCK, { testInfo });
+      priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      restoreDefault = true;
+    });
+
+    // Restored even when the test fails: a leaked nomination routes every other worker's unmatched page.
+    test.afterEach(async ({ page }) => {
+      try {
+        // afterEach still runs when the outer beforeEach skipped, and then there is nothing to restore.
+        if (restoreDefault) await setDefaultTeam(page, priorDefault);
+      } finally {
+        releaseLock?.();
+        releaseLock = null;
+        restoreDefault = false;
+      }
+    });
+
     /**
      * TS-14.01 and TS-14.02 in ONE test, deliberately.
      *
@@ -701,15 +756,12 @@ test.describe('On-call routing rules', {
     test('TS-14.03 a signal that only defaulted is recorded as defaulted, and a claimed one is not recorded at all', {
       tag: ['@P1'],
     }, async ({ page }, testInfo) => {
-    // A real firing has to clear ingestion, the scheduler and the ladder; the
-    // 3-minute default is for screens, not for this.
-    test.setTimeout(900_000);
+      // A real firing clears ingestion, the scheduler and the ladder; added to, not set, so beforeEach's lock wait is kept.
+      test.setTimeout(testInfo.timeout - testInfo.project.timeout + 900_000);
       const f = await seedPageableFixture(page, testInfo, 'owned');
       await createOwnershipRule(page, { teamId: f.team.id, dimensions: { service: f.service } });
 
-      // Nominate a default so an unmatched signal has somewhere to land,
-      // remembering what was there so the org is handed back as it was found.
-      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      // Nominate a default so an unmatched signal has somewhere to land.
       await setDefaultTeam(page, f.team.id);
       await expect.poll(async () => (await getRoutingConfig(page))?.default_team_id,
         { timeout: 60000, intervals: [1000] }).toBe(f.team.id);
@@ -762,8 +814,6 @@ test.describe('On-call routing rules', {
         pm.oncallRoutingPage.getUnroutedFilterDefault(),
         'the screen must offer the defaulted-vs-unowned distinction, not just one undifferentiated queue',
       ).toBeVisible({ timeout: 30000 });
-
-      await setDefaultTeam(page, priorDefault).catch(() => {});
     });
 
     /**
@@ -791,7 +841,6 @@ test.describe('On-call routing rules', {
     }, async ({ page }, testInfo) => {
       const name = uniqueName(`${workerPrefix(testInfo)}_dflt`);
       const team = await createTeam(page, { name });
-      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
 
       await pm.oncallRoutingPage.goto(ORG);
       await pm.oncallRoutingPage.expectAvailable();
@@ -853,9 +902,6 @@ test.describe('On-call routing rules', {
       // And the screen still says which team is the catch-all.
       await pm.oncallRoutingPage.goto(ORG);
       await pm.oncallRoutingPage.expectDefaultTeamLabelNames(name);
-
-      // Leave the org as it was found: an org-wide nomination outlives this spec.
-      await setDefaultTeam(page, priorDefault).catch(() => {});
     });
   });
 });

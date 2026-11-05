@@ -120,23 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  size="sm"
-                  data-test="trace-details-error-spans-count"
-                  class="py-1!"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <TraceErrorSpansMenu :errors="errorSpans" compact @select="selectErrorSpan" />
+              </template>
             </div>
           </template>
 
@@ -190,9 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="openUpgradeDialog"
               >
                 <OIcon name="fact-check" size="sm" />
-                <template #icon-right
-                  ><OIcon name="lock" size="xs" class="text-warning-600"
-                /></template>
+                <template #icon-right><OIcon name="lock" size="xs" class="lock-chip" /></template>
               </OButton>
             </template>
 
@@ -206,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="table-chart" size="sm" />
               <template v-if="!queuesAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-warning-600" />
+                <OIcon name="lock" size="xs" class="lock-chip" />
               </template>
               <OTooltip
                 v-if="queuesAccess.allowed"
@@ -228,12 +213,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </template>
         </OPageHeader>
@@ -355,21 +340,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="me-[0.85rem] inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  data-test="trace-details-error-spans-count"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <span class="me-[0.85rem] inline-flex">
+                  <TraceErrorSpansMenu :errors="errorSpans" @select="selectErrorSpan" />
+                </span>
+              </template>
             </div>
           </div>
 
@@ -414,13 +390,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
         </header>
@@ -469,6 +445,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-critical-path-toggle"
               @update:model-value="setShowCriticalPath"
             />
+            <OButton
+              v-if="activeTab === 'waterfall' && askAiVisible"
+              variant="outline"
+              size="sm"
+              class="h-8! text-xs font-normal!"
+              data-test="trace-explain-trace-btn"
+              @click="explainTrace"
+            >
+              <template #icon-left>
+                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              </template>
+              {{ t("traces.askAi.explainTrace") }}
+              <OTooltip side="bottom" :content="t('traces.askAi.explainTraceHint')" />
+            </OButton>
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -539,17 +529,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-44!"
               />
               <span class="traces-view-logs-btn ps-1">
-                <!-- Single button with wrapper for tooltip functionality -->
-                <span class="inline-block" tabindex="0">
+                <OTooltip v-if="logsLocked" :content="logsLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      data-test="trace-details-view-logs-btn"
+                      variant="outline"
+                      size="sm"
+                      class="h-8! text-xs font-normal!"
+                      disabled
+                      icon-left="lock"
+                    >
+                      {{
+                        searchObj.meta.redirectedFromLogs
+                          ? t("traces.backToLogs")
+                          : t("traces.viewLogs")
+                      }}
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <span v-else class="inline-block" tabindex="0">
                   <OButton
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
                     size="sm"
                     class="h-8! text-xs font-normal!"
+                    icon-left="search"
                     :disabled="isViewLogsDisabled"
                     @click="redirectToLogs"
                   >
-                    <template #icon-left><OIcon name="search" size="xs" /></template>
                     {{
                       searchObj.meta.redirectedFromLogs
                         ? t("traces.backToLogs")
@@ -564,8 +571,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </span>
             </div>
+            <OTooltip
+              v-if="hasReplaySession && !hideSessionReplayButton && rumLocked"
+              :content="rumLockedReason"
+            >
+              <span class="ms-1 inline-flex">
+                <OButton
+                  data-test="trace-details-view-session-replay-btn"
+                  variant="outline"
+                  size="sm"
+                  disabled
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" class="lock-chip" size="sm" />
+                  </template>
+                  {{ t("rum.playSessionReplay") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
-              v-if="hasReplaySession && !hideSessionReplayButton"
+              v-else-if="hasReplaySession && !hideSessionReplayButton"
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
@@ -707,6 +732,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -771,6 +798,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -851,6 +880,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -904,12 +935,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <!-- Chart Container -->
-              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+              <div class="relative min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="trace-details-service-map-chart"
                   :data="traceServiceMapChartOptions"
+                  :key="traceGraphChartKey"
                   class="h-full"
+                />
+                <ChartZoomControls
+                  v-if="traceGraphHasChart"
+                  data-test-prefix="trace-graph"
+                  @zoom-in="zoomTraceGraphIn"
+                  @zoom-out="zoomTraceGraphOut"
+                  @fit="fitTraceGraph"
                 />
               </div>
             </div>
@@ -929,6 +968,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="trace-details-loading-text" class="pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
+    </div>
+    <div
+      v-else-if="licenseLockedView"
+      class="flex min-h-0 flex-1 flex-col"
+      data-test="trace-details-license-locked"
+    >
+      <FeatureLockExempt v-if="showBackButton" class="shrink-0">
+        <OPageHeader
+          :title="t('menu.traces')"
+          :back="{ onClick: handleBackOrClose, dataTest: 'trace-details-back-btn' }"
+        />
+      </FeatureLockExempt>
+      <LicenseDeniedState :features="['traces']" />
     </div>
 
     <!-- Filters Sidebar -->
@@ -1004,12 +1056,18 @@ import {
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
+import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
+import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
+import { buildTraceAiPayload, type AiChatHandoff } from "./utils/traceAiPayload";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1035,8 +1093,13 @@ import {
 } from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
-import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
-import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import {
+  buildFilterTerm,
+  applyFilterTerm,
+  mergeFilterTerm,
+  mergePendingFilters,
+} from "@/utils/traces/filterUtils";
+import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
 import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
@@ -1051,9 +1114,11 @@ import { spanWindowUs, waterfallAxisSpans } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder, { hasDanglingParent } from "@/composables/rum/useRumSpanBuilder";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
@@ -1094,6 +1159,8 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation, type KeyFieldsConfig } from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import useChartZoom from "@/composables/traces/useChartZoom";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/FlameGraphView.vue"));
@@ -1298,16 +1365,25 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // Only the routed Traces page has a listener for sendToAiChat; embeds leave this off.
+    showAskAi: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     ShareButton,
     OPageHeader,
+    FeatureLockExempt,
+    LicenseDeniedState,
     OTag,
     TraceDetailsSidebar,
     TraceTree,
     TraceDAG,
     TraceHeader,
+    TraceErrorSpansMenu,
     FlameGraphView,
+    ChartZoomControls,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -1330,7 +1406,7 @@ export default defineComponent({
     AddToDatasetDrawer,
   },
 
-  emits: ["searchQueryUpdated", "close", "spanSelected"],
+  emits: ["searchQueryUpdated", "close", "spanSelected", "sendToAiChat"],
   setup(props, { emit }) {
     const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
     provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
@@ -1345,7 +1421,17 @@ export default defineComponent({
     const traceGraphSearch = ref("");
     const sidebarActiveTab = ref("attributes");
 
-    const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      navigateToCorrelatedLogs,
+      navigateToLogs,
+      buildQueryDetails,
+    } = useTraces();
+    const { locked: correlationLocked } = useLicenseLock("correlation");
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
+    const { locked: tracesLocked } = useLicenseLock("traces");
+    const licenseLockedView = computed(() => props.mode !== "embedded" && tracesLocked.value);
 
     const { loadKeyFields } = useServiceCorrelation();
 
@@ -1361,6 +1447,18 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // Recreating the chart drops the tree view's hover listeners, so fit re-attaches them.
+    const {
+      chartKey: traceGraphChartKey,
+      zoomIn: zoomTraceGraphIn,
+      zoomOut: zoomTraceGraphOut,
+      fitToScreen: fitTraceGraph,
+    } = useChartZoom(
+      () => chartRendererRef.value?.chart,
+      () => {
+        setupTooltips();
+      },
+    );
     // The tree view's span sidebar; it owns the correlation lookup.
     const treeSidebarRef = ref<any>(null);
 
@@ -1384,6 +1482,7 @@ export default defineComponent({
 
     // Pattern View - new functionality
     const consolidatedPatterns = ref(new Map());
+    const tracePathPatterns = ref(new Map());
     const { isDark: isDarkMode } = useTheme();
 
     // Set up pattern tree composable and visualization engine
@@ -1393,7 +1492,10 @@ export default defineComponent({
       getNodeLabel: getPatternNodeLabel,
       getNodeTooltip: getPatternNodeTooltip,
       getNodeErrorRate: getPatternNodeErrorRate,
-    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode, tracePathPatterns);
+    const traceGraphTree = computed(() =>
+      filterTraceTree(patternTreeData.value, traceGraphSearch.value),
+    );
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
@@ -1455,7 +1557,7 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
-      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      const treeData = traceGraphTree.value;
       // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
       if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
@@ -1480,6 +1582,10 @@ export default defineComponent({
         lazyUpdate: true,
       };
     });
+
+    const traceGraphHasChart = computed(
+      () => !!(traceServiceMapChartOptions.value.options as { series?: unknown }).series,
+    );
 
     const spanDimensions = {
       height: 30,
@@ -1557,10 +1663,16 @@ export default defineComponent({
       showFilterPopover.value = true;
     };
 
-    const applyAndViewTraces = () => {
-      searchObj.data.editorValue = searchObj.data.editorValue
-        ? searchObj.data.editorValue + " and " + localEditorValue.value
-        : localEditorValue.value;
+    // A full view opened in a new browser tab starts with the default search mode, so the URL's tab wins.
+    const originSearchTab = (): "traces" | "spans" => {
+      const tab = router.currentRoute.value.query.tab;
+      if (tab === "traces" || tab === "spans") return tab;
+      // Only the traces and spans tabs run a search, so any other tab falls back to spans.
+      return searchObj.meta.searchMode === "traces" ? "traces" : "spans";
+    };
+
+    const viewTracesWithQuery = (editorValue: string) => {
+      searchObj.data.editorValue = editorValue;
       showFilterPopover.value = false;
       localEditorValue.value = "";
       areFiltersAdded.value = false;
@@ -1572,9 +1684,18 @@ export default defineComponent({
         query.from = searchObj.data.datetime.startTime.toString();
         query.to = searchObj.data.datetime.endTime.toString();
       }
-      query.query = b64EncodeUnicode(searchObj.data.editorValue);
+      query.query = b64EncodeUnicode(editorValue);
       query["run-query"] = "true";
+      query.tab = originSearchTab();
       router.push({ name: "traces", query });
+    };
+
+    const applyAndViewTraces = () => {
+      viewTracesWithQuery(
+        searchObj.data.editorValue
+          ? searchObj.data.editorValue + " and " + localEditorValue.value
+          : localEditorValue.value,
+      );
     };
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1634,6 +1755,7 @@ export default defineComponent({
 
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
+      if (logsLocked.value) return true;
       // In non-enterprise mode with visible log stream selector, disable when no streams are selected
       return (
         config.isEnterprise !== "true" &&
@@ -1659,6 +1781,7 @@ export default defineComponent({
     // Gate and target share one span so the button never links to a session with nothing to play.
     const replaySpan = computed(() => resolveReplaySpan(spanList.value));
     const hasReplaySession = computed(() => replaySpan.value !== null);
+    const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
 
     // Computed properties for mode-based priority logic
     const effectiveTraceId = computed(() => {
@@ -1764,11 +1887,7 @@ export default defineComponent({
     });
 
     // Computed properties for new header
-    const errorSpansCount = computed(() => {
-      const spans = effectiveSpanList.value;
-      if (!spans || spans.length === 0) return 0;
-      return spans.filter((span: any) => span.span_status === "ERROR").length;
-    });
+    const errorSpans = computed(() => errorSpansDeepestFirst(effectiveSpanList.value ?? []));
 
     const rootServiceName = computed(() => {
       if (traceTree.value.length > 0) {
@@ -2114,6 +2233,29 @@ export default defineComponent({
       },
     );
 
+    const { aiIconSrc } = useAiIcon();
+    const askAiVisible = computed(
+      () => props.showAskAi && config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const relayToAiChat = (payload: AiChatHandoff) => emit("sendToAiChat", payload);
+
+    const explainTrace = () => {
+      const trace = searchObj.data.traceDetails.selectedTrace;
+      const criticalPath = computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode));
+      relayToAiChat(
+        buildTraceAiPayload(t, {
+          spans: effectiveSpanList.value,
+          criticalPathSpanIds: criticalPath.map((section) => section.spanId),
+          rootOperation: String(traceTree.value[0]?.operationName ?? ""),
+          traceId: effectiveTraceId.value,
+          stream: currentTraceStreamName.value,
+          traceStartTime: Number(trace?.trace_start_time) || 0,
+          traceEndTime: Number(trace?.trace_end_time) || 0,
+        }),
+      );
+    };
+
     const setShowCriticalPath = (value: unknown) => {
       showCriticalPath.value = value === true;
       try {
@@ -2174,7 +2316,10 @@ export default defineComponent({
           tooltipCleanup = setupTraceNodeTooltips(
             chart,
             {
-              treeData: patternTreeData.value,
+              // A getter, so a hover resolves its tree path in the tree the chart draws now, even after a search.
+              get treeData() {
+                return traceGraphTree.value;
+              },
               getNodeTooltip: getPatternNodeTooltip,
               getNodeErrorRate: getPatternNodeErrorRate,
             } as TreeVisualizationData,
@@ -2275,6 +2420,8 @@ export default defineComponent({
         return;
       }
 
+      // The route-locked page shows its locked view; the details call would only 403.
+      if (licenseLockedView.value) return;
       // Fetch from API — standalone mode, or embedded with no pre-fetched spans
       await loadLogStreams();
       const timeRange = effectiveTimeRange.value;
@@ -2547,6 +2694,8 @@ export default defineComponent({
         analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
         if (generation !== loadGeneration) return;
+        // The top bar explains a license denial; redirecting would leave the locked page.
+        if (licenseDeniedFeatures(error) !== null) return;
         // A 401 is the expired session the global handler is already logging the user out of.
         if ((error as { response?: { status?: number } })?.response?.status !== 401) {
           console.error("Error fetching trace details:", error);
@@ -2894,6 +3043,7 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
+      tracePathPatterns.value = buildPathPatterns(traceTree.value);
       consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
@@ -3177,6 +3327,10 @@ export default defineComponent({
         return;
       }
 
+      if (correlationLocked.value) {
+        navigateToLogs(buildQueryDetails(spanMap.value[spanId] ?? span));
+        return;
+      }
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
         navigateToCorrelatedLogs(correlationData);
@@ -3275,6 +3429,10 @@ export default defineComponent({
       }
     };
 
+    const selectErrorSpan = (spanId: string) => {
+      updateSelectedSpan(spanId, true);
+    };
+
     const handleDAGNodeClick = (spanId: string) => {
       updateSelectedSpan(spanId);
     };
@@ -3301,9 +3459,9 @@ export default defineComponent({
       operator: "=" | "!=";
     }) => {
       const term = buildFilterTerm(field, value, operator);
-      localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
-      areFiltersAdded.value = true;
-      applyAndViewTraces();
+      // viewTracesWithQuery clears the pending sidebar filters, so they go into the query first.
+      const query = mergePendingFilters(localEditorValue.value, searchObj.data.editorValue ?? "");
+      viewTracesWithQuery(mergeFilterTerm(term, query));
     };
 
     const handleExpandToFullView = () => {
@@ -3313,6 +3471,7 @@ export default defineComponent({
         from: effectiveTimeRange.value.from.toString(),
         to: effectiveTimeRange.value.to.toString(),
         org_identifier: effectiveOrgIdentifier.value,
+        tab: originSearchTab(),
       };
 
       // Add log_stream parameter for correlation navigation
@@ -3415,6 +3574,10 @@ export default defineComponent({
       raw,
       showCriticalPath,
       setShowCriticalPath,
+      aiIconSrc,
+      askAiVisible,
+      relayToAiChat,
+      explainTrace,
       traceGraphView,
       setTraceGraphView,
       traceGraphSearch,
@@ -3454,6 +3617,11 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      traceGraphChartKey,
+      traceGraphHasChart,
+      zoomTraceGraphIn,
+      zoomTraceGraphOut,
+      fitTraceGraph,
       treeSidebarRef,
       activeVisual,
       traceVisuals,
@@ -3475,6 +3643,11 @@ export default defineComponent({
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasReplaySession,
+      rumLocked,
+      rumLockedReason,
+      logsLocked,
+      logsLockedReason,
+      licenseLockedView,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,
@@ -3545,7 +3718,8 @@ export default defineComponent({
       hasLLMSpans,
       hasPreviewableSpans,
       // New header computed properties
-      errorSpansCount,
+      errorSpans,
+      selectErrorSpan,
       rootServiceName,
       traceStartTime,
       canManualEvaluate,

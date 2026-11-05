@@ -107,6 +107,29 @@ describe("CompositeAlertForm", () => {
     },
   );
 
+  it("keeps save blocked when a pending server validation resolves after the draft became invalid", async () => {
+    let resolvePending!: (value: { data: typeof validPreview }) => void;
+    vi.mocked(alertsService.validateComposite).mockReturnValueOnce(
+      new Promise((resolve) => (resolvePending = resolve)) as any,
+    );
+    const wrapper = mountForm();
+    await wrapper.setProps({
+      modelValue: draft({
+        composite_condition: {
+          expression: "({id-a} && {id-b}",
+          warning_counts_as_firing: true,
+          stale_child_policy: "use_last_state",
+        },
+      }),
+    });
+    resolvePending({ data: validPreview });
+    await flushPromises();
+
+    expect(wrapper.emitted("validation")?.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ valid: false }),
+    );
+  });
+
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
     const wrapper = mountForm(draft());
 

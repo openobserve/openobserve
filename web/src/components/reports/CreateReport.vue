@@ -109,6 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      change, wiping each field's TanStack error meta. -->
                 <template v-for="(dashboard, index) in dashboardRows" :key="index">
                   <div :data-test="`add-report-dashboard-${index}`" class="my-2 flex flex-col px-2">
+                    <div
+                      v-if="dashboardsLocked"
+                      class="text-text-secondary mb-2 flex items-center gap-1 text-xs"
+                      data-test="add-report-dashboards-locked"
+                    >
+                      <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+                      {{ dashboardsLockedReason }}
+                    </div>
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
@@ -120,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-folder-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].folder`"
                           :options="folderOptions"
                           :label="t('reports.dashboardFolder')"
@@ -137,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-name-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].dashboard`"
                           :options="dashboardOptions"
                           :label="t('reports.dashboard')"
@@ -154,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-tab-select"
+                          :disabled="dashboardsLocked"
                           :name="`dashboards[${index}].tabs`"
                           :options="dashboardTabOptions"
                           :label="t('reports.dashboardTab')"
@@ -665,6 +676,7 @@ import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeCreateReportSchema,
@@ -794,6 +806,8 @@ const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? [
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
 
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
 const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
 const dashboardOptions: Ref<{ label: I18nText; value: string; tabs: any[]; version: number }[]> =
@@ -827,8 +841,7 @@ const buildFormValues = (overrides: Partial<CreateReportForm> = {}): CreateRepor
   ...overrides,
 });
 
-// Seed the form's values (create-query / edit prefill). Async-arriving data is
-// applied with `form.reset(values)`, not a per-field setFieldValue loop.
+// Replaces every value at once, for the edit prefill and a restored draft.
 const seedForm = async (values: CreateReportForm) => {
   await nextTick();
   form.reset(values);
@@ -845,6 +858,11 @@ const snapshot = () =>
   });
 
 onBeforeMount(async () => {
+  const initialReportFolderId = selectedReportFolderId.value;
+  const initialQuery = router.currentRoute.value.query;
+  // Needs nothing fetched, so it is seeded before the user can flip the switch.
+  if (!(initialQuery.report_id || initialQuery.name) && initialQuery.type === "cached")
+    form.setFieldValue("isCachedReport", true, { dontUpdateMeta: true });
   await getFoldersListByType(store, "reports");
   await getDashboaordFolders();
 
@@ -852,8 +870,9 @@ onBeforeMount(async () => {
   isEditingReport.value = !!(query?.report_id || query?.name);
 
   if (!isEditingReport.value) {
-    await setInitialReportData();
-    originalReportData.value = snapshot();
+    const seeded = await setInitialReportData();
+    // Built from what the page seeds, not read back, so edits made while loading still count as changes.
+    originalReportData.value = JSON.stringify({ values: seeded, folderId: initialReportFolderId });
     await reportDraft.start();
   } else {
     isFetchingReport.value = true;
@@ -1046,16 +1065,28 @@ const setInitialReportData = async () => {
   // Load the options the query-seeded selections need (no cascade @update fires
   // for programmatic seeding, so load them here).
   if (dashboardFolderId) await setDashboardOptions(dashboardFolderId);
-  if (dashboardFolderId && dashboardId) setDashboardTabOptions(dashboardId);
 
-  const row = {
+  const seededRow = {
     ...createReportDefaults().dashboards[0],
     folder: dashboardFolderId ?? "",
     dashboard: dashboardFolderId && dashboardId ? dashboardId : "",
     tabs: dashboardId && tabId ? tabId : "",
   };
 
-  await seedForm(buildFormValues({ isCachedReport: cached, dashboards: [row] }));
+  // Per-field writes into still-untouched fields only: the user may have typed or picked while the fetches ran.
+  const seed = { dontUpdateMeta: true };
+  const row = form.state.values.dashboards?.[0];
+  const folderUntouched = !row?.folder;
+  if (folderUntouched && seededRow.folder)
+    form.setFieldValue("dashboards[0].folder", seededRow.folder, seed);
+  if (folderUntouched && seededRow.dashboard && !row?.dashboard) {
+    setDashboardTabOptions(seededRow.dashboard);
+    form.setFieldValue("dashboards[0].dashboard", seededRow.dashboard, seed);
+  }
+  if (folderUntouched && seededRow.tabs && !row?.tabs)
+    form.setFieldValue("dashboards[0].tabs", seededRow.tabs, seed);
+
+  return buildFormValues({ isCachedReport: cached, dashboards: [seededRow] });
 };
 
 // Cascade: USER picks a folder → clear that row's dependent dashboard/tabs + load
@@ -1074,34 +1105,39 @@ const onFolderSelection = async (id: string, index = 0) => {
   }
 };
 
+let dashboardOptionsRequest = 0;
+
 const setDashboardOptions = (id: string) => {
-  dashboardOptions.value.length = 0;
+  if (dashboardsLocked.value) return Promise.resolve(true);
+  const request = ++dashboardOptionsRequest;
+  dashboardOptions.value = [];
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
     dashboardService
       .list(0, 10000, "name", false, "", store.state.selectedOrganization.identifier, id, "")
       .then((response: any) => {
-        response.data.dashboards
+        // A later folder pick owns the list; an older response landing after it must not fill it.
+        if (request !== dashboardOptionsRequest) return resolve(true);
+        dashboardOptions.value = response.data.dashboards
           .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
-          .forEach(
-            (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => {
-              dashboardOptions.value.push({
-                label: raw(dashboard.title),
-                value: dashboard.dashboardId,
-                tabs: dashboard?.tabs?.map((tab) => ({
-                  label: raw(tab.name),
-                  value: tab.tabId,
-                })) || [{ label: t("reports.destinationDefault"), value: "default" }],
-                version: dashboard.version,
-              });
-              options.value["dashboards"] = [...dashboardOptions.value];
-            },
+          .map(
+            (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => ({
+              label: raw(dashboard.title),
+              value: dashboard.dashboardId,
+              tabs: dashboard?.tabs?.map((tab) => ({
+                label: raw(tab.name),
+                value: tab.tabId,
+              })) || [{ label: t("reports.destinationDefault"), value: "default" }],
+              version: dashboard.version,
+            }),
           );
-
+        options.value["dashboards"] = [...dashboardOptions.value];
         resolve(true);
       })
       .catch((_err) => reject(true))
-      .finally(() => (isFetchingDashboard.value = false));
+      .finally(() => {
+        if (request === dashboardOptionsRequest) isFetchingDashboard.value = false;
+      });
   });
 };
 
@@ -1226,6 +1262,7 @@ const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({
 });
 
 const getDashboaordFolders = () => {
+  if (dashboardsLocked.value) return Promise.resolve(true);
   return new Promise((resolve, reject) => {
     isFetchingFolders.value = true;
     dashboardService
@@ -1517,14 +1554,20 @@ const setupEditingReport = async (report: any) => {
   // Resolve folder/dashboard/tab against the loaded options (drop + warn if the
   // saved selection has since been deleted).
   let folder = "";
-  if (folderOptions.value.some((f) => f.value === report.dashboards[0].folder)) {
+  if (
+    dashboardsLocked.value ||
+    folderOptions.value.some((f) => f.value === report.dashboards[0].folder)
+  ) {
     folder = report.dashboards[0].folder;
   } else {
     toast({ variant: "error", message: t("toastMessages.reports.selectedFolderHasBeenDeleted") });
   }
 
   let dashboard = "";
-  if (dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)) {
+  if (
+    dashboardsLocked.value ||
+    dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)
+  ) {
     dashboard = report.dashboards[0].dashboard;
   } else {
     toast({
@@ -1537,7 +1580,9 @@ const setupEditingReport = async (report: any) => {
 
   let tabs = "";
   const tab = dashboardTabOptions.value.find((t) => t.value === report.dashboards[0].tabs[0]);
-  if (tab) {
+  if (dashboardsLocked.value) {
+    tabs = report.dashboards[0].tabs[0] ?? "";
+  } else if (tab) {
     tabs = tab.value;
   } else {
     toast({

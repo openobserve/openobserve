@@ -59,7 +59,6 @@ export class OnCallPolicyEditorPage {
       panelPolicy: '[data-test="oncall-policy-panel-policy"]',
       rungPanel: '[data-test="oncall-policy-rung"]',
       silent: '[data-test="oncall-policy-silent"]',
-      sentence: '[data-test="oncall-policy-sentence"]',
       save: '[data-test="oncall-policy-save"]',
 
       // delivery tab
@@ -68,7 +67,6 @@ export class OnCallPolicyEditorPage {
       teamChannel: '[data-test="oncall-team-channel"]',
       teamChannelSelect: '[data-test="oncall-team-channel-select"]',
       teamChannelSource: '[data-test="oncall-team-channel-source"]',
-      teamChannelSave: '[data-test="oncall-team-channel-save"]',
       teamChannelClear: '[data-test="oncall-team-channel-clear"]',
       teamChannelSilent: '[data-test="oncall-team-channel-silent"]',
 
@@ -220,15 +218,17 @@ export class OnCallPolicyEditorPage {
   }
 
   /**
-   * The provenance tag's text — "set on this team" or "from the policy".
+   * Where the team channel's answer comes from: 'team' or 'policy'.
    *
-   * This is the ONLY rendered difference between `Some([])` and `None`: both
-   * draw an empty destination list.
+   * The only rendered difference between `Some([])` and `None`, both of which draw an
+   * empty list: a team's own list offers "Use the policy's list"; an inherited one
+   * carries the "from the policy" tag.
    */
-  async readChannelSourceText() {
+  async readChannelSource() {
+    const clear = this.page.locator(this.locators.teamChannelClear).first();
     const tag = this.page.locator(this.locators.teamChannelSource).first();
-    await tag.waitFor({ state: 'visible', timeout: 20000 });
-    return ((await tag.innerText().catch(() => '')) || '').trim();
+    await expect(clear.or(tag)).toBeVisible({ timeout: 20000 });
+    return (await clear.isVisible()) ? 'team' : 'policy';
   }
 
   async expectChannelSilentWarning() {
@@ -254,10 +254,6 @@ export class OnCallPolicyEditorPage {
     await option.click();
     // A multi-select keeps its popover open; close it so the Save button is hit.
     await this.page.keyboard.press('Escape');
-  }
-
-  async saveTeamChannel() {
-    await this.page.locator(this.locators.teamChannelSave).first().click();
   }
 
   // ------------------------------------------------------------------ L0

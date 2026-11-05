@@ -60,13 +60,16 @@ export class OnCallPagesListPage {
       causeFilter: '[data-test="oncall-responses-cause-filter"]',
       search: '[data-test="oncall-responses-search"]',
       groupToggle: '[data-test="oncall-responses-group-toggle"]',
+      filtersBtn: '[data-test="oncall-responses-filters-btn"]',
+      filtersPanel: '[data-test="oncall-responses-filters-panel"]',
       refresh: '[data-test="oncall-responses-refresh"]',
-      mineButton: '[data-test="oncall-responses-mine-btn"]',
+      scopeToggle: '[data-test="oncall-responses-scope"]',
+      scopeMine: '[data-test="oncall-responses-scope-mine"]',
+      scopeEveryone: '[data-test="oncall-responses-scope-everyone"]',
       empty: '[data-test="oncall-responses-empty"]',
       error: '[data-test="oncall-responses-error"]',
       unavailable: '[data-test="oncall-responses-unavailable"]',
       truncated: '[data-test="oncall-responses-truncated"]',
-      escalationCapped: '[data-test="oncall-escalation-capped"]',
       responderNobody: '[data-test="oncall-responder-nobody"]',
       onCallNowGap: '[data-test="oncall-oncallnow-gap"]',
 
@@ -75,7 +78,6 @@ export class OnCallPagesListPage {
       bulkAck: '[data-test="oncall-bulk-ack"]',
       bulkResolve: '[data-test="oncall-bulk-resolve"]',
       bulkSnooze: '[data-test="oncall-bulk-snooze"]',
-      bulkCancel: '[data-test="oncall-bulk-cancel"]',
 
       // Shared OTable furniture.
       body: '[data-test="o2-table-body"]',
@@ -92,13 +94,14 @@ export class OnCallPagesListPage {
       // The data-test lands on the OCheckbox LABEL; the thing that toggles is the
       // inner `button[role="checkbox"]`, so that is what is clicked.
       selectAll: '[data-test="o2-table-select-all"] button[role="checkbox"]',
-      confirmOk: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
       whoIsOn: '[data-test="oncall-who-is-on"]',
       whoIsOnPrimaryReach: '[data-test="oncall-who-is-on-primary-reach"]',
       setupBanner: '[data-test="oncall-setup-banner"]',
       setupChecklist: '[data-test="oncall-setup-checklist"]',
       setupExpand: '[data-test="oncall-setup-expand"]',
       setupCollapse: '[data-test="oncall-setup-collapse"]',
+      // The compact bar's close; hides it for this user in this org.
+      setupDismiss: '[data-test="oncall-setup-dismiss"]',
       pageSizeSelect: '[data-test="o2-table-page-size-select"]',
       paginationInfo: '[data-test="o2-table-pagination-info"]',
       firstPage: '[data-test="o2-table-first-page-btn"]',
@@ -109,7 +112,6 @@ export class OnCallPagesListPage {
   }
 
   // Built rather than stored — these carry a section key, a rowKey or an index.
-  filterTab(key) { return `[data-test="oncall-responses-tab-${key}"]`; }
   sectionHeader(key) { return `[data-test="oncall-section-header-${key}"]`; }
   sectionCount(key) { return `[data-test="oncall-section-count-${key}"]`; }
 
@@ -119,7 +121,6 @@ export class OnCallPagesListPage {
   rowIncident(rowKey) { return `[data-test="oncall-row-incident-${rowKey}"]`; }
   rowMore(rowKey) { return `[data-test="oncall-row-more-${rowKey}"]`; }
   rowTeam(rowKey) { return `[data-test="oncall-row-team-${rowKey}"]`; }
-  rowTimeline(rowKey) { return `[data-test="oncall-row-timeline-${rowKey}"]`; }
   rowLadderStarted(rowKey) { return `[data-test="oncall-ladder-started-${rowKey}"]`; }
   rowSnooze(rowKey, minutes) {
     return `[data-test="oncall-row-snooze-${rowKey}-${minutes}"]`;
@@ -143,7 +144,6 @@ export class OnCallPagesListPage {
   getSelectAll() { return this.page.locator(this.locators.selectAll).first(); }
   getBulkAck() { return this.page.locator(this.locators.bulkAck); }
   getBulkResolve() { return this.page.locator(this.locators.bulkResolve); }
-  getConfirmOk() { return this.page.locator(this.locators.confirmOk).first(); }
   getRowByIndex(index) { return this.page.locator(this.rowByIndex(index)); }
   getEscalationCell(responseId) { return this.page.locator(this.escalationCell(responseId)); }
   getWhoIsOn() { return this.page.locator(this.locators.whoIsOn); }
@@ -162,6 +162,16 @@ export class OnCallPagesListPage {
     const el = this.getSetupStep(key);
     if (!(await el.count())) return null;
     return await el.getAttribute('data-state');
+  }
+
+  /** Both the checklist and the table's loading flag wait on `setupLoaded`, so either settling means the setup context is in. */
+  async waitForSetupContext() {
+    const settled = this.page.locator([
+      this.locators.setupChecklist,
+      this.locators.setupBanner,
+      `${this.locators.table} [data-test="o2-table"][data-test-loading="false"]`,
+    ].join(', ')).first();
+    await expect(settled).toBeVisible({ timeout: 30000 });
   }
 
   /** Open the checklist if it is sitting collapsed behind its banner. */
@@ -196,17 +206,21 @@ export class OnCallPagesListPage {
   /**
    * Narrow to one state.
    *
-   * The tabs are an OToggleGroup, not a select: there is no popover, and each
-   * item reports `data-state`, so the click is verifiable rather than assumed.
+   * The state is an OSelect that opens on "Status: All" (no search box), so this
+   * picks its option by the raw value on `data-test-value`, never the translated label.
    *
-   * @param {'all'|'ringing'|'handled'|'resolved'|'snoozed'} key
+   * @param {'open'|'all'|'ringing'|'handled'|'resolved'|'snoozed'} key
    */
   async selectFilterTab(key) {
-    const tab = this.page.locator(this.filterTab(key));
-    await tab.waitFor({ state: 'visible', timeout: 20000 });
-    await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    await this._settleList();
+    await this._selectFilter(this.locators.filterTabs, key);
+  }
+
+  /** Cause and group-by sit behind the one Filters button; open it before reaching for either. */
+  async openFilters() {
+    const panel = this.page.locator(this.locators.filtersPanel).first();
+    if (await panel.isVisible().catch(() => false)) return;
+    await this.page.locator(this.locators.filtersBtn).first().click();
+    await panel.waitFor({ state: 'visible', timeout: 20000 });
   }
 
   /**
@@ -259,6 +273,7 @@ export class OnCallPagesListPage {
    * control is not there to click.
    */
   async filterByCause(cause) {
+    await this.openFilters();
     await this._selectFilter(this.locators.causeFilter, cause);
   }
 
@@ -282,6 +297,7 @@ export class OnCallPagesListPage {
   }
 
   async isGrouped() {
+    await this.openFilters();
     const control = this.getGroupToggleControl();
     await control.waitFor({ state: 'visible', timeout: 20000 });
     return (await control.getAttribute('data-state')) === 'checked';
@@ -296,13 +312,13 @@ export class OnCallPagesListPage {
     await this._settleList();
   }
 
-  /** Narrow to pages the signed-in user is on the hook for. Hidden when the viewer is unknown. */
-  async toggleMineOnly() {
-    const button = this.page.locator(this.locators.mineButton);
-    await button.waitFor({ state: 'visible', timeout: 20000 });
-    const before = await button.getAttribute('aria-pressed');
-    await button.click();
-    await expect(button).not.toHaveAttribute('aria-pressed', before ?? '', { timeout: 15000 });
+  /** Pick Mine or Everyone in the filter bar; it opens on Everyone. Hidden when the viewer is unknown or nothing has paged yet. */
+  async setScope(scope) {
+    const item = this.page.locator(scope === 'mine' ? this.locators.scopeMine : this.locators.scopeEveryone);
+    await item.waitFor({ state: 'visible', timeout: 20000 });
+    await item.click();
+    await expect(item).toHaveAttribute('data-state', 'on', { timeout: 15000 });
+    await this._settleList();
   }
 
   // ---------------------------------------------------------------- pagination
@@ -511,6 +527,22 @@ export class OnCallPagesListPage {
     await this.page.locator(this.rowSelect(target)).click();
   }
 
+  /** Resolve every selected row through the bulk dialog, picking `cause` by its wire value. */
+  async bulkResolveWithCause(cause) {
+    await this.getBulkResolve().click();
+    const dialog = this.page.locator('[data-test="oncall-bulk-resolve-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 20000 });
+    const field = '[data-test="oncall-bulk-resolve-cause"]';
+    const trigger = this.page.locator(part(field, 'trigger')).first();
+    await trigger.waitFor({ state: 'visible', timeout: 20000 });
+    await trigger.click();
+    const option = this.page.locator(`${part(field, 'option')}[data-test-value="${cause}"]`).first();
+    await option.waitFor({ state: 'visible', timeout: 20000 });
+    await option.click();
+    await this.page.locator('[data-test="oncall-bulk-resolve-confirm"]').click();
+    await expect(dialog).toBeHidden({ timeout: 20000 });
+  }
+
   async readBulkCount() {
     const node = this.page.locator(this.locators.bulkCount);
     if ((await node.count()) === 0) return null;
@@ -670,6 +702,7 @@ export class OnCallPagesListPage {
 
   /** The cause filter exists on the list, not only on the record — §TS-15.06. */
   async expectCauseFilterVisible() {
+    await this.openFilters();
     await expect(this.page.locator(this.locators.causeFilter)).toBeVisible({ timeout: 30000 });
   }
 

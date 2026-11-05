@@ -150,6 +150,7 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("oncall"), Lit("incidents"), Param, Lit("responses")], GET),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("unsnooze")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
     v1(&[Param, Lit("ai"), Lit("chat")], POST),
     v1(&[Param, Lit("ai"), Lit("chat_stream")], POST),
@@ -175,6 +176,8 @@ const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("update")], PATCH),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
+    v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("unacknowledge")], POST),
 ];
 
 /// Set only by the validator; a request extension, so a client can never supply it.
@@ -706,6 +709,7 @@ mod tests {
         );
         for reason in [
             DisabledReason::Edition,
+            DisabledReason::License,
             DisabledReason::Flag,
             DisabledReason::MasterKey,
             DisabledReason::SuperCluster,
@@ -713,6 +717,7 @@ mod tests {
             // A new reason must join this list: the match stops compiling until it does.
             match reason {
                 DisabledReason::Edition
+                | DisabledReason::License
                 | DisabledReason::Flag
                 | DisabledReason::MasterKey
                 | DisabledReason::SuperCluster => {}
@@ -859,6 +864,8 @@ mod tests {
             (Method::PATCH, "/v2/acme/alerts/incidents/i1/update"),
             (Method::POST, "/acme/oncall/responses/r1/resolve"),
             (Method::POST, "/acme/oncall/responses/r1/snooze"),
+            (Method::POST, "/acme/oncall/responses/r1/acknowledge"),
+            (Method::POST, "/acme/oncall/responses/r1/unacknowledge"),
         ] {
             assert_eq!(action_route(method.clone(), path), 200, "{method} {path}");
         }
@@ -872,7 +879,6 @@ mod tests {
             (Method::GET, "/acme/streams"),
             (Method::POST, "/v2/acme/downtimes"),
             (Method::POST, "/v2/acme/downtimes/d1/cancel"),
-            (Method::POST, "/acme/oncall/responses/r1/acknowledge"),
             (Method::GET, "/acme/oncall/responses/r1"),
             (Method::POST, "/v2/acme/alerts/incidents/i1/events/comment"),
             (Method::GET, "/v2/acme/alerts/incidents/i1"),
@@ -998,6 +1004,7 @@ mod tests {
             (Method::GET, "acme/oncall/teams/t1/on-call"),
             (Method::POST, "acme/oncall/responses/r1/acknowledge"),
             (Method::POST, "acme/oncall/responses/r1/snooze"),
+            (Method::POST, "acme/oncall/responses/r1/unsnooze"),
             (Method::POST, "acme/oncall/responses/r1/resolve"),
             (Method::POST, "acme/ai/chat_stream"),
             (Method::POST, "acme/ai/confirm/s1"),

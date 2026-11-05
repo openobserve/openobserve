@@ -263,6 +263,17 @@ describe("useDbmListPage", () => {
     expect(page.forbidden.value).toBe(false);
   });
 
+  it("run reports a license denial as forbidden even when the page has a 403 handler", async () => {
+    const { page } = mountPage({ load: vi.fn() });
+    const onForbidden = vi.fn();
+    const denial = {
+      response: { status: 403, data: { code: 40001, error_detail: "db_monitoring" } },
+    };
+    await page.run(() => Promise.reject(denial), { onForbidden });
+    expect(onForbidden).not.toHaveBeenCalled();
+    expect(page.forbidden.value).toEqual(["db_monitoring"]);
+  });
+
   it("run flags a 403 as forbidden, not an error, for a page with no handler", async () => {
     const { page } = mountPage({ load: vi.fn() });
     await page.run(() => Promise.reject(axiosErr(403, "Unauthorized Access")));

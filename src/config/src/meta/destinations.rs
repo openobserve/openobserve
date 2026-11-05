@@ -311,6 +311,20 @@ pub struct Template {
     pub body: String,
     #[serde(default)]
     pub kind: TemplateKind,
+    /// The kinds this template is meant for; empty means every kind.
+    #[serde(default)]
+    #[schema(value_type = Vec<String>)]
+    pub applies_to: Vec<crate::meta::alerts::notification_kind::NotificationKind>,
+}
+
+impl Template {
+    /// Empty `applies_to` applies to every kind.
+    pub fn applies_to_kind(
+        &self,
+        kind: crate::meta::alerts::notification_kind::NotificationKind,
+    ) -> bool {
+        self.applies_to.is_empty() || self.applies_to.contains(&kind)
+    }
 }
 
 impl MemorySize for Template {
@@ -320,6 +334,7 @@ impl MemorySize for Template {
             + self.org_id.mem_size()
             + self.name.mem_size()
             + self.body.mem_size()
+            + self.applies_to.len()
     }
 }
 
@@ -506,6 +521,7 @@ mod tests {
             },
             body: "Hello {{name}}!".to_string(),
             kind: TemplateKind::default(),
+            applies_to: Vec::new(),
         };
 
         assert_eq!(template.id, Some(id));
@@ -659,9 +675,8 @@ mod tests {
     fn test_prebuilt_destinations() {
         let prebuilt = Destination::prebuilt_destinations();
 
-        // Should have 8 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
-        // Opsgenie, ServiceNow, Email
-        assert_eq!(prebuilt.len(), 8);
+        // Slack, Teams, PagerDuty, Discord, Generic Webhook, Opsgenie, ServiceNow, Jira and Email.
+        assert_eq!(prebuilt.len(), 9);
 
         // Check that each destination has expected properties
         // Use flexible matching since names may vary between JSON config and built-in defaults

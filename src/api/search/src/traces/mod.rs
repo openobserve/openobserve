@@ -80,6 +80,33 @@ pub(crate) async fn check_stream_permissions(
     }
 }
 
+/// Requires search permission on every stream `sql` reads, not only the path stream.
+pub(crate) async fn check_sql_permissions(
+    org_id: &str,
+    user_id: &str,
+    sql: &str,
+    trace_id: &str,
+) -> Option<Response> {
+    #[cfg(feature = "enterprise")]
+    {
+        return crate::search::check_sql_stream_permissions(
+            sql,
+            org_id,
+            user_id,
+            StreamType::Traces,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+            trace_id,
+        )
+        .await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, sql, trace_id);
+        None
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/v1/traces",
@@ -226,7 +253,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -257,6 +285,7 @@ pub async fn get_latest_traces(
         user_id,
         &query,
         list::TraceListMode::Complete,
+        &trace_id,
     )
     .await
     {
@@ -313,8 +342,8 @@ pub async fn get_latest_traces(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
-        ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
+        ("from" = Option<i64>, Query, description = "from"),
+        ("size" = Option<i64>, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
@@ -325,6 +354,10 @@ pub async fn get_latest_traces(
         (status = 200, description = "Success", content_type = "text/event-stream"),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_latest_traces_stream(
@@ -337,7 +370,8 @@ pub async fn get_latest_traces_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -367,6 +401,7 @@ pub async fn get_latest_traces_stream(
         user_id,
         &query,
         list::TraceListMode::Streaming,
+        &trace_id,
     )
     .await
     {
@@ -397,6 +432,38 @@ fn record_latest_traces_metrics(org_id: &str, status: &str, elapsed: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_filter_handlers_authorize_the_sql_they_run() {
+        let handlers = [
+            (include_str!("list/mod.rs"), "pub async fn prepare(", "&sql"),
+            (
+                include_str!("user.rs"),
+                "pub async fn get_latest_users(",
+                "&query_sql",
+            ),
+            (
+                include_str!("session.rs"),
+                "pub async fn get_latest_sessions(",
+                "&query_sql",
+            ),
+        ];
+        for (text, handler, sql) in handlers {
+            let body = &text[text.find(handler).expect(handler)..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            let check = body
+                .find("check_sql_permissions(")
+                .unwrap_or_else(|| panic!("{handler} must authorize every stream its SQL reads"));
+            let call = &body[check..check + body[check..].find(')').expect("call end")];
+            assert!(
+                call.contains(sql),
+                "{handler} must authorize the SQL it runs"
+            );
+            if let Some(search) = body.find("cache::search(") {
+                assert!(check < search, "{handler} must authorize before searching");
+            }
+        }
+    }
 
     #[cfg(not(feature = "cloud"))]
     async fn call_traces_write(

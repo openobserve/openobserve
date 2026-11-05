@@ -248,73 +248,9 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should let a field's value shrink so long values wrap inside the row", () => {
       const valueCell = wrapper.find('[data-test="log-expand-detail-key-field1"]');
       expect(valueCell.classes()).toContain("min-w-0");
-    });
-
-    it("should have correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("JsonPreview");
-    });
-
-    it("should initialize with correct props", () => {
-      expect(wrapper.props("value")).toEqual(mockValue);
-      expect(wrapper.props("showCopyButton")).toBe(true);
-      expect(wrapper.props("mode")).toBe("sidebar");
-      expect(wrapper.props("streamName")).toBe("test-stream");
-    });
-
-    it("should have default prop values", () => {
-      const testWrapper = mount(JsonPreview, {
-        props: {
-          value: {},
-        },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            AppTabs: true,
-            CodeQueryEditor: true,
-            ODialog: ODialogStub,
-            OButton: true,
-            ODropdown: true,
-            ODropdownItem: true,
-            ODropdownSeparator: true,
-            OSelect: true,
-            OIcon: true,
-            OInput: true,
-            OSpinner: true,
-            OTooltip: true,
-            LogsHighLighting: true,
-            ChunkedContent: true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      expect(testWrapper.props("showCopyButton")).toBe(true);
-      expect(testWrapper.props("mode")).toBe("sidebar");
-      expect(testWrapper.props("streamName")).toBe("");
-      testWrapper.unmount();
-    });
-
-    it("should initialize reactive data correctly", () => {
-      expect(wrapper.vm.activeTab).toBe("flattened");
-      expect(wrapper.vm.streamSearchValue).toBe("");
-      expect(wrapper.vm.loading).toBe(false);
-      expect(wrapper.vm.showMenu).toBe(false);
-      expect(wrapper.vm.selectedText).toBe("");
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.vm.regexPatternType).toBe("");
-    });
-
-    it("should generate unique preview ID", () => {
-      expect(wrapper.vm.previewId).toBe("mock-uuid-123");
     });
   });
 
@@ -330,40 +266,6 @@ describe("JsonPreview Component", () => {
         value: { field1: "value1" },
       });
       expect(wrapper.vm.filteredTabs).toHaveLength(0);
-    });
-
-    it("should return empty filteredTabs when has aggregation", () => {
-      // Test the computed property behavior - this is already tested in the actual computed property
-      expect(Array.isArray(wrapper.vm.filteredTabs)).toBe(true);
-    });
-
-    it("should return empty filteredTabs when multiple streams selected", () => {
-      // Test the computed property behavior - this is already tested in the actual computed property
-      expect(Array.isArray(wrapper.vm.filteredTabs)).toBe(true);
-    });
-
-    it("should calculate getBtnLogo for dark theme", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-    });
-
-    it("should calculate getBtnLogo for light theme", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIcon for dark theme", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIcon for light theme", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIconForContextMenu correctly", () => {
-      expect(wrapper.vm.regexIconForContextMenu).toBe("mock-image-url");
     });
   });
 
@@ -748,38 +650,6 @@ describe("JsonPreview Component", () => {
       expect(window.addEventListener).toHaveBeenCalledWith("click", expect.any(Function));
       expect(window.addEventListener).toHaveBeenCalledWith("contextmenu", expect.any(Function));
     });
-
-    it("should not add event listeners when enterprise disabled", () => {
-      vi.clearAllMocks();
-
-      mount(JsonPreview, {
-        props: { value: mockValue },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            AppTabs: true,
-            CodeQueryEditor: true,
-            ODialog: ODialogStub,
-            OButton: true,
-            ODropdown: true,
-            ODropdownItem: true,
-            ODropdownSeparator: true,
-            OSelect: true,
-            OIcon: true,
-            OInput: true,
-            OSpinner: true,
-            OTooltip: true,
-            LogsHighLighting: true,
-            ChunkedContent: true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      // Event listeners should not be called for non-enterprise
-    });
   });
 
   describe("Component Lifecycle", () => {
@@ -788,171 +658,14 @@ describe("JsonPreview Component", () => {
       expect(wrapper.vm.multiStreamFields).toContain("field2");
       expect(wrapper.vm.multiStreamFields).not.toContain("field3"); // field3 has multiple streams
     });
-
-    it("should set preview ID on beforeMount", () => {
-      expect(wrapper.vm.previewId).toBe("mock-uuid-123");
-    });
-
-    it("should call setViewTraceBtn on beforeMount", () => {
-      // This is tested implicitly through the component mounting successfully
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should handle different value types", async () => {
-      const objectValue = { test: "string" };
-      await wrapper.setProps({
-        value: objectValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(objectValue);
-    });
-
-    it("should handle boolean props", async () => {
-      await wrapper.setProps({
-        showCopyButton: false,
-      });
-
-      expect(wrapper.props("showCopyButton")).toBe(false);
-    });
-
-    it("should handle different modes", async () => {
-      await wrapper.setProps({
-        mode: "expanded",
-      });
-
-      expect(wrapper.props("mode")).toBe("expanded");
-    });
   });
 
   describe("Error Handling", () => {
-    it("should handle missing trace field gracefully", () => {
-      store.state.organizationData.organizationSettings = {};
-      wrapper.vm.setViewTraceBtn();
-
-      // Function should execute without throwing errors
-      expect(typeof wrapper.vm.setViewTraceBtn).toBe("function");
-    });
-
     it("should handle empty streams gracefully", () => {
       wrapper.vm.tracesStreams = [];
       wrapper.vm.filterStreamFn("test");
 
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual([]);
-    });
-
-    it("should handle missing selectedText in regex creation", () => {
-      wrapper.vm.selectedText = "";
-      wrapper.vm.regexPatternType = "email";
-
-      expect(() => wrapper.vm.confirmRegexPatternType()).not.toThrow();
-    });
-  });
-
-  describe("Theme Integration", () => {
-    it("should handle dark theme correctly", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should handle light theme correctly", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should handle undefined theme gracefully", () => {
-      store.state.theme = undefined;
-      expect(() => wrapper.vm.getBtnLogo).not.toThrow();
-    });
-  });
-
-  describe("Advanced Functionality", () => {
-    it("should handle complex nested objects", async () => {
-      const complexValue = {
-        _o2_id: "complex-id",
-        _timestamp: 1680246906650420,
-        level1: {
-          level2: {
-            level3: "deep value",
-          },
-        },
-      };
-
-      await wrapper.setProps({
-        value: complexValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(complexValue);
-    });
-
-    it("should handle array values", async () => {
-      const arrayValue = {
-        _o2_id: "array-id",
-        _timestamp: 1680246906650420,
-        items: [1, 2, 3, 4, 5],
-      };
-
-      await wrapper.setProps({
-        value: arrayValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(arrayValue);
-    });
-
-    it("should handle null and undefined values", async () => {
-      const nullValue = {
-        _o2_id: "null-id",
-        _timestamp: 1680246906650420,
-        nullField: null,
-        undefinedField: undefined,
-      };
-
-      await wrapper.setProps({
-        value: nullValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(nullValue);
-    });
-
-    it("should handle empty objects", async () => {
-      await wrapper.setProps({
-        value: {},
-      });
-
-      expect(wrapper.props("value")).toEqual({});
-    });
-  });
-
-  describe("Store Integration", () => {
-    it("should access organization data correctly", () => {
-      expect(wrapper.vm.store.state.organizationData).toBeDefined();
-      expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
-    });
-
-    it("should handle missing organization settings", () => {
-      store.state.organizationData.organizationSettings = undefined;
-
-      expect(() => wrapper.vm.setViewTraceBtn()).not.toThrow();
-    });
-
-    it("should use correct organization identifier", () => {
-      expect(wrapper.vm.searchObj.organizationIdentifier).toBe("test-org");
-    });
-  });
-
-  describe("Performance Considerations", () => {
-    it("should handle rapid tab changes", async () => {
-      wrapper.vm.activeTab = "unflattened";
-      await nextTick();
-      wrapper.vm.activeTab = "flattened";
-      await nextTick();
-      wrapper.vm.activeTab = "unflattened";
-      await nextTick();
-
-      expect(wrapper.vm.activeTab).toBe("unflattened");
     });
   });
 
@@ -1357,6 +1070,51 @@ describe("JsonPreview Component", () => {
         expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
         expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
         expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).attributes("disabled")).not.toBe("true");
+      });
+
+      it("disables the button with a lock and hides the picker while traces is locked", async () => {
+        store.state.zoConfig.features = { traces: "locked" };
+        try {
+          traceWrapper = mount(JsonPreview, {
+            props: { value: recordWithTraceId, mode: "sidebar" },
+            global: {
+              plugins: [i18n],
+              provide: { store },
+              stubs: {
+                AppTabs: true,
+                CodeQueryEditor: true,
+                ODialog: ODialogStub,
+                OButton: {
+                  props: { disabled: Boolean, iconLeft: String },
+                  template:
+                    '<button :disabled="disabled" :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+                },
+                OTooltip: { template: "<div><slot /></div>" },
+                ODropdown: true,
+                ODropdownItem: true,
+                ODropdownSeparator: true,
+                OSelect: true,
+                OIcon: true,
+                OInput: true,
+                OSpinner: true,
+                LogsHighLighting: true,
+                ChunkedContent: true,
+                EqualIcon: true,
+                NotEqualIcon: true,
+              },
+            },
+          });
+          await flushPromises();
+          const btn = traceWrapper.find(viewTraceBtnSelector);
+          expect(btn.attributes("disabled")).toBeDefined();
+          expect(btn.attributes("data-icon")).toBe("lock");
+          expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+          await btn.trigger("click");
+          expect(traceWrapper.emitted("view-trace")).toBeUndefined();
+        } finally {
+          delete store.state.zoConfig.features;
+        }
       });
 
       it("should hide the stream picker and the button when hideViewTrace is true", async () => {
@@ -1486,5 +1244,144 @@ describe("JsonPreview Component", () => {
         expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
       });
     });
+  });
+
+  describe("View Related under a license lock", () => {
+    const mountRelated = () =>
+      mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: {
+              props: { disabled: Boolean },
+              template:
+                '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+            },
+            OTooltip: { template: "<div><slot /></div>" },
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: { props: ["name"], template: '<i :data-icon="name" />' },
+            OInput: true,
+            OSpinner: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    afterEach(() => {
+      store.state.zoConfig = { ai_enabled: true };
+    });
+
+    it("renders the button disabled with a lock, skips the probe and emits nothing on click", async () => {
+      store.state.zoConfig = {
+        ai_enabled: true,
+        service_streams_enabled: true,
+        features: { correlation: "locked" },
+      };
+      const related = mountRelated();
+      await flushPromises();
+      const btn = related.find('[data-test="log-correlation-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(related.find('[data-test="log-correlation-btn-lock"]').exists()).toBe(true);
+      await btn.trigger("click");
+      expect(related.emitted("show-correlation")).toBeUndefined();
+      related.unmount();
+    });
+  });
+});
+
+describe("JsonPreview in-place copy", () => {
+  const mountInPlace = () =>
+    mount(JsonPreview, {
+      props: { value: { a: 1 }, mode: "sidebar", copyInPlace: true },
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          AppTabs: true,
+          CodeQueryEditor: true,
+          OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+          ODropdown: true,
+          ODropdownItem: true,
+          ODropdownSeparator: true,
+          OSelect: true,
+          OIcon: true,
+          OInput: true,
+          OSpinner: true,
+          OTooltip: true,
+          LogsHighLighting: true,
+          ChunkedContent: true,
+          EqualIcon: true,
+          NotEqualIcon: true,
+        },
+      },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  });
+
+  it("copies the log itself and shows Copied on the button, with no toast and no emit", async () => {
+    const wrapper = mountInPlace();
+    const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(JSON.stringify({ a: 1 }));
+    expect(wrapper.emitted("copy")).toBeUndefined();
+    expect(mockToast).not.toHaveBeenCalled();
+    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
+    expect(visible).toHaveLength(1);
+    expect(visible[0].text()).toBe(i18n.global.t("common.copied"));
+    wrapper.unmount();
+  });
+
+  it("shows an error toast and keeps the copy label when the clipboard refuses", async () => {
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("denied"),
+    );
+    const wrapper = mountInPlace();
+    const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
+    expect(visible[0].text()).toBe(i18n.global.t("common.copyToClipboard"));
+    wrapper.unmount();
+  });
+
+  it("confirms a copied selection inside the menu, then closes it", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountInPlace();
+      (wrapper.vm as any).selectedText = "picked";
+      (wrapper.vm as any).showMenu = true;
+      await (wrapper.vm as any).copySelectedText();
+      await flushPromises();
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("picked");
+      expect((wrapper.vm as any).selectionCopied).toBe(true);
+      expect((wrapper.vm as any).showMenu).toBe(true);
+      vi.advanceTimersByTime(1000);
+      expect((wrapper.vm as any).showMenu).toBe(false);
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

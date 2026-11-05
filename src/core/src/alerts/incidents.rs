@@ -72,7 +72,7 @@ struct IncidentSend<'a> {
 /// non-alert identities (e.g. external alert sources) can be correlated using the
 /// same machinery. For the internal alert path this is built from an `Alert`.
 #[derive(Debug, Clone)]
-pub struct CorrelationSubject {
+pub struct CorrelationSubject<'a> {
     /// internal: `alert.get_unique_key()`; external: `external_alerts.id`
     pub id: String,
     pub name: String,
@@ -83,6 +83,7 @@ pub struct CorrelationSubject {
     /// carry `alert.priority` mapped through `determine_severity`, when set.
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    pub title_inputs: Option<super::incident_title::TitleInputs<'a>>,
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -476,17 +477,18 @@ async fn send_incident_notifications_inner(
             &service_name,
             &incident_url,
         );
+        let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
         for dest_name in &send.dest_names {
-            match crate::alerts::alert::send_templated_to_destination(
+            match crate::alerts::notifications::notify::notify(
                 org_id,
-                &subject,
                 dest_name,
-                send.alert_template,
+                &explicit,
+                Some(&subject),
                 &mut send.ctx,
             )
             .await
             {
-                Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                Ok(sent) => success_parts.push(format!("{dest_name}: {}", sent.response)),
                 Err(e) => {
                     log::error!(
                         "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
@@ -525,6 +527,18 @@ fn apply_incident_to_context(
 ) {
     // The alert's own link points at its search; an incident notification must open the incident.
     ctx.alert_url = incident_url.to_string();
+    ctx.incident_id = incident_id.to_string();
+    ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
+    ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
+    ctx.episode_id = Some(incident_id.to_string());
+    // Level, the dot and show_when follow the incident severity, as an on-call priority does.
+    ctx.alert_level = severity.to_string();
+    // P4 is informational, so it gets no level rather than a warning dot.
+    ctx.level = match severity {
+        "P1" | "P2" => Some(config::meta::alerts::level::AlertLevel::Critical),
+        "P3" => Some(config::meta::alerts::level::AlertLevel::Warning),
+        _ => None,
+    };
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -545,26 +559,8 @@ async fn subject_notification_context(
     subject_name: &str,
     triggered_at: i64,
 ) -> crate::alerts::notifications::NotificationContext {
-    use chrono::TimeZone;
-
-    let org_name = match crate::common::infra::config::ORGANIZATIONS
-        .read()
-        .await
-        .get(org_id)
-    {
-        Some(org) => org.name.clone(),
-        None => org_id.to_string(),
-    };
-    let trigger_time_str = if triggered_at > 0 {
-        chrono::Local
-            .timestamp_nanos(triggered_at * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
     crate::alerts::notifications::NotificationContext {
-        org_name,
+        org_name: org_display_name(org_id).await,
         alert_name: subject_name.to_string(),
         alert_status: crate::alerts::notifications::STATUS_FIRING.to_string(),
         alert_start_time: String::from("N/A"),
@@ -572,9 +568,18 @@ async fn subject_notification_context(
         alert_start_time_millis: String::from("N/A"),
         alert_end_time_millis: String::from("N/A"),
         alert_trigger_time: triggered_at,
-        alert_trigger_time_str: trigger_time_str,
+        alert_trigger_time_str: crate::alerts::alert::format_alert_time(triggered_at),
         ..Default::default()
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn org_display_name(org_id: &str) -> String {
+    crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(org_id)
+        .map_or_else(|| org_id.to_string(), |org| org.name.clone())
 }
 
 /// Send a notification for an incident severity change to all correlated alert destinations.
@@ -625,6 +630,28 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         &merged_destinations,
     )
     .await;
+}
+
+/// Whether the operator switched incident correlation on and the license grants it.
+#[cfg(feature = "enterprise")]
+pub fn incidents_enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Incidents,
+        ])
+}
+
+/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+#[cfg(feature = "enterprise")]
+pub fn rca_agent_available() -> bool {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    cfg.ai.enabled
+        && cfg.ai.has_agent_target()
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
 }
 
 /// Correlate an alert to an incident, and send a notification if appropriate.
@@ -753,6 +780,12 @@ pub async fn correlate_alert_to_incident(
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
         severity,
+        title_inputs: Some(super::incident_title::TitleInputs {
+            alert,
+            result_row,
+            notify_rows,
+            labels: &labels,
+        }),
     };
 
     // Find or create incident
@@ -769,6 +802,15 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
     let outcome = correlation.outcome;
+    // D23: a firing joining an acknowledged incident is acknowledged too, so nobody is re-paged.
+    if !matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) && let Some(alert_id) = alert.id.map(|id| id.to_string())
+    {
+        crate::alerts::ack::join_acked_incident(&alert.org_id, outcome.incident_id(), &alert_id)
+            .await;
+    }
 
     // The on-call record routing opened; its team decides L0 for the incident.
     #[cfg(feature = "enterprise")]
@@ -814,7 +856,11 @@ pub async fn correlate_alert_to_incident(
         let priority = alert
             .priority
             .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-        let title = alert.name.clone();
+        // The stored title, so a templated or reopened incident pages under the name it shows.
+        let title = match infra::table::alert_incidents::get(&alert.org_id, incident_id).await {
+            Ok(Some(incident)) => incident.title.unwrap_or_else(|| alert.name.clone()),
+            _ => alert.name.clone(),
+        };
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
             &incident_id.to_string(),
@@ -1001,6 +1047,7 @@ pub async fn correlate_external_event(
         kind: AlertKind::External,
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        title_inputs: None,
     };
 
     let triggered_at = external.last_seen_at;
@@ -1483,7 +1530,7 @@ async fn create_new_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -1503,8 +1550,23 @@ async fn create_new_incident(
         }
     };
 
-    let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
+    // Rendered once here, so later firings that join the incident never retitle it.
+    let custom_title = match subject
+        .title_inputs
+        .as_ref()
+        .filter(|i| i.alert.incident_title_template.is_some())
+    {
+        Some(inputs) => super::incident_title::render(
+            inputs,
+            &org_display_name(org_id).await,
+            group_values,
+            triggered_at,
+        ),
+        None => None,
+    };
+    let title = custom_title.unwrap_or_else(|| {
+        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values)
+    });
 
     let incident = infra::table::alert_incidents::create_with_mute(
         org_id,
@@ -1625,7 +1687,7 @@ async fn create_new_incident(
 async fn escalate_severity(
     org_id: &str,
     incident: &infra::table::entity::alert_incidents::Model,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<bool, anyhow::Error> {
     let Some((current_severity, new_severity)) =
@@ -1721,7 +1783,7 @@ async fn find_or_create_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -2427,7 +2489,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
+    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
@@ -2795,7 +2857,7 @@ pub async fn trigger_rca_for_incident(
 
     let config = get_o2_config();
 
-    if !config.incidents.enabled || !config.incidents.rca_enabled {
+    if !incidents_enabled() || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
         end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
         return Ok(());
@@ -3143,30 +3205,25 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
-/// An incident ack made anywhere but an alert's own ack acks every firing row of its alerts (§5.6).
-async fn ack_incident_alerts(org_id: &str, incident_id: &str, user_id: &str) {
-    if crate::alerts::ack::propagating() {
-        return;
-    }
-    let alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id).await {
-        Ok(rows) => rows,
+/// The event and the super-cluster status of an ack change the one ack wrote.
+/// [weak: a lost event or publish is logged; the row change stands]
+pub async fn record_ack_change(
+    org_id: &str,
+    incident_id: &str,
+    status: config::meta::alerts::incidents::IncidentStatus,
+    event: IncidentEvent,
+) {
+    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
         Err(e) => {
-            log::warn!("[incidents] could not list the alerts of {incident_id} to ack them: {e}");
-            return;
+            log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
+            false
         }
     };
-    let mut ids: Vec<String> = alerts.into_iter().map(|a| a.alert_id).collect();
-    ids.sort();
-    ids.dedup();
-    for alert_id in ids {
-        crate::alerts::ack::ack_from_elsewhere(
-            org_id,
-            &alert_id,
-            user_id,
-            config::meta::alerts::ack::AckSource::Incident,
-        )
-        .await;
+    if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
+        log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
     }
+    publish_status(org_id, incident_id, &status.to_string()).await;
 }
 
 /// Update incident status
@@ -3187,33 +3244,25 @@ pub async fn update_status_as(
     user_id: &str,
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
-    // Acknowledging goes through a dedicated atomic path so the actor and
-    // timestamp land on the row itself (not just the event log) and a
-    // second/concurrent acknowledge can't silently overwrite the first
-    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    if is_the_one_ack(org_id, incident_id, status).await? {
+        return through_the_one_ack(org_id, incident_id, status, user_id).await;
+    }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let before = infra::table::alert_incidents::get(org_id, incident_id).await?;
     let muted_before = reads_mute_before(
         status,
         o2_enterprise::enterprise::common::config::get_config()
             .downtimes
             .enabled,
-    ) && infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
+    ) && before
+        .as_ref()
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = if status == "acknowledged" {
-        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
-    } else {
-        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    // A re-sent Resolve re-runs the idempotent repairs but keeps the first row and event.
+    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
+    let updated = match before {
+        Some(m) if again => m,
+        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
     };
-    // The ack guard left a resolved row alone: record and replicate nothing.
-    if status == "acknowledged" && updated.status != "acknowledged" {
-        return model_to_incident(updated).await;
-    }
-    if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
-        ack_incident_alerts(org_id, incident_id, user_id).await;
-    }
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3234,12 +3283,11 @@ pub async fn update_status_as(
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
-        "acknowledged" => Some(IncidentEvent::acknowledged(user_id)),
         "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
     };
-    if let Some(evt) = event
+    if let Some(evt) = event.filter(|_| !again)
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
@@ -3267,7 +3315,82 @@ pub async fn update_status_as(
         .await;
     }
 
-    #[cfg(feature = "enterprise")]
+    publish_status(org_id, incident_id, status).await;
+    model_to_incident(updated).await
+}
+
+/// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
+pub async fn authorize_status(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<(), crate::alerts::ack::AckError> {
+    use crate::alerts::ack::{self, AckError, Act, Problem};
+
+    if !is_the_one_ack(org_id, incident_id, status)
+        .await
+        .map_err(|e| AckError::Internal(e.to_string()))?
+    {
+        return Ok(());
+    }
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    ack::authorize_problem(&problem, user_id, Act::Ack)
+        .await
+        .map(|_| ())
+}
+
+/// Acknowledging, and reopening an acknowledged incident, are the one ack's (AK-2).
+async fn is_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+) -> Result<bool, anyhow::Error> {
+    Ok(match status {
+        "acknowledged" => true,
+        "open" => infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "acknowledged"),
+        _ => false,
+    })
+}
+
+async fn through_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use crate::alerts::ack::{self, AckError, Problem};
+
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    let source = config::meta::alerts::ack::AckSource::Incident;
+    let done = if status == "acknowledged" {
+        ack::acknowledge(&problem, user_id, source)
+            .await
+            .map(|_| ())
+    } else {
+        ack::unack(&problem, user_id, source).await.map(|_| ())
+    };
+    match done {
+        // A resolved incident has nothing to acknowledge; the answer is the incident as it stands.
+        Ok(()) | Err(AckError::Conflict(_)) => {}
+        Err(AckError::NotFound) => anyhow::bail!("Incident not found"),
+        Err(e) => anyhow::bail!("could not change the ack of {incident_id}: {e:?}"),
+    }
+    let model = infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(model).await
+}
+
+async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -3283,8 +3406,6 @@ pub async fn update_status_as(
             "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
         );
     }
-
-    model_to_incident(updated).await
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
@@ -3382,6 +3503,64 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_incident_send_is_keyed_by_the_incident_id() {
+        use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+        let mut ctx = crate::alerts::notifications::NotificationContext {
+            episode_id: Some("alert-episode".into()),
+            ..Default::default()
+        };
+        apply_incident_to_context(
+            &mut ctx,
+            "inc_1",
+            "severity_escalated",
+            "High error rate",
+            "P1",
+            "checkout",
+            "https://o2/web/alerts/incidents/inc_1",
+        );
+        assert_eq!(ctx.kind, NotificationKind::Incident);
+        assert_eq!(ctx.event, NotificationEvent::Firing);
+        assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
+        assert_eq!(ctx.alert_url, "https://o2/web/alerts/incidents/inc_1");
+        let route =
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
+        assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
+        // Strict D8: an incident sends no recovery today, so a platform hears nothing on resolve.
+        ctx.event = NotificationEvent::Resolved;
+        assert!(matches!(
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx),
+            Err(crate::alerts::notifications::notify::NotifyError::Skipped(
+                _
+            ))
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn pagerduty_resolved() -> crate::alerts::notifications::notify::Resolved {
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some("pagerduty".into()),
+                url: "https://events.pagerduty.com/v2/enqueue".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback("org"),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
 
     /// The incident path and the alert path page the same person about the same
     /// alert, so an unset priority has to mean the same thing on both. They used
@@ -4472,6 +4651,7 @@ mod tests {
             stream_name: "go_gc_duration_seconds".into(),
             alert_status: "firing".into(),
             alert_url: "https://o2.example/short/alert".into(),
+            alert_level: "critical".into(),
             ..Default::default()
         };
         super::apply_incident_to_context(
@@ -4484,6 +4664,25 @@ mod tests {
             incident_url,
         );
         assert_eq!(ctx.alert_url, incident_url);
+        assert_eq!(ctx.incident_id, "inc-1");
+        assert_eq!(ctx.alert_level, "P2");
+        assert_eq!(
+            ctx.level,
+            Some(config::meta::alerts::level::AlertLevel::Critical)
+        );
+        for (severity, level) in [
+            (
+                "P1",
+                Some(config::meta::alerts::level::AlertLevel::Critical),
+            ),
+            ("P3", Some(config::meta::alerts::level::AlertLevel::Warning)),
+            ("P4", None),
+            ("", None),
+        ] {
+            let mut other = NotificationContext::default();
+            super::apply_incident_to_context(&mut other, "inc-2", "e", "t", severity, "s", "u");
+            assert_eq!(other.level, level, "{severity}");
+        }
 
         let content = resolve_content(
             &compiled_default_content(),
@@ -4496,7 +4695,7 @@ mod tests {
         };
         let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(slack.get("incident").is_none(), "{body}");
-        assert!(slack["attachments"].is_array(), "{body}");
+        assert!(slack["blocks"].is_array(), "{body}");
         assert!(body.contains("incidents/inc-1"), "{body}");
 
         let custom = apply_custom_template(

@@ -72,6 +72,7 @@ pub struct CompositeCreate {
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
     pub pending_period_sec: i64,
+    pub incident_title_template: Option<String>,
 }
 
 /// Errors the composite service surfaces to the API layer; each variant maps to
@@ -110,6 +111,8 @@ pub enum CompositeServiceError {
     Scheduler(#[from] anyhow::Error),
     #[error("Pending period must be >= 0")]
     NegativePendingPeriod,
+    #[error("{0}")]
+    JiraDestinationNotSupported(String),
 }
 
 pub async fn create_composite(
@@ -321,6 +324,7 @@ pub async fn clone_composite(
         owner: current.owner,
         last_edited_by: Some(editor),
         pending_period_sec: current.pending_period_sec,
+        incident_title_template: current.incident_title_template,
     })
     .await
 }
@@ -334,6 +338,8 @@ async fn persist(
     if request.pending_period_sec < 0 {
         return Err(CompositeServiceError::NegativePendingPeriod);
     }
+    validate_jira_destinations(&request.org, &request.destinations, request.silence_seconds)
+        .await?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);
@@ -367,6 +373,20 @@ async fn persist(
 
     schedule_definition(&definition).await;
     Ok(definition)
+}
+
+/// The alert's Jira rules; a composite is never real-time or multi-alert, so only silence refuses.
+async fn validate_jira_destinations(
+    org: &str,
+    destinations: &[String],
+    silence_seconds: i64,
+) -> Result<(), CompositeServiceError> {
+    let mut alert = config::meta::alerts::alert::Alert::default();
+    alert.destinations = destinations.to_vec();
+    alert.trigger_condition.silence = silence_seconds / 60;
+    crate::alerts::alert::validate_jira_destinations(org, &alert)
+        .await
+        .map_err(|e| CompositeServiceError::JiraDestinationNotSupported(e.to_string()))
 }
 
 async fn persist_under_lock(
@@ -412,6 +432,7 @@ async fn persist_under_lock(
         updated_at: Set(Some(config::utils::time::now_micros())),
         evaluation_generation: Set(0),
         pending_period_sec: Set(request.pending_period_sec),
+        incident_title_template: Set(request.incident_title_template),
     };
     let children = resolved
         .into_iter()
@@ -861,5 +882,45 @@ pub async fn startup_preflight() -> anyhow::Result<()> {
             job_count,
         }
         .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::destinations::{Destination, DestinationType, Endpoint, Module};
+
+    use super::validate_jira_destinations;
+    use crate::alerts::notifications::jira;
+
+    #[tokio::test]
+    async fn jira_refuses_a_composite_silenced_under_ten_minutes() {
+        let org = "composite_jira_silence";
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org}/Jira OPS"),
+            Destination {
+                org_id: org.into(),
+                name: "Jira OPS".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint {
+                        destination_type: Some(jira::DESTINATION_TYPE.into()),
+                        ..Default::default()
+                    }),
+                },
+                ..Default::default()
+            },
+        );
+        let destinations = ["Jira OPS".to_string()];
+        assert_eq!(
+            validate_jira_destinations(org, &destinations, 599)
+                .await
+                .map_err(|e| e.to_string()),
+            Err("Jira destinations need a silence period of 10 minutes or more. This stops a comment on every check.".into())
+        );
+        assert!(
+            validate_jira_destinations(org, &destinations, 600)
+                .await
+                .is_ok()
+        );
     }
 }

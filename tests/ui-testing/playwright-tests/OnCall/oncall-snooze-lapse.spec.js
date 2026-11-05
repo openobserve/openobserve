@@ -24,7 +24,8 @@
  * while it is quiet — lives in `oncall-response-verbs.spec.js` and does run in
  * CI.
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  * Self-cleaning, worker-scoped prefix.
  */
 

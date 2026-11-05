@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -69,7 +70,8 @@ vi.mock("@/composables/useTraces", () => ({
   },
 }));
 
-vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
+vi.mock("@/plugins/traces/composables/useTracesTableColumns", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/traces/composables/useTracesTableColumns")>()),
   useTracesTableColumns: () => ({
     buildColumns: vi.fn(() => []),
   }),
@@ -101,6 +103,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "columns",
       "data",
       "rowClass",
+      "getRowStatusColor",
       "loading",
       "sortBy",
       "sortOrder",
@@ -117,7 +120,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "selectedStreamFields",
       "wrap",
     ],
-    emits: ["row-click", "sort-change", "close-column", "column-order-change"],
+    emits: ["row-click", "row-auxclick", "sort-change", "close-column", "column-order-change"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
@@ -167,6 +170,12 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
     template: "<span />",
   },
 }));
+
+// Reka UI portals menu content into <body>; render it inline so tests can query it.
+vi.mock("reka-ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("reka-ui")>();
+  return { ...actual, ContextMenuPortal: actual.ContextMenuContent };
+});
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
@@ -324,6 +333,125 @@ describe("TracesSearchResultList", () => {
     });
   });
 
+  // ─── Open in a new tab ────────────────────────────────────────────────────
+  describe("open in new tab", () => {
+    const hit = makeHit("t-new-tab");
+    const href = (row: any) => `/web/traces/trace?trace_id=${row.trace_id}`;
+
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [{ id: "operation_name" }];
+    });
+
+    it("renders the operation name as a real link to the trace", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const link = wrapper.find('[data-test="trace-row-link"]');
+      expect(link.exists()).toBe(true);
+      expect(link.element.tagName).toBe("A");
+      expect(link.attributes("href")).toBe("/web/traces/trace?trace_id=t-new-tab");
+    });
+
+    it("keeps the link out of the tab order because the row is already focusable", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      expect(wrapper.find('[data-test="trace-row-link"]').attributes("tabindex")).toBe("-1");
+    });
+
+    it("keeps the in-app open on a plain click and blocks the full page load", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      wrapper.find('[data-test="trace-row-link"]').element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("row-click")![0]).toEqual([hit]);
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    it("leaves a ctrl/cmd click on the link to the browser", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: true,
+      });
+      wrapper.find('[data-test="trace-row-link"]').element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("opens a new tab on ctrl/cmd click anywhere on the row", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hit, { ctrlKey: true });
+      await table.vm.$emit("row-click", hit, { metaKey: true });
+      expect(wrapper.emitted("open-in-new-tab")).toEqual([[hit], [hit]]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("renders no link and keeps ctrl click as a row click when the parent gives no href", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      expect(wrapper.find('a[data-test="trace-row-link"]').exists()).toBe(false);
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hit, { ctrlKey: true });
+      expect(wrapper.emitted("row-click")![0]).toEqual([hit]);
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    it("opens a new tab on a middle click on the row", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-auxclick", hit, { button: 1 });
+      expect(wrapper.emitted("open-in-new-tab")![0]).toEqual([hit]);
+    });
+
+    it("ignores a middle click on the row when the parent gives no href", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-auxclick", hit, { button: 1 });
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    describe("context menu", () => {
+      const openMenu = async (props: Record<string, any>) => {
+        wrapper = mount(TracesSearchResultList, {
+          props: { hits: [hit], loading: false, ...props } as any,
+          global: { plugins: [i18n, store] },
+          attachTo: document.body,
+        });
+        const cell = document.createElement("td");
+        cell.setAttribute("data-test", "o2-table-cell-operation_name");
+        wrapper.find(".contents").element.appendChild(cell);
+        cell.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+        // The table records the right-clicked cell after the capture-phase reset, as in the app.
+        const table = wrapper.findComponent({ name: "OTable" });
+        await table.vm.$emit("cell-contextmenu", {
+          columnId: "operation_name",
+          row: hit,
+          value: "x",
+        });
+        await nextTick();
+        await nextTick();
+        await flushPromises();
+      };
+      const item = () =>
+        wrapper.element.querySelector('[data-test="trace-context-menu-open-new-tab"]');
+
+      it("offers open in new tab with an href and emits the right-clicked row", async () => {
+        await openMenu({ rowHref: href });
+        expect(item()).not.toBeNull();
+        item()!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await flushPromises();
+        expect(wrapper.emitted("open-in-new-tab")![0]).toEqual([hit]);
+      });
+
+      it("omits open in new tab when the parent gives no href", async () => {
+        await openMenu({});
+        expect(
+          wrapper.element.querySelector('[data-test="trace-context-menu-field"]'),
+        ).not.toBeNull();
+        expect(item()).toBeNull();
+      });
+    });
+  });
+
   // ─── Events ───────────────────────────────────────────────────────────────
   describe("events", () => {
     it("re-emits row-click from TracesTable", async () => {
@@ -346,31 +474,36 @@ describe("TracesSearchResultList", () => {
     });
   });
 
-  // ─── Row error class ──────────────────────────────────────────────────────
-  describe("row error class", () => {
-    it("passes a rowClass function to TracesTable", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(typeof rowClassFn).toBe("function");
-    });
+  // ─── Row error status bar ─────────────────────────────────────────────────
+  describe("row error status bar", () => {
+    const ERROR_BAR = "var(--color-log-severity-error-indicator)";
+    const statusColorFn = (w: any) =>
+      w.findComponent({ name: "OTable" }).props("getRowStatusColor") as (
+        row: any,
+      ) => string | undefined;
 
-    it("returns 'oz-table__row--error' for rows with errors", () => {
+    it("does not mark rows through a row class", () => {
       wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeHit("t1", 2))).toBe("oz-table__row--error");
+      expect(wrapper.findComponent({ name: "OTable" }).props("rowClass")).toBeUndefined();
     });
 
-    it("returns empty string for rows without errors", () => {
+    it("gives rows with errors the Logs error status colour", () => {
+      wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
+      expect(statusColorFn(wrapper)(makeHit("t1", 2))).toBe(ERROR_BAR);
+    });
+
+    it("gives rows without errors no status colour", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeHit("t1", 0))).toBe("");
+      expect(statusColorFn(wrapper)(makeHit("t1", 0))).toBeUndefined();
     });
   });
 
-  describe("row error class — spans mode", () => {
+  describe("row error status bar — spans mode", () => {
+    const ERROR_BAR = "var(--color-log-severity-error-indicator)";
+    const statusColorFn = (w: any) =>
+      w.findComponent({ name: "OTable" }).props("getRowStatusColor") as (
+        row: any,
+      ) => string | undefined;
     const makeSpanHit = (id: string, span_status = "OK") => ({
       trace_id: id,
       service_name: "frontend",
@@ -382,38 +515,19 @@ describe("TracesSearchResultList", () => {
       start_time: Date.now() * 1_000_000,
     });
 
-    it("uses span_status='ERROR' for error class in spans mode", () => {
-      wrapper = mount_({
-        hits: [makeSpanHit("s1")],
-        loading: false,
-        searchMode: "spans",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
+    it("uses span_status='ERROR' for the error bar in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      expect(statusColorFn(wrapper)(makeSpanHit("s1", "ERROR"))).toBe(ERROR_BAR);
     });
 
-    it("returns empty string for non-error span_status in spans mode", () => {
-      wrapper = mount_({
-        hits: [makeSpanHit("s1")],
-        loading: false,
-        searchMode: "spans",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
+    it("gives non-error spans no status colour in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      expect(statusColorFn(wrapper)(makeSpanHit("s1", "OK"))).toBeUndefined();
     });
 
-    it("uses errors count (not span_status) for error class in traces mode", () => {
-      wrapper = mount_({
-        hits: [makeHit("t1", 0)],
-        loading: false,
-        searchMode: "traces",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+    it("uses errors count (not span_status) for the error bar in traces mode", () => {
+      wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
+      expect(statusColorFn(wrapper)({ ...makeHit("t1", 2), span_status: "OK" })).toBe(ERROR_BAR);
     });
   });
 
@@ -489,6 +603,75 @@ describe("TracesSearchResultList", () => {
       expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(
         false,
       );
+    });
+  });
+
+  describe("onCloseColumn — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    it("hands the remaining width to the new last column when the last one is closed", async () => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration", "method"];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("close-column", { id: "method" });
+
+      const last = sharedSearchObj.data.resultGrid.columns.at(-1);
+      expect(last.id).toBe("duration");
+      expect(last.meta.fillRemaining).toBe(true);
+      expect(last.minSize).toBe(120);
+    });
+  });
+
+  describe("onColumnReorder — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    const fillIds = () =>
+      sharedSearchObj.data.resultGrid.columns
+        .filter((c: any) => c.meta?.fillRemaining)
+        .map((c: any) => c.id);
+
+    const reorder = async (order: string[], searchMode = "spans") => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "span_status", size: 120, meta: {} },
+        { id: "_span_error", size: 240, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = [
+        "service_name",
+        "span_status",
+        "duration",
+        "method",
+      ];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: searchMode as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("column-order-change", order);
+    };
+
+    it("moves the fill to the column dragged last and off the old filler", async () => {
+      await reorder(["service_name", "method", "span_status", "_span_error", "duration"]);
+
+      expect(fillIds()).toEqual(["duration"]);
+      const method = sharedSearchObj.data.resultGrid.columns.find((c: any) => c.id === "method");
+      expect(method.minSize).toBeUndefined();
+      expect(method.meta.autoWidth).toBeUndefined();
+    });
+
+    it("fills a Spans-view error column that is dragged last", async () => {
+      await reorder(["service_name", "span_status", "duration", "method", "_span_error"]);
+
+      expect(fillIds()).toEqual(["_span_error"]);
+      expect(sharedSearchObj.data.resultGrid.columns.at(-1).id).toBe("_span_error");
     });
   });
 

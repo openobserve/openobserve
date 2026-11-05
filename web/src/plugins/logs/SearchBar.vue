@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
               <template v-if="!patternsAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
               </template>
             </OToggleGroupItem>
           </OToggleGroup>
@@ -267,74 +267,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
-              <ODropdownGroup :label="t('search.savedViewsLabel')">
-                <div
-                  v-if="searchObj.loadingSavedView"
-                  class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
-                >
-                  <OSpinner size="xs" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-                <div
-                  v-else-if="sortedSavedViews.length"
-                  class="max-h-72 overflow-y-auto overscroll-contain"
-                  data-test="logs-search-bar-saved-views-menu-list"
-                >
-                  <ODropdownItem
-                    v-for="view in sortedSavedViews"
-                    :key="view.view_id"
-                    :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
-                    @select="applySavedView(view)"
-                  >
-                    <template #icon-left>
-                      <OIcon
-                        :name="favoriteViews.includes(view.view_id) ? 'star' : 'saved-search'"
-                        size="sm"
-                        :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
-                      />
-                    </template>
-                    <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
-                    <template #icon-right>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        icon-left="edit"
-                        class="ms-auto"
-                        :aria-label="t('search.updateSavedViewWithCurrent')"
-                        :disabled="!!saveViewReason"
-                        focusable-unavailable
-                        :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
-                        @click.stop.prevent="quickUpdateSavedView(view)"
-                        @keydown.enter.stop.prevent="quickUpdateSavedView(view)"
-                        @keydown.space.stop
-                      >
-                        <template #unavailable-reason>{{ saveViewReason }}</template>
-                      </OButton>
-                    </template>
-                  </ODropdownItem>
-                </div>
-                <ODropdownItem v-else disabled>
-                  {{ t("search.savedViewsNotFound") }}
-                </ODropdownItem>
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem
-                icon-left="save"
-                data-test="logs-search-bar-saved-views-menu-create"
-                :disabled="!!saveViewReason"
-                focusable-unavailable
-                :description="saveViewReason || saveViewNote"
-                @select="fnSavedView"
-              >
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="settings"
-                data-test="logs-search-bar-saved-views-menu-manage"
-                @select="openSavedViewsList"
-              >
-                {{ t("search.manageSavedViews") }}
-              </ODropdownItem>
+              <SavedViewsMenu
+                :views="searchObj.data.savedViews"
+                :favorite-ids="favoriteViews"
+                :applied-view-id="appliedSavedViewId"
+                :loading="!!searchObj.loadingSavedView"
+                :save-reason="saveViewReason"
+                :save-note="saveViewNote"
+                create-shortcut-id="logsSaveView"
+                data-test-prefix="logs-search-bar-saved-views-menu"
+                @apply="applySavedView"
+                @update="requestUpdateSavedView"
+                @toggle-favorite="handleFavoriteSavedView"
+                @create="fnSavedView"
+                @delete="handleDeleteSavedView"
+              />
             </ODropdown>
             <OSeparator vertical />
             <OButton
@@ -363,7 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown class="flex-shrink-0" side="bottom" align="start">
+        <ODropdown
+          class="flex-shrink-0"
+          side="bottom"
+          align="start"
+          :open="utilitiesMenuOpen"
+          @update:open="onUtilitiesMenuOpenChange"
+        >
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
@@ -554,8 +507,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SAVED VIEWS -->
-          <ODropdownGroup :label="t('search.menuGroupSavedViews')">
-            <template #label-action>
+          <SavedViewsSubmenu
+            :views="searchObj.data.savedViews"
+            :favorite-ids="favoriteViews"
+            :applied-view-id="appliedSavedViewId"
+            :loading="!!searchObj.loadingSavedView"
+            :save-reason="saveViewReason"
+            :save-note="saveViewNote"
+            create-shortcut-id="logsSaveView"
+            data-test-prefix="logs-search-bar-menu-saved-views"
+            trigger-test-id="logs-search-bar-menu-list-saved-views-btn"
+            create-test-id="logs-search-bar-menu-create-saved-view-btn"
+            @apply="applySavedView"
+            @update="requestUpdateSavedView"
+            @toggle-favorite="handleFavoriteSavedView"
+            @create="fnSavedView"
+            @delete="handleDeleteSavedView"
+          >
+            <template #actions>
               <OButton
                 data-test="logs-search-bar-menu-pin-saved-views-btn"
                 variant="ghost-neutral"
@@ -568,40 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
               </OButton>
             </template>
-            <ODropdownItem
-              data-test="logs-search-bar-menu-list-saved-views-btn"
-              @select="openSavedViewsList"
-            >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="format-list-bulleted" size="sm" />
-                </span>
-              </template>
-              {{ t("search.listSavedViews") }}
-            </ODropdownItem>
-
-            <ODropdownItem
-              data-test="logs-search-bar-menu-create-saved-view-btn"
-              shortcut-id="logsSaveView"
-              :disabled="!!saveViewReason"
-              focusable-unavailable
-              :description="saveViewReason || saveViewNote"
-              @select="fnSavedView"
-            >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="add" size="sm" />
-                </span>
-              </template>
-              {{ t("search.createSavedView") }}
-            </ODropdownItem>
-          </ODropdownGroup>
-
-          <ODropdownSeparator />
+          </SavedViewsSubmenu>
 
           <!-- SYNTAX GUIDE -->
           <div class="flex w-full items-center pe-2">
@@ -632,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="toolbarRightRef"
         class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
       >
+        <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <FunctionSelector
             :function-options="functionOptions"
@@ -785,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="lock"
                 size="xs"
-                class="text-warning-600"
+                class="lock-chip"
                 data-test="search-scheduler-locked-icon"
               />
             </template>
@@ -892,7 +829,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
-              :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
+              :disabled="
+                !searchObj.data.query ||
+                searchObj.data.query.trim() === '' ||
+                isExplainQuery(searchObj.data.query)
+              "
               @select="openExplainDialog"
             >
               <template #icon-left>
@@ -936,7 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 me-1 max-md:me-auto">
+        <div class="order-1 max-md:me-auto">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -960,9 +901,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="search-time order-2">
           <div class="flex">
+            <OTooltip
+              v-if="
+                config.isEnterprise == 'true' &&
+                store.state.zoConfig.super_cluster_enabled &&
+                superClusterLocked
+              "
+              :content="superClusterLockedReason"
+            >
+              <span class="me-1 inline-flex">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  class="region-dropdown-btn px-1"
+                  disabled
+                  data-test="logs-search-bar-region-btn"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      name="lock"
+                      class="lock-chip"
+                      size="sm"
+                      data-test="logs-search-bar-region-lock"
+                    />
+                  </template>
+                  {{ t("search.region") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButtonGroup
               class="border-card-glass-border me-1 border p-0"
-              v-if="
+              v-else-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
                 store.state.zoConfig.super_cluster_enabled
@@ -1000,13 +969,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              source="logs"
-              :examples="recentExamples"
+              class="me-1 size-[2.125rem]!"
               data-test="logs-search-bar-recent-searches-btn"
-              @run="(entry, when) => restoreRecent(entry, when, true)"
-              @load="(entry, when) => restoreRecent(entry, when, false)"
               @view-all="openRecentSearches"
-              @example="applyRecentExample"
             />
             <div
               v-if="
@@ -1035,7 +1000,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
@@ -1052,7 +1018,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                          : [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1093,7 +1062,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
@@ -1110,7 +1080,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                          : [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1169,7 +1142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                    : [
+                        runButtonTone,
+                        'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                      ],
                   showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
                 ]"
                 @click="handleRunQueryFn()"
@@ -1214,7 +1190,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
+                          ? [
+                              runButtonTone,
+                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                            ]
                           : showRunQueryPending
                             ? 'border-s-0'
                             : '',
@@ -1346,6 +1325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
+                text-preview
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
@@ -1710,28 +1690,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      :title="t('search.updateSavedView')"
-      :message="t('search.updateSavedViewConfirm')"
-      @update:ok="confirmUpdateSavedViews"
-      @update:cancel="confirmUpdate = false"
-      v-model="confirmUpdate"
+      :title="t('search.overwriteSavedView')"
+      message-keypath="search.overwriteSavedViewConfirm"
+      :message-name="overwriteViewName"
+      :ok-label="t('search.overwriteSavedViewOk')"
+      focus-cancel
+      @update:ok="confirmOverwriteSavedView"
+      @update:cancel="cancelOverwriteSavedView"
+      v-model="confirmOverwrite"
     />
     <!-- Query Plan Dialog -->
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
-
-    <SavedViewsListDialog
-      v-model:open="savedViewsListDialog"
-      v-model:search="searchObj.data.savedViewFilterFields"
-      data-test-prefix="logs-saved-views-dialog"
-      :views="searchObj.data.savedViews"
-      :favorite-ids="favoriteViews"
-      :favorite-views="localSavedViews"
-      :loading="searchObj.loadingSavedView == true"
-      @apply="applySavedView"
-      @update="handleUpdateSavedView"
-      @delete="handleDeleteSavedView"
-      @toggle-favorite="handleFavoriteSavedView"
-    />
   </div>
 </template>
 
@@ -1769,6 +1738,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
 import RecentSearchesDrawer from "@/components/queryHistory/RecentSearchesDrawer.vue";
@@ -1840,7 +1810,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -1885,9 +1855,8 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -1903,8 +1872,8 @@ import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
-import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
-import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
+import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
+import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 import { applySessionTimezone } from "@/utils/storage";
@@ -1942,21 +1911,22 @@ const replaceExistingFieldCondition = (
   newExpression: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
-  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
+    return queryStr.replace(multiRegex, () => newExpression);
   }
 
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
+    return queryStr.replace(singleRegex, () => newExpression);
   }
 
   return queryStr;
@@ -1965,6 +1935,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OPageHeaderStatus,
     CreateAlertAction,
     OSeparator,
     OSplitter,
@@ -1988,9 +1959,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
-    OSpinner,
     OTooltip,
-    OTruncatedText,
     OInput,
     OSelect,
     OForm,
@@ -1998,10 +1967,11 @@ export default defineComponent({
     OFormSelect,
     OSwitch,
     OTree,
-    SavedViewsListDialog,
     RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
+    SavedViewsMenu,
+    SavedViewsSubmenu,
   },
   emits: [
     "searchdata",
@@ -2033,24 +2003,11 @@ export default defineComponent({
     },
     handleDeleteSavedView(item: any) {
       this.savedViewDropdownModel = false;
-      this.savedViewsListDialog = false;
+      this.savedViewsDropdownOpen = false;
+      this.utilitiesMenuOpen = false;
       this.deleteViewID = item.view_id;
       this.deleteViewName = item.view_name;
       this.confirmDelete = true;
-    },
-    handleUpdateSavedView(item: any) {
-      if (this.searchObj.data.stream.selectedStream.length == 0) {
-        toast({
-          variant: "error",
-          message: this.t("logs.searchBar.noStreamUpdateView"),
-        });
-        return;
-      }
-      if (this.blockWithReason(this.saveViewReason)) return;
-      this.savedViewDropdownModel = false;
-      this.savedViewsListDialog = false;
-      this.updateViewObj = item;
-      this.confirmUpdate = true;
     },
     confirmDeleteSavedViews() {
       this.deleteSavedViews();
@@ -2058,10 +2015,6 @@ export default defineComponent({
     toggleCustomDownloadDialog() {
       if (this.blockWithReason(this.customRangeReason || this.downloadReason)) return;
       this.customDownloadDialog = true;
-    },
-    confirmUpdateSavedViews() {
-      this.updateSavedViews(this.updateViewObj.view_id, this.updateViewObj.view_name);
-      return;
     },
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
@@ -2153,6 +2106,15 @@ export default defineComponent({
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const regionFilter = ref();
+    const { locked: superClusterLocked, lockedReason: superClusterLockedReason } =
+      useLicenseLock("super_cluster");
+    const { locked: pageLocked } = useFeatureLock();
+    // The forced primary fill hides the disabled look, so it yields only on a license-locked page.
+    const runButtonTone = computed(() =>
+      pageLocked.value
+        ? "enabled:bg-button-primary! enabled:text-button-primary-foreground!"
+        : "bg-button-primary! text-button-primary-foreground!",
+    );
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
     const { buildPatternsAlertPrefill } = usePatternActions();
@@ -2421,7 +2383,6 @@ export default defineComponent({
     const dateTimeRef = ref(null);
     const {
       favoriteIds: favoriteViews,
-      favoriteViews: localSavedViews,
       toggleFavorite: handleFavoriteSavedView,
       removeFavorite,
       pruneFavorites,
@@ -2459,10 +2420,12 @@ export default defineComponent({
     }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
+    const confirmOverwrite = ref(false);
+    const overwriteViewId = ref("");
+    const overwriteViewName = ref("");
     const deleteViewID = ref("");
     const deleteViewName = ref("");
     const savedViewDropdownModel = ref(false);
-    const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
     const searchTerm = ref("");
 
@@ -2629,9 +2592,6 @@ export default defineComponent({
     );
 
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
-
-    const confirmUpdate = ref(false);
-    const updateViewObj = ref({});
 
     const transformTypes = computed(() => {
       return [{ label: t("logs.searchBar.transformTypeFunction"), value: "function" }];
@@ -3539,11 +3499,6 @@ export default defineComponent({
       savedViewDropdownModel.value = false;
     };
 
-    const openSavedViewsList = () => {
-      loadSavedView();
-      savedViewsListDialog.value = true;
-    };
-
     // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
     // Controlled open state so a quick update can close the menu itself.
     const savedViewsDropdownOpen = ref(false);
@@ -3553,13 +3508,29 @@ export default defineComponent({
       if (open) loadSavedView();
     };
 
-    const sortedSavedViews = computed(() =>
-      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
-    );
+    const appliedSavedViewId = ref<string | null>(null);
+    const savedViewSignature = () =>
+      JSON.stringify([searchObj.data.query, searchObj.data.stream.selectedStream]);
+    let appliedSignature = "";
+    const markSavedViewApplied = (viewId: string) => {
+      appliedSignature = savedViewSignature();
+      appliedSavedViewId.value = viewId;
+    };
+    // While a view is being applied the search state is rewritten on purpose, so it re-baselines instead of clearing.
+    watch(savedViewSignature, (signature) => {
+      if (!appliedSavedViewId.value) return;
+      if (searchObj.shouldIgnoreWatcher) appliedSignature = signature;
+      else if (signature !== appliedSignature) appliedSavedViewId.value = null;
+    });
 
-    // One-click overwrite of a view with the current search state — no list
-    // dialog, no stacked confirm dialog.
-    const quickUpdateSavedView = (item: any) => {
+    const utilitiesMenuOpen = ref(false);
+    const onUtilitiesMenuOpenChange = (open: boolean) => {
+      utilitiesMenuOpen.value = open;
+      if (open) loadSavedView();
+    };
+
+    // Overwriting destroys the stored query, so it is confirmed first.
+    const requestUpdateSavedView = (item: any) => {
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
@@ -3569,7 +3540,19 @@ export default defineComponent({
       }
       if (blockWithReason(saveViewReason.value)) return;
       savedViewsDropdownOpen.value = false;
-      updateSavedViews(item.view_id, item.view_name);
+      utilitiesMenuOpen.value = false;
+      overwriteViewId.value = item.view_id;
+      overwriteViewName.value = item.view_name;
+      confirmOverwrite.value = true;
+    };
+
+    const cancelOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+    };
+
+    const confirmOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+      updateSavedViews(overwriteViewId.value, overwriteViewName.value);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3619,9 +3602,12 @@ export default defineComponent({
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
+      const viewOrg = store.state.selectedOrganization.identifier;
+      const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
-        .getViewDetail(store.state.selectedOrganization.identifier, item.view_id)
+        .getViewDetail(viewOrg, item.view_id)
         .then(async (res) => {
+          if (leftViewOrg()) return;
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
@@ -3771,6 +3757,7 @@ export default defineComponent({
 
                 try {
                   const streamDataList = await Promise.all(streamDataPromises);
+                  if (leftViewOrg()) return;
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
@@ -3857,6 +3844,7 @@ export default defineComponent({
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
+              if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
               resetStreamData();
@@ -3916,6 +3904,7 @@ export default defineComponent({
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
+              if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
@@ -3982,7 +3971,9 @@ export default defineComponent({
               message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
               variant: "success",
             });
+            markSavedViewApplied(item.view_id);
             setTimeout(async () => {
+              if (leftViewOrg()) return;
               try {
                 searchObj.loadingHistogram = false;
                 searchObj.meta.refreshHistogram = true;
@@ -4034,6 +4025,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if (leftViewOrg()) return;
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
@@ -4064,6 +4056,7 @@ export default defineComponent({
           .then((res: any) => {
             removeFavorite(deleteViewID.value);
             if (res.status == 200) {
+              if (appliedSavedViewId.value === deleteViewID.value) appliedSavedViewId.value = null;
               toast({
                 message: t("search.viewDeletedSuccessfully"),
                 variant: "success",
@@ -4187,6 +4180,7 @@ export default defineComponent({
                 message: t("search.viewCreatedSuccessfully"),
                 variant: "success",
               });
+              if (res.data.view_id) markSavedViewApplied(res.data.view_id);
               refreshSavedViews();
               isSavedViewAction.value = "create";
             } else {
@@ -4245,6 +4239,7 @@ export default defineComponent({
                 },
               );
 
+              markSavedViewApplied(viewID);
               toast({
                 message: t("search.viewUpdatedSuccessfully"),
                 variant: "success",
@@ -4326,6 +4321,7 @@ export default defineComponent({
     }
 
     const resetFilters = () => {
+      appliedSavedViewId.value = null;
       flushEditorValue();
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
@@ -4883,15 +4879,12 @@ export default defineComponent({
         guardJobSnapshot.value = null;
         await getJobData(false, snapshot);
       } catch (e) {
-        const status = e?.response?.status;
+        if (e?.response?.status === 403) return;
         toast({
           variant: "error",
-          message:
-            status === 403
-              ? t("search.searchJobNoPermission")
-              : e?.response?.data?.message
-                ? raw(e.response.data.message)
-                : t("search.errorAddingJob"),
+          message: e?.response?.data?.message
+            ? raw(e.response.data.message)
+            : t("search.errorAddingJob"),
         });
       }
     };
@@ -5179,12 +5172,9 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       fnSavedView,
-      openSavedViewsList,
       applySavedView,
       savedViewsDropdownOpen,
       onSavedViewsDropdownOpenChange,
-      sortedSavedViews,
-      quickUpdateSavedView,
       isSavedViewAction,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
@@ -5196,8 +5186,12 @@ export default defineComponent({
       deleteViewID,
       deleteViewName,
       confirmDelete,
+      confirmOverwrite,
+      overwriteViewName,
+      requestUpdateSavedView,
+      confirmOverwriteSavedView,
+      cancelOverwriteSavedView,
       savedViewDropdownModel,
-      savedViewsListDialog,
       moreOptionsDropdownModel,
       fnSavedFunctionDialog,
       // Saved-function OForm (owner pattern, Rule ③): the form is created with
@@ -5222,7 +5216,9 @@ export default defineComponent({
       confirmSavedViewDialogVisible,
       handleFavoriteSavedView,
       favoriteViews,
-      localSavedViews,
+      appliedSavedViewId,
+      onUtilitiesMenuOpenChange,
+      utilitiesMenuOpen,
       loadSavedView,
       config,
       patternsAccess,
@@ -5234,6 +5230,9 @@ export default defineComponent({
       regionFilterMethod,
       regionFilterRef,
       regionFilter,
+      superClusterLocked,
+      runButtonTone,
+      superClusterLockedReason,
       resetRegionFilter,
       cancelQuery,
       onLogsVisualizeToggleUpdate,
@@ -5268,8 +5267,6 @@ export default defineComponent({
       navigateToSearchInspect,
       searchTerm,
       filteredFunctionOptions,
-      confirmUpdate,
-      updateViewObj,
       updateSavedViews,
       checkQuery,
       checkFnQuery,
@@ -5308,6 +5305,7 @@ export default defineComponent({
       buildStreamQuery,
       updateEditorWidth,
       showExplainDialog,
+      isExplainQuery,
       openExplainDialog,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,

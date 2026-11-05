@@ -23,7 +23,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use config::{
-    meta::alerts::level::AlertLevel,
+    meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    },
     utils::json::{Map, Value},
 };
 
@@ -38,6 +41,10 @@ pub struct NotificationContext {
     pub stream_type: String,
     pub stream_name: String,
     pub alert_name: String,
+    /// The alert's id (a composite's own id) that labels its Jira ticket; empty with no alert.
+    pub alert_id: String,
+    /// Set only by the incident sender, so alert attributes cannot claim an incident's ticket.
+    pub incident_id: String,
     /// "realtime" | "scheduled"
     pub alert_type: String,
     pub alert_period: String,
@@ -61,6 +68,8 @@ pub struct NotificationContext {
     pub alert_tags: String,
     pub alert_threshold_crit: String,
     pub alert_threshold_warn: String,
+    /// Operator the crit/warn thresholds were compared with (family-aware).
+    pub alert_threshold_operator: String,
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,
@@ -93,6 +102,41 @@ pub struct NotificationContext {
     pub metadata: Vec<(String, String)>,
     pub group_labels: Option<BTreeMap<String, String>>,
     pub level: Option<AlertLevel>,
+    pub kind: NotificationKind,
+    pub event: NotificationEvent,
+    pub cluster_name: String,
+    /// Today's body for a generic webhook while no user template applies (D1).
+    pub legacy_payload: Option<LegacyPayload>,
+    pub render_hints: RenderHints,
+}
+
+/// Producer choices the renderer honors; the defaults keep the alert output unchanged.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RenderHints {
+    /// The email or SNS subject when a Custom template has no title of its own.
+    pub fallback_subject: Option<String>,
+    /// HTML-escape context attributes in email bodies, as the producer's own sender did.
+    pub escape_email_attributes: bool,
+}
+
+/// Builds a producer's pre-template JSON body only when the legacy rule selects it.
+#[derive(Clone)]
+pub struct LegacyPayload(pub std::sync::Arc<dyn Fn() -> Value + Send + Sync>);
+
+impl LegacyPayload {
+    pub fn new(f: impl Fn() -> Value + Send + Sync + 'static) -> Self {
+        Self(std::sync::Arc::new(f))
+    }
+
+    pub fn build(&self) -> Value {
+        (self.0)()
+    }
+}
+
+impl std::fmt::Debug for LegacyPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LegacyPayload")
+    }
 }
 
 /// Collect row columns in deterministic order.

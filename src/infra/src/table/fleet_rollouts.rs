@@ -80,6 +80,13 @@ pub async fn insert_with<C: ConnectionTrait>(
         gates: Set(row.gates),
     };
     Entity::insert(record).exec_without_returning(conn).await?;
+    insert_members_with(conn, members).await
+}
+
+pub async fn insert_members_with<C: ConnectionTrait>(
+    conn: &C,
+    members: Vec<MemberModel>,
+) -> Result<(), Error> {
     for chunk in members.chunks(INSERT_CHUNK) {
         MemberEntity::insert_many(chunk.iter().cloned().map(member_active_model))
             .exec_without_returning(conn)
@@ -177,10 +184,12 @@ pub async fn guard_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-/// Writes status, phases, failure, events and gates of a row the caller already fenced.
+/// Writes the strategy, status, from_version, phases, failure, events and gates of a fenced row.
 pub async fn save_state_with<C: ConnectionTrait>(conn: &C, row: &Model) -> Result<(), Error> {
     Entity::update_many()
+        .col_expr(Column::Strategy, Expr::value(row.strategy.clone()))
         .col_expr(Column::Status, Expr::value(row.status.clone()))
+        .col_expr(Column::FromVersion, Expr::value(row.from_version))
         .col_expr(Column::Phases, Expr::value(row.phases.clone()))
         .col_expr(Column::Failure, Expr::value(row.failure.clone()))
         .col_expr(Column::Events, Expr::value(row.events.clone()))
@@ -251,6 +260,35 @@ pub async fn members_with_delivery_with<C: ConnectionTrait>(
     Ok(MemberDelivery::find_by_statement(backend.build(&query))
         .all(conn)
         .await?)
+}
+
+/// A deleted fleet's rollout history, members first; returns how many rollouts went.
+pub async fn delete_for_fleet_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    fleet: &str,
+) -> Result<u64, Error> {
+    let ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    for chunk in ids.chunks(ID_CHUNK) {
+        MemberEntity::delete_many()
+            .filter(MemberColumn::OrgId.eq(org_id))
+            .filter(MemberColumn::RolloutId.is_in(chunk))
+            .exec(conn)
+            .await?;
+    }
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
 }
 
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
@@ -468,7 +506,9 @@ mod tests {
             .unwrap();
         assert_eq!(members_with(&db, "r1").await.unwrap()[1].state, "running");
 
+        row.strategy = serde_json::json!({"verify": true}).to_string();
         row.status = "halted".to_string();
+        row.from_version = Some(7);
         row.failure =
             Some(serde_json::json!({"gate": "rejected", "kind": "rejection"}).to_string());
         row.events = serde_json::json!([{"key": "rejected", "at": 5}]).to_string();

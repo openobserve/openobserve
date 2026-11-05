@@ -65,17 +65,14 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const selectLabel = computed(() => {
-  let named: unknown;
-  for (const cell of props.row.getVisibleCells()) {
-    const value = cell.getValue();
-    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
-      named = value;
-      break;
-    }
-  }
-  return t("components.table.selectRow", {
-    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
-  });
+  const index = props.row.index + 1;
+  const named = props.row
+    .getVisibleCells()
+    .map((cell) => cell.getValue())
+    .find((value: unknown): value is string => typeof value === "string" && !!value.trim());
+  // The position keeps the label unique, since many rows can share the same title.
+  if (!named) return t("components.table.selectRowAt", { index });
+  return t("components.table.selectRowAtNamed", { index, name: raw(named.slice(0, 80)) });
 });
 
 const emit = defineEmits<{
@@ -83,6 +80,7 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-auxclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
@@ -199,6 +197,13 @@ function onSelectCellClick() {
   emit("toggle-selection", props.row.original);
 }
 
+function onAuxclick(event: MouseEvent) {
+  if (event.button !== 1) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) return;
+  emit("row-auxclick", props.row.original, event);
+}
+
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
@@ -226,7 +231,6 @@ function onRowMouseleave() {
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
-      'transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
       clickable ? 'cursor-pointer' : '',
       isRowSelected || isActive
         ? 'bg-table-row-selected-bg [--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'
@@ -252,6 +256,7 @@ function onRowMouseleave() {
     :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
+    @auxclick="onAuxclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
   >
@@ -325,6 +330,9 @@ function onRowMouseleave() {
       :cell="cell"
       :row="row"
       :row-selected="isRowSelected"
+      :row-active="isActive"
+      :row-striped="isStriped"
+      :row-focusable="clickable"
       :highlight-text="highlightText"
       :should-highlight="shouldHighlightColumn?.(cell.column.id) ?? false"
       :get-highlighted-html="getHighlightedHtml"

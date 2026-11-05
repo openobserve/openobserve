@@ -45,6 +45,7 @@ pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
+pub mod gen_ai_health;
 pub mod ingest_rejections;
 pub mod keys;
 pub mod kv;
@@ -90,5 +91,8 @@ pub mod synthetics;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
+
+#[cfg(feature = "cloud")]
+pub mod org_domains;
 
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};

@@ -3,39 +3,21 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const {
+  TracesPage,
+  decodedSqlOf,
+  isComparison,
+  isCount,
+  isTableSearch,
+  bandSql,
+} = require('../../pages/tracesPages/tracesPage.js');
 
 const USER_FILTER = "duration >= '1ms'";
-const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
 const MINUTE_US = 60 * 1000000;
 const HOUR_US = 60 * MINUTE_US;
 
-function decodedSqlOf(request) {
-  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
-  const body = request.postDataJSON?.() ?? null;
-  const query = body?.query ?? {};
-  if (typeof query.sql !== 'string') return null;
-  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
-  return {
-    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
-    start: query.start_time,
-    end: query.end_time,
-  };
-}
-
-// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
-const isComparison = (q) => /^SELECT count\(\*\) AS n FROM/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
-const isCount = (q) => /^SELECT count\(\*\) AS n FROM/.test(q.sql);
-// The table search: spans mode posts a base64 `SELECT *` SQL.
-const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
-
-// The band's bounds in µs as the SQL writes them; a missing side is absent.
-function bandSql(editorBand) {
-  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
-  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
-  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
-  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
-}
+// The default brush spans 35-75% of a 15m range (~10-4 min ago); spans stamped now sit right of it.
+const BRUSH_WINDOW_AGE_MS = 6 * 60 * 1000;
 
 test.describe('Traces triage loop', () => {
   let pm;
@@ -43,16 +25,7 @@ test.describe('Traces triage loop', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
-        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
-        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
-      }
-    } finally {
-      await context.close();
-    }
+    await TracesPage.seedTraces(browser);
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -108,19 +81,23 @@ test.describe('Traces triage loop', () => {
       await searchWith(USER_FILTER);
       const preBox = queries.filter(isTableSearch).at(-1);
 
-      // Step 2: box the slow rows across the whole range, where the just-seeded spans are; manual mode sends no table search.
+      // Step 2: box the slow rows across the whole range, where the just-seeded spans are; the box only opens its popover.
       const beforeBox = queries.length;
       expect(
-        await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.2, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.45 }),
-        'Heatmap must accept the box drag',
+        await pm.tracesPage.boxDurationBand({ startRatio: 0.2, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.45 }),
+        'Heatmap must accept the box drag and open its popover',
       ).toBeTruthy();
-      await page.waitForTimeout(2000);
+      expect((await pm.tracesPage.getQueryEditorContent()).trim(), 'The box alone writes nothing').toBe(USER_FILTER);
+      expect(queries.slice(beforeBox).filter(isTableSearch), 'A box alone must not search').toHaveLength(0);
+
+      // Filter to selection writes the band; manual mode keeps it staged until Run.
+      await pm.tracesPage.filterToHeatmapSelection();
       const editor = (await pm.tracesPage.getQueryEditorContent()).trim();
       expect(editor.startsWith(`(${USER_FILTER}) and `), `Editor keeps the user filter: ${editor}`).toBeTruthy();
       const band = bandSql(editor.slice(`(${USER_FILTER}) and `.length));
       expect(band, `The box must write a duration bound: ${editor}`).not.toBe('');
       if (!live) {
-        expect(queries.slice(beforeBox).filter(isTableSearch), 'Manual mode must not search on a box').toHaveLength(0);
+        expect(queries.slice(beforeBox).filter(isTableSearch), 'Manual mode must not search on Filter to selection').toHaveLength(0);
       }
 
       // Step 3: Drill down runs on the pending selection, without Run.
@@ -179,15 +156,22 @@ test.describe('Traces triage loop', () => {
         expect(toggled.find((q) => !isCount(q)).end).toBe(selection.start);
       }
 
-      // Step 6: filter to the top value — closes the page, restores the range, searches (manual mode too).
+      // Step 6: filter to the top value and restore the range; live mode searches, manual mode waits for Run.
       const beforeApply = queries.length;
       const top = (await pm.tracesPage.getComparisonCards())[0];
       await pm.tracesPage.includeFirstComparisonValue(top.name);
-      await expect(page.locator(pm.tracesPage.comparisonPage)).toBeHidden({ timeout: 15000 });
       await page.waitForTimeout(2000);
       const applied = (await pm.tracesPage.getQueryEditorContent()).trim();
       expect(applied.startsWith(`(${USER_FILTER}) and `), `Editor after apply: ${applied}`).toBeTruthy();
       expect(applied).toContain(top.name);
+      if (!live) {
+        expect(queries.slice(beforeApply).filter(isTableSearch), 'Manual mode stages the value until Run').toHaveLength(0);
+        await expect(page.locator(pm.tracesPage.drillDownPage), 'The page stays open until Run').toBeVisible();
+        await pm.tracesPage.runTraceSearch();
+        await pm.tracesPage.waitForTraceSearchResults();
+      }
+      // A search started from the applied value closes the page.
+      await expect(page.locator(pm.tracesPage.drillDownPage)).toBeHidden({ timeout: 15000 });
       const tableAfter = queries.slice(beforeApply).filter(isTableSearch);
       expect(tableAfter.length, 'Applying a value must search').toBeGreaterThan(0);
       const restored = tableAfter.at(-1);
@@ -195,10 +179,10 @@ test.describe('Traces triage loop', () => {
       expect(Math.abs(restored.start - preBox.start)).toBeLessThan(10000000);
       expect(Math.abs(restored.end - preBox.end)).toBeLessThan(10000000);
 
-      // Step 7: the heatmap is back and accepts another box.
+      // Step 7: the heatmap is back and accepts another box, which Filter to selection applies.
       expect((await pm.tracesPage.waitForMetricsPanels()).includes('Duration')).toBeTruthy();
+      await page.waitForTimeout(2000);
       expect(await pm.tracesPage.zoomDurationBand()).toBeTruthy();
-      await page.waitForTimeout(1500);
       expect((await pm.tracesPage.getQueryEditorContent()).trim()).toMatch(/duration (>=|<) '\d+(us|ms|s)'$/);
       if (live) await pm.tracesPage.setLiveMode(false);
     });
@@ -212,11 +196,11 @@ test.describe('Traces triage loop', () => {
     await searchWith('', '24h');
     const range = queries.filter(isTableSearch).at(-1);
     expect(
-      await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.85, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.85 }),
+      await pm.tracesPage.boxDurationBand({ startRatio: 0.85, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.85 }),
     ).toBeTruthy();
-    await page.waitForTimeout(2000);
     const beforeOpen = queries.length;
-    const state = await pm.tracesPage.openComparison();
+    // Drill down from the box's popover compares the drawn box without applying it.
+    const state = await pm.tracesPage.drillDownHeatmapSelection();
     testLogger.info('Capped-baseline comparison state', { state });
     // When every span falls inside the box the capped baseline is empty, and its note still states the cap.
     expect([pm.tracesPage.comparisonPage, pm.tracesPage.comparisonEmptyBaseline]).toContain(state);
@@ -235,8 +219,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: an Errors brush compares error spans with the rest of its window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     const preBox = queries.filter(isTableSearch).at(-1);
     expect(await pm.tracesPage.zoomOnMetricsPanel('Errors')).toBeTruthy();
@@ -256,8 +241,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: a Rate brush compares its window with the rest of the range', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     expect(await pm.tracesPage.zoomOnMetricsPanel('Rate')).toBeTruthy();
     await page.waitForTimeout(2000);
@@ -285,8 +271,9 @@ test.describe('Traces triage loop across time zones', () => {
 
   test('P2: an Errors brush under an Asia/Kolkata app zone keeps the brushed window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P2', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     const queries = [];
     page.on('request', (r) => {
       const q = decodedSqlOf(r);

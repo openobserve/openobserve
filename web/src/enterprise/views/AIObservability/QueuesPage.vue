@@ -371,6 +371,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState } from "@/utils/featureGate";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import llmQueuesService, {
   type LlmQueue,
@@ -408,7 +409,7 @@ const lastUpdatedAt = queuesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = queuesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 const search = ref("");
 
@@ -531,7 +532,6 @@ async function refresh(force = true) {
     // open re-fetches.
     optionsLoaded.value = false;
   } catch {
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({ variant: "error", message: t("aiObservability.queues.loadError") });
     }

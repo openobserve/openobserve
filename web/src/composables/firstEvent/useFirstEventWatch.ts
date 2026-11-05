@@ -29,9 +29,7 @@ import useStreams from "@/composables/useStreams";
 import { gt } from "@/types/i18n";
 import {
   USER_DATA_STREAM_TYPES,
-  isInternalStreamName,
   isUserDataStream,
-  isUserDataStreamType,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "./firstEventBudget";
@@ -49,11 +47,7 @@ import {
 } from "./confirmQuery";
 import { markDetectionSeen, orgHasUserStreams, readFirstDataRecord } from "./useFirstDataNotice";
 
-// Profiles are watched only on their own setup page; "any" (no signal) still means logs, metrics and traces.
-export type StreamSignal = UserDataStreamType | "profiles";
-/** A stream the watch may count: user data of the watched type, never one O2 writes itself. */
-const isWatchedStream = (name: string, type: string) =>
-  type === "profiles" ? !isInternalStreamName(name) : isUserDataStream(name, type);
+export type StreamSignal = UserDataStreamType;
 export type FirstEventState =
   "idle" | "waiting" | "received" | "rejected" | "no-requests" | "stopped";
 export type DiagnosisTrigger = "auto" | "troubleshoot";
@@ -84,11 +78,14 @@ export interface FirstEventWatchOptions {
   match?: Ref<"exact" | "keyword" | undefined>;
   /** Off for the pill display, which names no cause: no rejections read without a Troubleshoot. */
   autoDiagnosis?: Ref<boolean>;
+  /** Elapsed time without data before the first automatic rejections read; FIRST_EVENT_BUDGET.diagnosisAtMs when unset. */
+  diagnosisAtMs?: Ref<number | undefined>;
 }
 
 interface StreamRow {
   name: string;
   stream_type?: string;
+  is_internal?: boolean;
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 
@@ -418,7 +415,7 @@ export function useFirstEventWatch(
       total = res.total;
       rows.push(
         ...(res.list as StreamRow[]).filter(
-          (s) => s?.name?.includes(keyword) && isWatchedStream(s.name, s.stream_type ?? ctx.type),
+          (s) => s?.name?.includes(keyword) && isUserDataStream(s, ctx.type),
         ),
       );
       if (offset + STREAM_PROBE_PAGE >= res.total) break;
@@ -481,8 +478,7 @@ export function useFirstEventWatch(
     });
     // the Vuex stream store holds the selected org's lists only, so a late answer for another org stays out
     if (!list || stale(ctx) || ctx.org !== selectedOrg()) return;
-    // The Vuex stream store has no profiles list.
-    if (isUserDataStreamType(ctx.type)) setStreams(ctx.type, list);
+    setStreams(ctx.type, list);
   };
 
   const receive = async (ctx: PollContext, stream: string, c: Confirmation, sinceUs?: number) => {
@@ -652,7 +648,7 @@ export function useFirstEventWatch(
       if (!list || stale(ctx)) return;
       known.total = res.total;
       for (const s of list) {
-        if (!known.names.has(s.name) && isWatchedStream(s.name, s.stream_type ?? type)) {
+        if (!known.names.has(s.name) && isUserDataStream(s, type)) {
           pending.set(s.name, s);
         }
       }
@@ -732,7 +728,9 @@ export function useFirstEventWatch(
   };
 
   const rejectionsDue = (): boolean => {
-    if (lastRejectionsReadMs === undefined) return elapsedMs() >= FIRST_EVENT_BUDGET.diagnosisAtMs;
+    if (lastRejectionsReadMs === undefined) {
+      return elapsedMs() >= (options.diagnosisAtMs?.value ?? FIRST_EVENT_BUDGET.diagnosisAtMs);
+    }
     return nowMs() - lastRejectionsReadMs >= FIRST_EVENT_BUDGET.rejectionsEveryMs;
   };
 

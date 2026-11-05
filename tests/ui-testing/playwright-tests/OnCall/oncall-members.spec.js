@@ -7,7 +7,8 @@
  *   TS-04.02 a member on no rotation is named out loud, not silently stranded
  *   TS-04.04 a member payload that adds nobody is refused (the W-02 guard)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
  *   - The exact default ladder DELAYS. The plan quotes the book's 5/15/30/60m;
@@ -211,10 +212,11 @@ test.describe('On-call team staffing', {
     expect(primaryMembers.slice(0, seeded.length), 'the people already in the rotation keep their turns')
       .toEqual(seeded);
 
-    // Coverage recomputes on the same render — it is derived, not remembered.
-    const coverage = await pm.oncallTeamDetailPage.readMembersCoverage();
-    testLogger.info('TS-04.01 members coverage line', { coverage });
-    expect(coverage, 'the members tab states how many of the org are on this team').toMatch(/\d+/);
+    // The tab's count chip recomputes from the roster — derived, not remembered.
+    await expect.poll(
+      () => pm.oncallTeamDetailPage.readMembersTabCount(),
+      { timeout: 30000, intervals: [1000], message: 'the Members tab counts the joiner' },
+    ).toBe(members.length);
   });
 
   // ------------------------------------------------------------------ TS-04.02
@@ -235,7 +237,7 @@ test.describe('On-call team staffing', {
    * green the moment the risk is derived, and weakening it to assert the gap
    * would pin the gap as correct.
    */
-  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — not wired: config-risks derives no such kind, verified 15 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — config-risks derives no such kind. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_strand`);
@@ -353,11 +355,11 @@ test.describe('On-call team staffing', {
     const name = uniqueName(`${workerPrefix(testInfo)}_holder`);
     const users = await createOrgUsers(page, name, 3);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const before = (await whoIsOnCall(page, team.id)) ?? [];
     expect(before.length, 'somebody must be on call before this test removes them')

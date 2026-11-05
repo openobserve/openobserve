@@ -198,8 +198,10 @@ impl TraceListOptions {
     }
 
     pub fn restrict_range(&mut self, max_hours: i64) {
-        if max_hours > 0 && (self.range.1 - self.range.0) > max_hours * 3600 * 1_000_000 {
-            self.range.0 = self.range.1 - max_hours * 3600 * 1_000_000;
+        if let Some(clamped) =
+            config::utils::query_range::clamp_start_time(self.range.0, self.range.1, max_hours)
+        {
+            self.range.0 = clamped;
             self.range_error = format!(
                 "Query duration is modified due to query range restriction of {max_hours} hours"
             );
@@ -457,6 +459,41 @@ mod tests {
                 sql.contains("reference_parent_span_id IS NULL OR reference_parent_span_id = ''")
             );
             assert!(sql.ends_with("FROM \"trace\"\" stream\" WHERE service_name = 'api' OR span_status = 'ERROR' GROUP BY trace_id ORDER BY zo_sql_duration ASC"));
+        }
+    }
+
+    #[test]
+    fn request_sql_names_the_path_stream_and_every_filter_stream() {
+        let subquery = "(SELECT count(*) FROM \"poc_b\" WHERE operation_name = 'x') > 0";
+        for (filter, expected) in [("", vec!["poc_a"]), (subquery, vec!["poc_a", "poc_b"])] {
+            for sort_order in ["asc", "desc"] {
+                let mut query = query();
+                query.insert("filter".to_string(), filter.to_string());
+                query.insert("sort_by".to_string(), "duration".to_string());
+                query.insert("sort_order".to_string(), sort_order.to_string());
+                for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+                    for llm_schema in [
+                        None,
+                        Some(schema_compat::ValidatedLlmSchema::fallback(true)),
+                        Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+                    ] {
+                        let plan = TraceListPlan {
+                            options: TraceListOptions::parse(&query, mode).unwrap(),
+                            sort: TraceSort::parse(&query).unwrap(),
+                            columns: TraceColumns::default(),
+                            llm_schema,
+                            mode,
+                        };
+                        let sql = plan.request("poc_a").query.sql;
+                        let tables = openobserve_core::authz::resolve_sql_tables(&sql)
+                            .unwrap_or_else(|e| panic!("{e}: {sql}"));
+                        let mut names: Vec<_> = tables.iter().map(|t| t.table()).collect();
+                        names.sort();
+                        names.dedup();
+                        assert_eq!(names, expected, "{sql}");
+                    }
+                }
+            }
         }
     }
 

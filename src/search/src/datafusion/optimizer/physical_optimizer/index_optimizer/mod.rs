@@ -354,9 +354,12 @@ mod tests {
     use super::*;
     use crate::datafusion::{
         distributed_plan::node::RemoteScanNode,
-        optimizer::physical_optimizer::{
-            aggregate_topk::AggregateTopkRule, index_optimizer::utils::tests::get_remote_scan,
-            remote_scan::RemoteScanRule,
+        optimizer::{
+            logical_optimizer::like_to_str_match::RewriteLikeToStrMatch,
+            physical_optimizer::{
+                aggregate_topk::AggregateTopkRule, index_optimizer::utils::tests::get_remote_scan,
+                remote_scan::RemoteScanRule,
+            },
         },
         sort_order::FileSortOrder,
         table_provider::empty_table::NewEmptyTable,
@@ -580,6 +583,46 @@ mod tests {
                 true
             ))
         )
+    }
+
+    #[tokio::test]
+    async fn test_leader_rule_distinct_with_like_rewritten_to_str_match() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let index_fields = HashMap::from([(
+            TableReference::from("t"),
+            HashSet::from(["name".to_string()]),
+        )]);
+        let mut file_id_lists = hashbrown::HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_optimizer_rule(Arc::new(RewriteLikeToStrMatch::new(index_fields.clone())))
+            .with_physical_optimizer_rule(Arc::new(RemoteScanRule::new_test(file_id_lists, false)))
+            .with_physical_optimizer_rule(Arc::new(LeaderIndexOptimizerRule::new(index_fields)))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "select name from t where _timestamp >= 1 and _timestamp < 2 \
+                   and name like '%open%' group by name order by name limit 10";
+        let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+        let plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        assert_eq!(
+            get_remote_scan(plan)[0].index_optimize_mode(),
+            Some(IndexOptimizeMode::SimpleDistinct(
+                "name".to_string(),
+                10,
+                true
+            ))
+        );
     }
 
     #[tokio::test]

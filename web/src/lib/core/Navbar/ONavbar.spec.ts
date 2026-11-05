@@ -149,6 +149,18 @@ describe("ONavbar", () => {
       expect(wrapper.findAll('[data-test^="nav-group-"]')).toHaveLength(0);
     });
 
+    it("draws placeholder tiles while the menu is loading", () => {
+      wrapper = mountNavbar({ linksList: [], loading: true });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(0);
+    });
+
+    it("replaces the placeholder tiles with the menu once it is ready", () => {
+      wrapper = mountNavbar({ loading: false });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(3);
+    });
+
     it("passes the paywall verdict for each plain link's destination to its tile", () => {
       paywalled.add("/logs");
       wrapper = mountNavbar();

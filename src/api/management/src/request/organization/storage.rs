@@ -64,17 +64,13 @@ fn enforce_checks(provider: ProviderType, data: String) -> Result<String, anyhow
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 201, description = "Stored", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -155,8 +151,12 @@ pub async fn save(
     path = "/{org_id}/storage",
     context_path = "/api",
     operation_id = "GetStorageInformation",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Get storage details",
     description = "retrieves storage details if configured in redacted manor",
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -166,7 +166,7 @@ pub async fn save(
         ),
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -210,17 +210,13 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
         description = "updated key data",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 201, description = "Stored", content_type = "application/json", body = inline(HttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     tag = "Organizations",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

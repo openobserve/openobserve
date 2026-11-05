@@ -148,6 +148,15 @@ describe("fleet issues", () => {
     expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r1" });
   });
 
+  it("shows a waiting rollout as a warning", async () => {
+    serve([], [rollout({ status: "waiting", total: 0, running: 0, phases: [] })]);
+    const api = await mountIssues();
+    const [issue] = api.fleetIssues("default");
+    expect(issue.severity).toBe("warning");
+    expect(String(issue.title)).toBe("v2 waits for a collector to come online");
+    expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r1" });
+  });
+
   it("shows a halted rollout within 3 days as an error and an older one as nothing", async () => {
     serve([], [rollout({ status: "halted", started_at: Date.now() - DAY })]);
     let api = await mountIssues();

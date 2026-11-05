@@ -21,7 +21,9 @@ use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+use openobserve_core::auth::{
+    ReadCheck, UserEmail, UserReads, check_permissions, first_unreadable, is_ofga_object_visible,
+};
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
@@ -37,6 +39,12 @@ use crate::{
     },
 };
 
+/// Most scorers one request may name; each costs a permission check before anything runs.
+pub(crate) const MAX_SCORERS_PER_REQUEST: usize = 50;
+
+/// Per-scorer PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
 fn scorer_error_response(value: ScorerError) -> Response {
     match value {
         ScorerError::InfraError(err) => {
@@ -45,6 +53,8 @@ fn scorer_error_response(value: ScorerError) -> Response {
         }
         ScorerError::MissingName => MetaHttpResponse::bad_request("Scorer name cannot be empty"),
         ScorerError::NotFound => MetaHttpResponse::not_found("Scorer not found"),
+        ScorerError::ProviderNotFound(_) => MetaHttpResponse::not_found(value),
+        ScorerError::ProviderNotReadable(_) => MetaHttpResponse::forbidden(value),
         ScorerError::InvalidScorerType(_)
         | ScorerError::ScorerTypeImmutable
         | ScorerError::ProducesScoreConfigIdImmutable
@@ -53,6 +63,45 @@ fn scorer_error_response(value: ScorerError) -> Response {
         | ScorerError::InvalidProviderConfig(_) => MetaHttpResponse::bad_request(value),
         ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
         ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
+    }
+}
+
+/// Remote scorer credentials stay with those who may change the scorer.
+async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
+    use futures::StreamExt;
+
+    let mut ids: Vec<String> = scorers
+        .iter()
+        .filter(|s| s.has_credentials())
+        .map(|s| s.entity_id.clone())
+        .collect();
+    if ids.is_empty()
+        || check_permissions(
+            org_id, org_id, user_id, "scorers", "PUT", None, true, false, false,
+        )
+        .await
+    {
+        return;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    let writable: std::collections::HashSet<String> = futures::stream::iter(ids)
+        .map(|id| async move {
+            check_permissions(
+                &id, org_id, user_id, "scorers", "PUT", None, false, false, true,
+            )
+            .await
+            .then_some(id)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|id| async move { id })
+        .collect()
+        .await;
+    for scorer in scorers
+        .iter_mut()
+        .filter(|s| s.has_credentials() && !writable.contains(&s.entity_id))
+    {
+        scorer.redact_credentials();
     }
 }
 
@@ -73,7 +122,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
     responses(
         (status = 200, body = inline(ListScorersResponseBody)),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
@@ -109,7 +158,8 @@ pub async fn list_scorers(
                     )
                 })
                 .collect();
-            let body: ListScorersResponseBody = list.into();
+            let mut body: ListScorersResponseBody = list.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.list).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),
@@ -131,17 +181,24 @@ pub async fn list_scorers(
     responses(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
+        (status = 403, description = "Provider not accessible", body = ()),
+        (status = 404, description = "Provider not found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn create_scorer(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<ScorerRequestBody>,
 ) -> Response {
     let scorer: infra::table::scorers::Scorer = body.into();
+    #[cfg(feature = "enterprise")]
+    if let Err(err) = require_provider_read(&org_id, &user_email.user_id, &scorer).await {
+        return scorer_error_response(err);
+    }
     match scorers::save_scorer(&org_id, scorer).await {
         Ok(s) => {
             set_ownership(&org_id, "scorers", Authz::new(&s.entity_id)).await;
@@ -170,14 +227,23 @@ pub async fn create_scorer(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "get"})),
     ),
 )]
-pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn get_scorer(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer(&org_id, &entity_id).await {
         Ok(s) => {
-            let resp: ScorerResponseBody = s.into();
+            let mut resp: ScorerResponseBody = s.into();
+            redact_unwritable(
+                &org_id,
+                &user_email.user_id,
+                std::slice::from_mut(&mut resp),
+            )
+            .await;
             MetaHttpResponse::json(resp)
         }
         Err(err) => scorer_error_response(err),
@@ -201,14 +267,18 @@ pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Re
     responses(
         (status = 200, body = inline(ListScorerVersionsResponseBody)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list_versions"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
-pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn list_scorer_versions(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer_versions(&org_id, &entity_id).await {
         Ok(versions) => {
-            let body: ListScorerVersionsResponseBody = versions.into();
+            let mut body: ListScorerVersionsResponseBody = versions.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.versions).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),
@@ -232,17 +302,25 @@ pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, Strin
     request_body(content = inline(ScorerUpdateRequestBody), description = "Scorer payload"),
     responses(
         (status = 200, body = inline(ScorerResponseBody)),
-        (status = 404, description = "Not Found", body = ()),
+        (status = 403, description = "Provider not accessible", body = ()),
+        (status = 404, description = "Scorer or provider not found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "update"})),
     ),
 )]
 pub async fn update_scorer(
     Path((org_id, entity_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<ScorerUpdateRequestBody>,
 ) -> Response {
     let scorer: infra::table::scorers::Scorer = body.into();
+    #[cfg(feature = "enterprise")]
+    if let Err(err) =
+        require_changed_provider_read(&org_id, &user_email.user_id, &entity_id, &scorer).await
+    {
+        return scorer_error_response(err);
+    }
     match scorers::update_scorer(&org_id, &entity_id, scorer).await {
         Ok(s) => {
             let resp: ScorerResponseBody = s.into();
@@ -267,11 +345,11 @@ pub async fn update_scorer(
         ("entity_id" = String, Path, description = "Scorer stable entity id"),
     ),
     responses(
-        (status = 200, description = "Deactivated", body = String),
+        (status = 200, description = "Deactivated", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "delete"})),
     ),
 )]
@@ -300,17 +378,19 @@ pub async fn delete_scorer(Path((org_id, entity_id)): Path<(String, String)>) ->
     responses(
         (status = 200, body = inline(ScorerTestResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
+        (status = 403, description = "Provider not accessible", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "test"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn test_scorer(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<ScorerTestRequestBody>,
 ) -> Response {
-    match run_scorer_test(&org_id, &body).await {
+    match run_scorer_test(&org_id, &user_email.user_id, &body).await {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(err) => scorer_error_response(err),
     }
@@ -332,8 +412,8 @@ pub async fn test_scorer(
         (status = 200, body = inline(LlmJudgeOutputSchemaResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "preview_llm_judge_output_schema"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn preview_llm_judge_output_schema(
@@ -346,6 +426,76 @@ pub async fn preview_llm_judge_output_schema(
         }
         Err(err) => scorer_error_response(err),
     }
+}
+
+/// The provider each LLM-judge scorer calls.
+pub(crate) fn judge_provider_ids(
+    scorers: &[infra::table::scorers::Scorer],
+) -> impl Iterator<Item = &str> {
+    scorers
+        .iter()
+        .filter(|scorer| scorer.scorer_type == infra::table::scorers::ScorerType::LlmJudge)
+        .filter_map(|scorer| scorer.params.get("provider_id")?.as_str())
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+}
+
+/// Scorers are loaded only after every named object is readable, then their providers are checked.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn authorize_references(
+    objects: &[(&'static str, &str)],
+    reads: &impl ReadCheck,
+    scorer_definitions: impl Future<Output = Result<Vec<infra::table::scorers::Scorer>, Response>>,
+) -> Result<(), Response> {
+    if first_unreadable(objects, reads).await.is_some() {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    let definitions = scorer_definitions.await?;
+    let providers: Vec<_> = judge_provider_ids(&definitions)
+        .map(|id| ("providers", id))
+        .collect();
+    if first_unreadable(&providers, reads).await.is_some() {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn require_provider_read(
+    org_id: &str,
+    user_id: &str,
+    scorer: &infra::table::scorers::Scorer,
+) -> Result<(), ScorerError> {
+    let providers: Vec<_> = judge_provider_ids(std::slice::from_ref(scorer))
+        .map(|id| ("providers", id))
+        .collect();
+    match first_unreadable(&providers, &UserReads { org_id, user_id }).await {
+        Some((_, id)) => Err(ScorerError::ProviderNotReadable(id.to_string())),
+        None => Ok(()),
+    }
+}
+
+/// A new version that keeps its provider needs no read on it; rebinding does.
+#[cfg(feature = "enterprise")]
+async fn require_changed_provider_read(
+    org_id: &str,
+    user_id: &str,
+    entity_id: &str,
+    incoming: &infra::table::scorers::Scorer,
+) -> Result<(), ScorerError> {
+    let existing = match scorers::get_scorer(org_id, entity_id).await {
+        Ok(existing) => Some(existing),
+        Err(ScorerError::NotFound) => None,
+        Err(err) => return Err(err),
+    };
+    let unchanged = existing.as_ref().is_some_and(|existing| {
+        judge_provider_ids(std::slice::from_ref(existing))
+            .eq(judge_provider_ids(std::slice::from_ref(incoming)))
+    });
+    if unchanged {
+        return Ok(());
+    }
+    require_provider_read(org_id, user_id, incoming).await
 }
 
 async fn derive_llm_judge_output_schema(
@@ -442,11 +592,13 @@ async fn score_config_info_for_test_scorer(
 
 async fn run_scorer_test(
     org_id: &str,
+    user_id: &str,
     body: &ScorerTestRequestBody,
 ) -> Result<ScorerTestResponseBody, ScorerError> {
     use std::collections::HashMap;
 
     let mut scorer = scorer_for_test(org_id, body)?;
+    require_provider_read(org_id, user_id, &scorer).await?;
     let score_config_info = score_config_info_for_test_scorer(org_id, &mut scorer).await?;
 
     let mut attrs: HashMap<String, serde_json::Value> = HashMap::new();
@@ -460,6 +612,8 @@ async fn run_scorer_test(
 
     match &scorer.scorer_type {
         infra::table::scorers::ScorerType::LlmJudge => {
+            // Admins pass the read check, so this is what keeps another org's provider out.
+            scorers::validate_llm_judge_provider_model(org_id, &scorer).await?;
             let prepared =
                 openobserve_core::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
                     org_id,
@@ -507,9 +661,8 @@ async fn run_scorer_test(
                     org_id, &scorer,
                 )
                 .await
-                .map_err(|e| {
-                    ScorerError::InfraError(infra::errors::Error::Message(e.to_string()))
-                })?;
+                // Prepare only validates the inline config, so its errors are the caller's.
+                .map_err(|e| ScorerError::InvalidProviderConfig(e.to_string()))?;
 
             match remote_cfg.run(&attrs).await {
                 Ok(output) => {
@@ -558,6 +711,8 @@ mod tests {
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
             (ScorerError::InvalidProviderConfig("bad".to_string()), 400),
+            (ScorerError::ProviderNotFound("p".to_string()), 404),
+            (ScorerError::ProviderNotReadable("p".to_string()), 403),
             (ScorerError::DuplicateName, 409),
             (ScorerError::InUseByEvalJob, 409),
         ];
@@ -624,5 +779,98 @@ mod tests {
 
         let err = scorer_for_test("org1", &body).unwrap_err();
         assert!(matches!(err, ScorerError::MissingName));
+    }
+
+    fn denied_user() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: format!("{}@example.com", config::ider::uuid()),
+        })
+    }
+
+    fn judge(provider_id: &str) -> serde_json::Value {
+        serde_json::json!({
+            "type": "llm_judge",
+            "template": "Rate {{output}}",
+            "params": {"provider_id": provider_id}
+        })
+    }
+
+    #[tokio::test]
+    async fn testing_a_judge_on_an_unreadable_provider_is_refused() {
+        let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "probe",
+            "scorer": judge("provider-1"),
+            "inputVariables": {"output": "hello"}
+        }))
+        .unwrap();
+        let resp = test_scorer(Path("org1".to_string()), denied_user(), axum::Json(body)).await;
+        assert_eq!(resp.status().as_u16(), 403);
+    }
+
+    #[tokio::test]
+    async fn testing_a_remote_scorer_with_an_invalid_endpoint_is_a_bad_request() {
+        for endpoint in ["", "/evaluate"] {
+            let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+                "name": "default",
+                "description": null,
+                "scorer": {
+                    "type": "remote",
+                    "template": "",
+                    "params": {"endpoint": endpoint}
+                },
+                "inputVariables": null
+            }))
+            .unwrap();
+            let resp = test_scorer(Path("org1".to_string()), denied_user(), axum::Json(body)).await;
+            assert_eq!(resp.status().as_u16(), 400, "endpoint {endpoint:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn creating_a_judge_on_an_unreadable_provider_is_refused() {
+        let body: ScorerRequestBody = serde_json::from_value(
+            serde_json::json!({"name": "judge", "scorer": judge("provider-1")}),
+        )
+        .unwrap();
+        let resp = create_scorer(Path("org1".to_string()), denied_user(), axum::Json(body)).await;
+        assert_eq!(resp.status().as_u16(), 403);
+    }
+
+    #[tokio::test]
+    async fn rebinding_a_judge_needs_read_on_the_new_provider_but_keeping_it_does_not() {
+        infra::table::scorers::create_table().await.unwrap();
+        let org_id = format!("rebind_{}", config::ider::uuid());
+        let body: ScorerRequestBody = serde_json::from_value(
+            serde_json::json!({"name": "judge", "scorer": judge("provider-a")}),
+        )
+        .unwrap();
+        let mut existing: infra::table::scorers::Scorer = body.into();
+        existing.id = config::ider::uuid();
+        existing.entity_id = config::ider::uuid();
+        existing.org_id = org_id.clone();
+        existing.version = 1;
+        existing.is_active = true;
+        infra::table::scorers::add(&existing).await.unwrap();
+
+        let user = denied_user().0.user_id;
+        let kept = existing.clone();
+        assert!(
+            require_changed_provider_read(&org_id, &user, &existing.entity_id, &kept)
+                .await
+                .is_ok()
+        );
+
+        let rebound: ScorerUpdateRequestBody =
+            serde_json::from_value(serde_json::json!({"scorer": judge("provider-b")})).unwrap();
+        let resp = update_scorer(
+            Path((org_id.clone(), existing.entity_id.clone())),
+            denied_user(),
+            axum::Json(rebound),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 403);
+        infra::table::scorers::delete_all_by_org(&org_id)
+            .await
+            .unwrap();
     }
 }

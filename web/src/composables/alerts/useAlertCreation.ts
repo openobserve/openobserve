@@ -28,6 +28,7 @@ import { useStore } from "vuex";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { isPrefillBlocked, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { writeAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { featureState } from "@/utils/featureGate";
 
 export interface OpenAlertCreationOptions {
   /** Folder the alert lands in. Defaults to the org's default folder. */
@@ -111,6 +112,9 @@ export const useAlertCreation = (deps: UseAlertCreationDeps = {}) => {
     prefill: AlertPrefill,
     opts: OpenAlertCreationOptions = {},
   ): boolean => {
+    // Reads the store directly: deps callers run outside setup, where useLicenseLock cannot.
+    if (featureState(store?.state.zoConfig?.features, "alerts") === "locked") return false;
+
     const normalized = normalizePrefill(prefill);
 
     if (isPrefillBlocked(normalized)) return false;

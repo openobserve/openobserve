@@ -36,21 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-mode-spans-btn"
               value="spans"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.spansTab') : undefined"
             >
               <template #icon-left><OIcon name="layers" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.spansTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.spansTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               data-test="traces-search-mode-traces-btn"
               value="traces"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.tracesTab') : undefined"
             >
               <template #icon-left
                 ><OIcon name="account-tree" size="sm" class="shrink-0"
               /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.tracesTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               v-if="serviceGraphAccess.visible"
@@ -59,22 +59,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
               :tooltip="
-                serviceGraphAccess.allowed && shouldHideToggleText
+                serviceGraphAccess.allowed && toolbarToggleIconOnly
                   ? t('traces.serviceGraphTab')
                   : undefined
               "
             >
               <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.serviceGraphTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               data-test="traces-search-mode-services-catalog-btn"
               value="services-catalog"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.servicesCatalog.tabLabel') : undefined"
             >
               <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.servicesCatalog.tabLabel") }}</span>
             </OToggleGroupItem>
           </OToggleGroup>
 
@@ -83,12 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="insights-button"
             variant="outline"
             size="xs"
+            :disabled="searchObj.loading"
             @click="$emit('drill-down')"
           >
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="shrink-0" />
             </template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.drillDown") }}</span>
+            <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
             <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
           </OButton>
 
@@ -99,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.searchMode !== 'services-catalog'
             "
           >
-            <!-- Reset: icon+text at wide widths, icon-only when narrow -->
             <OButton
+              v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
               size="xs"
@@ -109,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
-              <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+              <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
             </OButton>
           </template>
 
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :open="savedViewsDropdownOpen"
               side="bottom"
               align="start"
-              @update:open="savedViewsDropdownOpen = $event"
+              @update:open="onSavedViewsDropdownOpenChange"
             >
               <template #trigger>
                 <OButton
@@ -148,30 +149,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
-              <ODropdownGroup :label="t('search.savedViewsLabel')">
-                <TracesSavedViewsMenuItems
-                  :views="sortedTracesSavedViews"
-                  :favorite-ids="favoriteIds"
-                  :loading="savedViewsLoading"
-                  @apply="applySavedView"
-                  @update="quickUpdateSavedView"
-                />
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem
-                icon-left="save"
-                data-test="traces-saved-view-create"
-                @select="openSaveViewDialog"
-              >
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="settings"
-                data-test="traces-saved-view-manage"
-                @select="openSavedViewsDialog"
-              >
-                {{ t("search.manageSavedViews") }}
-              </ODropdownItem>
+              <SavedViewsMenu
+                :views="tracesSavedViews"
+                :favorite-ids="favoriteIds"
+                :applied-view-id="appliedSavedViewId"
+                :loading="savedViewsLoading"
+                data-test-prefix="traces-saved-view"
+                @apply="applySavedView"
+                @update="requestUpdateSavedView"
+                @toggle-favorite="toggleFavorite"
+                @create="openSaveViewDialog"
+                @delete="deleteTracesSavedView"
+              />
             </ODropdown>
             <OSeparator vertical />
             <OButton
@@ -186,7 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
 
-        <ODropdown side="bottom" align="start">
+        <ODropdown
+          :open="moreMenuOpen"
+          side="bottom"
+          align="start"
+          @update:open="moreMenuOpen = $event"
+        >
           <template #trigger>
             <OButton
               data-test="traces-search-bar-more-menu-btn"
@@ -198,6 +192,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.menuMore") }}
             </OButton>
           </template>
+
+          <ODropdownItem
+            v-if="isSearchMode && toolbarMoveResetToMenu"
+            data-test="traces-search-bar-menu-reset-filters-btn"
+            @select="resetFilters"
+          >
+            <template #icon-left>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="restart-alt" size="sm" />
+              </span>
+            </template>
+            {{ t("search.resetFilters") }}
+          </ODropdownItem>
 
           <ODropdownItem
             v-if="isSearchMode"
@@ -237,11 +246,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="isSearchMode">
             <ODropdownSeparator />
-            <ODropdownGroup
-              :label="t('search.menuGroupSavedViews')"
-              data-test="traces-search-bar-menu-saved-views-group"
+            <SavedViewsSubmenu
+              :views="tracesSavedViews"
+              :favorite-ids="favoriteIds"
+              :applied-view-id="appliedSavedViewId"
+              :loading="savedViewsLoading"
+              data-test-prefix="traces-search-bar-menu-saved-views"
+              trigger-test-id="traces-search-bar-menu-list-saved-views-btn"
+              create-test-id="traces-search-bar-menu-create-saved-view-btn"
+              @open="refreshSavedViews"
+              @apply="applySavedView"
+              @update="requestUpdateSavedView"
+              @toggle-favorite="toggleFavorite"
+              @create="openSaveViewDialog"
+              @delete="deleteTracesSavedView"
             >
-              <template #label-action>
+              <template #actions>
                 <OButton
                   data-test="traces-search-bar-menu-pin-saved-views-btn"
                   variant="ghost-neutral"
@@ -254,33 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
                 </OButton>
               </template>
-              <ODropdownItem
-                data-test="traces-search-bar-menu-list-saved-views-btn"
-                @select="openSavedViewsDialog"
-              >
-                <template #icon-left>
-                  <span
-                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                  >
-                    <OIcon name="format-list-bulleted" size="sm" />
-                  </span>
-                </template>
-                {{ t("search.listSavedViews") }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="traces-search-bar-menu-create-saved-view-btn"
-                @select="openSaveViewDialog"
-              >
-                <template #icon-left>
-                  <span
-                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                  >
-                    <OIcon name="add" size="sm" />
-                  </span>
-                </template>
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-            </ODropdownGroup>
+            </SavedViewsSubmenu>
             <ODropdownSeparator />
           </template>
 
@@ -303,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
+          <OPageHeaderStatus />
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -322,13 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:timezone-change="updateTimezone"
           />
           <RecentSearchesButton
-            source="traces"
-            :examples="recentExamples"
             data-test="traces-search-bar-recent-searches-btn"
-            @run="(entry, when) => emit('recent-restore', entry, when, true)"
-            @load="(entry, when) => emit('recent-restore', entry, when, false)"
             @view-all="openRecentSearches"
-            @example="applyRecentExample"
           />
           <div>
             <div class="flex items-center">
@@ -378,18 +368,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator v-if="!showRunQueryPending" class="h-[1.875rem]! w-px" vertical />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     :aria-label="t('common.moreOptions')"
-                    variant="ghost"
+                    :variant="showRunQueryPending && !isLoading ? 'pending' : 'ghost'"
                     size="icon-xs"
                     :disabled="isLoading"
                     :class="[
                       config.isEnterprise == 'true' && isLoading
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
+                        : showRunQueryPending
+                          ? 'border-s-0'
+                          : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
                       '![border-radius:0_0.375rem_0.375rem_0]',
                     ]"
                   >
@@ -426,15 +418,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </div>
           </div>
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            :disabled="!searchObj.data.queryResults?.hits?.length"
-            :title="t('traces.exportTraces')"
-            @click="downloadLogs"
-          >
-            <OIcon name="download" size="sm" />
-          </OButton>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
@@ -442,11 +425,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             shortcut-id="tracesCopyUrl"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="traces-search-bar-more-actions-btn"
+                class="hover:bg-interactive-hover-bg! size-[2.125rem]!"
+                variant="outline"
+                size="icon-toolbar"
+              >
+                <OIcon name="menu" size="sm" />
+                <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+              </OButton>
+            </template>
+
+            <ODropdownGroup :label="t('search.menuGroupDownloads')">
+              <ODropdownItem
+                data-test="traces-search-bar-export-btn"
+                :disabled="!searchObj.data.queryResults?.hits?.length"
+                @select="downloadLogs"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="download" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.exportTraces") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('search.menuGroupAlerts')">
+              <ODropdownItem
+                data-test="traces-create-alert-btn"
+                :disabled="!!createAlertDisabledReason"
+                focusable-unavailable
+                :description="createAlertDisabledReason || createAlertNote"
+                @select="onCreateAlert"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon :name="createAlertIcon" size="sm" />
+                  </span>
+                </template>
+                {{ t("alerts.prefill.sources.traces.label") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('traces.redActions.menuGroupDashboards')">
+              <ODropdownItem
+                data-test="traces-add-red-to-dashboard-btn"
+                :disabled="!!redDashboardDisabledReason"
+                focusable-unavailable
+                :description="redDashboardDisabledReason"
+                @select="openRedDashboardDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="dashboard" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.redActions.addRedToDashboard") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+          </ODropdown>
+          <AddToDashboard
+            v-if="redDashboardOpen"
+            v-model:open="redDashboardOpen"
+            :dashboard-panel-data="{ data: {} }"
+            :panels="redDashboardPanels"
+            :notice="redDashboardNotice"
+          />
         </div>
 
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
+            <OPageHeaderStatus />
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -500,6 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
         <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
           <div class="flex items-center gap-2">
+            <OPageHeaderStatus />
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -533,17 +597,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
-        <CodeQueryEditor
+        <UnifiedQueryEditor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
+          data-test-prefix="traces-search-bar"
           v-model:query="searchObj.data.editorValue"
+          v-model:nlp-mode="nlpMode"
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
-          language="sql"
+          :hide-nl-toggle="!isAiEnabled"
+          :transform-generated-query="toTracesFilter"
+          editor-height="100%"
           @update:query="updateQueryValue"
           @user-edit="onRecentEditorEdit"
           @run-query="searchData"
@@ -566,7 +634,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
-            !recentFocusOpen
+            !recentFocusOpen &&
+            !nlpMode
           "
           class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
@@ -596,18 +665,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-saved-view-name-input"
       />
     </ODialog>
-    <SavedViewsListDialog
-      v-model:open="savedViewsDialogOpen"
-      data-test-prefix="traces-saved-views-dialog"
-      :views="tracesSavedViews"
-      :favorite-ids="favoriteIds"
-      :favorite-views="favoriteViews"
-      :loading="savedViewsLoading"
-      @apply="applySavedView"
-      @update="confirmUpdateSavedView"
-      @delete="deleteTracesSavedView"
-      @toggle-favorite="toggleFavorite"
-    />
   </div>
 </template>
 
@@ -622,8 +679,15 @@ import {
   onActivated,
   computed,
   toRef,
+  shallowRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
+import { chartInterval } from "./metrics/latencyHeatmap";
+import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -633,12 +697,13 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -650,9 +715,8 @@ import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import TracesSavedViewsMenuItems from "./TracesSavedViewsMenuItems.vue";
-import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
-import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
+import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
+import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 
 import { debounce } from "lodash-es";
@@ -668,7 +732,12 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
-import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import {
+  isDatetimeChanged,
+  tracesRunIsStaged,
+  tracesToolbarLayout,
+  TRACES_TOOLBAR_WIDTHS,
+} from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
@@ -700,6 +769,7 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OPageHeaderStatus,
     OSeparator,
     DateTime,
     ShareButton,
@@ -710,20 +780,21 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    ODropdownGroup,
     ODropdownSeparator,
+    ODropdownGroup,
+    AddToDashboard: defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue")),
     ODialog,
     OInput,
     OSwitch,
     OSelect,
     OTooltip,
-    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     SyntaxGuide,
-    TracesSavedViewsMenuItems,
-    SavedViewsListDialog,
     RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
+    SavedViewsMenu,
+    SavedViewsSubmenu,
   },
   emits: [
     "searchdata",
@@ -770,6 +841,16 @@ export default defineComponent({
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
 
+    const nlpMode = ref(false);
+    const isAiEnabled = computed(
+      () => config.isEnterprise === "true" && Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const toTracesFilter = (sql: string): string | null => {
+      const filter = nlSqlToTracesFilter(sql, tracesParser.value);
+      if (filter === null) toast({ message: t("traces.nlNeedsSql"), variant: "warning" });
+      return filter;
+    };
+
     const {
       onFocus: _sqlOnFocus,
       onBlur: _sqlOnBlur,
@@ -786,8 +867,9 @@ export default defineComponent({
     const recentFocusRef = ref<InstanceType<typeof RecentSearchesFocusDropdown> | null>(null);
     const recentDrawerRef = ref<InstanceType<typeof RecentSearchesDrawer> | null>(null);
     const recentFocusOpen = ref(false);
-    // A typed edit and a recent search loaded without running both leave the shown results stale until the next run.
+    // Pending when auto-run is off and the state differs from the last Run, or the editor differs from the last applied query.
     const showRunQueryPending = computed(() => {
+      if (tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled)) return true;
       const applied: unknown = searchObj.data.appliedEditorValue;
       if (typeof applied !== "string") return false;
       return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
@@ -1138,11 +1220,56 @@ export default defineComponent({
       }
     };
 
+    const {
+      createAlert,
+      disabledReason: createAlertDisabledReason,
+      queryNotRun,
+    } = useTracesAlertAction();
+    const createAlertIcon = getAlertSource("traces").icon;
+    const createAlertNote = computed(() =>
+      queryNotRun.value ? t("search.queryActions.usesUnrunQuery") : null,
+    );
+    const onCreateAlert = () => {
+      if (!createAlertDisabledReason.value) createAlert("matches");
+    };
+
+    const redDashboardOpen = ref(false);
+    const redDashboardPanels = shallowRef([]);
+    const redDashboardNotice = ref(undefined);
+    const redDashboardDisabledReason = computed(() =>
+      searchObj.data.stream.selectedStream?.value
+        ? null
+        : t("alerts.prefill.sources.traces.noStream"),
+    );
+    const openRedDashboardDialog = () => {
+      const stream = searchObj.data.stream.selectedStream?.value;
+      if (!stream) return;
+      const view = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
+      // Same bucket the RED charts compute for this range.
+      const interval = chartInterval(
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+      );
+      const editorText = searchObj.data.editorValue ?? "";
+      redDashboardPanels.value = buildTracesRedPanels({
+        streamName: stream,
+        filter: resolveTracesFilter(editorText, tracesParser.value, stream),
+        filterText: editorText,
+        view,
+        interval,
+        rateUnit: t(`traces.metrics.perSecond.${view}`),
+      });
+      const { unit, count } = tracesBucketNotice(interval.seconds);
+      redDashboardNotice.value = t(`traces.redActions.bucketNotice.${unit}`, { count });
+      redDashboardOpen.value = true;
+    };
+
     const updateTimezone = () => {
       emit("onChangeTimezone");
     };
 
     const resetFilters = () => {
+      appliedSavedView.value = null;
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1233,7 +1360,7 @@ export default defineComponent({
       (savedViewsList.data.value ?? []).filter((view) => view.view_type === "traces"),
     );
     const savedViewsLoading = computed(() => savedViewsList.isLoading.value);
-    const { favoriteIds, favoriteViews, toggleFavorite, removeFavorite, pruneFavorites } =
+    const { favoriteIds, toggleFavorite, removeFavorite, pruneFavorites } =
       useFavoriteSavedViews("traces");
     // Only a successful fetch is the complete list; pruning on error would drop every favourite.
     watch(
@@ -1245,9 +1372,25 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const sortedTracesSavedViews = computed(() =>
-      sortSavedViews(tracesSavedViews.value, favoriteIds.value),
+    const appliedSavedView = ref<{ id: string; editorValue: string; streamValue: string } | null>(
+      null,
     );
+    // Derived from the live state so any later edit, stream switch or reset drops the check.
+    const appliedSavedViewId = computed(() => {
+      const applied = appliedSavedView.value;
+      if (!applied) return null;
+      const matches =
+        searchObj.data.editorValue === applied.editorValue &&
+        searchObj.data.stream.selectedStream?.value === applied.streamValue;
+      return matches ? applied.id : null;
+    });
+    const markSavedViewApplied = (id: string, data: any) => {
+      appliedSavedView.value = {
+        id,
+        editorValue: data?.editorValue ?? "",
+        streamValue: data?.stream?.value ?? "",
+      };
+    };
     const createSavedView = useMutation(() => createSavedViewMutation(orgId.value));
     const updateSavedView = useMutation(() => updateSavedViewMutation(orgId.value));
     const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgId.value));
@@ -1282,12 +1425,6 @@ export default defineComponent({
       saveViewDialogOpen.value = true;
     };
 
-    const savedViewsDialogOpen = ref(false);
-    const openSavedViewsDialog = () => {
-      savedViewsList.refetch();
-      savedViewsDialogOpen.value = true;
-    };
-
     const saveAsNewView = async () => {
       const viewName = newViewName.value.trim();
       if (!viewName) {
@@ -1295,11 +1432,13 @@ export default defineComponent({
         return;
       }
       try {
-        await createSavedView.mutateAsync({
+        const viewData = buildSavedViewData();
+        const res = await createSavedView.mutateAsync({
           view_name: viewName,
           view_type: "traces",
-          data: buildSavedViewData(),
+          data: viewData,
         });
+        if (res?.data?.view_id) markSavedViewApplied(res.data.view_id, viewData);
         saveViewDialogOpen.value = false;
         toast({ message: t("search.viewCreatedSuccessfully"), variant: "success" });
       } catch (err) {
@@ -1312,10 +1451,12 @@ export default defineComponent({
 
     const updateSavedViewFromCurrent = async (view) => {
       try {
+        const viewData = buildSavedViewData();
         await updateSavedView.mutateAsync({
           viewId: view.view_id,
-          view: { view_name: view.view_name, data: buildSavedViewData() },
+          view: { view_name: view.view_name, data: viewData },
         });
+        markSavedViewApplied(view.view_id, viewData);
         toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1326,22 +1467,29 @@ export default defineComponent({
     };
 
     const savedViewsDropdownOpen = ref(false);
-    const quickUpdateSavedView = (view) => {
-      savedViewsDropdownOpen.value = false;
-      return updateSavedViewFromCurrent(view);
+    const moreMenuOpen = ref(false);
+    const refreshSavedViews = () => savedViewsList.refetch();
+    const onSavedViewsDropdownOpenChange = (open: boolean) => {
+      savedViewsDropdownOpen.value = open;
+      if (open) refreshSavedViews();
     };
-
-    const confirmUpdateSavedView = async (view) => {
-      savedViewsDialogOpen.value = false;
+    const requestUpdateSavedView = async (view) => {
+      savedViewsDropdownOpen.value = false;
+      moreMenuOpen.value = false;
       const confirmed = await confirm({
-        title: t("search.updateSavedView"),
-        message: t("search.updateSavedViewConfirm"),
+        title: t("search.overwriteSavedView"),
+        messageKeypath: "search.overwriteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmLabel: t("search.overwriteSavedViewOk"),
+        focusCancel: true,
       });
-      if (confirmed) await updateSavedViewFromCurrent(view);
+      if (!confirmed) return;
+      await updateSavedViewFromCurrent(view);
     };
 
     const deleteTracesSavedView = async (view) => {
-      savedViewsDialogOpen.value = false;
+      savedViewsDropdownOpen.value = false;
+      moreMenuOpen.value = false;
       const confirmed = await confirm({
         title: t("search.deleteSavedView"),
         messageKeypath: "search.deleteSavedViewConfirm",
@@ -1352,6 +1500,7 @@ export default defineComponent({
       try {
         await deleteSavedView.mutateAsync(view.view_id);
         removeFavorite(view.view_id);
+        if (appliedSavedView.value?.id === view.view_id) appliedSavedView.value = null;
         toast({ message: t("search.viewDeletedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1368,6 +1517,7 @@ export default defineComponent({
         // Uncached on purpose, as in logs: applying must use the server's current copy.
         const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
         if (seq !== applySavedViewSeq) return;
+        markSavedViewApplied(view.view_id, res.data.data);
         emit("apply-saved-view", res.data.data);
       } catch (err) {
         if (seq !== applySavedViewSeq) return;
@@ -1386,29 +1536,12 @@ export default defineComponent({
         searchObj.meta.searchMode !== "services-catalog",
     );
 
-    // Approximate rendered widths of the Traces left-section items, used only to decide whether the pinned group fits.
-    const TOOLBAR_ITEM_GAP = 6;
-    const METRICS_PINNED_WIDTH = 72 + TOOLBAR_ITEM_GAP;
-    const SAVED_VIEWS_GROUP_WIDTH = 87 + TOOLBAR_ITEM_GAP;
-    const TOGGLE_WIDTH = { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } };
-    const DRILL_DOWN_WIDTH = { text: 97, icon: 36 };
-    const RESET_WIDTH = { text: 72, icon: 36 };
-    const MORE_WIDTH = 70;
-
     const metricsPinned = computed(() => isSearchMode.value && isPinned("histogram"));
     const savedViewsPinned = computed(() => isSearchMode.value && isPinned("savedViews"));
     const pinnedGroupWidth = computed(
       () =>
-        (metricsPinned.value ? METRICS_PINNED_WIDTH : 0) +
-        (savedViewsPinned.value ? SAVED_VIEWS_GROUP_WIDTH : 0),
-    );
-
-    // Traces-specific breakpoints, raised by the pinned group so labels shrink before it falls back into More.
-    const shouldHideToggleText = computed(
-      () => availableLeftWidth.value < 750 + pinnedGroupWidth.value,
-    );
-    const shouldHideResetText = computed(
-      () => availableLeftWidth.value < 540 + pinnedGroupWidth.value,
+        (metricsPinned.value ? TRACES_TOOLBAR_WIDTHS.metricsPinned : 0) +
+        (savedViewsPinned.value ? TRACES_TOOLBAR_WIDTHS.savedViewsPinned : 0),
     );
 
     // Only while Index renders SearchResult with its header, since the click is routed to it.
@@ -1416,7 +1549,6 @@ export default defineComponent({
       () =>
         isSearchMode.value &&
         !searchObj.loadingStream &&
-        !searchObj.loading &&
         searchObj.data.stream.streamLists.length > 0 &&
         !!searchObj.data.stream.selectedStream?.value &&
         !searchObj.data.errorMsg?.trim()?.length &&
@@ -1434,22 +1566,32 @@ export default defineComponent({
       emit("update:searchMode", value);
     };
 
-    const leftBaseWidth = computed(() => {
-      const textKey = shouldHideToggleText.value ? "icon" : "text";
-      const toggle = serviceGraphAccess.value.visible ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
-      const widths = [toggle[textKey], MORE_WIDTH];
-      if (showDrillDown.value) widths.push(DRILL_DOWN_WIDTH[textKey]);
-      if (isSearchMode.value) widths.push(RESET_WIDTH[shouldHideResetText.value ? "icon" : "text"]);
-      return widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * TOOLBAR_ITEM_GAP;
-    });
+    const toolbarLayout = computed(() =>
+      tracesToolbarLayout({
+        available: availableLeftWidth.value,
+        serviceGraph: serviceGraphAccess.value.visible,
+        drillDown: showDrillDown.value,
+        reset: isSearchMode.value,
+        pinnedWidth: pinnedGroupWidth.value,
+      }),
+    );
+    // Below lg the bar wraps and availableLeftWidth reads ~0, so the stage and pinned items need no budget there.
+    const toolbarStage = computed(() => (lgUp.value ? toolbarLayout.value.stage : "iconToggle"));
+    const shouldHideToolbarButtonText = computed(() => toolbarStage.value !== "full");
+    const toolbarToggleIconOnly = computed(
+      () => toolbarStage.value === "iconToggle" || toolbarStage.value === "resetInMenu",
+    );
+    const toolbarMoveResetToMenu = computed(() => toolbarStage.value === "resetInMenu");
 
-    // Below lg the bar wraps and availableLeftWidth reads ~0, so pinned items need no budget there.
     const pinnedFit = computed(() => {
       if (!lgUp.value) return { metrics: metricsPinned.value, savedViews: savedViewsPinned.value };
-      let budget = availableLeftWidth.value - leftBaseWidth.value;
-      const metrics = metricsPinned.value && budget >= METRICS_PINNED_WIDTH;
-      if (metrics) budget -= METRICS_PINNED_WIDTH;
-      return { metrics, savedViews: savedViewsPinned.value && budget >= SAVED_VIEWS_GROUP_WIDTH };
+      let budget = toolbarLayout.value.pinnedBudget;
+      const metrics = metricsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.metricsPinned;
+      if (metrics) budget -= TRACES_TOOLBAR_WIDTHS.metricsPinned;
+      return {
+        metrics,
+        savedViews: savedViewsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.savedViewsPinned,
+      };
     });
     const showPinnedMetrics = computed(() => pinnedFit.value.metrics);
     const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
@@ -1460,6 +1602,9 @@ export default defineComponent({
       store,
       searchObj,
       queryEditorRef,
+      nlpMode,
+      isAiEnabled,
+      toTracesFilter,
       onQueryEditorFocus,
       onQueryEditorBlur,
       queryEditorBoxRef,
@@ -1479,6 +1624,15 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       downloadLogs,
+      createAlertDisabledReason,
+      createAlertNote,
+      createAlertIcon,
+      onCreateAlert,
+      redDashboardOpen,
+      redDashboardPanels,
+      redDashboardNotice,
+      redDashboardDisabledReason,
+      openRedDashboardDialog,
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
@@ -1501,8 +1655,9 @@ export default defineComponent({
       traceEditorPlaceholder,
       toolbarLeftRef,
       toolbarRightRef,
-      shouldHideToggleText,
-      shouldHideResetText,
+      shouldHideToolbarButtonText,
+      toolbarToggleIconOnly,
+      toolbarMoveResetToMenu,
       showDrillDown,
       isSearchMode,
       isPinned,
@@ -1514,20 +1669,19 @@ export default defineComponent({
       saveViewDialogOpen,
       newViewName,
       openSaveViewDialog,
-      savedViewsDialogOpen,
-      openSavedViewsDialog,
       saveAsNewView,
       updateSavedViewFromCurrent,
       deleteTracesSavedView,
       applySavedView,
       savedViewsLoading,
       favoriteIds,
-      favoriteViews,
       toggleFavorite,
-      sortedTracesSavedViews,
+      appliedSavedViewId,
       savedViewsDropdownOpen,
-      quickUpdateSavedView,
-      confirmUpdateSavedView,
+      onSavedViewsDropdownOpenChange,
+      refreshSavedViews,
+      moreMenuOpen,
+      requestUpdateSavedView,
       serviceGraphAccess,
       onSearchModeChange,
     };

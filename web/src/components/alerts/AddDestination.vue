@@ -153,7 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Template selector for prebuilt destinations -->
               <div
-                v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
+                v-if="
+                  dtVal && dtVal !== 'custom' && dtVal !== 'jira' && showPrebuiltAdvancedSettings
+                "
                 class="w-1/2 py-1"
               >
                 <OFormSelect
@@ -177,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- None of these settings apply to email destinations -->
               <div
-                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
+                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email' && dtVal !== 'jira'"
                 class="mt-3 w-full"
                 data-test="prebuilt-additional-settings"
               >
@@ -196,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-key-input`"
                         :name="`apiHeaders[${index}].key`"
                         :placeholder="t('alert_destinations.api_header')"
+                        :aria-label="t('alert_destinations.api_header')"
                         tabindex="0"
                       />
                     </div>
@@ -204,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-value-input`"
                         :name="`apiHeaders[${index}].value`"
                         :placeholder="t('alert_destinations.api_header_value')"
+                        :aria-label="t('alert_destinations.api_header_value')"
                         tabindex="0"
                       />
                     </div>
@@ -359,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
                       :placeholder="t('alert_destinations.api_header')"
+                      :aria-label="t('alert_destinations.api_header')"
                       tabindex="0"
                     />
                   </div>
@@ -367,6 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
                       :placeholder="t('alert_destinations.api_header_value')"
+                      :aria-label="t('alert_destinations.api_header_value')"
                       tabindex="0"
                     />
                   </div>
@@ -400,6 +406,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"
                   :label="t('alert_destinations.skip_tls_verify')"
+                />
+              </div>
+              <div
+                v-if="isCustomWebhook"
+                class="w-1/2 py-2"
+                data-test="add-destination-payload-format"
+              >
+                <OFormSelect
+                  data-test="add-destination-payload-format-select"
+                  name="payload_format"
+                  :label="t('alert_destinations.payloadFormat')"
+                  :options="payloadFormatOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  :help-text="t('alert_destinations.payloadFormatHelp')"
+                  tabindex="0"
                 />
               </div>
 
@@ -488,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("alerts.cancel") }}</OButton
             >
             <OButton
-              v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
+              v-if="(!isNewSlackDestination && dtVal !== 'jira') || showPrebuiltAdvancedSettings"
               data-test="add-destination-submit-btn"
               variant="primary"
               size="sm-action"
@@ -554,6 +576,8 @@ import {
 } from "@/composables/usePrebuiltDestinations";
 import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
+import { jiraCredentialsFromMetadata } from "@/utils/prebuilt-templates/jira";
+import { PAGERDUTY_EU_EVENTS_URL } from "@/utils/prebuilt-templates/pagerduty";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
@@ -862,7 +886,16 @@ const isSlackOAuthConnected = computed(() => {
     slackChannelId.value.trim().length > 0
   );
 });
+// Jira lists its projects and issue types only after Connect, so nothing past them shows before.
+const isJiraReady = computed(
+  () =>
+    !!prebuiltCredentials.value.connectedAs &&
+    !!prebuiltCredentials.value.projectKey &&
+    !!prebuiltCredentials.value.issueTypeId &&
+    !!prebuiltCredentials.value.createMeta,
+);
 const showPrebuiltAdvancedSettings = computed(() => {
+  if (props.isAlerts && dtVal.value === "jira") return isJiraReady.value;
   if (isSlackOAuthFlow.value) return isSlackOAuthConnected.value;
   if (isSlackManifestFlow.value) return slackManifestReady.value;
   return true;
@@ -876,6 +909,11 @@ const showPrebuiltFinalActions = computed(
 const isCustomWebhook = computed(
   () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
+const payloadFormatOptions = computed(() => [
+  { label: t("alert_destinations.payloadFormatAuto"), value: "auto" },
+  { label: t("alert_destinations.payloadFormatLegacy"), value: "legacy" },
+  { label: t("alert_destinations.payloadFormatRendered"), value: "rendered" },
+]);
 const handleSlackFlowChange = (): void => {
   clearTestResult();
 };
@@ -982,6 +1020,7 @@ const getDestinationTypeIcon = (typeId: string) => {
     pagerduty: "warning",
     opsgenie: "notifications_active",
     servicenow: "support_agent",
+    jira: "assignment",
     custom: "settings",
   };
   return iconMap[typeId] || "webhook";
@@ -1064,6 +1103,7 @@ const setupDestinationData = () => {
       url: props.destination.url ?? "",
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
+      payload_format: storedPayloadFormat(parsedMetadata),
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
@@ -1084,6 +1124,8 @@ const setupDestinationData = () => {
           ? prebuiltDestinationDefaults(destType, extractPrebuiltCredentials(destType))
           : {},
     };
+    // Names the saved destination whose token the server reuses while the token stays empty.
+    if (destType === "jira") record.credentials.savedDestination = props.destination.name;
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
     // When there are none, the default apiHeaders row is kept. Custom and
@@ -1145,6 +1187,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
           credentials.severity = value;
         }
       });
+      if (typeId === "jira") Object.assign(credentials, jiraCredentialsFromMetadata(metadata));
     } catch (e) {
       console.error("Failed to parse destination metadata:", e);
     }
@@ -1154,6 +1197,9 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   // webhookUrl is stored in the url field for webhook-based destinations.
   if (props.destination.url) {
     credentials.webhookUrl = props.destination.url;
+  }
+  if (typeId === "jira") {
+    credentials.url = props.destination.url ?? "";
   }
   // For ServiceNow, instanceUrl is the base URL.
   if (typeId === "servicenow" && props.destination.url) {
@@ -1173,6 +1219,9 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
     props.destination.headers?.["X-Routing-Key"]
   ) {
     credentials.integrationKey = props.destination.headers["X-Routing-Key"];
+  }
+  if (typeId === "pagerduty") {
+    credentials.euRegion = props.destination.url === PAGERDUTY_EU_EVENTS_URL;
   }
   // Opsgenie: apiKey is in the Authorization header.
   if (typeId === "opsgenie" && props.destination.headers?.["Authorization"]) {
@@ -1427,6 +1476,30 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
   return headers;
 }
 
+/** The stored metadata.payload_format as the select's value; anything else is automatic. */
+function storedPayloadFormat(
+  metadata: Record<string, unknown> | null,
+): "auto" | "legacy" | "rendered" {
+  const stored = metadata?.payload_format;
+  return stored === "legacy" || stored === "rendered" ? stored : "auto";
+}
+
+/** The destination's metadata with payload_format set, or removed for automatic. */
+function withPayloadFormat(
+  stored: DestinationPayload["metadata"],
+  format: string | undefined,
+): Record<string, string> {
+  let metadata: Record<string, string> = {};
+  try {
+    metadata = typeof stored === "string" ? JSON.parse(stored || "{}") : { ...(stored ?? {}) };
+  } catch {
+    metadata = {};
+  }
+  delete metadata.payload_format;
+  if (format === "legacy" || format === "rendered") metadata.payload_format = format;
+  return metadata;
+}
+
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
 // types). OForm calls the submit only once the schema (incl. the type-keyed
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
@@ -1458,6 +1531,10 @@ function saveCustomDestination(value: AddDestinationForm) {
     payload["emails"] = value.emails ?? [];
   }
 
+  if (isCustomWebhook.value) {
+    payload.metadata = withPayloadFormat(props.destination?.metadata, value.payload_format);
+  }
+
   if (isUpdatingDestination.value) {
     track("Button Click", {
       button: "Update Destination",
@@ -1474,10 +1551,10 @@ function saveCustomDestination(value: AddDestinationForm) {
         });
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
@@ -1499,10 +1576,10 @@ function saveCustomDestination(value: AddDestinationForm) {
         });
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,

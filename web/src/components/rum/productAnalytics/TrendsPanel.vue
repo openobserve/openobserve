@@ -59,13 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-toolbar"
-          icon-left="dashboard-customize"
-          :disabled="eventsGate !== 'ready'"
+          :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
+          :disabled="dashboardsLocked || chartHeld || eventsGate !== 'ready'"
           :aria-label="t('rum.analytics.dashboard.add')"
           data-test="rum-analytics-trends-add-dashboard-btn"
           @click="dashboardOpen = true"
         />
-        <OTooltip :content="t('rum.analytics.dashboard.add')" />
+        <OTooltip
+          :content="dashboardsLocked ? dashboardsLockedReason : t('rum.analytics.dashboard.add')"
+        />
       </span>
     </div>
     <div v-if="series.length" class="flex flex-wrap items-center gap-1.5 px-4 pt-2">
@@ -104,11 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
       <!-- v-if (not v-show): an unresolved event series must not mount the renderer at all. -->
-      <OSkeleton
-        v-if="eventsGate === 'loading'"
-        class="h-full w-full"
-        data-test="rum-analytics-trends-loading"
-      />
+      <OSkeleton v-if="chartHeld" class="h-full w-full" data-test="rum-analytics-trends-loading" />
       <template v-else>
         <OSkeleton
           v-if="chartLoading"
@@ -156,6 +154,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
@@ -182,6 +181,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
 const metric = ref<"sessions" | "users">("sessions");
 // Users needs an identity, so losing it must not leave the toggle with nothing selected.
 watch(
@@ -224,6 +225,9 @@ const eventsGate = computed<NamedEventsStatus>(() =>
 const eventsHeld = computed(
   () => eventsGate.value === "failed" || eventsGate.value === "forbidden",
 );
+
+// The shell mounts the Overview before its app probe answers, and a query without an app is invalid.
+const chartHeld = computed(() => !props.scope.app || eventsGate.value === "loading");
 
 const chartSeries = computed<StepRef[]>(() =>
   eventsHeld.value ? props.series.filter((s) => s.kind !== "e") : props.series,

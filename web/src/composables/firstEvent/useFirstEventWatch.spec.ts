@@ -94,6 +94,7 @@ interface WatchOpts {
   filter?: string;
   match?: "exact" | "keyword";
   autoDiagnosis?: boolean;
+  diagnosisAtMs?: number;
 }
 const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
   scope = effectScope();
@@ -105,6 +106,7 @@ const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
       filter: ref(opts.filter),
       match: ref(opts.match),
       ...(opts.autoDiagnosis === undefined ? {} : { autoDiagnosis: ref(opts.autoDiagnosis) }),
+      ...(opts.diagnosisAtMs === undefined ? {} : { diagnosisAtMs: ref(opts.diagnosisAtMs) }),
     }),
   )!;
 };
@@ -274,8 +276,10 @@ describe("useFirstEventWatch — confirmation", () => {
     const w = watchOf();
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
-    rows.logs = [{ name: "usage", stats: { doc_num: 9, doc_time_min: 9 } }];
-    rows.metrics = [{ name: "_o2_db_stats", stats: { doc_num: 9, doc_time_min: 9 } }];
+    rows.logs = [{ name: "usage", is_internal: true, stats: { doc_num: 9, doc_time_min: 9 } }];
+    rows.metrics = [
+      { name: "_o2_db_stats", is_internal: true, stats: { doc_num: 9, doc_time_min: 9 } },
+    ];
     await vi.advanceTimersByTimeAsync(30_000);
     expect(w.state.value).toBe("waiting");
   });
@@ -842,10 +846,12 @@ describe("useFirstEventWatch — org data on a direct load, before the flag is s
 
   it("keeps checking when the org holds only internal streams", async () => {
     rows.logs = [
-      { name: "usage", stats: { doc_num: 9, doc_time_min: 1 } },
-      { name: "_o2_pipeline", stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "usage", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "_o2_pipeline", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
     ];
-    rows.metrics = [{ name: "_anomalies", stats: { doc_num: 9, doc_time_min: 1 } }];
+    rows.metrics = [
+      { name: "_anomalies", is_internal: true, stats: { doc_num: 9, doc_time_min: 1 } },
+    ];
     const w = watchOf("logs", { targetStream: "syslog_ng" });
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
@@ -1508,6 +1514,17 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.state.value).toBe("waiting");
     expect(w.diagnosis.value).toBeUndefined();
     expect(probeCalls()).toBeGreaterThan(100);
+  });
+
+  it("waits the caller's longer delay before its first automatic read (coding-agent tab)", async () => {
+    const w = watchOf("logs", { diagnosisAtMs: 15 * 60_000 });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(14 * 60_000);
+    expect(recentRejections).not.toHaveBeenCalled();
+    expect(w.state.value).toBe("waiting");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
+    expect(w.diagnosis.value).toMatchObject({ trigger: "auto" });
   });
 
   it("stops every request once data is received", async () => {

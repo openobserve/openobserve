@@ -130,6 +130,7 @@ describe("ViewDashboard default auto refresh", () => {
         stubs: {
           OPageLayout: { template: '<div><slot name="actions" /><slot /></div>' },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          OPopover: { template: '<div><slot name="trigger" /><slot /></div>' },
           AutoRefreshInterval: false,
           DateTimePickerDashboard: PickerStub,
           RenderDashboardCharts: RenderDashboardChartsStub,
@@ -161,7 +162,7 @@ describe("ViewDashboard default auto refresh", () => {
 
     expect(wrapper.vm.refreshInterval).toBe(60);
     expect(toolbarControl().props("modelValue")).toBe(60);
-    expect(toolbarControl().text()).toContain("1 min");
+    expect(toolbarControl().text()).toContain("1m");
     expect(route.query.refresh).toBe("1m");
   });
 

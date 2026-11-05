@@ -30,6 +30,7 @@ import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import K8sListView from "./K8sListView.vue";
 import MapView from "./MapView.vue";
+import DependenciesView from "./DependenciesView.vue";
 import ClusterOverview from "./ClusterOverview.vue";
 import WorkloadsOverview from "./WorkloadsOverview.vue";
 import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
@@ -38,6 +39,7 @@ import K8sDock from "./K8sDock.vue";
 import { metricsRoute, pickTracesStream, tracesRoute } from "./k8sNavigation";
 import useStreams from "@/composables/useStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import type { K8sAction } from "./k8sActions";
 import {
   closeTab,
@@ -85,7 +87,7 @@ import {
   type K8sUrlState,
 } from "./kubernetesUrlState";
 
-type ListView = Exclude<View, "cluster" | "map" | "workloads">;
+type ListView = Exclude<View, "cluster" | "map" | "dependencies" | "workloads">;
 
 const DEFAULT_RELATIVE_PERIOD = "1h";
 const DEFAULT_WINDOW_US = 60 * 60 * 1000 * 1000;
@@ -97,6 +99,7 @@ const streamsApi = useStreams(gt);
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
+const { isLocked } = useLicenseLocks();
 
 const state = computed(() => parseUrlState(route.query));
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -242,7 +245,9 @@ const listRows = computed(() => {
   return kind ? scopedRows(k8s.inventory.value[INVENTORY_KEY[kind]] as AnyRow[]) : [];
 });
 
-const isList = computed(() => !["cluster", "map", "workloads"].includes(state.value.view));
+const isList = computed(
+  () => !["cluster", "map", "dependencies", "workloads"].includes(state.value.view),
+);
 
 const drawerRow = computed(() => {
   const d = state.value.details;
@@ -451,6 +456,7 @@ const openTraces = async (ref: DetailsRef) => {
 };
 
 const onAction = (type: K8sAction, ref: DetailsRef) => {
+  if ((type === "metrics" || type === "traces") && isLocked(type)) return;
   if (type === "details") onDrawerLink(ref);
   else if (type === "logs") dock.value = openTab(dock.value, type, ref);
   else if (type === "yaml") dock.value = openTab(dock.value, type, ref, dockRowOf(ref));
@@ -637,6 +643,20 @@ k8s.loadStreams();
             @update="onUpdate"
             @open="onOpen"
             @navigate="onNavigate"
+            @refresh="onRefresh"
+          />
+          <DependenciesView
+            v-else-if="state.view === 'dependencies'"
+            :state="state"
+            :cluster="k8s.effectiveCluster.value"
+            :cluster-pending="k8s.effectiveCluster.value == null && !k8s.loaded.value"
+            :namespace-options="k8s.namespaceOptions.value"
+            :range="range"
+            :org-id="orgId"
+            :refresh-nonce="k8s.refreshNonce.value"
+            :has-stream="k8s.has"
+            @update="onUpdate"
+            @open="onOpen"
             @refresh="onRefresh"
           />
           <K8sListView

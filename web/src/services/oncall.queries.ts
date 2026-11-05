@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "./oncall";
 import { incidentKeys } from "./incidents.querykeys";
+import { oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import {
   LIVE_STALE_TIME,
@@ -27,6 +28,7 @@ import type {
   Contact,
   CoverageGaps,
   EscalationProgress,
+  EscalationProgressEntry,
   MyDeliveries,
   MyOnCall,
   OnCallPolicy,
@@ -35,6 +37,7 @@ import type {
   OnCallResponseReport,
   OnCallSchedule,
   OnCallTeam,
+  OnCallTeamContext,
   OnCallTeamMember,
   Override,
   OwnershipRule,
@@ -44,6 +47,7 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
   TelephonyStatus,
   TelephonyView,
@@ -157,6 +161,21 @@ export const whoIsOnCallQuery = (org: string, teamId: string, at?: number) =>
     queryKey: oncallKeys.whoIsOnCall(org, teamId, at),
     queryFn: async (): Promise<OnCallPosition[]> =>
       (await oncallService.whoIsOnCall({ org_identifier: org, team_id: teamId, at })).data ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** Carries each team's rotation, which handovers move, so it takes the live tier like `whoIsOnCallQuery`. */
+export const teamContextQuery = (org: string, teamIds: string[], includeMine: boolean) =>
+  queryOptions({
+    queryKey: oncallKeys.teamContext(org, teamIds, includeMine),
+    queryFn: async (): Promise<OnCallTeamContext[]> =>
+      (
+        await oncallService.teamContext({
+          org_identifier: org,
+          team_ids: teamIds,
+          include_mine: includeMine,
+        })
+      ).data?.teams ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -340,6 +359,20 @@ export const responseProgressQuery = (org: string, responseId: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+/** The batch form of `responseProgressQuery`, for a list of open pages. */
+export const responsesProgressQuery = (org: string, responseIds: string[]) =>
+  queryOptions({
+    queryKey: oncallKeys.responsesProgress(org, responseIds),
+    queryFn: async (): Promise<EscalationProgressEntry[]> =>
+      (
+        await oncallService.escalationProgressBatch({
+          org_identifier: org,
+          response_ids: responseIds,
+        })
+      ).data?.progress ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
 /** How this signal ended the last times it fired — history, so it cannot change under us. */
 export const responsePriorCausesQuery = (org: string, responseId: string) =>
   queryOptions({
@@ -507,6 +540,7 @@ export const unavailabilityQuery = (org: string, userEmail?: string, from?: numb
  */
 const teamWriteScopes = (org: string, teamId: string) => [
   oncallKeys.team(org, teamId),
+  oncallKeys.teamContextAll(org),
   oncallKeys.coverageGaps(org),
   oncallKeys.myAll(org),
 ];
@@ -593,18 +627,27 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
     mutationFn: (data: Parameters<typeof oncallService.setPolicy>[0]["data"]) =>
       oncallService.setPolicy({ org_identifier: org, team_id: teamId, data }),
     // Rungs feed the overview, the dry run and the risk list; coverage is unmoved.
-    meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+    meta: {
+      invalidates: [oncallKeys.team(org, teamId), oncallKeys.teamContextAll(org)],
+      silentError: true,
+    },
   });
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
-    meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
+    meta: {
+      invalidates: [oncallKeys.team(org, teamId), oncallKeys.teamContextAll(org)],
+      silentError: true,
+    },
+  });
+
+/** RO-6: posts one plain message and writes no row, so it expires nothing. */
+export const testTeamSlackChannelMutation = (org: string, teamId: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.testTeamSlackChannel({ org_identifier: org, team_id: teamId }),
+    meta: { silentError: true },
   });
 
 export const createOverrideMutation = (org: string, teamId: string) =>
@@ -683,7 +726,25 @@ export const acknowledgeResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: (responseId: string) =>
       oncallService.acknowledgeResponse({ org_identifier: org, response_id: responseId }),
-    meta: { invalidates: responseWriteScopes(org), silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const takeOverResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.acknowledgeResponse({
+        org_identifier: org,
+        response_id: responseId,
+        take_over: true,
+      }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const unacknowledgeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unacknowledgeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */
@@ -695,6 +756,13 @@ export const snoozeResponseMutation = (org: string) =>
         response_id: responseId,
         minutes,
       }),
+    meta: { invalidates: responseWriteScopes(org), silentError: true },
+  });
+
+export const unsnoozeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unsnoozeResponse({ org_identifier: org, response_id: responseId }),
     meta: { invalidates: responseWriteScopes(org), silentError: true },
   });
 

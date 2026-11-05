@@ -15,41 +15,9 @@
 
 use std::sync::{Arc, atomic::AtomicUsize};
 
-use datafusion::{
-    common::{
-        Result,
-        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
-    },
-    physical_plan::ExecutionPlan,
-    prelude::SessionContext,
-};
-use flight::common::Metrics;
-use parking_lot::Mutex;
+use datafusion::prelude::SessionContext;
 
-use super::{distributed_plan::remote_scan_exec::RemoteScanExec, peak_memory_pool::PeakMemoryPool};
-
-pub fn get_cluster_metrics(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<Vec<Metrics>>>> {
-    let mut visitor = MetricsVisitor::default();
-    let _ = plan.visit(&mut visitor);
-    visitor.metrics
-}
-
-#[derive(Default)]
-struct MetricsVisitor {
-    metrics: Vec<Arc<Mutex<Vec<Metrics>>>>,
-}
-
-impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "RemoteScanExec" {
-            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
-            self.metrics.push(remote_scan_exec.cluster_metrics());
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
-}
+use super::peak_memory_pool::PeakMemoryPool;
 
 /// Get the peak memory from the SessionContext's memory pool.
 /// This should be called after the query execution to get the peak memory usage.

@@ -36,6 +36,8 @@ const router = createRouter({
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
+import { urlWriteMode } from "@/composables/useLogs/useLogsUrl";
+import { saveLogsStreamType } from "@/utils/streamPersist";
 
 initializeLogsIndexDom();
 
@@ -107,6 +109,7 @@ vi.mock("@/composables/useStreams", () => ({
       list: [{ name: "k8s_json", stream_type: "logs", stats: { doc_time_max: 0 }, schema: [] }],
     })),
     getStream: vi.fn(async () => ({ name: "k8s_json", schema: [{ name: "_timestamp" }] })),
+    prefetchStreamSchema: vi.fn(),
     isStreamExists: vi.fn(() => true),
     isStreamFetched: vi.fn(() => true),
     getMultiStreams: vi.fn(async () => []),
@@ -166,6 +169,30 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     );
   });
 
+  it("a landing that runs nothing lets the user's first search push history", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "false");
+    localStorage.setItem(`oo_logs_selected_stream_logs_${org}`, '["k8s_json"]');
+    await router.replace({ name: "home" });
+    const logs = await land(
+      {},
+      { auto_query_enabled: true, query_on_stream_selection: true, auto_query_max_scan_mb: 0 },
+    );
+    expect(logs).not.toHaveBeenCalled();
+    const current = router.currentRoute.value.query;
+    expect(urlWriteMode(current, { ...current, stream: "k8s_json", query: "ZWRpdGVk" })).toBe(
+      "push",
+    );
+  });
+
+  it.each([
+    ["licensed", {}, "traces"],
+    ["locked", { traces: "locked" }, "logs"],
+  ])("restores a remembered traces type only while traces is %s", async (_s, features, type) => {
+    saveLogsStreamType(org, "traces");
+    await land({}, { auto_query_enabled: true, query_on_stream_selection: true, features });
+    expect(wrapper.vm.searchObj.data.stream.streamType).toBe(type);
+  });
+
   it("AQE=false: no restore and no preselect, as today", async () => {
     localStorage.setItem(`oo_logs_selected_stream_logs_${org}`, '["k8s_json"]');
     const logs = await land(
@@ -189,6 +216,32 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     );
   });
 
+  it("draws a URL stream's field list as loading, never empty, from the first render until its fields load", async () => {
+    store.state.zoConfig = {
+      ...originalZoConfig,
+      auto_query_enabled: true,
+      query_on_stream_selection: true,
+    };
+    (store.state as any).logs = { isInitialized: false, logs: {} };
+    vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+    (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: "" });
+    await router.replace({
+      name: "logs",
+      query: { org_identifier: org, stream: "k8s_json", stream_type: "logs", period: "15m" },
+    });
+    loadRuns.length = 0;
+    wrapper = mount(Index, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    expect(wrapper.vm.searchObj.loadingStream).toBe(true);
+    wrapper.vm.autoRun.setExecutors({ logs: vi.fn() });
+    await vi.waitFor(() => expect(loadRuns.length).toBeGreaterThan(0), { timeout: 10000 });
+    await Promise.allSettled(loadRuns);
+    await flushPromises();
+    expect(wrapper.vm.searchObj.loadingStream).toBe(false);
+  });
+
   it("a readable URL stream is an entry point: it runs once even with Auto Run off", async () => {
     localStorage.setItem("oo_toggle_auto_run", "false");
     const logs = await land(
@@ -200,8 +253,12 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
   });
 
   describe("re-applied query links (AI chat, search history)", () => {
-    const reApply = async (query: Record<string, string>) => {
-      store.state.zoConfig = { ...originalZoConfig, auto_query_enabled: true };
+    const reApply = async (
+      query: Record<string, string>,
+      zoConfig: Record<string, unknown> = {},
+      logs?: Mock,
+    ) => {
+      store.state.zoConfig = { ...originalZoConfig, auto_query_enabled: true, ...zoConfig };
       (store.state as any).logs = { isInitialized: false, logs: {} };
       vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
       (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: "" });
@@ -210,6 +267,7 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         attachTo: "#app",
         global: { provide: { store }, plugins: [i18n, router] },
       });
+      if (logs) wrapper.vm.autoRun.setExecutors({ logs });
       await vi.waitFor(
         () => expect(wrapper.vm.searchObj.data.stream.streamLists.length).toBeGreaterThan(0),
         { timeout: 10000 },
@@ -239,6 +297,77 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
       },
     );
+
+    it.each(["ai_chat_query", "search_history_re_apply"])(
+      "%s loaded without running shows the run-query prompt, not an empty result grid",
+      async (type) => {
+        await reApply(
+          { type, stream: "k8s_json", stream_type: "logs", period: "15m" },
+          { auto_query_enabled: false, query_on_stream_selection: true },
+        );
+        await vi.waitFor(() =>
+          expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+        );
+        await flushPromises();
+        expect(wrapper.vm.searchObj.meta.searchApplied).toBe(false);
+        expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+      },
+    );
+
+    it("a search Auto Run starts during a re-apply keeps its hits", async () => {
+      const logs = vi.fn(async () => {
+        wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1, body: "row" }] };
+        wrapper.vm.searchObj.meta.searchApplied = true;
+      });
+      await reApply(
+        { type: "search_history_re_apply", stream: "k8s_json", stream_type: "logs", period: "15m" },
+        { auto_query_enabled: true, query_on_stream_selection: false },
+        logs,
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() => expect(logs).toHaveBeenCalled());
+      await flushPromises();
+      expect(wrapper.vm.searchObj.data.queryResults.hits).toHaveLength(1);
+      expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
+    });
+
+    it("a search Auto Run starts during a re-apply keeps loading, not the run-query prompt, while it is pending", async () => {
+      const logs = vi.fn(() => {
+        wrapper.vm.searchObj.loading = true;
+        return new Promise(() => {});
+      });
+      await reApply(
+        { type: "search_history_re_apply", stream: "k8s_json", stream_type: "logs", period: "15m" },
+        { auto_query_enabled: true, query_on_stream_selection: false },
+        logs,
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() => expect(logs).toHaveBeenCalled());
+      await flushPromises();
+      expect(wrapper.vm.searchObj.loading).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
+    });
+
+    it("a re-applied query loaded without running lets the user's edited run push history", async () => {
+      await router.replace({ name: "home" });
+      await reApply({
+        type: "search_history_re_apply",
+        stream: "k8s_json",
+        stream_type: "logs",
+        period: "15m",
+      });
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await flushPromises();
+      const current = router.currentRoute.value.query;
+      expect(urlWriteMode(current, { ...current, query: "ZWRpdGVk" })).toBe("push");
+    });
 
     it("an ai_chat_query link opened on a loaded page shows stream-not-found", async () => {
       await reApply({ stream: "k8s_json", stream_type: "logs", period: "15m" });
@@ -366,6 +495,37 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       }
     });
 
+    it("turning auto-refresh off runs the query once, since live ticks fetch no total", async () => {
+      const { logs } = await ready();
+      wrapper.vm.searchObj.meta.refreshInterval = 5;
+      wrapper.vm.onChangeInterval();
+      await flushPromises();
+      logs.mockClear();
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.onChangeInterval();
+      await flushPromises();
+      expect(logs.mock.calls.map((c: any[]) => c[0].reason)).toEqual(["run"]);
+      logs.mockClear();
+      wrapper.vm.onChangeInterval();
+      await flushPromises();
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("turning auto-refresh off never runs unsaved editor edits", async () => {
+      const { logs } = await ready();
+      wrapper.vm.searchObj.meta.refreshInterval = 5;
+      wrapper.vm.onChangeInterval();
+      await flushPromises();
+      logs.mockClear();
+      wrapper.vm.searchObj.data.query = "level = ";
+      wrapper.vm.autoRun.engine.markEditorDirty();
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.onChangeInterval();
+      await flushPromises();
+      expect(logs).not.toHaveBeenCalled();
+      expect(wrapper.vm.searchObj.meta.editorDirty).toBe(true);
+    });
+
     it("pagination and page size are explicit page runs", async () => {
       const { logs } = await ready();
       wrapper.vm.searchObj.meta.refreshInterval = 0;
@@ -392,6 +552,21 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       await vi.waitFor(() => expect(histogram).toHaveBeenCalledTimes(1));
       expect(wrapper.vm.autoRun.engine.hasPendingRequest()).toBe(false);
       expect(request.mock.results.map((r: any) => r.value)).toEqual(["scheduled"]);
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("hiding and re-showing a current histogram keeps its counts for later pages", async () => {
+      const { logs, histogram } = await ready();
+      const aggs = [{ zo_sql_key: "2026-10-29T10:00:00", zo_sql_num: 3600000 }];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ a: 1 }], aggs };
+      wrapper.vm.searchObj.meta.jobId = "";
+      wrapper.vm.searchObj.meta.histogramDirtyFlag = false;
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      await flushPromises();
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      await flushPromises();
+      expect(wrapper.vm.searchObj.data.queryResults.aggs).toEqual(aggs);
+      expect(histogram).not.toHaveBeenCalled();
       expect(logs).not.toHaveBeenCalled();
     });
 

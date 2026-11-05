@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #expansion="{ field }">
               <FieldExpansion
+                :ref="(el: any) => setFieldExpansionRef(field.name, el)"
                 :field="field"
                 :field-values="fieldValues[field.name]"
                 :active-include-values="activeIncludeFieldValues?.[field.name] ?? []"
@@ -85,6 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
               >
+                <template v-if="field.name !== 'duration'" #caption>
+                  <div
+                    class="text-text-secondary py-1 text-xs"
+                    data-test="traces-field-values-count-caption"
+                  >
+                    {{ t("traces.results.fieldValueCountsCaption") }}
+                  </div>
+                </template>
                 <template v-if="field.name === 'duration'" #body>
                   <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
                     <OSpinner size="xs" />
@@ -194,12 +203,12 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import useDurationPercentiles, {
-  parseDurationWhereClause,
-} from "@/composables/useDurationPercentiles";
-import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
+import useDurationPercentiles from "@/composables/useDurationPercentiles";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -402,7 +411,7 @@ export default defineComponent({
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
       const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
-      const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+      const remaining = splitOnAnd(whereClause).filter((cond) => {
         const trimmed = cond.trim();
         return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
       });
@@ -412,19 +421,8 @@ export default defineComponent({
     const buildFieldValuesSql = (fieldName: string): string => {
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
-      let whereClause = searchObj.data.editorValue.trim();
-
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      whereClause = parseSpanKindWhereClause(
-        whereClause,
+      const whereClause = resolveTracesFilter(
+        searchObj.data.editorValue,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
@@ -474,10 +472,13 @@ export default defineComponent({
       }
 
       expandedFields.value[field.name] = true;
+      loadFieldValues(field.name);
+    };
 
-      if (field.name === "duration") {
+    const loadFieldValues = (fieldName: string) => {
+      if (fieldName === "duration") {
         // buildFieldValuesSql emits valid base64, so the decode never hits its catch (undefined) path.
-        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name))!;
+        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(fieldName))!;
         const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
         fetchPercentiles({
           streamName: searchObj.data.stream.selectedStream.value,
@@ -488,11 +489,35 @@ export default defineComponent({
         return;
       }
 
-      fieldValuesCurrentFrom.value[field.name] = 0;
-      fieldValuesCurrentKeyword.value[field.name] = "";
-      cancelFieldStream(field.name);
-      resetFieldValues(field.name, true);
-      fetchFieldValuesData(field.name, 0, "");
+      fieldValuesCurrentFrom.value[fieldName] = 0;
+      fieldValuesCurrentKeyword.value[fieldName] = "";
+      cancelFieldStream(fieldName);
+      resetFieldValues(fieldName, true);
+      fetchFieldValuesData(fieldName, 0, "");
+    };
+
+    const fieldExpansions = new Map<string, { reset: () => void }>();
+    const setFieldExpansionRef = (fieldName: string, el: any) => {
+      if (el) fieldExpansions.set(fieldName, el);
+      else fieldExpansions.delete(fieldName);
+    };
+
+    // Open rows are keyed by field name, so they survive a stream switch and never re-fire before-show.
+    const refreshOpenFieldValues = () => {
+      if (!searchObj.data.stream.selectedStream?.value) return;
+      const streamFields = new Set(
+        (searchObj.data.stream.selectedStreamFields ?? []).map((f: any) => f.name),
+      );
+      Object.keys(expandedFields.value)
+        .filter((name) => expandedFields.value[name])
+        .forEach((name) => {
+          if (!streamFields.has(name)) {
+            cancelFilterCreator({ name });
+            return;
+          }
+          fieldExpansions.get(name)?.reset();
+          loadFieldValues(name);
+        });
     };
 
     const handleSearchFieldValues = (fieldName: string, term: string) => {
@@ -600,6 +625,8 @@ export default defineComponent({
       handleAddSearchTerm,
       handleAddMultipleSearchTerms,
       cancelFilterCreator,
+      setFieldExpansionRef,
+      refreshOpenFieldValues,
       // Duration percentiles
       durationPercentiles,
       durationPercentilesLoading,

@@ -106,7 +106,12 @@ describe("AlertHeaderActions", () => {
     } as any);
     await mountActions({ unackedGroups: 2 });
     const button = find("alerts-alertdetail-ack");
-    expect(button.text()).toBe("Acknowledge 2 firing groups");
+    expect(button.text()).toBe("Acknowledge");
+    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "All 2 firing groups",
+    );
+    // The hint hangs off the whole button, so hovering or focusing it shows the count.
+    expect(button.attributes("data-o-tooltip-trigger")).toBeDefined();
     await button.trigger("click");
     await flushPromises();
     expect(alerts.ackAlert).toHaveBeenCalledWith("default", "a1", { all_groups: true }, "ops");

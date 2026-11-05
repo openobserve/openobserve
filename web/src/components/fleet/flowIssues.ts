@@ -20,7 +20,7 @@ import { FLOW_POLL_MS } from "@/services/fleet.queries";
 import { useRolloutText } from "./rolloutText";
 import { formatCount } from "./fleetFormat";
 import type { Telemetry } from "./flowTypes";
-import { useFleetCollectors, useFleetRollouts } from "./useFleetApi";
+import { isForbidden, useFleetCollectors, useFleetRollouts } from "./useFleetApi";
 
 export type Severity = "error" | "warning" | "progress" | "info";
 // "restricted": the caller may not read some metric streams, so a path without issues is unknown, not healthy.
@@ -72,6 +72,12 @@ export const SIGNAL_STROKE: Record<Telemetry, string> = {
   traces: "stroke-signal-traces",
 };
 
+export const SIGNAL_DOT: Record<Telemetry, string> = {
+  logs: "bg-signal-logs",
+  metrics: "bg-signal-metrics",
+  traces: "bg-signal-traces",
+};
+
 export const SEVERITY_TEXT: Record<PathSeverity, string> = {
   error: "text-status-error-text",
   warning: "text-status-warning-text",
@@ -118,6 +124,18 @@ export function useFlowIssues() {
   function rolloutIssues(fleetId: string): PathIssue[] {
     const latest = rollouts.rows.value.find((r) => r.fleetId === fleetId);
     if (!latest) return [];
+    if (latest.status === "waiting") {
+      return [
+        {
+          id: `rollout-${latest.id}`,
+          severity: "warning",
+          title: t("fleet.flowIssues.rolloutWaiting", { to: latest.toVersion }),
+          evidence: progressText(latest),
+          actionLabel: t("fleet.flowIssues.openRollout"),
+          action: { kind: "rollout", rolloutId: latest.id },
+        },
+      ];
+    }
     if (latest.status === "in_progress") {
       return [
         {
@@ -245,7 +263,11 @@ export function useFlowIssues() {
   return {
     fleetIssues,
     pipelineIssues,
-    error: computed(() => collectors.error.value ?? rollouts.error.value),
+    // A 403 only hides issues; the map itself loaded, so it is no load error.
+    error: computed(
+      () =>
+        [collectors.error.value, rollouts.error.value].find((e) => e && !isForbidden(e)) ?? null,
+    ),
     refetch,
   };
 }

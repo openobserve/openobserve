@@ -160,6 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </template>
         </WorkflowRunSwitcher>
+        <WorkflowHttpEndpointButton
+          v-if="showHttpButton"
+          :chip="httpChip"
+          :tooltip-key="httpTooltipKey"
+          size="sm-action"
+          data-test="workflow-editor-http-endpoint"
+          @click="httpEditorState.panelOpen = true"
+        />
         <OButton
           variant="outline"
           size="sm-action"
@@ -222,28 +230,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
-      <!-- Docked node palette — same shared component as Pipelines, so the two
+    <OPageLockedBody>
+      <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
+        <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
-      <NodePalette
-        v-if="workflowObj.showNodePalette"
-        :items="paletteItems"
-        test-prefix="workflow-palette"
-        :on-drag-start="paletteDragStart"
-        :on-item-click="paletteClick"
-      />
-      <!-- Canvas drop area — flush gray pane running to the viewport edges,
+        <NodePalette
+          v-if="workflowObj.showNodePalette"
+          :items="paletteItems"
+          test-prefix="workflow-palette"
+          :on-drag-start="paletteDragStart"
+          :on-item-click="paletteClick"
+        />
+        <!-- Canvas drop area — flush gray pane running to the viewport edges,
            matching the pipeline editor's `#pipelineChartContainer` so both look
            identical. `dark:bg-transparent` is part of that match: in dark mode
            the canvas falls through to the page background rather than sitting
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
-      <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
+        <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
+          <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
              so the canvas fills the space — no docked results panel. -->
-        <WorkflowCanvas />
+          <WorkflowCanvas />
+        </div>
       </div>
-    </div>
+    </OPageLockedBody>
 
     <!-- "add next step" picker (opened by the hover-+ on a node) — shared with
          pipelines. -->
@@ -254,6 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :search-placeholder="t('workflow.node.stepSearchPlaceholder')"
       :no-match-text="t('workflow.node.stepNoMatch')"
       test-prefix="workflow-step"
+      :footnote="pickerFootnote"
+      footnote-icon="webhook"
+      footnote-test-id="workflow-step-picker-http-cue"
       @pick="onStepPick"
       @close="closeStepPicker"
     />
@@ -267,7 +280,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          current graph (sent whole, no save needed). Results render as ✓ / error
          badges on the canvas nodes, and open in the results dock (T4) — clicking a
          node badge selects that step in the dock rather than opening an overlay. -->
-    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+    <WorkflowTestDialog
+      v-if="workflowObj.testRun.show"
+      :seed="testSeed"
+      :payload-from="testPayloadFrom"
+      :seed-run-at="testSeedRunAt"
+    />
+
+    <WorkflowHttpEndpointPanel
+      v-if="hooksOn"
+      :open="httpEditorState.panelOpen"
+      :workflow-id="workflowObj.currentSelectedWorkflow.id || null"
+      :workflow-name="workflowObj.currentSelectedWorkflow.name || ''"
+      :kind="httpKind"
+      :is-draft-only="!!workflowObj.currentSelectedWorkflow.isDraft"
+      :workflow-enabled="workflowObj.currentSelectedWorkflow.enabled !== false"
+      context="editor"
+      :before-create="persistDraft"
+      :trigger-node-id="httpTriggerNodeId"
+      @update:open="httpEditorState.panelOpen = $event"
+      @run-test="onHttpRunTest"
+    />
 
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
@@ -306,7 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import OPageLockedBody from "@/lib/core/PageLayout/OPageLockedBody.vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
@@ -319,6 +353,14 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import WorkflowHttpEndpointPanel from "./WorkflowHttpEndpointPanel.vue";
+import WorkflowHttpEndpointButton from "./WorkflowHttpEndpointButton.vue";
+import { useWorkflowHttpButton } from "@/plugins/workflows/useWorkflowHttpButton";
+import {
+  httpEditorState,
+  resetHttpEditorState,
+  type PayloadFrom,
+} from "@/plugins/workflows/httpEndpointUi";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
@@ -338,6 +380,7 @@ import useWorkflowCanvas, {
   triggerDef,
   triggerTypeForKind,
   currentTriggerKind,
+  currentTriggerNodeId,
   serializeWorkflow,
   markWorkflowDirty,
   reachableFrom,
@@ -351,6 +394,7 @@ import useWorkflowCanvas, {
   clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
@@ -501,6 +545,37 @@ const onStepPick = (item: any) => {
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
 
+// ── HTTP endpoint ───────────────────────────────────────────────────────────
+const httpKind = computed(() => currentTriggerKind());
+const httpTriggerNodeId = computed(() => currentTriggerNodeId());
+const {
+  visible: hooksOn,
+  endpointOn: httpEndpointOn,
+  chip: httpChip,
+  tooltipKey: httpTooltipKey,
+} = useWorkflowHttpButton({
+  workflowId: computed(() => workflowObj.currentSelectedWorkflow.id || ""),
+  isDraft: computed(() => !!workflowObj.currentSelectedWorkflow.isDraft),
+  workflowEnabled: computed(() => workflowObj.currentSelectedWorkflow.enabled !== false),
+});
+watch(httpEndpointOn, (on) => (httpEditorState.endpointOn = on), { immediate: true });
+const showHttpButton = computed(() => hooksOn.value && !workflowObj.readOnly);
+const pickerFootnote = computed(() =>
+  isTriggerStep.value && hooksOn.value ? t("workflow.http.pickerCue") : undefined,
+);
+const testSeed = ref<unknown[] | undefined>(undefined);
+const testPayloadFrom = ref<PayloadFrom | undefined>(undefined);
+const testSeedRunAt = ref<number | undefined>(undefined);
+watch(
+  () => workflowObj.testRun.show,
+  (show) => {
+    if (show) return;
+    testSeed.value = undefined;
+    testPayloadFrom.value = undefined;
+    testSeedRunAt.value = undefined;
+  },
+);
+
 // Start a fresh workflow on an EMPTY canvas. It used to pre-place an Alert
 // Trigger node here; the canvas now shows a "Choose a Trigger" start node that
 // opens the trigger picker, the same shape as the pipeline editor's source
@@ -558,8 +633,11 @@ const goBack = () => {
 const unsavedDialog = ref(false);
 const pendingRoute = ref<RouteLocationRaw | null>(null);
 
+// A locked page cannot be edited, and its locked Discard button would trap the user.
+const { locked: pageLocked } = useFeatureLock();
+
 onBeforeRouteLeave((to) => {
-  if (!workflowObj.dirtyFlag) return true;
+  if (pageLocked.value || !workflowObj.dirtyFlag) return true;
   pendingRoute.value = to.fullPath;
   unsavedDialog.value = true;
   return false;
@@ -580,7 +658,7 @@ const onKeepEditing = () => {
 
 // Native browser prompt for tab close / reload while there are unsaved edits.
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-  if (!workflowObj.dirtyFlag) return;
+  if (pageLocked.value || !workflowObj.dirtyFlag) return;
   e.preventDefault();
   e.returnValue = "";
 };
@@ -934,6 +1012,16 @@ const onTest = () => {
   workflowObj.testRun.show = true;
 };
 
+// The panel closes first, so the Test drawer is the only overlay (AC-UI-34); the seed is set only once the graph validates.
+const onHttpRunTest = (seed: unknown[], runAt?: number) => {
+  httpEditorState.panelOpen = false;
+  if (!validate({ requireName: false, allowOrphans: true })) return;
+  testSeed.value = seed;
+  testPayloadFrom.value = "http";
+  testSeedRunAt.value = runAt;
+  workflowObj.testRun.show = true;
+};
+
 // History → the dedicated read-only Runs inspection view (separate surface).
 const openRuns = () => {
   router.push({
@@ -1014,5 +1102,6 @@ const switchEditorRun = async (runId: string) => {
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
   resetWorkflowData();
+  resetHttpEditorState();
 });
 </script>

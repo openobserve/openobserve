@@ -97,7 +97,9 @@ pub async fn get_trace_dag(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) =
+            search_service::check_search_allowed(&org_id, Some((&stream_name, StreamType::Traces)))
+        {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -165,21 +167,10 @@ pub async fn get_trace_dag(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
-            from: 0,
             size: 10000, // Large enough for most traces
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -188,6 +179,7 @@ pub async fn get_trace_dag(
         search_type: None,
         search_event_context: None,
         use_cache: get_use_cache_from_request(&query),
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

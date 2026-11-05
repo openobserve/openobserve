@@ -417,6 +417,14 @@
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-200);
   --color-select-item-disabled: var(--color-text-disabled);
+  --color-select-header-bg: color-mix(
+    in srgb,
+    var(--color-accent) 15%,
+    var(--color-select-content-bg)
+  );
+  --color-select-header-count-text: var(--color-grey-400);
+  --color-select-header-action-text: var(--color-primary-300);
+  --color-select-header-action-hover-bg: var(--color-surface-accent-hover);
 
   /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
        mode. OFF uses primary outline + primary thumb (interactive signal).
@@ -670,8 +678,7 @@
   /* Chart expected-range band fill — dark override (see base.css) */
   --color-chart-band: rgba(255, 255, 255, 0.18);
 
-  /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
-     chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
+  /* Crosshair axis-pointer label chip — dark override (see base.css) */
   --color-chart-crosshair-bg: #333;
 
   /* trace span palette (16 colors) — dark values; see base.css for the reserved-hue
@@ -940,6 +947,7 @@
   --color-icon-chip-success-text: var(--color-success-400);
   --color-icon-chip-warning-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   --color-icon-chip-warning-text: var(--color-warning-400);
+  --color-icon-locked: var(--color-warning-400);
   --color-icon-chip-error-bg: color-mix(in srgb, var(--color-error-500) 15%, transparent);
   --color-icon-chip-error-text: var(--color-error-400);
   --color-icon-chip-info-bg: color-mix(in srgb, var(--color-blue-500) 15%, transparent);

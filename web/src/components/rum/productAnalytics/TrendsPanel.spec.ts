@@ -85,6 +85,19 @@ describe("TrendsPanel (AC-48)", () => {
     expect(w.find('[data-test="rum-analytics-trends"]').text()).toContain("per day");
   });
 
+  it("sends no query until an app is known, then charts it (ENT#3262)", async () => {
+    const w = mountPanel({ scope: { ...scope, app: "" } });
+    expect(renderer(w).exists()).toBe(false);
+    expect(w.find('[data-test="rum-analytics-trends-loading"]').exists()).toBe(true);
+    const addBtn = () => w.find('[data-test="rum-analytics-trends-add-dashboard-btn"]');
+    expect(addBtn().attributes("disabled")).toBeDefined();
+    await w.setProps({ scope });
+    expect((renderer(w).props("panelSchema") as Schema).queries[0].query).toContain(
+      "application_id = 'web'",
+    );
+    expect(addBtn().attributes("disabled")).toBeUndefined();
+  });
+
   it("switches to weekly buckets beyond 31 days", () => {
     const w = mountPanel({ range: { startUs: 0, endUs: 40 * DAY_US } });
     expect((renderer(w).props("panelSchema") as Schema).queries[0].query).toContain("'1 week'");
@@ -118,6 +131,23 @@ describe("TrendsPanel (AC-48)", () => {
     expect(
       w.find('[data-test="rum-analytics-trends-add-dashboard-btn"]').attributes("aria-label"),
     ).toBe("Add to dashboard");
+  });
+
+  it("locks Add to dashboard when dashboards are license-locked", async () => {
+    (store.state as any).zoConfig = { features: { dashboards: "locked" } };
+    const w = mountPanel({});
+    const btn = w
+      .findAllComponents({ name: "OButton" })
+      .find((b) => b.attributes("data-test") === "rum-analytics-trends-add-dashboard-btn")!;
+    expect(btn.props("disabled")).toBe(true);
+    expect(btn.props("iconLeft")).toBe("lock");
+    await btn.trigger("click");
+    expect(w.find("[data-test='add-to-dashboard-stub']").exists()).toBe(false);
+    (store.state as any).zoConfig = { features: { dashboards: "enabled" } };
+    await flushPromises();
+    expect(btn.props("iconLeft")).toBe("dashboard-customize");
+    expect(btn.props("disabled")).toBe(false);
+    delete (store.state as any).zoConfig;
   });
 
   it("replaces the chart with one series per selected key, each removable as a chip", async () => {

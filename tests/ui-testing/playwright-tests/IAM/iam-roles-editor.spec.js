@@ -373,4 +373,19 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
         expect(pairs.length, 'JSON view rendered no grants').toBeGreaterThan(0);
         expect(pairs).toEqual(stored.map((p) => `${p.object}|${p.permission}`).sort());
     });
+
+    // FL-RBAC-01 · guards openobserve#15949: the no-op "Fleet Manager" permission must not return.
+    test('U-23 · the Fleet group lists Fleets, Fleet configurations and Fleet management, and no Fleet Manager', {
+        tag: ['@iam', '@iamRolesEditor', '@fleet', '@regression', '@P0', '@all']
+    }, async () => {
+        await pm.fleetManagerPage.assertEnabled();
+        const labels = await pm.rolesPage.railModuleLabels();
+        expect(labels).toMatchObject({
+            fleets: 'Fleets',
+            fleet_configs: 'Fleet configurations',
+            fleet_management: 'Fleet management',
+        });
+        expect(Object.keys(labels)).not.toContain('fleet');
+        expect(Object.values(labels)).not.toContain('Fleet Manager');
+    });
 });

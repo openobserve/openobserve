@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { RcaEvidenceTarget } from "@/services/incidents";
 import { b64DecodeUnicode } from "@/utils/formatters";
 import {
+  rcaBlindSpotFeature,
   rcaBlindSpotRoute,
   rcaEvidenceLink,
   rcaEvidenceQuery,
@@ -86,7 +87,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     });
   });
 
-  it("PromQL: metricsEditor with base64 query, query_type=promql and ms from/to", () => {
+  it("PromQL: metrics with base64 query, query_type=promql and ms from/to", () => {
     const promql = 'max(db_pool_in_use{db="orders"})';
     const link = rcaEvidenceLink(
       { signal: "metrics", streams: [], promql, start_us: START_US, end_us: END_US },
@@ -94,7 +95,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     );
 
     expect(link?.page).toBe("metrics");
-    expect(routeOf(link).name).toBe("metricsEditor");
+    expect(routeOf(link).name).toBe("metrics");
     const q = routeOf(link).query;
     expect(q).toMatchObject({
       org_identifier: "default",
@@ -199,5 +200,18 @@ describe("rcaBlindSpotRoute (03 VE37)", () => {
 
   it.each(["resume_run", "none"] as const)("%s has no button", (fix) => {
     expect(rcaBlindSpotRoute(fix, "default")).toBeNull();
+  });
+});
+
+describe("rcaBlindSpotFeature", () => {
+  it.each([
+    ["connect_toolset", "ai_toolsets"],
+    ["open_pipeline", "pipelines"],
+    ["sampling_rules", "pipelines"],
+    ["ingest_data", null],
+    ["resume_run", null],
+    ["none", null],
+  ] as const)("%s is licensed under %s", (fix, feature) => {
+    expect(rcaBlindSpotFeature(fix)).toBe(feature);
   });
 });

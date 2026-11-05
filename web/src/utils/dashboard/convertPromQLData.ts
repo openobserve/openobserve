@@ -35,9 +35,9 @@ import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
   chartAxisLine,
+  chartAxisTextColor,
   chartColor,
   chartNumber,
-  chartTextColor,
   dataZoomBrushStyle,
   CHART_SELECTION_FILL,
 } from "@/utils/chartTheme";
@@ -89,7 +89,11 @@ import {
   labelFreeName,
 } from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
-import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
+import {
+  getPropsByChartTypeForSeries,
+  getSeriesItemOpacity,
+  getShiftedLineStyle,
+} from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendExprOf, legendFallbackOf } from "@/utils/dashboard/promql/formula";
@@ -864,6 +868,7 @@ export const convertPromQLData = async (
       nameLocation: "middle",
       nameGap: dynamicXAxisNameGap,
       nameTextStyle: {
+        color: chartAxisTextColor(),
         fontWeight: "bold",
         fontSize: 14,
       },
@@ -878,7 +883,7 @@ export const convertPromQLData = async (
         lineStyle: gridLineStyle,
       },
       axisLabel: {
-        color: chartTextColor(),
+        color: chartAxisTextColor(),
         fontSize: 12,
         // hide axis label if overlaps
         hideOverlap: true,
@@ -894,7 +899,7 @@ export const convertPromQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
-        color: chartTextColor(),
+        color: chartAxisTextColor(),
         fontSize: 12,
         // hide colliding tick labels instead of drawing them on top of each
         // other (short panels fit fewer labels than ECharts offers)
@@ -1191,13 +1196,10 @@ export const convertPromQLData = async (
                 // Twins share their primary's colour, so the line style is what tells them apart.
                 ...(nameSuffixes[index]
                   ? {
-                      lineStyle: {
-                        ...seriesPropsBasedOnChartType?.lineStyle,
-                        type:
-                          explorerOverlays && seriesRoles[index] !== "forecast"
-                            ? "dotted"
-                            : "dashed",
-                      },
+                      lineStyle: getShiftedLineStyle(
+                        seriesPropsBasedOnChartType?.lineStyle,
+                        explorerOverlays && seriesRoles[index] !== "forecast" ? "dotted" : "dashed",
+                      ),
                     }
                   : {}),
                 ...getAreaStyleOverride(

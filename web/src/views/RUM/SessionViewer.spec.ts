@@ -20,6 +20,9 @@ import { createRouter, createWebHistory } from "vue-router";
 
 // --- Module-level mocks (hoisted by Vitest before any import) ---
 
+// Extra fields a Sessions-list click-through leaves on the selected session.
+const seededSession = vi.hoisted(() => ({ extra: {} as Record<string, unknown> }));
+
 // Reactive like the real store, so computeds over the selected session follow getSession().
 vi.mock("@/composables/useSessionReplay", async () => {
   const { reactive } = await import("vue");
@@ -37,6 +40,7 @@ vi.mock("@/composables/useSessionReplay", async () => {
             city: "San Francisco",
             country: "US",
             session_id: "session-abc",
+            ...seededSession.extra,
           },
         },
       }),
@@ -49,7 +53,44 @@ const queryPayload = vi.hoisted(() => ({
   build: null as any,
 }));
 
+// The stream lookup for server spans; a test sets where each trace lives, and how the resolve ended.
+const tracesStream = vi.hoisted(() => ({
+  resolve: (async (ids: string[]) =>
+    Object.fromEntries(ids.map((id) => [id, { stream: "default" }]))) as (
+    ids: string[],
+    start: number,
+    end: number,
+  ) => Promise<
+    Record<string, { stream: string; range?: { start_time: number; end_time: number } }>
+  >,
+  outcome: { failed: false, streams: ["default"] } as { failed: boolean; streams: string[] },
+}));
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({
+    resolveTraceLocationsBulk: async (
+      ids: string[],
+      start: number,
+      end: number,
+      outcome?: { failed: boolean; streams: string[] },
+    ) => {
+      const result = await tracesStream.resolve(ids, start, end);
+      if (outcome) Object.assign(outcome, { ...tracesStream.outcome });
+      return result;
+    },
+    resolveTraceLocation: vi.fn(),
+    cancel: vi.fn(),
+  }),
+}));
+
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+const heatmapOpen = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/rum/useSessionHeatmap", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({ openSessionHeatmap: heatmapOpen, opening: ref(false) }),
+  };
+});
 
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
@@ -125,17 +166,56 @@ vi.mock("@/services/search", async (importOriginal) => {
 
 // The replay-segment fetches go over HTTP streaming; capture their SQL and answer them here.
 // A responder returns hits, { error } to fail the request, or "hang" to leave it open and silent.
-const streaming = vi.hoisted(() => ({
-  sqls: [] as string[],
-  requests: [] as any[],
-  responder: (_sql: string, _from: number): any => [],
-  cancel: null as any,
-}));
+// The server-span queries (span_kind) go over the same stream but are kept apart, in spanRequests: they answer
+// through spanResponder, which gets { page_type, query: { query } } and returns { data: { hits, is_partial?,
+// function_error? } } (also as a promise), "hang", "cut" (the stream ends with no event, as a cancelled one does), or
+// throws an error carrying a message and a status, or the server's own error `content`.
+const streaming = vi.hoisted(() => {
+  const noSpans = (_params: any): any => ({ data: { hits: [] } });
+  return {
+    sqls: [] as string[],
+    requests: [] as any[],
+    responder: (_sql: string, _from: number): any => [],
+    spanRequests: [] as any[],
+    noSpans,
+    spanResponder: noSpans as (params: any) => any,
+    cancel: null as any,
+  };
+});
 
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: async (data: any, handlers: any) => {
       const sql = data.queryReq.query.sql as string;
+      if (sql.includes("span_kind")) {
+        streaming.spanRequests.push(data);
+        let answer: any;
+        try {
+          answer = await streaming.spanResponder({
+            page_type: data.pageType,
+            query: data.queryReq,
+          });
+        } catch (error: any) {
+          // A failed stream carries the server's message and, for an HTTP failure, its status.
+          handlers.error(data, {
+            type: "error",
+            content: error?.content ?? { message: error?.message, status: error?.status },
+          });
+          return;
+        }
+        if (answer === "hang") return;
+        if (answer === "cut") {
+          handlers.complete(data, null);
+          return;
+        }
+        const { hits = [], ...results } = answer?.data ?? {};
+        handlers.onActivity?.();
+        // As the server streams it: the metadata (is_partial, function_error) first, then the hits.
+        handlers.data(data, { type: "search_response_metadata", content: { results } });
+        handlers.data(data, { type: "search_response_hits", content: { results: { hits } } });
+        handlers.complete(data, null);
+        return;
+      }
       streaming.sqls.push(sql);
       streaming.requests.push({ data, handlers });
       const result = streaming.responder(sql, data.queryReq.query.from);
@@ -278,6 +358,7 @@ function mountSessionViewer(router = createTestRouter()) {
             "endTime",
             "rumWindowUs",
             "markedTimestamps",
+            "loading",
           ],
         },
         EventDetailDrawer: {
@@ -1076,6 +1157,8 @@ async function mountLoaded(query: Record<string, string> = {}) {
 function resetStreaming(responder: (sql: string, from: number) => any) {
   streaming.sqls = [];
   streaming.requests = [];
+  streaming.spanRequests = [];
+  streaming.spanResponder = streaming.noSpans;
   streaming.responder = responder;
   streaming.cancel?.mockClear();
 }
@@ -2088,7 +2171,26 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
   const NOW = 1_750_000_000_000;
   const L = NOW - 10 * 60_000;
   const maxTs = (NOW - 30_000) * 1000;
-  const server = { rows: [] as any[], rum: [] as any[], logs: [] as any[] };
+  const server = {
+    rows: [] as any[],
+    rum: [] as any[],
+    logs: [] as any[],
+    failed: [] as any[],
+    failedError: null as any,
+    spans: [] as any[],
+    spanError: null as any,
+    // Overrides the span answer for a test that needs partial pages or answers that change over time.
+    spanHandler: null as null | ((params: any) => any),
+    // The columns the span stream really has: a select of any other column fails as the server does. Null: every column.
+    spanColumns: null as null | string[],
+    // The text of that failure for one missing column.
+    spanColumnError: (column: string) =>
+      `Schema error: No field named ${column}. Valid fields are traces.trace_id, traces.start_time.`,
+  };
+
+  // The columns a span query selects, in order.
+  const selectedColumns = (sql: string): string[] =>
+    (/^select (.+?) from /.exec(sql)?.[1] ?? "").split(",").map((column) => column.trim());
   let originalSearch: any;
 
   // Every row arrives at the open's upper bound unless a test says otherwise, so each poll window re-returns it.
@@ -2116,30 +2218,72 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
   }
 
   let replayStart: number | undefined;
+  // A test with a device clock far behind the server needs a session that started before its rows' dates.
+  let sessionStart: number | undefined;
 
   function lookupRow(endTime: number) {
     return {
       ...sessionLookupRow,
       zo_sql_timestamp: L * 1000,
-      start_time: L,
+      start_time: sessionStart ?? L,
       end_time: endTime,
       max_ts: maxTs,
       replay_start: replayStart,
     };
   }
 
+  // The span answers come over the stream, see `streaming` at the top.
+  function serveSpans() {
+    streaming.spanResponder = (params: any) => {
+      const query = params.query.query;
+      const sql: string = query.sql;
+      if (server.spanHandler) return server.spanHandler(params);
+      if (server.spanError) throw server.spanError;
+      const selected = selectedColumns(sql);
+      const missing = server.spanColumns
+        ? selected.find(
+            (column) => !["trace_id", "start_time", ...(server.spanColumns ?? [])].includes(column),
+          )
+        : undefined;
+      if (missing) throw Object.assign(new Error(server.spanColumnError(missing)), { status: 400 });
+      // Span start_time is ns; the request's bounds are µs, as on the server. Only the selected columns come back.
+      return {
+        data: {
+          hits: server.spans
+            .filter(
+              (span) =>
+                sql.includes(`'${span.trace_id}'`) &&
+                span.start_time / 1000 >= query.start_time &&
+                span.start_time / 1000 <= query.end_time,
+            )
+            .map((span) =>
+              Object.fromEntries(
+                Object.entries(span).filter(
+                  ([key]) => key === "trace_id" || key === "start_time" || selected.includes(key),
+                ),
+              ),
+            ),
+        },
+      };
+    };
+  }
+
   function serve(endTime: number) {
+    serveSpans();
     vi.mocked(searchService.search).mockImplementation(async (params: any) => {
       const query = params?.query?.query ?? {};
       const sql: string = query.sql ?? "";
       const from = Number(query.from) || 0;
       const size = Number(query.size) || 150;
       if (sql.includes("min(start)")) return { data: { hits: [lookupRow(endTime)] } } as any;
+      if (sql.includes("type='resource'") && server.failedError) throw server.failedError;
       const rows = sql.includes("_rumlog")
         ? server.logs
-        : sql.includes("_rumdata")
-          ? server.rum
-          : [];
+        : sql.includes("type='resource'")
+          ? server.failed
+          : sql.includes("_rumdata")
+            ? server.rum
+            : [];
       return { data: { hits: rows.slice(from, from + size) } } as any;
     });
   }
@@ -2180,13 +2324,28 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     server.rows = [liveRow(0), liveRow(1), liveRow(2)];
     server.rum = [];
     server.logs = [];
+    server.failed = [];
+    server.failedError = null;
+    server.spans = [];
+    server.spanError = null;
+    server.spanHandler = null;
+    server.spanColumns = null;
+    server.spanColumnError = (column: string) =>
+      `Schema error: No field named ${column}. Valid fields are traces.trace_id, traces.start_time.`;
     replayStart = undefined;
+    sessionStart = undefined;
     resetStreaming(liveResponder);
+    streamsMock.getStream = async () => ({ name: "_rumdata", schema: [{ name: "source" }] });
   });
 
   afterEach(() => {
+    streamsMock.getStream = null;
     vi.useRealTimers();
     vi.mocked(searchService.search).mockImplementation(originalSearch);
+    streaming.spanResponder = streaming.noSpans;
+    tracesStream.resolve = async (ids) =>
+      Object.fromEntries(ids.map((id) => [id, { stream: "default" }]));
+    tracesStream.outcome = { failed: false, streams: ["default"] };
     setVisibility("visible");
   });
 
@@ -2457,6 +2616,1182 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     wrapper.unmount();
   });
 
+  it("picks up failed requests from the live tail", async () => {
+    streamsMock.getStream = async () => ({
+      name: "_rumdata",
+      schema: [{ name: "resource_type" }, { name: "resource_status_code" }],
+    });
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(0);
+
+    server.failed = [
+      {
+        type: "resource",
+        resource_id: "r1",
+        resource_type: "xhr",
+        resource_url: "https://api.test/live",
+        resource_status_code: 0,
+        date: L + 50,
+        _timestamp: (L + 50) * 1000,
+      },
+    ];
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.segmentEvents.map((event: any) => event.name)).toEqual([
+      "No response GET https://api.test/live",
+    ]);
+    wrapper.unmount();
+  });
+
+  describe("failed requests: server status", () => {
+    const at = (offset: number) => ({ date: L + offset, _timestamp: (L + offset) * 1000 });
+    const resource = (id: string, status: number, offset: number, method = "get") => ({
+      type: "resource",
+      resource_id: id,
+      resource_type: "fetch",
+      resource_method: method,
+      resource_status_code: status,
+      resource_url: `https://example.test/${id}`,
+      ...at(offset),
+    });
+    // The failed-request query needs the resource columns on _rumdata; a test that changes the
+    // stream mock keeps answering this for _rumdata.
+    const RUM_SCHEMA = {
+      name: "_rumdata",
+      schema: [{ name: "resource_type" }, { name: "resource_status_code" }],
+    };
+
+    beforeEach(() => {
+      streamsMock.getStream = async () => RUM_SCHEMA;
+    });
+
+    describe("server status lookup", () => {
+      const canonical = (id: string) => id.padStart(32, "0");
+      const traced = (id: string, status: number, offset: number, traceId: string) => ({
+        ...resource(id, status, offset),
+        _oo_trace_id: traceId,
+      });
+      // A span is stamped when the request ran: `traced` rows are dated L + 30 ms, `youngTraced` rows 30 s ago (ns).
+      const SPAN_NS = (L + 30) * 1_000_000;
+      const YOUNG_NS = (NOW - 30_000) * 1_000_000;
+      const span = (traceId: string, extra: Record<string, any> = {}) => ({
+        trace_id: canonical(traceId),
+        start_time: SPAN_NS,
+        ...extra,
+      });
+      const youngSpan = (traceId: string, extra: Record<string, any> = {}) =>
+        span(traceId, { start_time: YOUNG_NS, ...extra });
+      // A row that arrived `ageMs` ago, so "no server span found" is not yet allowed for it.
+      const youngTraced = (id: string, status: number, traceId: string, ageMs = 30_000) => ({
+        ...traced(id, status, 0, traceId),
+        date: NOW - ageMs,
+        _timestamp: (NOW - ageMs) * 1000,
+      });
+      const ENDED = NOW - ACTIVE_WINDOW_MS - 1;
+      // The span queries, as { page_type, query: { query } } (the shape the streaming mock hands the span answer).
+      const spanSearches = () =>
+        streaming.spanRequests.map((data: any) => ({
+          page_type: data.pageType,
+          query: data.queryReq,
+        }));
+      const idsIn = (sql: string) => sql.match(/'[0-9a-f]{32}'/g) ?? [];
+      const failedEvents = (vm: any) =>
+        vm.segmentEvents.filter((event: any) => event.type === "failed_request");
+      const names = (vm: any) => failedEvents(vm).map((event: any) => event.name);
+      const lookups = (vm: any) => failedEvents(vm).map((event: any) => event.server_lookup);
+      const traceSchema = (...columns: string[]) => {
+        streamsMock.getStream = async (name, type) =>
+          name === "_rumdata"
+            ? RUM_SCHEMA
+            : type === "traces"
+              ? { name, schema: columns.map((column) => ({ name: column })) }
+              : null;
+      };
+      const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+      const answer = (hits: any[], extra: Record<string, any> = {}) => ({
+        data: { hits, ...extra },
+      });
+
+      it("shows the server status next to No response when a server span has one", async () => {
+        traceSchema("trace_id", "http_response_status_code", "http_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_response_status_code: "500" })];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual(["No response · 500 GET https://example.test/doc0"]);
+        const [event] = vm.segmentEvents;
+        expect(event.server_status).toBe("500");
+        expect(event.server_lookup).toBe("found");
+        wrapper.unmount();
+      });
+
+      it("asks the traces stream for server spans in a window around the failed requests", async () => {
+        traceSchema("trace_id", "http_response_status_code", "http_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        const wrapper = await mountLive();
+
+        const [params] = spanSearches();
+        expect(params.page_type).toBe("traces");
+        expect(params.query.query.sql).toBe(
+          `select trace_id, start_time, http_response_status_code, http_status_code from "default" where span_kind = '2' and trace_id IN ('${canonical("abc1")}') order by start_time asc`,
+        );
+        expect(params.query.query.start_time).toBe((L + 30) * 1000 - 300_000_000);
+        expect(params.query.query.end_time).toBe((L + 30) * 1000 + 300_000_000);
+        wrapper.unmount();
+      });
+
+      it("builds the window of each batch from its own failed requests, and resolves with the same one", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        const resolveCalls: { ids: string[]; start: number; end: number }[] = [];
+        tracesStream.resolve = async (ids, start, end) => {
+          resolveCalls.push({ ids, start, end });
+          return Object.fromEntries(ids.map((id) => [id, { stream: "default" }]));
+        };
+        server.failed = Array.from({ length: 450 }, (_, i) =>
+          traced(`r${i}`, 0, i * 1000, (0x1000 + i).toString(16)),
+        );
+        const wrapper = await mountLive();
+        await wait(100);
+
+        const margin = 300_000_000;
+        const expected = [
+          [0, 199_000],
+          [200_000, 399_000],
+          [400_000, 449_000],
+        ].map(([lo, hi]) => [(L + lo) * 1000 - margin, (L + hi) * 1000 + margin]);
+        expect(
+          spanSearches().map((p) => [p.query.query.start_time, p.query.query.end_time]),
+        ).toEqual(expected);
+        expect(resolveCalls.map((call) => [call.start, call.end])).toEqual(expected);
+        wrapper.unmount();
+      });
+
+      it("leaves a 403 as it was, whatever the server span says", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc403", 403, 20, "abc1")];
+        server.spans = [span("abc1", { http_response_status_code: "403" })];
+        const wrapper = await mountLive();
+
+        expect(names(wrapper.vm)).toEqual(["403 GET https://example.test/doc403"]);
+        wrapper.unmount();
+      });
+
+      it("leaves a miss unknown while the row is young, and says no server span was found once it is two minutes old by its arrival time", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(lookups(vm)).toEqual(["unknown"]);
+
+        // Asked at 30 s and 60 s of age: still young.
+        await wait(100_000);
+        expect(lookups(vm)).toEqual(["unknown"]);
+
+        // The ask at 180 s of age may call it a miss.
+        await wait(70_000);
+        expect(names(vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(lookups(vm)).toEqual(["no_server_span"]);
+        wrapper.unmount();
+      });
+
+      it("calls a miss for a row that arrived long ago once the viewer has known the trace for two minutes, whatever the device clock said", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        const wrapper = await mountLive();
+
+        // The first ask is never a miss: the age is capped by when this viewer first saw the trace.
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        await wait(170_000);
+        expect(lookups(wrapper.vm)).toEqual(["no_server_span"]);
+        wrapper.unmount();
+      });
+
+      it("does not call a miss on the first ask when the staff clock runs 20 minutes ahead of the server", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        sessionStart = L - 30 * 60_000;
+        // The server stamped the row 20 minutes before the staff clock's now: old by that clock.
+        server.failed = [youngTraced("doc0", 0, "abc1", 20 * 60_000)];
+        const wrapper = await mountLive();
+
+        expect(spanSearches()).toHaveLength(1);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("judges a request dated in the device's future by its arrival time, not its date", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [{ ...youngTraced("doc0", 0, "abc1"), date: NOW + 600_000 }];
+        const wrapper = await mountLive();
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+
+        await wait(200_000);
+        expect(lookups(wrapper.vm)).toEqual(["no_server_span"]);
+        wrapper.unmount();
+      });
+
+      it("records no miss when the device clock is over an hour from the arrival time, and asks again within the normal cap", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        sessionStart = L - 3 * 3_600_000;
+        server.failed = [{ ...youngTraced("doc0", 0, "abc1"), date: NOW + 2 * 3_600_000 }];
+        const wrapper = await mountLive();
+
+        await wait(1_000_000);
+        // Four asks, as for any trace, and the answer is still Unknown.
+        expect(spanSearches()).toHaveLength(4);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("does not let a device clock that says the row is old make a recent arrival a miss", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [{ ...youngTraced("doc0", 0, "abc1"), date: L }];
+        const wrapper = await mountLive();
+
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("leaves a request newer than two minutes unknown when no span matched", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [
+          {
+            ...traced("doc0", 0, 0, "abc1"),
+            date: NOW - 30_000,
+            _timestamp: (NOW - 30_000) * 1000,
+          },
+        ];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(vm.segmentEvents[0].server_lookup).toBe("unknown");
+        wrapper.unmount();
+      });
+
+      it("keeps plain No response and asks nothing when the row has no trace id", async () => {
+        server.failed = [resource("doc0", 0, 30)];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(vm.segmentEvents[0].server_lookup).toBe("no_trace");
+        expect(spanSearches()).toHaveLength(0);
+        wrapper.unmount();
+      });
+
+      it.each([
+        ["is_partial", { is_partial: true }],
+        ["function_error", { function_error: ["partial results"] }],
+      ])("does not record a miss from a response with %s", async (_name, extra) => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spanHandler = () => answer([], extra);
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches().length).toBeGreaterThanOrEqual(3);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("does not record a miss when the stream ends before its metadata, as a cancelled one does", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spanHandler = () => "cut";
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches().length).toBeGreaterThanOrEqual(3);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("narrows the columns when the server names the missing field only in its error detail", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_status_code: "503" })];
+        server.spanHandler = (params) => {
+          if (params.query.query.sql.includes("http_response_status_code"))
+            throw Object.assign(new Error("stream error"), {
+              content: {
+                code: 400,
+                message: "Search SQL execute error",
+                error_detail:
+                  "Schema error: No field named http_response_status_code. Valid fields are traces.trace_id, traces.start_time.",
+              },
+            });
+          return answer(server.spans);
+        };
+        const wrapper = await mountLive();
+
+        const sqls = selects();
+        expect(sqls).toHaveLength(2);
+        expect(sqls[1]).toContain(
+          "select trace_id, start_time, http_status_code, service_name from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 503 GET https://example.test/doc0"]);
+        wrapper.unmount();
+      });
+
+      it("does not record a miss when a later page is partial", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spanHandler = (params) =>
+          params.query.query.from === 0
+            ? answer(
+                Array.from({ length: 1000 }, () =>
+                  span("fff", { http_response_status_code: "200" }),
+                ),
+              )
+            : answer([], { is_partial: true });
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches().some((p) => p.query.query.from === 1000)).toBe(true);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("still takes a status from a partial response", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spanHandler = () =>
+          answer([span("abc1", { http_response_status_code: "500" })], { is_partial: true });
+        const wrapper = await mountLive();
+
+        expect(lookups(wrapper.vm)).toEqual(["found"]);
+        wrapper.unmount();
+      });
+
+      it("keeps a trace unknown, and asks no span query, when the stream resolver failed", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        tracesStream.resolve = async () => ({});
+        tracesStream.outcome = { failed: true, streams: ["default"] };
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches()).toHaveLength(0);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("keeps a trace unknown when the stream lookup rejects", async () => {
+        tracesStream.resolve = async () => {
+          throw new Error("no streams");
+        };
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(names(wrapper.vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        expect(spanSearches()).toHaveLength(0);
+        wrapper.unmount();
+      });
+
+      it("asks the default stream for a trace indexed nowhere when the org has it, and allows a miss after the wait", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        tracesStream.resolve = async () => ({});
+        tracesStream.outcome = { failed: false, streams: ["other", "default"] };
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        const wrapper = await mountLive();
+
+        expect(spanSearches()[0].query.query.sql).toContain('from "default"');
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        await wait(170_000);
+        expect(lookups(wrapper.vm)).toEqual(["no_server_span"]);
+        wrapper.unmount();
+      });
+
+      it("keeps a trace indexed nowhere unknown when the org has no default stream", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        tracesStream.resolve = async () => ({});
+        tracesStream.outcome = { failed: false, streams: ["other"] };
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches()).toHaveLength(0);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("asks again after a blank status and shows the status once it arrives", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        let status = "";
+        server.spanHandler = () => answer([span("abc1", { http_response_status_code: status })]);
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(lookups(vm)).toEqual(["unknown"]);
+
+        status = "500";
+        await wait(31_000);
+        expect(names(vm)).toEqual(["No response · 500 GET https://example.test/doc0"]);
+
+        // A status is final: no more asks about this trace.
+        const asked = spanSearches().length;
+        await wait(900_000);
+        expect(spanSearches()).toHaveLength(asked);
+        wrapper.unmount();
+      });
+
+      it("resolves a row left unknown when its span is ingested later", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+        expect(lookups(vm)).toEqual(["unknown"]);
+
+        server.spans = [youngSpan("abc1", { http_response_status_code: "503" })];
+        await wait(31_000);
+
+        expect(names(vm)).toEqual(["No response · 503 GET https://example.test/doc0"]);
+        expect(lookups(vm)).toEqual(["found"]);
+        wrapper.unmount();
+      });
+
+      it("replaces a recorded miss when a later ask finds the span", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+        await wait(170_000);
+        expect(lookups(vm)).toEqual(["no_server_span"]);
+
+        server.spans = [youngSpan("abc1", { http_response_status_code: "502" })];
+        await wait(700_000);
+        expect(names(vm)).toEqual(["No response · 502 GET https://example.test/doc0"]);
+        wrapper.unmount();
+      });
+
+      it("asks again after 30 s, 2 min and 10 min, and stops after four asks", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        const wrapper = await mountLive();
+        expect(spanSearches()).toHaveLength(1);
+
+        await wait(29_000);
+        expect(spanSearches()).toHaveLength(1);
+        await wait(2_000);
+        expect(spanSearches()).toHaveLength(2);
+
+        await wait(100_000);
+        expect(spanSearches()).toHaveLength(2);
+        await wait(25_000);
+        expect(spanSearches()).toHaveLength(3);
+
+        await wait(590_000);
+        expect(spanSearches()).toHaveLength(3);
+        await wait(10_000);
+        expect(spanSearches()).toHaveLength(4);
+
+        await wait(3_000_000);
+        expect(spanSearches()).toHaveLength(4);
+        wrapper.unmount();
+      });
+
+      it("counts errors as asks and ends after four, without narrowing the columns on them", async () => {
+        streamsMock.getStream = async (name) => {
+          if (name === "_rumdata") return RUM_SCHEMA;
+          throw new Error("no schema");
+        };
+        server.failed = [youngTraced("doc0", 0, "abc1")];
+        server.spanError = Object.assign(new Error("forbidden"), { status: 403 });
+        const wrapper = await mountLive();
+
+        // One ask, one query: a 403 does not try the narrower column sets.
+        expect(spanSearches()).toHaveLength(1);
+        await wait(1_000_000);
+        expect(spanSearches()).toHaveLength(4);
+        expect(names(wrapper.vm)).toEqual(["No response GET https://example.test/doc0"]);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("keeps the list as it is when the lookup throws", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1"), traced("doc403", 403, 40, "abc2")];
+        server.spanError = Object.assign(new Error("boom"), { status: 403 });
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(names(vm)).toEqual([
+          "No response GET https://example.test/doc0",
+          "403 GET https://example.test/doc403",
+        ]);
+        expect(vm.segmentEvents[0].server_lookup).toBe("unknown");
+        wrapper.unmount();
+      });
+
+      it("does not loop when a batch throws: its traces count as asked and are re-asked at 0, 30 s, 2.5 min and 12.5 min", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1"), traced("doc1", 0, 40, "abc2")];
+        const askedAt: number[] = [];
+        // A range whose read throws: the throw comes after the resolver, outside any ask's own handling.
+        tracesStream.resolve = async (ids) => {
+          askedAt.push(Date.now());
+          return Object.fromEntries(
+            ids.map((id) => [
+              id,
+              {
+                stream: "default",
+                range: {
+                  get start_time() {
+                    throw new Error("bad range");
+                  },
+                  end_time: 0,
+                },
+              },
+            ]),
+          );
+        };
+        const wrapper = await mountLive();
+        expect(askedAt).toHaveLength(1);
+
+        // Never a 0 ms retry: nothing more within the first 29 s.
+        await wait(29_000);
+        expect(askedAt).toHaveLength(1);
+
+        await wait(15 * 60_000);
+        // The gaps are the backoff after each failed ask, then the cap ends it.
+        expect(askedAt.map((at) => at - askedAt[0])).toEqual([0, 30_000, 150_000, 750_000]);
+        await wait(60 * 60_000);
+        expect(askedAt).toHaveLength(4);
+        expect(lookups(wrapper.vm)).toEqual(["unknown", "unknown"]);
+        wrapper.unmount();
+      });
+
+      it("still asks and resolves the later batches when an earlier batch throws, without extra attempts", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        const hex = (i: number) => (0x1000 + i).toString(16);
+        // 250 traces: the oldest 200 are batch 1 (their range read throws), the newest 50 are batch 2.
+        server.failed = Array.from({ length: 250 }, (_, i) => traced(`r${i}`, 0, 10 + i, hex(i)));
+        server.spans = [span(hex(249), { http_response_status_code: "502" })];
+        const bad = new Set(Array.from({ length: 200 }, (_, i) => canonical(hex(i))));
+        const resolves: string[][] = [];
+        tracesStream.resolve = async (ids) => {
+          resolves.push(ids);
+          return Object.fromEntries(
+            ids.map((id) => [
+              id,
+              bad.has(id)
+                ? {
+                    stream: "default",
+                    range: {
+                      get start_time() {
+                        throw new Error("bad range");
+                      },
+                      end_time: 0,
+                    },
+                  }
+                : { stream: "default" },
+            ]),
+          );
+        };
+        const wrapper = await mountLive();
+        await wait(100);
+
+        // Batch 2 was asked in the first pass and resolved.
+        expect(spanSearches()).toHaveLength(1);
+        expect((wrapper.vm as any).segmentEvents.at(-1).name).toBe(
+          "No response · 502 GET https://example.test/r249",
+        );
+
+        await wait(15 * 60_000);
+        // Both batches are asked four times in all (the cap), and the found trace only once: nothing was counted that was not asked.
+        const askedOf = (isBad: boolean) =>
+          resolves.filter((ids) => ids.some((id) => bad.has(id) === isBad));
+        expect(askedOf(true)).toHaveLength(4);
+        expect(askedOf(false).map((ids) => ids.length)).toEqual([50, 49, 49, 49]);
+        expect(spanSearches()).toHaveLength(4);
+        wrapper.unmount();
+      });
+
+      it("keeps the attempts of a stream recorded before another stream's ask throws", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [youngTraced("doc0", 0, "abc1"), youngTraced("doc1", 0, "abc2")];
+        tracesStream.resolve = async (ids) =>
+          Object.fromEntries(
+            ids.map((id) => [id, { stream: id === canonical("abc1") ? "streamA" : "streamB" }]),
+          );
+        server.spanHandler = (params: any) => {
+          if (params.query.query.sql.includes('from "streamB"')) {
+            throw Object.assign(new Error("stream-b"), { status: 403 });
+          }
+          return answer([]);
+        };
+        // The ask's own failure log throws, so the throw escapes the stream's handling.
+        const warn = vi.spyOn(console, "warn").mockImplementation((...args: any[]) => {
+          if (args[1]?.message === "stream-b") throw new Error("escaped");
+        });
+        const searchesTo = (stream: string) =>
+          spanSearches().filter((params) => params.query.query.sql.includes(`from "${stream}"`));
+        const wrapper = await mountLive();
+        expect(searchesTo("streamA")).toHaveLength(1);
+        expect(searchesTo("streamB")).toHaveLength(1);
+
+        // Stream A has its one attempt, so its next ask comes 30 s later (a second count would push it to 2 min).
+        await wait(31_000);
+        expect(searchesTo("streamA")).toHaveLength(2);
+        expect(searchesTo("streamB")).toHaveLength(2);
+
+        await wait(15 * 60_000);
+        expect(searchesTo("streamA")).toHaveLength(4);
+        expect(searchesTo("streamB")).toHaveLength(4);
+        warn.mockRestore();
+        wrapper.unmount();
+      });
+
+      it("retries a span search that failed with a server error before counting it", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        let calls = 0;
+        server.spanHandler = () => {
+          calls++;
+          if (calls === 1) throw Object.assign(new Error("unavailable"), { status: 503 });
+          return answer([span("abc1", { http_response_status_code: "500" })]);
+        };
+        const wrapper = await mountLive();
+        await wait(1_500);
+
+        expect(calls).toBe(2);
+        expect(lookups(wrapper.vm)).toEqual(["found"]);
+        wrapper.unmount();
+      });
+
+      it("batches the trace ids at 200 or fewer per query", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = Array.from({ length: 450 }, (_, i) =>
+          traced(`r${i}`, 0, 10 + i, (0x1000 + i).toString(16)),
+        );
+        server.spans = [span((0x1000 + 449).toString(16), { http_response_status_code: "502" })];
+        const wrapper = await mountLive();
+        await wait(100);
+
+        const sizes = spanSearches().map((params) => idsIn(params.query.query.sql).length);
+        expect(sizes.sort((a, b) => b - a)).toEqual([200, 200, 50]);
+        expect(Math.max(...sizes)).toBeLessThanOrEqual(200);
+        const last = (wrapper.vm as any).segmentEvents.at(-1);
+        expect(last.name).toBe("No response · 502 GET https://example.test/r449");
+        wrapper.unmount();
+      });
+
+      it("stops issuing batches once the viewer is unmounted", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = Array.from({ length: 450 }, (_, i) =>
+          traced(`r${i}`, 0, 10 + i, (0x1000 + i).toString(16)),
+        );
+        let wrapper: any;
+        // The page goes away while the first of three batches is being asked.
+        server.spanHandler = () => {
+          wrapper.unmount();
+          return answer([]);
+        };
+        serve(NOW - 60_000);
+        wrapper = mountSessionViewer(await pushRoute());
+        await wait(200);
+
+        expect(spanSearches()).toHaveLength(1);
+      });
+
+      it("uses http_status_code when the stream has no http_response_status_code", async () => {
+        traceSchema("trace_id", "http_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_status_code: "503" })];
+        const wrapper = await mountLive();
+
+        expect(spanSearches()[0].query.query.sql).toContain(
+          "select trace_id, start_time, http_status_code from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 503 GET https://example.test/doc0"]);
+        wrapper.unmount();
+      });
+
+      const noSchema = () => {
+        streamsMock.getStream = async (name) => {
+          if (name === "_rumdata") return RUM_SCHEMA;
+          throw new Error("no schema");
+        };
+      };
+      const selects = () => spanSearches().map((params) => params.query.query.sql as string);
+
+      it("drops the missing column named by the error, keeping the service, when the schema is unavailable", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_status_code: "503", service_name: "gateway" })];
+        server.spanColumns = ["http_status_code", "service_name"];
+        const wrapper = await mountLive();
+
+        const sqls = selects();
+        expect(sqls).toHaveLength(2);
+        expect(sqls[0]).toContain(
+          "select trace_id, start_time, http_response_status_code, http_status_code, service_name from",
+        );
+        expect(sqls[1]).toContain(
+          "select trace_id, start_time, http_status_code, service_name from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 503 GET https://example.test/doc0"]);
+        expect((wrapper.vm as any).segmentEvents[0].server_service).toBe("gateway");
+        wrapper.unmount();
+      });
+
+      it("shows the status when only http_response_status_code exists and the schema read fails", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_response_status_code: "502" })];
+        server.spanColumns = ["http_response_status_code"];
+        const wrapper = await mountLive();
+
+        expect(selects().at(-1)).toContain(
+          "select trace_id, start_time, http_response_status_code from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 502 GET https://example.test/doc0"]);
+        wrapper.unmount();
+      });
+
+      it("shows the status when service_name is the missing column and the schema read fails", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_response_status_code: "500", http_status_code: "" })];
+        server.spanColumns = ["http_response_status_code", "http_status_code"];
+        const wrapper = await mountLive();
+
+        expect(selects()).toHaveLength(2);
+        expect(selects()[1]).toContain(
+          "select trace_id, start_time, http_response_status_code, http_status_code from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 500 GET https://example.test/doc0"]);
+        wrapper.unmount();
+      });
+
+      it.each([
+        ["http_status_code", "503"],
+        ["http_response_status_code", "502"],
+      ])(
+        "falls down the ladder to the one status column %s when the error names no column",
+        async (column, status) => {
+          noSchema();
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          server.spans = [span("abc1", { [column]: status })];
+          server.spanColumns = [column];
+          server.spanColumnError = () => "Schema error: field not found";
+          const wrapper = await mountLive();
+
+          // Widest, then each status column alone: the service goes with the widest.
+          const sqls = selects();
+          expect(sqls[0]).toContain(
+            "select trace_id, start_time, http_response_status_code, http_status_code, service_name from",
+          );
+          expect(sqls[1]).toContain("select trace_id, start_time, http_response_status_code from");
+          expect(names(wrapper.vm)).toEqual([
+            `No response · ${status} GET https://example.test/doc0`,
+          ]);
+          wrapper.unmount();
+        },
+      );
+
+      it("ends the ladder with no columns, and a span with no status is still found", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1")];
+        server.spanColumns = [];
+        server.spanColumnError = () => "Schema error: field not found";
+        const wrapper = await mountLive();
+
+        expect(selects()).toHaveLength(4);
+        expect(selects()[3]).toContain("select trace_id, start_time from");
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("takes the earliest server span that has a status, and its service", async () => {
+        traceSchema("trace_id", "http_response_status_code", "http_status_code", "service_name");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [
+          span("abc1", {
+            start_time: SPAN_NS + 3_000,
+            http_response_status_code: "500",
+            service_name: "other",
+          }),
+          span("abc1", {
+            start_time: SPAN_NS + 1_000,
+            http_response_status_code: "",
+            service_name: "gateway",
+          }),
+          span("abc1", {
+            start_time: SPAN_NS + 2_000,
+            http_status_code: "502",
+            service_name: "copilot-be",
+          }),
+        ];
+        const wrapper = await mountLive();
+        const vm = wrapper.vm as any;
+
+        expect(spanSearches()[0].query.query.sql).toContain(
+          "select trace_id, start_time, http_response_status_code, http_status_code, service_name from",
+        );
+        // The service goes to the drawer only; the row stays simple.
+        expect(names(vm)).toEqual(["No response · 502 GET https://example.test/doc0"]);
+        expect(vm.segmentEvents[0].server_status).toBe("502");
+        expect(vm.segmentEvents[0].server_service).toBe("copilot-be");
+        wrapper.unmount();
+      });
+
+      it("queries each stream a trace lives in", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        tracesStream.resolve = async (ids) =>
+          Object.fromEntries(
+            ids.map((id) => [id, { stream: id.endsWith("1") ? "default" : "other" }]),
+          );
+        server.failed = [traced("a", 0, 30, "abc1"), traced("b", 0, 40, "abc2")];
+        const wrapper = await mountLive();
+
+        const sqls = spanSearches().map((params) => params.query.query.sql as string);
+        expect(
+          sqls.some((sql) => sql.includes('from "default"') && sql.includes(canonical("abc1"))),
+        ).toBe(true);
+        expect(
+          sqls.some((sql) => sql.includes('from "other"') && sql.includes(canonical("abc2"))),
+        ).toBe(true);
+        wrapper.unmount();
+      });
+
+      describe("server arrival time", () => {
+        const MIN_US = 60_000_000;
+        const arrival = NOW - 30_000;
+
+        it("finds the span when the device clock is 10 minutes slow, by searching around the arrival time", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          sessionStart = L - 15 * 60_000;
+          const date = arrival - 10 * 60_000;
+          server.failed = [{ ...youngTraced("doc0", 0, "abc1"), date }];
+          server.spans = [youngSpan("abc1", { http_response_status_code: "500" })];
+          const wrapper = await mountLive();
+
+          // Around the device's date alone, the window would end five minutes after it: before the span.
+          const [params] = spanSearches();
+          expect(params.query.query.start_time).toBe(date * 1000 - 5 * MIN_US);
+          expect(params.query.query.end_time).toBe(arrival * 1000 + 5 * MIN_US);
+          expect(names(wrapper.vm)).toEqual(["No response · 500 GET https://example.test/doc0"]);
+          wrapper.unmount();
+        });
+
+        it("ignores a device clock more than an hour off and looks 30 minutes back from the arrival", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          sessionStart = L - 3 * 3_600_000;
+          server.failed = [{ ...youngTraced("doc0", 0, "abc1"), date: arrival - 2 * 3_600_000 }];
+          server.spans = [youngSpan("abc1", { http_response_status_code: "500" })];
+          const wrapper = await mountLive();
+
+          const [params] = spanSearches();
+          expect(params.query.query.start_time).toBe(arrival * 1000 - 30 * MIN_US);
+          expect(params.query.query.end_time).toBe(arrival * 1000 + 5 * MIN_US);
+          expect(lookups(wrapper.vm)).toEqual(["found"]);
+          wrapper.unmount();
+        });
+
+        it("does not find a span outside the window", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          // Ten minutes before the request: outside the window, so it must stay unfound.
+          server.spans = [
+            youngSpan("abc1", {
+              start_time: YOUNG_NS - 10 * 60_000_000_000,
+              http_response_status_code: "500",
+            }),
+          ];
+          const wrapper = await mountLive();
+
+          expect(spanSearches()).toHaveLength(1);
+          expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+          wrapper.unmount();
+        });
+
+        it("widens the span window with the range the resolver returns", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          const spanStartMs = arrival - 20 * 60_000;
+          tracesStream.resolve = async (ids) =>
+            Object.fromEntries(
+              ids.map((id) => [
+                id,
+                {
+                  stream: "default",
+                  range: { start_time: spanStartMs * 1000, end_time: (spanStartMs + 1000) * 1000 },
+                },
+              ]),
+            );
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          server.spans = [
+            youngSpan("abc1", {
+              start_time: spanStartMs * 1_000_000,
+              http_response_status_code: "503",
+            }),
+          ];
+          const wrapper = await mountLive();
+
+          const [params] = spanSearches();
+          expect(params.query.query.start_time).toBe(spanStartMs * 1000 - MIN_US);
+          expect(params.query.query.end_time).toBe(arrival * 1000 + 5 * MIN_US);
+          expect(lookups(wrapper.vm)).toEqual(["found"]);
+          wrapper.unmount();
+        });
+
+        it("asks the oldest arrivals first", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          // The newest id has the oldest arrival.
+          server.failed = Array.from({ length: 250 }, (_, i) =>
+            youngTraced(`r${i}`, 0, (0x1000 + i).toString(16), 30_000 + i),
+          );
+          const wrapper = await mountLive();
+          await wait(100);
+
+          const [first] = spanSearches().map((params) => params.query.query.sql as string);
+          expect(first).toContain(canonical((0x1000 + 249).toString(16)));
+          expect(first).not.toContain(canonical((0x1000).toString(16)));
+          wrapper.unmount();
+        });
+      });
+
+      describe("retries without a live poll", () => {
+        const slowSpans = (ms: number) => {
+          server.spanHandler = async (params) => {
+            await new Promise((resolve) => setTimeout(resolve, ms));
+            const sql = params.query.query.sql as string;
+            return answer(server.spans.filter((spanRow) => sql.includes(`'${spanRow.trace_id}'`)));
+          };
+        };
+
+        it("retries, after a slow pass, a batch that came due during it", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          // Two batches of failed requests: the first has no spans (and comes due again), the second is final.
+          server.failed = Array.from({ length: 250 }, (_, i) =>
+            youngTraced(`r${i}`, 0, (0x1000 + i).toString(16), 30_000 - i),
+          );
+          server.spans = Array.from({ length: 50 }, (_, i) =>
+            youngSpan((0x1000 + 200 + i).toString(16), { http_response_status_code: "502" }),
+          );
+          // Each search takes 40 s, so the first batch is due again (30 s) before the second one ends.
+          slowSpans(40_000);
+          const wrapper = await mountLive(ENDED);
+          expect((wrapper.vm as any).isLive).toBe(false);
+
+          await wait(300_000);
+
+          const firstBatchId = canonical((0x1000).toString(16));
+          const asksAboutFirst = spanSearches().filter((params) =>
+            (params.query.query.sql as string).includes(firstBatchId),
+          );
+          expect(asksAboutFirst.length).toBeGreaterThanOrEqual(2);
+          wrapper.unmount();
+        });
+
+        it("clears a pending retry timer on unmount", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          const wrapper = await mountLive(ENDED);
+          expect(spanSearches()).toHaveLength(1);
+          const timersWithRetry = vi.getTimerCount();
+          expect(timersWithRetry).toBeGreaterThan(0);
+
+          wrapper.unmount();
+
+          expect(vi.getTimerCount()).toBeLessThan(timersWithRetry);
+          await wait(200_000);
+          expect(spanSearches()).toHaveLength(1);
+        });
+
+        it("cancels an in-flight span query on unmount", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          server.spanHandler = () => "hang";
+          const wrapper = await mountLive(ENDED);
+          expect(spanSearches()).toHaveLength(1);
+          const [request] = streaming.spanRequests;
+          expect(streaming.cancel).not.toHaveBeenCalled();
+
+          wrapper.unmount();
+
+          expect(streaming.cancel).toHaveBeenCalledWith(
+            expect.objectContaining({ trace_id: request.traceId }),
+          );
+        });
+
+        it("registers its visibility listener when the page mounts and removes the same one on unmount", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          const added: any[] = [];
+          const removed: any[] = [];
+          const add = vi.spyOn(document, "addEventListener");
+          const remove = vi.spyOn(document, "removeEventListener");
+          serve(ENDED);
+          const route = await pushRoute();
+          add.mockClear();
+          const wrapper = mountSessionViewer(route);
+          await wait(100);
+          for (const [type, handler] of add.mock.calls) {
+            if (type === "visibilitychange") added.push(handler);
+          }
+          expect(added).toHaveLength(1);
+
+          wrapper.unmount();
+          for (const [type, handler] of remove.mock.calls) {
+            if (type === "visibilitychange") removed.push(handler);
+          }
+          expect(removed).toContain(added[0]);
+          add.mockRestore();
+          remove.mockRestore();
+        });
+
+        it("asks nothing while the tab is hidden and asks at once when it is visible again", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          const wrapper = await mountLive(ENDED);
+          expect(spanSearches()).toHaveLength(1);
+
+          setVisibility("hidden");
+          await wait(200_000);
+          expect(spanSearches()).toHaveLength(1);
+
+          setVisibility("visible");
+          await wait(100);
+          expect(spanSearches()).toHaveLength(2);
+          wrapper.unmount();
+        });
+
+        it("asks again and records a verified miss when an old session is shown 20 minutes after it was opened hidden", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          setVisibility("hidden");
+          const wrapper = await mountLive(ENDED);
+          // The first ask is never a miss, and nothing is scheduled while hidden.
+          expect(spanSearches()).toHaveLength(1);
+          expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+
+          await wait(20 * 60_000);
+          expect(spanSearches()).toHaveLength(1);
+
+          setVisibility("visible");
+          await wait(100);
+          expect(spanSearches()).toHaveLength(2);
+          expect(lookups(wrapper.vm)).toEqual(["no_server_span"]);
+          wrapper.unmount();
+        });
+
+        it("asks again and finds the server status when the tab is shown 20 minutes after it was opened hidden", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          let calls = 0;
+          server.spanHandler = () =>
+            answer(++calls === 1 ? [] : [span("abc1", { http_response_status_code: "503" })]);
+          setVisibility("hidden");
+          const wrapper = await mountLive(ENDED);
+          expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+
+          await wait(20 * 60_000);
+          setVisibility("visible");
+          await wait(100);
+          expect(calls).toBe(2);
+          expect(lookups(wrapper.vm)).toEqual(["found"]);
+          wrapper.unmount();
+        });
+      });
+
+      describe("single flight and republishing", () => {
+        const blockedResolver = () => {
+          const resolveCalls: string[][] = [];
+          let release!: () => void;
+          const gate = new Promise<void>((resolve) => (release = resolve));
+          tracesStream.resolve = async (ids) => {
+            resolveCalls.push(ids);
+            await gate;
+            return Object.fromEntries(ids.map((id) => [id, { stream: "default" }]));
+          };
+          return { resolveCalls, release: () => release() };
+        };
+
+        it("does not run another pass when a poll during one brings no new trace id", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          server.spans = [span("abc1", { http_response_status_code: "500" })];
+          const { resolveCalls, release } = blockedResolver();
+          const wrapper = await mountLive();
+          expect(resolveCalls).toHaveLength(1);
+
+          await wait(31_000);
+          release();
+          await wait(100);
+
+          expect(resolveCalls).toHaveLength(1);
+          wrapper.unmount();
+        });
+
+        it("runs one more pass, for the new ids only, when a poll during one brings a new trace id", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          server.spans = [
+            span("abc1", { http_response_status_code: "500" }),
+            span("abc2", { http_response_status_code: "502" }),
+          ];
+          const { resolveCalls, release } = blockedResolver();
+          const wrapper = await mountLive();
+          expect(resolveCalls).toHaveLength(1);
+
+          server.failed = [...server.failed, traced("doc1", 0, 40, "abc2")];
+          await wait(31_000);
+          expect(resolveCalls).toHaveLength(1);
+          release();
+          await wait(100);
+
+          expect(resolveCalls).toEqual([[canonical("abc1")], [canonical("abc2")]]);
+          expect(lookups(wrapper.vm)).toEqual(["found", "found"]);
+          wrapper.unmount();
+        });
+
+        it("does not publish the list again when an ask changed nothing", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [
+            {
+              ...traced("doc0", 0, 0, "abc1"),
+              date: NOW - 30_000,
+              _timestamp: (NOW - 30_000) * 1000,
+            },
+          ];
+          const wrapper = await mountLive();
+          const vm = wrapper.vm as any;
+          const before = vm.segmentEvents;
+
+          await wait(31_000);
+
+          expect(spanSearches()).toHaveLength(2);
+          expect(vm.segmentEvents).toBe(before);
+          wrapper.unmount();
+        });
+
+        it("publishes the list again when an ask changed what a row shows", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [traced("doc0", 0, 30, "abc1")];
+          const wrapper = await mountLive();
+          const vm = wrapper.vm as any;
+          const before = vm.segmentEvents;
+
+          server.spans = [span("abc1", { http_response_status_code: "500" })];
+          await wait(31_000);
+
+          expect(vm.segmentEvents).not.toBe(before);
+          wrapper.unmount();
+        });
+      });
+    });
+  });
+
   it("dedups polled error logs by arrival time, device time and message", async () => {
     const log = (offset: number, message: string) => ({
       date: L + offset,
@@ -2650,6 +3985,34 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     wrapper.unmount();
   });
 
+  it("shows the session duration after a reload, when the store holds no row to copy it from", async () => {
+    const wrapper = await mountEventsOnly();
+    expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+    wrapper.unmount();
+  });
+
+  it("keeps the duration of the Sessions list row on a click-through instead of recomputing it", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-events" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("2m 3s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
+  });
+
+  it("ignores the duration of a different session left in the store by another entry point", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-other" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
+  });
+
   it("hands the Traces tab the route window padded by a day, not the device-clock bounds", async () => {
     const wrapper = await mountEventsOnly();
     const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
@@ -2805,6 +4168,207 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
   it("drops an oversize or unknown-kind label instead of rendering it", async () => {
     const { wrapper } = await mountFromFunnel({ af_kind: "x" });
     expect(wrapper.find('[data-test="session-viewer-analytics-context"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — the breadcrumbs wait for the events", () => {
+  const savedFields = replaySchema.fields;
+  const sidebarLoading = (wrapper: VueWrapper) =>
+    wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("loading");
+  const answer = (sql: string) => ({
+    data: { hits: sql.includes("min(start)") ? [sessionLookupRow] : [] },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    streamsMock.getStream = null;
+    replaySchema.fields = savedFields;
+    vi.mocked(searchService.search).mockImplementation((async (params: any) =>
+      answer(params?.query?.query?.sql ?? "")) as any);
+  });
+
+  it("passes loading to the sidebar until the events request settles", async () => {
+    let release: (v: unknown) => void = () => {};
+    vi.mocked(searchService.search).mockImplementation(((params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      if (sql.includes('"_rumdata"') && sql.includes("type='error'"))
+        return new Promise((resolve) => (release = resolve));
+      return Promise.resolve(answer(sql));
+    }) as any);
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(true);
+
+    release({ data: { hits: [] } });
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the replay schema lookup fails", async () => {
+    replaySchema.fields = undefined as never;
+    streamsMock.getStream = async () => {
+      throw new Error("network down");
+    };
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the session lookup fails", async () => {
+    vi.useFakeTimers();
+    vi.mocked(searchService.search).mockRejectedValue({ response: { status: 503 } });
+    const wrapper = mountSessionViewer(await pushRoute());
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — failed requests in the events list", () => {
+  const start = 1692884313968;
+  const columns = [{ name: "source" }, { name: "resource_type" }, { name: "resource_status_code" }];
+  const action = {
+    type: "action",
+    action_id: "a1",
+    action_type: "click",
+    action_target_name: "Save",
+    date: start + 1000,
+  };
+  const view = {
+    type: "view",
+    view_id: "v1",
+    view_url: "https://app.test/page",
+    view_loading_type: "initial_load",
+    date: start + 500,
+  };
+  const error = { type: "error", error_id: "e1", error_message: "boom", date: start + 2000 };
+  const resource = (id: string, status: number, date: number, method = "get") => ({
+    type: "resource",
+    resource_id: id,
+    resource_type: "fetch",
+    resource_method: method,
+    resource_url: `https://api.test/${id}`,
+    resource_status_code: status,
+    date,
+  });
+  let sqls: string[];
+  let failedSqlResponse: () => any;
+
+  async function mountWithEvents(schema: unknown[] = columns) {
+    vi.clearAllMocks();
+    sqls = [];
+    streamsMock.getStream = async () => ({ name: "_rumdata", schema });
+    vi.mocked(searchService.search).mockImplementation((async (params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      sqls.push(sql);
+      if (sql.includes("min(start)")) return { data: { hits: [] } };
+      if (sql.includes("MIN(date) AS start_time")) {
+        return {
+          data: { hits: [{ start_time: start, end_time: start + 60_000, source: "browser" }] },
+        };
+      }
+      if (sql.includes("type='resource'")) return failedSqlResponse();
+      if (sql.includes('"_rumdata"')) return { data: { hits: [view, action, error] } };
+      if (sql.includes('"_rumlog"')) return { data: { hits: [] } };
+      return { data: { hits: [] } };
+    }) as any);
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-events",
+      query: {
+        start_time: String(start * 1000),
+        end_time: String((start + 60_000) * 1000),
+        event_time: String(start),
+        from: "analytics",
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 8; i++) await flush();
+    return wrapper;
+  }
+
+  beforeEach(() => {
+    failedSqlResponse = () => ({
+      data: {
+        hits: [resource("a", 403, start + 3000), resource("b", 0, start + 4000, "post")],
+      },
+    });
+  });
+
+  afterEach(() => {
+    streamsMock.getStream = null;
+  });
+
+  it("issues the failed-request query, covering status 0 and the 4xx/5xx range", async () => {
+    const wrapper = await mountWithEvents();
+    const sql = sqls.find((q) => q.includes("type='resource'"));
+    expect(sql).toContain('from "_rumdata"');
+    expect(sql).toContain("resource_type in ('fetch','xhr')");
+    expect(sql).toContain("(resource_status_code >= 400 or resource_status_code = 0)");
+    expect(sql).toContain("order by date asc");
+    wrapper.unmount();
+  });
+
+  it("lists a 403 and a no-response request as failed_request events, in time order", async () => {
+    const wrapper = await mountWithEvents();
+    const events = (wrapper.vm as any).segmentEvents;
+    expect(events.map((e: any) => e.type)).toEqual([
+      "view",
+      "action",
+      "error",
+      "failed_request",
+      "failed_request",
+    ]);
+    expect(events.filter((e: any) => e.type === "failed_request").map((e: any) => e.name)).toEqual([
+      "403 GET https://api.test/a",
+      "No response POST https://api.test/b",
+    ]);
+    // The detail drawer reads the stored row, so it must be reachable by the event id.
+    expect((wrapper.vm as any).rawEventsMap.get("a").resource_status_code).toBe(403);
+    wrapper.unmount();
+  });
+
+  it("keeps the other events when the failed-request query fails", async () => {
+    failedSqlResponse = () => {
+      throw { response: { status: 400, data: { message: "no such column" } } };
+    };
+    const wrapper = await mountWithEvents();
+    const events = (wrapper.vm as any).segmentEvents;
+    expect(events.map((e: any) => e.type)).toEqual(["view", "action", "error"]);
+    wrapper.unmount();
+  });
+
+  it("does not issue the query when the stream has no resource columns", async () => {
+    const wrapper = await mountWithEvents([{ name: "source" }]);
+    expect(sqls.some((q) => q.includes("type='resource'"))).toBe(false);
+    expect((wrapper.vm as any).segmentEvents.map((e: any) => e.type)).toEqual([
+      "view",
+      "action",
+      "error",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("shows a resource row once even when it is returned again", async () => {
+    failedSqlResponse = () => ({
+      data: { hits: [resource("a", 500, start + 3000), resource("a", 500, start + 3000)] },
+    });
+    const wrapper = await mountWithEvents();
+    const failed = (wrapper.vm as any).segmentEvents.filter(
+      (e: any) => e.type === "failed_request",
+    );
+    expect(failed).toHaveLength(1);
+    expect(failed[0].name).toBe("500 GET https://api.test/a");
     wrapper.unmount();
   });
 });

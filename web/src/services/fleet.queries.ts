@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import fleet, {
   type FleetAuditList,
+  type FleetAuditParams,
   type FleetCollector,
   type FleetConfigDetail,
   type FleetConfigIssues,
@@ -45,7 +46,7 @@ import {
   type CollectorMetricValues,
 } from "@/components/fleet/collectorMetrics";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
-import { queryClient } from "@/composables/query/queryClient";
+import { quantizeRange, queryClient, stableFilters } from "@/composables/query/queryClient";
 
 // Delivery and rollout state move without any write from this tab, so the views poll while they do.
 const DELIVERY_POLL_MS = 5000;
@@ -56,8 +57,9 @@ export const FLOW_POLL_MS = 15_000;
 const inFlight = (delivery: string | null | undefined) =>
   delivery === "assigned" || delivery === "sent" || delivery === "accepted";
 
-// A scheduled rollout changes only when it becomes due, so a slow poll is enough to wake its row.
-const SCHEDULED_POLL_MS = 60_000;
+// A scheduled or waiting rollout changes only when it is due or a collector connects.
+const IDLE_POLL_MS = 60_000;
+const idle = (status: string | undefined) => status === "scheduled" || status === "waiting";
 
 // An auto-rollback commits in its own transaction after the halt, so the halt is not the last word.
 const rollbackOwed = (r: Pick<FleetRollout, "auto_rollback" | "halt">) =>
@@ -68,14 +70,14 @@ const rolloutMoving = (r: Pick<FleetRollout, "status" | "auto_rollback" | "halt"
 
 const rolloutPoll = (rollouts: FleetRollout[]) => {
   if (rollouts.some(rolloutMoving)) return DELIVERY_POLL_MS;
-  return rollouts.some((r) => r.status === "scheduled") ? SCHEDULED_POLL_MS : false;
+  return rollouts.some((r) => idle(r.status)) ? IDLE_POLL_MS : false;
 };
 
 const fleetPoll = (fleets: Fleet[]) => {
   const statuses = fleets.map((f) => f.state?.rollout?.status);
   // The fleet state cannot tell whether an auto-rollback is owed, so a halted fleet keeps polling.
   if (statuses.includes("in_progress") || statuses.includes("halted")) return DELIVERY_POLL_MS;
-  return statuses.includes("scheduled") ? SCHEDULED_POLL_MS : false;
+  return statuses.some(idle) ? IDLE_POLL_MS : false;
 };
 
 export interface BulkResult {
@@ -256,16 +258,23 @@ export const fleetConfigVersionQuery = (org: string, id: string, version: number
     staleTime: Infinity,
   });
 
-export const fleetAuditQuery = (org: string) =>
-  queryOptions({
-    queryKey: fleetKeys.audit(org),
+export const fleetAuditQuery = (org: string, params: FleetAuditParams = {}) => {
+  const sent = stableFilters(params);
+  // A preset period starts at Date.now(), so the key rounds it to the minute to let a remount hit.
+  const keyed = stableFilters({
+    ...sent,
+    from: sent.from === undefined ? undefined : quantizeRange(sent.from, sent.from).start,
+  });
+  return queryOptions({
+    queryKey: [...fleetKeys.audit(org), keyed],
     queryFn: async (): Promise<FleetAuditList> => {
-      const list = (await fleet.listAudit(org)).data;
+      const list = (await fleet.listAudit(org, sent)).data;
       if (!Array.isArray(list?.items)) throw new Error("Malformed fleet audit response");
       return list;
     },
     staleTime: LIVE_STALE_TIME,
   });
+};
 
 export const fleetSettingsQuery = (org: string) =>
   queryOptions({

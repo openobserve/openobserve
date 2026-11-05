@@ -18,6 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
   FirstEventDiagnosis,
   FirstEventResult,
@@ -200,6 +201,26 @@ describe("FirstEventStatus — waiting", () => {
     expect(q("first-event-status-troubleshoot-btn").attributes("aria-busy")).toBe("true");
     expect(fake.state.value).toBe("waiting");
   });
+
+  it("reads rejections at 2 minutes by default, as the stepped cards say", async () => {
+    mountBar();
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(120_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 2 minutes it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
+
+  it("waits the page's longer delay before a diagnosis and says so", async () => {
+    mountBar({ diagnosisAfterMs: 900_000 });
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(900_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min");
+    await vi.advanceTimersByTimeAsync(800_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
 });
 
 describe("FirstEventStatus — before the first decision", () => {
@@ -336,6 +357,30 @@ describe("FirstEventStatus — received", () => {
       from: String(result.rangeStart),
       to: String(result.rangeEnd),
     });
+  });
+
+  it("disables Open in Traces with a lock while the traces license is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = { ...result, streamType: "traces" };
+    fake.state.value = "received";
+    await nextTick();
+    const btn = q("first-event-status-open-btn");
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await btn.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).not.toBe("traces");
+  });
+
+  it("keeps Open in Logs live when only traces is locked", async () => {
+    mountBar({}, { zoConfig: { features: { traces: "locked" } } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").attributes("disabled")).toBeUndefined();
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
   });
 
   it("reads Test event received with Connect your real source primary on a test guide", async () => {
@@ -480,6 +525,21 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(q("first-event-diagnosis-fix").text()).toContain("Fluent Bit");
     await q("first-event-diagnosis-copy-btn").trigger("click");
     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+  });
+
+  it("reads Copy prompt on the coding-agent tab and points the token fix at the .env", async () => {
+    mountBar({ snippetKind: "prompt" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-copy-btn").text()).toBe("Copy prompt");
+    expect(q("first-event-diagnosis-fix").text()).toBe(
+      "The token in your .env doesn't match org token default. Download the .env again and ask your coding agent to re-run the request.",
+    );
   });
 
   it("names the guide's own tool in the config fix", async () => {
@@ -759,6 +819,11 @@ describe("FirstEventStatus — pill display for empty pages", () => {
   it.each([
     [{ targetStream: "system_", match: "keyword" }, "Matching streams already receive data."],
     [{ targetStream: "default", snippetKind: "config" }, "Checks start when you copy the config."],
+    [{ targetStream: "default", snippetKind: "prompt" }, "Checks start when you copy the prompt."],
+    [
+      { targetStream: "system_", match: "keyword", snippetKind: "prompt" },
+      "Matching streams already receive data. Checks start when you copy the prompt.",
+    ],
   ])("names what the idle bar waits on (%o)", async (props, text) => {
     mountBar(props);
     fake.state.value = "idle";
@@ -771,6 +836,10 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     [
       { targetStream: "syslog_ng", snippetKind: "config" },
       "Checks start when you copy the config.",
+    ],
+    [
+      { targetStream: "syslog_ng", snippetKind: "prompt" },
+      "Checks start when you copy the prompt.",
     ],
     [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
     [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],

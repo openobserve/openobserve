@@ -114,7 +114,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
-import { correlate as correlateStreams } from "@/services/service_streams";
+import { correlate as correlateStreams, getDimensionAnalytics } from "@/services/service_streams";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -132,7 +132,7 @@ const baseNode = {
 };
 
 const healthyNode = { ...baseNode, error_rate: 0, errors: 0 };
-const degradedNode = { ...baseNode, error_rate: 8 };
+const warningNode = { ...baseNode, error_rate: 8 };
 const criticalNode = { ...baseNode, error_rate: 15 };
 
 const baseGraphData = {
@@ -373,9 +373,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(badge.text()).toBe("Healthy");
     });
 
-    it("should show Degraded badge when error_rate is above 5", () => {
-      wrapper = mountPanel({ selectedNode: degradedNode });
-      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    it("should show Warning badge when error_rate is above 5", () => {
+      wrapper = mountPanel({ selectedNode: warningNode });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
     });
 
     it("should show Critical badge when error_rate is above 10", () => {
@@ -383,16 +383,46 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Critical");
     });
 
-    it("should show Healthy badge when error_rate is exactly 5", () => {
-      // error_rate <= 5 maps to "healthy" per the component logic (> 5 triggers degraded)
+    it("should show Degraded badge when error_rate is exactly 5", () => {
       wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 5 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    });
+
+    it("should show Warning badge when error_rate is exactly 10", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 10 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
+    });
+
+    it("should show Degraded badge when error_rate is exactly 1, as the legend's 1 – 5% band says", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 1 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    });
+
+    it("control: should show Healthy badge when error_rate is just under 1", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 0.99 } });
       expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Healthy");
     });
 
-    it("should show Degraded badge when error_rate is exactly 10", () => {
-      // error_rate <= 10 maps to "degraded" per component logic (> 10 triggers critical)
-      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 10 } });
-      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    // o2-enterprise#3126: Graph View chart nodes carry errors and value but no error_rate.
+    it("should derive Critical from errors over value when the node has no error_rate", () => {
+      wrapper = mountPanel({
+        selectedNode: { id: "database", name: "database", value: 2, errors: 1 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Critical");
+    });
+
+    it("should derive the badge from errors over requests when the node has no error_rate", () => {
+      wrapper = mountPanel({
+        selectedNode: { id: "db", name: "db", requests: 100, errors: 7 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
+    });
+
+    it("control: should prefer the node's error_rate over errors and requests", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, error_rate: 0, value: 10, errors: 9 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Healthy");
     });
   });
 
@@ -1458,5 +1488,97 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(rate(wrapper).config.unit).toBe("custom");
       expect(rate(wrapper).config.unit_custom).toBe("spans/s");
     });
+  });
+});
+
+describe("ServiceGraphNodeSidePanel — license locks", () => {
+  let wrapper: VueWrapper;
+  const LOGS_ITEM = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
+  const DB_ITEM = '[data-test="service-graph-node-panel-view-related-databases-btn"]';
+  const TRACES_ITEM = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
+  const METRICS_TAB = '[data-test="service-graph-node-panel-tab-metrics"]';
+
+  afterEach(() => {
+    wrapper?.unmount();
+    delete store.state.zoConfig.features;
+    vi.clearAllMocks();
+  });
+
+  it("locks the metrics tab and related logs without any correlation call when correlation is locked", async () => {
+    getStreamMock.mockResolvedValueOnce({ schema: [{ name: "service_name", type: "keyword" }] });
+    store.state.zoConfig.features = { correlation: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    await wrapper.find(METRICS_TAB).trigger("click");
+    await flushPromises();
+    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(
+      wrapper.find('[data-test="service-graph-side-panel-metrics-license-denied"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find(LOGS_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(LOGS_ITEM).trigger("click");
+    await flushPromises();
+    expect(correlateStreams).not.toHaveBeenCalled();
+    expect(getDimensionAnalytics).not.toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the correlation calls when correlation is enabled", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    await wrapper.find(METRICS_TAB).trigger("click");
+    await flushPromises();
+    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(correlateStreams).toHaveBeenCalled();
+  });
+
+  it("shows the related-databases item locked and does not navigate when db_monitoring is locked", async () => {
+    store.state.zoConfig.features = { db_monitoring: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(DB_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(DB_ITEM).trigger("click");
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("locks the related-logs item and does not navigate when logs is locked", async () => {
+    store.state.zoConfig.features = { logs: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(LOGS_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(LOGS_ITEM).trigger("click");
+    await flushPromises();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("locks the related-traces item when traces is locked and leaves it live otherwise", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(TRACES_ITEM).attributes("disabled")).toBe("false");
+    wrapper.unmount();
+    store.state.zoConfig.features = { traces: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(TRACES_ITEM).attributes("disabled")).toBe("true");
+    await wrapper.find(TRACES_ITEM).trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("view-traces")).toBeUndefined();
+  });
+
+  it("emits view-traces from View traces and row clicks only while traces is licensed", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    vm.viewInTraces();
+    vm.navigateToTraces({ operationName: "GET /" });
+    expect(wrapper.emitted("view-traces")).toHaveLength(2);
+    wrapper.unmount();
+
+    store.state.zoConfig.features = { traces: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    (wrapper.vm as any).viewInTraces();
+    (wrapper.vm as any).navigateToTraces({ operationName: "GET /" });
+    expect(wrapper.emitted("view-traces")).toBeUndefined();
   });
 });

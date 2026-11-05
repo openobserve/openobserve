@@ -23,6 +23,7 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
+import { getSeriesItemOpacity, getShiftedLineStyle } from "./promqlChartSeriesProps";
 import { layoutMetricGrid } from "./metricGrid";
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
@@ -284,6 +285,12 @@ export const convertMultiSQLData = async (
         Array.isArray(sparklineData) ? sparklineData[i] : undefined,
       ),
     );
+    // A bar gauge labels and orders each bar by the query it came from, after the dials are merged.
+    if (panelSchema.type === "gauge") {
+      options.at(-1)?.options?.series?.forEach((gauge: { _queryIndex?: number }) => {
+        gauge._queryIndex = panelQueryIndex;
+      });
+    }
   }
 
   const isAnnotationSeries = (series: any) => {
@@ -651,6 +658,20 @@ export const convertMultiSQLData = async (
     // A right-clicked series alerts on its own panel query, a shifted one on its parent's.
     const seriesRoleAt = (i: number) =>
       Number(metadata?.queries?.[i]?.timeRangeGap?.seconds) ? "shifted" : "primary";
+    // As in PromQL, a shifted series keeps its primary's colour and is told apart by its style.
+    const roleStyle = (
+      it: { lineStyle?: Record<string, unknown>; itemStyle?: Record<string, unknown> },
+      i: number,
+    ) =>
+      seriesRoleAt(i) === "shifted"
+        ? {
+            lineStyle: getShiftedLineStyle(it.lineStyle),
+            itemStyle: {
+              ...it.itemStyle,
+              ...getSeriesItemOpacity(chartType, panelSchema?.config, true),
+            },
+          }
+        : {};
 
     // Label Q1 series
     if (options[0].options.series) {
@@ -666,6 +687,7 @@ export const convertMultiSQLData = async (
           _queryIndex: 0,
           _panelQueryIndex: pIdx0,
           _seriesRole: seriesRoleAt(0),
+          ...roleStyle(it, 0),
         };
       });
     }
@@ -687,6 +709,7 @@ export const convertMultiSQLData = async (
               _queryIndex: i,
               _panelQueryIndex: panelQueryIndex,
               _seriesRole: seriesRoleAt(i),
+              ...roleStyle(it, i),
               // C4: prefix stack names to prevent cross-query stacking
               stack: it.stack ? `q${i}-${it.stack}` : it.stack,
             };

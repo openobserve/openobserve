@@ -7,7 +7,8 @@
  *   TS-13.03 a test page goes down the real path and leaves no trace
  *   TS-13.06 every link in every page email resolves to a real route (the W-01 guard)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHY THESE FOUR ARE ONE FILE. They are the same claim from four directions: a
  * dry run has to be TRUE and has to be FREE. A preview that lies converts a
@@ -15,7 +16,7 @@
  * somebody who was not on call. Both halves are asserted on every case here.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
- *   - The specificity tag. `oncall-simulator-specificity` renders only when
+ *   - The also-matched list. `oncall-simulator-also` renders only when
  *     there is something to explain — a second rule that matched and lost — so
  *     on a single-rule fixture its absence is correct, and asserting it would
  *     make the case about seeding competition rather than about agreement.
@@ -67,6 +68,7 @@ const {
   simulateRouting,
   getEscalationPreview,
   getCauseAnalytics,
+  requireMailSink,
   waitForMail,
   extractLinks,
 } = require('../utils/oncall-seed-ext.js');
@@ -157,7 +159,9 @@ test.describe('On-call dry runs', {
     const predictedResponder = predicted.current_responder?.user_email
       ?? predicted.ladder?.[0]?.recipients?.[0]?.user_email ?? null;
     expect(predictedResponder, 'a preview that does not name a person has predicted nothing').toBeTruthy();
-    expect(rendered.responder, 'the screen names the same person the engine does')
+    const renderedResponders = await pm.oncallRoutingPage.readSimulatorResponderEmails();
+    testLogger.info('TS-13.01 rendered responders', { renderedResponders });
+    expect(renderedResponders, 'the screen names the same person the engine does')
       .toContain(predictedResponder);
 
     // Simulating must cost nothing: no record, no unrouted entry, no page.
@@ -171,6 +175,7 @@ test.describe('On-call dry runs', {
     const destination = await seedNotificationDestination(page, f.prefix.toLowerCase());
     const { pages } = await firePageAndWait(page, {
       alertOptions: { name: `${f.prefix}_alert`, stream, destinations: [destination] },
+      expectTeamId: f.team.id,
     });
 
     // The prediction and the firing have to agree on the team AND on the person.
@@ -269,6 +274,7 @@ test.describe('On-call dry runs', {
   test('a test page reaches a real mailbox and leaves no record behind', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedRoutableTeam(page, testInfo, 'test');
 
     const recordsBefore = await listResponses(page, { teamId: f.team.id, includeResolved: true });
@@ -323,6 +329,7 @@ test.describe('On-call dry runs', {
   test('every link in a page email resolves to a route that renders its own screen', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
+    await requireMailSink(test);
     const f = await seedRoutableTeam(page, testInfo, 'links');
     const onCall = (await whoIsOnCall(page, f.team.id)).map((slot) => slot.user_email);
 
@@ -341,6 +348,7 @@ test.describe('On-call dry runs', {
     const pageSince = Date.now() - 2000;
     const { pages } = await firePageAndWait(page, {
       alertOptions: { name: `${f.prefix}_alert`, stream, destinations: [destination] },
+      expectTeamId: f.team.id,
     });
     const pageMail = await waitForMail({ to: onCall[0], sinceMs: pageSince, subject: /\[P\d\]/, timeout: 120000 });
     expect(pageMail, 'a fired page must produce a page email').not.toBeNull();
@@ -419,14 +427,11 @@ test.describe('On-call dry runs', {
       'a result panel that renders empty is the failure mode this case exists to catch')
       .toBeTruthy();
 
-    // The matched-rule slot: either absent, or carrying words. Never present
-    // and blank — that is a confident answer to a question with no answer.
-    if (rendered.specificity !== null) {
-      expect(
-        rendered.specificity,
-        'W-09: the matched-rule slot renders an empty element instead of saying nothing matched',
-      ).not.toBe('');
-    }
+    // The matched-rule line always renders; blank would be a confident answer to a question with no answer.
+    expect(
+      rendered.won,
+      'W-09: the matched-rule line renders empty instead of saying nothing matched',
+    ).toMatch(/no rule matches/i);
 
     // And the panel must say, in words a human can act on, that nothing claimed it.
     expect(

@@ -51,8 +51,9 @@
         :columns="columns"
         row-key="entityId"
         :loading="promptQuery.isPending.value"
+        :loading-reset-key="activeFolderId"
         :error="listError"
-        :forbidden="errorStatus(promptQuery.error.value) === 403"
+        :forbidden="forbiddenState(promptQuery.error.value)"
         :frame="false"
         :default-columns="false"
         :show-global-filter="false"
@@ -245,6 +246,7 @@
       :initial-version="routeVersion"
       :initial-tab="detailTab"
       :protected-labels="protectedLabels"
+      :show-playground="!hidesOnlineEvalEntries(store.state.zoConfig)"
       @update:open="closeDetail"
       @updated="replacePrompt"
       @edit="openEditorForVersion"
@@ -332,6 +334,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState } from "@/utils/featureGate";
 import llmPromptsService, {
   type Prompt,
   type PromptLabel,
@@ -347,6 +350,7 @@ import { storePromptPlaygroundHandoff } from "./promptPlaygroundHandoff";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { hidesOnlineEvalEntries } from "@/composables/shared/useOnlineEvalsGate";
 
 const store = useStore();
 const { t } = useI18nTyped();

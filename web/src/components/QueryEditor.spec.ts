@@ -67,6 +67,8 @@ const codeQueryEditorStub = {
     "showAutoComplete",
     "editorId",
     "valuesTimeRange",
+    "textPreview",
+    "transformGeneratedQuery",
   ],
   emits: [
     "update:query",
@@ -565,6 +567,41 @@ describe("QueryEditor", () => {
       // Assert — called with the actual new value
       expect(mockSetValue).toHaveBeenCalledOnce();
       expect(mockSetValue).toHaveBeenCalledWith("SELECT 2");
+    });
+  });
+
+  describe("text preview", () => {
+    it("forwards textPreview to the code editor", () => {
+      wrapper = mountQueryEditor({ textPreview: true });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("textPreview")).toBe(true);
+    });
+
+    it("leaves the preview off by default", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.findComponent(codeQueryEditorStub).props("textPreview")).toBe(false);
+    });
+  });
+
+  describe("page hooks for the code editor", () => {
+    it("names the editor from the prefix and language by default", () => {
+      wrapper = mountQueryEditor({ dataTestPrefix: "logs-search-bar" });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("editorId")).toBe(
+        "logs-search-bar-editor-sql",
+      );
+      expect(
+        wrapper.findComponent(codeQueryEditorStub).props("transformGeneratedQuery"),
+      ).toBeUndefined();
+    });
+
+    it("forwards a page's editor id and generated-query transform", () => {
+      const transform = (sql: string) => sql;
+      wrapper = mountQueryEditor({
+        editorId: "traces-query-editor",
+        transformGeneratedQuery: transform,
+      });
+      const editor = wrapper.findComponent(codeQueryEditorStub);
+      expect(editor.props("editorId")).toBe("traces-query-editor");
+      expect(editor.props("transformGeneratedQuery")).toBe(transform);
     });
   });
 

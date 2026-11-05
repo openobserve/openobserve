@@ -5,29 +5,29 @@ on:
     branches:
       - "**"
     types: [synchronize, labeled, ready_for_review, converted_to_draft]
-  # Runs once a labelled PR is approved, then for pushes while the approval stands.
+  # Runs when ready-for-ci is added and when the PR is approved; pushes run only while the approval stands.
   pull_request_review:
     types: [submitted]
 
 concurrency:
-  # A review that is not an approval does nothing, so it must not cancel a running dispatch.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
+  # A non-approval review or an unrelated label does nothing, so it must not cancel a running dispatch.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ ((github.event_name == 'pull_request_review' && github.event.review.state != 'approved') || (github.event.action == 'labeled' && github.event.label.name != 'ready-for-ci')) && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
   GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
-  approval:
+  trigger:
     # reviewDecision of a stacked PR is judged by the stack's merge rules, so it is what the merge will require.
-    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved') }}
+    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && ((github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || (github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'ready-for-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       pull-requests: read
       statuses: read
     outputs:
-      approved: ${{ steps.check.outputs.approved }}
+      dispatch: ${{ steps.check.outputs.dispatch }}
     steps:
       - id: check
         env:
@@ -35,28 +35,35 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          ACTION: ${{ github.event_name == 'pull_request' && github.event.action || '' }}
         run: |
-          DECISION=$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)
-          echo "reviewDecision: $DECISION"
-          APPROVED=false
-          if [ "$DECISION" = "APPROVED" ]; then APPROVED=true; fi
-          # A second approval or an unrelated label must not rebuild a commit the enterprise build already passed.
+          # The job filter leaves only ready-for-ci for labeled; it and ready_for_review dispatch once without an approval.
+          if [ "$ACTION" = "labeled" ] || [ "$ACTION" = "ready_for_review" ]; then
+            echo "Triggered by $ACTION; approval not required."
+            DISPATCH=true
+          else
+            DECISION=$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)
+            echo "reviewDecision: $DECISION"
+            DISPATCH=false
+            if [ "$DECISION" = "APPROVED" ]; then DISPATCH=true; fi
+          fi
+          # A second approval or a re-added label must not rebuild a commit the enterprise build already passed.
           STATUS=$(gh api "repos/$GH_REPO/commits/$SHA/status" --jq '.statuses[] | select(.context == "ent-build-status-check") | "\(.state) \(now - (.updated_at | fromdateiso8601) | floor)"')
           read -r STATE AGE <<< "$STATUS"
-          if [ "$APPROVED" = "true" ] && [ "$STATE" = "success" ]; then
+          if [ "$DISPATCH" = "true" ] && [ "$STATE" = "success" ]; then
             echo "ent-build-status-check already passed on $SHA."
-            APPROVED=false
+            DISPATCH=false
           fi
           # o2-enterprise cancels the older run for a branch, so re-dispatching a SHA still building would restart it; past an hour it is presumed lost.
-          if [ "$APPROVED" = "true" ] && [ "$STATE" = "pending" ] && [ "${AGE:-3600}" -lt 3600 ]; then
+          if [ "$DISPATCH" = "true" ] && [ "$STATE" = "pending" ] && [ "${AGE:-3600}" -lt 3600 ]; then
             echo "ent-build-status-check has been pending on $SHA for ${AGE}s; not re-dispatching."
-            APPROVED=false
+            DISPATCH=false
           fi
-          echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
+          echo "dispatch=$DISPATCH" >> "$GITHUB_OUTPUT"
 
   initiate_enterprise_build:
-    needs: approval
-    if: ${{ needs.approval.outputs.approved == 'true' }}
+    needs: trigger
+    if: ${{ needs.trigger.outputs.dispatch == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -104,7 +111,7 @@ jobs:
         if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         run: echo ${{ env.SHORT_COMMIT_ID }}
 
-      # Posted before the dispatch so it can never overwrite the enterprise result; the approval guard reads it.
+      # Posted before the dispatch so it can never overwrite the enterprise result; the trigger guard reads it.
       - name: Report dispatched
         id: pending
         if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
@@ -127,11 +134,11 @@ jobs:
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
           client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}", "o2_full_commit":"${{env.COMMIT_ID}}", "o2_target_branch": "${{ github.event.pull_request.base.ref }}"}'
-      # A pending left by a dispatch that never went out would make the approval guard skip the next one for an hour.
+      # A pending left by a dispatch that never went out would make the trigger guard skip the next one for an hour.
       - name: Report dispatch failed
         if: ${{ (failure() || cancelled()) && steps.pending.outcome == 'success' && steps.dispatch.outcome != 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_HEAD_SHA" \
-            -f state=error -f context=ent-build-status-check -f description="dispatch to o2-enterprise failed; push or re-approve the PR to retry"
+            -f state=error -f context=ent-build-status-check -f description="dispatch to o2-enterprise failed; re-add ready-for-ci or re-approve the PR to retry"

@@ -147,11 +147,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="tab"
             :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
             :data-test="TAB_TEST_IDS[tab]"
+            :suffix-icon="isCorrelationTab(tab) && correlationLocked ? 'lock' : undefined"
+            :tooltip="
+              isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
+            "
           >
             <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
                 <span>{{ tabLabels.alertTriggers }}</span>
-                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+                <OTag
+                  v-if="!loading"
+                  type="countChip"
+                  value="neutral"
+                  data-test="incident-alert-triggers-count"
+                  >{{ triggers.length }}</OTag
+                >
               </div>
             </template>
           </OTab>
@@ -1197,7 +1207,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Logs Tab Content -->
-              <div v-if="activeTab === 'logs'" class="flex h-full flex-1 flex-col overflow-hidden">
+              <LicenseDeniedState
+                v-if="correlationLocked && isCorrelationTab(activeTab)"
+                :features="['correlation']"
+                data-test="incident-correlation-license-denied"
+              />
+              <div
+                v-else-if="activeTab === 'logs'"
+                class="flex h-full flex-1 flex-col overflow-hidden"
+              >
                 <!-- Loading State -->
                 <div
                   v-if="correlationLoading"
@@ -1278,7 +1296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Metrics Tab Content -->
               <div
-                v-if="activeTab === 'metrics'"
+                v-else-if="activeTab === 'metrics'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Loading State -->
@@ -1359,7 +1377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Traces Tab Content -->
               <div
-                v-if="activeTab === 'traces'"
+                v-else-if="activeTab === 'traces'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Refresh Button (shown when traces data is loaded) -->
@@ -1464,6 +1482,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
+      <LicenseDeniedState
+        v-else-if="licenseDenied"
+        :features="licenseDenied"
+        data-test="incident-detail-license-denied"
+      />
     </OPageLayout>
   </div>
 </template>
@@ -1499,6 +1522,8 @@ import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
@@ -1531,6 +1556,9 @@ import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import BillingService, { type AiCreditCounts } from "@/services/billings";
 import config from "@/aws-exports";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const LS_INCIDENT_TAB_ORDER_KEY = "o2_incident_detail_tab_order";
 const DEFAULT_INCIDENT_TAB_ORDER = [
@@ -1554,6 +1582,12 @@ const TAB_TEST_IDS: Record<IncidentTab, string> = {
   metrics: "incident-metrics-tab",
   traces: "incident-traces-tab",
 };
+
+const CORRELATION_TABS: readonly string[] = ["logs", "metrics", "traces"];
+
+function isCorrelationTab(name: unknown): boolean {
+  return CORRELATION_TABS.includes(name as string);
+}
 
 function isIncidentTab(name: unknown): name is IncidentTab {
   return DEFAULT_INCIDENT_TAB_ORDER.includes(name as IncidentTab);
@@ -1595,6 +1629,7 @@ export default defineComponent({
     OTruncatedText,
     OInlineEdit,
     OBanner,
+    LicenseDeniedState,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
@@ -1629,6 +1664,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const licenseDenied = ref<string[] | null>(null);
     const updating = ref(false);
     // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
@@ -1782,11 +1818,18 @@ export default defineComponent({
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
 
     // Status and Severity options
-    const statusOptions = [
-      { label: t("alerts.incidents.statusOpen"), value: "open" },
+    // Leaving Acknowledged for Open is an Unacknowledge: it clears the ack everywhere and pages again.
+    const statusOptions = computed(() => [
+      {
+        label:
+          editableStatus.value === "acknowledged"
+            ? t("alerts.ack.unacknowledge")
+            : t("alerts.incidents.statusOpen"),
+        value: "open",
+      },
       { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
       { label: t("alerts.incidents.statusResolved"), value: "resolved" },
-    ];
+    ]);
 
     const severityOptions = [
       { label: t("alerts.incidents.severityP1"), value: "P1" },
@@ -1795,6 +1838,8 @@ export default defineComponent({
       { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
 
+    const { locked: correlationLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
     // Telemetry correlation state
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
     const correlationLoading = ref(false);
@@ -2080,7 +2125,7 @@ export default defineComponent({
 
     // Fetch correlated telemetry streams
     const fetchCorrelatedStreams = async (force: boolean = false) => {
-      if (!incidentDetails.value) return;
+      if (!incidentDetails.value || correlationLocked.value) return;
 
       // Skip if already loaded and not forcing refresh
       if (!force && correlationData.value) return;
@@ -2493,6 +2538,7 @@ export default defineComponent({
 
     const loadDetails = async (incidentId: string) => {
       loading.value = true;
+      licenseDenied.value = null;
 
       // Reset correlation state when loading new incident
       correlationData.value = null;
@@ -2524,6 +2570,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("Failed to load incident details:", error);
+        licenseDenied.value = licenseDeniedFeatures(error);
         toast({
           variant: "error",
           message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
@@ -2675,6 +2722,20 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
+    /** The one ack's toast for an acknowledge or unacknowledge; `null` for any other change. */
+    const statusToastOf = (
+      status: "open" | "acknowledged" | "resolved",
+      response:
+        { data?: Incident } | { data?: Incident; ack: AckAlertResponse | UnackAlertResponse },
+    ) =>
+      incidentStatusToast(
+        status,
+        "ack" in response ? response.ack : undefined,
+        incidentDetails.value?.title || incidentDetails.value?.id || "",
+        store.state.userInfo?.email,
+        t,
+      );
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -2682,21 +2743,35 @@ export default defineComponent({
         const response = await updateIncidentStatus.mutateAsync({
           id: incidentDetails.value.id,
           status: newStatus,
+          from: incidentDetails.value.status,
         });
         // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
-        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
-        incidentDetails.value.resolved_at = response.data.resolved_at ?? undefined;
-        incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
-        editableStatus.value = response.data.status;
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
-        });
+        const updated = response.data;
+        if (updated) {
+          incidentDetails.value.status = updated.status;
+          incidentDetails.value.acknowledged_by = updated.acknowledged_by;
+          incidentDetails.value.acknowledged_at = updated.acknowledged_at;
+          incidentDetails.value.resolved_at = updated.resolved_at ?? undefined;
+          incidentDetails.value.updated_at = updated.updated_at || Date.now() * 1000;
+          editableStatus.value = updated.status;
+        } else {
+          // The write stood but its read-back failed: read the incident again.
+          void loadDetails(incidentDetails.value.id);
+        }
+        toast(
+          statusToastOf(newStatus, response) ?? {
+            variant: "success",
+            message: t("alerts.incidents.statusUpdated"),
+          },
+        );
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch("incidents/setShouldRefresh", true);
         emit("status-updated");
+        // The one ack stopped or restarted the incident's pages; the write expired their read.
+        void loadOnCallResponse(
+          store.state.selectedOrganization.identifier,
+          incidentDetails.value.id,
+        );
 
         // Refresh events in timeline if Activity tab is active
         if (activeTab.value === "activity") {
@@ -2709,10 +2784,12 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
       } finally {
         updating.value = false;
       }
@@ -2966,7 +3043,7 @@ export default defineComponent({
               message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
             await reloadRca();
-          } else {
+          } else if (store.state.zoConfig?.incidents_rca_enabled === true) {
             const reanalysisCost = aiCreditCosts.value?.incident_reanalysis;
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
@@ -3054,6 +3131,7 @@ export default defineComponent({
     };
 
     return {
+      licenseDenied,
       mutedBannerText,
       openMutingDowntime,
       raw,
@@ -3136,6 +3214,9 @@ export default defineComponent({
       alertActivityChartData,
       getSemanticGroupDisplayName,
       refreshCorrelation,
+      correlationLocked,
+      correlationLockedReason,
+      isCorrelationTab,
       close,
       handleSendToAiChat,
       acknowledgeIncident,

@@ -42,8 +42,9 @@ import type {
   Contact,
   RefusalReason,
   VerificationRefusalBody,
+  TestPageResult,
 } from "@/ts/interfaces/oncall";
-import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
+import { PROMOTE_SEVERITIES, RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import {
   MICROS_PER_DAY,
   MICROS_PER_HOUR,
@@ -204,6 +205,7 @@ export function priorityTone(priority: number): RowRailTone {
 /** Whether a channel reaches a locked, silenced phone: texts and calls do; email and webhook land in apps a night-mode phone does not ring for. */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
+  slack: false,
   sms: true,
   voice: true,
   webhook: false,
@@ -301,12 +303,21 @@ export function isDeletedTeam(
   return !!teamId && knownTeamIds !== null && !knownTeamIds.includes(teamId);
 }
 
+/** A ringing page whose ladder stopped, or whose team was deleted, pages nobody; a ladder that ran out also sets `stopped_because` but is still paging. [pure] */
+export function ladderStopped(
+  progress: EscalationProgress | null | undefined,
+  teamDeleted: boolean,
+): boolean {
+  return teamDeleted || (!!progress?.stopped_because && !progress?.exhausted);
+}
+
 /** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
 export type PagePhrase =
   | { kind: "resolved"; afterMicros: number | null }
   | { kind: "acknowledged"; by: string }
   | { kind: "snoozed"; until: number }
   | { kind: "nobodyAnswered" }
+  | { kind: "nobodyPaged" }
   | { kind: "held"; secondsLeft: number }
   | { kind: "pagesNobody" }
   | { kind: "unknown" }
@@ -330,6 +341,7 @@ export function pagePhrase(input: {
   progressLoaded: boolean;
   totalRungs?: number | null;
   reachedStep?: number | null;
+  teamDeleted?: boolean;
   nowMicros: number;
 }): PagePhrase {
   const { record, progress, nowMicros } = input;
@@ -345,6 +357,7 @@ export function pagePhrase(input: {
   // Before the exhausted check: the server flags an empty ladder exhausted, and nobody can fail to answer it.
   if (input.totalRungs === 0) return { kind: "pagesNobody" };
   if (pageState(record, progress) === "exhausted") return { kind: "nobodyAnswered" };
+  if (ladderStopped(progress, !!input.teamDeleted)) return { kind: "nobodyPaged" };
   const heldUntil = progress?.held_until_micros;
   if (heldUntil && heldUntil > nowMicros) {
     return { kind: "held", secondsLeft: Math.ceil((heldUntil - nowMicros) / 1_000_000) };
@@ -356,8 +369,10 @@ export function pagePhrase(input: {
     return { kind: "unknown" };
   }
   const step = progress ? progress.fired.length : (input.reachedStep ?? 0);
-  if (!step) return { kind: "notPaged" };
   const total = input.totalRungs ?? null;
+  // A restarted ladder's first rung is due before the scheduler sends it; that is paging, not "not paged".
+  const due = !!progress?.next_at && progress.next_at <= nowMicros;
+  if (!step) return due ? { kind: "paging", step: 1, total, who: [] } : { kind: "notPaged" };
   const last = progress?.fired[progress.fired.length - 1];
   if (last?.reached_nobody) return { kind: "reachedNobody", step, total };
   return { kind: "paging", step, total, who: last?.reached ?? [] };
@@ -525,6 +540,8 @@ export function shortReachReason(
   // Matched on the distinctive noun, not the whole sentence: the engine has
   // reworded these before, and a near-miss must degrade to the sentence rather
   // than to silence.
+  // Before "smtp": the From sentence names `ZO_SMTP_FROM_EMAIL`, which contains it.
+  if (said.includes("zo_smtp_from_email")) return t("oncall.reachShortNoFromAddress");
   if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
   if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
   if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
@@ -567,7 +584,7 @@ export function rungProblem(
 }
 
 /// The order a priority's channels are said in, whatever order they are stored in.
-const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+const CHANNEL_ORDER: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 /** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
 export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
@@ -709,7 +726,7 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
 }
 
 /** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email", "sms", "voice", "webhook"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);
@@ -1085,6 +1102,17 @@ export function shiftBoundary(rule: ShiftRule, index: number, timezone: string):
   return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
 }
 
+/** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
+export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
+  return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
+}
+
+/** How many shifts before `rule`'s anchor the shift containing `nowMicros` starts; zero or negative once the anchor has passed. [pure] */
+export function shiftsBackToNow(rule: ShiftRule, nowMicros: number, timezone: string): number {
+  if (!rule.shift_micros || rule.shift_micros <= 0) return 0;
+  return -localShiftIndex(rule, nowMicros, timezone);
+}
+
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
 function isCountable(rule: ShiftRule): boolean {
   return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;
@@ -1318,14 +1346,16 @@ export function stopConsequence(
   return { takers, gap: spansOf(minutes) };
 }
 
-/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+/** Whether the server refuses `a` and `b` side by side: identical windows, or tied keys with hours and validity that meet. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
   const right = b.restrictions ?? [];
+  if ((a.priority ?? 0) !== (b.priority ?? 0) || left.length !== right.length) return false;
+  if (left.every((w, i) => sameWindow(w, right[i]))) return true;
   return (
-    (a.priority ?? 0) === (b.priority ?? 0) &&
-    left.length === right.length &&
-    left.every((w, i) => sameWindow(w, right[i]))
+    a.anchor_micros === b.anchor_micros &&
+    validityMeets(a, b) &&
+    spansMeet(weekCoverage(a), weekCoverage(b))
   );
 }
 
@@ -1406,6 +1436,13 @@ function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
   );
 }
 
+/** Whether the two rules' `[starts_at, ends_at)` validity periods intersect; a missing bound is open. */
+function validityMeets(a: ShiftRule, b: ShiftRule): boolean {
+  const start = Math.max(a.starts_at ?? -Infinity, b.starts_at ?? -Infinity);
+  const end = Math.min(a.ends_at ?? Infinity, b.ends_at ?? Infinity);
+  return start < end;
+}
+
 /** The team-local minutes of the week a rule covers, as `[start, end)` spans. */
 function weekCoverage(rule: ShiftRule): Array<[number, number]> {
   const windows = rule.restrictions ?? [];
@@ -1467,6 +1504,58 @@ export function formatInZone(
     return new Intl.DateTimeFormat(locale, { ...opts, timeZone: timezone }).format(date);
   } catch {
     return new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(date);
+  }
+}
+
+const RANGE_END_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+/** `Thu 5 Nov, 05:30 → Fri 6 Nov, 05:30` on one clock, with that clock's short name once at the end when `withZone`. [pure] */
+export function formatZonedRange(
+  from: number,
+  to: number,
+  timezone: string,
+  withZone = false,
+  locale?: string,
+): string {
+  const range = `${formatInZone(from, timezone, RANGE_END_OPTS, locale)} → ${formatInZone(to, timezone, RANGE_END_OPTS, locale)}`;
+  if (!withZone) return range;
+  try {
+    const zoneName = new Intl.DateTimeFormat(locale, { timeZone: timezone, timeZoneName: "short" })
+      .formatToParts(new Date(to / 1000))
+      .find((part) => part.type === "timeZoneName")?.value;
+    return zoneName ? `${range} ${zoneName}` : range;
+  } catch {
+    return range;
+  }
+}
+
+const DAY_RANGE_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+};
+
+/** `Sat 7 – Mon 9 Nov` on one clock; `to` is exclusive, so the range names the last day it holds. [pure] */
+export function formatDayRange(
+  from: number,
+  to: number,
+  timezone: string,
+  locale?: string,
+): string {
+  const last = Math.max(from, to - 1);
+  try {
+    return new Intl.DateTimeFormat(locale, { ...DAY_RANGE_OPTS, timeZone: timezone }).formatRange(
+      new Date(from / 1000),
+      new Date(last / 1000),
+    );
+  } catch {
+    return `${formatInZone(from, timezone, DAY_RANGE_OPTS, locale)} – ${formatInZone(last, timezone, DAY_RANGE_OPTS, locale)}`;
   }
 }
 
@@ -1611,7 +1700,7 @@ function windowWords(window: TimeWindow, t: TranslateFn): string {
   const everyDay = new Set(window.days ?? []).size % 7 === 0;
   const days = everyDay ? t("oncall.ruleHoursEveryDay") : describeDays(window.days, t);
   const { start_minute: start, end_minute: end } = window;
-  if (start === 0 && end === MINUTES_PER_DAY) return t("oncall.restrictionWindowAllDay", { days });
+  if (start === 0 && end === MINUTES_PER_DAY) return t("oncall.ruleHoursDaysAllDay", { days });
   const key = end < start ? "oncall.ruleHoursWindowNextDay" : "oncall.restrictionWindow";
   return t(key, { days, from: formatMinuteOfDay(start), to: formatMinuteOfDay(end) });
 }
@@ -1902,6 +1991,68 @@ export function identityDimensions(dimensions: Record<string, string>): Record<s
   );
 }
 
+/** What a rule written from a signal pins: its identity dimensions, or everything when it carries none. */
+export function claimableDimensions(dimensions: Record<string, string>): Record<string, string> {
+  const kept = identityDimensions(dimensions ?? {});
+  return Object.keys(kept).length ? kept : { ...(dimensions ?? {}) };
+}
+
+/** A field as a person names it, sentence case: `k8s-namespace` or "K8s Namespace" read "K8s namespace". */
+export function fieldLabel(id: string, aliases: { id: string; display?: string }[] = []): string {
+  const base = aliases.find((alias) => alias.id === id)?.display || id.replace(/[-_]+/g, " ");
+  const words = base.trim().split(/\s+/).filter(Boolean);
+  return words
+    .map((word, index) => {
+      if (!index) return word.charAt(0).toUpperCase() + word.slice(1);
+      // Acronyms (AWS, ID) and tokens with digits (K8s) keep their casing.
+      if (/\d/.test(word) || (word.length > 1 && word === word.toUpperCase())) return word;
+      return word.toLowerCase();
+    })
+    .join(" ");
+}
+
+/** Conditions as prose, "K8s namespace prod and Service starts with api"; the words come from the caller's `t`. */
+export function readableConditions(
+  dimensions: Record<string, string>,
+  aliases: { id: string; display?: string }[],
+  words: { and: string; startsWith: (field: string) => string },
+): string {
+  return Object.keys(dimensions ?? {})
+    .sort()
+    .map((name) => {
+      const value = String(dimensions[name]);
+      const label = fieldLabel(name, aliases);
+      return value.endsWith("*")
+        ? `${words.startsWith(label)} ${value.slice(0, -1)}`
+        : `${label} ${value}`;
+    })
+    .join(` ${words.and} `);
+}
+
+/** One concrete alert a rule's conditions describe: a `starts with` value is read as the prefix itself. */
+export function literalDimensions(dimensions: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(dimensions ?? {}).map(([name, value]) => [
+      name,
+      value.endsWith("*") ? value.slice(0, -1) : value,
+    ]),
+  );
+}
+
+/** Every field a rule could pin here: what the org emits, what the unowned signals carry and what rules already use. */
+export function routingFieldIds(
+  present: string[],
+  signals: { dimensions?: Record<string, string> }[],
+  rules: { dimensions?: Record<string, string> }[],
+): string[] {
+  const ids = new Set(present);
+  signals.forEach((signal) =>
+    Object.keys(claimableDimensions(signal.dimensions ?? {})).forEach((id) => ids.add(id)),
+  );
+  rules.forEach((rule) => Object.keys(rule.dimensions ?? {}).forEach((id) => ids.add(id)));
+  return [...ids];
+}
+
 /**
  * The severity a promotion derives when the caller sends none — the record's
  * own priority, with P5 folded into P4 because the incident scale has no P5.
@@ -1948,6 +2099,22 @@ export function isOnCallUnavailable(err: unknown): boolean {
   if (!response) return false;
   if (response.status === 404) return true;
   return response.status === 403 && /not supported/i.test(response.data?.message ?? "");
+}
+
+type ApiErrorShape = { response?: { status?: number; data?: { message?: string } } } | null;
+
+/// The server's own message for a failed request; `undefined` when it sent none.
+export function apiErrorMessage(err: unknown): string | undefined {
+  return (err as ApiErrorShape)?.response?.data?.message;
+}
+
+/// What a load-error panel says: the server's message, else the client error's.
+export function apiErrorText(err: unknown): string {
+  return String(apiErrorMessage(err) ?? (err instanceof Error ? err.message : ""));
+}
+
+export function apiErrorStatus(err: unknown): number | undefined {
+  return (err as ApiErrorShape)?.response?.status;
 }
 
 /// ── A date+time picker in somebody else's timezone ─────────────────────────
@@ -2066,6 +2233,40 @@ export function zonedMidnight(micros: number, timezone: string, days = 0): numbe
   return offsetChangeAt(midnight, jumpedTo, timezone);
 }
 
+/** A shift's span in one format: days alone when both ends fall on the team's midnight, else days with times. [pure] */
+export function formatShiftRange(
+  from: number,
+  to: number,
+  timezone: string,
+  locale?: string,
+): string {
+  const midnight = (micros: number) => toZonedInputValue(micros, timezone).endsWith("T00:00");
+  if (midnight(from) && midnight(to)) return formatDayRange(from, to, timezone, locale);
+  const opts: Intl.DateTimeFormatOptions = {
+    ...DAY_RANGE_OPTS,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+  try {
+    return new Intl.DateTimeFormat(locale, { ...opts, timeZone: timezone }).formatRange(
+      new Date(from / 1000),
+      new Date(to / 1000),
+    );
+  } catch {
+    return `${formatInZone(from, timezone, opts, locale)} – ${formatInZone(to, timezone, opts, locale)}`;
+  }
+}
+
+/** Next Monday 00:00 to the Monday after, on `timezone`'s calendar; on a Monday it is the coming one. [pure] */
+export function nextWeekRange(now: number, timezone: string): { from: number; to: number } {
+  const weekday = anchorWeekdayTime(now, timezone).weekday;
+  return {
+    from: zonedMidnight(now, timezone, 7 - weekday),
+    to: zonedMidnight(now, timezone, 14 - weekday),
+  };
+}
+
 /**
  * The activity feed's default view: what a person did, and what the ladder
  * did that changed who got woken. Engine bookkeeping (`sys`, `state`,
@@ -2083,6 +2284,241 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "severity_promoted",
   "flapped",
 ];
+
+/** How the engine's give-up line opens; twin of escalation.rs `GAVE_UP_MARKER`. */
+const GAVE_UP_MARKER = "nothing could be delivered to this rung";
+
+/** Whether a page that reached nobody is still retried: not once the engine gave up on its run and rung. [pure] */
+export function rungStillRetrying(
+  page: OnCallResponseEvent,
+  events: OnCallResponseEvent[],
+): boolean {
+  if (page.kind !== "page" || page.delivered !== false) return false;
+  const run = page.ladder_run ?? 1;
+  return !events.some(
+    (e) =>
+      e.kind === "sys" &&
+      (e.ladder_run ?? 1) === run &&
+      (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
+      e.body.startsWith(GAVE_UP_MARKER),
+  );
+}
+
+/** What a timeline line needs from the page to say names instead of ids. */
+export interface TimelineContext {
+  nameOf: (email: string) => string;
+  teamNameOf: (teamId: string) => string | null;
+}
+
+/** The engine's sentence for an automatic close, which repeats the recovery line before it. */
+const AUTO_RESOLVED_BODY = "resolved: recovered automatically";
+
+/** Drops a recovery line that the automatic-resolve line right after it already says. [pure] */
+export function mergeTimelineEvents(events: OnCallResponseEvent[]): OnCallResponseEvent[] {
+  return events.filter((event, index) => {
+    if (event.kind !== "recovery") return true;
+    return !events
+      .slice(index + 1)
+      .some(
+        (later) =>
+          later.kind === "state" &&
+          later.body === AUTO_RESOLVED_BODY &&
+          (later.ladder_run ?? 1) === (event.ladder_run ?? 1),
+      );
+  });
+}
+
+const KSUID_PATTERN = /\b[0-9A-Za-z]{27}\b/g;
+const EMAIL_PATTERN = /[^\s,;:()]+@[^\s,;:()]+\.[^\s,;:()]+/g;
+
+/** Emails as names and known team ids as team names, then a capital first letter. [pure] */
+function humanizeBody(body: string, ctx: TimelineContext): string {
+  const named = body
+    .replace(EMAIL_PATTERN, (email) => ctx.nameOf(email))
+    .replace(KSUID_PATTERN, (id) => ctx.teamNameOf(id) ?? id);
+  return named.charAt(0).toUpperCase() + named.slice(1);
+}
+
+/** A team the line names by id or name; an id nobody can resolve any more belongs to a deleted team. [pure] */
+function teamLabel(idOrName: string, ctx: TimelineContext, t: TranslateFn): I18nText {
+  const name = ctx.teamNameOf(idOrName);
+  if (name) return raw(name);
+  return /^[0-9A-Za-z]{27}$/.test(idOrName) ? t("oncall.tlDeletedTeam") : raw(idOrName);
+}
+
+function namesOf(list: string, ctx: TimelineContext): string {
+  return list
+    .split(", ")
+    .map((who) => ctx.nameOf(who.trim()))
+    .join(", ");
+}
+
+function causeLabel(cause: string, t: TranslateFn): string {
+  return (RESOLUTION_CAUSES as readonly string[]).includes(cause)
+    ? String(t(`oncall.cause_${cause as (typeof RESOLUTION_CAUSES)[number]}`))
+    : cause;
+}
+
+function pageLine(body: string, ctx: TimelineContext, t: TranslateFn): I18nText | null {
+  if (body === "paged nobody") return t("oncall.tlPagedNobody");
+  let m = body.match(/^nobody matched whoever is on call in (.+)$/);
+  if (m) return t("oncall.tlSeatEmpty", { rotation: raw(m[1]) });
+  m = body.match(/^nobody matched everyone on (.+)$/);
+  if (m) return t("oncall.tlRotationEmpty", { rotation: raw(m[1]) });
+  if (body.startsWith("nobody matched")) return t("oncall.tlNobodyMatched");
+  m = body.match(/^paged (.+) \((.+) unreachable\)$/);
+  if (m) {
+    return t("oncall.tlPagedSome", {
+      who: raw(namesOf(m[1], ctx)),
+      failed: raw(namesOf(m[2], ctx)),
+    });
+  }
+  m = body.match(/^paged (.+)$/);
+  if (m) return t("oncall.tlPaged", { who: raw(namesOf(m[1], ctx)) });
+  m = body.match(/^could not reach (.+)$/);
+  if (m) return t("oncall.tlCouldNotReach", { who: raw(namesOf(m[1], ctx)) });
+  return null;
+}
+
+function stateLine(body: string, t: TranslateFn): I18nText | null {
+  if (body === AUTO_RESOLVED_BODY) return t("oncall.tlAutoResolved");
+  if (body === "resolved") return t("oncall.tlResolved");
+  let m = body.match(/^resolved — ([a-z_]+): (.+)$/);
+  if (m)
+    return t("oncall.tlResolvedCauseNote", { cause: raw(causeLabel(m[1], t)), note: raw(m[2]) });
+  m = body.match(/^resolved — ([a-z_]+)$/);
+  if (m) return t("oncall.tlResolvedCause", { cause: raw(causeLabel(m[1], t)) });
+  m = body.match(/^resolved: (.+)$/);
+  if (m) return t("oncall.tlResolvedNote", { note: raw(m[1]) });
+  return null;
+}
+
+function sysLine(body: string, ctx: TimelineContext, t: TranslateFn): I18nText | null {
+  let m = body.match(/^opened for [a-z_]+\/\S+#(\d+): /);
+  if (m) return t("oncall.tlOpened", { n: Number(m[1]) });
+  m = body.match(/^routed to (.+?) by ownership rule (.+)$/);
+  if (m) return t("oncall.tlRoutedByRule", { team: teamLabel(m[1], ctx, t), rule: raw(m[2]) });
+  m = body.match(/^routed to (.+?) by the alert's own setting$/);
+  if (m) return t("oncall.tlRoutedByAlert", { team: teamLabel(m[1], ctx, t) });
+  m = body.match(/so it went to the default team (\S+)$/);
+  if (m) {
+    const team = teamLabel(m[1], ctx, t);
+    const covers = body.match(/^no ownership rule covers (.+?); /);
+    if (covers) return t("oncall.tlDefaultTeamFor", { dims: raw(covers[1]), team });
+    return t("oncall.tlDefaultTeam", { team });
+  }
+  m = body.match(
+    /^nothing in the service graph calls (.+), so no other team is downstream of this$/,
+  );
+  if (m) return t("oncall.tlNoDownstream", { service: raw(m[1]) });
+  if (body.startsWith("triage budget expired")) return t("oncall.tlTriageTimedOut");
+  m = body.match(/^escalated on request by (.+)$/);
+  if (m) return t("oncall.tlEscalatedBy", { who: raw(ctx.nameOf(m[1])) });
+  m = body.match(/^snoozed for (\d+) min/);
+  if (m) return t("oncall.tlSnoozed", { n: Number(m[1]) });
+  return null;
+}
+
+/** One timeline event as a plain sentence; unknown wording falls back to the server's text with names swapped in. [pure] */
+export function timelineSentence(
+  event: Pick<OnCallResponseEvent, "kind" | "body">,
+  ctx: TimelineContext,
+  t: TranslateFn,
+): I18nText {
+  const body = event.body.trim();
+  let line: I18nText | null = null;
+  switch (event.kind) {
+    case "page":
+      line = pageLine(body, ctx, t);
+      break;
+    case "ack": {
+      // The actor already leads the line, so the sentence starts at the verb.
+      const takeover = body.match(/ acknowledged, taking over from (.+)$/);
+      if (takeover) line = t("oncall.tlAckedTakeover", { from: raw(ctx.nameOf(takeover[1])) });
+      else if (/acknowledged$/.test(body)) line = t("oncall.tlAcked");
+      break;
+    }
+    case "handoff": {
+      const m = body.match(/^.+? handed off to (.+?)(?:: (.+))?$/);
+      if (m) {
+        const to = raw(ctx.nameOf(m[1]));
+        line = m[2]
+          ? t("oncall.tlHandedOffNote", { to, note: raw(m[2]) })
+          : t("oncall.tlHandedOff", { to });
+      }
+      break;
+    }
+    case "state":
+      line = stateLine(body, t);
+      break;
+    case "recovery":
+      line = body === "the alert stopped firing" ? t("oncall.tlAlertStopped") : null;
+      break;
+    case "exhausted":
+      line = t("oncall.tlExhausted");
+      break;
+    case "sys":
+      line = sysLine(body, ctx, t);
+      break;
+    case "severity_promoted": {
+      const m = body.match(/^severity promoted (P\d) → (P\d): (.+)$/s);
+      if (m) line = t("oncall.tlPromoted", { from: raw(m[1]), to: raw(m[2]), why: raw(m[3]) });
+      break;
+    }
+  }
+  return line ?? raw(humanizeBody(body, ctx));
+}
+
+/** Clock time, plus how long after the page opened from the first minute on: "14:39 · +2m". [pure] */
+export function timelineStamp(
+  atMicros: number,
+  openedAtMicros: number | null,
+  nowMicros: number,
+  zone: string,
+): string {
+  const clock = formatOnCallInstant(atMicros, nowMicros, zone);
+  if (openedAtMicros === null) return clock;
+  const offset = atMicros - openedAtMicros;
+  if (offset < MICROS_PER_MINUTE) return clock;
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  // The opening line carries the date; a later line on the same day only needs its clock.
+  const sameDay = day(atMicros) === day(openedAtMicros);
+  const time = sameDay ? formatTimestampInTimezone(atMicros, "HH:mm", zone) : clock;
+  return `${time} · +${formatMicrosDurationShort(offset)}`;
+}
+
+/** Whole units only, so an offset stays short beside a clock time. [pure] */
+function formatMicrosDurationShort(micros: number): string {
+  const minutes = Math.floor(micros / MICROS_PER_MINUTE);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return hours % 24 ? `${days}d ${hours % 24}h` : `${days}d`;
+}
+
+/** A test page's outcome as one toast, and whether any send actually landed. [pure] */
+export function testPageOutcome(
+  result: TestPageResult | null | undefined,
+  t: TranslateFn,
+): { landed: boolean; variant: "success" | "warning"; message: I18nText } {
+  const attempts = result?.attempts ?? [];
+  const sent = attempts.filter((attempt) => attempt.delivered).length;
+  if (result?.reached_anyone && sent > 0) {
+    return {
+      landed: true,
+      variant: sent === attempts.length ? "success" : "warning",
+      message: t("oncall.testPageSentOf", { sent, total: attempts.length }, attempts.length),
+    };
+  }
+  return {
+    landed: false,
+    variant: "warning",
+    message: t("oncall.testPageNobody", {
+      reason: raw(result?.not_sent_because) || t("oncall.wouldPageNobody"),
+    }),
+  };
+}
 
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
 export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";
@@ -2207,3 +2643,6 @@ export function formatCountdown(secs: number): string {
   if (hours > 0) return `${hours}:${pad(minutes)}:${pad(s % 60)}`;
   return `${minutes}:${pad(s % 60)}`;
 }
+
+/** Pins a start picker's dropdown to its field, so long condition rows fit chips to that width instead of stretching it. */
+export const START_PICKER_DROPDOWN_STYLE = { width: "var(--reka-popover-trigger-width)" };

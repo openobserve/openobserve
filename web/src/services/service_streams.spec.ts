@@ -23,6 +23,7 @@ import serviceStreams, {
   type FieldAlias,
 } from "@/services/service_streams";
 import http from "@/services/http";
+import store from "@/stores";
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -91,8 +92,8 @@ describe("service_streams service", () => {
 
   // -------------------------------------------------------------------------
   describe("getSemanticGroups", () => {
-    it("calls GET /api/{org}/alerts/deduplication/semantic-groups", () => {
-      getSemanticGroups(ORG);
+    it("calls GET /api/{org}/alerts/deduplication/semantic-groups", async () => {
+      await getSemanticGroups(ORG);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${ORG}/alerts/deduplication/semantic-groups`,
@@ -100,8 +101,8 @@ describe("service_streams service", () => {
       );
     });
 
-    it("forwards silentForbidden to the request config", () => {
-      getSemanticGroups(ORG, { silentForbidden: true });
+    it("forwards silentForbidden to the request config", async () => {
+      await getSemanticGroups(ORG, { silentForbidden: true });
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${ORG}/alerts/deduplication/semantic-groups`,
@@ -109,19 +110,17 @@ describe("service_streams service", () => {
       );
     });
 
-    it("calls GET exactly once", () => {
-      getSemanticGroups(ORG);
+    it("calls GET exactly once", async () => {
+      await getSemanticGroups(ORG);
 
       expect(mockHttpInstance.get).toHaveBeenCalledTimes(1);
     });
 
-    it("returns the promise from http().get", () => {
-      const expected = Promise.resolve({ data: [] });
-      mockHttpInstance.get.mockReturnValue(expected);
+    it("resolves with the http().get response", async () => {
+      const expected = { data: [{ id: "host" }] };
+      mockHttpInstance.get.mockResolvedValue(expected);
 
-      const result = getSemanticGroups(ORG);
-
-      expect(result).toBe(expected);
+      await expect(getSemanticGroups(ORG)).resolves.toBe(expected);
     });
 
     it("propagates rejection from http().get", async () => {
@@ -130,8 +129,24 @@ describe("service_streams service", () => {
       await expect(getSemanticGroups(ORG)).rejects.toThrow("not found");
     });
 
-    it("works when called via the default export", () => {
-      serviceStreams.getSemanticGroups(ORG);
+    it.each([
+      ["locked", 0],
+      ["enabled", 1],
+      ["hidden", 1],
+    ])("a %s alerts license makes %i request(s)", async (state, calls) => {
+      const original = store.state.zoConfig;
+      store.state.zoConfig = { ...original, features: { alerts: state } };
+      try {
+        const result = await getSemanticGroups(ORG);
+        expect(mockHttpInstance.get).toHaveBeenCalledTimes(calls);
+        if (!calls) expect(result).toEqual({ data: [] });
+      } finally {
+        store.state.zoConfig = original;
+      }
+    });
+
+    it("works when called via the default export", async () => {
+      await serviceStreams.getSemanticGroups(ORG);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${ORG}/alerts/deduplication/semantic-groups`,
@@ -240,8 +255,8 @@ describe("service_streams service", () => {
 
   // -------------------------------------------------------------------------
   describe("org_identifier scoping", () => {
-    it("getSemanticGroups uses the provided org in the URL", () => {
-      getSemanticGroups("acme-corp");
+    it("getSemanticGroups uses the provided org in the URL", async () => {
+      await getSemanticGroups("acme-corp");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/acme-corp/alerts/deduplication/semantic-groups",

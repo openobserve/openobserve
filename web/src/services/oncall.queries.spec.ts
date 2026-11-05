@@ -17,18 +17,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import {
+  addTeamMembersMutation,
+  applySchedulePresetMutation,
   confirmCodeMutation,
   contactQuery,
+  createOverrideMutation,
   createOwnershipRuleMutation,
+  deleteOverrideMutation,
   deleteOwnershipRuleMutation,
   deleteTelephonyMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
   responsesQuery,
   routingConfigQuery,
+  removeTeamMemberMutation,
   saveTelephonyMutation,
   setContactMutation,
+  setTeamChannelMutation,
+  setTeamPolicyMutation,
+  setTeamScheduleMutation,
+  teamContextQuery,
   telephonyQuery,
+  testTeamSlackChannelMutation,
   updateOwnershipRuleMutation,
   updateTeamMutation,
 } from "./oncall.queries";
@@ -41,6 +51,8 @@ vi.mock("./oncall", () => ({
     listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }),
     getRoutingConfig: vi.fn().mockResolvedValue({ data: { default_team_id: "t1" } }),
     listResponses: vi.fn().mockResolvedValue({ data: [{ id: "r1" }] }),
+    setTeamChannel: vi.fn().mockResolvedValue({ data: {} }),
+    testTeamSlackChannel: vi.fn().mockResolvedValue({ data: {} }),
   },
 }));
 
@@ -120,6 +132,31 @@ describe("editing a team", () => {
     ]) {
       expect(scopes).toContainEqual(key);
     }
+  });
+});
+
+describe("the Pages list's team context", () => {
+  beforeEach(() => queryClient.clear());
+
+  // One entry for many teams, so it sits outside every per-team prefix those writes drop.
+  it.each([
+    ["a policy write", setTeamPolicyMutation],
+    ["a schedule write", setTeamScheduleMutation],
+    ["a schedule preset", applySchedulePresetMutation],
+    ["an override", createOverrideMutation],
+    ["an override removal", deleteOverrideMutation],
+    ["adding members", addTeamMembersMutation],
+    ["removing a member", removeTeamMemberMutation],
+    ["a channel write", setTeamChannelMutation],
+  ])("is marked stale by %s", async (_, mutation) => {
+    const key = teamContextQuery(ORG, ["t1", "t2"], true).queryKey;
+    queryClient.setQueryData(key, []);
+
+    for (const scope of mutation(ORG, "t1").meta?.invalidates ?? []) {
+      await queryClient.invalidateQueries({ queryKey: scope, refetchType: "none" });
+    }
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
   });
 });
 
@@ -214,5 +251,34 @@ describe("the org's phone provider", () => {
   // The save carries the plaintext token, so its mutation must not outlive the dialog.
   it("drops a save from the mutation cache as soon as nothing observes it", () => {
     expect(saveTelephonyMutation(ORG).gcTime).toBe(0);
+  });
+});
+
+describe("the team's Slack channel", () => {
+  // The Slack fields ride in the same PUT as the destinations; an omitted same-room destination keeps it.
+  it("sends the body whole and re-reads the team", async () => {
+    const mutation = setTeamChannelMutation(ORG, "t1");
+    const body = { destinations: null, slack_same_room_destination: "" };
+    await mutation.mutationFn!(body, undefined as any);
+
+    expect(oncallService.setTeamChannel).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      team_id: "t1",
+      data: body,
+    });
+    expect(mutation.meta?.invalidates).toContainEqual(oncallKeys.team(ORG, "t1"));
+  });
+
+  // RO-6: the test writes no row, so it expires nothing; the card renders its own refusals.
+  it("tests the channel without expiring anything", async () => {
+    const mutation = testTeamSlackChannelMutation(ORG, "t1");
+    await mutation.mutationFn!(undefined, undefined as any);
+
+    expect(oncallService.testTeamSlackChannel).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      team_id: "t1",
+    });
+    expect(mutation.meta?.invalidates).toBeUndefined();
+    expect(mutation.meta?.silentError).toBe(true);
   });
 });

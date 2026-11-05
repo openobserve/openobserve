@@ -30,6 +30,7 @@ vi.mock("@/composables/rum/useStepOptions", async (importOriginal) => {
 
 import { resetStepOptions } from "@/utils/rum/__fixtures__/stepOptionsMock";
 import FunnelLayoutRail from "./FunnelLayoutRail.vue";
+import FunnelStepsTable from "../../funnelParts/FunnelStepsTable.vue";
 
 const store = createStore({
   state: { selectedOrganization: { identifier: "org1" }, timezone: "UTC", zoConfig: {} },
@@ -96,10 +97,6 @@ describe("FunnelLayoutRail", () => {
         includeHidden: false,
         filterFields: ["geo_info_country"],
         filterValues: { field: null, status: "idle", rows: [] },
-        settings: [
-          { id: "unit", label: "Count by" as never, value: "Sessions" as never },
-          { id: "window", label: "Window" as never, value: "Same session" as never },
-        ],
         ...extra,
       },
       global: {
@@ -107,7 +104,8 @@ describe("FunnelLayoutRail", () => {
         stubs: {
           VueDraggableNext: draggableStub,
           OPopover: popoverStub,
-          ODropdown: popoverStub,
+          ODropdown: { ...popoverStub },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           StepPicker: true,
         },
       },
@@ -140,10 +138,43 @@ describe("FunnelLayoutRail", () => {
       "App filters for web",
     );
     expect(w.find('[data-test="rum-analytics-funnel-app-filters-none"]').exists()).toBe(true);
-    expect(w.find('[data-test="rum-analytics-funnel-rail-setting-window"]').text()).toContain(
-      "Same session",
-    );
     expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+  });
+
+  it("has no Settings row, since unit, window and breakdown are all on screen elsewhere", () => {
+    const w = mountRail();
+    expect(w.find('[data-test="rum-analytics-funnel-rail-settings"]').exists()).toBe(false);
+    expect(w.find("aside").text()).not.toContain("Settings");
+  });
+
+  it("forwards a step row's trend-from-step to the page", async () => {
+    const w = mountRail();
+    w.findComponent(FunnelStepsTable).vm.$emit("trend-from-step", 1);
+    await w.vm.$nextTick();
+    expect(w.emitted("trend-from-step")).toEqual([[1]]);
+  });
+
+  it("renders the breakdown slot as the rail's first section, above Filter all steps", () => {
+    const base = mountRail();
+    const props = base.props() as never;
+    base.unmount();
+    wrapper = mount(FunnelLayoutRail, {
+      props,
+      slots: { breakdown: "<div data-test='b' />" },
+      global: {
+        plugins: [store],
+        stubs: { VueDraggableNext: { template: "<div><slot /></div>" } },
+      },
+    });
+    const sections = wrapper.find('[data-test="rum-analytics-funnel-rail-sections"]');
+    const ids = sections
+      .findAll("[data-test]")
+      .map((e) => e.attributes("data-test"))
+      .filter((id) => ["b", "rum-analytics-funnel-filter-all"].includes(id!));
+    expect(ids).toEqual(["b", "rum-analytics-funnel-filter-all"]);
+    expect(
+      wrapper.find('[data-test="rum-analytics-funnel-card"]').find("[data-test='b']").exists(),
+    ).toBe(false);
   });
 
   it("a page step's filter button opens its conditions and emits update:def", async () => {
@@ -160,10 +191,11 @@ describe("FunnelLayoutRail", () => {
     expect(def.steps[0].f).toEqual({ frustrated: true, errored: true });
   });
 
-  it("a click step has no condition editor", () => {
-    expect(mountRail().find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(
-      false,
-    );
+  it("a click step's condition editor offers only its Property rows", async () => {
+    const w = mountRail();
+    await w.find('[data-test="rum-analytics-funnel-step-1-filters"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-property"]').exists()).toBe(true);
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-filter-min"]').exists()).toBe(false);
   });
 
   it("table rows drag by their handle, and a drop reorders the funnel", async () => {
@@ -351,6 +383,20 @@ describe("FunnelLayoutRail", () => {
       }
     });
 
+    it("expand() opens a collapsed panel, and leaves an open one open", async () => {
+      localStorage.setItem(COLLAPSED_KEY, "1");
+      const w = mountRail();
+      const expand = () => (w.vm as unknown as { expand: () => void }).expand();
+      expand();
+      await w.vm.$nextTick();
+      expect(w.find(PANEL).classes()).not.toContain("lg:hidden");
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+      expect(w.find(SEPARATOR).classes()).not.toContain("hidden");
+      expand();
+      await w.vm.$nextTick();
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+    });
+
     it("still collapses when localStorage cannot be written", async () => {
       const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         throw new Error("blocked");
@@ -423,7 +469,24 @@ describe("FunnelLayoutRail", () => {
       await w.vm.$nextTick();
       expect(separatorOf(w).attributes("aria-valuemax")).toBe("480");
       await w.setProps({ hideTime: false });
-      expect(separatorOf(w).attributes("aria-valuemax")).toBe("406");
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("350");
+    });
+
+    it("gives the table its compare columns before the rail grows", async () => {
+      observeWidth(1318);
+      const w = mountRail({ hideTime: true });
+      await w.vm.$nextTick();
+      await w.setProps({
+        compare: {
+          status: "loading",
+          data: null,
+          range: "12–15 Oct",
+          prevRange: "8–11 Oct",
+          rangeExact: "",
+          prevRangeExact: "",
+        },
+      });
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("286");
     });
   });
 });
@@ -471,7 +534,6 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         app: "web",
         appFilters: null,
         includeHidden: false,
-        settings: [],
         filterFields: ["geo_info_country"],
         filterValues: { field: null, status: "idle", rows: [] },
         ...extra,
@@ -481,7 +543,8 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         stubs: {
           VueDraggableNext: draggableStub,
           OPopover: popoverStub,
-          ODropdown: popoverStub,
+          ODropdown: { ...popoverStub },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           StepPicker: true,
         },
       },
@@ -601,7 +664,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     expect(w.text()).toMatch(/\b5\s?s\b/);
   });
 
-  it("a page step's options offer time on page, frustrated and errored; a click step has none", async () => {
+  it("a page step's options offer time on page, frustrated and errored; a click step only a property", async () => {
     const w = mountLayout(
       defWith(
         [],
@@ -615,7 +678,10 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     const page = w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]').text();
     expect(page).toMatch(/time on page/i);
     expect(page).toMatch(/frustrat/i);
-    expect(w.find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(false);
+    await w.find('[data-test="rum-analytics-funnel-step-1-filters"]').trigger("click");
+    const click = w.find('[data-test="rum-analytics-funnel-step-1-filters-popover"]').text();
+    expect(click).not.toMatch(/time on page/i);
+    expect(click).toMatch(/property/i);
   });
 
   it("choosing the frustrated filter on a page step emits a def whose step carries it", async () => {

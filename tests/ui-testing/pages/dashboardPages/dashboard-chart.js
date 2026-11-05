@@ -436,6 +436,7 @@ export default class ChartTypeSelector {
           )
         );
       },
+      undefined,
       { timeout: 15000 }
     );
 

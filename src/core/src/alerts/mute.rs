@@ -60,6 +60,15 @@ impl From<DowntimeError> for MuteError {
     }
 }
 
+impl From<ack::AckError> for MuteError {
+    fn from(e: ack::AckError) -> Self {
+        match e {
+            ack::AckError::Refused(refusal) => Self::Refused(refusal),
+            e => Self::Downtime(DowntimeError::Internal(format!("{e:?}"))),
+        }
+    }
+}
+
 /// Mutes the alert, or the named groups of a multi-alert, with a one-time downtime.
 pub async fn mute(
     target: &AckTarget,
@@ -70,12 +79,13 @@ pub async fn mute(
     downtimes::ensure_enabled()?;
     ack::authorize(target, actor, Act::Mute)
         .await
-        .map_err(MuteError::Refused)?;
+        .map_err(MuteError::from)?;
     authorize_folder(&target.org_id, actor, req).await?;
     let now = now_micros();
     let ends_at = requested_end(req.until_clear, req.minutes, req.ends_at, now)?;
     let groups = requested_groups(target, req).await?;
-    let rows = db::downtimes::list_cached(&target.org_id);
+    // The primary, so a mute made moments ago is seen; two at the same instant can still race.
+    let rows = downtimes::primary_rows(&target.org_id).await?;
     if let Some(live) = covering_mute(&rows, &target.alert_id, groups.as_deref(), now) {
         return Err(MuteError::Conflict(AlertMuteConflict::AlreadyMuted {
             downtime_id: live.id.clone(),
@@ -83,7 +93,7 @@ pub async fn mute(
             ends_at: end_of(live),
         }));
     }
-    if let Some(message) = downtimes::cap_reached(&target.org_id) {
+    if let Some(message) = downtimes::cap_reached(&target.org_id, now) {
         return Err(MuteError::Conflict(AlertMuteConflict::DowntimeCap {
             message,
         }));
@@ -94,12 +104,15 @@ pub async fn mute(
     let request = quick_mute_request(target, req, now, ends_at, groups, end_on_clear);
     let row = downtimes::create_for_alert(&target.org_id, actor, request, source).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&row)).await;
+    // D25: a mute quiets the problem's open pages until it ends, as a Slack mute always did.
+    let pages = ack::snooze_pages_until(target, actor, ends_at, now).await;
     Ok(AlertMuteResponse {
         downtime_id: row.id,
         version: row.version,
         ends_at,
         end_on_clear: row.end_on_clear,
         alert_groups: row.alert_groups,
+        pages,
     })
 }
 
@@ -113,7 +126,7 @@ pub async fn extend(
     downtimes::ensure_enabled()?;
     ack::authorize(target, actor, Act::Mute)
         .await
-        .map_err(MuteError::Refused)?;
+        .map_err(MuteError::from)?;
     let row = quick_mute_of(target, downtime_id).await?;
     if req.version != row.version {
         return Err(version_changed(&row));
@@ -152,7 +165,7 @@ pub async fn unmute(
     downtimes::ensure_enabled()?;
     ack::authorize(target, actor, Act::Mute)
         .await
-        .map_err(MuteError::Refused)?;
+        .map_err(MuteError::from)?;
     let row = quick_mute_of(target, downtime_id).await?;
     let after = downtimes::cancel_quick_mute(&target.org_id, actor, row).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;

@@ -201,6 +201,7 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    incident_title_template: "",
     // Off by default: a recovery is a new outbound message class, so it is opted into.
     notify_on_recovery: false,
     recovery_destinations: [],
@@ -346,6 +347,10 @@ export const defaultAnomalyConfig = () => ({
   alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
+  // Template override for anomaly messages; null uses each destination's template.
+  template: null as string | null,
+  // The server's 400 for the template override, shown under the picker until it changes.
+  template_error: null as string | null,
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -493,17 +498,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // QueryConfig then keeps `_meta` fresh via its own syncMeta watcher, and
   // re-seeds `_ui.checkEvery` from the stored frequency at setup.
   const withFormExtras = (obj: any): any => {
+    // A response-only key: moved into `_ui`, which every save path strips.
+    const { locked_target_names: lockedTargetNames, ...alert } = obj ?? {};
     const groupBy: string[] = Array.isArray(obj?.query_condition?.aggregation?.group_by)
       ? obj.query_condition.aggregation.group_by.filter((g: string) => g)
       : [];
     const freq = frequencyDisplay(obj);
     return {
-      ...obj,
+      ...alert,
       logGroupBy: groupBy,
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
         forecast: formForecastOf(obj),
+        lockedTargetNames,
       },
       _meta:
         obj?._meta ??
@@ -1268,6 +1276,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
+        incident_title_template: source.creates_incident
+          ? String(source.incident_title_template ?? "").trim() || undefined
+          : undefined,
         workflows: source.workflows ?? [],
         priority: source.priority ?? null,
         tags: source.tags ?? [],
@@ -1830,7 +1841,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // schema (it reads them off the form); resetForm below re-seeds anyway.
         setF("stream_type", data.stream_type);
         setF("stream_name", data.stream_name);
-        await updateStreams(false);
+        // A stream this org has not ingested yet has no schema; the rest of the prefill still applies.
+        await Promise.resolve(updateStreams(false)).catch(() => undefined);
       }
 
       if (prefill.queryType === "promql") {
@@ -2102,6 +2114,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
+          // Always sent so clearing the picker clears the stored override.
+          template: c.template || null,
         },
       };
 
@@ -2119,9 +2133,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
+      const message: string = err?.response?.data?.message ?? "";
+      // The template binding rule names the template; the picker shows it inline too.
+      if (err?.response?.status === 400 && /template '[^']*'/.test(message)) {
+        c.template_error = message.replace(/^validation error: /, "");
+      }
       toast({
         variant: "error",
-        message: err?.response?.data?.message || t("alerts.messages.anomalyConfigSaveFailed"),
+        message: message ? raw(message) : t("alerts.messages.anomalyConfigSaveFailed"),
       });
     } finally {
       anomalySaving.value = false;
@@ -2672,6 +2691,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // form inputs expect strings/arrays, so normalize them here.
       data.description ??= "";
       data.template ??= "";
+      data.incident_title_template ??= "";
       data.tags ??= [];
       data.composite_condition ??= {
         expression: "",

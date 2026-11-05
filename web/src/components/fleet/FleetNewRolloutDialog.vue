@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem value="now" size="sm">{{
             t("fleet.rollouts.startNow")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="at" size="sm" :disabled="emptyFleet">{{
+          <OToggleGroupItem value="at" size="sm">{{
             t("fleet.rollouts.startAt")
           }}</OToggleGroupItem>
         </OFormToggleGroup>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("fleet.rollouts.collapsed") }}</OText
           >
           <OText variant="meta" data-test="fleet-new-rollout-dialog-timeout">{{
-            t("fleet.rollouts.phaseTimeoutNote", { minutes: phaseTimeoutMin })
+            phaseTimeoutNote
           }}</OText>
         </div>
       </div>
@@ -210,12 +210,12 @@ import { makeRolloutSchema, requestOf, type RolloutForm } from "./FleetNewRollou
 import { useRolloutText } from "./rolloutText";
 import {
   isForbidden,
-  serverMessage,
   useFleetConfigs,
   useFleetRollouts,
   useFleetSettings,
   useFleets,
   usePlanPreview,
+  failureText,
 } from "./useFleetApi";
 
 const props = defineProps<{
@@ -287,19 +287,17 @@ const fleetOptions = computed(() =>
   readableFleets.value.map((f) => ({ label: raw(f.name), value: f.id })),
 );
 const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
-const emptyFleet = computed(() => (fleetRow.value?.collectors ?? 0) === 0);
 
-// The server refuses a schedule for a fleet with no members.
-watch(emptyFleet, (empty) => {
-  if (empty && start.value === "at") form.setFieldValue("start", "now");
-});
-
-const phaseTimeoutMin = computed(() => {
+const phaseTimeoutNote = computed(() => {
   const secs =
     fleetRow.value?.settings.phase_timeout_secs ??
     orgSettings.settings.value?.fleet_defaults?.phase_timeout_secs ??
     DEFAULT_PHASE_TIMEOUT_SECS;
-  return Math.round(secs / 60);
+  const minutes = Math.floor(secs / 60);
+  const seconds = secs % 60;
+  return seconds
+    ? t("fleet.rollouts.phaseTimeoutNoteSeconds", { minutes, seconds })
+    : t("fleet.rollouts.phaseTimeoutNote", { minutes });
 });
 
 const published = computed(() => configs.rows.value.filter((c) => c.version > 0));
@@ -357,7 +355,8 @@ watch(
     }
     if (seeded.value || configsLoading || fleetsLoading || rolloutsLoading || listsUnusable) return;
     const ids = readableFleets.value.map((f) => f.id);
-    const fleet = props.fleetId ?? (ids.includes("default") ? "default" : (ids[0] ?? "default"));
+    // A guessed fleet would change what every new collector there receives, so only a sole one is picked.
+    const fleet = props.fleetId ?? (ids.length === 1 ? ids[0] : "");
     const config = props.config ?? desiredOf(fleet) ?? "";
     form.reset(blank(fleet, config, props.toVersion ?? defaultVersion(fleet, config)));
     seeded.value = true;
@@ -366,8 +365,12 @@ watch(
 );
 
 function onFleetPicked(id: unknown) {
+  const fleet = String(id ?? "");
+  if (!props.config && !form.state.values.config) {
+    form.setFieldValue("config", desiredOf(fleet) ?? "");
+  }
   if (props.toVersion != null) return;
-  form.setFieldValue("version", defaultVersion(String(id ?? ""), form.state.values.config));
+  form.setFieldValue("version", defaultVersion(fleet, form.state.values.config));
 }
 
 function onConfigPicked(id: unknown) {
@@ -396,7 +399,13 @@ const preview = usePlanPreview(
 
 const planLine = computed(() => {
   const p = preview.preview.value;
-  if (emptyFleet.value) return t("fleet.rollouts.emptyFleet");
+  const stable = fleetRow.value?.stable;
+  // The stable version needs no proof, so the server sets it at once instead of waiting.
+  const toStable =
+    stable?.config === values.value.config && stable?.version === values.value.version;
+  if (toStable && (fleetRow.value?.collectors === 0 || p?.phases.length === 0))
+    return t("fleet.rollouts.planStable");
+  if (fleetRow.value?.collectors === 0) return t("fleet.rollouts.emptyFleet");
   if (!p) return preview.error.value ? t("fleet.rollouts.planUnavailable") : raw("—");
   return planText(p.phases);
 });
@@ -412,7 +421,7 @@ async function submit(value: RolloutForm) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

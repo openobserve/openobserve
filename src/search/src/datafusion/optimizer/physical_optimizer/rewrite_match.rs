@@ -46,10 +46,10 @@ use crate::datafusion::{
     optimizer::physical_optimizer::utils::{
         disjunction, extract_column, extract_int64_literal, extract_string_literal,
     },
-    udf::{
-        fuzzy_match_udf,
-        match_all_hash_udf::MATCH_ALL_HASH_UDF_NAME,
-        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    udf::fulltext::{
+        fuzzy_match,
+        match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        match_all_hash::MATCH_ALL_HASH_UDF_NAME,
     },
 };
 
@@ -280,7 +280,7 @@ fn rewrite_match_all_physical(
         let item = extract_column(item_expr)?;
         let distance_expr = &args[1];
         let distance = extract_int64_literal(distance_expr)?;
-        let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
+        let fuzzy_expr = Arc::new(fuzzy_match::FUZZY_MATCH_UDF.clone());
 
         let mut expr_list = Vec::with_capacity(fields.len());
         for (field, data_type) in fields.iter() {
@@ -546,7 +546,8 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
+        sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable,
+        udf::fulltext::match_all,
     };
 
     #[test]
@@ -658,8 +659,8 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();
@@ -694,8 +695,8 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("t", schema).with_partitions(8);
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(crate::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(crate::datafusion::udf::fulltext::str_match::STR_MATCH_UDF.clone());
 
         let sql =
             "select count(*) from t where match_all('test') and str_match(message, 'success')";
@@ -804,7 +805,7 @@ mod tests {
 
         let predicate = Arc::new(
             ScalarFunctionExpr::try_new(
-                Arc::new(match_all_udf::MATCH_ALL_UDF.clone()),
+                Arc::new(match_all::MATCH_ALL_UDF.clone()),
                 vec![Arc::new(Literal::new(ScalarValue::Utf8(Some(
                     "test".to_string(),
                 ))))],
@@ -857,7 +858,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("t", schema).with_partitions(1);
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         let plan = ctx
             .state()

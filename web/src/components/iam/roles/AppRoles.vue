@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           v-model:page-size="pageSize"
@@ -138,6 +139,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -326,7 +328,7 @@ const lastUpdatedAt = rolesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = rolesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
@@ -544,7 +546,7 @@ const bulkDeleteUserRoles = async () => {
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         message:
           error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),

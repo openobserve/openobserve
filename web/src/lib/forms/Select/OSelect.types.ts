@@ -2,8 +2,11 @@
 
 import type { I18nText } from "@/types/i18n";
 
-import type { InjectionKey } from "vue";
+import type { Component, InjectionKey } from "vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { FieldWidth } from "../Input/OInput.types";
+
+export type { SelectHeaderRowEmits, SelectHeaderRowProps } from "./OSelectHeaderRow.types";
 
 export type SelectValue = string | number | boolean | null;
 export type SelectModelValue = SelectValue | SelectValue[] | undefined;
@@ -54,12 +57,24 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
+  /** Header only, and only in listbox mode (searchable or multiple): secondary detail such as how many options the group holds. */
+  headerCount?: I18nText;
+  /** Header only, listbox mode only: label of an action on the header; activating it emits `header-action`, and an empty label means no action. */
+  headerAction?: I18nText;
+  /** Header only: accessible name of the header action when its label alone is ambiguous. */
+  headerActionAriaLabel?: I18nText;
+  /** Header only, listbox mode only: stays listed while searching even when no option under it matches. */
+  keepOnSearch?: boolean;
   /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
   expandable?: boolean;
   /** Nests this option under the `expandable` row with this value. */
   parentValue?: SelectValue;
   /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  /** Listbox mode: label shown in the list rows instead of `label`, which still names the selected value in the trigger. */
+  listLabel?: I18nText;
+  /** Listbox mode: small muted detail right-aligned in the list row, such as a UTC offset. */
+  suffix?: I18nText;
   [key: string]: unknown;
 }
 
@@ -166,6 +181,7 @@ export interface SelectProps {
    * - `"outside"` (default): label sits above the trigger as a separate element.
    * - `"inside"`: label is rendered as a compact inline prefix inside the trigger,
    *   saving vertical space when the label is short (e.g. in config panels).
+   *   With `appearance="inline"` it leads the value on the same line, so the whole "Label value ▾" is the trigger.
    */
   labelPosition?: "inside" | "outside";
   /** When true, replaces the chevron with a spinner to indicate async loading */
@@ -199,6 +215,8 @@ export interface SelectEmits {
   (_e: "blur", _event: FocusEvent): void;
   (_e: "change", _value: SelectModelValue): void;
   (_e: "keydown", _event: KeyboardEvent): void;
+  /** Fired when a header's `headerAction` button is activated, with that header option as passed in */
+  (_e: "header-action", _option: SelectOption): void;
 }
 
 export interface SelectSlots {
@@ -210,6 +228,8 @@ export interface SelectSlots {
   chip?: (_scope: { label: string; value: SelectValue }) => unknown;
   /** Empty state — shown when no options match the search */
   empty?: () => unknown;
+  /** Listbox mode only: replaces an option row's label (its icon stays), handed the option as passed in. */
+  option?: (_scope: { option: SelectOption }) => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
   /** Content after the options list */
@@ -232,6 +252,12 @@ export interface SelectItemProps {
   label?: I18nText;
   /** Prevents selection */
   disabled?: boolean;
+  /** Registry icon shown before the label */
+  icon?: IconName;
+  /** Raw Vue component shown before the label; wins over `icon` */
+  iconComponent?: Component;
+  /** Keeps a blank icon-sized slot when this item has no icon so labels align with iconned siblings */
+  reserveIconSpace?: boolean;
 }
 
 export interface SelectItemSlots {

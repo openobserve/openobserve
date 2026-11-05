@@ -7,6 +7,7 @@ class SlackWorkspaceCardPage {
     this.root = page.locator('[data-test="slack-workspace"]');
     this.name = page.locator('[data-test="slack-workspace-name"]');
     this.meta = page.locator('[data-test="slack-workspace-meta"]');
+    this.tooltip = page.locator('[data-test="o-tooltip-content"]:visible');
     this.status = page.locator('[data-test="slack-workspace-status"]');
     this.sockets = page.locator('[data-test="slack-workspace-sockets"]');
     this.refreshToken = page.locator('[data-test="slack-refresh-token"]');

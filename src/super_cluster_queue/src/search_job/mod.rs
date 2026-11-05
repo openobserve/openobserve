@@ -16,6 +16,7 @@
 pub mod search_job_partitions;
 pub mod search_job_results;
 pub mod search_jobs;
+mod workflow_http_triggers;
 
 use config::utils::json;
 use db::{
@@ -175,12 +176,23 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     log::error!("error while deleting workflow from db {id} : {e}");
                 }
             }
-            log::info!("successfully handled workflow delete for {id}");
+            let tombstoned = infra::table::workflow_http_triggers::tombstone_for_workflow(
+                infra::db::get_orm_client_rw().await,
+                &id,
+                config::utils::time::now_micros(),
+            )
+            .await;
             // trigger watch event by putting value to cluster coordinator
             let cluster_coordinator = get_coordinator().await;
             cluster_coordinator
                 .delete(&format!("{WORKFLOWS_PREFIX}{id}",), false, true, None)
                 .await?;
+            if let Some(trigger_id) = tombstoned?
+                && let Err(e) = db::workflow_http_triggers::notify_local(&trigger_id).await
+            {
+                log::error!("error while evicting workflow http trigger {trigger_id} : {e}");
+            }
+            log::info!("successfully handled workflow delete for {id}");
         }
         MessageType::WorkflowDraftPut => {
             let draft: Workflow = json::from_slice(&msg.value.unwrap())?;
@@ -193,7 +205,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             match existing {
                 Some(_) => {
                     log::info!("updating existing workflow draft for {org_id}/{id}");
-                    match infra::table::workflows::update_draft(draft.clone()).await {
+                    match infra::table::workflows::update_draft(&org_id, draft.clone()).await {
                         Ok(_) => {}
                         Err(e) => {
                             log::error!(
@@ -220,10 +232,19 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::WorkflowDraftDelete => {
             let id: String = json::from_slice(&msg.value.unwrap())?;
             log::info!("received workflow draft delete for {id}");
-            match infra::table::workflows::delete_draft(&id).await {
-                Ok(_) => {}
+            match infra::table::workflows::get_draft_org_id(&id).await {
+                Ok(Some(org_id)) => {
+                    if let Err(e) = infra::table::workflows::delete_draft(&org_id, &id).await {
+                        log::error!(
+                            "error while deleting workflow draft from db {org_id}/{id} : {e}"
+                        );
+                    }
+                }
+                Ok(None) => {
+                    log::debug!("workflow draft {id} not found, nothing to delete");
+                }
                 Err(e) => {
-                    log::error!("error while deleting workflow draft from db {id} : {e}");
+                    log::error!("error while looking up workflow draft {id} for delete : {e}");
                 }
             }
             log::info!("successfully handled workflow draft delete for {id}");
@@ -335,6 +356,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 }
             }
         }
+        MessageType::WorkflowHttpTriggerPut => workflow_http_triggers::process(msg).await?,
 
         _ => {
             log::error!(

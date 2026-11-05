@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildNavigationRoute,
   generateNavigationFromToolResult,
+  navigationFeature,
   navigationPageName,
 } from "@/components/O2AIChat.navigation";
 import type { NavigationAction } from "@/ts/interfaces/chat";
@@ -232,6 +233,34 @@ describe("buildNavigationRoute", () => {
     expect(decode(route.query.query)).toBe("SELECT 1");
   });
 
+  it.each(["traces", "metrics"] as const)("sends %s SQL searches to the logs page", (signal) => {
+    const route = buildNavigationRoute(
+      {
+        resource_type: signal,
+        action: "load_query",
+        label: raw("l"),
+        target: { query: "SELECT 1", sql_mode: true, from: 1, to: 2, stream: ["a"] },
+      },
+      "org1",
+    )!;
+    expect(route.path).toBe("/logs");
+    expect(route.query.stream_type).toBe(signal);
+    expect(decode(route.query.query)).toBe("SELECT 1");
+  });
+
+  it("keeps the traces page for a non-SQL traces filter", () => {
+    const route = buildNavigationRoute(
+      {
+        resource_type: "traces",
+        action: "load_query",
+        label: raw("l"),
+        target: { query: "service_name='a'", sql_mode: false, from: 1, to: 2, stream: ["a"] },
+      },
+      "org1",
+    )!;
+    expect(route.path).toBe("/traces");
+  });
+
   it("uses period when no absolute range is given", () => {
     const route = buildNavigationRoute(
       { resource_type: "logs", action: "load_query", label: raw("l"), target: { period: "15m" } },
@@ -325,5 +354,28 @@ describe("buildNavigationRoute", () => {
         "org1",
       ),
     ).toBeNull();
+  });
+});
+
+describe("navigationFeature", () => {
+  it.each([
+    ["logs", "logs"],
+    ["metrics", "metrics"],
+    ["traces", "traces"],
+    ["enrichment_tables", null],
+  ])("keys a %s query to %s", (type, key) => {
+    expect(
+      navigationFeature({ action: "load_query", resource_type: type, target: {} } as any),
+    ).toBe(key);
+  });
+
+  it.each([
+    ["alert", "alerts"],
+    ["dashboard", "dashboards"],
+    ["pipeline", null],
+  ])("keys a direct %s navigation to %s", (type, key) => {
+    expect(
+      navigationFeature({ action: "navigate_direct", resource_type: type, target: {} } as any),
+    ).toBe(key);
   });
 });

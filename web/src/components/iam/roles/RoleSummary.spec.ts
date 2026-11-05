@@ -5,6 +5,8 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { raw } from "@/types/i18n";
 import type { PresetInfo, PresetPreview } from "@/composables/iam/useRolePresets";
+import { defineComponent, h, ref } from "vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
@@ -47,6 +49,7 @@ async function mountSummary(
     modules: SummaryModule[];
     loading: boolean;
     previewPreset: (id: string) => PresetPreview;
+    licenseDenied: string[];
   }> = {},
   attachTo?: HTMLElement,
 ) {
@@ -89,6 +92,31 @@ describe("RoleSummary - empty role", () => {
     await wrapper.find('[data-test="edit-role-preset-apply"]').trigger("click");
 
     expect(wrapper.emitted("preset")).toEqual([["readonly"]]);
+  });
+
+  it("offers no preset on a license-locked page", async () => {
+    const LockedPage = defineComponent({
+      setup() {
+        provideFeatureLock(ref("rbac"));
+        return () => h(RoleSummary, { modules: [], loading: false });
+      },
+    });
+    const wrapper = mount(LockedPage, { global: { plugins: [i18n, store, router] } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="edit-role-summary-empty"] button')).toHaveLength(0);
+    expect(wrapper.find('[data-test="edit-role-presets-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-presets-open"]').exists()).toBe(false);
+  });
+
+  it("says the license lacks the feature instead of offering presets when the load was denied", async () => {
+    const wrapper = await mountSummary({ licenseDenied: ["rbac"] });
+
+    expect(wrapper.find('[data-test="edit-role-summary-license-denied"]').text()).toContain(
+      "Your license does not include",
+    );
+    expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(false);
   });
 
   // Presets must not show counts while the saved grants are still loading.

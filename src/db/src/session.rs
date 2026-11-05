@@ -35,15 +35,14 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
             let expires_at = *expires_at_ref;
             drop(expires_at_ref); // Drop reference before any operations
 
-            let now = chrono::Utc::now().timestamp();
+            let expired = is_expired(expires_at);
             log::debug!(
-                "Session expiry check (cached): session={}, now={}, expires_at={}, expired={}",
+                "Session expiry check (cached): session={}, expires_at={}, expired={}",
                 session_id,
-                now,
                 expires_at,
-                now > expires_at
+                expired
             );
-            if now > expires_at {
+            if expired {
                 // Session expired - remove from cache and DB
                 log::warn!(
                     "Session expired (cached): {} (expired at {})",
@@ -80,8 +79,7 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
         Some(session) => {
             // Check if session has expired
             let expires_at = session.expires_at;
-            let now = chrono::Utc::now().timestamp();
-            if now > expires_at {
+            if is_expired(expires_at) {
                 log::warn!(
                     "Session expired (db): {} (expired at {})",
                     session_id,
@@ -119,8 +117,8 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `val` - Access token to store
-/// * `expires_at` - Expiration timestamp (seconds since epoch) All sessions must have an expiry -
-///   either from JWT or default 24 hours
+/// * `expires_at` - Expiration timestamp (microseconds since epoch) All sessions must have an
+///   expiry - either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
     val: &str,
@@ -271,14 +269,13 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
         );
 
         // Clean up cache - check all cached sessions for expiry
-        let now = chrono::Utc::now().timestamp();
         let mut expired_sessions = Vec::new();
 
         // Collect expired session IDs
         for entry in USER_SESSIONS_EXPIRY.iter() {
             let session_id = entry.key();
             let expires_at = *entry.value();
-            if now > expires_at {
+            if is_expired(expires_at) {
                 expired_sessions.push(session_id.clone());
             }
         }
@@ -300,9 +297,20 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
     Ok(deleted_count)
 }
 
+fn is_expired(expires_at_micros: i64) -> bool {
+    config::utils::time::now_micros() > expires_at_micros
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_expired_uses_microseconds() {
+        let now = config::utils::time::now_micros();
+        assert!(is_expired(now - 1_000_000));
+        assert!(!is_expired(now + 3_600_000_000));
+    }
 
     #[test]
     fn test_user_session_key_format() {

@@ -164,9 +164,8 @@ fn index_schema() -> Schema {
     ])
 }
 
-async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String> {
-    let index_stream = get_trace_time_index_stream_name(source_stream);
-    let schema_cache = infra::schema::get_cache(org_id, &index_stream, StreamType::Metadata)
+async fn ensure_index_stream(org_id: &str, source_stream: &str, index_stream: &str) -> Result<()> {
+    let schema_cache = infra::schema::get_cache(org_id, index_stream, StreamType::Metadata)
         .await
         .map_err(|e| Error::Message(format!("load trace time index schema: {e}")))?;
     let fields_map = schema_cache.fields_map();
@@ -177,7 +176,7 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         let expected = index_schema();
         crate::db::schema::merge(
             org_id,
-            &index_stream,
+            index_stream,
             StreamType::Metadata,
             &expected,
             Some(config::utils::time::now_micros()),
@@ -190,7 +189,7 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         .await
         .unwrap_or_default();
     let mut index_settings =
-        infra::schema::get_settings(org_id, &index_stream, StreamType::Metadata)
+        infra::schema::get_settings(org_id, index_stream, StreamType::Metadata)
             .await
             .map(|settings| (*settings).clone())
             .unwrap_or_else(|| StreamSettings {
@@ -224,12 +223,12 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         index_settings.data_retention = source_settings.data_retention;
         index_settings.extended_retention_days = source_settings.extended_retention_days.clone();
         index_settings.enable_distinct_fields = false;
-        schema::save_stream_settings(org_id, &index_stream, StreamType::Metadata, index_settings)
+        schema::save_stream_settings(org_id, index_stream, StreamType::Metadata, index_settings)
             .await
             .map_err(|e| Error::Message(format!("save trace time index settings: {e}")))?;
     }
 
-    Ok(index_stream)
+    Ok(())
 }
 
 pub async fn write(
@@ -246,7 +245,16 @@ pub async fn write(
         return Ok(());
     }
 
-    let index_stream = ensure_index_stream(org_id, source_stream).await?;
+    let index_stream = get_trace_time_index_stream_name(source_stream);
+    // its key outgrows the source's by 19, so a source near the limit has an unstorable index
+    if infra::file_list::stream_key_violation(org_id, StreamType::Metadata, &index_stream).is_some()
+    {
+        config::metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[org_id, "write", "skipped_key_too_long"])
+            .inc();
+        return Ok(());
+    }
+    ensure_index_stream(org_id, source_stream, &index_stream).await?;
     let schema = Arc::new(index_schema());
     let schema_key = schema.hash_key();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
@@ -311,6 +319,33 @@ mod tests {
         value.insert("start_time".to_string(), start_ns.into());
         value.insert("end_time".to_string(), end_ns.into());
         (start_ns / 1_000, value)
+    }
+
+    #[tokio::test]
+    async fn write_skips_an_index_whose_stream_key_is_too_long() {
+        let org_id = "time_index_key_len_org";
+        // the source key is exactly at the limit, so only the index key is over it
+        let source =
+            "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN - org_id.len() - "/traces/".len());
+        assert!(
+            infra::file_list::stream_key_violation(org_id, StreamType::Traces, &source).is_none()
+        );
+        let index_stream = get_trace_time_index_stream_name(&source);
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Metadata, &index_stream)
+                .is_some();
+
+        write(
+            org_id,
+            &source,
+            &[span("trace", 10_000_000_000, 20_000_000_000)],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            infra::schema::exists(org_id, StreamType::Metadata, &index_stream).await,
+            !bounded
+        );
     }
 
     #[test]

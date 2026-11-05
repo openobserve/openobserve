@@ -47,6 +47,7 @@ import {
   type WindowUs,
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
 import { noteUserScopeChange } from "@/composables/useLogs/useLogPermalink";
@@ -67,6 +68,7 @@ export interface LogsRunSettled {
   startUs: number;
   endUs: number;
   partial: boolean;
+  noResults: boolean;
   /** Null when the search finished. */
   error: RunError | null;
 }
@@ -137,7 +139,11 @@ export function zoConfig(): AutoRunConfig & Record<string, unknown> {
 }
 
 export function isSuperCluster(): boolean {
-  return config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
+  return (
+    config.isEnterprise === "true" &&
+    !!zoConfig().super_cluster_enabled &&
+    featureState(zoConfig().features as FeatureStates | undefined, "super_cluster") !== "locked"
+  );
 }
 
 export function setAutoRunTransport(next: AutoRunTransport): void {
@@ -425,6 +431,7 @@ function createLogsAutoRun() {
       startUs: window.startUs,
       endUs: window.endUs,
       partial: error === null && searchObj().data.queryResults?.is_partial === true,
+      noResults: error === null && hasNoHits(searchObj().data.queryResults),
       error,
     };
     runSettledListeners.forEach((listener) => {
@@ -639,6 +646,10 @@ function createLogsAutoRun() {
         : null,
   };
 }
+
+// A run that settled without writing any rows, as opposed to one whose result is still unknown.
+const hasNoHits = (results: { hits?: unknown; total?: unknown } | undefined): boolean =>
+  Array.isArray(results?.hits) && results.hits.length === 0 && !(Number(results?.total) > 0);
 
 export type LogsAutoRun = ReturnType<typeof createLogsAutoRun>;
 

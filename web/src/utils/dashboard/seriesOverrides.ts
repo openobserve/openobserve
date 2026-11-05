@@ -316,8 +316,7 @@ const applyPieOverrides = (
   options: { legend?: { selected?: Record<string, boolean> } },
 ) => {
   if (!Array.isArray(series?.data)) return;
-  // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
-  const percentLabel = series.label?.formatter === "{d}%";
+  // A label reads the lookup itself and only needs the exact share.
   const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
   const items = series.data;
   // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
@@ -341,16 +340,15 @@ const applyPieOverrides = (
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
-    if ((percentLabel || customLabel) && decimals !== undefined) {
+    if (customLabel && decimals !== undefined) {
       labelOverridden = true;
       const share = () => sharePercent(item.value, visibleTotal());
       next = {
         ...next,
         label: {
           ...next.label,
-          formatter: customLabel
-            ? (params: Record<string, unknown>) => customLabel({ ...params, percent: share() })
-            : () => `${share().toFixed(decimals)}%`,
+          formatter: (params: Record<string, unknown>) =>
+            customLabel({ ...params, percent: share() }),
         },
       };
     }

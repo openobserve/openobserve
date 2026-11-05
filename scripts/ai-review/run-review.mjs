@@ -12,12 +12,47 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
   addUsage,
   cleanAttributes,
+  genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
   genAiUsageAttributes,
   sha256,
 } from "./telemetry.mjs";
-import { REVIEW_PASS_TAG, reviewPassCount, reviewPassTag, selectOwnReviewComment } from "./src/comments.mjs";
+import {
+  autoApproveLine,
+  createAutoApproveGate,
+  isApprovedReview,
+  parseAutoApproveMode,
+  parseRawDiff,
+  reviewerFacts,
+  sizeReasons,
+  withoutCarriedApproval,
+} from "./src/auto-approve.mjs";
+import {
+  ANY_REVIEW_MARKER,
+  NOTICE_TAG,
+  REVIEW_HEADING,
+  REVIEW_TITLE,
+  bodyAtFailedRun,
+  bodyAtPassLimit,
+  bodyAtReviewedHead,
+  bodyAtUnchangedDiff,
+  bodyAtUnreviewedHead,
+  claimedReviewBody,
+  finishReviewBody,
+  isPlaceholderComment,
+  parseMaxPasses,
+  previousReviewText,
+  redactProviderIdentity,
+  reviewKey,
+  reviewPassCount,
+  reviewSkipReason,
+  reviewedDiffFingerprint,
+  sanitizeReviewBody,
+  selectOwnReviewComment,
+  shouldSkipAsUnchangedDiff,
+  withPassTag,
+} from "./src/comments.mjs";
 import {
   buildReviewPayload,
   existingFingerprints,
@@ -25,12 +60,26 @@ import {
   rightSideLines,
   selectInlineComments,
 } from "./src/inline.mjs";
-import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
-import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
-import { failedReviewersNote, insertAfterCallout, mapStrings } from "./src/report.mjs";
+import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
+import { OpencodeServer, modelVariantIds, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { stripJsonc } from "./src/jsonc.mjs";
+import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, reviewComplete, runPooled } from "./src/passes.mjs";
+import { MAX_USER_PROMPT_CHARS, fitCoordinatorPrompt } from "./src/coordinator-input.mjs";
+import { diffFingerprint, fetchPinnedDiff, hunksLocatable, prefixDiffPaths, reviewerDiff, runFile } from "./src/pr-diff.mjs";
+import {
+  buildFallbackReview,
+  partialFindingsBlock,
+  failedReviewersNote,
+  insertAfterCallout,
+  mapStrings,
+  parseFindings,
+  reviewerReported,
+  selectFallbackFindings,
+  toKeptFinding,
+} from "./src/report.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
 import { scrubReviewBody, scrubSecrets } from "./src/scrub.mjs";
-import { isReleaseFile, resolveRulesFiles } from "./src/selection.mjs";
+import { isReleaseFile, narrowTier, resolveRulesFiles } from "./src/selection.mjs";
 import { buildImpactContext } from "./src/impact.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,7 +87,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ENGINE_DIR is the trusted base-branch checkout; PR_DIR is the PR head, which is data only and never executed.
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR || resolve(__dirname, "../.."));
 const PR_DIR = process.env.PR_DIR ? resolve(process.env.PR_DIR) : "";
-// REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, every tool allowed).
+// REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, file tools and a shell allowlist).
 const OPENCODE_CONFIG = resolveOpencodeConfig(process.env.REVIEW_OPENCODE_CONFIG);
 const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, OPENCODE_CONFIG.file);
 // A same-named PR in another repo reviewed together with this one (the OSS side of an ENT pair).
@@ -53,31 +102,31 @@ const PAIRED = {
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
 // can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
-// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4.1-Flash (max effort) setup, so an
+// currently has a single anthropic leg). Everything defaults to that Claude Sonnet 5.5 (high effort) setup, so an
 // invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
 // what must never name it is the posted PR comment — see redactProviderIdentity.
 //
 // - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
 //   provider/model registered in opencode.jsonc).
-// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
+// - REVIEW_MODEL_VARIANT / REVIEW_COORDINATOR_VARIANT: opencode `variant` (effort) of reviewers / coordinator (coordinator defaults to reviewers').
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
-const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-flash";
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "anthropic-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "claude-sonnet-5-5";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
-const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME
-  || (PROVIDER_ID.toLowerCase().includes("deepseek") ? "deepseek" : PROVIDER_ID);
-// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+const COORDINATOR_VARIANT = process.env.REVIEW_COORDINATOR_VARIANT || MODEL_VARIANT;
+const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME || genAiProviderName(PROVIDER_ID);
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "ANTHROPIC_REVIEW_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
 // posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
 // malformed value must not become the vehicle for leaking anything. This also keeps CodeQL's
 // js/clear-text-logging taint analysis from treating the *name* as the secret (it flags any
 // `...API_KEY...` env read reaching a log).
-const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "ANTHROPIC_REVIEW_API_KEY";
 const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
   ? RAW_API_KEY_VAR_NAME
-  : "DEEPSEEK_API_KEY";
+  : "ANTHROPIC_REVIEW_API_KEY";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
@@ -86,57 +135,38 @@ function apiKey() {
 
 const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 
-// The shape of any marker a provider leg may post — matched as a pattern rather than a list so a
-// retired leg's suffixed marker (e.g. the old per-provider ones) is still claimed and rewritten
-// in place. The coordinator prompt is told not to emit markers at all, but models don't reliably
-// obey formatting instructions, so sanitizeReviewBody strips every match and re-prepends only
-// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
-// findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
-// .github/workflows/ai-code-review.yml.
-const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
-// Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
-const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
-// Tags the "not reviewed: key not set" notice, which is likewise replaced but never fed back as a previous review.
-const NOTICE_TAG = "<!-- o2-review-notice -->";
 // Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
 const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
 // Inline review comments are opt-in; the summary comment is posted either way.
 const REVIEW_INLINE = (process.env.REVIEW_INLINE || "false").toLowerCase() === "true";
-// Paid reviews per PR; the count lives in the review comment, so deleting that comment resets it.
-const REVIEW_MAX_PASSES = Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) > 0 ? Number.parseInt(process.env.REVIEW_MAX_PASSES, 10) : 2;
+// Optional ceiling on paid reviews per PR, 0 for none; the count lives in the review comment, so deleting that comment resets it.
+const REVIEW_MAX_PASSES = parseMaxPasses(process.env.REVIEW_MAX_PASSES);
 const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true";
-// The runner appends the limit note itself, so a copy the coordinator echoes from the previous review is stripped.
-const PASS_LIMIT_NOTE_RE = /\n*> \[!NOTE\]\n> This PR has used its \d+ automatic reviews[^\n]*/g;
+// A run someone started by hand always reviews, even a diff the last review already read.
+const REVIEW_MANUAL_RUN = process.env.REVIEW_MANUAL_RUN === "true";
+// Anything but an exact known mode is "off": the gate must be opted into.
+const AUTO_APPROVE_MODE = parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
+// Only the workflow's "no open PR on this branch" path sets this; any failed or skipped pairing lookup leaves it unset.
+const REVIEW_PAIR_CLEAR = process.env.REVIEW_PAIR_CLEAR === "true";
 // Where the raw findings JSON is written for the workflow to upload; unset skips it.
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
+// Independent reviewer sessions per area (1..3); one cold pass misses findings a second one catches.
+const REVIEW_COLD_PASSES = parseColdPasses(process.env.REVIEW_COLD_PASSES);
 
-// ─── Branding (presentation only) ───────────────────────────────────────────
-// The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
-// comment looks/reads — never what the reviewers find or decide. The engine is unchanged.
-const REVIEW_TITLE = "OpenObserve Code Review";
-const REVIEW_HEADING = `## 🔎 ${REVIEW_TITLE}`;
-// Matches the review heading line whether or not the model included the 🔎 emoji, and tolerates
-// a legacy "AI Code Review" heading (older comments / prompt drift) so re-review still finds and
-// normalizes the header. Case-insensitive, multiline.
-const REVIEW_HEADING_RE = /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b/mi;
-// Category → glyph, used by the deterministic fallback renderer to prefix each finding line so it
-// matches the coordinator's happy-path formatting. Cosmetic only.
-const CATEGORY_GLYPH = {
-  security: "🔒",
-  performance: "⚡",
-  correctness: "🐞",
-  "code-quality": "🧩", "code quality": "🧩", quality: "🧩",
-  documentation: "📝", docs: "📝",
-  release: "📦",
-  frontend: "🎨", ui: "🎨",
-  qa: "🧪", test: "🧪",
-};
 const MAX_DIFF_TOKENS = 150_000;
+const UNPARSEABLE_OUTPUT = "output was cut off or held neither findings nor a no-issues marker";
 const AGENT_TIMEOUT_MS = 20 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
 const POST_RESERVE_MS = 2 * 60 * 1000;
 const MIN_COORDINATOR_MS = 60 * 1000;
+// A reviewer still running this long before its timeout is interrupted and asked for its findings, which a hard timeout throws away.
+const REVIEWER_WRAP_UP = {
+  ms: 3 * 60 * 1000,
+  text: "Time is up for this review. Do not call any more tools. Reply now with your final output in the exact format your instructions require: a <findings> block with every issue you have already verified, or the no-issues marker if you verified none. Do not report anything you have not checked.",
+};
+// Covers every area of two passes at once (8 reviewers at most); a third pass queues instead of adding to provider rate limits.
+const REVIEWER_CONCURRENCY = 16;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
 const TRACE_SCOPE_NAME = "scripts/ai-review/run-review.mjs";
 const DEFAULT_TRACE_STREAM = "github_ai_code_review";
@@ -239,6 +269,15 @@ const RISK_TIERS = {
     agents: ["security", "correctness", "code-quality", "performance", "documentation"],
     coordinatorAgent: COORDINATOR_AGENT,
   },
+  "test-only": {
+    // qa reviews Playwright only, and is added by CONDITIONAL_AGENTS when those files change.
+    agents: ["correctness", "code-quality"],
+    coordinatorAgent: COORDINATOR_AGENT,
+  },
+  "ci-only": {
+    agents: ["security", "release"],
+    coordinatorAgent: COORDINATOR_AGENT,
+  },
 };
 
 // Agents added on top of the tier's set when the diff touches their domain, regardless of size.
@@ -253,10 +292,11 @@ const CONDITIONAL_AGENTS = [
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function gh(args) {
+function gh(args, input) {
   const result = execSync(`gh ${args}`, {
     encoding: "utf-8",
     maxBuffer: 50 * 1024 * 1024,
+    input,
     stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...process.env,
@@ -284,10 +324,24 @@ function execErrorText(err) {
   return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
 }
 
+// cat-file reads the raw blob, so the PR's own attributes cannot reshape the base text a hunk is matched against.
+function readBaseFile(path) {
+  const paired = Boolean(PAIRED.dir) && path.startsWith(`${PAIRED.dir}/`);
+  const rel = paired ? path.slice(PAIRED.dir.length + 1) : path;
+  const dir = paired ? resolve(PR_DIR, PAIRED.dir) : PR_DIR;
+  const base = paired ? PAIRED.mergeBase : process.env.MERGE_BASE_SHA;
+  if (!dir || !base) return null;
+  try {
+    return runFile("git", ["-C", dir, "cat-file", "blob", `${base}:${rel}`]);
+  } catch {
+    return null;
+  }
+}
+
 // The API refuses diffs over 20k lines; the workflow fetches the merge base into PR_DIR so the same three-dot diff can be built locally.
 function fetchPrDiff(prNumber) {
   const log = message => console.log(`[${isoNow()}] ${message}`);
-  const own = fetchDiff({
+  const own = fetchPinnedDiff({
     repo: process.env.GITHUB_REPOSITORY,
     prNumber,
     prDir: PR_DIR,
@@ -295,8 +349,8 @@ function fetchPrDiff(prNumber) {
     head: process.env.HEAD_SHA,
     log,
   });
-  if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own, own };
-  const paired = fetchDiff({
+  if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own.diff, own: own.diff, pinned: own.pinned };
+  const paired = fetchPinnedDiff({
     repo: PAIRED.repo,
     prNumber: PAIRED.prNumber,
     prDir: PR_DIR && PAIRED.dir ? resolve(PR_DIR, PAIRED.dir) : "",
@@ -305,7 +359,8 @@ function fetchPrDiff(prNumber) {
     log,
   });
   log(`Reviewing together with paired PR ${PAIRED.repo}#${PAIRED.prNumber} (paths prefixed with ${PAIRED.dir}/)`);
-  return { diff: `${own.replace(/\n?$/, "\n")}${prefixDiffPaths(paired, PAIRED.dir)}`, own };
+  // The review key names both heads, so both sides must be pinned for it to be true.
+  return { diff: `${own.diff.replace(/\n?$/, "\n")}${prefixDiffPaths(paired.diff, PAIRED.dir)}`, own: own.diff, pinned: own.pinned && paired.pinned };
 }
 
 function pairedPrContext() {
@@ -721,9 +776,13 @@ function filterDiff(diff) {
 function assessRiskTier(filteredDiff) {
   const totalLines = filteredDiff.totalAdded + filteredDiff.totalRemoved;
   const fileCount = filteredDiff.files.length;
-  const hasSecurityFiles = filteredDiff.files.some(f => isSecuritySensitiveFile(f.newPath));
+  // A rename's source counts too: moving code out of production or CI removes it from there.
+  const paths = filteredDiff.files.flatMap(f => [f.oldPath, f.newPath]);
+  const hasSecurityFiles = paths.some(isSecuritySensitiveFile);
 
   if (fileCount > 50 || hasSecurityFiles) return "full";
+  const narrow = narrowTier(paths.map(logicalPath));
+  if (narrow) return narrow;
   if (totalLines <= 10 && fileCount <= 20) return "trivial";
   if (totalLines <= 100 && fileCount <= 20) return "lite";
   return "full";
@@ -743,8 +802,8 @@ function selectAgents(tierConfig, filteredDiff) {
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
 // a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
-// the diff, not just the diff text — that repo context is the main quality lever over the
-// old DeepSeek-only approach.
+// the diff, not just the diff text — that repo context is the main quality lever over a
+// diff-only prompt.
 
 const OPENCODE = new OpencodeServer({
   cwd: PR_DIR || ENGINE_DIR,
@@ -764,7 +823,7 @@ async function opencodeClient() {
   const client = await OPENCODE.ensureStarted();
   if (!selfChecks.has(client)) {
     const check = selfCheck(client, reviewOpencodeAgents(), { readOnly: OPENCODE_CONFIG.readOnly }).then(result => {
-      const grant = OPENCODE_CONFIG.readOnly ? "only read/glob/grep allowed" : "every tool allowed (ci-full)";
+      const grant = OPENCODE_CONFIG.readOnly ? "only read/glob/grep allowed" : "file tools and a shell allowlist (ci-full)";
       console.log(`[${isoNow()}] opencode self-check passed: ${result.plugins} built-in plugins, ${grant} for ${result.agents} agents`);
       return result;
     });
@@ -779,11 +838,12 @@ function remainingRunMs() {
 }
 
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
+  const variant = traceOptions.agentKey === "coordinator" ? COORDINATOR_VARIANT : MODEL_VARIANT;
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": "chat",
     "gen_ai.provider.name": GEN_AI_PROVIDER_NAME,
     "gen_ai.request.model": MODEL_ID,
-    "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
+    "gen_ai.request.reasoning_effort": variant || "default",
     "ai.review.operation.name": traceOptions.operationName || "chat",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
@@ -794,7 +854,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
   }, traceOptions.parentSpan, SpanKind.CLIENT);
 
   const truncatedSystem = systemPrompt.slice(0, 100_000);
-  const truncatedUser = userPrompt.slice(0, 150_000);
+  const truncatedUser = userPrompt.slice(0, MAX_USER_PROMPT_CHARS);
 
   TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
@@ -808,12 +868,14 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         const result = await client.prompt({
           agent: agentName,
           model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
-          variant: MODEL_VARIANT,
+          variant,
           system: truncatedSystem,
           text: truncatedUser,
-          title: `ai-review:${traceOptions.agentKey || agentName}`,
+          title: `ai-review:${traceOptions.agentKey || agentName}${traceOptions.pass ? `:pass-${traceOptions.pass}` : ""}`,
           timeoutMs,
+          wrapUp: traceOptions.wrapUp,
         });
+        if (result.wrappedUp) console.warn(`[${isoNow()}] ${agentName}: interrupted near its timeout and asked for its findings`);
         if (result.rejectedPermissions > 0) {
           console.warn(`[${isoNow()}] ${agentName}: rejected ${result.rejectedPermissions} permission request(s)`);
         }
@@ -826,8 +888,9 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
           "ai.review.output.chars": result.text.length,
           "ai.review.attempts": attempt,
           "opencode.permission_rejections": result.rejectedPermissions,
+          "ai.review.wrapped_up": Boolean(result.wrappedUp),
         });
-        return { text: result.text, responseId: result.responseId };
+        return { text: result.text, responseId: result.responseId, wrappedUp: Boolean(result.wrappedUp) };
       } catch (err) {
         failedUsage = addUsage(failedUsage, err?.usage);
         const retry = shouldRetry({
@@ -850,38 +913,13 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
   }
 }
 
-// ─── Finding parser ────────────────────────────────────────────────────────
-
-function parseFindings(xmlText) {
-  const findings = [];
-  const re = /<finding>([\s\S]*?)<\/finding>/g;
-  let match;
-  while ((match = re.exec(xmlText)) !== null) {
-    const block = match[1];
-    const getTag = (tag) => {
-      const m = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, "s").exec(block);
-      return m ? m[1].trim() : "";
-    };
-    const finding = {
-      category: getTag("category"),
-      severity: getTag("severity"),
-      file: getTag("file"),
-      line: getTag("line"),
-      summary: getTag("summary"),
-      description: getTag("description"),
-      suggestion: getTag("suggestion"),
-    };
-    if (finding.severity && finding.summary) {
-      findings.push(finding);
-    }
-  }
-  return findings;
-}
-
 // ─── Run single reviewer ──────────────────────────────────────────────────
 
-async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, parentSpan, impact = "") {
+async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, parentSpan, impact = "", unfocused = false, pass = 1) {
+  const label = passLabel(agentDef.name, pass, REVIEW_COLD_PASSES);
   const reviewerSpan = TRACE.startSpan("ai_review.reviewer", {
+    "review.pass": pass,
+    "review.passes": REVIEW_COLD_PASSES,
     "review.agent.key": agentKey,
     "review.agent.name": agentDef.name,
     "ai.agent.key": agentKey,
@@ -893,12 +931,12 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
   }, parentSpan);
 
   if (!apiKey()) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
+    console.log(`[${isoNow()}] ${label}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
       "review.error": `${API_KEY_VAR_NAME} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
@@ -910,20 +948,20 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     throw err;
   }
 
-  let relevantDiff = diff;
-  if (agentDef.fileFocus) {
-    const sections = diff.split(/^diff --git /gm).filter(Boolean);
-    const relevant = sections.filter(s => {
-      const m = s.match(/^a\/(.*?) b\/(.*?)\n/);
-      return m && agentDef.fileFocus(logicalPath(m[2]));
-    });
-    if (relevant.length > 0) {
-      relevantDiff = relevant.map(s => "diff --git " + s).join("");
-    } else if (agentDef.requiresFocus) {
-      console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no files in focus`);
-      TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
-      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
-    }
+  const { diff: relevantDiff, skipped, fullDiff } = reviewerDiff(diff, agentDef, { unfocused, pathOf: logicalPath });
+  if (skipped) {
+    console.log(`[${isoNow()}] ${label}: SKIPPED — no files in focus`);
+    TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
+  }
+
+  // A pass the pool started late must still leave the coordinator its slot.
+  const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - MIN_COORDINATOR_MS - POST_RESERVE_MS);
+  if (timeoutMs < MIN_COORDINATOR_MS) {
+    const error = `not started: only ${Math.round(remainingRunMs() / 1000)}s left in the run`;
+    console.error(`[${isoNow()}] ${label}: ${error}`);
+    TRACE.endSpan(reviewerSpan, { "review.not_started": true }, new Error(error));
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error, genAIResponseId: "" };
   }
 
   const userPrompt = [
@@ -937,7 +975,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${label} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -945,145 +983,68 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
       agentDef.opencodeAgent,
       fullSystem,
       userPrompt,
-      AGENT_TIMEOUT_MS,
+      timeoutMs,
       {
         parentSpan: reviewerSpan,
         agentKey,
         agentName: agentDef.name,
+        pass,
         operationName: "code_review",
+        wrapUp: REVIEWER_WRAP_UP,
       },
     );
     const text = completion.text;
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`[${isoNow()}] ${agentDef.name} completed in ${elapsed}s`);
+    console.log(`[${isoNow()}] ${label} completed in ${elapsed}s`);
 
     const findings = parseFindings(text);
-    if (findings.length === 0 && !text.includes("no-issues") && !text.includes("LGTM")) {
-      console.log(`[${isoNow()}] ${agentDef.name}: No structured findings found, checking for no-issues marker`);
-      console.log(`[${isoNow()}] ${agentDef.name} raw output (first 500 chars): ${text.slice(0, 500)}`);
+    const parsed = reviewerReported(text, findings);
+    if (!parsed) {
+      console.log(`[${isoNow()}] ${label}: ${UNPARSEABLE_OUTPUT}`);
+      console.log(`[${isoNow()}] ${label} raw output (first 500 chars): ${text.slice(0, 500)}`);
     } else {
-      console.log(`[${isoNow()}] ${agentDef.name}: ${findings.length} findings`);
+      console.log(`[${isoNow()}] ${label}: ${findings.length} findings`);
     }
 
     TRACE.endSpan(reviewerSpan, {
       "review.elapsed_seconds": Number(elapsed),
       "review.findings": findings.length,
       "review.raw_text_length": text.length,
+      "review.wrapped_up": completion.wrappedUp,
       "gen_ai.response.id": completion.responseId,
     });
-    return { agentKey, agentName: agentDef.name, findings, rawText: text, error: null, genAIResponseId: completion.responseId };
+    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed, wrappedUp: completion.wrappedUp };
   } catch (err) {
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.error(`[${isoNow()}] ${agentDef.name} FAILED after ${elapsed}s: ${err.message}`);
+    console.error(`[${isoNow()}] ${label} FAILED after ${elapsed}s: ${err.message}`);
     TRACE.endSpan(reviewerSpan, { "review.elapsed_seconds": Number(elapsed) }, err);
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: err.message, timedOut: err?.name === "TimeoutError", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: err.message, timedOut: err?.name === "TimeoutError", genAIResponseId: "" };
   }
 }
 
 // ─── Sanitization ──────────────────────────────────────────────────────────
 
-// Anything reaching the PR goes through here: the posted review must never name the model or
-// provider behind it, and a model naming itself (or an upstream error echoing the slug) would
-// undo that. The vendor prefix of the ids is redacted too, so "deepseek-v4-pro" and a bare
-// "DeepSeek" both go. Longest term first: alternation is first-match, so an unsorted list would
-// leave the rest of a longer id behind after redacting its prefix.
-function redactProviderIdentity(text) {
-  const vendor = MODEL_ID.split(/[-/_]/)[0];
-  const terms = [PROVIDER_ID, MODEL_ID, vendor.length >= 4 ? vendor : null]
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length)
-    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  if (terms.length === 0) return text;
-  return text.replace(new RegExp(terms.join("|"), "gi"), "[redacted]");
+// Anything reaching the PR goes through here: the posted review must never name the model or provider behind it.
+function redactIdentity(text) {
+  return redactProviderIdentity(text, { providerId: PROVIDER_ID, modelId: MODEL_ID });
 }
 
-function sanitizeReviewBody(body) {
-  if (!body) return "";
-
-  // If body is JSON-wrapped (edge case from bad LLM output), unwrap it
-  let cleaned = body;
-  if (cleaned.trim().startsWith("{") && cleaned.trim().endsWith("}")) {
-    try {
-      const parsed = JSON.parse(cleaned);
-      if (parsed.body && typeof parsed.body === "string") {
-        cleaned = parsed.body;
-      }
-    } catch {
-      // Not valid JSON, leave as-is
-    }
+function sanitizeForPosting(body) {
+  const { text, secretHits } = sanitizeReviewBody(body, { marker: REVIEW_MARKER, providerId: PROVIDER_ID, modelId: MODEL_ID, env: process.env });
+  if (secretHits > 0) {
+    console.warn(`[${isoNow()}] Redacted ${secretHits} secret-shaped value(s) from the review before posting`);
+    TRACE.setSpanAttributes(activeRootSpan, { "security.output_scrub.hits": secretHits });
   }
-
-  // Unescape common escaped sequences from LLM output
-  cleaned = cleaned.replace(/\\n/g, "\n");
-  cleaned = cleaned.replace(/\\t/g, "\t");
-  cleaned = cleaned.replace(/\\"/g, '"');
-
-  // Remove any XML boundary tags that escaped into the output.
-  // NOTE: "summary" is deliberately NOT in this list — it collides with the HTML
-  // <details><summary> element the review comment itself uses, and stripping it turns the
-  // findings fold's clickable label into bare text. Leaked XML <summary> finding-fields are
-  // already covered because they only appear inside <finding> blocks, which ARE stripped.
-  const boundaryTags = ["mr_input", "mr_body", "mr_comments", "mr_details",
-    "changed_files", "existing_inline_findings", "previous_review",
-    "custom_review_instructions", "review_task", "pr_context", "diff",
-    "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
-    "reviewers_ran", "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
-    "category", "severity", "file", "line", "description", "suggestion"];
-  const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
-  cleaned = cleaned.replace(boundaryPattern, "");
-
-  // Strip EVERY marker (not just ours) wherever it appears, so a model that echoes a marker
-  // from the prompt or from a previous review can't end up carrying two of them.
-  cleaned = cleaned.replace(new RegExp(ANY_REVIEW_MARKER, "gi"), "");
-  cleaned = cleaned.replace(new RegExp(REVIEW_PASS_TAG, "gi"), "");
-  cleaned = cleaned.replace(PASS_LIMIT_NOTE_RE, "");
-
-  // Drop any preamble the model emitted before the review proper ("Now I have all the
-  // context. Let me produce the consolidated review."). Runs after marker stripping so a
-  // leading marker can't anchor the search at index 0 and mask the preamble behind it.
-  const headingAt = cleaned.search(REVIEW_HEADING_RE);
-  if (headingAt > 0) cleaned = cleaned.slice(headingAt);
-
-  // Re-prepend exactly one marker — ours.
-  cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
-
-  // Normalize the review heading to the branded title, dropping any trailing "(Label)" an older
-  // comment or the model itself appended — the posted review must not name the model.
-  cleaned = cleaned.replace(
-    /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b[ \t]*[^\n]*$/mi,
-    REVIEW_HEADING,
-  );
-
-  const scrubbed = scrubReviewBody(redactProviderIdentity(cleaned.trim()), process.env);
-  if (scrubbed.secretHits > 0) {
-    console.warn(`[${isoNow()}] Redacted ${scrubbed.secretHits} secret-shaped value(s) from the review before posting`);
-    TRACE.setSpanAttributes(activeRootSpan, { "security.output_scrub.hits": scrubbed.secretHits });
-  }
-  return scrubbed.text;
+  return text;
 }
 
 // ─── Coordinator pass ─────────────────────────────────────────────────────
 
-async function runCoordinator(agentResults, prContext, tier, existingReview, parentSpan) {
+async function runCoordinator(agentResults, passResults, prContext, tier, existingReview, parentSpan) {
   const coordinatorPrompt = readPrompt("agents/coordinator.md");
   const sharedRules = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
 
-  const findingsSections = agentResults
-    .filter(r => r.findings.length > 0)
-    .map(r => {
-      const xml = r.findings.map(f => `  <finding>
-    <category>${f.category}</category>
-    <severity>${f.severity}</severity>
-    <file>${f.file}</file>
-    <line>${f.line}</line>
-    <summary>${f.summary}</summary>
-    <description>${f.description}</description>
-    <suggestion>${f.suggestion}</suggestion>
-  </finding>`).join("\n");
-      return `<reviewer name="${r.agentName}">\n${xml}\n</reviewer>`;
-    }).join("\n");
-
-  const failedAgents = agentResults.filter(r => r.error);
+  const failedAgents = agentResults.filter(r => !r.skipped && !reviewerFinished(r));
   const failedNote = failedAgents.length > 0
     ? `\n<failed_reviewers>${failedAgents.map(r => r.agentName).join(", ")}</failed_reviewers>`
     : "";
@@ -1091,18 +1052,28 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   // Authoritative list of reviewers that actually ran (not skipped, not failed). The coordinator
   // must render the "Reviewers" row from THIS, not infer it — a reviewer with no findings sends no
   // <reviewer> block, so without this the LLM guesses and can invent an agent that never ran.
-  const ranReviewers = agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName);
+  const ranReviewers = agentResults.filter(reviewerFinished).map(r => r.agentName);
+  const passesNote = REVIEW_COLD_PASSES > 1
+    ? `<cold_passes>Each reviewer ran ${REVIEW_COLD_PASSES} independent passes with no shared context; a reviewer name ending in "pass N/${REVIEW_COLD_PASSES}" is one of them. A finding raised by only one pass is still a finding: keep it. Merge findings that describe the same issue into one, keeping the higher severity. List each reviewer once in the Reviewers row, without a pass suffix.</cold_passes>`
+    : "";
 
-  const userPrompt = [
+  const buildPrompt = findingsSections => [
     `<coordinator_task>`,
     `<overall_pr_context>${prContext}</overall_pr_context>`,
     `<risk_tier>${tier}</risk_tier>`,
     `<reviewers_ran>${ranReviewers.join(", ")}</reviewers_ran>`,
+    passesNote,
     `<all_findings>${findingsSections}</all_findings>`,
     failedNote,
     existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
     `</coordinator_task>`,
   ].join("\n");
+  const fit = fitCoordinatorPrompt(passResults, REVIEW_COLD_PASSES, buildPrompt);
+  if (fit.mode === "compacted") {
+    console.warn(`[${isoNow()}] Coordinator input compacted from ${fit.fullChars} to ${fit.chars} chars to fit the ${MAX_USER_PROMPT_CHARS}-char limit`);
+  } else if (fit.mode === "too_large") {
+    console.warn(`[${isoNow()}] Coordinator input is ${fit.chars} chars and does not fit ${MAX_USER_PROMPT_CHARS} even compacted; using the deterministic fallback`);
+  }
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
   const coordinatorAgent = tierConfig.coordinatorAgent || COORDINATOR_AGENT;
@@ -1117,16 +1088,20 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
-    "review.failed_agents": agentResults.filter(r => r.error).length,
+    "review.failed_agents": failedAgents.length,
+    "review.passes": REVIEW_COLD_PASSES,
+    "review.coordinator_input": fit.mode,
+    "review.coordinator_input_chars": fit.chars,
   }, parentSpan);
 
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
+    if (fit.mode === "too_large") throw new Error(`coordinator input of ${fit.chars} chars exceeds the ${MAX_USER_PROMPT_CHARS}-char limit even compacted`);
     // Reviewer retries can eat into the run, so the coordinator gets what is left rather than a fixed slot past the watchdog.
     const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - POST_RESERVE_MS);
     if (timeoutMs < MIN_COORDINATOR_MS) throw new Error(`only ${Math.round(remainingRunMs() / 1000)}s left in the run`);
-    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, timeoutMs, {
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, fit.prompt, timeoutMs, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
@@ -1134,7 +1109,8 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     });
     // The machine-readable list of kept findings never reaches the summary comment.
     const inline = extractInlineBlock(completion.text);
-    if (inline.error) console.warn(`[${isoNow()}] Coordinator inline block: ${inline.error}; no inline comments from it`);
+    // Without its list the report may be cut off, and stamping it would hide the reviewers' blockers from every later run.
+    if (inline.error) throw new Error(`inline block: ${inline.error}`);
     TRACE.endSpan(coordinatorSpan, {
       "review.output_length": completion.text.length,
       "gen_ai.response.id": completion.responseId,
@@ -1143,145 +1119,27 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     return {
       text: inline.text,
       kept: inline.findings,
+      findingsKnown: !inline.error,
       genAIResponseId: completion.responseId,
       fallback: false,
       error: null,
     };
   } catch (err) {
     console.error(`[${isoNow()}] Coordinator failed: ${err.message}`);
-    const fallback = buildFallbackReview(agentResults, tier, failedAgents);
+    const fallback = buildFallbackReview(agentResults, tier, failedAgents, REVIEW_MARKER);
     TRACE.endSpan(coordinatorSpan, {
       "review.fallback": true,
       "review.output_length": fallback.length,
     }, err);
     return {
       text: fallback,
-      kept: dedupeFindings(agentResults).map(toKeptFinding),
+      kept: selectFallbackFindings(agentResults).map(toKeptFinding),
+      findingsKnown: true,
       genAIResponseId: "",
       fallback: true,
       error: err.message,
     };
   }
-}
-
-// Same shape as an entry of the coordinator's inline block.
-function toKeptFinding(f) {
-  return {
-    file: (f.file || "").replace(/^\.?\//, ""),
-    line: Number.parseInt(f.line, 10) || 0,
-    severity: (f.severity || "").toLowerCase(),
-    category: f.category || "",
-    title: f.summary,
-    body: [f.description, f.suggestion ? `**Fix:** ${f.suggestion}` : ""].filter(Boolean).join("\n\n"),
-  };
-}
-
-function dedupeFindings(agentResults) {
-  const allFindings = agentResults.flatMap(r => r.findings);
-
-  const seen = new Map();
-  const deduped = [];
-  for (const f of allFindings) {
-    const key = `${(f.category || "").toLowerCase()}|${(f.summary || "").toLowerCase().slice(0, 120)}`;
-    const existing = seen.get(key);
-    if (existing) {
-      const severityRank = { critical: 3, warning: 2, suggestion: 1, low: 0 };
-      if ((severityRank[f.severity?.toLowerCase()] || 0) > (severityRank[existing.severity?.toLowerCase()] || 0)) {
-        existing.severity = f.severity;
-        existing.description = f.description || existing.description;
-        existing.suggestion = f.suggestion || existing.suggestion;
-        existing.file = f.file || existing.file;
-        existing.line = f.line || existing.line;
-      }
-    } else {
-      seen.set(key, { ...f });
-      deduped.push(seen.get(key));
-    }
-  }
-  return deduped;
-}
-
-function buildFallbackReview(agentResults, tier, failedAgents) {
-  const allFindings = agentResults.flatMap(r => r.findings);
-  const deduped = dedupeFindings(agentResults);
-
-  const MAX_FALLBACK_FINDINGS = 15;
-  const sorted = deduped
-    .sort((a, b) => {
-      const rank = { critical: 3, warning: 2, suggestion: 1, low: 0 };
-      return (rank[b.severity?.toLowerCase()] || 0) - (rank[a.severity?.toLowerCase()] || 0);
-    })
-    .slice(0, MAX_FALLBACK_FINDINGS);
-
-  if (sorted.length === 0) {
-    return `${REVIEW_MARKER}
-${REVIEW_HEADING}
-
-> [!TIP]
-> ### ✅ Approved
-> LGTM — No issues found by automated reviewers.
-
-**🔴 0 blockers · 🟡 0 warnings · 🔵 0 suggestions**
-
-<details>
-<summary>🧾 Review details</summary>
-
-- Risk tier: ${tier}
-${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
-
-</details>`;
-  }
-
-  const findingLine = f => {
-    const glyph = CATEGORY_GLYPH[(f.category || "").toLowerCase()] || "•";
-    const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
-    const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
-    const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
-    return `- ${glyph} ${loc}${cat}${f.summary}${fix}`;
-  };
-
-  const bySeverity = { critical: [], warning: [], suggestion: [] };
-  for (const f of sorted) {
-    const sev = (f.severity || "suggestion").toLowerCase();
-    (bySeverity[sev in bySeverity ? sev : "suggestion"]).push(f);
-  }
-
-  const sections = [];
-  if (bySeverity.critical.length > 0) {
-    sections.push(`#### 🔴 Blockers`, ...bySeverity.critical.map(findingLine), "");
-  }
-  if (bySeverity.warning.length > 0) {
-    sections.push(`#### 🟡 Warnings`, ...bySeverity.warning.map(findingLine), "");
-  }
-  if (bySeverity.suggestion.length > 0) {
-    sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
-  }
-
-  const dedupNote = allFindings.length > sorted.length
-    ? `\n> Deduplicated: ${allFindings.length} raw findings → ${sorted.length} unique (${allFindings.length - sorted.length} duplicates removed).`
-    : "";
-
-  return `${REVIEW_MARKER}
-${REVIEW_HEADING}
-
-> [!NOTE]
-> ### 💬 Approved with comments
-> Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${dedupNote}
-
-**🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion**
-
-<details open>
-<summary>📋 Show findings (${sorted.length})</summary>
-
-${sections.join("\n")}
-
----
-
-- Risk tier: ${tier}
-- Reviewers completed: ${agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName).join(", ") || "none"}
-${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
-
-</details>`;
 }
 
 // ─── GitHub integration ────────────────────────────────────────────────────
@@ -1301,39 +1159,53 @@ function findExistingReviewComment(prNumber) {
   }
 }
 
-function passLimitNote() {
-  return `> [!NOTE]\n> This PR has used its ${REVIEW_MAX_PASSES} automatic reviews; later pushes are not reviewed. Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.`;
-}
-
-function isPlaceholderComment(body) {
-  return body.includes(PAIRED_POINTER_TAG) || body.includes(NOTICE_TAG);
-}
-
 function passesDoneIn(comment) {
   if (!comment) return 0;
   return reviewPassCount(comment.body, isPlaceholderComment(comment.body) ? 0 : 1);
 }
 
-function withPassTag(body, count) {
-  return `${body.replace(new RegExp(`\\n?${REVIEW_PASS_TAG}`, "gi"), "")}\n${reviewPassTag(count)}`;
-}
-
-// Recorded before any reviewer starts, so a run cancelled by a newer push still uses up its pass; returns the comment id.
-function claimReviewPass(prNumber, existingComment, count) {
+// Recorded before any reviewer starts, so a run stopped midway (label removed, draft, crash) still uses up its pass; returns the comment id.
+function claimReviewPass(prNumber, existingComment, count, key) {
   if (existingComment) {
-    return updateReviewComment(prNumber, existingComment.id, withPassTag(existingComment.body, count)).id;
+    return updateReviewComment(prNumber, existingComment.id, claimedReviewBody(existingComment.body, count, key)).id;
   }
   const placeholder = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`;
   return postReviewComment(prNumber, withPassTag(placeholder, count));
 }
 
-function postReviewComment(prNumber, body) {
-  const tmpFile = `/tmp/review_comment_${randomUUID()}.txt`;
-  writeFileSync(tmpFile, body, "utf-8");
+// Advisory like the review: the skip stands whether or not the note lands.
+function noteOnComment(prNumber, comment, body) {
+  if (body === comment.body) return;
   try {
-    const out = gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
-    const m = out.match(/#issuecomment-(\d+)/);
-    return m ? m[1] : null;
+    updateReviewComment(prNumber, comment.id, body);
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not update the review comment: ${execErrorText(err).slice(0, 300)}`);
+  }
+}
+
+// Costs no pass: nothing was reviewed, but a verdict covers one commit and this push is not that commit.
+function noteUnreviewedHead(prNumber, comment, key) {
+  if (comment) noteOnComment(prNumber, comment, bodyAtUnreviewedHead(comment.body, key));
+}
+
+// Costs no pass and calls no model: the commit was reviewed, only a run that stopped on another head left its line behind.
+function noteReviewedHead(prNumber, comment) {
+  noteOnComment(prNumber, comment, bodyAtReviewedHead(comment.body, REVIEW_MAX_PASSES));
+}
+
+function noteFailedRun(prNumber, comment, key) {
+  if (comment) noteOnComment(prNumber, comment, bodyAtFailedRun(comment.body, key));
+}
+
+function noteSkippedPush(prNumber, comment, key) {
+  noteOnComment(prNumber, comment, bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key));
+}
+
+function postReviewComment(prNumber, body) {
+  const tmpFile = `/tmp/review_comment_${randomUUID()}.json`;
+  writeFileSync(tmpFile, JSON.stringify({ body }));
+  try {
+    return gh(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments" --method POST --input "${tmpFile}" --jq .id`) || null;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -1360,7 +1232,17 @@ function updateReviewComment(prNumber, commentId, body) {
   }
 }
 
-// Inline threads for the kept blockers and warnings. Advisory like the rest of the review: any failure is logged, never fatal.
+function githubReviewApi(prNumber) {
+  const repoPath = `repos/${process.env.GITHUB_REPOSITORY}/pulls/${prNumber}`;
+  return {
+    readPr: () => JSON.parse(gh(`api "${repoPath}"`)),
+    listReviews: () => JSON.parse(gh(`api --paginate --slurp "${repoPath}/reviews"`)).flat(),
+    dismissReview: (id, message) => gh(`api "${repoPath}/reviews/${id}/dismissals" --method PUT --input -`, JSON.stringify({ message })),
+    approve: payload => gh(`api "${repoPath}/reviews" --method POST --input -`, JSON.stringify(payload)),
+  };
+}
+
+// Advisory like the rest of the review, so the caller logs a failure here and never fails the job on it.
 function postInlineReview(prNumber, kept, ownDiff) {
   if (!REVIEW_INLINE) {
     console.log(`[${isoNow()}] REVIEW_INLINE=false; not posting inline comments`);
@@ -1375,7 +1257,7 @@ function postInlineReview(prNumber, kept, ownDiff) {
   console.log(`[${isoNow()}] Inline: ${selected.length} to post; dropped ${JSON.stringify(dropped)}`);
   if (selected.length === 0) return { posted: 0, dropped };
   const scrub = text => {
-    const scrubbed = scrubReviewBody(redactProviderIdentity(text), process.env);
+    const scrubbed = scrubReviewBody(redactIdentity(text), process.env);
     if (scrubbed.secretHits > 0) console.warn(`[${isoNow()}] Redacted ${scrubbed.secretHits} secret-shaped value(s) from an inline comment`);
     return scrubbed.text;
   };
@@ -1392,10 +1274,10 @@ function postInlineReview(prNumber, kept, ownDiff) {
 }
 
 // Model output only (parsed findings, no raw text, no prompts), scrubbed like the comment, for grading what the coordinator kept.
-function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult) {
+function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult, confidence, autoApprove) {
   if (!REVIEW_ARTIFACT_DIR) return;
   try {
-    const clean = text => scrubSecrets(redactProviderIdentity(text), process.env).text;
+    const clean = text => scrubSecrets(redactIdentity(text), process.env).text;
     const data = mapStrings({
       pr: String(prNumber),
       head_sha: process.env.HEAD_SHA || "",
@@ -1404,13 +1286,23 @@ function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlin
         agent: r.agentKey,
         name: r.agentName,
         skipped: Boolean(r.skipped),
+        parsed: r.parsed === true,
         error: r.error || null,
         findings: r.findings,
+        pass_results: (r.passResults || [r]).map(p => ({
+          pass: p.pass ?? 1,
+          skipped: Boolean(p.skipped),
+          parsed: p.parsed === true,
+          error: p.error || null,
+          findings: p.findings,
+        })),
       })),
       coordinator: coordinatorResult
         ? { fallback: coordinatorResult.fallback, error: coordinatorResult.error, kept: coordinatorResult.kept || [] }
         : null,
       inline: inlineResult,
+      merge_confidence: confidence,
+      auto_approve: autoApprove,
     }, clean);
     mkdirSync(REVIEW_ARTIFACT_DIR, { recursive: true });
     writeFileSync(resolve(REVIEW_ARTIFACT_DIR, "review-findings.json"), `${JSON.stringify(data, null, 2)}\n`);
@@ -1420,6 +1312,34 @@ function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlin
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
+
+// A variant the config does not declare would fail every session, so the run stops before it claims a pass.
+function variantProblem() {
+  let config;
+  try {
+    config = JSON.parse(stripJsonc(readFileSync(OPENCODE_CONFIG_PATH, "utf-8")));
+  } catch (err) {
+    return `cannot read ${OPENCODE_CONFIG.file}: ${err.message}`;
+  }
+  const known = modelVariantIds(config, PROVIDER_ID, MODEL_ID);
+  const unknown = [...new Set([MODEL_VARIANT, COORDINATOR_VARIANT])].filter(v => v && !known.includes(v));
+  return unknown.length > 0 ? `variant "${unknown.join('", "')}" is not declared for ${MODEL_SLUG} in ${OPENCODE_CONFIG.file} (declared: ${known.join(", ") || "none"})` : "";
+}
+
+// Fetched ahead of the cap check, and only when the comment holds a fingerprint, so a push that changed nothing is skipped even past the cap.
+function unchangedDiffCheck(prNumber, comment) {
+  const force = REVIEW_MANUAL_RUN || REVIEW_IGNORE_PASS_LIMIT || process.env.FORCE_FULL === "true";
+  if (force || !reviewedDiffFingerprint(comment?.body)) return null;
+  try {
+    const fetched = fetchPrDiff(prNumber);
+    const fingerprint = diffFingerprint(fetched.diff);
+    const unchanged = shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned, force }) && hunksLocatable(fetched.diff, readBaseFile);
+    return { fetched, unchanged };
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not fetch the diff to compare with the last review, so it is reviewed: ${execErrorText(err).slice(0, 300)}`);
+    return null;
+  }
+}
 
 function prepareReviewTree(rootSpan) {
   if (!PR_DIR) {
@@ -1472,12 +1392,42 @@ async function main() {
     if (!REVIEW_IGNORE_PASS_LIMIT && !lookup.ok) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_count_unknown" });
-      throw new Error("Cannot read this PR's review comments (no reviewer app token, or the comment list failed), so the review limit cannot be checked; not reviewing.");
+      throw new Error("Cannot read this PR's review comments (no reviewer app token, or the comment list failed), so the reviewed commit and the review limit cannot be checked; not reviewing.");
     }
-    if (!REVIEW_IGNORE_PASS_LIMIT && passesDone >= REVIEW_MAX_PASSES) {
-      console.log(`[${isoNow()}] PR #${prNumber} already had ${passesDone}/${REVIEW_MAX_PASSES} reviews; skipping. Dispatch the workflow with ignore_pass_limit to review again.`);
+    const headKey = reviewKey(process.env.HEAD_SHA, PAIRED.head);
+    const skipReason = reviewSkipReason({
+      body: existingComment?.body,
+      key: headKey,
+      passesDone,
+      maxPasses: REVIEW_MAX_PASSES,
+      ignorePassLimit: REVIEW_IGNORE_PASS_LIMIT,
+      forceFull: process.env.FORCE_FULL === "true",
+      manual: REVIEW_MANUAL_RUN,
+    });
+    const gate = createAutoApproveGate({
+      mode: AUTO_APPROVE_MODE,
+      api: githubReviewApi(prNumber),
+      botLogin: REVIEW_BOT_LOGIN,
+      headSha: process.env.HEAD_SHA,
+      warn: message => console.warn(`[${isoNow()}] Auto-approve: ${message}`),
+    });
+    // Ahead of the cap skip too: a push the cap leaves unreviewed must still lose the earlier approval.
+    if (skipReason !== "already_reviewed") gate.start();
+    const early = skipReason === "already_reviewed" ? null : unchangedDiffCheck(prNumber, existingComment);
+    if (early?.unchanged) {
+      console.log(`[${isoNow()}] PR #${prNumber} skipped (unchanged_diff): ${headKey} changes the same lines the last review read. Dispatch the workflow to review it again.`);
+      const kept = bodyAtUnchangedDiff(existingComment.body, headKey, REVIEW_MAX_PASSES);
+      noteOnComment(prNumber, existingComment, AUTO_APPROVE_MODE === "approve" ? withoutCarriedApproval(kept) : kept);
       outcome = "skipped";
-      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_limit_reached" });
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "unchanged_diff" });
+      return;
+    }
+    if (skipReason) {
+      console.log(`[${isoNow()}] PR #${prNumber} skipped (${skipReason}): ${headKey || "no head"}, ${passesDone} review(s) so far. Dispatch the workflow with ignore_pass_limit to review again.`);
+      if (skipReason === "pass_limit_reached") noteSkippedPush(prNumber, existingComment, headKey);
+      else noteReviewedHead(prNumber, existingComment);
+      outcome = "skipped";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": skipReason });
       return;
     }
 
@@ -1505,16 +1455,24 @@ async function main() {
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
+    const variantError = variantProblem();
+    if (variantError) {
+      outcome = "misconfigured";
+      TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "unknown_variant" });
+      noteFailedRun(prNumber, existingComment, headKey);
+      throw new Error(`${variantError}; fix AI_REVIEW_EFFORT or AI_REVIEW_COORDINATOR_EFFORT.`);
+    }
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured, reviewers at "${MODEL_VARIANT || "default"}", coordinator at "${COORDINATOR_VARIANT || "default"}"`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
     let diff;
     // This repo's diff alone: inline comments can only anchor to files of this PR, not the paired one.
     let ownDiff;
+    let diffPinned = false;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      ({ diff, own: ownDiff } = fetchPrDiff(prNumber));
+      ({ diff, own: ownDiff, pinned: diffPinned } = early?.fetched ?? fetchPrDiff(prNumber));
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
@@ -1522,6 +1480,7 @@ async function main() {
       const detail = execErrorText(err);
       console.error(`Failed to fetch PR diff: ${detail}`);
       TRACE.endSpan(diffSpan, {}, err);
+      noteUnreviewedHead(prNumber, existingComment, headKey);
       throw new Error(`Failed to fetch PR diff: ${detail}`);
     }
 
@@ -1530,7 +1489,10 @@ async function main() {
     const rawFiles = parseDiffFiles(diff);
     const filtered = filterDiff(diff);
     const changedLines = filtered.totalAdded + filtered.totalRemoved;
+    // The unfiltered diff: a lockfile or asset the filter hides still changes what the verdict covers.
+    const fingerprint = diffFingerprint(diff);
     TRACE.endSpan(filterSpan, {
+      "diff.fingerprint": fingerprint,
       "diff.changed_lines": changedLines,
       "diff.filtered_files": filtered.files.length,
       "diff.skipped_files": rawFiles.length - filtered.files.length,
@@ -1541,6 +1503,7 @@ async function main() {
 
     if (changedLines === 0) {
       console.log("No meaningful changes to review after filtering. Skipping.");
+      noteUnreviewedHead(prNumber, existingComment, headKey);
       outcome = "skipped";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
@@ -1553,7 +1516,10 @@ async function main() {
     const riskSpan = TRACE.startSpan("ai_review.risk_assessment", {
       "review.force_full": process.env.FORCE_FULL === "true",
     }, rootSpan);
-    const tier = process.env.FORCE_FULL === "true" ? "full" : assessRiskTier(filtered);
+    // Only the full tier runs Security, which the auto-approve gate requires.
+    const rawDiffFacts = parseRawDiff(diff);
+    const gateNeedsFullTier = gate.active && sizeReasons(rawDiffFacts).length === 0;
+    const tier = process.env.FORCE_FULL === "true" || gateNeedsFullTier ? "full" : assessRiskTier(filtered);
     const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
     const selectedAgents = selectAgents(tierConfig, filtered);
     TRACE.endSpan(riskSpan, {
@@ -1573,6 +1539,7 @@ async function main() {
 
     // 4. PR context
     let prContext = `PR #${prNumber} in ${process.env.GITHUB_REPOSITORY}`;
+    let reviewedText = null;
     const contextSpan = TRACE.startSpan("github.pr.context", { "github.pr.number": prNumber }, rootSpan);
     try {
       const prData = ghJson(`pr view "${prNumber}" --json title,body,author,files,baseRefOid,headRefOid`);
@@ -1584,6 +1551,7 @@ async function main() {
         `Files changed: ${prData.files?.length || filtered.files.length}`,
         `Description: ${prData.body || "N/A"}`,
       ].join("\n") + pairedPrContext();
+      reviewedText = { title: prData.title, body: prData.body };
       TRACE.endSpan(contextSpan, {
         "github.pr.author": prData.author?.login || "unknown",
         "github.pr.file_count": prData.files?.length || filtered.files.length,
@@ -1605,16 +1573,16 @@ async function main() {
       if (isPlaceholderComment(existingComment.body)) {
         console.log(`[${isoNow()}] Replacing pointer/notice comment #${existingComment.id} with a review`);
       } else {
-        existingReview = existingComment.body;
+        existingReview = previousReviewText(existingComment.body);
         console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingComment.id}`);
       }
     }
     let existingCommentId = existingComment?.id ?? null;
     if (lookup.ok) {
       try {
-        existingCommentId = claimReviewPass(prNumber, existingComment, passesDone + 1);
+        existingCommentId = claimReviewPass(prNumber, existingComment, passesDone + 1, headKey);
       } catch (err) {
-        throw new Error(`Could not record the review pass, so the review limit cannot be enforced; not reviewing: ${execErrorText(err).slice(0, 300)}`);
+        throw new Error(`Could not record the review pass, so the review count cannot be kept; not reviewing: ${execErrorText(err).slice(0, 300)}`);
       }
     }
 
@@ -1627,32 +1595,36 @@ async function main() {
       console.warn(`[${isoNow()}] Impact map skipped: ${err.message}`);
     }
     const agentsToRun = selectedAgents;
-    console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers in parallel...`);
+    const plan = passPlan(agentsToRun, REVIEW_COLD_PASSES);
+    console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers x ${REVIEW_COLD_PASSES} cold passes (${plan.length} sessions, up to ${REVIEWER_CONCURRENCY} at once)...`);
 
-    const agentResults = await Promise.allSettled(
-      agentsToRun.map(agentKey => {
-        const def = AGENTS[agentKey];
-        if (!def) return Promise.resolve({ agentKey, agentName: agentKey, findings: [], error: `Unknown agent: ${agentKey}`, genAIResponseId: "" });
-        return runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact);
-      }),
-    );
+    const settled = await runPooled(plan, REVIEWER_CONCURRENCY, ({ agentKey, pass }) => {
+      const def = AGENTS[agentKey];
+      if (!def) return Promise.resolve({ agentKey, agentName: agentKey, pass, findings: [], error: `Unknown agent: ${agentKey}`, genAIResponseId: "" });
+      return runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact, gateNeedsFullTier, pass);
+    });
 
-    const results = agentResults.map(r => r.status === "fulfilled" ? r.value : { agentKey: "unknown", agentName: "unknown", findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
+    const passResults = settled.map((r, i) => r.status === "fulfilled"
+      ? r.value
+      : { agentKey: plan[i].agentKey, agentName: AGENTS[plan[i].agentKey]?.name || plan[i].agentKey, pass: plan[i].pass, findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
+    // One entry per area from here on; the coordinator alone sees each pass separately.
+    const results = mergePassResults(passResults);
     const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
     // A requiresFocus agent that saw no files in its domain opted out — it is neither expected
     // nor completed, so it must not count toward coverage.
     const ranResults = results.filter(r => !r.skipped);
-    const failedAgents = ranResults.filter(r => r.error);
-    const completedAgents = ranResults.filter(r => !r.error);
+    // Free-form output is no review, so it counts as a failure everywhere a clean exit would otherwise read as finished.
+    const failedAgents = ranResults.filter(r => r.error || r.parsed !== true);
+    const completedAgents = ranResults.filter(r => !r.error && r.parsed === true);
     const failedAgentNames = failedAgents.map(r => r.agentName);
     const failureReasons = Object.fromEntries(
-      failedAgents.map(r => [r.agentName, r.error]),
+      failedAgents.map(r => [r.agentName, r.error || UNPARSEABLE_OUTPUT]),
     );
     const coverageRatio = ranResults.length > 0 ? completedAgents.length / ranResults.length : 0;
     if (failedAgents.length > 0 && failedAgents.length < ranResults.length) {
       outcome = "partial_success";
     }
-    const reviewerResponseIds = results.map(r => r.genAIResponseId).filter(Boolean);
+    const reviewerResponseIds = passResults.map(r => r.genAIResponseId).filter(Boolean);
     TRACE.setSpanAttributes(rootSpan, {
       "review.total_findings": totalFindings,
       "review.failed_agents": failedAgents.length,
@@ -1663,12 +1635,14 @@ async function main() {
       "review.expected_agent_count": ranResults.length,
       "review.coverage_ratio": coverageRatio,
       "review.degraded": failedAgents.length > 0,
+      "review.cold_passes": REVIEW_COLD_PASSES,
+      "review.lost_pass_agents": lostPasses(results).map(r => r.agentName),
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
     // 7. Coordinator pass — unless nothing survived to coordinate.
     //
-    // If EVERY reviewer failed there are no findings to consolidate, so the coordinator can
+    // If EVERY reviewer failed or returned nothing parseable there are no findings to consolidate, so the coordinator can
     // only produce "no issues found" — which reads as an approval on a PR that was never
     // actually reviewed. That is strictly worse than posting nothing: it is a green light
     // manufactured from a total outage. Report the failure instead, skip the coordinator
@@ -1683,20 +1657,22 @@ async function main() {
       outcome = "all_agents_failed";
       exitCode = 1;
       const detail = failedAgents
-        .map(r => `- ${r.agentName}: ${r.error}`)
+        .map(r => `- ${r.agentName}: ${r.error || UNPARSEABLE_OUTPUT}`)
         .join("\n");
       console.error(`[${isoNow()}] All ${ranResults.length} reviewers failed — skipping coordinator and reporting failure.`);
       TRACE.setSpanAttributes(rootSpan, {
         "review.all_agents_failed": true,
         "review.coordinator_skipped": true,
       });
+      const partial = partialFindingsBlock(results);
       finalReview = [
         REVIEW_HEADING,
         ``,
         `> [!CAUTION]`,
         `> ### ⛔ Not reviewed`,
-        `> All ${ranResults.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> All ${ranResults.length} reviewers failed, so ${partial ? "the findings below are incomplete" : "there are no findings to report"} — this is an infrastructure failure, not an approval.`,
         ``,
+        ...(partial ? [partial, ``] : []),
         `<details>`,
         `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
         ``,
@@ -1705,8 +1681,9 @@ async function main() {
         `</details>`,
       ].join("\n");
     } else {
-      coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-      finalReview = insertAfterCallout(coordinatorResult.text, failedReviewersNote(failedAgents, ranResults.length));
+      coordinatorResult = await runCoordinator(results, passResults, prContext, tier, existingReview, rootSpan);
+      const notes = [failedReviewersNote(failedAgents, ranResults.length), lostPassesNote(ranResults)].filter(Boolean).join("\n>\n");
+      finalReview = insertAfterCallout(coordinatorResult.text, notes);
       responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
       if (coordinatorResult.fallback) {
         outcome = "partial_success";
@@ -1718,22 +1695,68 @@ async function main() {
       }
     }
 
+    const confidence = mergeConfidence({
+      counts: severityCounts(coordinatorResult?.kept ?? []),
+      findingsKnown: Boolean(coordinatorResult?.findingsKnown),
+      failedReviewers: unfinishedReviewers(ranResults),
+      ranCount: ranResults.length,
+      coordinatorFallback: Boolean(coordinatorResult?.fallback),
+      // The unfiltered diff: a production asset the noise filter hides from reviewers is still an untested production change.
+      ...changedCodeEvidence(diff, PAIRED.dir),
+    });
     TRACE.setSpanAttributes(rootSpan, {
       "gen_ai.response.ids": responseIds,
       "gen_ai.response.count": responseIds.length,
+      "review.merge_confidence": confidence.level,
     });
 
-    // Written now so a failed post still leaves the findings behind; rewritten with the inline outcome below.
-    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, null);
-
-    // Sanitize and validate before posting
+    // Ahead of the gate, which must judge what gets posted: the sanitizer can discard the callout the model led with.
     const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
-    finalReview = sanitizeReviewBody(finalReview);
-    // A run where every reviewer failed reviewed nothing, so it does not use up a pass.
-    const passes = allAgentsFailed ? passesDone : passesDone + 1;
-    if (passes >= REVIEW_MAX_PASSES) finalReview += `\n\n${passLimitNote()}`;
-    finalReview = withPassTag(finalReview, passes);
-    TRACE.endSpan(sanitizeSpan, { "review.final_length": finalReview.length });
+    const sanitizedReview = sanitizeForPosting(finalReview);
+    TRACE.endSpan(sanitizeSpan, { "review.sanitized_length": sanitizedReview.length });
+
+    // Decided before the comment is written so the line can state what really happened; a failed approval never fails the job.
+    const autoApprove = gate.conclude({
+      diff: rawDiffFacts,
+      diffPinned,
+      reviewedText,
+      reviewConfig: OPENCODE_CONFIG.name,
+      filteredFileCount: filtered.files.length,
+      reviewedChars: prContext.length + filtered.diff.length,
+      confidence,
+      counts: severityCounts(coordinatorResult?.kept ?? []),
+      reviewerFindingCount: totalFindings,
+      findingsKnown: Boolean(coordinatorResult?.findingsKnown),
+      coordinatorFallback: Boolean(coordinatorResult?.fallback),
+      decisionApproved: isApprovedReview(sanitizedReview),
+      reviewers: reviewerFacts(results),
+      paired: Boolean(PAIRED.repo || PAIRED.prNumber || PAIRED.head),
+      pairClear: REVIEW_PAIR_CLEAR,
+    });
+    if (autoApprove) {
+      console.log(`[${isoNow()}] Auto-approve (${autoApprove.mode}): eligible=${autoApprove.eligible} approved=${autoApprove.approved} ${autoApprove.reasons.join("; ")}`);
+      TRACE.setSpanAttributes(rootSpan, {
+        "review.auto_approve.mode": autoApprove.mode,
+        "review.auto_approve.eligible": autoApprove.eligible,
+        "review.auto_approve.eligible_ignoring_config": autoApprove.eligible_ignoring_config,
+        "review.auto_approve.approved": autoApprove.approved,
+        "review.auto_approve.reasons": autoApprove.reasons,
+      });
+    }
+
+    // Written now so a failed post still leaves the findings behind; rewritten with the inline outcome below.
+    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, null, confidence, autoApprove);
+
+    // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
+    const reviewed = completedAgents.length > 0;
+    const passes = reviewed ? passesDone + 1 : passesDone;
+    const complete = reviewComplete(passResults, coordinatorResult);
+    // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed.
+    const fullyRead = diff.length <= MAX_DIFF_TOKENS;
+    if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
+    if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
+    TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
     // 8. Post or update review
@@ -1772,7 +1795,7 @@ async function main() {
         TRACE.endSpan(inlineSpan, {}, err);
       }
     }
-    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult);
+    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult, confidence, autoApprove);
 
     // The failure notice is posted above so it is visible on the PR; now fail the check too,
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands

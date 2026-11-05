@@ -128,7 +128,22 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
 // 129: add source, query_key, streams, run_count, updated_at and status to query_history.
 // 130: add suppress_repeats to alerts.
-pub const DB_SCHEMA_VERSION: u64 = 130;
+// 131: org domain mapping migrations
+// 132: create oncall_chat_messages; add oncall_teams slack columns.
+// 133: add status page run streaks to synthetics.
+// 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
+// 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
+// 136: add applies_to to templates.
+// 137: rename user templates under the reserved o2_default_ prefix.
+// 138: add template to anomaly_detection_config.
+// 139: add template to synthetics.
+// 140: add template to oncall_policies.
+// 141: add templates to downtime_notifications.
+// 142: add templates to oncall_response_events.
+// 143: fold the retired compiled default templates into prebuilt_default.
+// 144: turn a json templates column from an earlier 141 or 142 into text.
+// 145: add alerts.incident_title_template.
+pub const DB_SCHEMA_VERSION: u64 = 145;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -432,9 +447,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
-pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
-    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+/// The shortest `ZO_DYNAMIC_PARTITION_WINDOW_DAYS`: fewer days are too little to move a stream on.
+pub const DYNAMIC_PARTITION_MIN_WINDOW_DAYS: i64 = 3;
+
+/// `ZO_DYNAMIC_PARTITION_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static DYNAMIC_PARTITION_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_partition_stream_types(&get_config().compact.dynamic_partition_stream_types)
         .expect("validated at startup")
 });
 
@@ -1933,6 +1951,12 @@ pub struct Search {
     )]
     pub inverted_index_count_optimizer_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_LIKE_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle using the inverted index for `col LIKE '%x%'` and `col ILIKE '%x%'`. When off, these predicates are answered by scanning files."
+    )]
+    pub inverted_index_like_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
         help = "Toggle tantivy result cache."
@@ -2858,6 +2882,12 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    #[env_config(
+        name = "ZO_OVERVIEW_CACHE_TTL",
+        default = 30,
+        help = "Seconds the org overview response is cached per caller; 0 disables the cache."
+    )]
+    pub overview_cache_ttl: u64,
     // How long an o2-ai session->owner claim survives. Must exceed the longest
     // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
     #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
@@ -3281,6 +3311,72 @@ pub struct Limit {
         help = "Default is 30 days, how many days in past to retain the errored workflow input files"
     )]
     pub workflow_error_retention_secs: i64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_IP_RPM",
+        default = 6000,
+        help = "Requests per minute one client IP may send to workflow HTTP endpoints"
+    )]
+    pub workflow_hook_ip_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_PREAUTH_SLOTS",
+        default = 256,
+        help = "Workflow HTTP endpoint requests read at once before authentication"
+    )]
+    pub workflow_hook_preauth_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_UNRESOLVED_IP_SLOTS",
+        default = 16,
+        help = "Pre-authentication slots shared by requests whose client IP is unknown"
+    )]
+    pub workflow_hook_unresolved_ip_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_RPM",
+        default = 1200,
+        help = "Workflow HTTP endpoint requests per minute per organization"
+    )]
+    pub workflow_hook_org_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_BYTES_PER_MIN",
+        default = 16777216,
+        help = "Workflow HTTP endpoint body bytes per minute per organization; run history keeps about 3x this per minute for ZO_WORKFLOW_ERROR_RETAIN_DURATION"
+    )]
+    pub workflow_hook_org_bytes_per_min: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_QUEUE_MAX",
+        default = 1000,
+        help = "Queued workflow HTTP runs allowed per organization"
+    )]
+    pub workflow_hook_org_queue_max: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_CONCURRENCY",
+        default = 2,
+        help = "Workflow HTTP runs executing at once per organization, at most ZO_WORKFLOW_HOOK_CONCURRENCY"
+    )]
+    pub workflow_hook_org_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_CONCURRENCY",
+        default = 8,
+        help = "Workflow HTTP runs executing at once per region"
+    )]
+    pub workflow_hook_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_RUN_TIMEOUT",
+        default = 900,
+        help = "Seconds a workflow HTTP run may take before it is cancelled"
+    )]
+    pub workflow_hook_run_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_QUEUE_TTL",
+        default = 3600,
+        help = "Seconds a workflow HTTP run may wait in the queue before it expires"
+    )]
+    pub workflow_hook_queue_ttl_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_WORKER_DISABLED",
+        default = false,
+        help = "Never run the workflow HTTP worker on this node"
+    )]
+    pub workflow_hook_worker_disabled: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -3318,11 +3414,17 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
     #[env_config(
-        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        name = "ZO_DYNAMIC_PARTITION_STREAM_TYPES",
         default = "",
-        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `dynamic_partition` overrides this per stream; while it is off the level can be set by hand. Levels already recorded stay in effect. Before downgrading to a version without this setting, set ZO_<TYPE>_QUERY_RETENTION=daily for these types, or queries miss the days already merged by day."
     )]
-    pub dynamic_merge_stream_types: String,
+    pub dynamic_partition_stream_types: String,
+    #[env_config(
+        name = "ZO_DYNAMIC_PARTITION_WINDOW_DAYS",
+        default = 7,
+        help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
+    )]
+    pub dynamic_partition_window_days: i64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -4229,7 +4331,45 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
 
+    check_workflow_hook_limits(&mut cfg.limit);
+
     Ok(())
+}
+
+fn check_workflow_hook_limits(limit: &mut Limit) {
+    if limit.workflow_hook_ip_rpm == 0 {
+        limit.workflow_hook_ip_rpm = 6000;
+    }
+    if limit.workflow_hook_preauth_slots == 0 {
+        limit.workflow_hook_preauth_slots = 256;
+    }
+    if limit.workflow_hook_unresolved_ip_slots == 0 {
+        limit.workflow_hook_unresolved_ip_slots = 16;
+    }
+    if limit.workflow_hook_org_rpm == 0 {
+        limit.workflow_hook_org_rpm = 1200;
+    }
+    if limit.workflow_hook_org_bytes_per_min == 0 {
+        limit.workflow_hook_org_bytes_per_min = 16777216;
+    }
+    if limit.workflow_hook_org_queue_max == 0 {
+        limit.workflow_hook_org_queue_max = 1000;
+    }
+    if limit.workflow_hook_org_concurrency == 0 {
+        limit.workflow_hook_org_concurrency = 2;
+    }
+    if limit.workflow_hook_concurrency == 0 {
+        limit.workflow_hook_concurrency = 8;
+    }
+    if limit.workflow_hook_run_timeout_secs == 0 {
+        limit.workflow_hook_run_timeout_secs = 900;
+    }
+    if limit.workflow_hook_queue_ttl_secs == 0 {
+        limit.workflow_hook_queue_ttl_secs = 3600;
+    }
+    limit.workflow_hook_org_concurrency = limit
+        .workflow_hook_org_concurrency
+        .min(limit.workflow_hook_concurrency);
 }
 
 fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
@@ -4936,7 +5076,15 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Data retention is not allowed to be less than 3 days."
         ));
     }
-    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
+    parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
+    if cfg.compact.dynamic_partition_window_days == 0 {
+        cfg.compact.dynamic_partition_window_days = 7;
+    }
+    if cfg.compact.dynamic_partition_window_days < DYNAMIC_PARTITION_MIN_WINDOW_DAYS {
+        return Err(anyhow::anyhow!(
+            "ZO_DYNAMIC_PARTITION_WINDOW_DAYS is not allowed to be less than {DYNAMIC_PARTITION_MIN_WINDOW_DAYS} days."
+        ));
+    }
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -4990,21 +5138,19 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
-fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+/// Parses `ZO_DYNAMIC_PARTITION_STREAM_TYPES`; only logs, metrics and traces are classified.
+fn parse_dynamic_partition_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
     list.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let stream_type = StreamType::from(s);
-            stream_type
-                .support_dynamic_merge()
-                .then_some(stream_type)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
-                    )
-                })
+        // not `StreamType::from`: it turns an unknown name into logs instead of refusing it
+        .map(|s| match s.to_lowercase().as_str() {
+            "logs" => Ok(StreamType::Logs),
+            "metrics" => Ok(StreamType::Metrics),
+            "traces" => Ok(StreamType::Traces),
+            _ => Err(anyhow::anyhow!(
+                "ZO_DYNAMIC_PARTITION_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+            )),
         })
         .collect()
 }
@@ -6556,6 +6702,37 @@ mod tests {
     }
 
     #[test]
+    fn workflow_hook_limits_replace_zeros_and_cap_org_concurrency() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.workflow_hook_ip_rpm = 0;
+        cfg.limit.workflow_hook_org_bytes_per_min = 0;
+        cfg.limit.workflow_hook_queue_ttl_secs = 0;
+        cfg.limit.workflow_hook_concurrency = 3;
+        cfg.limit.workflow_hook_org_concurrency = 5;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.workflow_hook_ip_rpm, 6000);
+        assert_eq!(cfg.limit.workflow_hook_org_bytes_per_min, 16_777_216);
+        assert_eq!(cfg.limit.workflow_hook_queue_ttl_secs, 3600);
+        assert_eq!(cfg.limit.workflow_hook_org_concurrency, 3);
+
+        let defaults = Config::init().unwrap().limit;
+        assert_eq!(
+            (
+                defaults.workflow_hook_org_rpm,
+                defaults.workflow_hook_org_bytes_per_min,
+                defaults.workflow_hook_org_queue_max,
+                defaults.workflow_hook_concurrency,
+                defaults.workflow_hook_org_concurrency,
+                defaults.workflow_hook_run_timeout_secs,
+                defaults.workflow_hook_preauth_slots,
+                defaults.workflow_hook_unresolved_ip_slots,
+            ),
+            (1200, 16_777_216, 1000, 8, 2, 900, 256, 16)
+        );
+        assert!(!defaults.workflow_hook_worker_disabled);
+    }
+
+    #[test]
     fn test_check_limit_config_batch_size_clamping() {
         let mut cfg = Config::init().unwrap();
         cfg.limit.batch_size = 0;
@@ -6817,15 +6994,34 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_merge_stream_types_accept_only_merged_types() {
-        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+    fn dynamic_partition_window_days_is_at_least_three() {
+        let check = |days| {
+            let mut cfg = Config::default();
+            cfg.compact.dynamic_partition_window_days = days;
+            super::check_compact_config(&mut cfg).map(|_| cfg.compact.dynamic_partition_window_days)
+        };
+        assert_eq!(check(0).unwrap(), 7);
+        assert_eq!(check(3).unwrap(), 3);
+        assert_eq!(check(30).unwrap(), 30);
+        for days in [1, 2, -1] {
+            assert!(check(days).is_err(), "{days}");
+        }
+    }
+
+    #[test]
+    fn dynamic_partition_stream_types_accept_only_supported_types() {
+        let set = super::parse_dynamic_partition_stream_types(" logs, Metrics ,,traces ").unwrap();
         assert_eq!(set.len(), 3);
         assert!(
-            super::parse_dynamic_merge_stream_types("")
+            super::parse_dynamic_partition_stream_types("")
                 .unwrap()
                 .is_empty()
         );
-        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,index").is_err());
+        // unknown names must not fall back to logs
+        assert!(super::parse_dynamic_partition_stream_types("foo").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("log").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,foo").is_err());
     }
 
     #[test]

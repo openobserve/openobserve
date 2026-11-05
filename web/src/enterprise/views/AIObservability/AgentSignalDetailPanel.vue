@@ -71,6 +71,7 @@
           :data="errorRows"
           :columns="errorColumns"
           :loading="loading"
+          :loading-reset-key="row"
           :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
           :frame="false"
@@ -121,17 +122,38 @@
           :data="traceRows"
           :columns="traceColumns"
           :loading="loading"
+          :loading-reset-key="row"
           :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
           :frame="false"
           pagination="client"
           :page-size="10"
-          @row-click="openTrace"
+          v-on="rowClickListeners"
         >
           <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
-            <span class="text-text-link inline-flex max-w-full items-center gap-1 hover:underline">
+            <span
+              v-if="tracesLock.locked.value"
+              class="text-text-secondary inline-flex max-w-full items-center gap-1"
+              aria-disabled="true"
+            >
+              <OTooltip :content="tracesLock.lockedReason.value">
+                <span class="inline-flex">
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="agent-signal-detail-trace-lock"
+                  />
+                </span>
+              </OTooltip>
+              <OTruncatedText class="font-mono">{{ row.trace_id }}</OTruncatedText>
+            </span>
+            <span
+              v-else
+              class="text-text-link inline-flex max-w-full items-center gap-1 hover:underline"
+            >
               <OIcon
                 name="open-in-new"
                 size="xs"
@@ -162,6 +184,8 @@ import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildAgentClimbFilter } from "./agentClimbFilter";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -195,6 +219,7 @@ const emit = defineEmits<{ (e: "update:open", v: boolean): void }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
 
 const errorRows = ref<
   Array<{
@@ -554,6 +579,7 @@ const openTrace = (row: Record<string, any>) => {
   });
   window.open(resolved.href, "_blank", "noopener,noreferrer");
 };
+const rowClickListeners = computed(() => (tracesLock.locked.value ? {} : { rowClick: openTrace }));
 
 watch(
   () => [props.open, props.row],

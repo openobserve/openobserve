@@ -87,6 +87,7 @@ vi.mock("@/aws-exports", () => ({
 
 import AlertInsights from "@/components/alerts/AlertInsights.vue";
 import alertsService from "@/services/alerts";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 async function mountComp(props: Record<string, any> = {}) {
   return mount(AlertInsights, {
@@ -351,6 +352,22 @@ describe("AlertInsights - handleChartContextMenu", () => {
       panel: {},
     });
     expect((w.vm as any).contextMenu.show).toBe(false);
+  });
+});
+
+describe("AlertInsights - filter toggle tooltips", () => {
+  it.each([
+    ["failed-only-toggle", "alerts.insights.filters.failedOnlyTooltip"],
+    ["silenced-only-toggle", "alerts.insights.filters.silencedTooltip"],
+  ])("renders the %s tooltip through the OSwitch tooltip slot", async (dataTest, key) => {
+    const w = await mountComp();
+    await flushPromises();
+    const info = w.find(`[data-test="${dataTest}-info"]`);
+    expect(info.exists()).toBe(true);
+    const tooltip = info.findComponent(OTooltip);
+    expect(tooltip.exists()).toBe(true);
+    expect(tooltip.props("content")).toBe(i18n.global.t(key));
+    expect(tooltip.props("content")).not.toBe(key);
   });
 });
 

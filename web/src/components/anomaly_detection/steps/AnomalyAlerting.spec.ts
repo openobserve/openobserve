@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -26,7 +26,14 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
+vi.mock("@/services/alert_templates", () => ({
+  default: {
+    list: vi.fn().mockResolvedValue({ data: [{ name: "ops-card", kind: "content" }] }),
+  },
+}));
+
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
+import templateService from "@/services/alert_templates";
 
 const makeConfig = (overrides: Record<string, any> = {}) => ({
   alert_enabled: true,
@@ -104,6 +111,19 @@ describe("AnomalyAlerting - destinations", () => {
     const selectEl = w.find('[data-test="anomaly-destination"]');
     expect(selectEl.exists()).toBe(true);
   });
+
+  it("leaves Jira destinations out of the options", async () => {
+    const w = await mountComp({
+      destinations: [...makeDestinations(), { name: "jira-ops", destination_type_name: "jira" }],
+    });
+    const select = w
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "anomaly-destination");
+    expect(select?.props("options").map((d: { name: string }) => d.name)).toEqual([
+      "slack-dest",
+      "pagerduty-dest",
+    ]);
+  });
 });
 
 describe("AnomalyAlerting - emits", () => {
@@ -170,5 +190,36 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(w.find('[data-test="anomaly-window-share-error"]').text()).toBe(
       t("alerts.anomaly.windowBucketsRange"),
     );
+  });
+
+  it("names the notifications switch after its row label and state", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: true }) });
+    const btn = w.find('[role="switch"]');
+    const name = btn
+      .attributes("aria-labelledby")!
+      .split(" ")
+      .map((id) => w.find(`#${id}`).text())
+      .join(" ");
+    expect(name).toBe("Notifications Enabled");
+  });
+});
+
+describe("AnomalyAlerting - template override", () => {
+  it("lists anomaly templates and writes the pick to the config", async () => {
+    const config = makeConfig({ template: null, template_error: "old" });
+    const w = await mountComp({ config });
+    await flushPromises();
+    expect(templateService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ applies_to: "anomaly" }),
+    );
+    const picker = w.findComponent({ name: "TemplateOverridePicker" });
+    await picker.vm.$emit("update:modelValue", "ops-card");
+    expect(config.template).toBe("ops-card");
+    expect(config.template_error).toBeNull();
+  });
+
+  it("hides the picker while notifications are off", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: false }) });
+    expect(w.findComponent({ name: "TemplateOverridePicker" }).exists()).toBe(false);
   });
 });

@@ -119,7 +119,7 @@ describe("OTableBodyRow selection marking", () => {
     }
   });
 
-  it("gives a clickable row an inset focus-visible outline and no outline transition", () => {
+  it("gives a clickable row an inset focus-visible outline and no transition", () => {
     const classes = mountSelectable({ clickable: true });
     expect(classes).toEqual(
       expect.arrayContaining([
@@ -129,14 +129,51 @@ describe("OTableBodyRow selection marking", () => {
         "focus-visible:outline-focus-ring-accent",
       ]),
     );
-    expect(classes).toContain("transition-[background-color]");
-    expect(classes).not.toContain("transition-colors");
+    expect(classes.filter((c) => /(^|:)transition/.test(c))).toEqual([]);
   });
 
-  it("puts the hover-in and hover-out motion tokens on the background transition", () => {
+  it("switches the hover background instantly so a fast pointer leaves no trail of fading rows", () => {
     const classes = mountSelectable({});
-    expect(classes).toContain("duration-(--duration-hover-out)");
-    expect(classes).toContain("hover:duration-(--duration-hover-in)");
+    expect(classes.filter((c) => /(^|:)(transition|duration-)/.test(c))).toEqual([]);
     expect(classes.some((c) => c.startsWith("focus-visible:outline"))).toBe(false);
+  });
+});
+
+describe("OTableBodyRow auxclick", () => {
+  let wrapper: VueWrapper | undefined;
+  afterEach(() => wrapper?.unmount());
+
+  const mountEmitting = () => {
+    const onAuxclick = vi.fn();
+    const Host = defineComponent({
+      setup: () => () =>
+        h("table", [
+          h("tbody", [
+            h(OTableBodyRow, { row: row as any, table: {} as any, onRowAuxclick: onAuxclick }),
+          ]),
+        ]),
+    });
+    wrapper = mount(Host, { global: { plugins: [i18n] } });
+    return { onAuxclick, tr: wrapper.find('[data-test="o2-table-row-0"]') };
+  };
+
+  it("emits row-auxclick for a middle click and ignores other buttons", async () => {
+    const { onAuxclick, tr } = mountEmitting();
+    await tr.trigger("auxclick", { button: 2 });
+    expect(onAuxclick).not.toHaveBeenCalled();
+    await tr.trigger("auxclick", { button: 1 });
+    expect(onAuxclick).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips a middle click that lands on a link inside the row but not on a plain cell", async () => {
+    const { onAuxclick, tr } = mountEmitting();
+    const anchor = document.createElement("a");
+    const cell = document.createElement("td");
+    tr.element.appendChild(cell);
+    cell.appendChild(anchor);
+    anchor.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(onAuxclick).not.toHaveBeenCalled();
+    cell.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(onAuxclick).toHaveBeenCalledTimes(1);
   });
 });

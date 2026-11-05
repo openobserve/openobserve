@@ -44,29 +44,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("fleet.editor.saveDraft") }}
       </OButton>
-      <OButton
-        v-if="undeployed"
-        variant="outline"
-        size="sm"
-        :disabled="!loaded"
-        data-test="fleet-config-editor-publish"
-        @click="onPublish"
-      >
-        {{ t("fleet.editor.publishVersion") }}
-      </OButton>
+      <span v-if="undeployed" class="inline-flex">
+        <OButton
+          variant="outline"
+          size="sm"
+          :disabled="!loaded || publishUnchanged"
+          data-test="fleet-config-editor-publish"
+          @click="onPublish"
+        >
+          {{ t("fleet.editor.publishVersion") }}
+        </OButton>
+        <OTooltip v-if="publishUnchanged" :content="t('fleet.editor.publishUnchanged')" />
+      </span>
     </template>
 
     <template #actions>
-      <OButton
-        v-if="!undeployed"
-        variant="primary"
-        size="sm"
-        :disabled="!loaded"
-        data-test="fleet-config-editor-publish"
-        @click="onPublish"
-      >
-        {{ t("fleet.editor.publishVersion") }}
-      </OButton>
+      <span v-if="!undeployed" class="inline-flex">
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="!loaded || publishUnchanged"
+          data-test="fleet-config-editor-publish"
+          @click="onPublish"
+        >
+          {{ t("fleet.editor.publishVersion") }}
+        </OButton>
+        <OTooltip v-if="publishUnchanged" :content="t('fleet.editor.publishUnchanged')" />
+      </span>
       <template v-if="undeployed">
         <OButton
           variant="primary"
@@ -202,10 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="relative min-h-0 min-w-0 flex-1">
-        <OEmptyState
+        <OAccessLock
           v-if="!loaded && loadForbidden"
-          size="block"
-          preset="no-access"
+          :denials="loadDenials"
           data-test="fleet-config-editor-forbidden"
         />
         <OEmptyState
@@ -420,6 +423,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OAccessLock from "@/components/access/OAccessLock.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -463,6 +467,7 @@ import {
   useFleetConfigVersion,
 } from "@/components/fleet/useFleetApi";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -543,6 +548,13 @@ const loaded = computed(() => isNew.value || loadedFor.value === id.value);
 const loadForbidden = computed(
   () => isForbidden(config.error.value) || isForbidden(savedVersion.error.value),
 );
+const loadDenials = computed(() => [
+  viewDenial(
+    "fleet_configs",
+    "get",
+    failedRequests(...[config.error.value, savedVersion.error.value].filter(isForbidden)),
+  ),
+]);
 // A failed background refetch keeps the config that already loaded.
 const loadFailed = computed(
   () =>
@@ -568,6 +580,11 @@ const savedYaml = computed(
   () => detail.value?.draft?.yaml ?? savedVersion.version.value?.yaml ?? "",
 );
 const latestVersion = computed(() => detail.value?.versions[0] ?? null);
+// The hash covers the version number, so republishing the same text would roll out as new and fail alike.
+const publishUnchanged = computed(() => {
+  const latest = savedVersion.version.value?.yaml;
+  return latest !== undefined && yamlText.value.trimEnd() === latest.trimEnd();
+});
 const undeployed = computed(() =>
   latestVersion.value?.state === "published" ? latestVersion.value.version : null,
 );

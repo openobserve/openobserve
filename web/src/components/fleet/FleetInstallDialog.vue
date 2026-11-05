@@ -271,6 +271,10 @@ const collectors = useQuery(() =>
   }),
 );
 const collectorsForbidden = computed(() => isForbidden(collectors.error.value));
+// The poll stops while no token is selected, so a token created here must start it again.
+watch(selectedId, (id) => {
+  if (props.open && id) void collectors.refetch({ cancelRefetch: false });
+});
 
 watch(
   () => props.fleetId,

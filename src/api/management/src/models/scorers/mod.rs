@@ -18,7 +18,13 @@ use infra::table::scorers::ScorerType;
 use openobserve_core::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utoipa::ToSchema;
+use utoipa::{
+    PartialSchema, ToSchema,
+    openapi::{
+        RefOr,
+        schema::{ObjectBuilder, OneOfBuilder, Schema, Type},
+    },
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -26,7 +32,11 @@ pub struct LlmJudgeScorerParams {
     pub provider_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_f64"
+    )]
     pub temperature: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
@@ -38,6 +48,25 @@ pub struct LlmJudgeScorerParams {
     pub include_reasoning: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_metadata_fields: Option<Vec<ExtraMetadataField>>,
+}
+
+/// Deserializes an optional float through `serde_json::Number`.
+///
+/// The workspace enables `serde_json/arbitrary_precision`, under which a
+/// non-integer number is handed to visitors as a private map. Inside an
+/// internally tagged enum (`#[serde(tag = "type")]`) that map is buffered and
+/// a plain `f64` field rejects it with `invalid type: map, expected f64`.
+/// `Number` understands both the buffered map and a plain number.
+fn deserialize_optional_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<serde_json::Number>::deserialize(deserializer)?
+        .map(|n| {
+            n.as_f64()
+                .ok_or_else(|| serde::de::Error::custom(format!("{n} is not a valid f64")))
+        })
+        .transpose()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -73,11 +102,28 @@ pub struct RemoteScorerHeader {
     pub value: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ScorerCreateConfig {
     LlmJudge(LlmJudgeScorerRequest),
     Remote(RemoteScorerRequest),
+}
+
+// Not derived: utoipa's allOf keeps additionalProperties:false and so forbids the tag.
+impl PartialSchema for ScorerCreateConfig {
+    fn schema() -> RefOr<Schema> {
+        OneOfBuilder::new()
+            .item(tagged_variant("llm_judge", LlmJudgeScorerRequest::schema()))
+            .item(tagged_variant("remote", RemoteScorerRequest::schema()))
+            .into()
+    }
+}
+
+impl ToSchema for ScorerCreateConfig {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        LlmJudgeScorerRequest::schemas(schemas);
+        RemoteScorerRequest::schemas(schemas);
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
@@ -104,11 +150,34 @@ pub struct RemoteScorerRequest {
     pub params: RemoteScorerParams,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ScorerUpdateConfig {
     LlmJudge(LlmJudgeScorerUpdateRequest),
     Remote(RemoteScorerUpdateRequest),
+}
+
+// Not derived for the same reason as `ScorerCreateConfig`.
+impl PartialSchema for ScorerUpdateConfig {
+    fn schema() -> RefOr<Schema> {
+        OneOfBuilder::new()
+            .item(tagged_variant(
+                "llm_judge",
+                LlmJudgeScorerUpdateRequest::schema(),
+            ))
+            .item(tagged_variant(
+                "remote",
+                RemoteScorerUpdateRequest::schema(),
+            ))
+            .into()
+    }
+}
+
+impl ToSchema for ScorerUpdateConfig {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        LlmJudgeScorerUpdateRequest::schemas(schemas);
+        RemoteScorerUpdateRequest::schemas(schemas);
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
@@ -137,6 +206,22 @@ pub struct RemoteScorerUpdateRequest {
 
 fn params_to_value<T: Serialize>(params: T) -> Value {
     serde_json::to_value(params).unwrap_or_else(|_| serde_json::json!({}))
+}
+
+/// Adds the serde `type` tag to a variant's own object schema.
+fn tagged_variant(tag: &str, variant: RefOr<Schema>) -> RefOr<Schema> {
+    let RefOr::T(Schema::Object(mut object)) = variant else {
+        return variant;
+    };
+    object.properties.insert(
+        "type".to_string(),
+        ObjectBuilder::new()
+            .schema_type(Type::String)
+            .enum_values(Some([tag]))
+            .into(),
+    );
+    object.required.push("type".to_string());
+    RefOr::T(Schema::Object(object))
 }
 
 /// HTTP request body for creating a Scorer.
@@ -185,6 +270,40 @@ pub struct ScorerResponseBody {
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+impl ScorerResponseBody {
+    /// Whether [`Self::redact_credentials`] has anything to blank, so a caller can skip the check.
+    pub fn has_credentials(&self) -> bool {
+        ["endpoint", "auth", "custom_headers"]
+            .iter()
+            .any(|key| self.params.get(key).is_some_and(|v| !v.is_null()))
+    }
+
+    /// The endpoint keeps its origin and the auth and header names stay; their values are blanked.
+    pub fn redact_credentials(&mut self) {
+        if let Some(endpoint) = self.params.get_mut("endpoint")
+            && let Some(raw) = endpoint.as_str()
+        {
+            *endpoint = Value::String(config::utils::str::url_origin(raw));
+        }
+        if let Some(auth) = self.params.get_mut("auth").and_then(Value::as_object_mut) {
+            for field in ["token", "password"] {
+                if let Some(value) = auth.get_mut(field) {
+                    *value = Value::String(String::new());
+                }
+            }
+        }
+        let headers = self
+            .params
+            .get_mut("custom_headers")
+            .and_then(Value::as_array_mut);
+        for header in headers.into_iter().flatten() {
+            if let Some(value) = header.get_mut("value") {
+                *value = Value::String(String::new());
+            }
+        }
+    }
 }
 
 /// HTTP response body for listing Scorers.
@@ -418,6 +537,30 @@ impl From<Vec<infra::table::scorers::Scorer>> for ListScorerVersionsResponseBody
 mod tests {
     use super::*;
 
+    /// Indexes of the `oneOf` variants a body satisfies on required keys, known keys and tag.
+    fn matching_variants(schema: RefOr<Schema>, body: &Value) -> Vec<usize> {
+        let schema = serde_json::to_value(schema).unwrap();
+        let body = body.as_object().unwrap();
+        let variants = schema["oneOf"].as_array().unwrap();
+        (0..variants.len())
+            .filter(|&i| {
+                let variant = &variants[i];
+                let properties = variant["properties"].as_object().unwrap();
+                let closed = variant["additionalProperties"] == Value::Bool(false);
+                let required = variant["required"].as_array().unwrap();
+                let tag_ok = variant["properties"]["type"]["enum"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&body["type"]);
+                tag_ok
+                    && required
+                        .iter()
+                        .all(|k| body.contains_key(k.as_str().unwrap()))
+                    && (!closed || body.keys().all(|k| properties.contains_key(k)))
+            })
+            .collect()
+    }
+
     fn sample_scorer() -> infra::table::scorers::Scorer {
         infra::table::scorers::Scorer {
             id: "abc".to_string(),
@@ -436,6 +579,44 @@ mod tests {
             created_at: 1000,
             updated_at: 2000,
         }
+    }
+
+    #[test]
+    fn scorer_config_schemas_admit_exactly_the_bodies_serde_accepts() {
+        let judge = serde_json::json!({
+            "type": "llm_judge",
+            "producesScoreConfigId": "scfg-entity-1",
+            "template": "Judge {{input}}",
+            "outputSchema": {"type": "object"},
+            "params": {"provider_id": "p1"}
+        });
+        let remote = serde_json::json!({
+            "type": "remote",
+            "template": "{{output}}",
+            "params": {"endpoint": "https://eval.example.com", "timeout_ms": null}
+        });
+        for (body, variant) in [(&judge, 0), (&remote, 1)] {
+            serde_json::from_value::<ScorerCreateConfig>(body.clone()).unwrap();
+            serde_json::from_value::<ScorerUpdateConfig>(body.clone()).unwrap();
+            assert_eq!(
+                matching_variants(ScorerCreateConfig::schema(), body),
+                [variant]
+            );
+            assert_eq!(
+                matching_variants(ScorerUpdateConfig::schema(), body),
+                [variant]
+            );
+        }
+
+        let mut unknown = judge.clone();
+        unknown["bogus"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ScorerCreateConfig>(unknown.clone()).is_err());
+        assert!(matching_variants(ScorerCreateConfig::schema(), &unknown).is_empty());
+
+        let mut mistagged = judge.clone();
+        mistagged["type"] = serde_json::json!("remote");
+        assert!(serde_json::from_value::<ScorerCreateConfig>(mistagged.clone()).is_err());
+        assert!(matching_variants(ScorerCreateConfig::schema(), &mistagged).is_empty());
     }
 
     #[test]
@@ -590,6 +771,54 @@ mod tests {
         );
     }
 
+    /// Issue #3143: with `serde_json/arbitrary_precision`, a float inside the
+    /// internally tagged scorer config used to fail with
+    /// `invalid type: map, expected f64`. Parse from raw JSON, as the HTTP
+    /// extractor does.
+    #[test]
+    fn test_llm_judge_scorer_accepts_float_temperature() {
+        let scorer_json = r#"{
+            "type": "llm_judge",
+            "producesScoreConfigVersion": 2,
+            "template": "Judge {{input}}",
+            "params": {
+                "provider_id": "p1",
+                "temperature": 0.1,
+                "max_tokens": 256,
+                "timeout_ms": 30000
+            }
+        }"#;
+
+        let create: ScorerRequestBody =
+            serde_json::from_str(&format!(r#"{{"name": "judge", "scorer": {scorer_json}}}"#))
+                .unwrap();
+        let scorer = infra::table::scorers::Scorer::from(create);
+        assert_eq!(scorer.params["temperature"].as_f64(), Some(0.1));
+        assert_eq!(scorer.params["max_tokens"].as_u64(), Some(256));
+        let stored: LlmJudgeScorerParams = serde_json::from_value(scorer.params).unwrap();
+        assert_eq!(stored.temperature, Some(0.1));
+
+        let update: ScorerUpdateRequestBody =
+            serde_json::from_str(&format!(r#"{{"scorer": {scorer_json}}}"#)).unwrap();
+        let ScorerUpdateConfig::LlmJudge(update) = update.scorer else {
+            panic!("expected llm_judge");
+        };
+        assert_eq!(update.params.temperature, Some(0.1));
+
+        let test: ScorerTestRequestBody = serde_json::from_str(&format!(
+            r#"{{"name": "judge", "scorer": {scorer_json}, "inputVariables": {{}}}}"#
+        ))
+        .unwrap();
+        let ScorerCreateConfig::LlmJudge(test) = test.scorer else {
+            panic!("expected llm_judge");
+        };
+        assert_eq!(test.params.temperature, Some(0.1));
+
+        let omitted: LlmJudgeScorerParams =
+            serde_json::from_str(r#"{"provider_id": "p1"}"#).unwrap();
+        assert_eq!(omitted.temperature, None);
+    }
+
     #[test]
     fn test_remote_scorer_request_deserialize_rejects_response_paths() {
         let result: Result<ScorerRequestBody, _> = serde_json::from_value(serde_json::json!({
@@ -678,5 +907,37 @@ mod tests {
         let list = ListScorersResponseBody::from(vec![s]);
         assert_eq!(list.list.len(), 1);
         assert_eq!(list.list[0].name, "faithfulness_judge");
+    }
+
+    #[test]
+    fn redaction_keeps_the_endpoint_origin_and_blanks_auth_and_header_values() {
+        let mut s = sample_scorer();
+        s.params = serde_json::json!({
+            "endpoint": "https://u:p@eval.example.com/score?api_key=k3y",
+            "auth": {"type": "api_key", "token": "k3y", "header_name": "X-Api-Key"},
+            "custom_headers": [{"key": "X-Tenant", "value": "t3n"}],
+        });
+        let mut body = ScorerResponseBody::from(s);
+        assert!(body.has_credentials());
+        body.redact_credentials();
+        assert_eq!(
+            body.params,
+            serde_json::json!({
+                "endpoint": "https://eval.example.com",
+                "auth": {"type": "api_key", "token": "", "header_name": "X-Api-Key"},
+                "custom_headers": [{"key": "X-Tenant", "value": ""}],
+            })
+        );
+
+        let mut basic = ScorerResponseBody::from(sample_scorer());
+        basic.params =
+            serde_json::json!({"auth": {"type": "basic", "username": "u", "password": "p"}});
+        basic.redact_credentials();
+        assert_eq!(basic.params["auth"]["username"], "u");
+        assert_eq!(basic.params["auth"]["password"], "");
+
+        let mut judge = ScorerResponseBody::from(sample_scorer());
+        judge.params = serde_json::json!({"prompt": "Is it faithful?"});
+        assert!(!judge.has_credentials());
     }
 }

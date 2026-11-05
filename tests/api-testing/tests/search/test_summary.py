@@ -33,11 +33,16 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from support.client import OpenObserveClient
 from support.factories import unique_name
 from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
+
+# Asserts the org-wide stream count grows, which concurrent stream creates and deletes would mask.
+pytestmark = pytest.mark.serial
 
 ORG_ID = "default"
 

@@ -19,7 +19,7 @@ import { describe, it, expect } from "vitest";
 import * as hostsQueries from "./hostsQueries";
 import {
   HOSTS_LIVENESS_QUERY,
-  HOSTS_LAST_SEEN_SQL,
+  hostsLastSeenSql,
   HOSTS_CPU_QUERY,
   HOSTS_MEMORY_UTILIZATION_QUERY,
   HOSTS_MEMORY_USAGE_QUERY,
@@ -54,6 +54,8 @@ const AGGREGATED_CONSTANTS = [
   HOSTS_CORES_QUERY,
 ];
 
+const HOSTS_LAST_SEEN_SQL = hostsLastSeenSql(true);
+
 describe("hostsQueries — liveness & last-seen ride the 1-series-per-host load stream", () => {
   it("liveness counts last_over_time over system_cpu_load_average_15m, by host and os_type", () => {
     expect(HOSTS_LIVENESS_QUERY).toBe(
@@ -61,6 +63,12 @@ describe("hostsQueries — liveness & last-seen ride the 1-series-per-host load 
         GUARD +
         "}[10m]))",
     );
+  });
+
+  it("last-seen groups by node only where the stream has the column", () => {
+    expect(HOSTS_LAST_SEEN_SQL).toContain("GROUP BY host_name, k8s_node_name");
+    expect(hostsLastSeenSql(false)).not.toContain("k8s_node_name");
+    expect(hostsLastSeenSql(false)).toContain("GROUP BY host_name");
   });
 
   it("last-seen is SQL max(_timestamp) grouped by host over the same load stream", () => {

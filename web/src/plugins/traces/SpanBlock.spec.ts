@@ -17,8 +17,14 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SpanBlock from "@/plugins/traces/SpanBlock.vue";
 import i18n from "@/locales";
-import router from "@/test/unit/helpers/router";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { createStore } from "vuex";
+
+// The app router lazy-loads whole views on push, which times out under CI load.
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/:pathMatch(.*)*", component: { render: () => null } }],
+});
 
 const mockStore = createStore({
   state: {
@@ -1046,6 +1052,13 @@ describe("SpanBlock", () => {
       await setEvents("not-json");
 
       expect(markers()).toHaveLength(0);
+    });
+
+    it("pins an event past the span's end to the bar's end", async () => {
+      await setEvents([{ name: "late", _timestamp: eventNsAt(0.98) }]);
+
+      expect(markers()).toHaveLength(1);
+      expect(markers()[0].attributes("style")).toContain("left: 91.72%");
     });
 
     it("skips events falling outside the trace window", async () => {

@@ -364,6 +364,24 @@ describe("TraceTree", () => {
       '[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]',
     );
     expect(viewLogsBtn.exists()).toBe(true);
+    expect(viewLogsBtn.attributes("disabled")).toBeUndefined();
+  });
+
+  it("disables the row view logs button with a lock while logs is locked", async () => {
+    const lockedStore = createStore({
+      state: {
+        ...mockStore.state,
+        zoConfig: { timestamp_column: "@timestamp", features: { logs: "locked" } },
+      },
+    });
+    const locked = mountTraceTree({}, lockedStore);
+    const btn = locked.find('[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]');
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+    expect(btn.attributes("aria-label")).toBeTruthy();
+    await btn.trigger("click");
+    expect(locked.emitted("view-correlated-logs")).toBeUndefined();
+    locked.unmount();
   });
 
   describe("Span selection", () => {
@@ -791,6 +809,32 @@ describe("TraceTree", () => {
 
       expect(action.classes()).toContain("hidden");
       expect(action.classes()).not.toContain("invisible");
+    });
+  });
+
+  describe("name and badge layout", () => {
+    const SPAN = "d9603ec7f76eb499";
+
+    it("lets every row's name shrink instead of reserving a fixed width", () => {
+      const nameBoxes = wrapper.findAll('[data-test^="trace-tree-span-select-btn-"]');
+      expect(nameBoxes.length).toBeGreaterThan(0);
+      for (const box of nameBoxes) {
+        const row = box.element.parentElement as HTMLElement;
+        expect(box.classes()).toEqual(expect.arrayContaining(["min-w-0", "flex-1"]));
+        expect(row.classList.contains("min-w-0")).toBe(true);
+        expect(row.classList.contains("flex-1")).toBe(true);
+        expect(row.className).not.toMatch(/w-full|w-\[calc/);
+        expect(box.element.className).not.toMatch(/w-\[calc/);
+      }
+    });
+
+    it("never shrinks the child-count pill or the badge cluster", () => {
+      const pill = wrapper.find(`[data-test="trace-tree-span-badge-collapse-btn-${SPAN}"]`);
+      const cluster = wrapper.find(`[data-test="trace-tree-span-view-logs-container-${SPAN}"]`)
+        .element.parentElement as HTMLElement;
+
+      expect(pill.classes()).toContain("shrink-0");
+      expect(cluster.classList.contains("shrink-0")).toBe(true);
     });
   });
 

@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        border-b on a wrapper — that adds a second 1px line and makes the header
        61px on some pages and 60px on others. -->
   <header
+    ref="headerEl"
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
     :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
     :class="[tabsBelow ? 'flex flex-col' : ROW_CLASS]"
@@ -64,36 +65,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch max-md:gap-2 md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
         :class="[
+          statusComponent ? 'md:@max-4xl/page:min-w-40' : '',
           hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
-        <OButton
-          v-if="ownsSidebarTrigger"
-          variant="ghost"
-          size="icon-toolbar"
-          data-test="o-page-layout-mobile-sidebar-btn"
-          :aria-label="t('common.sidePanel')"
-          @click="layoutSidebar?.open()"
-        >
-          <OIcon name="menu" size="sm" />
-        </OButton>
+        <FeatureLockExempt v-if="ownsSidebarTrigger" as="span" class="contents">
+          <OButton
+            variant="ghost"
+            size="icon-toolbar"
+            data-test="o-page-layout-mobile-sidebar-btn"
+            :aria-label="t('common.sidePanel')"
+            @click="layoutSidebar?.open()"
+          >
+            <OIcon name="menu" size="sm" />
+          </OButton>
+        </FeatureLockExempt>
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
            footprint, so the title's X never shifts between list and add/edit). -->
         <template v-if="hasBack()">
           <slot name="back">
-            <button
-              type="button"
-              class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
-              :title="backLabel"
-              :aria-label="backLabel"
-              :data-test="props.back?.dataTest ?? 'app-page-header-back'"
-              @click="onBack"
-            >
-              <OIcon name="chevron-left" size="md" />
-            </button>
+            <FeatureLockExempt as="span" class="contents">
+              <button
+                type="button"
+                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                :title="backLabel"
+                :aria-label="backLabel"
+                :data-test="props.back?.dataTest ?? 'app-page-header-back'"
+                @click="onBack"
+              >
+                <OIcon name="chevron-left" size="md" />
+              </button>
+            </FeatureLockExempt>
           </slot>
         </template>
 
@@ -113,29 +118,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The row is sized by its container, not the viewport, so the tab-less title stays shrinkable at every width. -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="
+          :class="[
             titleOverflow === 'visible'
               ? ''
               : hasTabs() && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
-                : 'md:max-lg:min-w-32'
-          "
+                : statusComponent
+                  ? ''
+                  : 'md:max-lg:min-w-32',
+            titleMinWidth ? 'min-w-40' : '',
+          ]"
         >
-          <h1
-            v-if="titleOverflow === 'visible'"
-            class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-            :data-test="titleDataTest"
-          >
-            <slot name="title">{{ title }}</slot>
-          </h1>
-          <OTruncatedText
-            v-else
-            as="h1"
-            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-            :data-test="titleDataTest"
-          >
-            <slot name="title">{{ title }}</slot>
-          </OTruncatedText>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <h1
+              v-if="titleOverflow === 'visible'"
+              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              :data-test="titleDataTest"
+            >
+              <slot name="title">{{ title }}</slot>
+            </h1>
+            <OTruncatedText
+              v-else
+              as="h1"
+              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              :data-test="titleDataTest"
+            >
+              <slot name="title">{{ title }}</slot>
+            </OTruncatedText>
+            <span
+              v-if="locked"
+              role="img"
+              :aria-label="lockedLabel"
+              class="lock-chip inline-flex shrink-0"
+              data-test="app-page-header-locked"
+            >
+              <OIcon name="lock" size="sm" />
+              <OTooltip :content="lockedLabel" />
+            </span>
+          </div>
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
@@ -157,6 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Inline content placed immediately after the title block (e.g. a name
            input on create pages). Renders between title text and tabs/actions. -->
         <slot name="title-trail" />
+
+        <!-- A status arrives after paint; while the row wraps it takes width from the title, so the row never wraps or grows for it. One element moved by order keeps an open card open. -->
+        <span v-if="statusComponent" :class="statusClass()">
+          <component :is="statusComponent" :compact="rowWraps" />
+        </span>
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
@@ -220,6 +245,7 @@ import {
   onBeforeUnmount,
   onDeactivated,
   onMounted,
+  ref,
   useSlots,
 } from "vue";
 import { useRouter } from "vue-router";
@@ -228,8 +254,12 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useFeatureLock, useFeatureNames } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
+import { usePageHeaderStatusHost } from "@/lib/core/PageHeader/pageHeaderStatus";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -263,12 +293,15 @@ const props = withDefaults(
     titleOverflow?: "truncate" | "visible";
     /** Render #actions-overflow BEFORE #actions on desktop, so a trailing primary CTA stays last. */
     overflowFirst?: boolean;
+    /** Keep the title at least 10rem wide at every width, for a #title-trail that competes for the row. */
+    titleMinWidth?: boolean;
   }>(),
   {
     title: raw(""),
     subtitle: raw(""),
     titleOverflow: "truncate",
     overflowFirst: false,
+    titleMinWidth: false,
   },
 );
 
@@ -276,11 +309,22 @@ const props = withDefaults(
 // The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =
   "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5 @max-4xl/page:h-auto @max-4xl/page:min-h-15 @max-4xl/page:flex-wrap @max-4xl/page:gap-y-1 @max-4xl/page:py-1.5";
+// Tailwind's `4xl` container width, the `@max-4xl/page` threshold above.
+const PAGE_WRAP_REM = 56;
 
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
-const { isMobile } = useBreakpoint();
+const { featureName } = useFeatureNames();
+const { isMobile, lgUp } = useBreakpoint();
+const { locked, feature: lockedFeature } = useFeatureLock();
+const lockedLabel = computed(() =>
+  t("featureLock.headerLocked", {
+    feature: raw(
+      lockedFeature.value ? (featureName(lockedFeature.value) ?? lockedFeature.value) : "",
+    ),
+  }),
+);
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
 const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);
@@ -298,6 +342,26 @@ onDeactivated(releaseSidebarTrigger);
 const ownsSidebarTrigger = computed(
   () => isMobile.value && layoutSidebar?.owner.value === sidebarClaim,
 );
+
+const headerEl = ref<HTMLElement | null>(null);
+const statusComponent = usePageHeaderStatusHost(headerEl);
+
+// The status follows the row's own wrap condition (viewport or page container), so it never wraps onto a line of its own.
+const pageNarrow = ref(false);
+let pageObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const page = headerEl.value?.closest<HTMLElement>('[class~="@container/page"]');
+  if (!page || typeof ResizeObserver === "undefined") return;
+  const measure = () => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    pageNarrow.value = page.clientWidth < PAGE_WRAP_REM * rem;
+  };
+  measure();
+  pageObserver = new ResizeObserver(measure);
+  pageObserver.observe(page);
+});
+onBeforeUnmount(() => pageObserver?.disconnect());
+const rowWraps = computed(() => !lgUp.value || pageNarrow.value);
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -324,6 +388,12 @@ const hasTabs = (): boolean => slotHasContent("tabs");
 const hasActions = (): boolean => slotHasContent("actions");
 const hasActionsOverflow = (): boolean => slotHasContent("actions-overflow");
 const hasBack = (): boolean => Boolean(props.back) || slotHasContent("back");
+// On one row the status sits last in the title block, at the actions' own gap from them.
+const statusClass = (): string[] => [
+  "flex shrink-0 items-center",
+  rowWraps.value ? "" : "order-last ms-auto",
+  !rowWraps.value && (hasActions() || hasActionsOverflow()) ? "-me-2" : "",
+];
 const backLabel = computed(() =>
   props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
 );

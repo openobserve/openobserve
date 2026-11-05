@@ -398,6 +398,83 @@ pub async fn acknowledge(
     get(org_id, id).await
 }
 
+/// Moves the incident's ack to `user_id` only while `previous_holder` holds it; false otherwise.
+pub async fn take_over_acknowledgement(
+    org_id: &str,
+    id: &str,
+    previous_holder: &str,
+    user_id: &str,
+) -> Result<bool, errors::Error> {
+    take_over_acknowledgement_with(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        previous_holder,
+        user_id,
+    )
+    .await
+}
+
+/// [`take_over_acknowledgement`] on a given connection.
+pub async fn take_over_acknowledgement_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    previous_holder: &str,
+    user_id: &str,
+) -> Result<bool, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let res = alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::AcknowledgedBy,
+            Expr::value(user_id.to_string()),
+        )
+        .col_expr(alert_incidents::Column::AcknowledgedAt, Expr::value(now))
+        .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.eq("acknowledged"))
+        .filter(alert_incidents::Column::AcknowledgedBy.eq(previous_holder))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Clears the ack and reopens the incident only while `holder` holds it; false otherwise.
+pub async fn unacknowledge(org_id: &str, id: &str, holder: &str) -> Result<bool, errors::Error> {
+    unacknowledge_with(get_orm_client_rw().await, org_id, id, holder).await
+}
+
+/// [`unacknowledge`] on a given connection.
+pub async fn unacknowledge_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    holder: &str,
+) -> Result<bool, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let res = alert_incidents::Entity::update_many()
+        .col_expr(alert_incidents::Column::Status, Expr::value("open"))
+        .col_expr(
+            alert_incidents::Column::AcknowledgedBy,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            alert_incidents::Column::AcknowledgedAt,
+            Expr::value(Option::<i64>::None),
+        )
+        .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.eq("acknowledged"))
+        .filter(alert_incidents::Column::AcknowledgedBy.eq(holder))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
+}
+
 /// Clears the mute only while it names `downtime_id`, so one of two concurrent firings sees `true`.
 pub async fn clear_muted_by_downtime_id(
     org_id: &str,
@@ -522,6 +599,39 @@ pub async fn update_severity(
         .update(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// The titles of the incidents among `ids` in this org; untitled and unknown ids are absent.
+pub async fn titles(
+    org_id: &str,
+    ids: &[String],
+) -> Result<HashMap<String, String>, errors::Error> {
+    titles_with(get_orm_client_ro().await, org_id, ids).await
+}
+
+/// [`titles`] on a given connection.
+pub async fn titles_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    ids: &[String],
+) -> Result<HashMap<String, String>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    Ok(alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::Title)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.is_in(ids.to_vec()))
+        .filter(alert_incidents::Column::Title.is_not_null())
+        .into_tuple::<(String, Option<String>)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .filter_map(|(id, title)| title.map(|t| (id, t)))
+        .collect())
 }
 
 /// List incidents with optional filters
@@ -1328,6 +1438,69 @@ mod tests {
         );
     }
 
+    async fn acked_by(db: &DatabaseConnection, holder: &str) -> String {
+        let id = fired_into(db, "open", 1).await;
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::Status, Expr::value("acknowledged"))
+            .col_expr(
+                alert_incidents::Column::AcknowledgedBy,
+                Expr::value(holder.to_string()),
+            )
+            .col_expr(alert_incidents::Column::AcknowledgedAt, Expr::value(5_i64))
+            .filter(alert_incidents::Column::Id.eq(&id))
+            .exec(db)
+            .await
+            .unwrap();
+        id
+    }
+
+    async fn holder_of(db: &DatabaseConnection, id: &str) -> (String, Option<String>) {
+        let m = alert_incidents::Entity::find_by_id(id)
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        (m.status, m.acknowledged_by)
+    }
+
+    #[tokio::test]
+    async fn a_take_over_and_an_unack_change_the_incident_only_while_the_holder_still_holds_it() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let id = acked_by(&db, "ana@acme.io").await;
+
+        assert!(
+            !take_over_acknowledgement_with(&db, "acme", &id, "kim@acme.io", "bo@acme.io")
+                .await
+                .unwrap(),
+            "a stale holder moves nothing"
+        );
+        assert!(
+            take_over_acknowledgement_with(&db, "acme", &id, "ana@acme.io", "bo@acme.io")
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            holder_of(&db, &id).await,
+            ("acknowledged".to_string(), Some("bo@acme.io".to_string()))
+        );
+
+        assert!(
+            !unacknowledge_with(&db, "acme", &id, "ana@acme.io")
+                .await
+                .unwrap(),
+            "an ack that landed in between is kept"
+        );
+        assert!(
+            unacknowledge_with(&db, "acme", &id, "bo@acme.io")
+                .await
+                .unwrap()
+        );
+        assert_eq!(holder_of(&db, &id).await, ("open".to_string(), None));
+    }
+
     fn group(name: &str, count: i32) -> IncidentAlertGroup {
         IncidentAlertGroup {
             alert_id: format!("id-{name}"),
@@ -1781,6 +1954,44 @@ mod tests {
             serde_json::from_value(json);
 
         assert!(result.is_err(), "Should reject malformed JSON");
+    }
+
+    #[tokio::test]
+    async fn titles_answer_only_titled_incidents_of_the_org_in_one_read() {
+        let db = incidents_db().await;
+        let titled = |org: &str, title: Option<&str>| {
+            new_incident(
+                org,
+                "P2",
+                serde_json::json!({}),
+                "service",
+                1,
+                title.map(str::to_string),
+                None,
+            )
+        };
+        let paid = titled("acme", Some("Payments down"))
+            .insert(&db)
+            .await
+            .unwrap();
+        let untitled = titled("acme", None).insert(&db).await.unwrap();
+        let foreign = titled("other", Some("Not yours"))
+            .insert(&db)
+            .await
+            .unwrap();
+        let asked = [
+            paid.id.clone(),
+            untitled.id,
+            foreign.id,
+            "missing".to_string(),
+        ];
+
+        let found = titles_with(&db, "acme", &asked).await.unwrap();
+        assert_eq!(
+            found,
+            HashMap::from([(paid.id, "Payments down".to_string())])
+        );
+        assert!(titles_with(&db, "acme", &[]).await.unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -39,7 +39,13 @@ const SIEM_LIST_ATTRIBUTES: [&str; 8] = [
 
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct GetAlertResponseBody(pub Alert);
+pub struct GetAlertResponseBody {
+    #[serde(flatten)]
+    pub alert: Alert,
+    /// Display names of the alert's locked workflows and on-call team, by id, for the edit form.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub locked_target_names: HashMap<String, String>,
+}
 
 /// HTTP response body for `ListAlerts` endpoint.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -473,7 +479,10 @@ pub struct EnableAlertResponseBody {
 
 impl From<(meta_alerts::Alert, Option<Trigger>)> for GetAlertResponseBody {
     fn from(value: (meta_alerts::Alert, Option<Trigger>)) -> Self {
-        Self(value.into())
+        Self {
+            alert: value.into(),
+            locked_target_names: HashMap::new(),
+        }
     }
 }
 

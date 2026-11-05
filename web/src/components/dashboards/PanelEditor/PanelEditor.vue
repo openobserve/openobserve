@@ -116,12 +116,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
                     class="border-border-default flex items-center justify-between border-b px-2 py-2"
+                    :class="{ 'min-h-12.5': pageType === 'build' }"
                   >
                     <QueryTypeSelector v-if="pageType === 'build'" :showQueryType="false" />
                     <div v-else />
-                    <div class="flex items-center gap-2">
+                    <div class="ms-auto flex items-center gap-2">
+                      <!-- A disabled button fires no pointer events, so the span is the tooltip's hover target. -->
+                      <OTooltip
+                        v-if="resolvedConfig.showAddToDashboardButton && dashboardsLocked"
+                        :content="dashboardsLockedReason"
+                      >
+                        <span class="inline-flex">
+                          <OButton
+                            data-test="panel-editor-add-to-dashboard-btn"
+                            variant="primary"
+                            size="xs"
+                            disabled
+                          >
+                            <template #icon-left>
+                              <OIcon
+                                name="lock"
+                                class="lock-chip"
+                                size="sm"
+                                data-test="panel-editor-add-to-dashboard-lock"
+                              />
+                            </template>
+                            {{ t("search.addToDashboard") }}
+                          </OButton>
+                        </span>
+                      </OTooltip>
                       <OButton
-                        v-if="resolvedConfig.showAddToDashboardButton"
+                        v-else-if="resolvedConfig.showAddToDashboardButton"
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
@@ -196,10 +221,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div class="me-2 flex items-center justify-end gap-2">
-                    <!-- Show Legends button (hidden when the chart has no data) -->
+                    <PanelViewToggle
+                      v-if="showDataViewToggle"
+                      v-model="previewView"
+                      class="my-2 ms-2 me-auto"
+                      data-test-prefix="panel-editor"
+                    />
+
                     <OButton
                       v-if="
-                        !panelSchemaRendererRef?.noData &&
+                        !isDataView &&
                         ![
                           'table',
                           'heatmap',
@@ -217,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'maps',
                         ].includes(dashboardPanelData.data.type)
                       "
+                      :class="{ invisible: panelSchemaRendererRef?.noData }"
                       variant="ghost"
                       size="icon"
                       @click="showLegendsDialog = true"
@@ -233,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Add Annotations button -->
                     <OButton
                       v-if="
+                        !isDataView &&
                         editMode &&
                         pageType === 'dashboard' &&
                         [
@@ -342,6 +375,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @format-column="openColumnFormatting"
                       />
                     </div>
+                    <!-- Overlays the chart instead of replacing it so the query result and chart state survive the switch. -->
+                    <PanelDataView
+                      v-if="showDataOverlay && chartData"
+                      class="absolute inset-0 z-10"
+                      :data="previewRawData"
+                      :query-type="dashboardPanelData.data.queryType"
+                      :loading="isPanelLoading"
+                      data-test-prefix="panel-editor"
+                    />
                   </div>
 
                   <!-- Errors Component -->
@@ -793,6 +835,7 @@ import { resolveConfig } from "./types/panelEditor";
 import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
 import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
@@ -808,6 +851,9 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import PanelDataView from "@/components/dashboards/addPanel/PanelDataView.vue";
+import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -883,6 +929,9 @@ const emit = defineEmits<PanelEditorEmits>();
 // ============================================================================
 
 const { t } = useI18nTyped();
+
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
 
 // Resolve configuration (merge props with presets)
 const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
@@ -1015,6 +1064,18 @@ const seriesOverridePreviewSource = computed(() => {
     resultMetaData: lastResultMetaData.value,
     hiddenQueries: dashboardPanelData.layout.hiddenQueries ?? [],
   };
+});
+
+const {
+  previewView,
+  showDataViewToggle,
+  isDataView,
+  showDataOverlay,
+  rawData: previewRawData,
+} = usePanelDataView({
+  panelType: () => dashboardPanelData.data.type,
+  renderer: panelSchemaRendererRef,
+  enabled: () => props.pageType === "dashboard",
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.

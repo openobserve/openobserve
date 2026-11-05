@@ -152,6 +152,19 @@ export default class DashboardPanelConfigs {
     //Guage chart locators
     this.gaugeMin = page.locator('[data-test="dashboard-config-gauge-min"]');
     this.gaugeMax = page.locator('[data-test="dashboard-config-gauge-max"]');
+    this.gaugeMinField = this.gaugeMin.locator('[data-test$="-field"]');
+    this.gaugeMaxField = this.gaugeMax.locator('[data-test$="-field"]');
+    this.gaugeRangeMode = page.locator('[data-test="dashboard-config-gauge-range-mode"]');
+    this.gaugeStyle = page.locator('[data-test="dashboard-config-gauge_style"]');
+
+    //Bar gauge locators
+    this.barGaugeRangeMode = page.locator('[data-test="dashboard-config-bar-gauge-range-mode"]');
+    this.barGaugeRangeModeTrigger = page.locator('[data-test="dashboard-config-bar-gauge-range-mode-trigger"]');
+    this.barGaugeMode = page.locator('[data-test="dashboard-config-bar_gauge_mode"]');
+    this.barGaugeModeTrigger = page.locator('[data-test="dashboard-config-bar_gauge_mode-trigger"]');
+    this.barGaugeOrientation = page.locator('[data-test="dashboard-config-bar_gauge_orientation"]');
+    this.barGaugeOrientationTrigger = page.locator('[data-test="dashboard-config-bar_gauge_orientation-trigger"]');
+    this.barGaugeShowUnfilled = page.locator('[data-test="dashboard-config-bar_gauge_show_unfilled"]');
 
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
@@ -1294,7 +1307,9 @@ export default class DashboardPanelConfigs {
       `[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`
     );
     await trigger.waitFor({ state: "visible" });
-    // The threshold section above shifts layout while it renders, so a single click can land before the popover holds.
+    await trigger.scrollIntoViewIfNeeded();
+    // The sidebar closes open dropdowns on scroll, and a scroll event fires a frame later, after a same-frame click opened the list.
+    await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await expect(async () => {
       if ((await trigger.getAttribute("aria-expanded")) !== "true") {
         await trigger.click();
@@ -1313,6 +1328,36 @@ export default class DashboardPanelConfigs {
   async selectGuageMax(max) {
     await this.gaugeMax.waitFor({ state: "visible" });
     await this.gaugeMax.locator('[data-test$="-field"]').fill(max);
+  }
+
+  //Bar gauge configs
+  async selectBarGaugeRangeMode(label) {
+    await this.selectConfigOption("dashboard-config-bar-gauge-range-mode", label);
+  }
+
+  async selectBarGaugeMode(label) {
+    await this.selectConfigOption("dashboard-config-bar_gauge_mode", label);
+  }
+
+  async selectBarGaugeOrientation(label) {
+    await this.selectConfigOption("dashboard-config-bar_gauge_orientation", label);
+  }
+
+  /** Assert a config OSelect's committed value, retrying while a reopened panel hydrates. */
+  async expectConfigSelectValue(trigger, value) {
+    await this.scrollSidebarToElement(trigger);
+    await expect(trigger).toHaveAttribute("data-test-selected-value", value, { timeout: 15000 });
+  }
+
+  /** Labels of an OSelect's options, read from the open popover and then closed again. */
+  async getConfigSelectOptionLabels(baseTestId) {
+    await this.openConfigSelect(baseTestId);
+    const options = this.page.locator(`[data-test="${baseTestId}-option"]`);
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+    const labels = await options.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
+    await this.page.keyboard.press("Escape");
+    await expect(this.page.locator(`[data-test="${baseTestId}-trigger"]`)).not.toHaveAttribute("data-state", "open");
+    return labels;
   }
 
   // Get connect null values toggle state

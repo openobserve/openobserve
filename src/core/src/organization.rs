@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::stream::Stream;
 use config::{
     DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
@@ -25,6 +26,8 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+#[cfg(feature = "cloud")]
+use db::organization::get_org_setting;
 use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -46,6 +49,8 @@ use {
 
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+#[cfg(feature = "cloud")]
+use crate::org_domain_ownership::get_cached_org_for_domain;
 use crate::{
     auth::{delete_org_tuples, save_org_tuples},
     common::{
@@ -115,8 +120,7 @@ async fn create_and_assign_sre_readonly_role(
     .await
 }
 
-pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let streams = get_streams(org_id, None, false, None).await;
+fn summarize_streams(org_id: &str, streams: &[Stream]) -> (StreamSummary, bool) {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
@@ -127,6 +131,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
             stream_summary.num_streams += 1;
+            if usage::is_user_data_stream(org_id, &stream.name, stream.stream_type) {
+                stream_summary.num_user_streams += 1;
+            }
             stream_summary.total_records += stream.stats.doc_num;
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
@@ -134,6 +141,12 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
+    (stream_summary, has_trigger_stream)
+}
+
+pub async fn get_summary(org_id: &str) -> OrgSummary {
+    let streams = get_streams(org_id, None, false, None).await;
+    let (stream_summary, has_trigger_stream) = summarize_streams(org_id, &streams);
 
     let trigger_status_results = if !has_trigger_stream {
         vec![]
@@ -687,20 +700,6 @@ pub async fn create_org(
                 }
                 crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
             }
-            // Best-effort — the compiled-in fallback (design §4.4) covers the
-            // race if this fails or the backfill hasn't run yet; never block
-            // org creation on it.
-            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
-                &org.identifier,
-                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
-            )
-            .await
-            {
-                log::warn!(
-                    "Failed to set default_alert_template for org '{}': {e}",
-                    org.identifier
-                );
-            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -1103,6 +1102,21 @@ pub async fn generate_invitation(
             return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
         }
 
+        let Some((_, domain)) = invitee.split_once('@') else {
+            return Err(anyhow::anyhow!("invalid email id {invitee}"));
+        };
+
+        if let Some(linked_org) = get_cached_org_for_domain(domain).await {
+            let settings = get_org_setting(&linked_org).await?;
+            for mapping in settings.domain_org_mappings {
+                if mapping.domain == domain && mapping.org_id == org_id {
+                    return Err(anyhow::anyhow!(
+                        "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
+                    ));
+                }
+            }
+        }
+
         if get_billing_by_org_id(org_id).await?.is_none() {
             // If the org we are inviting to is paid, its fine to send invitations
             // irrespective of what other orgs invitees are part of.
@@ -1495,6 +1509,61 @@ mod tests {
 
     use super::*;
     use crate::{common::meta::user::UserRequest, users};
+
+    fn summary_stream(name: &str, stream_type: StreamType) -> Stream {
+        stream::stream_res(
+            "summary_org",
+            name,
+            stream_type,
+            arrow_schema::Schema::empty(),
+            None,
+        )
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_system_streams_as_user_data() {
+        let streams = [summary_stream(
+            "_o2_alert_calibration_digests",
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_a_customer_stream_named_like_a_meta_stream() {
+        let streams = [summary_stream(usage::ERROR_STREAM, StreamType::Logs)];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_user_streams, 1);
+        let (summary, _) = summarize_streams(META_ORG_ID, &streams);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_slo_slices_as_user_data() {
+        let streams = [summary_stream(
+            config::meta::slo::stream::SLO_SLICES_STREAM,
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_user_streams() {
+        let streams = [
+            summary_stream("_o2_alert_calibration_digests", StreamType::Logs),
+            summary_stream(usage::TRIGGERS_STREAM, StreamType::Logs),
+            summary_stream("default", StreamType::Logs),
+            summary_stream("cpu_usage", StreamType::Metrics),
+        ];
+        let (summary, has_trigger_stream) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 4);
+        assert_eq!(summary.num_user_streams, 2);
+        assert!(has_trigger_stream);
+    }
 
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()

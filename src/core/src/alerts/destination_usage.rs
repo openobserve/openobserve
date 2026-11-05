@@ -545,6 +545,7 @@ mod tests {
             updated_at: Set(None),
             evaluation_generation: Set(0),
             pending_period_sec: Set(0),
+            incident_title_template: Set(None),
         };
         infra::table::alert_composites::create_with_children(conn, active, vec![])
             .await
@@ -885,6 +886,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,

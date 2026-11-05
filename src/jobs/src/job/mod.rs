@@ -586,6 +586,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_status::watch());
     // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
     tokio::task::spawn(db::kv::watch());
+    #[cfg(feature = "enterprise")]
+    tokio::spawn(o2_enterprise::enterprise::common::settings::watch());
     retry_with_backoff(
         "load the org status cache",
         ORG_STATUS_LOAD_ATTEMPTS,
@@ -596,7 +598,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .await?;
 
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+    {
+        openobserve_core::org_domain_ownership::init().await;
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+        tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+    }
 
     // check version
     db::metas::version::set()
@@ -685,13 +691,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
 
+    // Routers serve the hook routes, so the hook node tasks start before the router return.
+    #[cfg(feature = "enterprise")]
+    openobserve_core::workflows::http_trigger::spawn_node_tasks();
+
+    // Routers profile themselves too; without an ingester role they need ZO_SELF_PROFILES_URL.
+    #[cfg(feature = "cpu-profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
-
-    #[cfg(feature = "cpu-profiling")]
-    tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
@@ -752,6 +763,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             // An ack token is single-use, and single-use on one node only is not single-use.
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
+    }
+    // On-call destination sends go through the shared notification path.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::oncall::sender::register_oncall_sender(|n| {
+            Box::pin(openobserve_core::alerts::notifications::oncall::notify_destination(n))
+        });
+        if LOCAL_NODE.is_scheduler() {
+            tokio::spawn(
+                openobserve_core::alerts::notifications::oncall::log_mail_destination_policies(),
+            );
+        }
     }
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
@@ -863,11 +886,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
+        // Warm from committed seed rows even offline or when coordinator notification fails.
+        if let Err(e) = openobserve_builtins::model_pricing::load_seed().await {
+            log::error!("[model_pricing] loading seed prices failed: {e}");
+        }
         db::model_pricing::cache()
             .await
             .expect("model pricing cache failed");
 
-        // Sync built-in model pricing from GitHub (initial + periodic)
+        // Only queriers perform the initial and periodic GitHub sync.
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =
@@ -897,12 +924,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system templates initialization failed");
 
-    // Give every org without a default_alert_template pointer one, pointing
-    // at the just-seeded o2_default_content. Best-effort: the compiled-in
-    // fallback (design §4.4) covers any org this misses.
-    if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
-        log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
-    }
     #[cfg(feature = "enterprise")]
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
@@ -1727,6 +1748,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         )
         .await;
         tokio::task::spawn(db::license::watch());
+        tokio::task::spawn(db::license::watch_usage());
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
@@ -1848,6 +1870,26 @@ mod tests {
         assert!(
             kv_watch < router_return,
             "routers serve the PKCE login callback, which reads the KV cache"
+        );
+    }
+
+    #[test]
+    fn self_profiles_are_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let self_profiles = init
+            .find("tokio::task::spawn(openobserve_core::self_profiles::run());")
+            .expect("init() must spawn self_profiles::run()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            self_profiles < router_return,
+            "single-role routers must run the self-profiles loop"
         );
     }
 

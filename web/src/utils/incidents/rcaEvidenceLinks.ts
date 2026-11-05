@@ -73,12 +73,12 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
       : null;
   }
 
-  // PromQL: the metrics editor runs a `query` parameter on load; its share link writes ms.
+  // PromQL: the `/metrics` guard opens a `query` parameter in Visualize; from/to are ms.
   if (link.promql) {
     return {
       page: "metrics",
       route: {
-        name: "metricsEditor",
+        name: "metrics",
         query: {
           org_identifier: org,
           query: b64EncodeUnicode(link.promql) ?? "",
@@ -119,6 +119,13 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
 /** The query text "Copy query" copies, or null when the entry stored none. */
 export const rcaEvidenceQuery = (link: RcaEvidenceTarget): string | null =>
   link.sql || link.promql || link.filter || link.command || null;
+
+/** The license feature whose page a blind spot's button opens, or null when that page is free. */
+export function rcaBlindSpotFeature(fix: RcaBlindSpotFix): "ai_toolsets" | "pipelines" | null {
+  if (fix === "connect_toolset") return "ai_toolsets";
+  if (fix === "open_pipeline" || fix === "sampling_rules") return "pipelines";
+  return null;
+}
 
 /** The page a blind spot's button opens, or null for no button. */
 export function rcaBlindSpotRoute(fix: RcaBlindSpotFix, org: string): RouteLocationRaw | null {

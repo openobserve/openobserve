@@ -7,6 +7,7 @@ import type {
   SelectSlots,
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
+  SelectOption,
 } from "./OSelect.types";
 import {
   SELECT_VALUE_MAP_KEY,
@@ -14,7 +15,9 @@ import {
   NULL_VALUE_SENTINEL,
 } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
+import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -52,6 +55,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -67,7 +71,7 @@ type NormalizedOption = {
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
-  icon?: string;
+  icon?: IconName;
   /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
@@ -95,6 +99,14 @@ type NormalizedOption = {
   parentKey?: string;
   /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  listLabel?: I18nText;
+  suffix?: I18nText;
+  headerCount?: I18nText;
+  headerAction?: I18nText;
+  headerActionAriaLabel?: I18nText;
+  keepOnSearch?: boolean;
+  /** The option as passed in: handed back by `header-action`, and to the `#option` slot. */
+  source?: SelectOption;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -132,6 +144,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 // Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
 const tooltipIconLabel = computed(() =>
@@ -223,11 +236,17 @@ function normalizeOption(input: unknown): NormalizedOption | null {
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
+    const header = option as SelectOption;
     return {
       label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
+      headerCount: header.headerCount,
+      headerAction: header.headerAction,
+      headerActionAriaLabel: header.headerActionAriaLabel,
+      keepOnSearch: header.keepOnSearch === true,
+      source: header,
     };
   }
 
@@ -247,7 +266,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
-    icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
+    icon: typeof rawIcon === "string" && rawIcon ? (rawIcon as IconName) : undefined,
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
@@ -266,6 +285,9 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       : undefined,
     searchText:
       typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
+    source: option as SelectOption,
+    listLabel: option.listLabel ? raw(String(option.listLabel)) : undefined,
+    suffix: option.suffix ? raw(String(option.suffix)) : undefined,
   };
 }
 
@@ -351,7 +373,9 @@ const baseFilteredOptions = computed(() => {
   const result: NormalizedOption[] = [];
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
-    if (opt.header) {
+    if (opt.header && opt.keepOnSearch) {
+      result.push(opt);
+    } else if (opt.header) {
       // Include the header only if at least one subsequent non-header item matches
       let j = i + 1;
       while (j < options.length && !options[j].header) {
@@ -419,7 +443,9 @@ const nestedFilteredOptions = computed(() => {
   if (isSearching.value) {
     const flat = base.filter((o) => !o.expandable);
     // A header kept only for a matching expandable row has nothing left under it.
-    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+    return flat.filter(
+      (o, i) => !o.header || o.keepOnSearch || (flat[i + 1] !== undefined && !flat[i + 1].header),
+    );
   }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
@@ -517,11 +543,22 @@ watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
     if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
-    filterDebounceTimer.value = setTimeout(() => emit("search", value), props.searchDebounce);
+    filterDebounceTimer.value = setTimeout(() => {
+      filterDebounceTimer.value = null;
+      emit("search", value);
+    }, props.searchDebounce);
     return;
   }
   emit("search", value);
 });
+
+// The consumer must rebuild a header from the term the list is filtered by, or a header it drops for that term unmounts the focused action.
+function flushPendingSearch() {
+  if (!filterDebounceTimer.value) return;
+  clearTimeout(filterDebounceTimer.value);
+  filterDebounceTimer.value = null;
+  emit("search", searchTerm.value);
+}
 
 // Clear the search term whenever the popover closes so re-opening the
 // dropdown always shows the full unfiltered option list.
@@ -700,10 +737,18 @@ function handleCreateFromInput() {
   const term = searchTerm.value.trim();
   if (!term) return;
 
-  const hasExisting = normalizedOptions.value.some(
+  const matches = normalizedOptions.value.filter(
     (opt) => opt.label === term || String(opt.value) === term,
   );
-  if (hasExisting) return;
+  if (matches.length) {
+    const pick = matches.find((opt) => !opt.header && !opt.disabled && !opt.expandable);
+    if (!pick) return;
+    // Enter on a typed exact match picks it; a multi-select only adds, never toggles it off.
+    if (!props.multiple) handleListboxUpdate(toRekaString(pick.value));
+    else if (!selectedValues.value.includes(pick.value))
+      emit("update:modelValue", [...selectedValues.value, pick.value]);
+    return;
+  }
 
   emit("create", term);
 }
@@ -722,7 +767,7 @@ function close() {
 function focus() {
   if (typeof document === "undefined") return;
   document.getElementById(inputId.value)?.focus();
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -737,7 +782,7 @@ defineExpose({ close, focus });
 // event is consumed here so page-level single-letter shortcuts (logs "s",
 // "r", "h", …) never fire while the select has keyboard focus.
 function handleTriggerKeydown(e: KeyboardEvent) {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key.length !== 1 || e.key === " ") return;
   e.preventDefault();
@@ -769,19 +814,18 @@ const listboxScrollEl = ref<HTMLElement | null>(null);
 //
 // Strategy:
 //   - highlightedIndex tracks which filteredOptions entry is highlighted.
-//   - Up / Down move the index through selectable (non-header, non-disabled)
-//     items with wrap-around.
+//   - Up / Down move it through navigable rows with wrap-around.
 //   - Enter commits the selection; Escape closes the dropdown.
 //   - The highlight class is applied reactively — no DOM focus juggling.
 //   - The search <input> retains browser focus the whole time the dropdown is
 //     open, so typing always goes straight to the filter.
 const highlightedIndex = ref(-1);
 
-// Indices into filteredOptions that are actual selectable items (no headers/disabled).
+// Indices into filteredOptions the arrow keys land on: selectable items, plus action headers.
 const navigableIndices = computed(() =>
   filteredOptions.value
     .map((opt, i) => ({ opt, i }))
-    .filter(({ opt }) => !opt.header && !opt.disabled)
+    .filter(({ opt }) => isActionHeader(opt) || (!opt.header && !opt.disabled))
     .map(({ i }) => i),
 );
 
@@ -858,6 +902,57 @@ function handleExpandKey(e: KeyboardEvent): boolean {
   return true;
 }
 
+/** A header carrying a count or an action renders as OSelectHeaderRow instead of the plain label. */
+function isRichHeader(opt: NormalizedOption): boolean {
+  return opt.header && (opt.headerAction !== undefined || opt.headerCount !== undefined);
+}
+
+function isActionHeader(opt: NormalizedOption): boolean {
+  return opt.header && Boolean(opt.headerAction);
+}
+
+// Rows outside the virtual window are not in the DOM, so scrollIntoView alone cannot reach them.
+function highlightAndReveal(index: number) {
+  highlightedIndex.value = index;
+  virtualizer.value.scrollToIndex(index, { align: "auto" });
+  nextTick(scrollHighlightedIntoView);
+}
+
+// Enter or Space on a highlighted action header runs its action; the highlight follows the header across the swap.
+function handleHeaderActionKey(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  const opt = filteredOptions.value[highlightedIndex.value];
+  if (!opt || !isActionHeader(opt)) return false;
+  // Reka's ListboxFilter guards: IME commits and modified keys do nothing, and must not fall through to select the header.
+  if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || (e.key === " " && e.shiftKey))
+    return true;
+  e.preventDefault();
+  flushPendingSearch();
+  if (opt.source) emit("header-action", opt.source);
+  // Runs after the filteredOptions watcher has reset the highlight.
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    if (index >= 0) highlightAndReveal(index);
+  });
+  return true;
+}
+
+// The consumer usually swaps this header's text in response; a keyboard user must stay on its action.
+function handleHeaderAction(opt: NormalizedOption, event: MouseEvent) {
+  const hadFocus =
+    event.currentTarget instanceof HTMLElement && event.currentTarget === document.activeElement;
+  flushPendingSearch();
+  if (opt.source) emit("header-action", opt.source);
+  if (!hadFocus) return;
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    const button = listboxScrollEl.value?.querySelector<HTMLElement>(
+      `[data-vrow="${index}"] [data-select-header-action]`,
+    );
+    if (button && button !== document.activeElement) button.focus();
+  });
+}
+
 function handleDropdownKeydown(e: KeyboardEvent) {
   const nav = navigableIndices.value;
 
@@ -867,7 +962,7 @@ function handleDropdownKeydown(e: KeyboardEvent) {
     popoverOpen.value = false;
     return;
   }
-  if (handleExpandKey(e)) return;
+  if (handleExpandKey(e) || handleHeaderActionKey(e)) return;
 
   // Allow Enter to trigger create even when no options are visible.
   // Otherwise creatable=true with an empty filtered list silently swallows
@@ -883,13 +978,11 @@ function handleDropdownKeydown(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur < nav.length - 1 ? nav[cur + 1] : nav[0];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur < nav.length - 1 ? nav[cur + 1] : nav[0]);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur > 0 ? nav[cur - 1] : nav[nav.length - 1];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur > 0 ? nav[cur - 1] : nav[nav.length - 1]);
   } else if (e.key === "Enter") {
     e.preventDefault();
     if (highlightedIndex.value >= 0) {
@@ -908,6 +1001,8 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
+      // Must equal the min-h-8 of OSelectHeaderRow or the virtual rows drift.
+      if (isRichHeader(opt)) return 32;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
       const hasPalette = !!opt.colorPalette?.length;
@@ -955,7 +1050,7 @@ const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : se
 // the `click` a native <label for> forwards never opens them; open explicitly.
 // `.prevent` (on the template handler) stops the redundant native forwarding.
 function handleLabelClick() {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -1014,6 +1109,12 @@ if (sidebarScrollTick) {
   });
 }
 
+// Scroll events arrive a frame late, so a scroll from before the open is only real if the trigger moved since.
+let openTriggerTop: number | null = null;
+let openTriggerLeft: number | null = null;
+// One layout read per frame: a sticky trigger never moves, so per-event reads would force layout throughout a long scroll.
+let triggerMoveFrame: number | null = null;
+
 // Generic close-on-scroll: while the dropdown is open, scrolling any ancestor
 // scroll container (page, query-builder area, joins popup, etc.) would leave
 // the portaled list floating detached from the trigger — close it instead.
@@ -1035,10 +1136,23 @@ function handleViewportScroll(event: Event) {
   // menu detached. Scrolls in unrelated sections (e.g. the field list while a
   // config-panel dropdown is open) are ignored.
   const triggerEl = triggerWrapperRef.value ?? selectTriggerWrapperRef.value;
-  if (triggerEl && target.contains(triggerEl)) {
-    popoverOpen.value = false;
-    selectOpen.value = false;
-  }
+  if (!triggerEl || !target.contains(triggerEl) || triggerMoveFrame !== null) return;
+  triggerMoveFrame = requestAnimationFrame(closeIfTriggerMoved);
+}
+
+function closeIfTriggerMoved() {
+  triggerMoveFrame = null;
+  if (!isOpen.value) return;
+  const rect = (triggerWrapperRef.value ?? selectTriggerWrapperRef.value)?.getBoundingClientRect();
+  if (rect && rect.top === openTriggerTop && rect.left === openTriggerLeft) return;
+  popoverOpen.value = false;
+  selectOpen.value = false;
+}
+
+function cancelTriggerMoveCheck() {
+  if (triggerMoveFrame === null) return;
+  cancelAnimationFrame(triggerMoveFrame);
+  triggerMoveFrame = null;
 }
 
 // Type-ahead, label clicks, focus(), Escape and picks set popoverOpen directly and Reka never reports them.
@@ -1050,18 +1164,25 @@ watch(popoverOpen, (open, wasOpen) => {
 watch(isOpen, (open) => {
   if (typeof window === "undefined") return;
   if (open) {
+    const rect = (
+      triggerWrapperRef.value ?? selectTriggerWrapperRef.value
+    )?.getBoundingClientRect();
+    openTriggerTop = rect?.top ?? null;
+    openTriggerLeft = rect?.left ?? null;
     window.addEventListener("scroll", handleViewportScroll, {
       capture: true,
       passive: true,
     });
   } else {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 
@@ -1191,7 +1312,7 @@ const overflowSelectedCount = computed(() =>
 // clear button toggles into view.
 const isInlineAppearance = computed(() => props.appearance === "inline");
 const triggerTextTone = computed(() =>
-  props.disabled
+  isDisabled.value
     ? "text-select-disabled-text"
     : hasSelection.value
       ? "text-select-text"
@@ -1208,15 +1329,22 @@ const inlineTriggerClasses = computed(() => [
   "rounded-default relative -mx-1 -my-0.5 flex w-auto shrink-0 items-center px-1 pe-6 py-0.5",
   "text-text-body text-xs font-medium",
   "ring-1 ring-inset transition-[color,background-color,box-shadow] duration-150",
-  "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
+  // focus:outline-none zeroes the outline style, so the keyboard ring has to restore it.
+  "focus:outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
   // The hover ring is gated on !hasError so it can't override the resting error
   // ring on hover (equal specificity, later class wins) and hide the error.
-  props.disabled
+  isDisabled.value
     ? "ring-transparent cursor-not-allowed opacity-60"
     : hasError.value
       ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
       : "ring-transparent cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
 ]);
+
+const insideLabelClasses = computed(() =>
+  isInlineAppearance.value
+    ? "text-text-secondary pointer-events-none me-1.5 font-normal whitespace-nowrap select-none"
+    : "text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none",
+);
 
 const triggerEndPadding = computed(() =>
   props.clearable && hasSelection.value ? "pe-12" : "pe-7",
@@ -1254,32 +1382,37 @@ const fieldWidthClass = computed(() => {
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text cursor-pointer font-medium',
       ]"
       @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
-      <OIcon
+      <!-- The tooltip goes first so it anchors to this focusable wrapper, not the icon's svg, and opens on Tab too. -->
+      <span
         v-if="$slots.tooltip"
-        name="info-outline"
-        size="sm"
-        :label="tooltipIconLabel"
+        tabindex="0"
+        role="img"
+        :aria-label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help"
-        ><slot name="tooltip"
-      /></OIcon>
+        class="rounded-default focus-visible:ring-focus-ring-accent inline-flex cursor-help focus-visible:ring-2 focus-visible:outline-none"
+        ><slot name="tooltip" /><OIcon name="info-outline" size="sm"
+      /></span>
     </label>
 
     <template v-if="listboxModeEnabled">
       <PopoverRoot v-model:open="popoverOpen">
-        <div ref="triggerWrapperRef" class="relative flex items-center">
+        <!-- An inline wrapper hugs its trigger so the absolutely placed chevron always lands on it. -->
+        <div
+          ref="triggerWrapperRef"
+          :class="['relative flex items-center', isInlineAppearance ? 'w-fit' : '']"
+        >
           <PopoverTrigger
             type="button"
             :id="inputId"
             :name="name"
-            :disabled="disabled"
+            :disabled="isDisabled"
             :tabindex="inputTabindex"
             role="combobox"
             :aria-expanded="popoverOpen"
@@ -1324,16 +1457,14 @@ const fieldWidthClass = computed(() => {
             "
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
-            <span
-              v-if="label && labelPosition === 'inside'"
-              class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
+            <span v-if="label && labelPosition === 'inside'" :class="insideLabelClasses"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
             <div
               :class="
-                labelPosition === 'inside' && label
+                labelPosition === 'inside' && label && !isInlineAppearance
                   ? [
                       'flex w-full min-w-0 flex-1 items-center',
                       triggerEndPadding,
@@ -1389,7 +1520,7 @@ const fieldWidthClass = computed(() => {
                       // width, letting any ancestor squeeze it to a lone ellipsis.
                       isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
                       labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                      disabled
+                      isDisabled
                         ? 'text-select-disabled-text'
                         : hasSelection
                           ? 'text-select-text'
@@ -1494,7 +1625,7 @@ const fieldWidthClass = computed(() => {
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
@@ -1615,12 +1746,23 @@ const fieldWidthClass = computed(() => {
                         transform: `translateY(${vRow.start}px)`,
                       }"
                     >
+                      <OSelectHeaderRow
+                        v-if="isRichHeader(filteredOptions[vRow.index])"
+                        :label="filteredOptions[vRow.index].label"
+                        :count="filteredOptions[vRow.index].headerCount"
+                        :action="filteredOptions[vRow.index].headerAction"
+                        :action-aria-label="filteredOptions[vRow.index].headerActionAriaLabel"
+                        :highlighted="vRow.index === highlightedIndex"
+                        :data-test="parentDataTest ? `${parentDataTest}-header` : undefined"
+                        @action="handleHeaderAction(filteredOptions[vRow.index], $event)"
+                      />
+
                       <!-- Group header — non-interactive label. Virtualisation
                          renders each flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                       <div
-                        v-if="filteredOptions[vRow.index].header"
+                        v-else-if="filteredOptions[vRow.index].header"
                         :class="[
                           'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
                           collapsibleGroups
@@ -1755,9 +1897,21 @@ const fieldWidthClass = computed(() => {
                             />
                           </template>
 
+                          <template v-if="$slots.option && filteredOptions[vRow.index].source">
+                            <OIcon
+                              v-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span class="flex min-w-0 flex-1 items-center">
+                              <slot name="option" :option="filteredOptions[vRow.index].source!" />
+                            </span>
+                          </template>
+
                           <!-- Inline subLabel: name – url on a single row -->
                           <template
-                            v-if="
+                            v-else-if="
                               filteredOptions[vRow.index].subLabel &&
                               filteredOptions[vRow.index].subLabelInline
                             "
@@ -1847,7 +2001,15 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
+                            <OTruncatedText class="min-w-0 flex-1">{{
+                              filteredOptions[vRow.index].listLabel ??
+                              filteredOptions[vRow.index].label
+                            }}</OTruncatedText>
+                            <span
+                              v-if="filteredOptions[vRow.index].suffix"
+                              class="text-text-secondary ms-auto shrink-0 text-xs tabular-nums"
+                              >{{ filteredOptions[vRow.index].suffix }}</span
+                            >
                           </template>
                         </ListboxItem>
                       </div>
@@ -1919,7 +2081,7 @@ const fieldWidthClass = computed(() => {
       v-else
       :model-value="stringValue"
       :open="selectOpen"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :name="name"
       @update:model-value="handleUpdate"
       @update:open="
@@ -1930,7 +2092,10 @@ const fieldWidthClass = computed(() => {
         }
       "
     >
-      <div ref="selectTriggerWrapperRef" class="relative flex items-center">
+      <div
+        ref="selectTriggerWrapperRef"
+        :class="['relative flex items-center', isInlineAppearance ? 'w-fit' : '']"
+      >
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
@@ -1961,16 +2126,14 @@ const fieldWidthClass = computed(() => {
           "
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
-          <span
-            v-if="label && labelPosition === 'inside'"
-            class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
+          <span v-if="label && labelPosition === 'inside'" :class="insideLabelClasses"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
           <div
             :class="
-              labelPosition === 'inside' && label
+              labelPosition === 'inside' && label && !isInlineAppearance
                 ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-3']
                 : 'contents'
             "
@@ -2111,6 +2274,9 @@ const fieldWidthClass = computed(() => {
                 :value="opt.value"
                 :label="opt.label"
                 :disabled="opt.disabled || opt.expandable"
+                :icon="opt.icon"
+                :icon-component="opt.iconComponent"
+                :reserve-icon-space="!!iconKey"
               />
             </template>
 

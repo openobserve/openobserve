@@ -234,4 +234,17 @@ describe("useAnalyticsSearch", () => {
     const orgs = vi.mocked(searchService.search).mock.calls.map((c) => c[0].org_identifier);
     expect(orgs).toEqual(["org1", "org1"]);
   });
+
+  it("accepts a _sessionreplay query only when its stream is named, via the real guard", async () => {
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [{ v: 1 }] } } as never);
+    const replay = "SELECT view_id FROM \"_sessionreplay\" WHERE view_id = 'v1'";
+    const runner = useAnalyticsSearch();
+
+    const res = await runner.run("r", { ...spec(replay), stream: "_sessionreplay" }, "k");
+    expect(res.status).toBe("ok");
+    await expect(runner.run("r2", spec(replay), "k")).rejects.toThrow(/_rumdata exactly once/);
+    await expect(
+      runner.run("r3", { ...spec(`${replay} JOIN x`), stream: "_sessionreplay" }, "k"),
+    ).rejects.toThrow(/join-free/);
+  });
 });

@@ -16,6 +16,7 @@
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import LabelFilterBar from "./LabelFilterBar.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -257,6 +258,69 @@ describe("LabelFilterBar", () => {
         wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
       ).toBe(true);
     });
+
+    describe("follow the value scope", () => {
+      const valueOptions = () =>
+        wrapper
+          .findAllComponents(OSelect)
+          .find((select) => select.props("creatable"))!
+          .props("options")
+          .map((o: { value: string }) => o.value);
+
+      it("reloads the open draft's suggestions and leaves the draft and filters alone", async () => {
+        const filters: LabelFilter[] = [{ label: "job", value: "api", operator: "=" }];
+        const loadValues = vi
+          .fn()
+          .mockResolvedValueOnce(["docker-host"])
+          .mockResolvedValueOnce(["docker-host", "host-a"]);
+        wrapper = createWrapper({ filters, loadValues, valueScope: "container" });
+
+        // Idle: nothing to refresh.
+        await wrapper.setProps({ valueScope: "process" });
+        expect(loadValues).not.toHaveBeenCalled();
+
+        await openPicker(wrapper);
+        await wrapper.vm.onLabelPicked("host_name");
+        await flushPromises();
+        wrapper.vm.draftOperator = "!=";
+        expect(valueOptions()).toEqual(["docker-host"]);
+
+        await wrapper.setProps({ valueScope: "system" });
+        await flushPromises();
+
+        expect(loadValues).toHaveBeenCalledTimes(2);
+        expect(valueOptions()).toEqual(["docker-host", "host-a"]);
+        expect(wrapper.emitted("add")).toBeUndefined();
+        expect(wrapper.emitted("remove")).toBeUndefined();
+        expect(wrapper.emitted("clear-all")).toBeUndefined();
+
+        // Free text still commits, with the operator picked before the refresh.
+        await wrapper.vm.onValueCreated("host-c");
+        expect(wrapper.emitted("add")![0]).toEqual([
+          { label: "host_name", value: "host-c", operator: "!=" },
+        ]);
+      });
+
+      it("drops an answer that lands after the scope changed", async () => {
+        let answerOldScope!: (values: string[]) => void;
+        const loadValues = vi
+          .fn()
+          .mockReturnValueOnce(new Promise((resolve) => (answerOldScope = resolve)))
+          .mockResolvedValueOnce(["host-a"]);
+        wrapper = createWrapper({ loadValues, valueScope: "container" });
+
+        await openPicker(wrapper);
+        const picked = wrapper.vm.onLabelPicked("host_name");
+        await wrapper.setProps({ valueScope: "system" });
+        await flushPromises();
+
+        answerOldScope(["docker-host"]);
+        await picked;
+        await flushPromises();
+
+        expect(valueOptions()).toEqual(["host-a"]);
+      });
+    });
   });
 
   describe("operators", () => {
@@ -485,6 +549,84 @@ describe("LabelFilterBar", () => {
 
       expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
+    });
+  });
+
+  describe("OR groups", () => {
+    const grouped: LabelFilter[] = [
+      { label: "job", value: "api", operator: "=" } as LabelFilter,
+      { label: "code", value: "500", operator: "=", group: 1 } as LabelFilter,
+      { label: "env", value: "prod", operator: "=", group: 2, negate: true } as LabelFilter,
+    ];
+
+    it("offers an OR group only once there is a filter to OR against", async () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(false);
+      await wrapper.setProps({ filters: grouped.slice(0, 1) });
+      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(true);
+    });
+
+    it("adds the next filter as a new OR group", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      await wrapper.find('[data-test="metrics-explorer-label-add-group"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("code");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("503");
+      await flushPromises();
+      expect(wrapper.emitted("add")![0]).toEqual([
+        { label: "code", value: "503", operator: "=", group: 3 },
+      ]);
+    });
+
+    it("adds into an existing group, negated when the group is", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      await wrapper.find('[data-test="metrics-explorer-label-group-add-2"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("instance");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("a");
+      await flushPromises();
+      expect(wrapper.emitted("add")![0]).toEqual([
+        { label: "instance", value: "a", operator: "=", group: 2, negate: true },
+      ]);
+    });
+
+    it("renders groups joined by or and emits negate-group from the NOT toggle", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-1"]').text()).toBe(
+        "and any of",
+      );
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-2"]').text()).toBe("or");
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-2"]').text()).toContain(
+        "env = prod",
+      );
+
+      await wrapper.find('[data-test="metrics-explorer-label-group-not-1"]').trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-label-group-not-2"]').trigger("click");
+      expect(wrapper.emitted("negate-group")).toEqual([
+        [1, true],
+        [2, false],
+      ]);
+    });
+
+    it("refuses an add that expands past the branch cap, and says so", async () => {
+      const negated = Array.from(
+        { length: 16 },
+        (_, i) =>
+          ({ label: `l${i}`, value: "x", operator: "=", group: 1, negate: true }) as LabelFilter,
+      );
+      wrapper = createWrapper({ filters: negated });
+      await wrapper.find('[data-test="metrics-explorer-label-group-add-1"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("job");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("api");
+      await flushPromises();
+      expect(wrapper.emitted("add")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="metrics-explorer-label-too-many-branches"]').text(),
+      ).toContain("17");
     });
   });
 });

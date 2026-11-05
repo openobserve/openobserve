@@ -883,6 +883,68 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.text()).toContain("523ms");
     });
 
+    it("should fall back to the span duration when the trace ends before the RUM request", async () => {
+      wrapper.unmount();
+
+      // _date = 5000ms but the trace ended at 1150ms (clock skew); span lasted 150ms.
+      setupSuccessfulMocks(
+        [createRumHit({ _date: 5000 })],
+        [createTraceMetadata({ start_time: 1_000_000_000, end_time: 1_150_000_000 })],
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("150ms");
+      expect(wrapper.text()).not.toContain("0us");
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+      expect(wrapper.text()).toContain("150ms");
+    });
+
+    it("should show a dash and no timer chip when the trace has no usable duration", async () => {
+      wrapper.unmount();
+
+      // Trace ended before the RUM request and the span has zero length.
+      setupSuccessfulMocks(
+        [createRumHit({ _date: 5000 })],
+        [createTraceMetadata({ start_time: 1_000_000_000, end_time: 1_000_000_000 })],
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="table-row-0"]').text()).toContain("—");
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists()).toBe(true);
+      expect(wrapper.html()).not.toContain('name="timer"');
+    });
+
+    it("should match the Slow filter on the span duration when the trace ends before the RUM request", async () => {
+      wrapper.unmount();
+
+      setupSuccessfulMocks(
+        [createRumHit({ _date: 9000 })],
+        [createTraceMetadata({ start_time: 1_000_000_000, end_time: 2_500_000_000 })],
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const status = wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find(
+          (select) => select.attributes("data-test") === "rum-player-traces-tab-status-filter",
+        )!;
+      status.vm.$emit("update:modelValue", ["slow"]);
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+    });
+
     it("should display error count badge in detail header when trace has errors", async () => {
       wrapper.unmount();
 

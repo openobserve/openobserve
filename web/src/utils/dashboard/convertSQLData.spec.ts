@@ -1051,6 +1051,32 @@ describe("convertSQLData", () => {
     });
 
     describe("Mark line functionality", () => {
+      it("uses a mark line's own label formatter instead of its raw value", async () => {
+        const result = await convertSQLData(
+          {
+            ...mockPanelSchema,
+            config: {
+              mark_line: [
+                { name: "Limit", type: "yAxis", value: 204800, label_formatter: "{b}:200 GB" },
+                { name: "Plain", type: "yAxis", value: 5 },
+              ],
+            },
+          },
+          [[{ timestamp: "2023-01-01", value: 10 }]],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const lines = result.options.series.find((s: any) => s.markLine?.data?.length).markLine
+          .data;
+        expect(lines.map((line: any) => line.label.formatter)).toEqual(["{b}:200 GB", "{b}:{c}"]);
+      });
+
       it("should handle mark lines with xAxis type", async () => {
         const schema = {
           ...mockPanelSchema,
@@ -4176,6 +4202,62 @@ describe("convertSQLData", () => {
         ]);
       });
 
+      it.each([
+        ["line", { lineStyle: { type: "dashed" } }],
+        ["bar", { itemStyle: { opacity: 0.5 } }],
+      ])(
+        "draws a compared %s series in its series' colour, set apart by style",
+        async (type, style) => {
+          const searchData = [
+            [{ timestamp: "2023-01-01", value: 10 }],
+            [{ timestamp: "2023-01-02", value: 20 }],
+          ];
+          const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
+          const metadata = {
+            queries: [
+              { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+              {
+                panelQueryIndex: 0,
+                timeRangeGap: { seconds: 3_600_000, periodAsStr: "1 Hour ago" },
+              },
+            ],
+          };
+          const schema = {
+            ...mockPanelSchema,
+            type,
+            queries: [
+              {
+                fields: {
+                  x: [{ alias: "timestamp", label: "Timestamp" }],
+                  y: [{ alias: "value", label: "Count" }],
+                  z: [],
+                  breakdown: [],
+                },
+              },
+            ],
+          };
+          const result = await convertMultiSQLData(
+            schema,
+            searchData,
+            mockStore,
+            mockChartPanelRef,
+            mockHoveredSeriesState,
+            resultMetaData,
+            metadata,
+            mockChartPanelStyle,
+            mockAnnotations,
+          );
+
+          const [current, compared] = result.options.series.filter(
+            (s: { name?: string }) => s.name,
+          );
+          expect(compared.name).toBe("Count (1 Hour ago)");
+          expect(compared.color).toBe(current.color);
+          expect(compared).toMatchObject(style);
+          expect(current.lineStyle?.type).not.toBe("dashed");
+          expect(current.itemStyle?.opacity).toBeUndefined();
+        },
+      );
       it("should handle metadata queries without periodAsStr", async () => {
         const schema = mockPanelSchema;
         const searchData = [

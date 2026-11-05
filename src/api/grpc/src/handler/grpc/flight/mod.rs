@@ -15,7 +15,6 @@
 
 use std::{io::Cursor, sync::Arc};
 
-use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
@@ -28,11 +27,14 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{MetricsInfo, PreCustomMessage};
+use flight::common::{MetricsInfo, NodeMessages};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
-use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+use search::{
+    datafusion::distributed_plan::profile,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
@@ -45,11 +47,8 @@ use {
 use crate::handler::grpc::{
     MetadataMap,
     flight::{
-        stream::{FlightEncoderStreamBuilder, MAX_FLIGHT_DATA_SIZE},
-        visitor::{
-            get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
-            get_scan_stats,
-        },
+        stream::FlightEncoderStreamBuilder,
+        visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
 
@@ -164,31 +163,15 @@ impl FlightService for FlightServiceImpl {
         }
 
         let start = std::time::Instant::now();
-        let write_options: IpcWriteOptions = IpcWriteOptions::default()
-            .try_with_compression(Some(CompressionType::ZSTD))
-            .map_err(|e| {
-                log::error!(
-                    "[trace_id {trace_id}] flight->search: do_get create IPC write options error: {e:?}",
-                );
-                Status::internal(e.to_string())
-            })?;
-
-        // used for EXPLAIN ANALYZE to collect metrics after stream is done
-        let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
-            plan: plan.clone(),
-            is_super_cluster,
-            func: Box::new(super_cluster_enabled),
-        });
-
-        // Get the peak memory usage from the memory pool
-        // Note: We get peak memory after stream execution, so we pass it via a shared reference
-        let peak_memory = get_peak_memory_from_ctx(&ctx);
-
-        // used for super cluster follower leader to get information from follower node
-        let scan_stats_ref = get_scan_stats(&plan);
-        let metrics_ref = get_cluster_metrics(&plan);
-        let peak_memory_ref = get_peak_memory(&plan);
-        let partial_err_ref = get_partial_err(&plan);
+        let node_messages = NodeMessages {
+            scan_stats,
+            peak_memory: get_peak_memory_from_ctx(&ctx),
+            profile: req.search_info.is_analyze.then(|| MetricsInfo {
+                plan: plan.clone(),
+                build_profile: profile::build_profile,
+            }),
+            role: node_role(&plan),
+        };
 
         // One stream per output partition so they encode in parallel
         let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
@@ -198,23 +181,12 @@ impl FlightService for FlightServiceImpl {
             Status::internal(e.to_string())
         })?;
 
-        let mut stream =
-            FlightEncoderStreamBuilder::new(write_options, MAX_FLIGHT_DATA_SIZE, session_guard)
-                .with_trace_id(trace_id.to_string())
-                .with_is_super(is_super_cluster)
-                .with_defer_lock(lock)
-                .with_start(start)
-                .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
-                .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
-                .with_custom_message(PreCustomMessage::Metrics(metrics))
-                .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
-                .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
-                .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
-                .with_custom_message(PreCustomMessage::PartialErrRefEarly(
-                    partial_err_ref.clone(),
-                ))
-                .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
-                .build(streams, span);
+        let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
+            .with_trace_id(trace_id.to_string())
+            .with_is_super(is_super_cluster)
+            .with_defer_lock(lock)
+            .with_start(start)
+            .build(streams, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
@@ -367,16 +339,6 @@ fn clear_session_data(trace_id: &str) {
     log::info!("Cleared session for trace_id: {trace_id}");
 }
 
-#[cfg(feature = "enterprise")]
-fn super_cluster_enabled() -> bool {
-    get_o2_config().super_cluster.enabled
-}
-
-#[cfg(not(feature = "enterprise"))]
-fn super_cluster_enabled() -> bool {
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -384,10 +346,5 @@ mod tests {
     #[test]
     fn test_flight_service_impl_default() {
         let _impl = FlightServiceImpl;
-    }
-
-    #[test]
-    fn test_super_cluster_disabled_in_oss() {
-        assert!(!super_cluster_enabled());
     }
 }

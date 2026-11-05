@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { keepPreviousData, useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import {
@@ -36,6 +37,7 @@ import {
   fleetTokensQuery,
 } from "@/services/fleet.queries";
 import type {
+  FleetAuditParams,
   FleetCollector,
   FleetCollectorDetail,
   FleetCollectorEvent,
@@ -187,7 +189,7 @@ export const NO_OVERRIDES: FleetSettings = {
 
 export const HALT_EXITS: FleetHaltExit[] = ["rollback", "resume", "fix_forward", "skip"];
 
-const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled"];
+const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled", "waiting"];
 
 const ENV_REF = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
@@ -376,6 +378,17 @@ export function isForbidden(err: unknown): boolean {
   return e?.status === 403 || e?.response?.status === 403;
 }
 
+// The route check and the fleet handlers refuse with these words, which never say it is about permission.
+const BARE_REFUSALS = new Set(["Forbidden", "Unauthorized Access"]);
+
+/** A failed write's toast text; a bare refusal becomes a permission message, a stated reason is kept. */
+export function failureText(err: unknown, t: TranslateFn): I18nText {
+  const message = serverMessage(err);
+  if (isForbidden(err) && (!message || BARE_REFUSALS.has(message)))
+    return t("fleet.common.noPermission");
+  return raw(message) || t("fleet.common.requestFailed");
+}
+
 export function isNotFound(err: unknown): boolean {
   const e = err as { status?: number; response?: { status?: number } } | null;
   return e?.status === 404 || e?.response?.status === 404;
@@ -554,15 +567,20 @@ export function useFleetConfigVersion(
   };
 }
 
-export function useFleetAudit() {
+export function useFleetAudit(params: () => FleetAuditParams = () => ({})) {
   const orgId = useOrgId();
   const query = useQuery(() =>
-    Object.assign(fleetAuditQuery(orgId.value), { enabled: !!orgId.value }),
+    Object.assign(fleetAuditQuery(orgId.value, params()), {
+      enabled: !!orgId.value,
+      placeholderData: keepPreviousData,
+    }),
   );
   return {
     rows: computed(() => (isForbidden(query.error.value) ? [] : (query.data.value?.items ?? []))),
+    total: computed(() => (isForbidden(query.error.value) ? 0 : (query.data.value?.total ?? 0))),
     disabled: computed(() => !!query.data.value?.audit_disabled),
-    loading: query.isPending,
+    // The previous page stays on screen while the next one loads, and the table dims it.
+    loading: computed(() => query.isPending.value || query.isPlaceholderData.value),
     fetching: query.isFetching,
     lastUpdatedAt: query.dataUpdatedAt,
     error: query.error,

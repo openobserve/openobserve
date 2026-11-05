@@ -114,7 +114,7 @@ describe("useFirstDataNotice", () => {
   it("shows the banner after a visit with no data, from the oldest user stream, and fires RUM once", async () => {
     writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
     rows.logs = [
-      userStream("usage", NOW * 1000 - 9 * HOUR_US),
+      { ...userStream("usage", NOW * 1000 - 9 * HOUR_US), is_internal: true },
       userStream("later", NOW * 1000 - HOUR_US),
       userStream("first", NOW * 1000 - 2 * HOUR_US),
     ];
@@ -170,16 +170,20 @@ describe("useFirstDataNotice", () => {
     });
   });
 
-  it("bounds the flag-off source to three limit-1 probes and 20-row pages", async () => {
+  it("bounds the flag-off source to one limit-1 probe per type and 20-row pages", async () => {
     writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
     rows.metrics = [
-      ...Array.from({ length: 30 }, (_, i) => ({ name: `_o2_internal_${i}`, stats: {} })),
+      ...Array.from({ length: 30 }, (_, i) => ({
+        name: `_o2_internal_${i}`,
+        is_internal: true,
+        stats: {},
+      })),
       userStream("cpu", NOW * 1000 - HOUR_US, "metrics"),
     ];
     noticeOf();
     await flushPromises();
     const calls = nameList.mock.calls;
-    expect(calls.filter((c) => c[4] === 1)).toHaveLength(3);
+    expect(calls.filter((c) => c[4] === 1)).toHaveLength(4);
     expect(calls.every((c) => c[4] === 1 || c[4] === 20)).toBe(true);
     expect(calls.filter((c) => c[1] === "metrics" && c[4] === 20).map((c) => c[3])).toEqual([
       0, 20,

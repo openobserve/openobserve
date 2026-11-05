@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            titleMeta ? 'me-2!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
@@ -69,6 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ panelTitle }}
         </OTruncatedText>
+        <span
+          v-if="titleMeta"
+          class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
+          data-test="dashboard-panel-header-meta"
+          >{{ titleMeta }}</span
+        >
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -130,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="hoverRevealClass"
           v-if="
             props.showLegendsButton &&
+            !isDataView &&
             !PanleSchemaRendererRef?.noData &&
             ![
               'table',
@@ -169,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :class="hoverRevealClass"
           v-if="
+            !isDataView &&
             !viewOnly &&
             !simplifiedPanelView &&
             [
@@ -203,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <ExemplarToggle
-          v-if="exemplarsEligible && !viewOnly"
+          v-if="exemplarsEligible && !viewOnly && !isDataView"
           :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
@@ -339,6 +348,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
 
+        <!-- Only in viewOnly, so it can never sit beside the panel's own Create alert. -->
+        <ODropdown v-if="viewOnly && exploreActions" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              :aria-label="t('dashboard.moreActions')"
+              variant="ghost"
+              size="icon"
+              data-test="panel-explore-actions-btn"
+            >
+              <OIcon name="more-vert" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            data-test="panel-explore-create-alert"
+            icon-left="shield-alert-outline"
+            @select="$emit('exploreCreateAlert', props.data)"
+          >
+            {{ t("dashboard.panelContainer.exploreCreateAlert") }}
+          </ODropdownItem>
+          <ODropdownItem
+            data-test="panel-explore-add-to-dashboard"
+            icon-left="dashboard"
+            @select="$emit('exploreAddToDashboard', props.data)"
+          >
+            {{ t("dashboard.panelContainer.exploreAddToDashboard") }}
+          </ODropdownItem>
+        </ODropdown>
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
@@ -379,6 +415,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OTooltip>
             </template>
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="showDataViewToggle && !isLayoutEditing"
+            data-test="dashboard-panel-data-view-toggle"
+            @select="previewView = isDataView ? 'chart' : 'data'"
+          >
+            <template #icon-left
+              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+            /></template>
+            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -435,7 +481,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("panel.downloadAsJSON") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
+              "
+              disabled
+              focusable-unavailable
+              icon-left="lock"
+              :description="goToLogsLockedReason"
+              data-test="dashboard-move-to-logs-module"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               :disabled="props.data.queryType != 'sql'"
               data-test="dashboard-move-to-logs-module"
               @select="onLogPanel"
@@ -540,6 +598,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-data-update="onCuratedSeriesData"
         @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
+      <PanelDataView
+        v-if="showDataOverlay"
+        class="absolute inset-0 z-10"
+        :data="previewRawData"
+        :query-type="props.data.queryType"
+        :loading="isPanelLoading"
+        data-test-prefix="dashboard-panel"
+      />
 
       <!-- Until the first result or error lands, an empty body would read as "No Data" on a TV. -->
       <div
@@ -644,6 +710,8 @@ import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh"
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
+import PanelDataView from "./addPanel/PanelDataView.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
@@ -664,6 +732,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { supportsResultSchema } from "@/utils/crossLinking";
+import { buildPanelLogsQuery } from "@/utils/dashboard/panelLogsQuery";
 import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
@@ -696,6 +766,8 @@ import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -718,6 +790,8 @@ export default defineComponent({
     "update:runId",
     "contextmenu",
     "sendToAiChat",
+    "exploreCreateAlert",
+    "exploreAddToDashboard",
   ],
   props: [
     "data",
@@ -746,12 +820,14 @@ export default defineComponent({
     "injectedPanelData",
     "layoutMode",
     "kiosk",
+    "exploreActions",
   ],
   components: {
     OTag,
     OBadge,
     OSkeleton,
     PanelSchemaRenderer,
+    PanelDataView,
     PanelBar,
     QueryInspector,
     ConfirmDialog,
@@ -780,6 +856,8 @@ export default defineComponent({
       context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
     });
     const panelFileName = computed(() => toPanelFileName(panelTitle.value));
+    // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
+    const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -818,6 +896,17 @@ export default defineComponent({
     );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+    const {
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => props.data?.type,
+      renderer: PanleSchemaRendererRef,
+      enabled: () => !props.kiosk && !props.viewOnly && !props.simplifiedPanelView,
+    });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));
     const exemplarKey = computed(() =>
@@ -977,6 +1066,10 @@ export default defineComponent({
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
+    // Layout editing hides the panel bar controls, which would leave the Data view with no way back.
+    watch(isLayoutEditing, (editing) => {
+      if (editing) previewView.value = "chart";
+    });
 
     // Editor actions follow the "Edit panel" menu item; Refresh is a viewer action, so layout edit and viewOnly keep it.
     const canEditFromNotice = computed(
@@ -1078,6 +1171,7 @@ export default defineComponent({
       queryDetails: any,
       currentUrl: string,
       vrlFunctionQueryEncoded: string,
+      showHistogram: boolean,
     ) => {
       const logsUrl = new URL(currentUrl + "/logs");
       logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
@@ -1100,9 +1194,34 @@ export default defineComponent({
       } else {
         logsUrl.searchParams.set("quick_mode", "false");
       }
-      logsUrl.searchParams.set("show_histogram", "false");
+      logsUrl.searchParams.set("show_histogram", showHistogram ? "true" : "false");
       return logsUrl;
     };
+
+    // null = keep the executed query, since the WHERE could not be read or rebuilt safely.
+    const buildLogsRowsQuery = async (
+      queryDetails: any,
+      query: string,
+      streamName: string,
+    ): Promise<string | null> => {
+      const renderer = PanleSchemaRendererRef.value;
+      // The panel's VRL was written for its result columns, which raw log rows don't have.
+      if (queryDetails.queries[0]?.vrlFunctionQuery?.trim()) return null;
+      if (!supportsResultSchema(queryDetails.queries[0]?.fields?.stream_type) || !renderer) {
+        return null;
+      }
+      await renderer.ensureDrilldownSchema(0, true);
+      return buildPanelLogsQuery(query, streamName, renderer.panelBaseWhere ?? "");
+    };
+
+    const licenseLocks = useLicenseLocks();
+    const goToLogsFeature = computed(() =>
+      streamTypeFeature(props.data?.queries?.[0]?.fields?.stream_type),
+    );
+    const goToLogsLocked = computed(() => licenseLocks.isLocked(goToLogsFeature.value));
+    const goToLogsLockedReason = computed(() =>
+      goToLogsFeature.value ? licenseLocks.lockedReason(goToLogsFeature.value) : raw(""),
+    );
 
     const onLogPanel = async () => {
       const showNotification = showPositiveNotification(
@@ -1117,11 +1236,10 @@ export default defineComponent({
       const { originalQuery, streamName } = getOriginalQueryAndStream(queryDetails, metaData) || {};
       if (!originalQuery || !streamName) return;
 
-      let modifiedQuery = originalQuery;
+      const executedQuery = originalQuery.replace(/`/g, '"');
+      const rowsQuery = await buildLogsRowsQuery(queryDetails, executedQuery, streamName);
 
-      modifiedQuery = modifiedQuery.replace(/`/g, '"');
-
-      const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+      const encodedQuery: any = b64EncodeUnicode((rowsQuery ?? executedQuery).replace(/`/g, '"'));
 
       const vrlFunctionQuery = queryDetails.queries[0]?.vrlFunctionQuery;
       const vrlFunctionQueryEncoded: any = b64EncodeUnicode(vrlFunctionQuery);
@@ -1138,6 +1256,7 @@ export default defineComponent({
         queryDetails,
         currentUrl,
         vrlFunctionQueryEncoded,
+        rowsQuery !== null,
       );
 
       // Use short_url service to shorten the URL and redirect
@@ -1471,6 +1590,8 @@ export default defineComponent({
 
     return {
       props,
+      goToLogsLocked,
+      goToLogsLockedReason,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,
@@ -1490,6 +1611,7 @@ export default defineComponent({
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       panelTitle,
+      titleMeta,
       panelFileName,
       alertDisabledReason,
       canCreateAlert,
@@ -1502,6 +1624,11 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      previewRawData,
       hasNoticeChips,
       showViewPanel,
       dependentAdHocVariable,

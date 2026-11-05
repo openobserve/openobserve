@@ -15,9 +15,12 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { nextTick, reactive } from "vue";
 import SettingsIndex from "./index.vue";
+import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 import i18n from "@/locales";
-import { createRouter, createWebHistory } from "vue-router";
+import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
+import awsConfig from "@/aws-exports";
 
 // Mock external dependencies
 vi.mock("@/aws-exports", () => ({
@@ -53,7 +56,7 @@ const mockStore = {
     },
     zoConfig: {
       service_streams_enabled: true,
-    },
+    } as Record<string, boolean>,
   },
 };
 
@@ -248,6 +251,84 @@ describe("SettingsIndex", () => {
       expect(orgManagementItem?.visible).toBe(true);
       expect(syntheticsItem?.visible).toBe(true);
     });
+
+    describe("license-gated items", () => {
+      const byKeyUnder = (zoConfig: Record<string, unknown>) => {
+        mockStore.state.zoConfig = { service_streams_enabled: true, ...zoConfig } as any;
+        const items = getAllItems(createWrapper());
+        return (key: string) => items.find((i: any) => i.key === key);
+      };
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+      ])("marks %s license-locked under a locked %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "locked" } });
+        expect(byKey(key)?.licenseLocked).toBe(true);
+      });
+
+      it("locks Correlation only when the alerts feature it also runs on is locked", () => {
+        const only = byKeyUnder({ features: { correlation: "locked" } });
+        expect(only("correlation_settings")?.licenseLocked).toBe(false);
+        const both = byKeyUnder({ features: { correlation: "locked", alerts: "locked" } });
+        expect(both("correlation_settings")?.licenseLocked).toBe(true);
+      });
+
+      it.each(["model_pricing", "llm_providers", "gen_ai_agent_mapping"])(
+        "locks %s and keeps it visible under a locked ai_observability license",
+        (key) => {
+          const byKey = byKeyUnder({
+            online_evals_enabled: false,
+            features: { ai_observability: "locked" },
+          });
+          expect(byKey(key)?.licenseLocked).toBe(true);
+          if (key !== "model_pricing") expect(byKey(key)?.visible).toBe(true);
+        },
+      );
+
+      it("keeps Telephony visible and locked under a locked oncall license", () => {
+        const byKey = byKeyUnder({ oncall_enabled: false, features: { oncall: "locked" } });
+        expect(byKey("telephony")).toMatchObject({ visible: true, licenseLocked: true });
+      });
+
+      it.each([
+        ["synthetics_locations", "synthetics"],
+        ["queryManagement", "query_management"],
+        ["storageSettings", "byob"],
+        ["correlation_settings", "correlation"],
+      ])("hides %s under a hidden %s license", (key, feature) => {
+        const byKey = byKeyUnder({ features: { [feature]: "hidden" } });
+        expect(byKey(key)?.visible).toBe(false);
+      });
+
+      it("keeps locked synthetics locations and correlation visible though their flags are off", () => {
+        const byKey = byKeyUnder({
+          synthetics_enabled: false,
+          service_streams_enabled: false,
+          features: { synthetics: "locked", correlation: "locked", alerts: "locked" },
+        });
+        expect(byKey("synthetics_locations")).toMatchObject({ visible: true, licenseLocked: true });
+        expect(byKey("correlation_settings")).toMatchObject({ visible: true, licenseLocked: true });
+      });
+
+      it("leaves every item unlocked when the license enables it", () => {
+        const byKey = byKeyUnder({});
+        for (const key of [
+          "synthetics_locations",
+          "queryManagement",
+          "storageSettings",
+          "correlation_settings",
+          "telephony",
+          "llm_providers",
+        ]) {
+          expect(byKey(key)?.licenseLocked).toBe(false);
+        }
+        expect(byKey("synthetics_locations")?.visible).toBe(true);
+        expect(byKey("queryManagement")?.visible).toBe(true);
+        expect(byKey("correlation_settings")?.visible).toBe(true);
+      });
+    });
   });
 
   describe("Router integration", () => {
@@ -330,6 +411,13 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       const labels = (wrapper.vm.sectionGroups as any[]).map((g: any) => g.label);
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+    });
+
+    it("gives the Slack section no page subtitle", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);
+      expect(items.find((i) => i.key === "slack")?.description).toBeUndefined();
     });
 
     it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
@@ -591,5 +679,90 @@ describe("SettingsIndex", () => {
         );
       });
     });
+  });
+});
+
+// `/providers` exists only with online evaluations on, so the rail hides it and deep links disable.
+describe("SettingsIndex — LLM providers with online evaluations off", () => {
+  const LlmProvidersPage = { template: "<div data-test='llm-providers-page'></div>" };
+  // SettingsIndex is a route component; its own <router-view> renders the section.
+  const App = { template: "<router-view />" };
+
+  async function mountOnLlmProviders(onlineEvalsEnabled: boolean | undefined, version?: string) {
+    vi.mocked(awsConfig).isEnterprise = "true";
+    const store = {
+      state: reactive({
+        theme: "light",
+        selectedOrganization: { identifier: "test-org" },
+        organizationData: { organizationSettings: { org_storage_enabled: false } },
+        zoConfig: {
+          ...(version === undefined ? {} : { version }),
+          ...(onlineEvalsEnabled === undefined ? {} : { online_evals_enabled: onlineEvalsEnabled }),
+        } as Record<string, unknown>,
+      }),
+    };
+    const settingsRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: "/settings",
+          component: SettingsIndex,
+          children: [
+            { path: "general", name: "general", component: { template: "<div />" } },
+            {
+              path: "llm_providers",
+              name: "llmProviders",
+              component: LlmProvidersPage,
+              meta: { requiresOnlineEvals: true },
+            },
+          ],
+        },
+      ],
+    });
+    await settingsRouter.push("/settings/llm_providers");
+    await settingsRouter.isReady();
+    const wrapper = mount(App, {
+      global: {
+        plugins: [i18n, settingsRouter],
+        provide: { store },
+        stubs: {
+          OPageLayout: { template: "<div><slot name='sidebar' /><slot /></div>" },
+          SectionRail: { template: "<div />", props: ["groups", "activeKey", "title"] },
+          OEmptyState: { template: "<div />", props: ["size", "icon", "title", "description"] },
+        },
+      },
+    });
+    const llmProvidersItemVisible = () =>
+      (
+        wrapper.findComponent(SettingsIndex).vm.sectionGroups as Array<{
+          items: Array<{ key: string; visible?: boolean }>;
+        }>
+      )
+        .flatMap((g) => g.items)
+        .find((i) => i.key === "llm_providers")?.visible;
+    return { wrapper, store, llmProvidersItemVisible };
+  }
+
+  it("hides the rail entry and renders the disabled state on a deep link when the flag is false", async () => {
+    const { wrapper, llmProvidersItemVisible } = await mountOnLlmProviders(false, "v1");
+    expect(llmProvidersItemVisible()).toBe(false);
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(false);
+  });
+
+  it("lists the entry and renders the page when the flag is true", async () => {
+    const { wrapper, llmProvidersItemVisible } = await mountOnLlmProviders(true, "v1");
+    expect(llmProvidersItemVisible()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(false);
+  });
+
+  it("keeps the page while /config is in flight, then switches once it reports evaluations off", async () => {
+    const { wrapper, store } = await mountOnLlmProviders(undefined);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(true);
+    store.state.zoConfig = { version: "v1", online_evals_enabled: false };
+    await nextTick();
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(false);
   });
 });

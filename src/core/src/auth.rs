@@ -26,7 +26,7 @@ use base64::Engine;
 use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
-    meta::user::UserRole,
+    meta::{feature::Feature, user::UserRole},
     utils::{hash::try_get_passcode_hash, json},
 };
 use lru::LruCache;
@@ -224,6 +224,37 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
+/// A per-object GET check, taken as a trait so tests can stand in for OpenFGA.
+#[cfg(feature = "enterprise")]
+pub trait ReadCheck {
+    fn can_read(&self, resource: &str, object_id: &str) -> impl Future<Output = bool> + Send;
+}
+
+/// One user's reads in one org, checked as the `GET /{org}/{resource}/{id}` routes check them.
+#[cfg(feature = "enterprise")]
+pub struct UserReads<'a> {
+    pub org_id: &'a str,
+    pub user_id: &'a str,
+}
+
+#[cfg(feature = "enterprise")]
+impl ReadCheck for UserReads<'_> {
+    async fn can_read(&self, resource: &str, object_id: &str) -> bool {
+        check_permissions(
+            object_id,
+            self.org_id,
+            self.user_id,
+            resource,
+            "GET",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -235,6 +266,8 @@ pub struct AuthExtractor {
     pub use_all_org: bool,
     pub use_self_context: bool,
     pub use_self_parent: bool,
+    /// License features the route requires; checked even when `bypass_check` is set.
+    pub feature: Option<&'static [Feature]>,
 }
 
 impl AuthExtractor {
@@ -251,6 +284,7 @@ impl AuthExtractor {
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         }
     }
 }
@@ -335,6 +369,9 @@ where
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -345,6 +382,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -354,15 +392,19 @@ where
             return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
-        // This is case for ingestion endpoints where we need to check
-        // permissions on the stream. Classified against the authoritative
-        // ingestion-route table (method + exact path shape) rather than
-        // substring-matching an ingestion word, so only real writes take the
-        // stream-level bypass.
-        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
+        // Only a matched ingestion route takes the stream-level bypass, never a look-alike path.
+        let route = parts
+            .extensions
+            .get::<axum::extract::MatchedPath>()
+            .map(|route| route.as_str());
+        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path, route) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                // the stream-level bypass skips RBAC, not the license gate
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -373,6 +415,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -416,6 +459,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
         };
@@ -436,6 +480,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: resolved.feature,
             });
         }
 
@@ -454,6 +499,7 @@ where
             use_all_org: resolved.use_all_org,
             use_self_context: resolved.use_self_context,
             use_self_parent: resolved.use_self_parent,
+            feature: resolved.feature,
         })
     }
 
@@ -492,6 +538,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             });
         }
 
@@ -549,6 +596,7 @@ fn opamp_extractor(
         use_all_org: false,
         use_self_context: false,
         use_self_parent: false,
+        feature: None,
     })
 }
 
@@ -762,6 +810,7 @@ pub async fn check_permissions(
                 use_all_org,
                 use_self_context,
                 use_self_parent,
+                feature: None,
             },
             user.role,
             user.is_external,
@@ -769,6 +818,22 @@ pub async fn check_permissions(
         .await;
     }
     true
+}
+
+/// The first object `reads` refuses, asking once per distinct trimmed id.
+#[cfg(feature = "enterprise")]
+pub async fn first_unreadable<'a>(
+    objects: &[(&'static str, &'a str)],
+    reads: &impl ReadCheck,
+) -> Option<(&'static str, &'a str)> {
+    let mut asked = std::collections::HashSet::new();
+    for &(resource, id) in objects {
+        let id = id.trim();
+        if asked.insert((resource, id)) && !reads.can_read(resource, id).await {
+            return Some((resource, id));
+        }
+    }
+    None
 }
 
 // OSS has no folder boundary to cross, so this allows where the `check_permissions`
@@ -952,6 +1017,39 @@ mod tests {
             generate_presigned_url(username, password, salt, base_url, exp_in, time);
 
         assert_eq!(generated_url, expected_url);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn ingestion_write_carries_its_route_feature() {
+        use axum::{Router, body::Body, routing::post};
+        use config::meta::feature::Feature;
+        use tower::ServiceExt;
+
+        // `MatchedPath` only exists on a routed request, so the extractor runs behind a router.
+        let app = Router::new()
+            .route(
+                "/{org_id}/v1/logs",
+                post(|auth: AuthExtractor| async move {
+                    (auth.bypass_check && auth.feature == Some(&[Feature::Logs][..])).to_string()
+                }),
+            )
+            .route(
+                "/{org_id}/kv/{key}",
+                post(|auth: AuthExtractor| async move { auth.bypass_check.to_string() }),
+            );
+        for (uri, expected) in [("/myorg/v1/logs", "true"), ("/myorg/kv/_json", "false")] {
+            let request = axum::http::Request::post(uri)
+                .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
+                .body(Body::empty())
+                .unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(response.status(), axum::http::StatusCode::OK, "{uri}");
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(body, expected, "{uri}");
+        }
     }
 
     #[tokio::test]

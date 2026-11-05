@@ -199,40 +199,56 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
   // would incorrectly show child durations. Self-patterns fix this by capturing
   // each service's own span metrics directly from allServices.
   allServices.forEach((serviceInfo, serviceName) => {
-    const durations = serviceInfo.spans.map((s: any) => s.durationMs || 0);
-    const errorCount = serviceInfo.errorCount;
-
-    patterns.set(serviceName, {
-      pathSignature: serviceName,
-      instances: serviceInfo.spans.map((span: any) => ({
-        spanId: span.span_id || span.spanId || "",
-        duration: span.durationMs || 0,
-        isError: isSpanError(span),
-        timestamp: span.start_time || 0,
-        attributes: span.attributes || {},
-        serviceName,
-        operationName: span.operationName || span.operation_name || "",
-      })),
-      metrics: {
-        count: serviceInfo.spans.length,
-        avg: calculateAverage(durations),
-        min: durations.length > 0 ? durations.reduce((m, d) => Math.min(m, d), Infinity) : 0,
-        max: durations.length > 0 ? durations.reduce((m, d) => Math.max(m, d), -Infinity) : 0,
-        p75: calculatePercentile(durations, 75),
-        p95: calculatePercentile(durations, 95),
-        p99: calculatePercentile(durations, 99),
-        totalDuration: durations.reduce((sum, d) => sum + d, 0),
-        errorRate: serviceInfo.spans.length > 0 ? (errorCount / serviceInfo.spans.length) * 100 : 0,
-        errorCount,
-        traceTimePercent:
-          totalTraceDuration > 0 && durations.length > 0
-            ? (calculateAverage(durations) / totalTraceDuration) * 100
-            : 0,
-      },
-      spanIds: serviceInfo.spans.map((span: any) => span.span_id || span.spanId || ""),
-    });
+    patterns.set(
+      serviceName,
+      spansToPattern(serviceName, serviceName, serviceInfo.spans, totalTraceDuration),
+    );
   });
 
+  return patterns;
+}
+
+/** Groups spans by their service ancestor path ("frontend→checkout→database"), so each branch keeps its own metrics. */
+export function buildPathPatterns(traceTree: any[]): Map<string, CallPattern> {
+  const patterns = new Map<string, CallPattern>();
+  if (!traceTree || traceTree.length === 0) return patterns;
+
+  const totalTraceDuration = traceTree.reduce(
+    (max, rootSpan) => Math.max(max, rootSpan.durationMs || 0),
+    0,
+  );
+  const spansByPath = new Map<string, { serviceName: string; spans: any[] }>();
+  // A path that revisits a service is never a Tree View node (the tree drops cycles), so it stops being tracked; this keeps keys short on deep alternating chains.
+  type Frame = [span: any, key: string | null, service: string, seen: Set<string> | null];
+  const stack: Frame[] = [];
+  for (let i = traceTree.length - 1; i >= 0; i--) stack.push([traceTree[i], "", "", new Set()]);
+  while (stack.length) {
+    const [span, parentKey, parentService, parentSeen] = stack.pop()!;
+    const serviceName = span.resolvedIdentity || span.serviceName || "unknown";
+    let key = parentKey;
+    let seen = parentSeen;
+    if (parentKey !== null && parentSeen && serviceName !== parentService) {
+      if (parentSeen.has(serviceName)) {
+        key = null;
+        seen = null;
+      } else {
+        key = parentKey ? `${parentKey}→${serviceName}` : serviceName;
+        seen = new Set(parentSeen).add(serviceName);
+      }
+    }
+    if (key !== null) {
+      if (!spansByPath.has(key)) spansByPath.set(key, { serviceName, spans: [] });
+      spansByPath.get(key)!.spans.push(span);
+    }
+    const children = span.spans ?? [];
+    for (let i = children.length - 1; i >= 0; i--) {
+      stack.push([children[i], key, serviceName, seen]);
+    }
+  }
+
+  spansByPath.forEach(({ serviceName, spans }, key) => {
+    patterns.set(key, spansToPattern(key, serviceName, spans, totalTraceDuration));
+  });
   return patterns;
 }
 
@@ -257,6 +273,45 @@ export function isSpanError(span: any): boolean {
   }
 
   return false;
+}
+
+function spansToPattern(
+  signature: string,
+  serviceName: string,
+  spans: any[],
+  totalTraceDuration: number,
+): CallPattern {
+  const durations = spans.map((s: any) => s.durationMs || 0);
+  const errorCount = spans.filter((span: any) => isSpanError(span)).length;
+  return {
+    pathSignature: signature,
+    instances: spans.map((span: any) => ({
+      spanId: span.span_id || span.spanId || "",
+      duration: span.durationMs || 0,
+      isError: isSpanError(span),
+      timestamp: span.start_time || 0,
+      attributes: span.attributes || {},
+      serviceName,
+      operationName: span.operationName || span.operation_name || "",
+    })),
+    metrics: {
+      count: spans.length,
+      avg: calculateAverage(durations),
+      min: durations.length > 0 ? durations.reduce((m, d) => Math.min(m, d), Infinity) : 0,
+      max: durations.length > 0 ? durations.reduce((m, d) => Math.max(m, d), -Infinity) : 0,
+      p75: calculatePercentile(durations, 75),
+      p95: calculatePercentile(durations, 95),
+      p99: calculatePercentile(durations, 99),
+      totalDuration: durations.reduce((sum, d) => sum + d, 0),
+      errorRate: spans.length > 0 ? (errorCount / spans.length) * 100 : 0,
+      errorCount,
+      traceTimePercent:
+        totalTraceDuration > 0 && durations.length > 0
+          ? (calculateAverage(durations) / totalTraceDuration) * 100
+          : 0,
+    },
+    spanIds: spans.map((span: any) => span.span_id || span.spanId || ""),
+  };
 }
 
 /**

@@ -91,6 +91,7 @@ const recorder = (name: string, emits: string[] = []) =>
 
 const ListStub = recorder("K8sListView", ["open", "update", "refresh", "action"]);
 const MapStub = recorder("MapView", ["open", "update", "navigate", "refresh"]);
+const DependenciesStub = recorder("DependenciesView", ["open", "update", "refresh"]);
 const ClusterStub = recorder("ClusterOverview", ["open", "refresh", "navigate"]);
 const WorkloadsStub = recorder("WorkloadsOverview", ["open", "update", "view", "refresh"]);
 const DrawerStub = recorder("K8sDetailsDrawer", ["close", "open"]);
@@ -202,6 +203,7 @@ describe("KubernetesPage", () => {
           DataSourceSetupCard: setupCardStub,
           K8sListView: ListStub,
           MapView: MapStub,
+          DependenciesView: DependenciesStub,
           ClusterOverview: ClusterStub,
           WorkloadsOverview: WorkloadsStub,
           K8sDetailsDrawer: DrawerStub,
@@ -262,7 +264,7 @@ describe("KubernetesPage", () => {
       expect(wrapper.find('[data-test="stub-ClusterOverview"]').exists()).toBe(true);
     });
 
-    it.each(VIEWS.filter((v) => !["cluster", "map", "workloads"].includes(v)))(
+    it.each(VIEWS.filter((v) => !["cluster", "map", "dependencies", "workloads"].includes(v)))(
       "renders the list for view=%s",
       async (view) => {
         await mountPage({ view });
@@ -270,9 +272,12 @@ describe("KubernetesPage", () => {
       },
     );
 
-    it("renders the Map and the Workloads overview", async () => {
+    it("renders the Map, Dependencies and the Workloads overview", async () => {
       await mountPage({ view: "map" });
       expect(wrapper.findComponent(MapStub).exists()).toBe(true);
+      wrapper.unmount();
+      await mountPage({ view: "dependencies" });
+      expect(wrapper.findComponent(DependenciesStub).exists()).toBe(true);
       wrapper.unmount();
       await mountPage({ view: "workloads" });
       expect(wrapper.findComponent(WorkloadsStub).exists()).toBe(true);
@@ -324,6 +329,7 @@ describe("KubernetesPage", () => {
       expect(railItems()).toEqual([
         "cluster",
         "map",
+        "dependencies",
         "nodes",
         "namespaces",
         "events",
@@ -737,6 +743,18 @@ describe("KubernetesPage", () => {
         query: { query_type: "promql", stream_name: "k8s_pod_cpu_usage" },
       });
     });
+
+    it.each(["traces", "metrics"])(
+      "does not leave for %s when its license is locked",
+      async (type) => {
+        await mountPage({ view: "pods", cluster: "alpha" });
+        store.state.zoConfig = { features: { [type]: "locked" } };
+        const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.findComponent(ListStub).vm.$emit("action", type, pod);
+        await flushPromises();
+        expect(push).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("wiring", () => {

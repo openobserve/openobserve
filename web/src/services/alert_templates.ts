@@ -33,8 +33,13 @@ const template = {
         return res;
       });
   },
-  list: ({ org_identifier }: any) => {
-    return http().get(`/api/${org_identifier}/alerts/templates`);
+  list: ({ org_identifier, applies_to, type }: any) => {
+    const url = `/api/${org_identifier}/alerts/templates`;
+    if (!applies_to && !type) return http().get(url);
+    const params: Record<string, string> = {};
+    if (applies_to) params.applies_to = applies_to;
+    if (type) params.type = type;
+    return http().get(url, { params });
   },
   get_by_name: ({ org_identifier, template_name }: any) => {
     return http().get(
@@ -61,9 +66,7 @@ const template = {
   get_system_templates: ({ org_identifier }: any) => {
     return http().get(`/api/${org_identifier}/alerts/templates/system/prebuilt`);
   },
-  // Renders a template against sample/preview data server-side. Seam for a
-  // future live-preview panel (Task 13 scope excludes building that UI) — no
-  // caller yet.
+  // Renders a template against the sample of `data.kind` and returns the variable groups.
   preview: ({ org_identifier, data }: any) => {
     return http().post(`/api/${org_identifier}/alerts/templates/preview`, data);
   },

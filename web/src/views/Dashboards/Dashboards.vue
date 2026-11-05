@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
@@ -635,6 +636,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -787,7 +789,13 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+    const {
+      isHome,
+      setHomeDashboard,
+      clearHomeDashboard,
+      homeDashboard,
+      load: loadHomeDashboard,
+    } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -1005,7 +1013,7 @@ export default defineComponent({
       try {
         await getFoldersList(store);
       } catch {
-        // Already reported by the grouped access toast; the empty rail stands in.
+        // The empty rail stands in; the access boundary reports a 403.
       }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
@@ -1082,8 +1090,7 @@ export default defineComponent({
           // A newer folder switch cancelled this load; the newer one reports its own outcome.
           if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
-          forbidden.value = asCaughtError(error).response?.status === 403;
-          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          forbidden.value = forbiddenState(error);
           if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
@@ -1334,7 +1341,7 @@ export default defineComponent({
     };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1361,6 +1368,8 @@ export default defineComponent({
       // on screen keeps them and spins the button instead.
       refreshing.value = true;
       loading.value = dashboardList.value.length === 0;
+      forbidden.value = false;
+      const target = `${showFavoritesOnly.value}|${activeFolderId.value}`;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
@@ -1401,9 +1410,14 @@ export default defineComponent({
           stampFolders([folderId]);
         }
       } catch (err) {
-        showErrorNotification(
-          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
-        );
+        // A late failure for a folder the user already left must not lock the folder now on screen.
+        if (target !== `${showFavoritesOnly.value}|${activeFolderId.value}`) return;
+        forbidden.value = asCaughtError(err).response?.status === 403;
+        if (!forbidden.value) {
+          showErrorNotification(
+            raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+          );
+        }
       } finally {
         dismiss();
         loading.value = false;
@@ -1566,6 +1580,11 @@ export default defineComponent({
 
     const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
+      const org = store.state.selectedOrganization?.identifier;
+      // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
+      if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
+        await loadHomeDashboard(org, true);
+      }
     };
 
     const deleteFolder = async () => {
@@ -1631,6 +1650,7 @@ export default defineComponent({
 
         return migratedDashboards;
       } catch (error) {
+        if (asCaughtError(error).response?.status === 403) return;
         showErrorNotification(
           raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch")),
         );
@@ -1917,7 +1937,7 @@ export default defineComponent({
           caught.response?.data?.message ||
           caught.message ||
           t("dashboard.dashboards.errorDeleting");
-        if (caught.response?.status != 403 || caught.status != 403) {
+        if (caught.response?.status !== 403 && caught.status !== 403) {
           toast({
             variant: "error",
             message: raw(errorMessage),

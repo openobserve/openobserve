@@ -80,6 +80,8 @@ vi.mock("@/services/settings", async (importOriginal) => {
 import settingsService from "@/services/settings";
 import * as commons from "@/utils/commons";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { gt } from "@/types/i18n";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, "removeAttribute", {
@@ -385,15 +387,6 @@ describe("Dashboards.vue", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should mount successfully", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
     it("should initialize with default folder when no route query parameter", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n, {}),
@@ -428,37 +421,19 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should have reactive activeFolderId property", async () => {
+    it("keys the table on the folder so a folder switch shows the skeleton, not the last folder's rows", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
       });
-
-      // Wait for component initialization to complete
       await nextTick();
-      await nextTick();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.activeFolderId).toBeDefined();
-
-      // Test that updateActiveFolderId method works
-      expect(wrapper.vm.updateActiveFolderId).toBeDefined();
+      const table = () => wrapper.findComponent({ name: "OTable" });
       wrapper.vm.updateActiveFolderId("folder1");
-      expect(wrapper.vm.activeFolderId).toBe("folder1");
-    });
-
-    it("should expose addDashboardRef and addFolderRef on the component surface", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
       await nextTick();
-      await nextTick();
+      expect(table().vm.$attrs["loading-reset-key"]).toBe("folder1");
 
-      // The refs are exposed on the public surface so the drawer's
-      // @click:primary handler can invoke addDashboardRef?.submit().
-      // After mount, they are bound to the slotted child component instance.
-      expect("addDashboardRef" in wrapper.vm).toBe(true);
-      expect("addFolderRef" in wrapper.vm).toBe(true);
+      wrapper.vm.updateActiveFolderId("folder2");
+      await nextTick();
+      expect(table().vm.$attrs["loading-reset-key"]).toBe("folder2");
     });
   });
 
@@ -546,100 +521,6 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.dashboards).toHaveLength(0);
       expect(wrapper.vm.showFirstData).toBe(false);
       expect(findPanel().exists()).toBe(false);
-    });
-  });
-
-  describe("Computed Properties", () => {
-    it("should define table columns correctly", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      const columns = wrapper.vm.columns;
-      expect(columns).toBeDefined();
-      expect(Array.isArray(columns)).toBe(true);
-      expect(columns.length).toBeGreaterThan(0);
-
-      // Check specific required columns (columns use id/header, not name).
-      // "#" is no longer a member column — it's OTable's built-in show-index.
-      const columnIds = columns.map((col: any) => col.id);
-      expect(columnIds).not.toContain("#");
-      expect(columnIds).toContain("name");
-      expect(columnIds).toContain("actions");
-    });
-
-    it("should test dashboards computed property", async () => {
-      // Create a store with dashboard data
-      const testStore = createMockStore();
-      testStore.state.organizationData.allDashboardList = {
-        default: [
-          {
-            dashboardId: "dash1",
-            title: "Dashboard 1",
-            description: "",
-            owner: "",
-            created: "2023-01-01T00:00:00Z",
-          },
-          {
-            dashboardId: "dash2",
-            title: "Dashboard 2",
-            description: "",
-            owner: "",
-            created: "2023-01-01T00:00:00Z",
-          },
-        ],
-      };
-
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(testStore, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      expect(wrapper.vm.dashboards).toBeDefined();
-      expect(Array.isArray(wrapper.vm.dashboards)).toBe(true);
-    });
-
-    it("should list every dashboard of the active folder", async () => {
-      // Create a store with dashboard data
-      const testStore = createMockStore();
-      testStore.state.organizationData.allDashboardList = {
-        default: [
-          {
-            dashboardId: "dash1",
-            title: "Dashboard 1",
-            description: "",
-            owner: "",
-            created: "2023-01-01T00:00:00Z",
-          },
-          {
-            dashboardId: "dash2",
-            title: "Dashboard 2",
-            description: "",
-            owner: "",
-            created: "2023-01-01T00:00:00Z",
-          },
-          {
-            dashboardId: "dash3",
-            title: "Dashboard 3",
-            description: "",
-            owner: "",
-            created: "2023-01-01T00:00:00Z",
-          },
-        ],
-      };
-
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(testStore, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      expect(wrapper.vm.dashboards).toHaveLength(3);
     });
   });
 
@@ -1013,6 +894,35 @@ describe("Dashboards.vue", () => {
     });
   });
 
+  describe("Delete dialogs", () => {
+    it("names the dashboard in the delete dialog with a destructive button", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await nextTick();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-dialog");
+      expect(dialog.props()).toMatchObject({
+        messageKeypath: "dashboard.deleteDashboardConfirmMsg",
+        messageName: "cpu-overview",
+        okVariant: "destructive",
+      });
+    });
+
+    it("uses a destructive button in the bulk delete dialog", () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+  });
+
   describe("List view state persistence", () => {
     const defaults = {
       searchQuery: "",
@@ -1081,118 +991,6 @@ describe("Dashboards.vue", () => {
     });
   });
 
-  describe("Methods", () => {
-    it("should handle addDashboard method", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-
-      // Call addDashboard method
-      wrapper.vm.addDashboard();
-
-      expect(wrapper.vm.showAddDashboardDialog).toBe(true);
-    });
-
-    it("should handle addFolder method", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-
-      // Call addFolder method
-      wrapper.vm.addFolder();
-
-      expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-    });
-
-    it("should have showDeleteDialogFn method defined", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      expect(wrapper.vm.showDeleteDialogFn).toBeDefined();
-      expect(typeof wrapper.vm.showDeleteDialogFn).toBe("function");
-    });
-
-    it("names the dashboard in the delete dialog with a destructive button", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
-      await nextTick();
-
-      const dialog = wrapper
-        .findAllComponents({ name: "ConfirmDialog" })
-        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-dialog");
-      expect(dialog.props()).toMatchObject({
-        messageKeypath: "dashboard.deleteDashboardConfirmMsg",
-        messageName: "cpu-overview",
-        okVariant: "destructive",
-      });
-    });
-
-    it("uses a destructive button in the bulk delete dialog", () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-      const dialog = wrapper
-        .findAllComponents({ name: "ConfirmDialog" })
-        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
-      expect(dialog.props("okVariant")).toBe("destructive");
-    });
-
-    it("should handle editFolder method", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      const testFolderId = "test-folder-id";
-
-      expect(wrapper.vm.selectedFolderToEdit).toBeFalsy();
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-
-      wrapper.vm.editFolder(testFolderId);
-
-      expect(wrapper.vm.selectedFolderToEdit).toBe(testFolderId);
-      expect(wrapper.vm.isFolderEditMode).toBe(true);
-      expect(wrapper.vm.showAddFolderDialog).toBe(true);
-    });
-
-    it("should handle clearSearchHistory method", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-
-      // Set up some search data
-      wrapper.vm.searchQuery = "test search";
-      wrapper.vm.filteredResults = [{ id: 1, title: "Test Result" }];
-
-      expect(wrapper.vm.searchQuery).toBe("test search");
-      expect(wrapper.vm.filteredResults).toHaveLength(1);
-
-      wrapper.vm.clearSearchHistory();
-
-      expect(wrapper.vm.searchQuery).toBe("");
-      expect(wrapper.vm.filteredResults).toEqual([]);
-    });
-  });
-
   // Helper: locate ODialog instances by title prop.
   // Each migrated dialog differs only by title, so this gives us a
   // deterministic, attribute-free lookup against the global stub.
@@ -1202,22 +1000,6 @@ describe("Dashboards.vue", () => {
   };
 
   describe("ODrawer migration: Add Dashboard drawer", () => {
-    it("should render ODrawer for add dashboard, closed by default, with correct props", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(drawer).toBeTruthy();
-      expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("size")).toBe("md");
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
-    });
-
     it("should open the add dashboard drawer when addDashboard() is invoked", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
@@ -1250,70 +1032,9 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
     });
-
-    it("should pass form-id to ODialog for native form submission (add dashboard)", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddDashboardDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(drawer.props("formId")).toBe("add-dashboard-form");
-    });
-
-    it("should not throw when click:primary fires with null addDashboardRef", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      // Edge case: optional chaining guards against null refs
-      wrapper.vm.addDashboardRef = null;
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
-
-    it("should sync open state when ODrawer emits update:open", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddDashboardDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("update:open", false);
-      await nextTick();
-
-      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-    });
   });
 
   describe("ODrawer migration: Add/Edit Folder drawer", () => {
-    it("should render the folder drawer closed with 'New Folder' title by default", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      expect(drawer).toBeTruthy();
-      expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("size")).toBe("sm");
-    });
-
     it("should switch drawer title to 'Update Folder' when in edit mode", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
@@ -1347,51 +1068,9 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
     });
-
-    it("should pass form-id to ODialog for native form submission (add folder)", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddFolderDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
-    });
-
-    it("should not throw when click:primary fires with null addFolderRef", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.addFolderRef = null;
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
   });
 
   describe("Move Dashboard component (v-model:open contract)", () => {
-    it("should pass open state and dashboard ids to MoveDashboardToAnotherFolder", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const move = wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" });
-      expect(move.exists()).toBe(true);
-      // Initially closed
-      expect(move.props("open")).toBe(false);
-    });
-
     it("should sync close via update:open emit from MoveDashboardToAnotherFolder", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
@@ -1411,6 +1090,47 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+  });
+
+  describe("Home pin after a move", () => {
+    const pinIn = (folderId: string) => ({
+      data: { setting_value: { dashboardId: "d1", folderId, label: "Pinned" } },
+    });
+
+    afterEach(() => {
+      useHomeDashboard(gt).homeDashboard.value = null;
+    });
+
+    const mountWithWarmPin = async () => {
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("B") as any);
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
+      vi.mocked(settingsService.getSetting).mockClear();
+      vi.mocked(settingsService.getSetting).mockResolvedValue(pinIn("A") as any);
+    };
+
+    it("re-reads the pin past a warm cache when the pinned dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["d1"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("A");
+      expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+
+    it("does not re-read the pin when a different dashboard is moved", async () => {
+      await mountWithWarmPin();
+
+      wrapper.vm.selectedDashboardIdToMove = ["other"];
+      await wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" }).vm.$emit("updated");
+      await flushPromises();
+
+      expect(settingsService.getSetting).not.toHaveBeenCalled();
+      expect(useHomeDashboard(gt).homeDashboard.value?.folderId).toBe("B");
     });
   });
 

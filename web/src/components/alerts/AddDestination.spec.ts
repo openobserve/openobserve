@@ -258,7 +258,64 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
         template: "tmpl1",
         headers: { H1: "V1" },
         name: "dest1",
+        metadata: {},
       },
+    });
+  });
+
+  it("shows the payload format select on a generic webhook and saves it as metadata", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(true);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("template", "tmpl1");
+    form.setFieldValue("payload_format", "legacy");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.create as any).mock.calls[0][0].data.metadata).toEqual({
+      payload_format: "legacy",
+    });
+  });
+
+  it("hides the payload format select on email and Slack destinations", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+    form.setFieldValue("type", "http");
+    form.setFieldValue("destination_type", "slack");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+  });
+
+  it("an edit reads the stored payload format and automatic removes only that key", async () => {
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "hook",
+        url: "https://example.com/webhook",
+        method: "post",
+        type: "http",
+        template: "tmpl1",
+        metadata: { payload_format: "rendered", team: "ops" },
+      },
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+    expect(form.state.values.payload_format).toBe("rendered");
+
+    form.setFieldValue("payload_format", "auto");
+    await nextTick();
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.update as any).mock.calls[0][0].data.metadata).toEqual({
+      team: "ops",
     });
   });
 
@@ -321,6 +378,35 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
 
     expect(form.state.isValid).toBe(false);
     expect(destinationService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddDestination - refused save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["create", undefined],
+    ["update", { name: "dest1", url: "https://example.com/webhook", method: "post", type: "http" }],
+  ])("closes its loading toast when a %s is refused with a 403", async (op, destination) => {
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockReturnValueOnce(dismissLoading);
+    const service = destinationService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    service[op].mockRejectedValueOnce({ response: { status: 403 } });
+    wrapper = mountComp({ isAlerts: true, ...(destination ? { destination } : {}) });
+    await flushPromises();
+    const form = destination ? getForm(wrapper) : await toCustomHttp(wrapper);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("method", "post");
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(service[op]).toHaveBeenCalledTimes(1);
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
   });
 });
 
@@ -847,6 +933,27 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     const credentials = getForm(wrapper).state.values.credentials;
     expect(credentials.integrationKey).toBe("x".repeat(32));
     expect(credentials.severity).toBe("critical");
+  });
+
+  it.each([
+    ["https://events.eu.pagerduty.com/v2/enqueue", true],
+    ["https://events.pagerduty.com/v2/enqueue", false],
+  ])("restores the PagerDuty EU region toggle from the saved URL %s", async (url, euRegion) => {
+    const existingPagerDuty = {
+      name: "pagerduty-alerts",
+      url,
+      type: "http",
+      method: "post",
+      destination_type_name: "pagerduty",
+      template: "prebuilt_pagerduty",
+      skip_tls_verify: false,
+      headers: {},
+      metadata: { prebuilt_type: "pagerduty", routing_key: "x".repeat(32), severity: "critical" },
+    };
+    wrapper = mountComp({ isAlerts: true, destination: existingPagerDuty });
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.credentials.euRegion).toBe(euRegion);
   });
 
   // The DOM wiring that makes Enter-in-any-field AND the footer Save submit the
@@ -1648,6 +1755,46 @@ describe("AddDestination — email destinations", () => {
     expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
       true,
+    );
+  });
+
+  it("keeps Save hidden for Jira until the create screen has loaded", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+  });
+
+  it("hides Additional Settings for Jira once it is ready to save", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+      createMeta: {
+        projectName: "Operations",
+        issueTypeName: "Bug",
+        hasLabels: true,
+        requiredFields: [],
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
     );
   });
 

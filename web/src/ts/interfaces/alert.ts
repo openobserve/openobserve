@@ -87,6 +87,8 @@ export interface Template {
   // "custom" raw-payload template (body is an arbitrary user string). Absent
   // on templates created before this field existed — treat as "custom".
   kind?: "content" | "custom";
+  // Notification kinds the template is meant for; [] or absent means every kind.
+  applies_to?: string[];
 }
 
 // Template object which is modified in frontend to display in table and form
@@ -224,6 +226,7 @@ export interface AckAlertResponse {
   oncall?: {
     acknowledged: string[];
     still_paging: { response_id: string; team: string }[];
+    stopped?: { response_id: string; team: string }[];
   };
   other_groups_unacked: number;
 }
@@ -286,6 +289,15 @@ export interface MuteAlertResponse {
   ends_at: number;
   end_on_clear?: EndOnClear;
   alert_groups?: AlertGroupRef[];
+  pages?: MutedPage[];
+}
+
+/** One open page of the alert's problem a mute snoozed, or why it could not. */
+export interface MutedPage {
+  response_id: string;
+  team: string;
+  snoozed_until?: number;
+  refused?: string;
 }
 
 /** Body of `POST /alerts/{id}/mute/{downtime_id}/extend`, with the version the caller saw. */

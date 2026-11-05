@@ -297,7 +297,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     // Resolving before groupedFields lands makes the caller's next makeAutoSQLQuery() a silent no-op.
     if (isUpdatingGroupedFields) {
       pendingUpdateGroupedFields = true;
-      await inFlightGroupedFields;
+      // The run this call joined predates its change; the queued run the join starts is the one that carries it.
+      while (isUpdatingGroupedFields) await inFlightGroupedFields;
       return;
     }
 

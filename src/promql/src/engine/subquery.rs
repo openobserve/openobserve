@@ -24,11 +24,24 @@ use promql_parser::parser::{Expr as PromExpr, SubqueryExpr};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::Engine;
-use crate::{ast::subquery_grid::subquery_grid, exec::PromqlContext, utils::offset_micros};
+use crate::{
+    ast::{
+        at_modifier::{pin, rebase_at},
+        subquery_grid::subquery_grid,
+    },
+    exec::PromqlContext,
+    utils::offset_micros,
+};
 
 impl Engine {
     /// A subquery as a range function reads it: its samples moved forward by its offset.
     pub(super) async fn exec_subquery(&mut self, sq: &SubqueryExpr) -> Result<Value> {
+        // the caller pins `sq @ T` through `pin`; reading it here would use the outer grid
+        if sq.at.is_some() {
+            return Err(DataFusionError::Internal(
+                "a pinned subquery must be evaluated through its pin".to_string(),
+            ));
+        }
         let mut series = self.eval_subquery(sq).await?;
         let offset = offset_micros(&sq.offset);
         if offset != 0 {
@@ -48,12 +61,25 @@ impl Engine {
         while let PromExpr::Paren(paren) = root {
             root = &paren.expr;
         }
-        match root {
-            PromExpr::Subquery(sq) if self.eval_ctx.is_instant() && sq.at.is_none() => {
-                Ok(Some(matrix_or_none(self.eval_subquery(sq).await?)))
-            }
-            _ => Ok(None),
+        let PromExpr::Subquery(sq) = root else {
+            return Ok(None);
+        };
+        if !self.eval_ctx.is_instant() {
+            return Ok(None);
         }
+        if sq.at.is_none() {
+            return Ok(Some(matrix_or_none(self.eval_subquery(sq).await?)));
+        }
+        // fails on an unresolved `start()` / `end()`, which the rebase would drop
+        pin(root)?;
+        let mut rebased = PromExpr::Subquery(sq.clone());
+        rebase_at(&mut rebased, self.eval_ctx.start);
+        let PromExpr::Subquery(sq) = &rebased else {
+            return Err(DataFusionError::Internal(
+                "a rebased subquery is a subquery".to_string(),
+            ));
+        };
+        Ok(Some(matrix_or_none(self.eval_subquery(sq).await?)))
     }
 
     async fn eval_subquery(&mut self, sq: &SubqueryExpr) -> Result<Vec<RangeValue>> {

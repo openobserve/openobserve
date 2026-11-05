@@ -26,6 +26,16 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("oncall.state_exhausted");
   });
 
+  it("resolves the on-call routing groups as pills", () => {
+    expect(resolveBadge("oncallRuleHealth", "shadowed").variant).toBe("warning-soft");
+    expect(resolveBadge("oncallUnroutedOutcome", "nobody").labelKey).toBe(
+      "oncall.unroutedPagedNobody",
+    );
+    for (const group of ["oncallRuleHealth", "oncallUnroutedOutcome"] as const) {
+      expect(BADGE_GROUPS[group].shape).toBe("pill");
+    }
+  });
+
   it("resolves alertStatus to dot mode (no icon)", () => {
     const r = resolveBadge("alertStatus", "active");
     expect(r.mode).toBe("dot");
@@ -375,6 +385,25 @@ describe("slackInstallStatus", () => {
       const r = resolveBadge("slackInstallStatus", status);
       expect(r.variant).toBe(variant);
       expect(r.labelKey).toBe(`components.badge.slackInstallStatus.${status}`);
+    }
+  });
+});
+
+describe("hookRunStatus", () => {
+  it("maps every stored run status to a coloured, translated dot pill", () => {
+    const expected = {
+      queued: ["warning-soft", "workflow.history.statusQueued"],
+      running: ["blue-soft", "workflow.history.statusRunning"],
+      succeeded: ["success-soft", "workflow.history.success"],
+      failed: ["error-soft", "workflow.history.failed"],
+      expired: ["default-soft", "workflow.history.statusExpired"],
+    };
+    for (const [status, [variant, labelKey]] of Object.entries(expected)) {
+      const r = resolveBadge("hookRunStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(labelKey);
+      expect(r.mode).toBe("dot");
+      expect(r.shape).toBe("pill");
     }
   });
 });

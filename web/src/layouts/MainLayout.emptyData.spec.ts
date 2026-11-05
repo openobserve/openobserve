@@ -119,7 +119,9 @@ describe("MainLayout — empty-data check", () => {
     async (path, flagOn, landing) => {
       const flag = store.state.zoConfig.restricted_routes_on_empty_data;
       store.state.zoConfig.restricted_routes_on_empty_data = flagOn;
-      getStreams.mockResolvedValue({ list: [{ name: "usage", stream_type: "logs" }] });
+      getStreams.mockResolvedValue({
+        list: [{ name: "usage", stream_type: "logs", is_internal: true }],
+      });
       try {
         const mounted = await mountLayout(path);
         wrapper = mounted.wrapper;

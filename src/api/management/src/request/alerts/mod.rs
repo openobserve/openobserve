@@ -88,6 +88,14 @@ pub mod mute;
 pub mod slack_oauth;
 pub mod templates;
 
+/// Save warning for an alert that keeps a workflow the license does not grant.
+const WORKFLOWS_LOCKED_WARNING: &str =
+    "This alert's workflow will not run: Workflows is not included in your license.";
+
+/// Save warning for an alert that keeps an on-call team the license does not grant.
+const ONCALL_LOCKED_WARNING: &str =
+    "This alert will not page its on-call team: On-Call is not included in your license.";
+
 /// Stripped on export: re-importing this state would claim a model the destination never trained.
 #[cfg(feature = "enterprise")]
 const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
@@ -131,21 +139,68 @@ async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(),
     }
 }
 
-/// Advisories about who this alert will page, for a save that has succeeded.
-///
-/// Same posture as `validate_oncall_team` — say it at save — but a warning
-/// rather than a refusal: routing is not being changed, and an operator who
-/// meant it must still be able to save. An alert bound to an explicit
-/// `oncall_team` is silent here, because ownership rules never get a say.
-async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
+/// Operator-off is not locked: it hides the feature, and nothing was taken from this license.
+fn workflows_locked() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        if _alert
-            .oncall_team
-            .as_deref()
-            .is_some_and(|t| !t.trim().is_empty())
-        {
-            return Vec::new();
+        o2_enterprise::enterprise::common::config::get_config()
+            .common
+            .workflows_enabled
+            && !o2_enterprise::enterprise::license::check_features(&[
+                config::meta::feature::Feature::Workflows,
+            ])
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
+fn oncall_locked() -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::oncall::is_unlicensed()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
+fn locked_target_warnings(
+    has_workflows: bool,
+    has_oncall_team: bool,
+    workflows_locked: bool,
+    oncall_locked: bool,
+) -> Vec<String> {
+    [
+        (has_workflows && workflows_locked).then_some(WORKFLOWS_LOCKED_WARNING),
+        (has_oncall_team && oncall_locked).then_some(ONCALL_LOCKED_WARNING),
+    ]
+    .into_iter()
+    .flatten()
+    .map(str::to_string)
+    .collect()
+}
+
+/// Warnings, not refusals, for a save that succeeded; an explicit team gets no routing advice.
+async fn save_warnings(
+    _org_id: &str,
+    alert: &MetaAlert,
+    workflows_locked: bool,
+    oncall_locked: bool,
+) -> Vec<String> {
+    let has_oncall_team = alert
+        .oncall_team
+        .as_deref()
+        .is_some_and(|t| !t.trim().is_empty());
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut warnings = locked_target_warnings(
+        !alert.workflows.is_empty(),
+        has_oncall_team,
+        workflows_locked,
+        oncall_locked,
+    );
+    #[cfg(feature = "enterprise")]
+    {
+        if has_oncall_team {
+            return warnings;
         }
         let rules = match o2_enterprise::enterprise::oncall::routing::list_rules(_org_id).await {
             Ok(rules) => rules,
@@ -154,18 +209,95 @@ async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
                 // advisory that cannot be computed is not an error the caller
                 // can act on.
                 log::error!("[alerts] reading ownership rules for save-time warnings: {e}");
-                return Vec::new();
+                return warnings;
             }
         };
         let semantic_groups = db::system_settings::get_semantic_field_groups(_org_id).await;
-        o2_enterprise::enterprise::oncall::routing::paging_warnings(
+        warnings.extend(o2_enterprise::enterprise::oncall::routing::paging_warnings(
             &semantic_groups,
-            &_alert.query_condition,
+            &alert.query_condition,
             &rules,
-        )
+        ));
+    }
+    warnings
+}
+
+/// Which of these targets need a name from us; a blank team id is no team.
+fn locked_target_ids<'a>(
+    workflows: &'a [String],
+    oncall_team: Option<&'a str>,
+    workflows_unusable: bool,
+    oncall_locked: bool,
+) -> (&'a [String], Option<&'a str>) {
+    (
+        if workflows_unusable { workflows } else { &[] },
+        oncall_team.filter(|team| oncall_locked && !team.trim().is_empty()),
+    )
+}
+
+/// A target with no readable name stays out, so the form shows its fallback label.
+fn known_target_names(
+    read: Vec<(String, Option<String>)>,
+) -> std::collections::HashMap<String, String> {
+    read.into_iter()
+        .filter_map(|(id, name)| Some((id, name?)))
+        .collect()
+}
+
+/// Operator-off counts too: the form skips its workflow fetch then, yet shows the chip by name.
+fn workflows_unusable() -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        workflows_locked()
+            || !o2_enterprise::enterprise::common::config::get_config()
+                .common
+                .workflows_enabled
     }
     #[cfg(not(feature = "enterprise"))]
-    Vec::new()
+    false
+}
+
+#[cfg(feature = "enterprise")]
+async fn workflow_name(org_id: &str, id: &str) -> Option<String> {
+    openobserve_core::workflows::get_workflow_by_id(org_id, id)
+        .await
+        .inspect_err(|e| log::warn!("[alerts] reading workflow {id} for its name: {e}"))
+        .ok()
+        .flatten()
+        .map(|workflow| workflow.name)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn workflow_name(_org_id: &str, _id: &str) -> Option<String> {
+    None
+}
+
+/// The names the edit form cannot fetch itself, because a locked target's own routes refuse it.
+async fn locked_target_names(
+    org_id: &str,
+    workflows: &[String],
+    oncall_team: Option<&str>,
+) -> std::collections::HashMap<String, String> {
+    let (workflows, oncall_team) = locked_target_ids(
+        workflows,
+        oncall_team,
+        workflows_unusable(),
+        oncall_locked(),
+    );
+    let mut read = Vec::with_capacity(workflows.len() + 1);
+    for id in workflows {
+        read.push((id.clone(), workflow_name(org_id, id).await));
+    }
+    if let Some(id) = oncall_team {
+        let name = infra::table::oncall_teams::get(org_id, id)
+            .await
+            .inspect_err(|e| log::warn!("[alerts] reading on-call team {id} for its name: {e}"))
+            .ok()
+            .flatten()
+            .map(|team| team.name);
+        read.push((id.to_string(), name));
+    }
+    known_target_names(read)
 }
 
 /// Reject a `runbook_url` that is not a link.
@@ -270,7 +402,7 @@ pub async fn create_alert(
     let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
         Ok(v) => {
-            let warnings = paging_warnings(&org_id, &v).await;
+            let warnings = save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await;
             MetaHttpResponse::json(
                 MetaHttpResponse::message(StatusCode::OK, "Alert saved")
                     .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -311,11 +443,10 @@ async fn create_composite_alert(
     }
     let input = composite_input(None, org_id, folder_id, user_id, req.alert, condition);
     match openobserve_core::alerts::composite::create_composite(input).await {
-        Ok(definition) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
-                .with_id(definition.id)
-                .with_name(definition.name),
-        ),
+        Ok(definition) => {
+            let warnings = composite_save_warnings(&definition, workflows_locked());
+            composite_created_response(definition.id, definition.name, warnings)
+        }
         Err(error) => composite_error_response(error),
     }
 }
@@ -380,9 +511,35 @@ async fn update_composite_alert(
         input.owner = updated_owner(named_owner, stored);
     }
     match openobserve_core::alerts::composite::update_composite(id, input).await {
-        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Ok(definition) => {
+            composite_updated_response(composite_save_warnings(&definition, workflows_locked()))
+        }
         Err(error) => composite_error_response(error),
     }
+}
+
+/// Composites have no on-call team of their own, so a locked workflow is their one warning.
+fn composite_save_warnings(
+    definition: &infra::table::entity::alert_composites::Model,
+    workflows_locked: bool,
+) -> Vec<String> {
+    let alert = openobserve_core::alerts::composite::notification_alert(definition);
+    locked_target_warnings(!alert.workflows.is_empty(), false, workflows_locked, false)
+}
+
+fn composite_created_response(id: String, name: String, warnings: Vec<String>) -> Response {
+    MetaHttpResponse::json(
+        MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+            .with_id(id)
+            .with_name(name)
+            .with_warnings(warnings),
+    )
+}
+
+fn composite_updated_response(warnings: Vec<String>) -> Response {
+    MetaHttpResponse::json(
+        MetaHttpResponse::message(StatusCode::OK, "Alert Updated").with_warnings(warnings),
+    )
 }
 
 /// Only a named owner moves ownership; an omitted or empty one keeps `stored`.
@@ -489,6 +646,9 @@ fn composite_input(
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
         pending_period_sec: alert.pending_period_sec,
+        incident_title_template: alert
+            .incident_title_template
+            .filter(|t| !t.trim().is_empty()),
     }
 }
 
@@ -503,6 +663,12 @@ async fn composite_detail_response(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    let locked_names = locked_target_names(
+        &definition.org,
+        &openobserve_core::alerts::composite::notification_alert(&definition).workflows,
+        None,
+    )
+    .await;
     let scheduler_job_present = infra::scheduler::get(
         &definition.org,
         TriggerModule::CompositeAlert,
@@ -624,7 +790,7 @@ async fn composite_detail_response(
             "evaluated_at": composite_state.and_then(|state| state.level_at),
         })
     });
-    MetaHttpResponse::json(serde_json::json!({
+    let mut detail = serde_json::json!({
         "id": definition.id,
         "alert_type": "composite",
         "folderId": definition.folder_id,
@@ -648,7 +814,12 @@ async fn composite_detail_response(
         "children": children,
         "evaluation": evaluation_json,
         "pending_period_sec": definition.pending_period_sec,
-    }))
+        "incident_title_template": definition.incident_title_template,
+    });
+    if !locked_names.is_empty() {
+        detail["locked_target_names"] = serde_json::json!(locked_names);
+    }
+    MetaHttpResponse::json(detail)
 }
 
 fn composite_list_item(
@@ -790,6 +961,11 @@ fn composite_error_response(
         CompositeServiceError::NegativePendingPeriod => {
             composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
         }
+        CompositeServiceError::JiraDestinationNotSupported(_) => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "jira_destination_not_supported",
+            error,
+        ),
     }
 }
 
@@ -1357,6 +1533,7 @@ async fn create_anomaly_alert(
         alert_window_fire_pct: anomaly_fields.alert_window_fire_pct,
         alert_window_recover_pct: anomaly_fields.alert_window_recover_pct,
         alert_enabled: anomaly_fields.alert_enabled,
+        template: anomaly_fields.template,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
         // The route's permission gate resolves `?folder=`, so the write must use the same value — a
@@ -1479,7 +1656,7 @@ fn parse_group_labels(rendered: Option<&str>) -> Vec<AlertGroupLabel> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List the per-group states of a multi-alert", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List the per-group states of a multi-alert", "category": "alerts"}))
     )
 )]
 pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
@@ -1585,7 +1762,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Per-group alert state history", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Per-group alert state history", "category": "alerts"}))
     )
 )]
 pub async fn list_alert_group_transitions(
@@ -1681,7 +1858,10 @@ pub async fn get_alert(
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
                 .ok();
-            let resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
+            let locked_names =
+                locked_target_names(&org_id, &alert.workflows, alert.oncall_team.as_deref()).await;
+            let mut resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
+            resp_body.locked_target_names = locked_names;
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
@@ -2163,8 +2343,9 @@ pub async fn update_alert(
     let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
         Ok(v) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Alert Updated")
-                .with_warnings(paging_warnings(&org_id, &v).await),
+            MetaHttpResponse::message(StatusCode::OK, "Alert Updated").with_warnings(
+                save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await,
+            ),
         ),
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
@@ -2240,6 +2421,7 @@ async fn build_and_run_anomaly_update(
         alert_window_recover_pct: fields.alert_window_recover_pct,
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
+        template: fields.template,
         alert_destinations: Some(alert.destinations),
         enabled: fields.enabled,
         folder_id: fields.folder_id,
@@ -3735,7 +3917,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. When a destination or the on-call page could not be delivered, the response also carries `warning` with the reason. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
     security(
         ("Authorization"= [])
     ),
@@ -3746,6 +3928,7 @@ pub async fn enable_alert_bulk(
     ),
     responses(
         (status = 200, description = "Success; for an anomaly alert, the detection result (see description)", content_type = "application/json", body = Object),
+        (status = 403, description = "Workflows is not in the license and the alert reached nobody else; `code` is 40001 and `error_detail` names the feature", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3776,7 +3959,14 @@ pub async fn trigger_alert(
     }
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
+        Ok(triggered) => match triggered.warning() {
+            Some(warning) => MetaHttpResponse::json(serde_json::json!({
+                "code": 200,
+                "message": triggered.response_message(),
+                "warning": warning,
+            })),
+            None => MetaHttpResponse::ok(triggered.response_message()),
+        },
         Err(AlertError::AlertNotFound) => {
             if let Some(_composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
@@ -4264,8 +4454,11 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::{
-        BulkDeleteRequest, HashMap, Headers, Json, Ksuid, Path, Query, UserEmail,
-        delete_alert_bulk, resolve_generate_sql,
+        BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid, MetaAlert,
+        ONCALL_LOCKED_WARNING, Path, Query, UserEmail, WORKFLOWS_LOCKED_WARNING,
+        composite_created_response, composite_save_warnings, composite_updated_response,
+        delete_alert_bulk, known_target_names, locked_target_ids, locked_target_warnings,
+        resolve_generate_sql, save_warnings,
     };
 
     /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
@@ -4302,6 +4495,174 @@ mod tests {
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
+    }
+
+    async fn body_json(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    fn composite_definition(
+        workflows: serde_json::Value,
+    ) -> infra::table::entity::alert_composites::Model {
+        infra::table::entity::alert_composites::Model {
+            id: "c1".to_string(),
+            org: "org".to_string(),
+            folder_id: "default".to_string(),
+            name: "c1".to_string(),
+            description: None,
+            expression: "a".to_string(),
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            enabled: true,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows,
+            priority: None,
+            tags: None,
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            evaluation_generation: 0,
+            pending_period_sec: 0,
+            incident_title_template: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_license_denied_trigger_answers_403_with_the_license_code() {
+        let denied = AlertError::FeatureNotLicensed("workflows".to_string());
+        let response = Response::from(denied);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let body = body_json(response).await;
+        assert_eq!(body["code"], 40001);
+        assert_eq!(body["error_detail"], "workflows");
+    }
+
+    #[test]
+    fn locked_target_warnings_name_only_what_is_locked_and_kept() {
+        let workflow = WORKFLOWS_LOCKED_WARNING;
+        let team = ONCALL_LOCKED_WARNING;
+        for (has_workflows, has_team, workflows_locked, oncall_locked, expected) in [
+            (true, true, true, true, vec![workflow, team]),
+            (true, false, true, true, vec![workflow]),
+            (false, true, true, true, vec![team]),
+            (true, true, false, false, vec![]),
+            (true, true, false, true, vec![team]),
+            (true, true, true, false, vec![workflow]),
+            (false, false, true, true, vec![]),
+        ] {
+            assert_eq!(
+                locked_target_warnings(has_workflows, has_team, workflows_locked, oncall_locked),
+                expected
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn an_explicit_team_still_gets_its_lock_warning_before_routing_returns_early() {
+        let mut alert = MetaAlert::default();
+        alert.oncall_team = Some("tm_sre".to_string());
+        assert_eq!(
+            save_warnings("org", &alert, false, true).await,
+            vec![ONCALL_LOCKED_WARNING]
+        );
+        alert.workflows = vec!["wf".to_string()];
+        assert_eq!(
+            save_warnings("org", &alert, true, true).await,
+            vec![WORKFLOWS_LOCKED_WARNING, ONCALL_LOCKED_WARNING]
+        );
+    }
+
+    #[test]
+    fn a_composite_warns_only_for_a_stored_workflow_while_locked() {
+        let with_workflow = composite_definition(serde_json::json!(["wf"]));
+        assert_eq!(
+            composite_save_warnings(&with_workflow, true),
+            vec![WORKFLOWS_LOCKED_WARNING]
+        );
+        assert!(composite_save_warnings(&with_workflow, false).is_empty());
+        let without = composite_definition(serde_json::json!([]));
+        assert!(composite_save_warnings(&without, true).is_empty());
+    }
+
+    #[tokio::test]
+    async fn both_composite_save_responses_carry_warnings() {
+        let warnings = vec![WORKFLOWS_LOCKED_WARNING.to_string()];
+        let created = body_json(composite_created_response(
+            "c1".to_string(),
+            "name".to_string(),
+            warnings.clone(),
+        ))
+        .await;
+        assert_eq!(created["warnings"][0], WORKFLOWS_LOCKED_WARNING);
+        assert_eq!(created["id"], "c1");
+        assert_eq!(created["message"], "Alert saved");
+
+        let updated = body_json(composite_updated_response(warnings)).await;
+        assert_eq!(updated["warnings"][0], WORKFLOWS_LOCKED_WARNING);
+        assert_eq!(updated["message"], "Alert Updated");
+
+        let clean = body_json(composite_updated_response(Vec::new())).await;
+        assert!(clean.get("warnings").is_none());
+    }
+
+    #[test]
+    fn only_locked_targets_ask_for_a_name() {
+        let workflows = vec!["wf".to_string()];
+        let none: &[String] = &[];
+        assert_eq!(
+            locked_target_ids(&workflows, Some("tm"), true, true),
+            (workflows.as_slice(), Some("tm"))
+        );
+        assert_eq!(
+            locked_target_ids(&workflows, Some("tm"), false, false),
+            (none, None)
+        );
+        assert_eq!(
+            locked_target_ids(&workflows, Some("tm"), false, true),
+            (none, Some("tm"))
+        );
+        assert_eq!(
+            locked_target_ids(&workflows, Some("  "), true, true),
+            (workflows.as_slice(), None)
+        );
+    }
+
+    #[test]
+    fn a_deleted_target_is_left_out_of_the_names() {
+        let names = known_target_names(vec![
+            ("wf-live".to_string(), Some("Restart pods".to_string())),
+            ("wf-deleted".to_string(), None),
+            ("tm".to_string(), Some("Platform SRE".to_string())),
+        ]);
+        assert_eq!(names.len(), 2);
+        assert_eq!(names["wf-live"], "Restart pods");
+        assert_eq!(names["tm"], "Platform SRE");
+        assert!(!names.contains_key("wf-deleted"));
+    }
+
+    #[test]
+    fn the_get_body_keeps_the_alert_shape_and_adds_names_only_when_present() {
+        let mut body: GetAlertResponseBody = (MetaAlert::default(), None).into();
+        let bare = serde_json::to_value(&body).unwrap();
+        assert_eq!(bare, serde_json::to_value(&body.alert).unwrap());
+        assert!(bare.get("locked_target_names").is_none());
+
+        body.locked_target_names
+            .insert("wf".to_string(), "Restart pods".to_string());
+        let named = serde_json::to_value(&body).unwrap();
+        assert_eq!(named["locked_target_names"]["wf"], "Restart pods");
+        assert_eq!(named["name"], bare["name"]);
+
+        let parsed: GetAlertResponseBody = serde_json::from_value(named).unwrap();
+        assert_eq!(parsed.locked_target_names["wf"], "Restart pods");
+        assert_eq!(parsed.alert.name, body.alert.name);
     }
 
     // 400 Bad Request

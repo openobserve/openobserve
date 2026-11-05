@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { ref } from "vue";
 import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
@@ -48,12 +49,16 @@ import {
 import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
 
 let selectionToken = 0;
 
 export const bumpSelectionToken = (): number => ++selectionToken;
 
 export const currentSelectionToken = (): number => selectionToken;
+
+// From a stream pick until its run starts, so the results area shows its skeleton, not the "run a query" state.
+export const streamSwitchPending = ref(false);
 
 export interface StreamChangeOptions {
   origin?: "editor" | "selector";
@@ -107,6 +112,7 @@ export const useSearchBar = (t: TranslateFn) => {
       });
       return;
     } catch (e) {
+      if ((e as { response?: { status?: number } })?.response?.status === 403) return;
       showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingFunctions"));
     }
   };
@@ -147,6 +153,7 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const getRegionInfo = () => {
+    if (featureState(store.state.zoConfig?.features, "super_cluster") === "locked") return;
     searchService.get_regions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};
@@ -306,6 +313,7 @@ export const useSearchBar = (t: TranslateFn) => {
     const editorOrigin = options.origin === "editor";
     const legacyAutoRun = !store.state.zoConfig.query_on_stream_selection;
     const stale = () => token !== selectionToken;
+    streamSwitchPending.value = !editorOrigin;
     try {
       searchObj.loadingStream = true;
       searchObj.loading = false;
@@ -339,6 +347,15 @@ export const useSearchBar = (t: TranslateFn) => {
 
       const streamDataResults = await Promise.all(streamDataPromises);
       if (stale()) return;
+      const listed = searchObj.data.streamResults?.list ?? [];
+      streams.forEach((stream: string, i: number) => {
+        const entry = listed.find((item: any) => item.name === stream);
+        const data = streamDataResults[i];
+        if (!entry || !data?.schema) return;
+        entry.schema = data.schema;
+        entry.settings = data.settings;
+        entry.removedSchemaFields = data.removedSchemaFields;
+      });
 
       // TODO : We can optimize filter + flatMap using a single reducer function
       // Collect all schema fields
@@ -410,7 +427,10 @@ export const useSearchBar = (t: TranslateFn) => {
           errorMsg: "",
           errorDetail: "",
         };
-        await extractFields();
+        // The schemas were fetched just above; fetching them again would hold the run back by a round trip.
+        await extractFields({
+          reuseLoadedSchema: streamDataResults.every((data: any) => !!data?.schema),
+        });
         if (stale()) return;
         searchObj.loading = false;
         if (!editorOrigin) autoRun.request("stream");
@@ -419,6 +439,10 @@ export const useSearchBar = (t: TranslateFn) => {
       console.info("Error while getting stream data:", e);
     } finally {
       if (!stale()) searchObj.loadingStream = false;
+      // Queued after the auto-run's zero-delay timer, so the run has started before the skeleton goes.
+      setTimeout(() => {
+        if (!stale()) streamSwitchPending.value = false;
+      }, 0);
     }
   };
 
@@ -434,6 +458,12 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const getQueryData = (isPagination = false, options: QueryDataOptions = {}) => {
+    // Every run funnels here, so a locked signal never loads data whichever trigger started it.
+    const signal = streamTypeFeature(searchObj.data.stream.streamType);
+    if (signal && featureState(store.state.zoConfig?.features, signal) === "locked") {
+      searchObj.loading = false;
+      return undefined;
+    }
     noteGridQuery(options.origin, options.generationId);
     const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
     const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();

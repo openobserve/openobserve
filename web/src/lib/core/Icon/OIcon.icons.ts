@@ -57,6 +57,8 @@ import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
+import EventAvailable from "~icons/material-symbols/event-available-outline";
+import EventBusy from "~icons/material-symbols/event-busy-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
 import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
@@ -126,6 +128,7 @@ import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline"
 import UnfoldLess from "~icons/material-symbols/unfold-less";
 import LeftPanelClose from "~icons/material-symbols/left-panel-close";
 import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
+import PinDrop from "~icons/material-symbols/pin-drop-outline";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -158,6 +161,7 @@ import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
 import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
+import MarkEmailUnread from "~icons/material-symbols/mark-email-unread-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
@@ -265,6 +269,7 @@ import MonetizationOnIcon from "~icons/material-symbols/paid-outline-rounded";
 import NoteAddIcon from "~icons/material-symbols/note-add-outline";
 import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
 import PaletteIcon from "~icons/material-symbols/palette-outline";
+import WaterDropIcon from "~icons/material-symbols/water-drop-outline";
 import PaymentsIcon from "~icons/material-symbols/payments-outline";
 import PrintIcon from "~icons/material-symbols/print-outline";
 import PsychologyIcon from "~icons/material-symbols/psychology-outline";
@@ -415,6 +420,8 @@ export const iconRegistry = {
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
+  "event-available": EventAvailable,
+  "event-busy": EventBusy,
   "expand-more": ExpandMore,
   extension: Extension,
   "upload-file": UploadFile,
@@ -485,6 +492,7 @@ export const iconRegistry = {
   "unfold-less": UnfoldLess,
   "left-panel-close": LeftPanelClose,
   "left-panel-open": LeftPanelOpen,
+  "pin-drop": PinDrop,
   reorder: Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
@@ -548,6 +556,7 @@ export const iconRegistry = {
   layers: Layers,
   public: Public,
   mail: Mail,
+  "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
   "more-horiz": MoreHoriz,
@@ -652,6 +661,7 @@ export const iconRegistry = {
   "notifications-active": NotificationsActiveIcon,
   palette: PaletteIcon,
   payments: PaymentsIcon,
+  "water-drop": WaterDropIcon,
   print: PrintIcon,
   psychology: PsychologyIcon,
   radar: RadarIcon,

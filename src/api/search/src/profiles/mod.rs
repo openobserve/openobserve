@@ -21,9 +21,10 @@ pub mod meta;
 pub mod series;
 pub mod tag_values;
 
+use arrow_schema::Schema;
 use axum::{Json, extract::rejection::JsonRejection, http::Method, response::Response};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
@@ -47,7 +48,7 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    search::error_utils::map_error_to_http_response,
+    search::{error_utils::map_error_to_http_response, utils::enrich_field_error},
 };
 
 const DEFAULT_RESULT_SIZE: i64 = 99_999;
@@ -125,7 +126,9 @@ pub(crate) async fn check_stream_permission(
     user_id: &str,
 ) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
-    if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
+    if let Err(e) =
+        search_service::check_search_allowed(org_id, Some((stream_name, StreamType::Profiles)))
+    {
         return Err(MetaHttpResponse::too_many_requests(e.to_string()));
     }
     if let Some(response) = check_stream_permissions(org_id, stream_name, user_id).await {
@@ -167,16 +170,12 @@ pub(crate) fn parse_time_range_from_params(
     parse_required_time_range(start_time, end_time)
 }
 
-pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> ProfilesQueryBody {
-    ProfilesQueryBody {
-        start_time: params
-            .get("start_time")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or_default(),
-        end_time: params
-            .get("end_time")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or_default(),
+pub(crate) fn query_body_from_params(
+    params: &HashMap<String, String>,
+) -> Result<ProfilesQueryBody, Response> {
+    Ok(ProfilesQueryBody {
+        start_time: parse_param(params, "start_time")?.unwrap_or_default(),
+        end_time: parse_param(params, "end_time")?.unwrap_or_default(),
         data_source: params.get("data_source").cloned().filter(|s| !s.is_empty()),
         service_name: params
             .get("service_name")
@@ -190,29 +189,42 @@ pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> Profil
             .get("profile_unit")
             .cloned()
             .filter(|s| !s.is_empty()),
-        filters: parse_filters_param(params.get("filters").map(|s| s.as_str())),
+        filters: parse_filters_param(params.get("filters").map(|s| s.as_str()))?,
         step: params.get("step").cloned().filter(|s| !s.is_empty()),
-        max_nodes: params.get("max_nodes").and_then(|v| v.parse().ok()),
-        timeout: params.get("timeout").and_then(|v| v.parse().ok()),
+        max_nodes: parse_param(params, "max_nodes")?,
+        timeout: parse_param(params, "timeout")?,
         group_by: params.get("group_by").cloned().filter(|s| !s.is_empty()),
-        group_limit: params.get("group_limit").and_then(|v| v.parse().ok()),
+        group_limit: parse_param(params, "group_limit")?,
+    })
+}
+
+/// An empty value counts as absent; anything else must parse.
+fn parse_param<T: std::str::FromStr>(
+    params: &HashMap<String, String>,
+    key: &str,
+) -> Result<Option<T>, Response> {
+    match params.get(key).filter(|v| !v.is_empty()) {
+        None => Ok(None),
+        Some(v) => v
+            .parse()
+            .map(Some)
+            .map_err(|_| MetaHttpResponse::bad_request(format!("Invalid {key} parameter"))),
     }
 }
 
 /// `filters` query param: `key=value,key2=value2`. Each side is percent-encoded.
-fn parse_filters_param(raw: Option<&str>) -> Vec<ProfileFilter> {
+fn parse_filters_param(raw: Option<&str>) -> Result<Vec<ProfileFilter>, Response> {
     let Some(raw) = raw.filter(|s| !s.is_empty()) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     raw.split(',')
-        .filter_map(|pair| {
-            let (key, value) = pair.split_once('=')?;
-            let key = decode_filter_component(key);
-            let value = decode_filter_component(value);
-            if key.is_empty() {
-                return None;
-            }
-            Some(ProfileFilter {
+        .map(|pair| {
+            let (key, value) = pair
+                .split_once('=')
+                .map(|(k, v)| (decode_filter_component(k), decode_filter_component(v)))
+                .filter(|(k, _)| !k.is_empty())
+                .ok_or_else(|| MetaHttpResponse::bad_request(format!("invalid filter: {pair}")))?;
+            Ok(ProfileFilter {
                 key,
                 op: "=".to_string(),
                 value,
@@ -334,13 +346,13 @@ pub(crate) fn resolve_query_body(
 ) -> Result<ProfilesQueryBody, Response> {
     match body {
         Ok(Json(mut body)) => {
-            merge_params_into_body(&mut body, params);
+            merge_params_into_body(&mut body, params)?;
             Ok(body)
         }
         Err(rejection) => {
             // GET (and HEAD) may omit a JSON body; fall back to query params.
             if matches!(*method, Method::GET | Method::HEAD) {
-                Ok(query_body_from_params(params))
+                query_body_from_params(params)
             } else {
                 Err(MetaHttpResponse::bad_request(rejection.body_text()))
             }
@@ -351,14 +363,14 @@ pub(crate) fn resolve_query_body(
 pub(crate) fn merge_params_into_body(
     body: &mut ProfilesQueryBody,
     params: &HashMap<String, String>,
-) {
+) -> Result<(), Response> {
     if body.start_time == 0
-        && let Some(v) = params.get("start_time").and_then(|s| s.parse().ok())
+        && let Some(v) = parse_param(params, "start_time")?
     {
         body.start_time = v;
     }
     if body.end_time == 0
-        && let Some(v) = params.get("end_time").and_then(|s| s.parse().ok())
+        && let Some(v) = parse_param(params, "end_time")?
     {
         body.end_time = v;
     }
@@ -387,17 +399,18 @@ pub(crate) fn merge_params_into_body(
         body.step = params.get("step").cloned().filter(|s| !s.is_empty());
     }
     if body.max_nodes.is_none() {
-        body.max_nodes = params.get("max_nodes").and_then(|s| s.parse().ok());
+        body.max_nodes = parse_param(params, "max_nodes")?;
     }
     if body.filters.is_empty() {
-        body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()));
+        body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()))?;
     }
     if body.group_by.is_none() {
         body.group_by = params.get("group_by").cloned().filter(|s| !s.is_empty());
     }
     if body.group_limit.is_none() {
-        body.group_limit = params.get("group_limit").and_then(|s| s.parse().ok());
+        body.group_limit = parse_param(params, "group_limit")?;
     }
+    Ok(())
 }
 
 pub(crate) fn resolve_timeout(timeout: Option<i64>) -> Result<i64, Response> {
@@ -411,6 +424,7 @@ pub(crate) fn resolve_timeout(timeout: Option<i64>) -> Result<i64, Response> {
 pub(crate) struct ProfilesSqlParams<'a> {
     pub request_trace_id: &'a str,
     pub org_id: &'a str,
+    pub stream_name: &'a str,
     pub user_id: &'a str,
     pub start_time: i64,
     pub end_time: i64,
@@ -426,21 +440,10 @@ pub(crate) async fn run_profiles_sql(
     let request = Request {
         query: Query {
             sql,
-            from: 0,
             size,
             start_time: params.start_time,
             end_time: params.end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
@@ -449,6 +452,7 @@ pub(crate) async fn run_profiles_sql(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -469,10 +473,15 @@ pub(crate) async fn run_profiles_sql(
     .await
     {
         Ok(response) => reject_partial_search_response(response),
-        Err(error) => Err(map_error_to_http_response(
-            &error,
-            Some(params.request_trace_id.to_string()),
-        )),
+        Err(error) => {
+            let streams = [params.stream_name.to_string()];
+            let error =
+                enrich_field_error(error, params.org_id, StreamType::Profiles, &streams).await;
+            Err(map_error_to_http_response(
+                &error,
+                Some(params.request_trace_id.to_string()),
+            ))
+        }
     }
 }
 
@@ -516,16 +525,33 @@ pub(crate) fn default_result_size() -> i64 {
 
 pub(crate) async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
     match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
-        Ok(schema) => schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect(),
+        Ok(schema) => queryable_field_names(&schema),
         Err(e) => {
             warn!("profiles schema lookup failed: {e}");
             Vec::new()
         }
     }
+}
+
+/// On a UDS stream the other columns are packed into `_all`, so they hold no rows to filter on.
+fn queryable_field_names(schema: &Schema) -> Vec<String> {
+    let defined_schema_fields = infra::schema::unwrap_stream_settings(schema)
+        .map(|settings| settings.defined_schema_fields)
+        .unwrap_or_default();
+    let column_all = &get_config().common.column_all;
+    // `_all` outlives a cleared UDS in the schema, so it is never a filter key
+    schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .filter(|name| {
+            *name != column_all
+                && (defined_schema_fields.is_empty()
+                    || *name == TIMESTAMP_COL_NAME
+                    || defined_schema_fields.contains(name))
+        })
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
@@ -534,7 +560,7 @@ mod tests {
 
     #[test]
     fn parse_filters_param_keeps_a_comma_inside_a_value() {
-        let filters = parse_filters_param(Some("k8s_pod_name=a%2Cb,env=prod"));
+        let filters = parse_filters_param(Some("k8s_pod_name=a%2Cb,env=prod")).unwrap();
         assert_eq!(filters.len(), 2);
         assert_eq!(filters[0].key, "k8s_pod_name");
         assert_eq!(filters[0].value, "a,b");
@@ -544,9 +570,40 @@ mod tests {
 
     #[test]
     fn parse_filters_param_reads_plain_pairs() {
-        let filters = parse_filters_param(Some("env=prod,region=us"));
+        let filters = parse_filters_param(Some("env=prod,region=us")).unwrap();
         assert_eq!(filters[0].value, "prod");
         assert_eq!(filters[1].value, "us");
+    }
+
+    async fn bad_request_text(resp: Response) -> String {
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn parse_filters_param_rejects_a_malformed_pair() {
+        for raw in ["foo", "env=prod,foo", "=prod"] {
+            let resp = parse_filters_param(Some(raw)).unwrap_err();
+            assert!(
+                bad_request_text(resp).await.contains("invalid filter: "),
+                "{raw}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn get_params_reject_unparsable_numbers() {
+        for key in ["max_nodes", "timeout", "group_limit", "start_time"] {
+            let params = HashMap::from([(key.to_string(), "abc".to_string())]);
+            let resp = query_body_from_params(&params).unwrap_err();
+            let text = bad_request_text(resp).await;
+            assert!(text.contains(&format!("Invalid {key} parameter")), "{text}");
+        }
+        let params = HashMap::from([("max_nodes".to_string(), String::new())]);
+        assert!(query_body_from_params(&params).unwrap().max_nodes.is_none());
     }
 
     #[test]
@@ -669,6 +726,51 @@ mod tests {
         assert!(
             text.contains("start_time and end_time are required (microseconds)"),
             "{text}"
+        );
+    }
+
+    #[test]
+    fn queryable_field_names_follow_the_user_defined_schema() {
+        use arrow_schema::{DataType, Field};
+        use config::meta::stream::StreamSettings;
+
+        let fields = [
+            TIMESTAMP_COL_NAME,
+            "stack",
+            "value",
+            "service_name",
+            "k8s_pod_name",
+            "k8s_node_name",
+            "_all",
+        ]
+        .map(|name| Field::new(name, DataType::Utf8, true));
+        let settings = StreamSettings {
+            defined_schema_fields: ["k8s_pod_name", "service_name", "stack", "value"]
+                .map(str::to_string)
+                .to_vec(),
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap(),
+        )]);
+
+        let cleared_uds = queryable_field_names(&Schema::new(fields.to_vec()));
+        assert_eq!(cleared_uds.len(), fields.len() - 1);
+        assert!(!cleared_uds.iter().any(|name| name == "_all"));
+
+        let uds = Schema::new_with_metadata(fields.to_vec(), metadata);
+        let mut names = queryable_field_names(&uds);
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                TIMESTAMP_COL_NAME,
+                "k8s_pod_name",
+                "service_name",
+                "stack",
+                "value"
+            ]
         );
     }
 }

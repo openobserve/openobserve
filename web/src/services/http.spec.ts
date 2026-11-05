@@ -46,8 +46,19 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
-const { addUnauthorizedError } = vi.hoisted(() => ({ addUnauthorizedError: vi.fn() }));
-vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedError }));
+const { recordForbidden, noteAccessSuccess, currentAccessRouteKey } = vi.hoisted(() => ({
+  recordForbidden: vi.fn(),
+  noteAccessSuccess: vi.fn(),
+  currentAccessRouteKey: vi.fn(() => undefined),
+}));
+vi.mock("@/composables/useAccessStore", () => ({
+  recordForbidden,
+  noteAccessSuccess,
+  currentAccessRouteKey,
+  resetAccess: vi.fn(),
+}));
+const { addLicenseDeniedError } = vi.hoisted(() => ({ addLicenseDeniedError: vi.fn() }));
+vi.mock("@/composables/useLicenseDenials", () => ({ addLicenseDeniedError }));
 
 import config from "../aws-exports";
 import store from "../stores";
@@ -180,12 +191,59 @@ describe("attemptTokenRefresh", () => {
   });
 });
 
+describe("response interceptor — license 403 handling", () => {
+  // Builds a real instance and returns the rejection handler it registered.
+  function errorHandler() {
+    const use = vi.fn();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: { request: { use: vi.fn() }, response: { use } },
+    } as any);
+    http();
+    return use.mock.calls[0][1] as (error: unknown) => Promise<unknown>;
+  }
+
+  const forbidden = (data: Record<string, unknown>) => ({
+    response: { status: 403, data },
+    request: { responseURL: "http://localhost:5080/api/org/workflows" },
+    config: { url: "/api/org/workflows" },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    (config as any).isEnterprise = "false";
+  });
+
+  it("sends the missing features of a code 40001 denial to the top bar", async () => {
+    const error = forbidden({ code: 40001, error_detail: "oncall, workflows" });
+    (error.config as Record<string, unknown>).startedAt = 42;
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"], 42);
+    expect(recordForbidden).not.toHaveBeenCalled();
+  });
+
+  it("keeps a plain 403 on the RBAC access toast", async () => {
+    const error = forbidden({ code: 403, message: "Unauthorized Access" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(recordForbidden).toHaveBeenCalledTimes(1);
+    expect(addLicenseDeniedError).not.toHaveBeenCalled();
+  });
+});
+
 describe("http 403 interceptor", () => {
   /** Builds an instance and returns the rejection handler it registered. */
   const errorHandler = () => {
     let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: {
           use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
             onError = err;
@@ -213,18 +271,35 @@ describe("http 403 interceptor", () => {
     (config as any).isEnterprise = "false";
   });
 
-  it("adds a 403 to the Access Required toast", async () => {
+  it("records a 403 with the access boundary", async () => {
     const error = forbidden();
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).toHaveBeenCalledWith(
-      "http://localhost:5080/api/v2/org/folders/alerts",
-    );
+    expect(recordForbidden).toHaveBeenCalledWith({
+      url: "http://localhost:5080/api/v2/org/folders/alerts",
+      method: undefined,
+      routeKey: undefined,
+    });
   });
 
-  it("leaves a 403 out of the toast when the request opts out, and still rejects", async () => {
+  it("stamps a new request with the current page but keeps a retried request's stamp", () => {
+    let stamp: (config: any) => any = (c) => c;
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: (fn: (config: any) => any) => (stamp = fn) },
+        response: { use: vi.fn() },
+      },
+    } as any);
+    http();
+    currentAccessRouteKey.mockReturnValue("acme|settings" as any);
+    expect(stamp({}).accessRouteKey).toBe("acme|settings");
+    expect(stamp({ accessRouteKey: "acme|users" }).accessRouteKey).toBe("acme|users");
+    currentAccessRouteKey.mockReturnValue(undefined);
+  });
+
+  it("leaves a 403 unrecorded when the request opts out, and still rejects", async () => {
     const error = forbidden({ skipAccessToast: true });
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).not.toHaveBeenCalled();
+    expect(recordForbidden).not.toHaveBeenCalled();
   });
 });
 
@@ -237,9 +312,10 @@ describe("403 handling", () => {
   });
 
   beforeEach(() => {
-    addUnauthorizedError.mockClear();
+    recordForbidden.mockClear();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
       },
     } as any);
@@ -255,17 +331,21 @@ describe("403 handling", () => {
     ["enterprise", "isEnterprise"],
     ["cloud", "isCloud"],
   ])(
-    "on %s, toasts an unflagged 403 and stays silent on a silentForbidden one",
+    "on %s, records an unflagged 403 and stays silent on a silentForbidden one",
     async (_, flag) => {
       (config as any)[flag] = "true";
 
       await expect(onRejected(forbidden({}))).rejects.toBeDefined();
-      expect(addUnauthorizedError).toHaveBeenCalledWith("http://localhost:5080/api/acme/x");
+      expect(recordForbidden).toHaveBeenCalledWith({
+        url: "http://localhost:5080/api/acme/x",
+        method: undefined,
+        routeKey: undefined,
+      });
 
-      addUnauthorizedError.mockClear();
+      recordForbidden.mockClear();
       const silent = forbidden({ silentForbidden: true });
       await expect(onRejected(silent)).rejects.toBe(silent);
-      expect(addUnauthorizedError).not.toHaveBeenCalled();
+      expect(recordForbidden).not.toHaveBeenCalled();
     },
   );
 });

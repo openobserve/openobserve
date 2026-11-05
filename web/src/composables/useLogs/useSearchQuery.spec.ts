@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 
 // ---------------------------------------------------------------------------
@@ -109,11 +109,16 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
+const superCluster = vi.hoisted(() => ({
+  enabled: false,
+  features: undefined as Record<string, string> | undefined,
+}));
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: {
       zoConfig: {
-        super_cluster_enabled: false,
+        super_cluster_enabled: superCluster.enabled,
+        features: superCluster.features,
         sql_base64_enabled: false,
         timestamp_column: "_timestamp",
       },
@@ -225,6 +230,7 @@ import { buildLogsSignature } from "./useAutoRun";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { gt } from "@/types/i18n";
 import { REFRESH_QUERY_ORIGIN, withQueryOrigin } from "./logsRowNav";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -262,6 +268,29 @@ function makeWhereASTWithField(fieldName: string) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("useSearchQuery › buildSearch › super_cluster license lock", () => {
+  afterEach(() => {
+    superCluster.enabled = false;
+    superCluster.features = undefined;
+    (config as any).isEnterprise = "false";
+  });
+
+  it("sends regions/clusters only while the license leaves super_cluster enabled", () => {
+    mockState = createMockState();
+    (config as any).isEnterprise = "true";
+    superCluster.enabled = true;
+    superCluster.features = { super_cluster: "locked" };
+    const locked = useSearchQuery(gt).buildSearch(false, false);
+    expect(locked).not.toHaveProperty("regions");
+    expect(locked).not.toHaveProperty("clusters");
+
+    superCluster.features = undefined;
+    const open = useSearchQuery(gt).buildSearch(false, false);
+    expect(open).toHaveProperty("regions");
+    expect(open).toHaveProperty("clusters");
+  });
+});
 
 describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
   let buildSearch: ReturnType<typeof useSearchQuery>["buildSearch"];
@@ -1335,6 +1364,16 @@ describe("useSearchQuery › free text (item 1)", () => {
     mockState.searchObj.data.query = `SELECT * FROM "fts_a" WHERE status=500 --404`;
     const { getQueryReq } = useSearchQuery(gt);
     expect(getSql(getQueryReq(false))).toBe(`SELECT * FROM "fts_a" WHERE status=500 --404`);
+  });
+
+  it("sends an EXPLAIN ANALYZE statement as typed without a pre-flight syntax error", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.meta.sqlMode = true;
+    const sql = `explain analyze verbose select * from "fts_a" limit 5`;
+    mockState.searchObj.data.query = sql;
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getSql(getQueryReq(false))).toBe(sql);
+    expect((mockState.searchObj.data as any).errorMsg).toBeFalsy();
   });
 
   it.each([false, true])(

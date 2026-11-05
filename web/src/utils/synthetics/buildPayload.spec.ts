@@ -20,6 +20,7 @@ import {
   buildCreateProtocolCheckPayload,
   mapResponseToBrowserCheck,
 } from "./buildPayload";
+import { useLocalTimezone } from "../storage";
 
 function journey(): BrowserStep[] {
   return [
@@ -87,6 +88,69 @@ describe("buildCreateBrowserTestPayload", () => {
   });
 });
 
+describe("cron schedule timezone", () => {
+  // Not the runner's zone, so a browser-zone overwrite cannot pass by coincidence.
+  const zone = "Pacific/Chatham";
+  const cronSchedule = (): BrowserCheck["schedule"] => ({
+    type: "cron",
+    cron: "0 0 9 * * *",
+    timezone: zone,
+  });
+  const storedCron = {
+    name: "cron check",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "cron", cron: "0 0 9 * * *", timezone: zone },
+    config: { steps: [] },
+  };
+
+  it("keeps the chosen zone on a scheduled-now browser create", () => {
+    const payload = buildCreateBrowserTestPayload(check({ schedule: cronSchedule() }));
+
+    expect(payload.frequency).toEqual({ type: "cron", cron: "0 0 9 * * *", timezone: zone });
+  });
+
+  it("keeps the stored zone when a browser cron check is edited", () => {
+    const loaded = mapResponseToBrowserCheck(storedCron);
+    const payload = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+
+    expect((payload.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+
+  it("gives a zone-less cron the browser zone on create and edit", () => {
+    const browserZone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const created = buildCreateBrowserTestPayload(
+      check({ schedule: { type: "cron", cron: "0 0 9 * * *" } }),
+    );
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(browserZone);
+
+    const loaded = mapResponseToBrowserCheck({
+      ...storedCron,
+      frequency: { type: "cron", cron: "0 0 9 * * *" },
+    });
+    const edited = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(browserZone);
+  });
+
+  it("keeps the chosen zone on a protocol create and edit", () => {
+    const protocolCheck = {
+      ...check({ schedule: cronSchedule() }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+    const created = buildCreateProtocolCheckPayload(protocolCheck);
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(zone);
+
+    const edited = buildCreateProtocolCheckPayload({
+      ...protocolCheck,
+      schedule: mapResponseToBrowserCheck(storedCron).schedule,
+    });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+});
+
 describe("environments round-trip", () => {
   it("carries environments through the browser payload", () => {
     const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));
@@ -113,6 +177,32 @@ describe("environments round-trip", () => {
     });
 
     expect(mapped.environments).toEqual(["env-1"]);
+  });
+});
+
+describe("template override round-trip", () => {
+  it("sends the override on both payloads and null when cleared", () => {
+    expect(buildCreateBrowserTestPayload(check({ template: "ops-card" })).template).toBe(
+      "ops-card",
+    );
+    expect(buildCreateBrowserTestPayload(check({ template: null })).template).toBeNull();
+    const protocolCheck = {
+      ...check({ template: "ops-card" }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+    expect(buildCreateProtocolCheckPayload(protocolCheck).template).toBe("ops-card");
+  });
+
+  it("reads the override back off the wire", () => {
+    const mapped = mapResponseToBrowserCheck({
+      name: "Cloud login",
+      target: "https://app.test",
+      template: "ops-card",
+      config: { steps: [] },
+    });
+    expect(mapped.template).toBe("ops-card");
+    expect(mapResponseToBrowserCheck({ name: "x", config: { steps: [] } }).template).toBeNull();
   });
 });
 
