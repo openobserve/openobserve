@@ -29,7 +29,7 @@ import {
   sharedAgentTroubleshooting,
 } from "./osAgent";
 
-export const install = `curl -O ${AGENTS_REPO}/linux/install.sh \\
+const install = `curl -O ${AGENTS_REPO}/linux/install.sh \\
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
@@ -166,10 +166,9 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
       fixTitle: t("ingestion.setupCard.agentServiceFixTitle"),
       fixBody: t("ingestion.setupCard.linuxAgentFixBody"),
       fixLang: "bash",
-      // linux/install.sh runs the collector as the otel-collector systemd unit.
-      fixSnippet: `sudo systemctl status otel-collector
-sudo journalctl -u otel-collector -n 50 --no-pager`,
-      troubleshooting: sharedAgentTroubleshooting(t, "`sudo systemctl status otel-collector`"),
+      fixSnippet: `sudo systemctl status openobserve-agent
+sudo journalctl -u openobserve-agent -n 50 --no-pager`,
+      troubleshooting: sharedAgentTroubleshooting(t, "`sudo systemctl status openobserve-agent`"),
       uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",
