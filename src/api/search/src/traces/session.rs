@@ -254,6 +254,11 @@ pub async fn get_latest_sessions(
     };
     let query_sql =
         build_latest_session_page_sql(&stream_name, &filter, &search, &sort, &validated);
+    if let Some(response) =
+        super::check_sql_permissions(&org_id, user_id, &query_sql, &trace_id).await
+    {
+        return response;
+    }
     let user_id_opt = Some(user_id.to_string());
 
     let mut req = config::meta::search::Request {
@@ -2042,6 +2047,8 @@ mod tests {
         );
 
         assert!(sql.contains(filter));
+        let tables = openobserve_core::authz::resolve_sql_tables(&sql).unwrap();
+        assert!(tables.iter().any(|t| t.table() == "other_stream"));
     }
 
     fn sort(field: LatestSessionSortField, order: LatestSessionSortOrder) -> LatestSessionSort {
