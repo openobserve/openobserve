@@ -24,15 +24,17 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use config::{axum::middlewares::RealIp, utils::time::now_micros};
+use config::{axum::middlewares::RealIp, meta::feature::Feature, utils::time::now_micros};
 use futures::StreamExt;
 use infra::{
     db::get_orm_client_rw,
+    errors::ErrorCodes,
     table::{
         organizations, workflow_http_trigger_requests as ledger,
         workflow_http_triggers::{AuthMode, CredentialKind},
     },
 };
+use o2_enterprise::enterprise::license::check_features;
 use openobserve_core::workflows::http_trigger::{
     HARD_BODY_CAP, HookReason,
     cache::{self, CachedTrigger},
@@ -174,9 +176,16 @@ async fn admit(
     let shape = AuthShape::of(&parts.headers);
     let auth = authenticate(call, &parts.headers, body, shape).await;
     drop(permits);
+    let auth = license_checked(auth, check_features(&[Feature::Workflows]))?;
+    Ok((auth, parts.headers))
+}
+
+/// Only a verified caller learns the license state; a failed credential keeps its uniform 401.
+fn license_checked<T>(auth: Result<T, HookReason>, entitled: bool) -> Result<T, Response> {
     match auth {
-        Ok(auth) => Ok((auth, parts.headers)),
         Err(reason) => Err(reject(reason, None)),
+        Ok(_) if !entitled => Err(not_entitled()),
+        Ok(auth) => Ok(auth),
     }
 }
 
@@ -648,6 +657,15 @@ fn unauthorized() -> Response {
         .into_response()
 }
 
+fn not_entitled() -> Response {
+    let err = ErrorCodes::LicenseFeatureNotEntitled(<&str>::from(Feature::Workflows).to_owned());
+    (
+        StatusCode::FORBIDDEN,
+        Json(MetaHttpResponse::error_code(err)),
+    )
+        .into_response()
+}
+
 fn busy_gate(gate: &Semaphore) -> Result<SemaphorePermit<'_>, Response> {
     hook_limits::enter(gate)
         .ok_or_else(|| reject(HookReason::RateLimited, Some(BUSY_RETRY_AFTER_SECS)))
@@ -721,6 +739,71 @@ mod tests {
             assert_eq!(body_of(resp).await, expected, "{reason:?}");
         }
         assert_eq!(body_of(unauthorized()).await, expected);
+    }
+
+    #[tokio::test]
+    async fn a_failed_credential_on_a_locked_license_gets_the_answer_it_always_got() {
+        let expected = r#"{"code":401,"message":"Unauthorized","error_detail":"unauthorized"}"#;
+        for reason in [
+            HookReason::Unauthorized,
+            HookReason::InvalidToken,
+            HookReason::InvalidSignature,
+            HookReason::StaleTimestamp,
+        ] {
+            let resp = license_checked::<()>(Err(reason), false).unwrap_err();
+            assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "{reason:?}");
+            assert!(resp.headers().contains_key(header::WWW_AUTHENTICATE));
+            assert_eq!(body_of(resp).await, expected, "{reason:?}");
+        }
+        for reason in [HookReason::InternalError, HookReason::PayloadTooLarge] {
+            let locked = license_checked::<()>(Err(reason), false).unwrap_err();
+            let unlocked = license_checked::<()>(Err(reason), true).unwrap_err();
+            assert_eq!(locked.status(), unlocked.status(), "{reason:?}");
+            assert_eq!(body_of(locked).await, body_of(unlocked).await, "{reason:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_verified_caller_on_a_locked_license_gets_the_license_denial() {
+        let resp = license_checked(Ok(()), false).unwrap_err();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let json: serde_json::Value = serde_json::from_str(&body_of(resp).await).unwrap();
+        assert_eq!(json["code"], 40001);
+        assert_eq!(json["error_detail"], "workflows");
+        assert_eq!(
+            json["message"],
+            "Features not included in your license: Workflows"
+        );
+        assert!(license_checked(Ok(()), true).is_ok());
+    }
+
+    /// No test can lock a license, so the source pins that both routes check it after the token.
+    #[test]
+    fn both_hook_routes_read_the_license_only_after_authenticating() {
+        let source = include_str!("hooks.rs");
+        let function = |signature: &str| {
+            let start = source
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} moved; update this scan"));
+            &source[start..start + source[start..].find("\n}\n").unwrap()]
+        };
+        for handler in ["pub async fn invoke(", "pub async fn run_status("] {
+            assert!(
+                function(handler).contains("admit(&call, ip, req)"),
+                "{handler} must authenticate and read the license through admit"
+            );
+        }
+        let admit = function("async fn admit(");
+        let authenticated = admit
+            .find("authenticate(call,")
+            .expect("admit must authenticate the caller");
+        let license = admit
+            .find("check_features(&[Feature::Workflows])")
+            .expect("admit must check the Workflows license");
+        assert!(
+            authenticated < license,
+            "the license check must follow authentication, or anonymous callers can read it"
+        );
     }
 
     #[tokio::test]
