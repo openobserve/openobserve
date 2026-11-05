@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :fill-height="false"
         :row-class="(row) => (clusterViewOf(row.name) === clusterView ? 'bg-surface-subtle' : '')"
         dense
-        @row-click="(row) => emit('cluster', clusterViewOf(row.name))"
+        @row-click="(row) => toggleCluster(row.name)"
       >
         <template v-for="(_, i) in clusters.stages" :key="i" #[`cell-wall${i}`]="{ row }">
           <span
@@ -365,9 +365,14 @@ const timelineRows = computed(() => {
   }));
 });
 
+function toggleCluster(name: string) {
+  const view = clusterViewOf(name);
+  emit("cluster", props.clusterView === view ? "all" : view);
+}
+
 // a cluster's own row has no samples on its pods' operators, so it opens that cluster instead of scoping
 function onTimelineRow(row: { nodeKey: string; cluster: string }) {
-  if (row.cluster) return emit("cluster", clusterViewOf(row.cluster));
+  if (row.cluster) return toggleCluster(row.cluster);
   emit("scope", activeNode.value === row.nodeKey ? "sum" : nodeScope(row.nodeKey));
 }
 </script>

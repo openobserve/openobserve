@@ -218,6 +218,19 @@ describe("QueryProfileView", () => {
       expect(find("query-profile-fold-notice").exists()).toBe(false);
     });
 
+    it("goes back to all clusters when the chosen cluster's row is clicked again", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      const row = () =>
+        find("query-profile-clusters")
+          .findAll("tr")
+          .find((r) => r.text().includes("sc-b"))!;
+      await row().trigger("click");
+      expect(find("query-profile-tile-nodes").text()).toContain("3Q · 2I");
+      await row().trigger("click");
+      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      expect(find("query-profile-fold-notice").exists()).toBe(false);
+    });
+
     it("opens a cluster from its timeline row instead of scoping to it", async () => {
       wrapper = mountView(superClusterJoinProfile());
       const row = wrapper
