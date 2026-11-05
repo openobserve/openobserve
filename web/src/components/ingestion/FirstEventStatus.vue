@@ -378,13 +378,6 @@ const fixText = computed((): I18nText => {
       return invalidCredentialsFix(currentTokenName.value);
   }
 });
-// The diagnosis's first line: the named cause's fix, or what to compare when no cause can be named.
-const diagnosisFix = computed((): I18nText => {
-  if (diagnosisForm.value === "rejected") return fixText.value;
-  return diagnosisForm.value === "unavailable"
-    ? t("ingestion.firstEvent.unavailable")
-    : t("ingestion.firstEvent.compare");
-});
 
 const noRequestsWindow = computed(() =>
   elapsedMs.value < FIRST_EVENT_BUDGET.diagnosisAtMs
@@ -787,10 +780,14 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         >
         <div class="flex min-w-0 flex-1 flex-col gap-2">
           <span v-if="diagnosisForm === 'rejected'" data-test="first-event-diagnosis-fix">{{
-            diagnosisFix
+            fixText
           }}</span>
           <template v-else>
-            <span data-test="first-event-diagnosis-fix">{{ diagnosisFix }}</span>
+            <span data-test="first-event-diagnosis-fix">{{
+              diagnosisForm === "unavailable"
+                ? t("ingestion.firstEvent.unavailable")
+                : t("ingestion.firstEvent.compare")
+            }}</span>
             <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
               <span class="text-text-secondary">{{ t("ingestion.firstEvent.orgIdLabel") }}</span>
               <OText variant="mono" data-test="first-event-diagnosis-org-id">{{ orgId }}</OText>
