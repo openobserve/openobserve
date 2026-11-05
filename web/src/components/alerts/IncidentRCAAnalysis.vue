@@ -39,18 +39,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaRun.noAnalysisText") }}
       </p>
       <div class="flex flex-wrap items-center gap-2">
-        <OButton
-          data-test="trigger-rca-btn"
-          variant="primary"
-          size="sm"
-          icon-left="auto-awesome"
-          :loading="triggering"
-          @click="$emit('trigger-rca', { buildOnPrevious: false })"
-        >
-          {{ t("alerts.incidents.rcaAnalyzeIncident") }}
-        </OButton>
+        <OTooltip :content="startLockedReason" :disabled="canStart" side="right">
+          <span class="inline-flex">
+            <OButton
+              data-test="trigger-rca-btn"
+              variant="primary"
+              size="sm"
+              :icon-left="canStart ? 'auto-awesome' : 'lock'"
+              :disabled="!canStart"
+              :loading="triggering"
+              @click="$emit('trigger-rca', { buildOnPrevious: false })"
+            >
+              {{ t("alerts.incidents.rcaAnalyzeIncident") }}
+            </OButton>
+          </span>
+        </OTooltip>
         <span
-          v-if="analyzeCreditCost"
+          v-if="analyzeCreditCost && canStart"
           data-test="rca-credit-cost"
           class="text-text-secondary text-xs"
         >
@@ -78,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :triggering="triggering"
         :resuming="resuming"
         :cancelling="cancelling"
+        :start-locked-reason="startLockedReason"
         @select-run="$emit('view-run', $event)"
         @reanalyze="openGuidance('')"
         @cancel="$emit('cancel-rca')"
@@ -105,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cancelled-text="cancelledText"
         :triggering="triggering"
         :cancelling="cancelling"
-        :can-resume="!!resumeRunId && !viewedRun"
+        :can-resume="canStart && !!resumeRunId && !viewedRun"
         :resuming="resuming"
         :org="orgId"
         :can-steer="canSteer"
@@ -115,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :unblocked="unblocked"
         :refusal="refusal"
         :reanalyze-credit-cost="reanalyzeCreditCost"
+        :start-locked-reason="startLockedReason"
         @cancel="$emit('cancel-rca')"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
@@ -241,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :run-live="threadLive"
       :run-state="threadRunState"
       :can-resume="canResumeThreadRun"
+      :can-reanalyze="canStart"
       :trigger-label="threadTriggerLabel"
       :context-used="threadContextUsed"
       :run-stats="threadRunStats"
@@ -277,6 +285,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   RcaContextUsed,
@@ -292,6 +301,7 @@ import type {
   RcaVerdictDetails,
 } from "@/services/incidents";
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -431,6 +441,19 @@ const aiEnabled = computed(
     checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)).allowed &&
     Boolean(store.state.zoConfig?.ai_enabled),
 );
+
+const aiLock = useLicenseLock("ai_assistant");
+
+/** A new run can start; the server's flag already includes the AI Assistant license. */
+const canStart = computed(() => store.state.zoConfig?.incidents_rca_enabled === true);
+
+/** Why no new run can start, unset when one can. */
+const startLockedReason = computed<I18nText | undefined>(() => {
+  if (canStart.value) return undefined;
+  return aiLock.locked.value
+    ? aiLock.lockedReason.value
+    : t("alerts.incidents.aiAnalysis.rcaDisabled");
+});
 
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
@@ -644,7 +667,11 @@ const threadRunState = computed<RcaRunState | null>(() => {
 
 /** The thread shows the latest run and Resume can continue it. */
 const canResumeThreadRun = computed(
-  () => !!props.resumeRunId && !props.viewedRun && props.threadRunId === props.rca?.run_id,
+  () =>
+    canStart.value &&
+    !!props.resumeRunId &&
+    !props.viewedRun &&
+    props.threadRunId === props.rca?.run_id,
 );
 
 const threadTriggerLabel = computed<I18nText | null>(() => {
