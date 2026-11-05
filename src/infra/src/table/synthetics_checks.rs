@@ -1114,6 +1114,8 @@ pub struct AlertState {
     pub gap_runs: i32,
     /// When the gap notice of the current gap was sent. 0 = not sent, so no resumed notice is due.
     pub gap_notified_at: i64,
+    /// When the run that closed the gap finished, while its "Monitoring resumed" notice is owed.
+    pub gap_resumed_at: i64,
 }
 
 /// Reads the alert state without pulling the whole check (config, secrets and
@@ -1131,7 +1133,8 @@ pub async fn get_alert_state<C: ConnectionTrait>(
         .column(Column::GapSince)
         .column(Column::GapRuns)
         .column(Column::GapNotifiedAt)
-        .into_tuple::<(i32, i64, bool, i64, i64, i32, i64)>()
+        .column(Column::GapResumedAt)
+        .into_tuple::<(i32, i64, bool, i64, i64, i32, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
@@ -1143,6 +1146,7 @@ pub async fn get_alert_state<C: ConnectionTrait>(
             gap_since,
             gap_runs,
             gap_notified_at,
+            gap_resumed_at,
         )| AlertState {
             consecutive_failures,
             last_alert_at,
@@ -1151,6 +1155,7 @@ pub async fn get_alert_state<C: ConnectionTrait>(
             gap_since,
             gap_runs,
             gap_notified_at,
+            gap_resumed_at,
         },
     ))
 }
@@ -1195,6 +1200,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .col_expr(Column::GapSince, Expr::value(state.gap_since))
         .col_expr(Column::GapRuns, Expr::value(state.gap_runs))
         .col_expr(Column::GapNotifiedAt, Expr::value(state.gap_notified_at))
+        .col_expr(Column::GapResumedAt, Expr::value(state.gap_resumed_at))
         // Watermark for the status-page rebuilder's delta read. Safe here
         // because the caller only writes when `next != prior` (job_api), so a
         // healthy check acking every minute never bumps it.
@@ -1210,6 +1216,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .filter(Column::GapSince.eq(expected.gap_since))
         .filter(Column::GapRuns.eq(expected.gap_runs))
         .filter(Column::GapNotifiedAt.eq(expected.gap_notified_at))
+        .filter(Column::GapResumedAt.eq(expected.gap_resumed_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1232,6 +1239,47 @@ pub async fn mark_gap_notified<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// Closes the gap that began at `since`, once its "Monitoring resumed" notice went out or the
+/// reaper gave up on it. Only that gap, and only while the notice is still owed: a Not measured run
+/// that reopened the gap keeps it.
+pub async fn clear_resumed_gap<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::GapSince, Expr::value(0_i64))
+        .col_expr(Column::GapRuns, Expr::value(0_i32))
+        .col_expr(Column::GapNotifiedAt, Expr::value(0_i64))
+        .col_expr(Column::GapResumedAt, Expr::value(0_i64))
+        .filter(Column::Id.eq(id))
+        .filter(Column::GapSince.eq(since))
+        .filter(Column::GapResumedAt.gt(0))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Enabled checks whose "Monitoring resumed" notice is still owed from at or before `before`:
+/// `(org_id, id, gap_since, gap_resumed_at)`.
+pub async fn list_due_resumed_notices<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+) -> Result<Vec<(String, String, i64, i64)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Id)
+        .column(Column::GapSince)
+        .column(Column::GapResumedAt)
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::GapResumedAt.gt(0))
+        .filter(Column::GapResumedAt.lte(before))
+        .into_tuple::<(String, String, i64, i64)>()
+        .all(conn)
+        .await?)
 }
 
 /// Enabled checks whose open gap began at or before `before` and still owes its notice:
@@ -1515,6 +1563,7 @@ pub(crate) mod tests {
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -2210,6 +2259,47 @@ pub(crate) mod tests {
                 .unwrap()
         );
         assert_eq!(get_alert_state(&db, "mon-1").await.unwrap(), Some(gap));
+    }
+
+    #[tokio::test]
+    async fn a_resumed_notice_stays_due_until_its_gap_is_cleared() {
+        let db = db_with_one_check(0).await;
+        let prior = get_alert_state(&db, "mon-1").await.unwrap().unwrap();
+        let owed = AlertState {
+            gap_since: 1_000,
+            gap_notified_at: 2_000,
+            gap_resumed_at: 3_000,
+            ..prior
+        };
+        assert!(
+            update_alert_state_if(&db, "mon-1", prior, owed)
+                .await
+                .unwrap()
+        );
+        assert!(
+            list_due_resumed_notices(&db, 2_999)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let due = list_due_resumed_notices(&db, 3_000).await.unwrap();
+        assert_eq!(
+            due.iter().map(|d| (d.2, d.3)).collect::<Vec<_>>(),
+            vec![(1_000, 3_000)]
+        );
+        // Another gap's notice does not clear this one.
+        assert!(!clear_resumed_gap(&db, "mon-1", 999).await.unwrap());
+        assert!(clear_resumed_gap(&db, "mon-1", 1_000).await.unwrap());
+        assert_eq!(
+            get_alert_state(&db, "mon-1").await.unwrap(),
+            Some(AlertState::default())
+        );
+        assert!(
+            list_due_resumed_notices(&db, 3_000)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {

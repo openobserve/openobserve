@@ -51,6 +51,12 @@ const JOB_ERROR: i32 = 6;
 pub const TRIGGER_SCHEDULE: &str = "schedule";
 /// `synthetics_runs.trigger_type` of the one extra run that fills a Not measured gap.
 pub const TRIGGER_GAP_RETRY: &str = "gap_retry";
+/// What a confirm job tells its probe, which writes it to the result row. The run keeps its own
+/// trigger type.
+pub const TRIGGER_CONFIRM: &str = "confirm";
+/// How often a steady check past the streak cap publishes its `tested_at` to other regions. The
+/// status page calls a check stale after three intervals, and the shortest interval is one minute.
+const TESTED_AT_PUBLISH_US: i64 = 120_000_000;
 /// `error_source` values for a job that never tested the site because of us. Mirrors
 /// `synthetics::alerting::classify`.
 const NOT_MEASURED_SOURCES: [&str; 4] = ["queue", "control_plane", "dispatch", "orphan"];
@@ -753,7 +759,8 @@ async fn write_check_row<C: ConnectionTrait>(
             let changed = cur.last_check_status != next.last_check_status
                 || cur.down_runs != next.down_runs
                 || cur.up_runs != next.up_runs
-                || cur.run_class != next.run_class;
+                || cur.run_class != next.run_class
+                || cur.tested_at / TESTED_AT_PUBLISH_US != next.tested_at / TESTED_AT_PUBLISH_US;
             return Ok(changed.then_some(next));
         }
     }
@@ -1091,6 +1098,7 @@ mod tests {
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -1339,6 +1347,24 @@ mod tests {
             }
         }
         assert_eq!(check_row(&db).await.0.up_runs, STREAK_CAP);
+    }
+
+    /// A steady check past the cap still tells other regions when it last tested the site, or
+    /// their status pages show a stale "Last checked".
+    #[tokio::test]
+    async fn a_steady_check_publishes_its_tested_time_every_two_minutes() {
+        const MINUTE: i64 = 60_000_000;
+        let db = db().await;
+        let mut published = Vec::new();
+        for k in 0..16 {
+            let run_id = format!("r{k}");
+            run_with_jobs(&db, &run_id, k * MINUTE + 1, 1).await;
+            let done = ack(&db, &run_id, 0, 1, k * MINUTE + 2).await.unwrap();
+            if k >= STREAK_CAP as i64 && done.check_update.is_some() {
+                published.push(k);
+            }
+        }
+        assert_eq!(published, vec![10, 12, 14]);
     }
 
     #[tokio::test]

@@ -896,6 +896,7 @@ pub(crate) mod tests {
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,
+                gap_resumed_at BIGINT NOT NULL DEFAULT 0,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

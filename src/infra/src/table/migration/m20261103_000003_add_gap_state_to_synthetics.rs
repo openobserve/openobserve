@@ -70,13 +70,15 @@ enum Synthetics {
     GapSince,
     GapRuns,
     GapNotifiedAt,
+    GapResumedAt,
 }
 
-fn columns() -> [(&'static str, Synthetics, bool); 3] {
+fn columns() -> [(&'static str, Synthetics, bool); 4] {
     [
         ("gap_since", Synthetics::GapSince, true),
         ("gap_runs", Synthetics::GapRuns, false),
         ("gap_notified_at", Synthetics::GapNotifiedAt, true),
+        ("gap_resumed_at", Synthetics::GapResumedAt, true),
     ]
 }
 
@@ -102,7 +104,7 @@ mod tests {
         let row = db
             .query_one(Statement::from_string(
                 db.get_database_backend(),
-                "SELECT gap_since, gap_runs, gap_notified_at FROM synthetics",
+                "SELECT gap_since, gap_runs, gap_notified_at, gap_resumed_at FROM synthetics",
             ))
             .await
             .unwrap()
@@ -110,6 +112,7 @@ mod tests {
         assert_eq!(row.try_get::<i64>("", "gap_since").unwrap(), 0);
         assert_eq!(row.try_get::<i32>("", "gap_runs").unwrap(), 0);
         assert_eq!(row.try_get::<i64>("", "gap_notified_at").unwrap(), 0);
+        assert_eq!(row.try_get::<i64>("", "gap_resumed_at").unwrap(), 0);
         Migration.down(&manager).await.unwrap();
         assert!(!manager.has_column(TABLE, "gap_since").await.unwrap());
     }

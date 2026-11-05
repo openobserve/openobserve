@@ -1850,3 +1850,41 @@ describe("start load (row 0)", () => {
     });
   });
 });
+
+describe("confirm jobs in uptime", () => {
+  it("should count a failure and its passing confirm job as one up result", () => {
+    const kpi = deriveKpiFromHistogram(
+      [{ total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 1 }],
+      null,
+      null,
+    );
+    expect(kpi.uptimePct).toBe(100);
+  });
+
+  it("should count a failure and its failing confirm job as one down result", () => {
+    const kpi = deriveKpiFromHistogram(
+      [{ total_runs: 3, passed_runs: 1, failed_runs: 2, confirm_runs: 1 }],
+      null,
+      null,
+    );
+    expect(kpi.uptimePct).toBe(50);
+  });
+
+  it("should stay at 100 when a bucket holds only the passing confirm job", () => {
+    const start = Date.UTC(2026, 0, 1) * 1000;
+    const key = new Date(start / 1000).toISOString().slice(0, 19);
+    const [bucket] = mapHistogram(
+      [{ ts: key, total_runs: 1, passed_runs: 1, confirm_runs: 1 }],
+      start,
+      start + 60_000_000,
+    );
+    expect(bucket.uptimePct).toBe(100);
+  });
+
+  it("should ask for confirm rows only when the stream has the field", () => {
+    expect(buildHistogramSql("m", "1 minute")).not.toContain("confirm_runs");
+    expect(
+      buildHistogramSql("m", "1 minute", false, false, undefined, false, true),
+    ).toContain("trigger_type = 'confirm'");
+  });
+});

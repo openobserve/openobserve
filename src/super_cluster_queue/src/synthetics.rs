@@ -664,6 +664,7 @@ mod tests {
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -905,6 +906,7 @@ mod tests {
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,
+                gap_resumed_at BIGINT NOT NULL DEFAULT 0,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

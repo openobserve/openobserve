@@ -1050,6 +1050,7 @@ export function buildHistogramSql(
   hasStatusReasonField = false,
   environment?: string,
   splitByEnvironment = false,
+  hasTriggerTypeField = false,
 ): string {
   const id = escapeSqlLiteral(monitorId);
   const envCol = splitByEnvironment ? "\n  environment," : "";
@@ -1061,13 +1062,17 @@ export function buildHistogramSql(
     ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
       `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
     : "";
+  // A confirm job and the failure it re-tested are one result, whose answer is the confirm job's.
+  const confirmClause = hasTriggerTypeField
+    ? `\n  COUNT(*) FILTER (WHERE trigger_type = 'confirm' AND ${F.status} != '${STATUS_VALUES.error}') as confirm_runs,`
+    : "";
   // Durations come from runs that tested the site: an `error` row (Not measured) has no real
   // response time, and a bucket of only those is a gap, not a 0 ms point.
   const measuredDuration = `CASE WHEN ${F.status} != '${STATUS_VALUES.error}' THEN ${F.duration} END`;
   return `SELECT
   histogram(${F.timestamp}, '${interval}') as ts,${envCol}
   AVG(${measuredDuration}) as avg_duration,
-  approx_percentile_cont(${measuredDuration}, 0.95) as p95_duration,${retriedClause}${reasonClauses}
+  approx_percentile_cont(${measuredDuration}, 0.95) as p95_duration,${retriedClause}${reasonClauses}${confirmClause}
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
@@ -1782,6 +1787,16 @@ LIMIT 1`;
 }
 
 /**
+ * Uptime over the results that tested the site. A confirm job and the failure it re-tested are
+ * one result, so each confirm row removes one result: a passing confirm stays in `up` and takes
+ * the failure's place. A pair split across two buckets can leave more up results than results.
+ */
+function uptimePercent(up: number, measured: number, confirmRuns: number): number | null {
+  const results = Math.max(measured - confirmRuns, up);
+  return results > 0 ? (up / results) * 100 : null;
+}
+
+/**
  * Sums the histogram's per-bucket counts into the KPI tiles.
  *
  * Every count tile is a plain sum over buckets, so it is exact — not an
@@ -1803,12 +1818,12 @@ export function deriveKpiFromHistogram(
   const passedRuns = sum("passed_runs");
   const warningRuns = sum("warning_runs");
   const errorRuns = sum("error_runs");
+  const confirmRuns = sum("confirm_runs");
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
     // P6a — `error` is excluded from BOTH sides, same as before: it means "we
     // could not look", not "the service was down".
-    uptimePct:
-      totalRuns - errorRuns > 0 ? ((passedRuns + warningRuns) / (totalRuns - errorRuns)) * 100 : 0,
+    uptimePct: uptimePercent(passedRuns + warningRuns, totalRuns - errorRuns, confirmRuns) ?? 0,
     p95Ms: num(p95Row?.p95_duration),
     passedRuns,
     warningRuns,
@@ -2263,7 +2278,7 @@ export function mapHistogram(
       tsMs: Number.isFinite(tsMs) ? tsMs : 0,
       avgMs: measured > 0 ? num(hit.avg_duration) : null,
       p95Ms: measured > 0 ? num(hit.p95_duration) : null,
-      uptimePct: measured > 0 ? ((passed + warning) / measured) * 100 : null,
+      uptimePct: uptimePercent(passed + warning, measured, num(hit.confirm_runs)),
       warningRuns: num(hit.warning_runs),
       failedRuns: num(hit.failed_runs),
       errorRuns: num(hit.error_runs),
@@ -2308,6 +2323,7 @@ export function mapHistogramSplit(
       "warning_runs",
       "failed_runs",
       "error_runs",
+      "confirm_runs",
       "retried_runs",
       "flaky_runs",
       "degraded_runs",

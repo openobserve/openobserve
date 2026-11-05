@@ -135,7 +135,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
 // 136: add last_run_class and last_run_class_at to synthetics.
 // 137: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
-// 138: add gap_since, gap_runs and gap_notified_at to synthetics.
+// 138: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
 pub const DB_SCHEMA_VERSION: u64 = 138;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

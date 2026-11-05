@@ -182,13 +182,14 @@ impl GapNotification {
 /// Low severity: it says our side could not test the site, not that the site failed. When the
 /// unified notification templates land (openobserve#16323), this becomes two template events.
 ///
-/// A "Monitoring gap" notice is marked as sent only when every destination took it, so a failed
-/// send is owed again on the next run or reaper sweep.
+/// A notice counts as sent when at least one destination took it. A notice that no destination
+/// took is owed again, on the next run or reaper sweep. One broken destination does not hold it,
+/// or the working destinations get the notice again on every sweep.
 #[cfg(feature = "enterprise")]
 pub async fn notify_gap(resp: GapNotification) {
     use config::meta::destinations::Module;
 
-    let mut delivered = true;
+    let mut delivered = false;
     let (subject, body) = openobserve_synthetics::alerting::gap_notice_text(
         resp.notice,
         &resp.synthetics_name,
@@ -203,7 +204,6 @@ pub async fn notify_gap(resp: GapNotification) {
                         "[synthetics] load dest={dest_name} org={}: {e}",
                         resp.org_id
                     );
-                    delivered = false;
                     continue;
                 }
             };
@@ -214,7 +214,7 @@ pub async fn notify_gap(resp: GapNotification) {
             continue;
         };
         let msg = gap_message(destination_type, &subject, &body);
-        if let Err(e) = crate::alerts::alert::dispatch_notification(
+        match crate::alerts::alert::dispatch_notification(
             &resp.org_id,
             destination_type,
             &subject,
@@ -222,31 +222,37 @@ pub async fn notify_gap(resp: GapNotification) {
         )
         .await
         {
-            log::error!(
+            Ok(_) => delivered = true,
+            Err(e) => log::error!(
                 "[synthetics] gap notice dest={dest_name} check={}: {e}",
                 resp.synthetics_id
-            );
-            delivered = false;
+            ),
         }
     }
-    if let (true, openobserve_synthetics::alerting::GapNotice::Opened { since }) =
-        (delivered, resp.notice)
-    {
-        let conn = infra::db::get_orm_client_rw().await;
-        let now = config::utils::time::now_micros();
-        if let Err(e) = infra::table::synthetics_checks::mark_gap_notified(
-            conn,
-            &resp.synthetics_id,
-            since,
-            now,
-        )
-        .await
-        {
-            log::error!(
-                "[synthetics] mark gap notified check={}: {e}",
-                resp.synthetics_id
-            );
+    if !delivered {
+        return;
+    }
+    let conn = infra::db::get_orm_client_rw().await;
+    let marked = match resp.notice {
+        openobserve_synthetics::alerting::GapNotice::Opened { since } => {
+            infra::table::synthetics_checks::mark_gap_notified(
+                conn,
+                &resp.synthetics_id,
+                since,
+                config::utils::time::now_micros(),
+            )
+            .await
         }
+        openobserve_synthetics::alerting::GapNotice::Resumed { since, .. } => {
+            infra::table::synthetics_checks::clear_resumed_gap(conn, &resp.synthetics_id, since)
+                .await
+        }
+    };
+    if let Err(e) = marked {
+        log::error!(
+            "[synthetics] mark gap notice check={}: {e}",
+            resp.synthetics_id
+        );
     }
 }
 

@@ -1258,7 +1258,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         })
         .collect();
 
-    let trigger_type = run_trigger_type(conn, &check.run_id).await;
+    // The probe writes this to the result row, the only marker a confirm job has there.
+    let trigger_type = if is_confirm_job(&check) {
+        synthetics_runs::TRIGGER_CONFIRM.to_string()
+    } else {
+        run_trigger_type(conn, &check.run_id).await
+    };
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
@@ -1799,72 +1804,94 @@ pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
 }
 
 /// Sends the "Monitoring gap" notice of every gap that passed the 15-minute rule without a run
-/// to send it, for example on an hourly check, and retries a notice whose send failed. The
-/// reaper calls it on each sweep. The notice is marked only after delivery
+/// to send it, for example on an hourly check, and retries a gap or resumed notice whose send
+/// failed. The reaper calls it on each sweep. A notice is marked only after delivery
 /// (`core::synthetics::notify_gap`).
 pub(crate) async fn send_due_gap_notices(now_us: i64) {
+    use crate::alerting::{
+        GAP_NOTICE_AFTER_US, GAP_RESUMED_GIVE_UP_US, GAP_RESUMED_RETRY_AFTER_US, GapNotice,
+    };
+
+    if RUN_NOTIFIER.get().is_none() {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    match synthetics_checks::list_due_gap_notices(conn, now_us - GAP_NOTICE_AFTER_US).await {
+        Ok(due) => {
+            for (org_id, synthetics_id, since) in due {
+                send_gap_notice(&org_id, &synthetics_id, GapNotice::Opened { since }).await;
+            }
+        }
+        Err(e) => tracing::error!("[synthetics reaper] list_due_gap_notices: {e}"),
+    }
+    match synthetics_checks::list_due_resumed_notices(conn, now_us - GAP_RESUMED_RETRY_AFTER_US)
+        .await
+    {
+        Ok(due) => {
+            for (org_id, synthetics_id, since, until) in due {
+                if now_us - until >= GAP_RESUMED_GIVE_UP_US {
+                    tracing::warn!(
+                        %synthetics_id,
+                        "[synthetics reaper] gave up on a resumed notice"
+                    );
+                    if let Err(e) =
+                        synthetics_checks::clear_resumed_gap(conn, &synthetics_id, since).await
+                    {
+                        tracing::error!("[synthetics reaper] clear_resumed_gap: {e}");
+                    }
+                    continue;
+                }
+                send_gap_notice(&org_id, &synthetics_id, GapNotice::Resumed { since, until }).await;
+            }
+        }
+        Err(e) => tracing::error!("[synthetics reaper] list_due_resumed_notices: {e}"),
+    }
+}
+
+/// Sends one gap notice outside a run, unless the check has no destination or is muted.
+async fn send_gap_notice(org_id: &str, synthetics_id: &str, notice: crate::alerting::GapNotice) {
     let Some(notify) = RUN_NOTIFIER.get() else {
         return;
     };
     let conn = get_orm_client_rw().await;
-    let due = match synthetics_checks::list_due_gap_notices(
-        conn,
-        now_us - crate::alerting::GAP_NOTICE_AFTER_US,
-    )
-    .await
-    {
-        Ok(due) => due,
-        Err(e) => {
-            tracing::error!("[synthetics reaper] list_due_gap_notices: {e}");
-            return;
-        }
+    let Ok(Some(synthetic)) = synthetics_checks::get_cached(conn, org_id, synthetics_id).await
+    else {
+        return;
     };
-    for (org_id, synthetics_id, since) in due {
-        let Ok(Some(synthetic)) =
-            synthetics_checks::get_cached(conn, &org_id, &synthetics_id).await
-        else {
-            continue;
-        };
-        if synthetic.destinations.is_empty()
-            || crate::alerting::muted_by(
-                &org_id,
-                &synthetic.id,
-                &synthetic.folder_id,
-                &synthetic.tags,
-            )
+    if synthetic.destinations.is_empty()
+        || crate::alerting::muted_by(org_id, &synthetic.id, &synthetic.folder_id, &synthetic.tags)
             .await
             .is_some()
-        {
-            continue;
-        }
-        notify(AckResponse {
-            run_complete: true,
-            run_status: None,
-            job_count: 0,
-            org_id,
-            job_id: String::new(),
-            run_id: String::new(),
-            synthetics_id,
-            synthetics_name: synthetic.name,
-            synthetic_type: String::new(),
-            target: synthetic.target,
-            destinations: synthetic.destinations,
-            location: String::new(),
-            pool: String::new(),
-            trigger_type: "scheduled".to_string(),
-            alert: AlertDecision::Silent,
-            status_reason: None,
-            consecutive_failures: 0,
-            failing_locations: Vec::new(),
-            passing_locations: Vec::new(),
-            usage_events: Vec::new(),
-            failing_environments: Vec::new(),
-            suppressed_by: None,
-            coverage: None,
-            gap_notice: Some(crate::alerting::GapNotice::Opened { since }),
-        })
-        .await;
+    {
+        return;
     }
+    notify(AckResponse {
+        run_complete: true,
+        run_status: None,
+        job_count: 0,
+        org_id: org_id.to_string(),
+        job_id: String::new(),
+        run_id: String::new(),
+        synthetics_id: synthetics_id.to_string(),
+        synthetics_name: synthetic.name,
+        synthetic_type: String::new(),
+        target: synthetic.target,
+        destinations: synthetic.destinations,
+        location: String::new(),
+        pool: String::new(),
+        trigger_type: "scheduled".to_string(),
+        alert: AlertDecision::Silent,
+        status_reason: None,
+        consecutive_failures: 0,
+        failing_locations: Vec::new(),
+        passing_locations: Vec::new(),
+        usage_events: Vec::new(),
+        failing_environments: Vec::new(),
+        suppressed_by: None,
+        coverage: None,
+        gap_notice: Some(notice),
+    })
+    .await;
 }
 
 /// Delay before the one extra run that fills a Not measured gap.
@@ -2625,7 +2652,8 @@ mod tests {
             resumed,
             Some(crate::alerting::GapNotice::Resumed { .. })
         ));
-        assert_eq!(closed.gap_since, 0);
+        assert_eq!(closed.gap_since, 100, "only a delivery closes the gap");
+        assert_eq!(closed.gap_resumed_at, 300);
     }
 
     #[test]

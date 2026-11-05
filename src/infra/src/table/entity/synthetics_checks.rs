@@ -66,6 +66,7 @@ pub struct Model {
     pub gap_runs: i32,
     /// When the "Monitoring gap" notice of the current gap was sent. 0 = not sent.
     pub gap_notified_at: i64,
+    pub gap_resumed_at: i64,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -115,6 +116,7 @@ mod tests {
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

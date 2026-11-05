@@ -235,11 +235,22 @@ pub fn suppressed_state(prior: AlertState, next: AlertState) -> AlertState {
         alerting: prior.alerting && next.alerting,
         degraded_notified_at: prior.degraded_notified_at,
         // A muted gap notice is not sent, so no resumed notice may follow it either.
-        gap_notified_at: if next.gap_since == 0 {
+        gap_since: if next.gap_resumed_at > 0 {
+            0
+        } else {
+            next.gap_since
+        },
+        gap_runs: if next.gap_resumed_at > 0 {
+            0
+        } else {
+            next.gap_runs
+        },
+        gap_notified_at: if next.gap_since == 0 || next.gap_resumed_at > 0 {
             0
         } else {
             prior.gap_notified_at
         },
+        gap_resumed_at: 0,
         ..next
     }
 }
@@ -386,6 +397,14 @@ pub const GAP_NOTICE_RUNS: i32 = 3;
 /// A gap at least this old sends its notice on the next Not measured run, whatever the count.
 pub const GAP_NOTICE_AFTER_US: i64 = 15 * MICROS_PER_MINUTE;
 
+/// The reaper retries a "Monitoring resumed" notice this long after the run that closed the gap,
+/// so it does not race the first send.
+pub const GAP_RESUMED_RETRY_AFTER_US: i64 = MICROS_PER_MINUTE;
+
+/// The reaper stops retrying a "Monitoring resumed" notice after this long and closes the gap, so
+/// a destination that stays broken does not hold the state forever.
+pub const GAP_RESUMED_GIVE_UP_US: i64 = 60 * MICROS_PER_MINUTE;
+
 /// The alert class of a finalized run, from its stored run class where that is sure.
 ///
 /// The stored class comes from every job of the run, while `acked` reads one ack: a run that no
@@ -402,7 +421,11 @@ pub fn class_for_run(
         Stored::Unknown => acked,
         Stored::NotMeasured => RunClass::NotMeasured,
         Stored::Partial if !alerts_on_partial => RunClass::Healthy,
-        Stored::Up if acked == RunClass::NotMeasured => RunClass::Healthy,
+        // No location failed. The aggregate is `error` when one location was Not measured, and
+        // the last ack can be a pass with no error source, which reads as a failure.
+        Stored::Up if matches!(acked, RunClass::NotMeasured | RunClass::Failing) => {
+            RunClass::Healthy
+        }
         Stored::Partial | Stored::Down | Stored::Misconfigured
             if acked == RunClass::NotMeasured =>
         {
@@ -454,25 +477,39 @@ pub enum GapNotice {
 ///
 /// This never sets `gap_notified_at`: the sender sets it after a delivery succeeds
 /// (`synthetics_checks::mark_gap_notified`), so a failed send is owed again on the next run or
-/// reaper sweep.
+/// reaper sweep. A closed gap whose notice went out keeps its state with `gap_resumed_at` set until
+/// the "Monitoring resumed" notice is delivered (`synthetics_checks::clear_resumed_gap`). The
+/// reaper retries that send. A Not measured run before then reopens the same gap, as no reader saw
+/// it close.
 pub fn decide_gap(
     prior: AlertState,
     not_measured: bool,
     now_us: i64,
 ) -> (Option<GapNotice>, AlertState) {
     if !not_measured {
+        // The reaper retries a resumed notice that is already owed.
+        if prior.gap_resumed_at > 0 {
+            return (None, prior);
+        }
+        if prior.gap_since > 0 && prior.gap_notified_at > 0 {
+            let next = AlertState {
+                gap_runs: 0,
+                gap_resumed_at: now_us,
+                ..prior
+            };
+            let notice = GapNotice::Resumed {
+                since: prior.gap_since,
+                until: now_us,
+            };
+            return (Some(notice), next);
+        }
         let next = AlertState {
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
             ..prior
         };
-        let notice =
-            (prior.gap_since > 0 && prior.gap_notified_at > 0).then_some(GapNotice::Resumed {
-                since: prior.gap_since,
-                until: now_us,
-            });
-        return (notice, next);
+        return (None, next);
     }
     let since = if prior.gap_since > 0 {
         prior.gap_since
@@ -482,6 +519,7 @@ pub fn decide_gap(
     let next = AlertState {
         gap_since: since,
         gap_runs: prior.gap_runs.saturating_add(1),
+        gap_resumed_at: 0,
         ..prior
     };
     let due = next.gap_runs >= GAP_NOTICE_RUNS || now_us - since >= GAP_NOTICE_AFTER_US;
@@ -1138,6 +1176,12 @@ mod tests {
             class_for_run(Stored::Up, true, RunClass::NotMeasured),
             RunClass::Healthy
         );
+        // The last ack passed, beside a location that was Not measured: the aggregate says
+        // `error` with no error source, which alone reads as a failure.
+        assert_eq!(
+            class_for_run(Stored::Up, true, classify(Some("error"), 1, "", None)),
+            RunClass::Healthy
+        );
         assert_eq!(
             class_for_run(Stored::Down, false, RunClass::NotMeasured),
             RunClass::Failing
@@ -1183,8 +1227,15 @@ mod tests {
         for (i, not_measured) in classes.iter().enumerate() {
             let now = start + i as i64 * MIN;
             let (notice, mut next) = decide_gap(state, *not_measured, now);
-            if let Some(GapNotice::Opened { .. }) = notice {
-                next.gap_notified_at = now;
+            match notice {
+                Some(GapNotice::Opened { .. }) => next.gap_notified_at = now,
+                Some(GapNotice::Resumed { .. }) => {
+                    next.gap_since = 0;
+                    next.gap_runs = 0;
+                    next.gap_notified_at = 0;
+                    next.gap_resumed_at = 0;
+                }
+                None => {}
             }
             notices.extend(notice);
             state = next;
@@ -1201,6 +1252,42 @@ mod tests {
         assert_eq!(undelivered.gap_notified_at, 0, "only a delivery marks it");
         let (again, _) = decide_gap(undelivered, true, t0 + 3 * MIN);
         assert_eq!(again, Some(GapNotice::Opened { since: t0 }));
+    }
+
+    #[test]
+    fn a_resumed_notice_that_was_not_delivered_stays_owed() {
+        let t0 = 10 * MIN;
+        let (_, open) = run_gap(AlertState::default(), t0, &[true, true, true]);
+        let until = t0 + 3 * MIN;
+        let (first, owed) = decide_gap(open, false, until);
+        assert_eq!(first, Some(GapNotice::Resumed { since: t0, until }));
+        assert_eq!(owed.gap_since, t0, "only a delivery closes the gap");
+        assert_eq!(owed.gap_resumed_at, until);
+        // The next good run does not send it again: the reaper retries it.
+        assert_eq!(decide_gap(owed, false, until + MIN), (None, owed));
+        // Not measured before delivery: the same gap goes on, and no second gap notice goes out.
+        let (notice, reopened) = decide_gap(owed, true, until + MIN);
+        assert_eq!(notice, None);
+        assert_eq!(reopened.gap_since, t0);
+        assert_eq!(reopened.gap_resumed_at, 0);
+        assert!(reopened.gap_notified_at > 0);
+    }
+
+    #[test]
+    fn a_muted_recovery_closes_the_gap_with_no_resumed_notice() {
+        let t0 = 10 * MIN;
+        let (_, open) = run_gap(AlertState::default(), t0, &[true, true, true]);
+        let (_, owed) = decide_gap(open, false, t0 + 3 * MIN);
+        let muted = suppressed_state(open, owed);
+        assert_eq!(
+            (
+                muted.gap_since,
+                muted.gap_runs,
+                muted.gap_notified_at,
+                muted.gap_resumed_at
+            ),
+            (0, 0, 0, 0)
+        );
     }
 
     #[test]

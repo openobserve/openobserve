@@ -2928,6 +2928,7 @@ mod tests {
             "gap_since",
             "gap_runs",
             "gap_notified_at",
+            "gap_resumed_at",
         ] {
             let start = checks.find(&format!("\"{col}\"")).unwrap();
             let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();
