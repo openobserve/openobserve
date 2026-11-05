@@ -5,6 +5,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
+import templateService from "@/services/alert_templates";
+import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   readEditorDraft,
@@ -35,12 +37,23 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
+
 describe("AddAlertView.vue", () => {
   let store: any;
   let router: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
+    vi.mocked(templateService.list).mockResolvedValue({ data: [] } as any);
 
     store = createStore({
       state: {
@@ -112,6 +125,36 @@ describe("AddAlertView.vue", () => {
     expect(destinationService.list).toHaveBeenCalledWith(
       expect.objectContaining({ org_identifier: "test-org", module: "alert" }),
     );
+  });
+
+  it("passes the org templates to the form so the override select has options", async () => {
+    vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
+    vi.mocked(templateService.list).mockResolvedValue({
+      data: [{ name: "slack_alert" }, { name: "email_alert" }],
+    } as any);
+
+    const wrapper = mount(AddAlertView, {
+      global: {
+        plugins: [store, router],
+        stubs: {
+          AddAlert: {
+            name: "AddAlert",
+            props: ["templates"],
+            template: '<div class="add-alert-stub"></div>',
+          },
+        },
+      },
+    });
+
+    await flushPromises();
+
+    expect(templateService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org" }),
+    );
+    expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
+      { name: "slack_alert" },
+      { name: "email_alert" },
+    ]);
   });
 
   it("renders AddAlert even when the org has no destinations", async () => {

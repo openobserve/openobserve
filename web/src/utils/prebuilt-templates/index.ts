@@ -126,7 +126,9 @@ export function isPrebuiltType(type: string): boolean {
  */
 export function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
   if (destination.type === "email") {
-    return destination.template?.startsWith("prebuilt_") ? "email" : null;
+    // prebuilt_default is the built-in card every kind falls back to, not the prebuilt email.
+    const template: string | undefined = destination.template;
+    return template?.startsWith("prebuilt_") && template !== "prebuilt_default" ? "email" : null;
   }
   const type = destination.destination_type_name;
   return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;

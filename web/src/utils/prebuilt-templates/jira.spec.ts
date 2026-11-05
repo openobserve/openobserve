@@ -83,6 +83,8 @@ describe("jira type config", () => {
 
   it("is detected from destination_type_name", () => {
     expect(detectPrebuiltType({ type: "http", destination_type_name: "jira" })).toBe("jira");
+    expect(detectPrebuiltType({ type: "email", template: "prebuilt_email" })).toBe("email");
+    expect(detectPrebuiltType({ type: "email", template: "prebuilt_default" })).toBeNull();
   });
 });
 

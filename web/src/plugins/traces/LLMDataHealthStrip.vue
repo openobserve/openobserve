@@ -19,29 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      problem to the setting or guide that fixes it. Hidden when every check passes. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDistanceToNowStrict } from "date-fns";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import type {
   DataHealthCheck,
   DataHealthCheckId,
   DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
-import {
-  fixTarget,
-  healthCounts,
-  sortChecks,
-  unpricedTotals,
-  type TimeWindow,
-} from "./llmDataTrust.utils";
+import { healthCounts, shownChecks, unpricedTotals, type TimeWindow } from "./llmDataTrust.utils";
 import type { DataHealthSamples } from "./composables/useLLMDataHealth";
-import { formatTokens } from "@/utils/llmUtils";
+import { affectedPct, useDataHealthText } from "./composables/useDataHealthText";
+import LLMDataHealthCheckCard from "./LLMDataHealthCheckCard.vue";
 
 const props = defineProps<{
   health: DataHealthResponse | null;
@@ -62,19 +54,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const router = useRouter();
 const store = useStore();
+const { label } = useDataHealthText();
 
 const drawerOpen = ref(false);
 const focusedCheck = ref<DataHealthCheckId | null>(null);
 
-// With model pricing off (ZO_MODEL_PRICING_ENABLED=false) nothing is priced and
-// Model Pricing is hidden in Settings, so there is no unpriced check to show or fix.
-const pricingEnabled = computed(() => !!store.state.zoConfig?.model_pricing_enabled);
 const checks = computed(() =>
-  sortChecks(
-    (props.health?.checks ?? []).filter((c) => c.id !== "unpriced_models" || pricingEnabled.value),
-  ),
+  shownChecks(props.health?.checks ?? [], !!store.state.zoConfig?.model_pricing_enabled),
 );
 const counts = computed(() => healthCounts(checks.value));
 // Passing checks fold into the "N passing" link; the drawer lists them all.
@@ -86,19 +73,6 @@ const checkedAgo = computed(() =>
     : "",
 );
 
-function pct(check: DataHealthCheck): string {
-  if (!check.total) return "0%";
-  const p = (check.affected / check.total) * 100;
-  return `${p < 1 && p > 0 ? p.toFixed(1) : Math.round(p)}%`;
-}
-
-const LABELS: Record<DataHealthCheckId, I18nText> = {
-  unpriced_models: t("llmDataTrust.health.checks.unpriced_models.label"),
-  missing_agent_identity: t("llmDataTrust.health.checks.missing_agent_identity.label"),
-  zero_duration_spans: t("llmDataTrust.health.checks.zero_duration_spans.label"),
-  missing_session_id: t("llmDataTrust.health.checks.missing_session_id.label"),
-};
-
 /** The count a chip shows: models for pricing, share for identity/session, spans otherwise. */
 function chipCount(check: DataHealthCheck): string {
   switch (check.id) {
@@ -106,117 +80,9 @@ function chipCount(check: DataHealthCheck): string {
       return String(unpricedTotals(check).modelCount || check.affected);
     case "missing_agent_identity":
     case "missing_session_id":
-      return pct(check);
+      return affectedPct(check);
     default:
       return check.affected.toLocaleString();
-  }
-}
-
-function detail(check: DataHealthCheck): I18nText {
-  if (check.status === "pass") {
-    switch (check.id) {
-      case "unpriced_models":
-        return t("llmDataTrust.health.checks.unpriced_models.pass");
-      case "missing_agent_identity":
-        return t("llmDataTrust.health.checks.missing_agent_identity.pass");
-      case "zero_duration_spans":
-        return t("llmDataTrust.health.checks.zero_duration_spans.pass");
-      case "missing_session_id":
-        return t("llmDataTrust.health.checks.missing_session_id.pass");
-    }
-  }
-  const params = {
-    affected: check.affected.toLocaleString(),
-    total: check.total.toLocaleString(),
-    pct: pct(check),
-  };
-  switch (check.id) {
-    case "unpriced_models": {
-      const { modelCount, tokens } = unpricedTotals(check);
-      return t(
-        "llmDataTrust.health.checks.unpriced_models.detail",
-        {
-          count: modelCount.toLocaleString(),
-          spans: check.affected.toLocaleString(),
-          tokens: formatTokens(tokens),
-        },
-        modelCount,
-      );
-    }
-    case "missing_agent_identity":
-      return t("llmDataTrust.health.checks.missing_agent_identity.detail", params);
-    case "zero_duration_spans":
-      return t("llmDataTrust.health.checks.zero_duration_spans.detail", params);
-    case "missing_session_id":
-      return t("llmDataTrust.health.checks.missing_session_id.detail", params);
-  }
-}
-
-/** "Top 20 of 25 by tokens" when the server lists only part of the unpriced models. */
-function truncatedNote(check: DataHealthCheck): I18nText | null {
-  const { truncated, models, modelCount } = unpricedTotals(check);
-  if (!truncated) return null;
-  return t("llmDataTrust.health.checks.unpriced_models.truncated", {
-    shown: models.length,
-    total: modelCount.toLocaleString(),
-  });
-}
-
-function fixLabel(id: DataHealthCheckId): I18nText {
-  switch (id) {
-    case "unpriced_models":
-      return t("llmDataTrust.health.checks.unpriced_models.fix");
-    case "missing_agent_identity":
-      return t("llmDataTrust.health.checks.missing_agent_identity.fix");
-    case "zero_duration_spans":
-      return t("llmDataTrust.health.checks.zero_duration_spans.fix");
-    case "missing_session_id":
-      return t("llmDataTrust.health.checks.missing_session_id.fix");
-  }
-}
-
-function statusVariant(status: DataHealthCheck["status"]) {
-  if (status === "error") return "error-soft" as const;
-  if (status === "warning") return "warning-soft" as const;
-  return "success-soft" as const;
-}
-
-function statusLabel(status: DataHealthCheck["status"]): I18nText {
-  if (status === "error") return t("llmDataTrust.health.status.error");
-  if (status === "warning") return t("llmDataTrust.health.status.warning");
-  return t("llmDataTrust.health.status.pass");
-}
-
-function orgId(): string {
-  return store.state.selectedOrganization?.identifier ?? "";
-}
-
-function targetFor(id: DataHealthCheckId) {
-  return fixTarget(id, props.stream, orgId(), props.checkedWindow);
-}
-
-function openFix(id: DataHealthCheckId) {
-  const target = targetFor(id);
-  if (target.kind === "route") {
-    drawerOpen.value = false;
-    router.push(target.to);
-  } else {
-    window.open(target.href, "_blank", "noopener,noreferrer");
-  }
-}
-
-/** For users who cannot open the setting themselves: a link an admin can follow. */
-async function copyFixLink(id: DataHealthCheckId) {
-  const target = targetFor(id);
-  const href =
-    target.kind === "route"
-      ? new URL(router.resolve(target.to).href, window.location.origin).toString()
-      : target.href;
-  try {
-    await navigator.clipboard.writeText(href);
-    toast({ variant: "success", message: t("llmDataTrust.health.linkCopied") });
-  } catch (e) {
-    console.error("Copy fix link failed:", e);
   }
 }
 
@@ -233,10 +99,6 @@ watch(
     if (needed) emit("load-samples");
   },
 );
-
-function shortTraceId(id: string): string {
-  return id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
-}
 
 function viewTrace(traceId: string) {
   drawerOpen.value = false;
@@ -276,7 +138,7 @@ function viewTrace(traceId: string) {
       @click="openDrawer(check.id)"
     >
       <OIcon :name="check.status === 'error' ? 'error' : 'warning-amber'" size="xs" />
-      {{ LABELS[check.id] }} · {{ raw(chipCount(check)) }}
+      {{ label(check.id) }} · {{ raw(chipCount(check)) }}
     </button>
     <button
       v-if="counts.passing"
@@ -306,73 +168,17 @@ function viewTrace(traceId: string) {
     @click:secondary="drawerOpen = false"
   >
     <div class="flex flex-col gap-2.5 p-3" data-test="llm-data-health-drawer">
-      <div
+      <LLMDataHealthCheckCard
         v-for="check in checks"
         :key="check.id"
-        class="rounded-default border-border-default flex flex-col gap-1.5 border p-3"
-        :class="{ 'ring-accent ring-1': focusedCheck === check.id }"
-        :data-test="`llm-data-health-card-${check.id}`"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-text-heading text-sm font-semibold">{{ LABELS[check.id] }}</span>
-          <OBadge :variant="statusVariant(check.status)" size="sm">{{
-            statusLabel(check.status)
-          }}</OBadge>
-        </div>
-        <span class="text-text-secondary text-xs">{{ detail(check) }}</span>
-        <div
-          v-if="check.id === 'unpriced_models' && check.models?.length"
-          class="flex flex-wrap gap-1"
-        >
-          <OBadge
-            v-for="m in check.models"
-            :key="m.model ?? ''"
-            variant="default-outline"
-            size="sm"
-            >{{
-              raw(`${m.model ?? t("llmDataTrust.noModelName")} · ${formatTokens(m.tokens)}`)
-            }}</OBadge
-          >
-          <span
-            v-if="truncatedNote(check)"
-            class="text-2xs text-text-secondary self-center"
-            data-test="llm-data-health-unpriced-truncated"
-            >{{ truncatedNote(check) }}</span
-          >
-        </div>
-        <div
-          v-if="check.status !== 'pass' && samples?.[check.id]?.length"
-          class="text-2xs text-text-secondary flex flex-wrap items-center gap-1.5"
-        >
-          <span>{{ t("llmDataTrust.health.samples") }}</span>
-          <button
-            v-for="id in samples?.[check.id]"
-            :key="id"
-            type="button"
-            class="text-text-link hover:text-text-link-hover font-mono underline"
-            :data-test="`llm-data-health-sample-${check.id}`"
-            @click="viewTrace(id)"
-          >
-            {{ raw(shortTraceId(id)) }}
-          </button>
-        </div>
-        <div v-if="check.status !== 'pass'" class="flex flex-wrap items-center gap-2 pt-1">
-          <OButton
-            variant="primary"
-            size="xs"
-            :data-test="`llm-data-health-fix-${check.id}`"
-            @click="openFix(check.id)"
-            >{{ fixLabel(check.id) }}</OButton
-          >
-          <OButton
-            v-if="targetFor(check.id).kind === 'route'"
-            variant="ghost-muted"
-            size="xs"
-            @click="copyFixLink(check.id)"
-            >{{ t("llmDataTrust.health.copyLink") }}</OButton
-          >
-        </div>
-      </div>
+        :check="check"
+        :stream="stream"
+        :checked-window="checkedWindow"
+        :samples="samples?.[check.id]"
+        :focused="focusedCheck === check.id"
+        @view-trace="viewTrace"
+        @leave="drawerOpen = false"
+      />
     </div>
   </ODrawer>
 </template>

@@ -24,6 +24,8 @@ import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import type { Template } from "@/ts/interfaces";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import {
@@ -79,6 +81,44 @@ describe("Alert List", async () => {
     wrapper.unmount();
     vi.useRealTimers();
     vi.clearAllMocks();
+  });
+
+  it("shows each template's kinds and counts the user templates that apply to every kind", async () => {
+    const vm = wrapper.vm as any;
+    const userAllKinds = vm.templates.filter(
+      (tpl: any) => !tpl.isPrebuilt && !tpl.applies_to?.length,
+    );
+    expect(userAllKinds.length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-test="alert-template-list-Template2-applies-to"]').text()).toBe(
+      "All kinds",
+    );
+    const notice = wrapper.find('[data-test="template-list-all-kinds-notice"]');
+    expect(notice.text()).toContain(`Templates that apply to every kind: ${userAllKinds.length}.`);
+
+    await wrapper.find('[data-test="template-list-all-kinds-review"]').trigger("click");
+    expect(vm.activeTab).toBe("custom");
+    expect(vm.appliesToFilter).toBe("all_kinds");
+
+    await wrapper.find('[data-test="template-list-all-kinds-dismiss"]').trigger("click");
+    expect(wrapper.find('[data-test="template-list-all-kinds-notice"]').exists()).toBe(false);
+    expect(localStorage.getItem(vm.allKindsNoticeKey)).toBe("1");
+    localStorage.removeItem(vm.allKindsNoticeKey);
+  });
+
+  it("filters the rows by the kind they apply to", async () => {
+    const vm = wrapper.vm as any;
+    queryClient.setQueryData(templateKeys.list(store.state.selectedOrganization.identifier), [
+      { name: "every", type: "http", body: "", applies_to: [] },
+      { name: "anomaly_only", type: "http", body: "", applies_to: ["anomaly"] },
+      { name: "alert_only", type: "http", body: "", applies_to: ["alert"] },
+    ]);
+    await flushPromises();
+    vm.appliesToFilter = "anomaly";
+    await flushPromises();
+    expect(vm.visibleRows.map((r: any) => r.name)).toEqual(["every", "anomaly_only"]);
+    vm.appliesToFilter = "all_kinds";
+    await flushPromises();
+    expect(vm.visibleRows.map((r: any) => r.name)).toEqual(["every"]);
   });
 
   it("titles itself with the SECTION, so the peer tabs never move", () => {

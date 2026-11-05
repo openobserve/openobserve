@@ -1,6 +1,6 @@
 # Mobile RUM SDK — Coverage Matrix & Gap Analysis
 
-_Coverage of the `tests/mobile-testing` suite across the four mobile tracks. **42 tests, 5 Playwright
+_Coverage of the `tests/mobile-testing` suite across the four mobile tracks. **46 tests, 5 Playwright
 projects** (rn-android, android-native, rn-ios, ios-native, sdk-drift). The native tracks are now at
 RN parity — masking, network, background/foreground, user-identity and no-phone-home ship for both
 `android-native` and `ios-native` (previously listed here as deferred). The PR-description matrix is the
@@ -14,7 +14,7 @@ capabilities is superseded by the shipped specs._
   (`pages/rumDashboardPage.js`).
 - **Per-capability factories** (`utils/rumChecks.js`) keep the four platforms at parity without
   copy-paste: `attributesSuite`, `userIdentitySuite`, `networkSuite` (positive + 404 negative),
-  `maskingSuite`, `bgFgSuite`, `noPhoneHomeAndroidSuite`. Each platform's spec is a thin call.
+  `maskingSuite`, `bgFgSuite`, `logsSuite`, `noPhoneHomeAndroidSuite`. Each platform's spec is a thin call.
 - **`coreRumSpec.js`** bundles the end-to-end crash journey (views + actions + handled error +
   native crash in `_rumdata`, then the crashed session rendering in the dashboard) for the three
   non-RN-Android platforms.
@@ -37,6 +37,7 @@ follow-ups) · **⚠** blocked by dashboard bug o2-enterprise#2289.
 | Attributes: env/service/version (API) | ✓ | ✓ | ✓ | ✓ |
 | Session replay privacy masking (UI, negative) | ✓ | N/A no form | ✓ | N/A no form |
 | Background/foreground continuity (API) | ✓ | ⏭ | ⏭ | ⏭ |
+| Logs upload: info/warn/error burst lands in `_rumlog` (API) | ✓ | ✓ | ✓ | ✓ |
 | No-phone-home: no Datadog hosts (security, negative) | ✓ | ✓ | N/A IPA | N/A IPA |
 | Crashed session viewable (UI) | ✓ | ✓ | ✓ | ✓ |
 | Error Tracking tab shows error (UI) | ⚠ skip | ⚠ skip | ⚠ skip | ⚠ skip |

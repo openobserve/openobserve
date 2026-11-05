@@ -343,6 +343,19 @@ pub struct ResponseEvent {
     /// the answer to "did the page reach them" — not the absence of one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivered: Option<bool>,
+    /// Per destination, the template a shared-path send rendered with; empty for other sends.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<SentTemplate>,
+}
+
+/// One destination's template on a delivery, as the send log line names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SentTemplate {
+    pub destination: String,
+    /// Empty when the send carried no rendered template (a platform resolve or a legacy body).
+    pub template_name: String,
+    /// `explicit`, `destination`, `org_default`, `compiled`, `platform_resolve` or `legacy`.
+    pub template_source: String,
 }
 
 impl ResponseEvent {
@@ -362,6 +375,7 @@ impl ResponseEvent {
             recipient: None,
             channel: None,
             delivered: None,
+            templates: Vec::new(),
         }
     }
 
@@ -385,6 +399,12 @@ impl ResponseEvent {
         self.recipient = Some(recipient.into());
         self.channel = Some(channel);
         self.delivered = Some(delivered);
+        self
+    }
+
+    /// Records the templates the shared path rendered this delivery with.
+    pub fn with_templates(mut self, templates: Vec<SentTemplate>) -> Self {
+        self.templates = templates;
         self
     }
 

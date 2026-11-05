@@ -1,6 +1,24 @@
 {
-  "@context": "http://schema.org/extensions",
   "@type": "MessageCard",
+  "@context": "http://schema.org/extensions",
+  "summary": "CPU &quot;high&quot; &amp; &lt;fire&gt; on web-1",
+  "sections": [
+    {
+      "activityTitle": "CPU &quot;high&quot; &amp; &lt;fire&gt; on web-1",
+      "markdown": false,
+      "text": "Value 92.5 exceeded 80 — see runbook<br><br>&lt;script&gt;alert(1)&lt;/script&gt;<br><br>host: web-1 &middot; cpu: 92.5",
+      "facts": [
+        {
+          "name": "host",
+          "value": "web-1 &amp; web-2"
+        },
+        {
+          "name": "cpu",
+          "value": "92.5"
+        }
+      ]
+    }
+  ],
   "potentialAction": [
     {
       "@type": "OpenUri",
@@ -22,24 +40,5 @@
         }
       ]
     }
-  ],
-  "sections": [
-    {
-      "activityTitle": "CPU &quot;high&quot; &amp; &lt;fire&gt; on web-1",
-      "facts": [
-        {
-          "name": "host",
-          "value": "web-1 &amp; web-2"
-        },
-        {
-          "name": "cpu",
-          "value": "92.5"
-        }
-      ],
-      "markdown": false,
-      "text": "Value 92.5 exceeded 80 — see runbook<br><br>&lt;script&gt;alert(1)&lt;/script&gt;<br><br>host: web-1 &middot; cpu: 92.5"
-    }
-  ],
-  "summary": "CPU &quot;high&quot; &amp; &lt;fire&gt; on web-1",
-  "themeColor": "E01E5A"
+  ]
 }

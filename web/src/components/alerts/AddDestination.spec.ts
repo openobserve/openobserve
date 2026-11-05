@@ -258,7 +258,64 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
         template: "tmpl1",
         headers: { H1: "V1" },
         name: "dest1",
+        metadata: {},
       },
+    });
+  });
+
+  it("shows the payload format select on a generic webhook and saves it as metadata", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(true);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("template", "tmpl1");
+    form.setFieldValue("payload_format", "legacy");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.create as any).mock.calls[0][0].data.metadata).toEqual({
+      payload_format: "legacy",
+    });
+  });
+
+  it("hides the payload format select on email and Slack destinations", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+    form.setFieldValue("type", "http");
+    form.setFieldValue("destination_type", "slack");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+  });
+
+  it("an edit reads the stored payload format and automatic removes only that key", async () => {
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "hook",
+        url: "https://example.com/webhook",
+        method: "post",
+        type: "http",
+        template: "tmpl1",
+        metadata: { payload_format: "rendered", team: "ops" },
+      },
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+    expect(form.state.values.payload_format).toBe("rendered");
+
+    form.setFieldValue("payload_format", "auto");
+    await nextTick();
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.update as any).mock.calls[0][0].data.metadata).toEqual({
+      team: "ops",
     });
   });
 

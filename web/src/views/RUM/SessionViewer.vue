@@ -333,7 +333,29 @@ import {
 } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
-import { rumField } from "@/utils/rum/fields";
+import { RUM_CORRELATION_TRACES_STREAM, normalizeTraceId, rumField } from "@/utils/rum/fields";
+import useCorrelatedTracesStream, {
+  type TraceLocation,
+  type TraceLocationsOutcome,
+} from "@/composables/rum/useCorrelatedTracesStream";
+import {
+  batchWindowUs,
+  entryLookup,
+  isCompleteResponse,
+  isSkewed,
+  newestArrivalMs,
+  nextServerColumns,
+  recordFailure,
+  recordSpans,
+  serverAskDue,
+  serverColumnSets,
+  serverColumnsKey,
+  serverSpansSql,
+  widenWindowUs,
+  type FailedRequestTimes,
+  type ServerLookupView,
+  type ServerStatusEntry,
+} from "@/utils/rum/serverStatus";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import {
   dedupManifest,
@@ -415,6 +437,10 @@ const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
 const RUM_EVENT_TYPES = ["action", "view", "error", "resource"];
 const MAX_EVENT_PAGES = 50;
+// The server status lookup for failed requests; its pure part is in utils/rum/serverStatus.
+const SERVER_STATUS_BATCH = 200;
+const SERVER_SPAN_PAGE_SIZE = 1000;
+const MAX_SERVER_SPAN_PAGES = 5;
 const SEARCH_STREAM_NOT_FOUND = 20002;
 const EMPTY_TIMELINE: MobileTimeline = Object.freeze({
   records: [],
@@ -504,6 +530,13 @@ let lastLogsTs = 0;
 const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
 const rumEventArrivals = new Map<string, number>();
+// The raw failed-request rows by event key, so a finished lookup can re-format them.
+const failedRequestRows = new Map<string, any>();
+
+// Keyed by canonical trace id; an id without an entry has no answer yet.
+const serverStatusByTrace = new Map<string, ServerStatusEntry>();
+// When this viewer first saw each trace id; it caps a trace's age against a staff clock that runs fast.
+const serverFirstSeen = new Map<string, number>();
 const eventsOnly = ref(false);
 const eventsOnlyRumWindowUs = ref<QueryWindow | null>(null);
 
@@ -546,6 +579,8 @@ watchDebounced(
 );
 const { performanceState } = usePerformance();
 const { getStream } = useStreams(t);
+const { resolveTraceLocationsBulk, cancel: cancelCorrelatedTracesStream } =
+  useCorrelatedTracesStream(t);
 
 const analyticsContext = computed<{ step: number | null; label: string; kind: StepKind } | null>(
   () => {
@@ -734,6 +769,10 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
 
 onBeforeUnmount(() => {
   cancelled = true;
+  if (serverRetryTimer) clearTimeout(serverRetryTimer);
+  serverRetryTimer = null;
+  document.removeEventListener("visibilitychange", handleServerRetryVisibility);
+  cancelCorrelatedTracesStream();
   stopWatchdog();
   stopLivePolling();
   // Leaving the page must stop the streams too, not only the loop that would start new ones.
@@ -1002,6 +1041,7 @@ const buildSegmentRequest = (sql: string, from: number, size: number, window: Qu
 };
 
 // A stream error keeps its status or code so the retry policy can tell a lost connection from a bad query.
+// The message is the server's own text (it may name a missing column), as the one-shot search error carried it.
 const queryErrorFrom = (response: any) => {
   const content = response?.content ?? {};
   const code = Number(content.code);
@@ -1013,17 +1053,25 @@ const queryErrorFrom = (response: any) => {
         : undefined;
   const errorCode =
     content.code === undefined || content.code === null ? undefined : String(content.code);
-  return createQueryError(content.message || "session replay query failed", status, errorCode);
+  const parts = [content.message, content.error, content.error_detail].filter(
+    (part) => typeof part === "string" && part,
+  );
+  const message = [...new Set(parts)].join(" ");
+  return createQueryError(message || "session replay query failed", status, errorCode);
 };
 
-const runSegmentQuery = (
-  sql: string,
-  from: number,
-  size: number,
-  window: QueryWindow,
-): Promise<any[]> =>
+// One streamed search page. `complete` is false when any event of the stream reported a partial result or a function
+// error (they ride on the `results` of the metadata events), or when no metadata arrived: the server sends it first,
+// even for no hits, and a cancelled or cut stream still ends as a normal finish. Every request is tracked in liveTraceIds,
+// so unmount cancels it.
+const runStreamQuery = (
+  queryReq: any,
+  pageType: "logs" | "traces",
+): Promise<{ hits: any[]; complete: boolean }> =>
   new Promise((resolve, reject) => {
     const hits: any[] = [];
+    let complete = true;
+    let sawMetadata = false;
     const traceId = generateTraceContext()?.traceId || getUUID();
     const orgId = store.state.selectedOrganization.identifier;
     let settled = false;
@@ -1045,25 +1093,40 @@ const runSegmentQuery = (
 
     void fetchQueryDataWithHttpStream(
       {
-        queryReq: buildSegmentRequest(sql, from, size, window),
+        queryReq,
         type: "search",
         traceId,
         org_id: orgId,
-        pageType: "logs",
+        pageType,
         searchType: "RUM",
       },
       {
         data: (_req: any, response: any) => {
-          if (response?.type === "search_response_hits") {
-            hits.push(...(response.content?.results?.hits ?? []));
+          const results = response?.content?.results;
+          if (response?.type === "search_response_hits") hits.push(...(results?.hits ?? []));
+          if (response?.type === "search_response_metadata") sawMetadata = true;
+          if (
+            (response?.type === "search_response_hits" ||
+              response?.type === "search_response_metadata") &&
+            !isCompleteResponse(results)
+          ) {
+            complete = false;
           }
         },
         error: (_req: any, response: any) => settle(() => reject(queryErrorFrom(response))),
-        complete: () => settle(() => resolve(hits)),
+        complete: () => settle(() => resolve({ hits, complete: complete && sawMetadata })),
         onActivity: () => timer.touch(),
       },
     );
   });
+
+const runSegmentQuery = async (
+  sql: string,
+  from: number,
+  size: number,
+  window: QueryWindow,
+): Promise<any[]> =>
+  (await runStreamQuery(buildSegmentRequest(sql, from, size, window), "logs")).hits;
 
 // A manifest truncated by the per-request size cap corrupts the snapshot-anchor search, so page past it.
 const fetchAllPages = async (
@@ -1491,6 +1554,7 @@ const pollEvents = async () => {
   if (cancelled) return;
   const changed = addRumEvents([...hits, ...failed]);
   if (addErrorLogs(logs) || changed) publishEvents();
+  void refreshServerStatuses();
 };
 
 const eventsRequest = (sql: string, window: QueryWindow, from: number) => {
@@ -1550,6 +1614,311 @@ const fetchFailedRequests = async (window: QueryWindow) => {
   }
 };
 
+const failedTraceId = (row: any): string => normalizeTraceId(rumField(row, "trace_id"));
+
+const serverLookupFor = (row: any): ServerLookupView => {
+  const traceId = failedTraceId(row);
+  if (!traceId) return { lookup: "no_trace" };
+  return entryLookup(serverStatusByTrace.get(traceId));
+};
+
+// The failed requests of each trace, with the device's date and the server's arrival time (µs).
+const failedTraceTimes = (): Map<string, FailedRequestTimes[]> => {
+  const byTrace = new Map<string, FailedRequestTimes[]>();
+  const field = timestampField();
+  for (const row of failedRequestRows.values()) {
+    const traceId = failedTraceId(row);
+    if (!traceId) continue;
+    const times = { dateUs: (Number(row.date) || 0) * 1000, arrivalUs: Number(row[field]) || 0 };
+    const rows = byTrace.get(traceId);
+    if (rows) rows.push(times);
+    else byTrace.set(traceId, [times]);
+  }
+  return byTrace;
+};
+
+// The traces to ask now, oldest arrival first so a batch covers a tight stretch of time, and when the next one comes due.
+const planServerAsks = (nowMs: number) => {
+  const times = failedTraceTimes();
+  const newest = new Map<string, number>();
+  const skewed = new Set<string>();
+  const due: string[] = [];
+  let nextDueAt = Infinity;
+  for (const [traceId, rows] of times) {
+    if (!serverFirstSeen.has(traceId)) serverFirstSeen.set(traceId, nowMs);
+    const arrival = newestArrivalMs(rows);
+    newest.set(traceId, arrival);
+    if (rows.some(isSkewed)) skewed.add(traceId);
+    const { ask, dueAt } = serverAskDue(serverStatusByTrace.get(traceId), nowMs);
+    if (ask) due.push(traceId);
+    else if (dueAt !== undefined) nextDueAt = Math.min(nextDueAt, dueAt);
+  }
+  due.sort((a, b) => (newest.get(a) ?? 0) - (newest.get(b) ?? 0));
+  return { times, newest, skewed, due, nextDueAt };
+};
+
+type ServerPassTiming = { newest: Map<string, number>; skewed: Set<string> };
+
+const recordFailures = (traceIds: string[]) =>
+  recordFailure(serverStatusByTrace, traceIds, Date.now());
+
+// Runs one unit of a pass (a batch, or a stream within it). A throw counts as one failed ask for the unit's ids
+// that are not recorded yet (their attempts did not move), and the pass goes on with the next unit.
+const guardServerUnit = async (
+  traceIds: string[],
+  run: () => Promise<boolean>,
+): Promise<boolean> => {
+  const attemptsOf = (traceId: string) => serverStatusByTrace.get(traceId)?.attempts ?? 0;
+  const before = traceIds.map(attemptsOf);
+  try {
+    return await run();
+  } catch (error) {
+    console.warn("Server status lookup failed:", error);
+    if (cancelled) return false;
+    recordFailures(traceIds.filter((traceId, i) => attemptsOf(traceId) === before[i]));
+    // Part of the unit may have been recorded before the throw, so the rows are compared again.
+    return true;
+  }
+};
+
+// A stream whose schema cannot be read still gets asked, see serverColumnSets and nextServerColumns.
+const serverStatusColumns = async (stream: string): Promise<string[]> => {
+  let names: string[] | null = null;
+  try {
+    const schema: { name?: string }[] = (await getStream(stream, "traces", true))?.schema ?? [];
+    names = schema.map((field) => String(field?.name));
+  } catch {
+    // no schema: the widest column set is tried first
+  }
+  return serverColumnSets(names)[0];
+};
+
+// Pages until a short one. `complete` is false when a page was partial, had a function error, or the page cap cut the answer off.
+const fetchServerSpans = async (
+  stream: string,
+  columns: string[],
+  traceIds: string[],
+  window: QueryWindow,
+): Promise<{ rows: any[]; complete: boolean }> => {
+  const rows: any[] = [];
+  let complete = true;
+  for (let page = 0; page < MAX_SERVER_SPAN_PAGES; page++) {
+    if (cancelled) return { rows, complete: false };
+    const res = await withRetries(
+      () =>
+        runStreamQuery(
+          {
+            query: {
+              sql: serverSpansSql(stream, columns, traceIds),
+              start_time: window.start,
+              end_time: window.end,
+              from: page * SERVER_SPAN_PAGE_SIZE,
+              size: SERVER_SPAN_PAGE_SIZE,
+            },
+          },
+          "traces",
+        ),
+      { isCancelled: () => cancelled },
+    );
+    const hits = res.hits;
+    rows.push(...hits);
+    if (!res.complete) complete = false;
+    if (hits.length < SERVER_SPAN_PAGE_SIZE) return { rows, complete };
+  }
+  return { rows, complete: false };
+};
+
+// Asks one stream for a batch. The columns narrow only on a missing-column error (the missing one is dropped,
+// each column at most once); any other error is a failed ask.
+const lookupServerBatch = async (
+  stream: string,
+  columnsByStream: Map<string, string[]>,
+  traceIds: string[],
+  window: QueryWindow,
+  timing: ServerPassTiming,
+): Promise<boolean> => {
+  let columns = columnsByStream.get(stream) ?? (await serverStatusColumns(stream));
+  const tried = new Set<string>();
+  while (!cancelled) {
+    tried.add(serverColumnsKey(columns));
+    try {
+      const { rows, complete } = await fetchServerSpans(stream, columns, traceIds, window);
+      if (cancelled) return false;
+      columnsByStream.set(stream, columns);
+      return recordSpans(serverStatusByTrace, traceIds, rows, complete, timing.newest, Date.now(), {
+        firstSeen: serverFirstSeen,
+        skewed: timing.skewed,
+      });
+    } catch (error) {
+      if (cancelled) return false;
+      console.warn("Server status lookup failed:", error);
+      const next = nextServerColumns(columns, tried, error);
+      if (!next) break;
+      columns = next;
+    }
+  }
+  return cancelled ? false : recordFailures(traceIds);
+};
+
+// Finds where each trace of a batch lives. A trace indexed nowhere is asked of the default stream only when the org has it;
+// a failed resolve is never turned into a guess, so it cannot become a "no server span found".
+const lookupServerBatchTraces = async (
+  traceIds: string[],
+  window: QueryWindow,
+  columnsByStream: Map<string, string[]>,
+  timing: ServerPassTiming,
+): Promise<boolean> => {
+  const outcome: TraceLocationsOutcome = { failed: false, streams: [] };
+  let locations: Record<string, TraceLocation> = {};
+  try {
+    locations = await resolveTraceLocationsBulk(traceIds, window.start, window.end, outcome);
+  } catch {
+    outcome.failed = true;
+  }
+  if (cancelled) return false;
+  // The resolver's ranges are server-derived: the span window grows to cover them.
+  const spanWindow = widenWindowUs(
+    window,
+    traceIds.map((traceId) => locations[traceId]?.range),
+  );
+  const defaultListed = !outcome.failed && outcome.streams.includes(RUM_CORRELATION_TRACES_STREAM);
+  const idsByStream = new Map<string, string[]>();
+  const unresolved: string[] = [];
+  for (const traceId of traceIds) {
+    const stream =
+      locations[traceId]?.stream ?? (defaultListed ? RUM_CORRELATION_TRACES_STREAM : "");
+    if (!stream) unresolved.push(traceId);
+    else {
+      const ids = idsByStream.get(stream);
+      if (ids) ids.push(traceId);
+      else idsByStream.set(stream, [traceId]);
+    }
+  }
+  let changed = unresolved.length ? recordFailures(unresolved) : false;
+  for (const [stream, ids] of idsByStream) {
+    changed =
+      (await guardServerUnit(ids, () =>
+        lookupServerBatch(stream, columnsByStream, ids, spanWindow, timing),
+      )) || changed;
+  }
+  return changed;
+};
+
+// Asks about the traces that are due, in batches of their own window; returns whether any answer changed what a row shows.
+const resolveServerStatuses = async (): Promise<boolean> => {
+  const { times, newest, skewed, due } = planServerAsks(Date.now());
+  const columnsByStream = new Map<string, string[]>();
+  let changed = false;
+  for (let i = 0; i < due.length; i += SERVER_STATUS_BATCH) {
+    if (cancelled) break;
+    const traceIds = due.slice(i, i + SERVER_STATUS_BATCH);
+    changed =
+      (await guardServerUnit(traceIds, () => {
+        const window = batchWindowUs(traceIds.flatMap((traceId) => times.get(traceId) ?? []));
+        return lookupServerBatchTraces(traceIds, window ?? routeRangeUs(), columnsByStream, {
+          newest,
+          skewed,
+        });
+      })) || changed;
+  }
+  return changed;
+};
+
+// The rows are plain objects, so a changed answer re-formats them and publishes the list again.
+const applyServerStatuses = () => {
+  let changed = false;
+  for (const [key, row] of failedRequestRows) {
+    const previous = rumEvents.get(key);
+    const next = previous && formatEvent(row);
+    if (
+      !next ||
+      (next.name === previous.name &&
+        next.server_lookup === previous.server_lookup &&
+        next.server_status === previous.server_status &&
+        next.server_service === previous.server_service)
+    ) {
+      continue;
+    }
+    rumEvents.set(key, next);
+    if (selectedEvent.value?.event_id === next.event_id) {
+      Object.assign(selectedEvent.value, {
+        name: next.name,
+        server_status: next.server_status,
+        server_service: next.server_service,
+        server_lookup: next.server_lookup,
+      });
+    }
+    changed = true;
+  }
+  if (changed) publishEvents();
+};
+
+let serverLookupRunning: Promise<void> | null = null;
+let serverLookupAgain = false;
+let serverRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+// A session that is not live has no poll to ask again, so the next due time is a timer. A trace already due
+// (it came due during a pass) is asked at once; every ask counts as an attempt, so that cannot loop.
+// A hidden tab asks nothing: showing it again schedules afresh.
+const scheduleServerRetry = () => {
+  if (serverRetryTimer) clearTimeout(serverRetryTimer);
+  serverRetryTimer = null;
+  if (cancelled || document.visibilityState === "hidden") return;
+  const nowMs = Date.now();
+  let at: number;
+  try {
+    const { due, nextDueAt } = planServerAsks(nowMs);
+    at = due.length ? nowMs : nextDueAt;
+  } catch (error) {
+    console.warn("Failed to plan the next server status lookup:", error);
+    return;
+  }
+  if (!Number.isFinite(at)) return;
+  serverRetryTimer = setTimeout(
+    () => {
+      serverRetryTimer = null;
+      void refreshServerStatuses();
+    },
+    Math.max(0, at - nowMs),
+  );
+};
+
+const handleServerRetryVisibility = () => {
+  if (document.visibilityState === "hidden") {
+    if (serverRetryTimer) clearTimeout(serverRetryTimer);
+    serverRetryTimer = null;
+  } else if (!serverLookupRunning) {
+    scheduleServerRetry();
+  }
+};
+// Registered when the page mounts, not during setup, and removed on unmount.
+onBeforeMount(() => document.addEventListener("visibilitychange", handleServerRetryVisibility));
+
+// Best effort and single-flight: a failure leaves the rows as they are, and a call during a run asks for one more pass
+// when anything is new or due (a pass asks only what is due, and every ask bumps attempts, so the passes end).
+const refreshServerStatuses = (): Promise<void> => {
+  if (serverLookupRunning) {
+    if (planServerAsks(Date.now()).due.length) serverLookupAgain = true;
+    return serverLookupRunning;
+  }
+  serverLookupRunning = (async () => {
+    try {
+      do {
+        serverLookupAgain = false;
+        const changed = await resolveServerStatuses();
+        if (!cancelled && changed) applyServerStatuses();
+      } while (serverLookupAgain && !cancelled);
+    } catch (error) {
+      // Each batch and stream records its own failures (guardServerUnit); this only logs.
+      console.warn("Failed to look up server statuses:", error);
+    } finally {
+      serverLookupRunning = null;
+    }
+    scheduleServerRetry();
+  })();
+  return serverLookupRunning;
+};
+
 // Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
 const isNewerRumEvent = (key: string, hit: any, field: string) => {
   if (!rumEvents.has(key)) return true;
@@ -1577,6 +1946,7 @@ const addRumEvents = (hits: any[]) => {
     const row = previous ? collapseViewDocuments([previous, hit])[0] : hit;
     if (eventId) rawEventsMap.value.set(eventId, row);
     rumEvents.set(key, formatEvent(row));
+    if (hit.type === "resource") failedRequestRows.set(key, row);
     rumEventArrivals.set(key, Number(hit[field]) || 0);
     changed = true;
   }
@@ -1626,6 +1996,7 @@ const getSessionEvents = () => {
 
       addRumEvents([...hits, ...failed]);
       publishEvents();
+      void refreshServerStatuses();
       getSessionErrorLogs();
     })
     .catch((error) => {
@@ -1705,10 +2076,20 @@ const handleActionEvent = (event: any) => {
 const handleResourceEvent = (event: any) => {
   const _event = getDefaultEvent(event);
   _event.type = "failed_request";
-  const status = Number(event?.resource_status_code);
-  _event.name = `${status === 0 ? t("rum.playerEvents.noResponse") : status} ${(
-    event?.resource_method || "GET"
-  ).toUpperCase()} ${event?.resource_url}`;
+  const { lookup, status: serverStatus, service } = serverLookupFor(event);
+  Object.assign(_event, {
+    server_status: serverStatus ?? "",
+    server_service: service ?? "",
+    server_lookup: lookup,
+  });
+  const status =
+    Number(event?.resource_status_code) === 0
+      ? [t("rum.playerEvents.noResponse"), serverStatus].filter(Boolean).join(" \u00b7 ")
+      : event?.resource_status_code;
+  _event.name =
+    [status, (event?.resource_method || "GET").toUpperCase(), event?.resource_url]
+      .filter((part) => part !== undefined && part !== null && part !== "")
+      .join(" ") || "--";
   return _event;
 };
 

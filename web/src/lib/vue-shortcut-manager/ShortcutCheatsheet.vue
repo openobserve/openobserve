@@ -450,6 +450,8 @@ useShortcut(
   {
     description: raw("shortcuts.actions.openCheatsheet"),
     scope: "global",
+    // Lets ? open the cheatsheet while focus is inside a drawer or popover.
+    allowInDialog: true,
   },
 );
 

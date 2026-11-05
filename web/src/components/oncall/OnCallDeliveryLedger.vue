@@ -59,6 +59,13 @@
           >
             {{ t("oncall.atRung", { delay: formatMicrosDuration(row.rung_micros) }) }}
           </span>
+          <span
+            v-if="row.templates?.length"
+            class="text-text-secondary text-xs"
+            :data-test="`oncall-delivery-row-template-${group.run}-${index}`"
+          >
+            {{ t("oncall.deliveryTemplate", { templates: sentTemplatesText(row.templates, t) }) }}
+          </span>
           <OTimeCell :value="row.at" unit="us" class="ms-auto" />
         </div>
 
@@ -90,6 +97,13 @@
             <OTag v-if="row.channel" variant="default-soft" size="sm">
               {{ t(`oncall.channel_${row.channel}`) }}
             </OTag>
+            <span
+              v-if="row.templates?.length"
+              class="text-text-secondary text-xs"
+              :data-test="`oncall-delivery-post-template-${group.run}-${index}`"
+            >
+              {{ t("oncall.deliveryTemplate", { templates: sentTemplatesText(row.templates, t) }) }}
+            </span>
             <OTimeCell :value="row.at" unit="us" class="ms-auto" />
           </div>
         </template>
@@ -118,6 +132,7 @@ import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { sentTemplatesText } from "@/utils/alerts/notificationKinds";
 
 const props = withDefaults(
   defineProps<{

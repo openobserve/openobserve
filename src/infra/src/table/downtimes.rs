@@ -1048,6 +1048,7 @@ mod tests {
             sent_at: 1,
             destinations: serde_json::json!(["slack"]),
             result: Some("ok".to_string()),
+            templates: None,
         };
         super::super::downtime_notifications::insert_if_absent_with(db, &record)
             .await

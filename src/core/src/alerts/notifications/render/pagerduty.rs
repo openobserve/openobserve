@@ -44,6 +44,21 @@ pub fn pagerduty_severity(level: Option<AlertLevel>) -> &'static str {
 /// PagerDuty's documented cap on `payload.summary`.
 const SUMMARY_MAX: usize = 1024;
 
+/// PagerDuty rejects an empty `source`, and a check or a page has no stream.
+fn event_source(ctx: &NotificationContext) -> String {
+    let attribute = |key: &str| {
+        ctx.context_attributes
+            .iter()
+            .find(|(k, v)| k == key && !v.trim().is_empty())
+            .map(|(_, v)| v.clone())
+    };
+    Some(ctx.stream_name.clone())
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| attribute("check_target"))
+        .or_else(|| attribute("oncall_team"))
+        .unwrap_or_else(|| "OpenObserve".to_string())
+}
+
 pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut custom_details = serde_json::Map::new();
     for (label, value) in &c.fields {
@@ -73,7 +88,7 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         "event_action": "trigger",
         "payload": {
             "summary": super::clamp(&c.title, SUMMARY_MAX),
-            "source": ctx.stream_name,
+            "source": event_source(ctx),
             "severity": pagerduty_severity(c.severity),
             "custom_details": custom_details,
         },
@@ -95,4 +110,49 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
     }
 
     event
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn source_of(ctx: &NotificationContext) -> Value {
+        let content = RenderedContent {
+            title: "t".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links: vec![],
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        render_pagerduty(&content, ctx)["payload"]["source"].clone()
+    }
+
+    #[test]
+    fn a_trigger_without_a_stream_names_its_check_team_or_openobserve() {
+        let attrs = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let stream = NotificationContext {
+            stream_name: "web-logs".into(),
+            ..Default::default()
+        };
+        assert_eq!(source_of(&stream), "web-logs");
+        let check = NotificationContext {
+            context_attributes: attrs(&[("check_target", "https://shop.acme.com/health")]),
+            ..Default::default()
+        };
+        assert_eq!(source_of(&check), "https://shop.acme.com/health");
+        let page = NotificationContext {
+            context_attributes: attrs(&[("check_target", ""), ("oncall_team", "checkout")]),
+            ..Default::default()
+        };
+        assert_eq!(source_of(&page), "checkout");
+        assert_eq!(source_of(&NotificationContext::default()), "OpenObserve");
+    }
 }
