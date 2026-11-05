@@ -584,7 +584,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :labels-pending="labelsPending"
             :retry-token="breakdownRetry"
             :announces="!rangeChanging"
-            :page-retries="!!pageFailure"
             @busy="(busy: boolean) => (breakdownBusy = busy)"
             @failures="(failures: BreakdownFailures) => (breakdownFailures = failures)"
             :labels-by-stream="labelsByStream"

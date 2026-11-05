@@ -39,7 +39,7 @@ const REMOVED_PROPS = new Set([
   "custom-pagination-bar",
   "customPaginationBar",
 ]);
-const BAR_SLOTS = new Set(["selection-actions", "footer-note", "status-note"]);
+const BAR_SLOTS = new Set(["selection-actions", "footer-note"]);
 
 const propName = (prop: TemplateProp): string | undefined => {
   if (prop.type === ATTRIBUTE) return prop.name;

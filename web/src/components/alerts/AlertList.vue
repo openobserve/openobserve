@@ -138,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:selected-ids="selectedAlertIds"
               :is-row-selectable="(row: any) => !anomalyRowLocked(row)"
               selection="multiple"
-              keep-page-size-label
               data-test="alert-list-table"
               :data="displayedAlerts"
               :columns="columns"
@@ -147,8 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading || refreshing"
               :loading-reset-key="`${activeFolderId}:${activeTab}`"
               keep-page-on-data-change
-              :row-messages="rowActionErrors"
-              @row-message-dismiss="dropRowActionError"
               :forbidden="anomalyTabLicenseLocked ? ['anomaly_detection'] : forbidden"
               forbidden-resource="alert_folders"
               pagination="client"
@@ -1007,97 +1004,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OEmptyState>
               </template>
 
-              <template #status-note>
-                <div
-                  v-if="bulkActionFailure"
-                  role="alert"
-                  data-test="alert-list-bulk-error"
-                  class="@container/bulk-note flex min-w-[7.5rem] flex-1 items-center"
-                >
-                  <div
-                    class="bg-status-error-bg text-status-error-text rounded-default inline-flex h-6.5 max-w-full min-w-0 items-center gap-1.5 ps-2 pe-0.5"
-                  >
-                    <OIcon name="error-outline" size="sm" class="shrink-0" />
-                    <span class="sr-only">{{ bulkFailureText }}</span>
-                    <OTruncatedText
-                      aria-hidden="true"
-                      class="@max-2xs/bulk-note:hidden"
-                      data-test="alert-list-bulk-error-text"
-                      >{{ bulkFailureText }}</OTruncatedText
-                    >
-                    <span
-                      aria-hidden="true"
-                      class="whitespace-nowrap @max-[10.25rem]/bulk-note:hidden @2xs/bulk-note:hidden"
-                      data-test="alert-list-bulk-error-short"
-                    >
-                      {{ bulkFailedShort }} ·
-                    </span>
-                    <OPopover
-                      v-model:open="bulkDetailsOpen"
-                      side="top"
-                      :align="bulkDetailsPlace.align"
-                      :side-offset="bulkDetailsPlace.offset"
-                      :aria-label="bulkFailureText"
-                    >
-                      <template #trigger>
-                        <button
-                          type="button"
-                          class="rounded-default focus-visible:outline-focus-ring-accent shrink-0 font-medium underline outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
-                          data-test="alert-list-bulk-error-details"
-                          @pointerdown="placeBulkDetails"
-                          @keydown.enter="placeBulkDetails"
-                          @keydown.space="placeBulkDetails"
-                        >
-                          <OTooltip :content="bulkFailureText" />
-                          <span class="@max-[10.25rem]/bulk-note:hidden">{{
-                            t("alerts.rowAction.details")
-                          }}</span>
-                          <span
-                            class="hidden whitespace-nowrap @max-[10.25rem]/bulk-note:inline"
-                            data-test="alert-list-bulk-error-details-short"
-                            >{{ bulkFailedShort }}</span
-                          >
-                        </button>
-                      </template>
-                      <ul
-                        class="text-text-body flex max-h-60 w-72 flex-col gap-1 overflow-y-auto px-3 py-2.5 text-xs"
-                        data-test="alert-list-bulk-error-details-list"
-                      >
-                        <li
-                          v-for="(name, index) in bulkActionFailure.names"
-                          :key="bulkActionFailure.ids[index]"
-                          class="break-words"
-                        >
-                          {{
-                            bulkActionFailure.cause
-                              ? t("alerts.rowAction.detailsItem", {
-                                  name: raw(name),
-                                  reason: bulkActionFailure.cause,
-                                })
-                              : raw(name)
-                          }}
-                        </li>
-                      </ul>
-                    </OPopover>
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs"
-                      icon-left="close"
-                      class="shrink-0"
-                      :aria-label="t('common.dismiss')"
-                      data-test="alert-list-bulk-error-dismiss"
-                      @click="bulkActionFailure = null"
-                    />
-                  </div>
-                </div>
-                <div
-                  v-else
-                  class="min-w-[7.5rem] flex-1"
-                  aria-hidden="true"
-                  data-test="alert-list-bulk-error-slot"
-                />
-              </template>
-
               <template #selection-actions>
                 <OButton
                   data-test="alert-list-move-across-folders-btn"
@@ -1363,7 +1269,6 @@ import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { toCauseClause } from "@/utils/causeClause";
 import { isFiringOutcome, outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -1388,7 +1293,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import FolderList from "../common/sidebar/FolderList.vue";
 
@@ -1434,7 +1338,7 @@ import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
 import type { CompositeAlertReference } from "@/ts/interfaces/alert";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { OTableColumnDef, OTableRowMessage } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -1482,7 +1386,6 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     OIcon,
-    OPopover,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -3768,43 +3671,11 @@ export default defineComponent({
       streamNames.value = filterColumns(indexOptions.value, val, update);
     };
 
-    // A failed pause or resume stays in its row until dismissed, keyed by alert id.
-    const rowActionErrors = ref<Record<string, OTableRowMessage>>({});
-    const dropRowActionError = (alertId: string) => {
-      if (!(alertId in rowActionErrors.value)) return;
-      rowActionErrors.value = Object.fromEntries(
-        Object.entries(rowActionErrors.value).filter(([id]) => id !== alertId),
-      );
-    };
-    // Why a write was refused, as the clause after "Couldn't pause:"; null when nothing answered.
-    const rowActionCause = (error: any, folder: string): I18nText | null => {
-      if (error?.response?.status === 403)
-        return t("alerts.rowAction.forbiddenCause", { folder: raw(folder) });
-      const reason = error?.response?.data?.message;
-      if (error?.response && typeof reason === "string" && reason.trim())
-        return raw(toCauseClause(reason));
-      return null;
-    };
-    const rowActionFailure = (action: "pause" | "resume", error: any, folder: string): I18nText => {
-      const pausing = action === "pause";
-      const cause = rowActionCause(error, folder);
-      if (cause)
-        return pausing
-          ? t("alerts.rowAction.pauseFailed", { reason: cause })
-          : t("alerts.rowAction.resumeFailed", { reason: cause });
-      return pausing
-        ? t("alerts.rowAction.pauseNoResponse")
-        : t("alerts.rowAction.resumeNoResponse");
-    };
-    const folderNameOf = (row: any): string =>
-      String(row?.folder_name?.name || row?.folder_name?.id || activeFolderId.value);
     // Confirmed writes only, found by id at settle time, since a refresh mid-write replaces the row objects.
     const applyConfirmedState = (alertId: any, enabled: boolean): boolean => {
       const id = String(alertId);
       let left = false;
       confirmedWrites.set(id, { enabled, seq: alertsFetchSeq });
-      // A confirmed write supersedes an earlier failed one on the same row, from either path.
-      dropRowActionError(id);
       for (const alert of filteredResults.value as any[]) {
         if (String(alert.alert_id) !== id) continue;
         alert.enabled = enabled;
@@ -3856,9 +3727,7 @@ export default defineComponent({
 
     const toggleAlertState = (row: any) => {
       if (anomalyRowLocked(row)) return;
-      const action = row?.enabled ? "pause" : "resume";
       alertStateLoadingMap.value[row.uuid] = true;
-      dropRowActionError(String(row.alert_id));
 
       // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
       const toggle = row.type === "anomaly" ? toggleAnomalyState : toggleAlertStateWrite;
@@ -3874,14 +3743,8 @@ export default defineComponent({
           if (applyConfirmedState(row.alert_id, isEnabled))
             announceLeftFilter([row.name], isEnabled);
         })
-        .catch((error: any) => {
-          rowActionErrors.value = {
-            ...rowActionErrors.value,
-            [String(row.alert_id)]: {
-              text: rowActionFailure(action, error, folderNameOf(row)),
-              dataTest: `alert-list-${row.name}-row-error`,
-            },
-          };
+        .catch(() => {
+          /* the mutation handler already toasts the failure; this only keeps the rejection handled */
         })
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
@@ -4449,51 +4312,7 @@ export default defineComponent({
       });
     };
 
-    // One summary line for a bulk pause or resume that partly or wholly failed, kept until dismissed.
-    const bulkActionFailure = ref<{
-      action: "pause" | "resume";
-      total: number;
-      names: string[];
-      ids: string[];
-      cause: I18nText | null;
-    } | null>(null);
-    const bulkDetailsOpen = ref(false);
-    // The open state outlives the summary it belongs to, so the next failure would open its list unasked.
-    watch(bulkActionFailure, (failure) => {
-      if (!failure) bulkDetailsOpen.value = false;
-    });
-    const bulkDetailsPlace = ref<{ align: "start" | "end"; offset: number }>({
-      align: "end",
-      offset: 4,
-    });
-    // The list grows toward the footer's start, away from the rows' end-pinned actions, unless only the end has room, and sits above the whole footer.
-    const placeBulkDetails = (event: Event) => {
-      const trigger = event.currentTarget;
-      if (!(trigger instanceof HTMLElement)) return;
-      const rect = trigger.getBoundingClientRect();
-      const footer = trigger.closest('[data-test="o2-table-pagination-bottom"]');
-      const footerTop = footer ? footer.getBoundingClientRect().top : rect.top;
-      const width = 18 * parseFloat(getComputedStyle(document.documentElement).fontSize || "16");
-      const rtl = getComputedStyle(trigger).direction === "rtl";
-      const roomTowardStart = rtl ? window.innerWidth - rect.left : rect.right;
-      bulkDetailsPlace.value = {
-        align: roomTowardStart - width >= 8 ? "end" : "start",
-        offset: Math.max(4, rect.top - footerTop + 4),
-      };
-    };
     const bulkToggleBusy = ref<"pause" | "resume" | null>(null);
-    const bulkFailedShort = computed(() =>
-      t("alerts.rowAction.bulkFailedShort", { failed: bulkActionFailure.value?.names.length ?? 0 }),
-    );
-    const bulkFailureText = computed(() => {
-      const f = bulkActionFailure.value;
-      if (!f) return "";
-      const params = { failed: f.names.length, total: f.total };
-      return f.action === "pause"
-        ? t("alerts.rowAction.bulkPauseFailed", params, f.total)
-        : t("alerts.rowAction.bulkResumeFailed", params, f.total);
-    });
-
     // Each bulk write gets a number, so only the latest one may set the summary, the busy state and the selection.
     let bulkRequestSeq = 0;
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
@@ -4516,13 +4335,12 @@ export default defineComponent({
 
       const request = ++bulkRequestSeq;
       bulkToggleBusy.value = action;
-      bulkActionFailure.value = null;
       const payload = {
         ids: alertsToToggle.map((a: any) => a.alert_id),
         names: alertsToToggle.map((a: any) => a.name),
       };
       let failed: any[] = [];
-      let cause: I18nText | null = null;
+      let failureMessage: I18nText | null = null;
       try {
         const response = await alertsService.bulkToggleState(
           store.state.selectedOrganization.identifier,
@@ -4539,13 +4357,19 @@ export default defineComponent({
           leftRows.map((row: any) => String(row.name)),
           isResuming,
         );
-        const err = response?.data?.err;
-        if (failed.length && err) cause = raw(toCauseClause(String(err)));
+        if (failed.length) {
+          const params = { failed: failed.length, total: alertsToToggle.length };
+          failureMessage = isResuming
+            ? t("alerts.rowAction.bulkResumeFailed", params, alertsToToggle.length)
+            : t("alerts.rowAction.bulkPauseFailed", params, alertsToToggle.length);
+        }
       } catch (error: any) {
         failed = alertsToToggle;
-        cause =
-          rowActionCause(error, folderNameOf(alertsToToggle[0])) ??
-          t("alerts.rowAction.noResponseCause");
+        console.error(`Error ${action}ing alerts:`, error);
+        if (error?.response?.status !== 403)
+          failureMessage = isResuming
+            ? t("toastMessages.alerts.errorResumingAlerts")
+            : t("toastMessages.alerts.errorPausingAlerts");
       }
       if (request !== bulkRequestSeq) return;
       bulkToggleBusy.value = null;
@@ -4554,13 +4378,7 @@ export default defineComponent({
         selectedAlerts.value = [];
         return;
       }
-      bulkActionFailure.value = {
-        action,
-        total: alertsToToggle.length,
-        names: failed.map((a: any) => String(a.name)),
-        ids: failed.map((a: any) => String(a.alert_id)),
-        cause,
-      };
+      if (failureMessage) toast({ variant: "error", message: failureMessage });
       // Only the rows that failed stay selected, so a retry is one click.
       selectedAlertIds.value = failed.map((a: any) => a.alert_id);
       for (const row of filteredResults.value as any[]) row.selected = false;
@@ -4778,14 +4596,6 @@ export default defineComponent({
       displayedAlerts,
       leftFilterIds,
       onStatSelect,
-      rowActionErrors,
-      dropRowActionError,
-      bulkActionFailure,
-      bulkFailureText,
-      bulkFailedShort,
-      bulkDetailsOpen,
-      bulkDetailsPlace,
-      placeBulkDetails,
       bulkToggleBusy,
       refreshing,
       formData,

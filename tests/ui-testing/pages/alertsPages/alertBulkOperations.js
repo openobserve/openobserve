@@ -59,9 +59,8 @@ export class AlertBulkOperations {
         await pauseBtn.click();
         await this.page.waitForTimeout(1000);
 
-        // A confirmed bulk write has no toast: full success clears the selection and shows no failure summary.
+        // A confirmed bulk write has no toast: full success clears the selection.
         await expect(this.page.locator('[data-test="o2-table-selected-count"]')).toHaveCount(0, { timeout: 10000 });
-        await expect(this.page.locator('[data-test="alert-list-bulk-error"]')).toHaveCount(0);
         testLogger.info('Bulk paused selected alerts');
     }
 
@@ -75,7 +74,6 @@ export class AlertBulkOperations {
         await this.page.waitForTimeout(1000);
 
         await expect(this.page.locator('[data-test="o2-table-selected-count"]')).toHaveCount(0, { timeout: 10000 });
-        await expect(this.page.locator('[data-test="alert-list-bulk-error"]')).toHaveCount(0);
         testLogger.info('Bulk unpaused selected alerts');
     }
 

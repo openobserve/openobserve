@@ -67,13 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("metrics.explorer.detail.breakdown.allLabels") }}
         </OButton>
-        <MetricsFailedLine
-          v-if="focusedLost"
-          :sentence="focusedLost.sentence"
-          :retry="!pageRetries"
-          data-test="metrics-breakdown-focused-failed"
-          @retry="retryFailedTiles"
-        />
       </div>
 
       <MetricOverlayKey
@@ -88,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
         parent-reports-failures
-        :retry-token="tileRetryToken"
+        :retry-token="retryToken"
         @busy="(on: boolean) => (focusedBusy = on)"
         :queries="heatmap ? heatmapQueries : focusedQueries"
         :chart-type="chartType"
@@ -413,14 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <div class="flex min-h-6 items-center">
-        <MetricsFailedLine
-          v-if="gridFailure.lost"
-          :sentence="gridFailure.lost.sentence"
-          :retry="!pageRetries"
-          data-test="metrics-breakdown-failed"
-          @retry="retryFailedTiles"
-        />
-        <p v-else class="text-text-secondary text-xs">
+        <p class="text-text-secondary text-xs">
           {{ t("metrics.explorer.detail.breakdown.selectHint") }}
         </p>
       </div>
@@ -435,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="label"
             class="hover:border-primary h-56 cursor-pointer"
             parent-reports-failures
-            :retry-token="tileRetryToken"
+            :retry-token="retryToken"
             @busy="(on: boolean) => onTileBusy(label, on)"
             @failed="(failure: TileFailure | null) => onTileFailed(label, failure)"
             :queries="queriesByLabel[label]"
@@ -525,9 +511,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OValue from "@/lib/data/Value/OValue.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { loadingText } from "@/lib/feedback/RegionStatus/regionText";
-import MetricsFailedLine from "./MetricsFailedLine.vue";
 import type { TileFailure } from "./MetricChartTile.vue";
-import { valueErrorCause } from "@/lib/data/Value/valueErrorCause";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -679,7 +663,6 @@ export default defineComponent({
     OBanner,
     OSkeleton,
     OValue,
-    MetricsFailedLine,
     LoadingProgress,
     PanelChartPlaceholder,
     OTooltip,
@@ -728,8 +711,6 @@ export default defineComponent({
     retryToken: { type: Number, default: 0 },
     /** Off while the page itself announces a load for every chart, e.g. a range change. */
     announces: { type: Boolean, default: true },
-    /** The page shows its own Retry, which reloads these charts too, so this view offers none. */
-    pageRetries: { type: Boolean, default: false },
   },
   emits: ["update:selectedLabel", "add-filter", "failures", "busy"],
   setup(props, { emit }) {
@@ -1020,15 +1001,10 @@ export default defineComponent({
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );
     const focusedFailure = ref<TileFailure | null>(null);
-    const failedSentence = (failure: TileFailure) =>
-      t("components.value.couldntLoadTooltip", { cause: valueErrorCause(t, failure.cause) });
     /** The focused chart failed with nothing drawn; its stats come from the same query, so they failed with it. */
-    const focusedLost = computed(() => {
-      const failure = focusedFailure.value;
-      if (!activeLabel.value || !failure || failure.keptAt !== null) return null;
-      return { sentence: failedSentence(failure) };
-    });
-    const statsFailed = computed(() => !!focusedLost.value);
+    const statsFailed = computed(
+      () => !!activeLabel.value && focusedFailure.value?.keptAt === null,
+    );
     const focusedBusy = ref(false);
     const heatmap = computed(() => props.variant?.chartType === "heatmap");
     const heatmapCtx = (panel: boolean) => ({
@@ -1349,7 +1325,7 @@ export default defineComponent({
       else next.delete(label);
       failedTiles.value = next;
     };
-    /** Kept charts go to the page's one failed-refresh sentence (j3); tiles with nothing drawn get this grid's one couldn't-load line. */
+    /** Kept charts go to the page's one failed-refresh sentence (j3); tiles with nothing drawn show their own error. */
     const gridFailure = computed(() => {
       const failed = labels.value
         .map((label) => failedTiles.value.get(label))
@@ -1365,7 +1341,7 @@ export default defineComponent({
               dataFrom: Math.min(...kept.map((failure) => failure.keptAt ?? 0)),
             }
           : null,
-        lost: lost.length ? { count: lost.length, sentence: failedSentence(lost[0]) } : null,
+        lost: lost.length,
       };
     });
     /** What this view shows: the focused chart alone, or the grid's tiles. */
@@ -1383,7 +1359,7 @@ export default defineComponent({
       return {
         total: gridFailure.value.total,
         kept: gridFailure.value.kept,
-        lost: gridFailure.value.lost?.count ?? 0,
+        lost: gridFailure.value.lost,
       };
     });
     watch(
@@ -1391,12 +1367,6 @@ export default defineComponent({
       () => emit("failures", failures.value),
       { immediate: true },
     );
-    const localRetry = ref(0);
-    const tileRetryToken = computed(() => localRetry.value + props.retryToken);
-    const retryFailedTiles = () => {
-      localRetry.value += 1;
-    };
-
     const busyTiles = ref<Set<string>>(new Set());
     const onTileBusy = (label: string, on: boolean) => {
       if (busyTiles.value.has(label) === on) return;
@@ -1431,12 +1401,9 @@ export default defineComponent({
       onTileBusy,
       onTileFailed,
       gridFailure,
-      tileRetryToken,
-      retryFailedTiles,
       gridRegion,
       gridBusy,
       focusedBusy,
-      focusedLost,
       statsFailed,
       chartsLoadingLabel,
       t,

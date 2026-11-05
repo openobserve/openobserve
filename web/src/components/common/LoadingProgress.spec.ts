@@ -367,29 +367,18 @@ describe("LoadingProgress", () => {
     });
   });
 
-  describe("accent (opt-in)", () => {
+  describe("bar colour", () => {
     const mountLine = (props: Record<string, unknown>) =>
       mount(LoadingProgress, {
         props: { loading: true, loadingProgressPercentage: 40, ...props },
         global: { plugins: [store] },
       });
 
-    it("keeps the fixed indigo bar and head when accent is not set (L-36)", () => {
+    it("draws the bar and head in the fixed indigo (L-36)", () => {
       const wrapper = mountLine({});
-      expect(wrapper.props("accent")).toBe(false);
       expect(wrapper.findAll(".bg-brand-indigo")).toHaveLength(2);
       expect(wrapper.find(".ring-brand-indigo\\/50").exists()).toBe(true);
       expect(wrapper.find(".bg-accent").exists()).toBe(false);
-    });
-
-    it("draws the bar and head in the theme accent when set, determinate or not", async () => {
-      const wrapper = mountLine({ accent: true });
-      expect(wrapper.findAll(".bg-accent")).toHaveLength(2);
-      expect(wrapper.find(".ring-accent\\/50").exists()).toBe(true);
-      expect(wrapper.find(".bg-brand-indigo").exists()).toBe(false);
-      await wrapper.setProps({ value: 30 });
-      expect(wrapper.findAll(".bg-accent")).toHaveLength(2);
-      expect(wrapper.find(".bg-brand-indigo").exists()).toBe(false);
     });
   });
 

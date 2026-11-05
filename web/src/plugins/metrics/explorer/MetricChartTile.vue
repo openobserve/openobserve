@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading-progress-percentage="0"
       />
       <div
-        v-if="state.status === 'error' && !(parentReportsFailures && failure)"
+        v-if="state.status === 'error'"
         class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
         :title="state.error"
         :data-test="`${dataTest}-error`"
@@ -90,11 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </slot>
 
-      <PanelChartPlaceholder
-        v-else
-        :failed="state.status === 'error'"
-        :data-test="`${dataTest}-loading`"
-      />
+      <PanelChartPlaceholder v-else :data-test="`${dataTest}-loading`" />
     </div>
   </div>
 </template>
@@ -178,7 +174,7 @@ const props = withDefaults(
       opts?: { window?: QueryWindow; instantAt?: number },
     ) => Promise<any>;
     dataTest: string;
-    /** The parent says once that many tiles failed, so this tile shows no error of its own and keeps a drawn chart. */
+    /** The parent reports a failed refresh once, so this tile keeps a drawn chart rather than replacing it with its error. */
     parentReportsFailures?: boolean;
     /** Bumped by the parent's one Retry; a tile whose query failed loads again. */
     retryToken?: number;

@@ -121,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
           data-test="traces-search-result-data-age"
         >
-          <!-- The progress line is the region's one moving loader, so the data age stays readable (ruling 14). -->
           <ORefreshButton
             layout="inline"
             age-format="clock"
@@ -168,16 +167,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="paginator-section float-right mt-0! min-w-54 justify-end"
             data-test="traces-search-result-pagination"
             @update:model-value="(page: number) => changePage(page)"
-          />
-        </div>
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-0">
-          <LoadingProgress
-            :loading="region.delayed.value"
-            :loading-progress-percentage="0"
-            :label="loadingLabel"
-            indeterminate
-            accent
-            data-test="traces-search-result-progress"
           />
         </div>
       </div>
@@ -284,8 +273,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import TracesMetricsPlaceholder from "./metrics/TracesMetricsPlaceholder.vue";
 import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
 import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
-import { loadingText, resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionText";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionText";
 import { useSettledValue } from "@/composables/useSettledValue";
 import { formatRefreshFailed } from "@/utils/formatters";
 
@@ -300,7 +288,6 @@ export default defineComponent({
     OTag,
     OSkeleton,
     ORegionStatus,
-    LoadingProgress,
     TracesSearchResultList,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
@@ -575,7 +562,6 @@ export default defineComponent({
         : 1;
     });
 
-    const loadingLabel = computed(() => loadingText(t, regionNoun.value));
     // Leaving the page cancels its search; that end must not be announced over the page now shown.
     let pageShown = true;
     onDeactivated(() => (pageShown = false));
@@ -678,7 +664,6 @@ export default defineComponent({
       regionBusy,
       regionNoun,
       region,
-      loadingLabel,
       rememberScrollTop,
       changePage,
       changeRowsPerPage,

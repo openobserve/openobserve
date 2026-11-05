@@ -1086,23 +1086,10 @@ describe("SearchResult header holds still as the first data lands", () => {
     expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-54", "justify-end"]));
   });
 
-  it("draws the region's progress line in the theme accent, which stays visible on the dark track", () => {
-    wrapper = mount(SearchResult, { global: globalOptions });
-    const line = wrapper.findComponent({ name: "LoadingProgress" });
-    expect(line.exists()).toBe(true);
-    expect(line.props("accent")).toBe(true);
-  });
-
-  it("travels for the whole run and never switches to a progress value", async () => {
+  it("draws no results progress line, even through a run", async () => {
     wrapper = mount(SearchResult, { global: globalOptions, props: { pending: true } });
-    const line = () => wrapper.findComponent({ name: "LoadingProgress" });
-    expect(line().props("indeterminate")).toBe(true);
-    expect(line().props("value")).toBeUndefined();
-    // A stray progress field on the shared state must not flip the line's mode mid-run.
-    (mockSearchObj.meta as any).searchProgress = 40;
     await flushPromises();
-    expect(line().props("indeterminate")).toBe(true);
-    expect(line().props("value")).toBeUndefined();
-    delete (mockSearchObj.meta as any).searchProgress;
+    expect(wrapper.find('[data-test="traces-search-result-progress"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "LoadingProgress" }).exists()).toBe(false);
   });
 });

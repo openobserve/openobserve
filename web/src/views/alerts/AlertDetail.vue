@@ -259,28 +259,25 @@
 
         <!-- With no Groups tab, a line per group on the chart reads as a bug, not the opt-in it is (M-9). -->
         <!-- Below the tabs: it lands with the alert, like the tab content, so nothing already painted moves. -->
-        <OBanner
-          v-if="isGroupedButSimple"
-          variant="info"
-          class="shrink-0"
-          data-test="alerts-alertdetail-simple-grouped-banner"
-        >
-          {{
-            t("alerts.multiAlert.groupedButSimple", {
-              columns: (aggregation?.group_by || []).join(", "),
-            })
-          }}
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="alerts-alertdetail-enable-multi"
-              @click="editAlert"
-            >
-              {{ t("alerts.multiAlert.enableCta") }}
-            </OButton>
-          </template>
-        </OBanner>
+        <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
+          <OBanner variant="info" data-test="alerts-alertdetail-simple-grouped-banner">
+            {{
+              t("alerts.multiAlert.groupedButSimple", {
+                columns: (aggregation?.group_by || []).join(", "),
+              })
+            }}
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="alerts-alertdetail-enable-multi"
+                @click="editAlert"
+              >
+                {{ t("alerts.multiAlert.enableCta") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </OContent>
 
         <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
         <OTabPanels v-if="alert" v-model="activeTab" class="min-h-0 flex-1">

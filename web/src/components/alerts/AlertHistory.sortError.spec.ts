@@ -79,9 +79,10 @@ describe("AlertHistory sort failure", () => {
     vi.mocked(alertsService.getHistory).mockRejectedValueOnce({
       response: { status, data: { message: "Can't sort by that column" } },
     });
-  const NOTICE = '[data-test="alert-history-refresh-failed"]';
+  const REFRESH = '[data-test="alert-history-refresh-btn"]';
+  const FAILED = `${REFRESH}[data-state="failed"]`;
 
-  it("keeps the previous sort's rows at full opacity under the failed-refresh notice, not the table's error state", async () => {
+  it("keeps the previous sort's rows at full opacity with the refresh button failed, not the table's error state", async () => {
     await mountHistory();
     expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("checkout-latency");
 
@@ -94,13 +95,13 @@ describe("AlertHistory sort failure", () => {
     expect(body.classes()).not.toContain("opacity-60");
     expect(wrapper.text()).not.toContain("Can't sort by that column");
     expect(wrapper.vm.historyError).toBe("Can't sort by that column");
-    const notice = wrapper.find(`[data-test="o2-table-pagination-status-note"] ${NOTICE}`);
-    expect(notice.exists()).toBe(true);
-    expect(notice.attributes("data-state")).toBe("failed");
-    expect(notice.text()).toMatch(/^Refresh failed at .+ · showing data from .+Retry$/);
-    expect(notice.classes()).toEqual(
-      expect.arrayContaining(["bg-status-error-bg", "text-status-error-text"]),
+    const button = wrapper.find(FAILED);
+    expect(button.exists()).toBe(true);
+    expect(button.attributes("aria-label")).toBe("Retry");
+    expect(button.find('[data-test="alert-history-refresh-btn-failed"]').text()).toMatch(
+      /^Refresh failed at .+ · showing data from .+$/,
     );
+    expect(button.classes()).toContain("bg-status-error-bg!");
     expect(wrapper.find('[data-test="o2-table-pagination-info"]').classes()).not.toContain(
       "invisible",
     );
@@ -123,7 +124,7 @@ describe("AlertHistory sort failure", () => {
 
     wrapper.vm.searchQuery = "staged-alert";
     wrapper.vm.dateTimeValues = { ...failedRange, startTime: 1, endTime: 2 };
-    wrapper.vm.retryFailedRead();
+    await wrapper.find(FAILED).trigger("click");
     await flushPromises();
 
     const retried = vi.mocked(alertsService.getHistory).mock.calls.at(-1)?.[1];
@@ -132,17 +133,27 @@ describe("AlertHistory sort failure", () => {
     expect(retried.end_time).toBe(String(failedRange.endTime));
   });
 
-  it("draws the failed read with the shared failed pill: full sentence and Retry", async () => {
+  it("puts the failed read's times on the header's inline refresh button, and takes them off once a read lands", async () => {
     await mountHistory();
+    const button = () => wrapper.findComponent({ name: "ORefreshButton" });
+    expect(button().props("layout")).toBe("inline");
+    expect(button().props("dataTest")).toBe("alert-history-refresh-btn");
+    expect(button().props("failedAt")).toBeFalsy();
+
     failSortOnce();
     await wrapper.vm.onSortChange({ column: "alert_name", order: "asc" });
     await flushPromises();
-    const pill = wrapper.findComponent({ name: "OFailedPill" });
-    expect(pill.exists()).toBe(true);
-    expect(pill.props("marker")).toBeUndefined();
-    expect(pill.props("retry")).toBe(true);
-    expect(pill.props("dataTest")).toBe("alert-history-refresh-failed");
-    expect(pill.props("sentence")).toMatch(/^Refresh failed at .+ · showing data from .+$/);
+    expect(button().props("failedAt")).toBe(wrapper.vm.refreshFailure.failedAt);
+    expect(button().props("failedAt")).toEqual(expect.any(Number));
+    expect(button().props("dataFrom")).toBe(wrapper.vm.refreshFailure.dataFrom);
+    expect(button().props("dataFrom")).toEqual(expect.any(Number));
+    expect(wrapper.find('[data-test="alert-history-refresh-failed"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-pagination-status-note"]').exists()).toBe(false);
+
+    await wrapper.find(FAILED).trigger("click");
+    await flushPromises();
+    expect(button().props("failedAt")).toBeFalsy();
+    expect(wrapper.find(FAILED).exists()).toBe(false);
   });
 
   it("puts the sort indicator back on the sort the kept rows were read with", async () => {
@@ -175,19 +186,19 @@ describe("AlertHistory sort failure", () => {
     await mountHistory();
     expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Can't sort by that column");
-    expect(wrapper.find(NOTICE).exists()).toBe(false);
+    expect(wrapper.find(FAILED).exists()).toBe(false);
     const range = wrapper.find('[data-test="o2-table-pagination-info"]');
     expect(range.classes()).toContain("invisible");
     expect(range.attributes("aria-hidden")).toBe("true");
   });
 
-  it("retries the failed sort from the notice and hands focus to the page's refresh button", async () => {
+  it("retries the failed sort from the refresh button, which keeps focus", async () => {
     await mountHistory();
     failSortOnce();
     await wrapper.vm.onSortChange({ column: "alert_name", order: "asc" });
     await flushPromises();
     const calls = vi.mocked(alertsService.getHistory).mock.calls.length;
-    const retry = wrapper.find('[data-test="alert-history-refresh-failed-retry"]');
+    const retry = wrapper.find(FAILED);
     (retry.element as HTMLElement).focus();
 
     await retry.trigger("click");
@@ -198,32 +209,12 @@ describe("AlertHistory sort failure", () => {
       sort_by: "alert_name",
       sort_order: "asc",
     });
-    expect(wrapper.find(NOTICE).exists()).toBe(false);
+    expect(wrapper.find(FAILED).exists()).toBe(false);
     expect(wrapper.find('[data-test="o2-table-body"]').classes()).not.toContain("opacity-60");
-    expect(document.activeElement).toBe(
-      wrapper.find('[data-test="alert-history-refresh-btn"]').element,
-    );
+    expect(document.activeElement).toBe(wrapper.find(REFRESH).element);
     expect(
       document.querySelectorAll('[data-test="region-announcer-alert"] [role="alert"]'),
     ).toHaveLength(0);
-  });
-
-  it("reserves the notice's footer slot before any failure, so it appearing moves nothing", async () => {
-    await mountHistory();
-    const note = wrapper.find('[data-test="o2-table-pagination-status-note"]');
-    expect(note.exists()).toBe(true);
-    expect(note.find(".min-w-\\[12rem\\]").exists()).toBe(true);
-    const bar = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
-    const shape = () =>
-      ["o2-table-pagination-info", "o2-table-page-size-label", "o2-table-next-page-btn"].map((id) =>
-        bar().find(`[data-test="${id}"]`).attributes("class"),
-      );
-    const before = shape();
-    failSortOnce();
-    await wrapper.vm.onSortChange({ column: "alert_name", order: "asc" });
-    await flushPromises();
-    expect(wrapper.find(NOTICE).exists()).toBe(true);
-    expect(shape()).toEqual(before);
   });
 
   it("withdraws the failure's alert when the page is left", async () => {
@@ -294,12 +285,13 @@ describe("AlertHistory failed page read", () => {
     vi.mocked(alertsService.getHistory).mockRejectedValueOnce({
       response: { status: 503, data: { message: "History is unavailable" } },
     });
+  const FAILED = '[data-test="alert-history-refresh-btn"][data-state="failed"]';
   const range = () =>
     wrapper.find('[data-test="o2-table-pagination-info"]').text().replace(/\s+/g, " ");
   // The read Retry made, not the next-page prefetch that follows it.
   const retry = async () => {
     const before = vi.mocked(alertsService.getHistory).mock.calls.length;
-    await wrapper.find('[data-test="alert-history-refresh-failed-retry"]').trigger("click");
+    await wrapper.find(FAILED).trigger("click");
     await flushPromises();
     return vi.mocked(alertsService.getHistory).mock.calls[before]?.[1] as any;
   };
@@ -316,7 +308,7 @@ describe("AlertHistory failed page read", () => {
     await wrapper.vm.onPaginationChange({ page: 3, size: 20 });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="alert-history-refresh-failed"]').exists()).toBe(true);
+    expect(wrapper.find(FAILED).exists()).toBe(true);
     expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-1");
     expect(wrapper.vm.currentPage).toBe(1);
     expect(range()).toBe("Showing 1 - 20 of 60");
@@ -370,7 +362,7 @@ describe("AlertHistory failed page read", () => {
     await wrapper.vm.refreshData();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="alert-history-refresh-failed"]').exists()).toBe(true);
+    expect(wrapper.find(FAILED).exists()).toBe(true);
     expect(item()).not.toBeNull();
     expect(item()!.getAttribute("aria-disabled")).toBeNull();
     expect(item()!.hasAttribute("data-disabled")).toBe(false);

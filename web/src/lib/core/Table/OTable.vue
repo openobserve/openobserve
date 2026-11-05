@@ -33,7 +33,6 @@ import {
   OTableCellActionsKey,
   OTableOverflowTooltipKey,
   OTableStaleKey,
-  OTableRowMessageKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
   type OTableProps,
@@ -295,15 +294,6 @@ onBeforeUnmount(() => {
 });
 
 provide(OTableStaleKey, readonly(staleDimmed));
-
-const rowKeyOf = (row: TData): string =>
-  typeof props.rowKey === "function"
-    ? props.rowKey(row)
-    : String((row as Record<string, unknown>)?.[props.rowKey ?? "id"]);
-provide(OTableRowMessageKey, {
-  messageFor: (row) => (props.rowMessages ? props.rowMessages[rowKeyOf(row)] : undefined),
-  dismiss: (row) => emit("row-message-dismiss", rowKeyOf(row)),
-});
 
 // The consumer's row menu acts on the row it opened on, so a slow refetch closes it.
 const rowContextMenu = injectContextMenuRootContext(null);
@@ -2077,7 +2067,6 @@ defineExpose({
         :stale="staleDimmed"
         :selected-count="selection.selectedCount.value"
         :bordered="props.paginationBordered"
-        :keep-page-size-label="props.keepPageSizeLabel"
         :range-hidden="showError"
         @update:page-size="pagination.setPageSize"
         @first-page="pagination.firstPage"
@@ -2090,9 +2079,6 @@ defineExpose({
         </template>
         <template v-if="slots['footer-note']" #footer-note>
           <slot name="footer-note" />
-        </template>
-        <template v-if="slots['status-note']" #status-note>
-          <slot name="status-note" />
         </template>
       </OTablePagination>
     </div>

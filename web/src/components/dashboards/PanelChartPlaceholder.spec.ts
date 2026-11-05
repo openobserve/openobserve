@@ -26,29 +26,18 @@ describe("PanelChartPlaceholder", () => {
     expect(root.classes()).toEqual(expect.arrayContaining(["h-full", "w-full"]));
   });
 
-  it("is one static block: no shimmer, no pulse, no axes, and no second live region", () => {
+  it("is a blank box: no skeleton, shimmer, axes or second live region", () => {
     const wrapper = mount(PanelChartPlaceholder);
-    const blocks = wrapper.findAll(".bg-skeleton-base");
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0].classes()).not.toContain("animate-pulse");
-    expect(blocks[0].classes()).not.toContain("skeleton-wave");
-    expect(blocks[0].attributes("aria-hidden")).toBe("true");
-    expect(wrapper.find("svg, canvas").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OSkeleton" }).exists()).toBe(false);
+    expect(wrapper.find(".bg-skeleton-base").exists()).toBe(false);
+    expect(wrapper.find('[data-test="chart-placeholder"]').element.childElementCount).toBe(0);
   });
 
-  it("announces nothing under a failure message, which says it instead, and keeps its look (K2)", () => {
-    const wrapper = mount(PanelChartPlaceholder, { props: { dataTest: "tile", failed: true } });
-    const root = wrapper.find('[data-test="tile"]');
-    expect(root.attributes("role")).toBeUndefined();
-    expect(root.attributes("aria-label")).toBeUndefined();
-    expect(root.attributes("aria-hidden")).toBe("true");
-    expect(wrapper.findAll(".bg-skeleton-base")).toHaveLength(1);
-    expect(root.classes()).toEqual(expect.arrayContaining(["h-full", "w-full"]));
-  });
-
-  it("is a loading image unless told it failed", () => {
-    const root = mount(PanelChartPlaceholder).find('[data-test="chart-placeholder"]');
-    expect(root.attributes("aria-hidden")).toBeUndefined();
+  it("stays a loading image with no way to be told it failed", () => {
+    const wrapper = mount(PanelChartPlaceholder, { props: { failed: true } as any });
+    const root = wrapper.find('[data-test="chart-placeholder"]');
+    expect(root.attributes("role")).toBe("img");
     expect(root.attributes("aria-label")).toBe("Loading chart");
+    expect(root.attributes("aria-hidden")).toBeUndefined();
   });
 });

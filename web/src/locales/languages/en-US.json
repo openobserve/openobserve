@@ -11213,17 +11213,8 @@
       "leftFilter": "No longer matches filter",
       "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
       "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
-      "forbiddenCause": "you need edit permission in the {folder} folder",
-      "noResponseCause": "the server didn't respond",
-      "pauseNoResponse": "Couldn't pause: the server didn't respond. Try again.",
-      "pauseFailed": "Couldn't pause: {reason}.",
-      "resumeNoResponse": "Couldn't resume: the server didn't respond. Try again.",
-      "resumeFailed": "Couldn't resume: {reason}.",
       "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
-      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed",
-      "bulkFailedShort": "{failed} failed",
-      "details": "Details",
-      "detailsItem": "{name}: {reason}"
+      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed"
     },
     "moreActions": "More actions",
     "promRuleMode": "Rule mode",
@@ -16076,7 +16067,6 @@
     "openFields": "Open Fields",
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
     "fetchingTraces": "Loading Traces...",
-    "loadingChart": "Loading chart",
     "noStream": {
       "title": "Pick a stream to start exploring",
       "description": "Choose a trace stream, then press <strong>Run query</strong>. You can filter by service, duration, span status, and more once results load.",

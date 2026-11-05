@@ -156,7 +156,6 @@ const mountView = (
             "forecast",
             "retryToken",
             "announces",
-            "pageRetries",
           ],
           template: "<div data-test='breakdown-stub' />",
         },
@@ -227,7 +226,6 @@ describe("MetricDetailView", () => {
         loading: true,
         loadingProgressPercentage: 0,
         indeterminate: false,
-        accent: false,
       });
 
       first(SERIES);
@@ -1630,18 +1628,6 @@ describe("MetricDetailView", () => {
         failed: true,
         failure: null,
       });
-    });
-
-    it("tells the breakdown when the page's own Retry covers its charts, so it offers none (N5)", async () => {
-      let fail!: (error: any) => void;
-      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
-      wrapper = mountView({ seed });
-      const breakdown = () => wrapper.findComponent({ name: "MetricBreakdown" });
-      expect(breakdown().props("pageRetries")).toBe(false);
-      fail({ response: { status: 403, data: { message: "Forbidden" } } });
-      await flushPromises();
-      expect(wrapper.find('[data-test="metrics-detail-refresh-failed-retry"]').exists()).toBe(true);
-      expect(breakdown().props("pageRetries")).toBe(true);
     });
 
     it("alerts the page's failed-refresh sentence once per failed run, not once per chart", async () => {

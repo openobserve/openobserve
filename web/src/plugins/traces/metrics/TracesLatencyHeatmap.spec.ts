@@ -196,7 +196,6 @@ describe("TracesLatencyHeatmap", () => {
         loading: true,
         loadingProgressPercentage: 0,
         indeterminate: false,
-        accent: false,
       });
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
 
@@ -310,8 +309,10 @@ describe("TracesLatencyHeatmap", () => {
       const cover = () => wrapper!.find('[data-test="traces-latency-heatmap-first-frame"]');
       expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
       expect(cover().exists()).toBe(true);
-      expect(cover().find('[role="img"]').attributes("aria-label")).toBe("Loading chart");
-      expect(cover().classes()).toEqual(expect.arrayContaining(["absolute", "inset-0", "p-1"]));
+      expect(cover().attributes("role")).toBe("img");
+      expect(cover().attributes("aria-label")).toBe("Loading chart");
+      expect(cover().classes()).toEqual(expect.arrayContaining(["absolute", "inset-0"]));
+      expect(cover().element.childElementCount).toBe(0);
 
       wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
       await settle();
@@ -332,12 +333,14 @@ describe("TracesLatencyHeatmap", () => {
       expect(wrapper.find('[data-test="traces-latency-heatmap-first-frame"]').exists()).toBe(true);
     });
 
-    it("draws a static Loading chart block, not a spinner, before its first grid", async () => {
+    it("draws a blank Loading chart box, not a spinner or skeleton, before its first grid", async () => {
       search.mockReturnValue(new Promise(() => {}) as any);
       wrapper = await mountHeatmap();
       const loading = wrapper.find('[data-test="traces-latency-heatmap-loading"]');
-      expect(loading.find('[role="img"]').attributes("aria-label")).toBe("Loading chart");
+      expect(loading.attributes("role")).toBe("img");
+      expect(loading.attributes("aria-label")).toBe("Loading chart");
       expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OSkeleton" }).exists()).toBe(false);
     });
 
     it("renders the empty state component for no hits", async () => {

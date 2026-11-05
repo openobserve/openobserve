@@ -84,23 +84,6 @@ export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
 /** True while kept rows are dimmed during a refetch; controls that act on those rows read it to disable themselves. */
 export const OTableStaleKey: InjectionKey<Readonly<Ref<boolean>>> = Symbol("OTableStale");
 
-// ─── Row message context ─────────────────────────────────────────
-/** A message drawn over a row's middle cells, such as a failed row action. */
-export interface OTableRowMessage {
-  text: I18nText;
-  /** Test id of the message; its Dismiss button gets the same id with `-dismiss`. */
-  dataTest?: string;
-}
-
-/** Lets a body row find its own message and dismiss it. */
-export interface OTableRowMessageContext {
-  messageFor: (row: any) => OTableRowMessage | undefined;
-  dismiss: (row: any) => void;
-}
-
-export const OTableRowMessageKey: InjectionKey<OTableRowMessageContext> =
-  Symbol("OTableRowMessage");
-
 // ─── Cut-off cell tooltip context ────────────────────────────────
 /** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
 export interface OTableOverflowTooltipContext {
@@ -499,8 +482,6 @@ export interface OTableProps<TData = any> {
   loadingResetKey?: unknown;
   /** Draw the table's own progress line under the header while loading; turn off when the page draws one line for the whole region (default: true). */
   progressLine?: boolean;
-  /** Messages keyed by row key, each drawn over that row's middle cells with a Dismiss button; the first data column and the actions stay visible. */
-  rowMessages?: Record<string, OTableRowMessage>;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
@@ -528,7 +509,6 @@ export interface OTableProps<TData = any> {
   toolbarBordered?: boolean;
   /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
   paginationBordered?: boolean;
-  keepPageSizeLabel?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -645,8 +625,6 @@ export interface OTableEmits<TData = any> {
   "row-auxclick": [row: TData, event: MouseEvent];
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
-  /** Dismiss pressed on a row message; carries that row's key. */
-  "row-message-dismiss": [key: string];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
   /** Right-click on a body cell. Not prevented — the consumer decides whether
    *  to open its own menu. */
@@ -736,8 +714,6 @@ export interface OTableSlots<TData = any> {
   "selection-actions"?: () => any;
   /** Footer start-side line for what the pager cannot say (a cap, partial data), yielding to the selection count; like `#selection-actions`, it needs the built-in bar. */
   "footer-note"?: () => any;
-  /** Status line that never takes a footer line of its own (a bulk failure): after the bulk actions while rows are selected, else at the start of the pager's line. */
-  "status-note"?: () => any;
   "loading-banner"?: () => any;
   /** Custom loading indicator (overlay when no data) */
   loading?: () => any;

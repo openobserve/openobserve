@@ -91,6 +91,7 @@ import AlertService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { setMutationNotifier } from "@/composables/query/queryClient";
 import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
@@ -497,14 +498,6 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
-  it("keeps the footer's Records per page label beside the bulk-failure note, so the range never moves", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    const table = wrapper.findComponent({ name: "OTable" });
-    expect(table.exists()).toBe(true);
-    expect(table.props("keepPageSizeLabel")).toBe(true);
-  });
-
   it("titles itself with the SECTION, so the peer tabs never move", async () => {
     // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
     // is NOT "Alerts": a per-page title sizes the title block and shifts the
@@ -1360,74 +1353,6 @@ describe("AlertList - row actions keep the view", () => {
     },
   );
 
-  it.each([
-    ["with a selection", ["alert-6", "alert-7", "alert-8"]],
-    ["without a selection", []],
-  ])(
-    "reserves the summary's slot, so nothing on the footer changes when it appears, %s",
-    async (_case, selection) => {
-      const wrapper = await mountOnPageTwo();
-      wrapper.vm.selectedAlertIds = selection;
-      await flushPromises();
-      const bar = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
-      const slot = bar().find('[data-test="alert-list-bulk-error-slot"]');
-      expect(slot.exists()).toBe(true);
-      expect(slot.classes()).toEqual(expect.arrayContaining(["min-w-[7.5rem]", "flex-1"]));
-      expect(slot.attributes("aria-hidden")).toBe("true");
-      const shape = () => ({
-        yields: bar().attributes("data-label-yield"),
-        selection: bar().find('[data-test="o2-table-pagination-selection"]').exists(),
-        classes: [
-          "o2-table-pagination-info",
-          "o2-table-pagination-divider",
-          "o2-table-page-size-label",
-          "o2-table-page-size",
-          "o2-table-next-page-btn",
-        ].map((id) => bar().find(`[data-test="${id}"]`).attributes("class")),
-      });
-      const empty = shape();
-      expect(empty.selection).toBe(selection.length > 0);
-
-      wrapper.vm.bulkActionFailure = {
-        action: "pause",
-        total: 3,
-        names: ["Alert 7", "Alert 8"],
-        ids: ["alert-7", "alert-8"],
-        cause: null,
-      };
-      await flushPromises();
-
-      const line = bar().find('[data-test="alert-list-bulk-error"]');
-      expect(line.exists()).toBe(true);
-      expect(line.classes()).toEqual(expect.arrayContaining(["min-w-[7.5rem]", "flex-1"]));
-      expect(bar().find('[data-test="alert-list-bulk-error-slot"]').exists()).toBe(false);
-      expect(shape()).toEqual(empty);
-    },
-  );
-
-  it("keeps the red error icon at every step of the bulk summary", async () => {
-    const wrapper = await mountOnPageTwo();
-    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
-    await flushPromises();
-    alertsSvc.bulkToggleState.mockResolvedValueOnce({
-      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: null },
-    });
-    await wrapper.vm.bulkToggleAlerts("pause");
-    await flushPromises();
-    const line = wrapper.find('[data-test="alert-list-bulk-error"]');
-    const pill = line.find(".bg-status-error-bg");
-    expect(pill.classes()).toContain("text-status-error-text");
-    const icon = line
-      .findAllComponents({ name: "OIcon" })
-      .find((c) => c.props("name") === "error-outline");
-    expect(icon).toBeDefined();
-    expect(icon!.classes().filter((c) => c.includes("hidden"))).toEqual([]);
-    const order = Array.from(pill.element.children);
-    expect(order.indexOf(icon!.element as Element)).toBeLessThan(
-      order.indexOf(line.find('[data-test="alert-list-bulk-error-short"]').element),
-    );
-  });
-
   it("drops the off-filter row and its tag on the next filter change", async () => {
     const wrapper = await mountOnPageTwo();
     await toggleBtn(wrapper, "Alert 6").trigger("click");
@@ -1468,83 +1393,57 @@ describe("AlertList - row actions keep the view", () => {
     expect(tag().exists()).toBe(false);
   });
 
-  it("clears a row's failed pause once a bulk pause of that row succeeds", async () => {
+  it("leaves a forbidden pause unflipped, with no row message and no toast from the page", async () => {
     const wrapper = await mountOnPageTwo(null);
-    const rowError = () => wrapper.find('[data-test="alert-list-Alert 6-row-error"]');
-    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
-      response: { status: 503, data: { message: "Temporarily unavailable" } },
-    });
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(rowError().exists()).toBe(true);
+    const central = vi.fn();
+    setMutationNotifier(central);
+    try {
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
 
-    wrapper.vm.selectedAlertIds = ["alert-6"];
-    await flushPromises();
-    alertsSvc.bulkToggleState.mockResolvedValueOnce({
-      data: { successful: ["alert-6"], unsuccessful: [], err: null },
-    });
-    await wrapper.vm.bulkToggleAlerts("pause");
-    await flushPromises();
-    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
-    expect(rowError().exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't pause");
+      expect(wrapper.vm.rowActionErrors).toBeUndefined();
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+      expect(toggleBtn(wrapper, "Alert 6").exists()).toBe(true);
+      expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
+      expect(errorToasts()).toHaveLength(0);
+      // The shared http interceptor owns 403s, so the central toast stays out of it too.
+      expect(central).not.toHaveBeenCalled();
+    } finally {
+      setMutationNotifier(() => {});
+    }
   });
 
-  it("shows a forbidden pause in the row, red and announced, without flipping it or toasting", async () => {
+  it("sends a failed pause to the central mutation toast with its reason, and nothing to the row", async () => {
     const wrapper = await mountOnPageTwo(null);
-    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+    const central = vi.fn();
+    setMutationNotifier(central);
+    try {
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
+        response: { status: 409, data: { message: "Alert is being edited" } },
+      });
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
+      expect(central).toHaveBeenCalledTimes(1);
+      expect(central).toHaveBeenLastCalledWith("error", "Alert is being edited");
+      expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
 
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-
-    const message = wrapper.find('[data-test="alert-list-Alert 6-row-error"]');
-    expect(message.exists()).toBe(true);
-    expect(message.attributes("role")).toBe("alert");
-    expect(message.text()).toContain(
-      "Couldn't pause: you need edit permission in the Default folder.",
-    );
-    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
-    expect(toggleBtn(wrapper, "Alert 6").exists()).toBe(true);
-    expect(errorToasts()).toHaveLength(0);
-
-    await wrapper.find('[data-test="alert-list-Alert 6-row-error-dismiss"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce(new Error("Network Error"));
+      await toggleBtn(wrapper, "Alert 7").trigger("click");
+      await flushPromises();
+      expect(central).toHaveBeenCalledTimes(2);
+      expect(central).toHaveBeenLastCalledWith("error", "Network Error");
+      expect(wrapper.find('[data-test="alert-list-Alert 7-row-error"]').exists()).toBe(false);
+      expect(errorToasts()).toHaveLength(0);
+    } finally {
+      setMutationNotifier(() => {});
+    }
   });
 
-  it("names the server's reason for another 4xx, and the lost connection when nothing answered", async () => {
-    const wrapper = await mountOnPageTwo(null);
-    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
-      response: { status: 409, data: { message: "Alert is being edited" } },
-    });
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').text()).toContain(
-      "Couldn't pause: alert is being edited.",
-    );
-
-    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce(new Error("Network Error"));
-    await toggleBtn(wrapper, "Alert 7").trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-Alert 7-row-error"]').text()).toContain(
-      "Couldn't pause: the server didn't respond. Try again.",
-    );
-    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(true);
-  });
-
-  it("clears a row's failure when its retry starts", async () => {
-    const wrapper = await mountOnPageTwo(null);
-    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(true);
-
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
-    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
-  });
-
-  it("sums up a partly failed bulk pause in one line with the names under Details", async () => {
+  it("toasts a partly refused bulk pause and keeps only the failed rows selected", async () => {
     const wrapper = await mountOnPageTwo();
     wrapper.vm.selectedAlertIds = ["alert-6", "alert-7", "alert-8"];
     await flushPromises();
@@ -1555,39 +1454,80 @@ describe("AlertList - row actions keep the view", () => {
     await wrapper.vm.bulkToggleAlerts("pause");
     await flushPromises();
 
-    const line = wrapper.find('[data-test="alert-list-bulk-error"]');
-    expect(line.attributes("role")).toBe("alert");
-    expect(line.text()).toContain("2 of 3 alerts couldn't be paused");
-    expect(wrapper.findAll('[data-test="alert-list-bulk-error"]')).toHaveLength(1);
-    expect(wrapper.vm.bulkActionFailure.names).toEqual(["Alert 7", "Alert 8"]);
+    expect(errorToasts()).toEqual([
+      [{ variant: "error", message: "2 of 3 alerts couldn't be paused" }],
+    ]);
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
     expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
     expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 7").enabled).toBe(true);
     expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
     expect(pageIndex(wrapper)).toBe(1);
-    expect(errorToasts()).toHaveLength(0);
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-8"]);
-    const bar = wrapper.find('[data-test="o2-table-pagination-bottom"]');
-    expect(bar.find('[data-test="o2-table-selected-count"]').exists()).toBe(true);
-    const note = '[data-test="o2-table-pagination-status-note"]';
-    expect(bar.find(`${note} [data-test="alert-list-bulk-error"]`).exists()).toBe(true);
-    expect(line.find(".sr-only").text()).toBe("2 of 3 alerts couldn't be paused");
-    expect(line.find('[data-test="alert-list-bulk-error-short"]').text()).toBe("2 failed ·");
-    expect(line.find('[data-test="alert-list-bulk-error-details-short"]').text()).toBe("2 failed");
-    expect(line.classes()).toContain("min-w-[7.5rem]");
-    expect(line.find('[data-test="alert-list-bulk-error-text"]').attributes("aria-hidden")).toBe(
-      "true",
-    );
-
-    wrapper.vm.selectedAlertIds = [];
-    await flushPromises();
-    expect(wrapper.find('[data-test="o2-table-selected-count"]').exists()).toBe(false);
-    expect(wrapper.find(`${note} [data-test="alert-list-bulk-error"]`).exists()).toBe(true);
-
-    await wrapper.find('[data-test="alert-list-bulk-error-dismiss"]').trigger("click");
-    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-selected-count"]').exists()).toBe(true);
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 
-  it("counts every alert when the whole bulk request fails, with the reason for Details", async () => {
+  it("toasts a partly refused bulk resume and keeps only the failed rows selected", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [] },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7"] },
+    });
+
+    await wrapper.vm.bulkToggleAlerts("resume");
+    await flushPromises();
+
+    expect(errorToasts()).toEqual([
+      [{ variant: "error", message: "1 of 2 alerts couldn't be resumed" }],
+    ]);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+  });
+
+  it.each([
+    ["pause", "Error pausing alerts. Please try again."],
+    ["resume", "Error resuming alerts. Please try again."],
+  ] as const)(
+    "toasts the whole-request failure of a bulk %s and keeps every row selected",
+    async (action, message) => {
+      const wrapper = await mountOnPageTwo(null);
+      const ids = ["alert-6", "alert-7"];
+      wrapper.vm.selectedAlertIds = ids;
+      await flushPromises();
+      if (action === "resume") {
+        alertsSvc.bulkToggleState.mockResolvedValueOnce({
+          data: { successful: ids, unsuccessful: [] },
+        });
+        await wrapper.vm.bulkToggleAlerts("pause");
+        await flushPromises();
+        wrapper.vm.selectedAlertIds = ids;
+        await flushPromises();
+      }
+      const before = wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled;
+      alertsSvc.bulkToggleState.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "boom" } },
+      });
+
+      await wrapper.vm.bulkToggleAlerts(action);
+      await flushPromises();
+
+      expect(errorToasts()).toEqual([[{ variant: "error", message }]]);
+      expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(
+        before,
+      );
+      expect(wrapper.vm.selectedAlertIds).toEqual(ids);
+    },
+  );
+
+  it("raises no toast when the whole bulk request is forbidden, and keeps every row selected", async () => {
     const wrapper = await mountOnPageTwo(null);
     wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
     await flushPromises();
@@ -1596,17 +1536,13 @@ describe("AlertList - row actions keep the view", () => {
     await wrapper.vm.bulkToggleAlerts("pause");
     await flushPromises();
 
-    expect(wrapper.find('[data-test="alert-list-bulk-error"]').text()).toContain(
-      "2 of 2 alerts couldn't be paused",
-    );
-    expect(wrapper.vm.bulkActionFailure.cause).toBe(
-      "you need edit permission in the Default folder",
-    );
+    expect(errorToasts()).toHaveLength(0);
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
     expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6", "alert-7"]);
   });
 
-  it("shows no toast and no summary when the whole bulk pause lands", async () => {
+  it("shows no toast when the whole bulk pause lands", async () => {
     const wrapper = await mountOnPageTwo(null);
     wrapper.vm.selectedAlertIds = ["alert-6"];
     await flushPromises();
@@ -1615,7 +1551,7 @@ describe("AlertList - row actions keep the view", () => {
     });
     await wrapper.vm.bulkToggleAlerts("pause");
     await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+    expect(errorToasts()).toHaveLength(0);
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     expect(wrapper.vm.selectedAlertIds).toEqual([]);
   });
@@ -1681,50 +1617,6 @@ describe("AlertList - row actions keep the view", () => {
     expect(names(wrapper)).toEqual(expect.arrayContaining(["Alert 6", "Alert 7"]));
     expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-list-Alert 7-left-filter"]').exists()).toBe(true);
-  });
-
-  it("lists every refused alert with its reason under Details, opened toward the start and closed by Escape back to Details", async () => {
-    const wrapper = await mountOnPageTwo(null);
-    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
-    await flushPromises();
-    alertsSvc.bulkToggleState.mockResolvedValueOnce({
-      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: "Alert is being edited." },
-    });
-    await wrapper.vm.bulkToggleAlerts("pause");
-    await flushPromises();
-
-    const details = wrapper.find('[data-test="alert-list-bulk-error-details"]');
-    const footer = wrapper.find('[data-test="o2-table-pagination-bottom"]');
-    const rect = (top: number, left: number, width: number, height: number) =>
-      ({
-        top,
-        left,
-        width,
-        height,
-        right: left + width,
-        bottom: top + height,
-        x: left,
-        y: top,
-      }) as DOMRect;
-    vi.spyOn(details.element, "getBoundingClientRect").mockReturnValue(rect(700, 600, 50, 26));
-    vi.spyOn(footer.element, "getBoundingClientRect").mockReturnValue(rect(690, 0, 1000, 43));
-    (details.element as HTMLElement).focus();
-    await details.trigger("keydown", { key: "Enter" });
-    await details.trigger("click");
-    await flushPromises();
-
-    expect(wrapper.vm.bulkDetailsPlace).toEqual({ align: "end", offset: 14 });
-    const items = Array.from(
-      document.querySelectorAll('[data-test="alert-list-bulk-error-details-list"] li'),
-    ).map((li) => li.textContent?.trim());
-    expect(items).toEqual(["Alert 6: alert is being edited", "Alert 7: alert is being edited"]);
-
-    (document.activeElement ?? document.body).dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    await flushPromises();
-    expect(document.querySelector('[data-test="alert-list-bulk-error-details-list"]')).toBeNull();
-    expect(document.activeElement).toBe(details.element);
   });
 
   describe.each(["row toggle", "bulk pause"] as const)(

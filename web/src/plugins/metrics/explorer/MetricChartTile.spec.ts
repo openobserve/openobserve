@@ -245,7 +245,6 @@ describe("MetricChartTile", () => {
       loading: true,
       loadingProgressPercentage: 0,
       indeterminate: false,
-      accent: false,
     });
     expect(line().element.nextElementSibling?.getAttribute("data-test")).toBe("tile-loading");
     expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
@@ -345,7 +344,7 @@ describe("MetricChartTile", () => {
       expect(wrapper.find('[data-test="tile-retry"]').exists()).toBe(true);
     });
 
-    it("when the parent reports failures, a failed first load keeps the placeholder and reports the failure with its cause", async () => {
+    it("when the parent reports failures, a failed first load still shows its own error and Retry, and reports the cause", async () => {
       let fail!: (error: any) => void;
       runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
       wrapper = mountTile({ parentReportsFailures: true });
@@ -355,14 +354,16 @@ describe("MetricChartTile", () => {
       );
       fail(FORBIDDEN);
       await flushPromises();
-      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
-      // The parent's red line says it failed; the kept placeholder must not still say loading (K2).
-      const placeholder = wrapper.find('[data-test="tile-loading"]');
-      expect(placeholder.attributes("aria-label")).toBeUndefined();
-      expect(placeholder.attributes("role")).toBeUndefined();
-      expect(placeholder.attributes("aria-hidden")).toBe("true");
+      expect(wrapper.find('[data-test="tile-error"]').text()).toContain("Query failed");
+      expect(wrapper.find('[data-test="tile-loading"]').exists()).toBe(false);
       const failure = wrapper.emitted("failed")!.at(-1)![0] as any;
       expect(failure).toMatchObject({ cause: { status: 403 }, keptAt: null });
+
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.find('[data-test="tile-retry"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
     });
 
     it("when the parent reports failures, a failed refresh keeps the drawn chart and says when it was fetched", async () => {
@@ -372,6 +373,7 @@ describe("MetricChartTile", () => {
       await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
       await flushPromises();
       expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
       const failure = wrapper.emitted("failed")!.at(-1)![0] as any;
       expect(failure.keptAt).toEqual(expect.any(Number));
     });

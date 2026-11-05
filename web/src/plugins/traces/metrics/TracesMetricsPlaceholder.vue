@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import { useI18nTyped } from "@/types/i18n";
 import LatencyHeatmapColorToggle from "./LatencyHeatmapColorToggle.vue";
 import TracesRedPlaceholder from "./TracesRedPlaceholder.vue";
@@ -43,12 +43,7 @@ const { t } = useI18nTyped();
             <LatencyHeatmapColorToggle data-test="traces-metrics-placeholder-color-toggle" />
           </span>
         </PanelBar>
-        <OSkeleton
-          animation="none"
-          class="m-1 min-h-0 flex-1"
-          role="img"
-          :aria-label="t('traces.loadingChart')"
-        />
+        <PanelChartPlaceholder class="min-h-0 flex-1" />
       </div>
     </div>
   </div>

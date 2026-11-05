@@ -15,8 +15,7 @@
       ></div>
       <div
         v-else-if="!travelMode"
-        class="o2-motion-keep relative h-full overflow-hidden"
-        :class="accent ? 'bg-accent' : 'bg-brand-indigo'"
+        class="o2-motion-keep bg-brand-indigo relative h-full overflow-hidden"
         :style="{
           width: `${displayPercentage}%`,
           transition: shouldAnimate ? `width ${PROGRESS_STEP} ${PROGRESS_EASE}` : 'none',
@@ -39,8 +38,7 @@
         }"
       >
         <div
-          class="absolute top-0 left-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
-          :class="accent ? 'bg-accent ring-accent/50' : 'bg-brand-indigo ring-brand-indigo/50'"
+          class="bg-brand-indigo ring-brand-indigo/50 absolute top-0 left-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
         >
           <div
             v-if="!determinate"
@@ -89,11 +87,6 @@ export default defineComponent({
     },
     /** No countable progress: a segment travels the track, still moving (slower) under reduced motion. */
     indeterminate: {
-      type: Boolean,
-      default: false,
-    },
-    /** Theme-aware accent in place of the fixed indigo, which is about 1.9:1 on the dark track. */
-    accent: {
       type: Boolean,
       default: false,
     },

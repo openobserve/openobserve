@@ -1033,9 +1033,7 @@ describe("PanelSchemaRenderer", () => {
         expect(placeholder.exists()).toBe(true);
         expect(placeholder.attributes("role")).toBe("img");
         expect(placeholder.attributes("aria-label")).toBe("Loading chart");
-        const block = placeholder.find(".bg-skeleton-base");
-        expect(block.classes()).not.toContain("animate-pulse");
-        expect(block.classes()).not.toContain("skeleton-wave");
+        expect(placeholder.element.childElementCount).toBe(0);
       });
 
       const promqlPanel = () => ({

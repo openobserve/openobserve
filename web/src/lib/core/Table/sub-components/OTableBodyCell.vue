@@ -489,7 +489,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
             ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn || ($slots.overlay && !isPinned) ? 'relative' : '',
+      isTreeColumn ? 'relative' : '',
       enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
@@ -658,13 +658,6 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         </div>
       </div>
     </Teleport>
-    <div
-      v-if="$slots.overlay"
-      class="absolute inset-y-0 end-0 z-1 flex items-center pe-1"
-      data-test="o2-table-cell-overlay"
-    >
-      <slot name="overlay" />
-    </div>
   </td>
 </template>
 

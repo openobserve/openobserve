@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5 max-lg:hidden"
+        class="o2-search-input max-w-62.5 min-w-62.5 max-lg:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -67,17 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTooltip :content="t('common.search')" />
       </OButton>
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="refresh"
-        ref="refreshButton"
-        @click="refreshData"
-        data-test="alert-history-refresh-btn"
+      <ORefreshButton
+        layout="inline"
+        variant="outline"
+        class="shrink-0"
+        :last-run-at="shownAt"
+        :failed-at="refreshFailure?.failedAt"
+        :data-from="refreshFailure?.dataFrom"
         :loading="fetching"
-      >
-        <OTooltip :content="t('common.refresh')" />
-      </OButton>
+        data-test="alert-history-refresh-btn"
+        @click="onRefreshClick"
+      />
     </template>
     <div
       class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
@@ -141,17 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <!-- eslint-enable local/no-hardcoded-px -->
-          <template #status-note>
-            <div ref="failureSlot" class="@container flex min-w-[12rem] flex-1 items-center">
-              <ODataAge
-                v-if="refreshFailure"
-                :at="refreshFailure.dataFrom"
-                :failed-at="refreshFailure.failedAt"
-                data-test="alert-history-refresh-failed"
-                @retry="retryFailedRead"
-              />
-            </div>
-          </template>
           <template #empty>
             <div class="h-screen w-full">
               <NoData />
@@ -586,7 +575,7 @@ import {
   isAckEventRow,
 } from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
 import { formatRefreshFailed } from "@/utils/formatters";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -647,8 +636,6 @@ let shownView: HistoryView | null = null;
 let withdrawFailure: (() => void) | null = null;
 // A read that settles after the page is left must not announce on the page the user went to.
 let unmounted = false;
-const failureSlot = ref<HTMLElement | null>(null);
-const refreshButton = ref<{ $el?: HTMLElement } | null>(null);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
@@ -962,12 +949,9 @@ const applyView = (view: HistoryView) => {
 
 const clearRefreshFailure = () => {
   if (!refreshFailure.value) return;
-  // Retry leaves with the notice, so focus goes to the page's refresh button rather than to the document.
-  const retryHadFocus = !!failureSlot.value?.contains(document.activeElement);
   refreshFailure.value = null;
   withdrawFailure?.();
   withdrawFailure = null;
-  if (retryHadFocus) void nextTick(() => refreshButton.value?.$el?.focus());
 };
 
 const keepRowsAfterFailure = (dataFrom: number, retry: FailedRead) => {
@@ -987,6 +971,8 @@ const retryFailedRead = () => {
   }
   fetchAlertHistory(true);
 };
+
+const onRefreshClick = () => (refreshFailure.value ? retryFailedRead() : refreshData());
 
 const updateDateTime = (value: any) => {
   dateTimeValues.value = {

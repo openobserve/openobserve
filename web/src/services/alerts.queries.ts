@@ -177,8 +177,8 @@ export const toggleAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
       alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
-    // The list shows a failure in the row itself.
-    meta: { silentError: true },
+    // No `silentError`: the list's toggle chain renders no failure of its own, so the central toast is the report.
+    meta: {},
   });
 
 /** Same write for an anomaly row, which Overview also renders from its own scope. */
@@ -186,7 +186,7 @@ export const toggleAnomalyAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
       alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
-    meta: { invalidates: [anomalyKeys.all(org)], silentError: true },
+    meta: { invalidates: [anomalyKeys.all(org)] },
   });
 
 /** An ack changes the list tile, the detail header and the groups tab, all under the alert scope. */

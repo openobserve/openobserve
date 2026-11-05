@@ -59,18 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="status === 'loading' || refetching"
         :loading-progress-percentage="0"
       />
-      <div
+      <PanelChartPlaceholder
         v-if="status === 'loading'"
-        class="h-full p-1"
         data-test="traces-latency-heatmap-loading"
-      >
-        <OSkeleton
-          animation="none"
-          class="h-full w-full"
-          role="img"
-          :aria-label="t('traces.loadingChart')"
-        />
-      </div>
+      />
       <div
         v-else-if="status === 'error' || status === 'unavailable'"
         class="text-status-error-text flex h-full items-center justify-center px-2 text-center text-sm"
@@ -189,18 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- The canvas is blank until its first frame, so the loading block stays over it until then. -->
-      <div
+      <PanelChartPlaceholder
         v-if="status === 'ready' && !chartPainted"
-        class="absolute inset-0 p-1"
+        class="absolute inset-0"
         data-test="traces-latency-heatmap-first-frame"
-      >
-        <OSkeleton
-          animation="none"
-          class="h-full w-full"
-          role="img"
-          :aria-label="t('traces.loadingChart')"
-        />
-      </div>
+      />
     </div>
   </div>
 </template>
@@ -214,7 +199,7 @@ import { useAiIcon } from "@/composables/useAiIcon";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

@@ -2,7 +2,7 @@
 
 <script setup lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useSlots, computed, onBeforeUnmount, onMounted, onUpdated, ref, watch } from "vue";
+import { useSlots, computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -37,7 +37,6 @@ const props = withDefaults(
     bordered?: boolean;
     /** No rows are on screen (the table shows its error state), so the range would describe rows nobody sees. */
     rangeHidden?: boolean;
-    keepPageSizeLabel?: boolean;
   }>(),
   {
     position: "bottom",
@@ -69,11 +68,6 @@ function swallowActivation(event: Event, inactive: boolean): void {
   event.stopPropagation();
 }
 
-// Read in render, not cached: slot presence is not reactive.
-function statusNoteShown(): boolean {
-  return !props.loading && !!slots["status-note"];
-}
-
 function requestPage(event: "first-page" | "prev-page" | "next-page" | "last-page"): void {
   if (pagingInactive.value) return;
   if (event === "first-page") emit("first-page");
@@ -81,57 +75,6 @@ function requestPage(event: "first-page" | "prev-page" | "next-page" | "last-pag
   else if (event === "next-page") emit("next-page");
   else emit("last-page");
 }
-
-const rootRef = ref<HTMLElement | null>(null);
-const statusNoteRef = ref<HTMLElement | null>(null);
-const labelYields = ref(false);
-
-// Measured, since whether the reserved note slot adds a line depends on every control's width; the label yields only when that ends the extra line.
-function fitPageSizeLabel(): void {
-  const root = rootRef.value;
-  const note = statusNoteRef.value;
-  let yields = false;
-  if (root && note && !props.keepPageSizeLabel) {
-    delete root.dataset.labelYield;
-    note.style.display = "none";
-    const withoutNote = root.offsetHeight;
-    note.style.display = "";
-    const withLabel = root.offsetHeight;
-    if (withLabel > withoutNote) {
-      root.dataset.labelYield = "";
-      yields = root.offsetHeight < withLabel;
-    }
-    if (!yields) delete root.dataset.labelYield;
-  }
-  labelYields.value = yields;
-}
-
-let footerResize: ResizeObserver | null = null;
-let fitFrame = 0;
-// A frame later, so the attribute toggles never resize an observed box inside the observer's own callback.
-const scheduleFit = (): void => {
-  cancelAnimationFrame(fitFrame);
-  fitFrame = requestAnimationFrame(fitPageSizeLabel);
-};
-// Only a footer with a status note is measured, so tables without one add no observer.
-watch(
-  statusNoteRef,
-  (note) => {
-    footerResize?.disconnect();
-    footerResize = null;
-    if (!note || typeof ResizeObserver === "undefined") return;
-    footerResize = new ResizeObserver(scheduleFit);
-    if (rootRef.value) footerResize.observe(rootRef.value);
-    footerResize.observe(note);
-  },
-  { flush: "post" },
-);
-onMounted(fitPageSizeLabel);
-onUpdated(fitPageSizeLabel);
-onBeforeUnmount(() => {
-  footerResize?.disconnect();
-  cancelAnimationFrame(fitFrame);
-});
 
 // Menus these wrappers open are portaled outside them, so an inactive wrapper closes them and blocks their items.
 const pageSizeRef = ref<HTMLElement | null>(null);
@@ -228,11 +171,9 @@ const selectionLabel = computed(() => {
 
 <template>
   <div
-    ref="rootRef"
     :data-test="`o2-table-pagination-${position}`"
-    :data-label-yield="labelYields ? '' : undefined"
     :class="[
-      'group/pager flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
+      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
       bordered ? 'border-border-default border-t' : '',
     ]"
   >
@@ -276,21 +217,9 @@ const selectionLabel = computed(() => {
       <slot name="footer-note" />
     </div>
 
-    <div
-      v-if="statusNoteShown()"
-      ref="statusNoteRef"
-      class="flex flex-[1_1_0] items-center text-xs"
-      data-test="o2-table-pagination-status-note"
-    >
-      <slot name="status-note" />
-    </div>
-
     <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
     <div
-      :class="[
-        'ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:gap-x-2',
-        statusNoteShown() ? '' : 'max-md:basis-full max-md:justify-between',
-      ]"
+      class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
     >
       <span
         v-if="loading"
@@ -314,7 +243,7 @@ const selectionLabel = computed(() => {
       </span>
       <div
         :class="[
-          'bg-border-default h-4 w-px shrink-0 group-data-[label-yield]/pager:hidden max-md:hidden',
+          'bg-border-default h-4 w-px shrink-0 max-md:hidden',
           rangeHidden ? 'invisible' : '',
         ]"
         v-if="pageSizeOptions.length > 0"
@@ -335,12 +264,7 @@ const selectionLabel = computed(() => {
         @click.capture="swallowActivation($event, pagingInactive)"
         @keydown.capture="swallowActivation($event, pagingInactive)"
       >
-        <!-- The select keeps this as its name, so a status note may take the label's room. -->
-        <span
-          class="whitespace-nowrap group-data-[label-yield]/pager:hidden max-md:hidden"
-          data-test="o2-table-page-size-label"
-          >{{ t("search.recordsPerPage") }}</span
-        >
+        <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"

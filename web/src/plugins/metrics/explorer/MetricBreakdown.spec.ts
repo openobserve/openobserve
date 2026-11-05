@@ -2066,7 +2066,7 @@ describe("MetricBreakdown", () => {
     });
     const tiles = (w: VueWrapper<any>) => w.findAllComponents({ name: "MetricChartTile" });
 
-    it("says couldn't load once with one Retry however many tiles failed, and the tiles keep their placeholders", async () => {
+    it("reports tiles lost on first load to the page with no line of its own, and hands the page's retry token straight to them", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
       const all = tiles(wrapper);
@@ -2074,21 +2074,15 @@ describe("MetricBreakdown", () => {
       for (const tile of all) tile.vm.$emit("failed", failure());
       await flushPromises();
 
-      const notices = wrapper.findAll('[data-test="metrics-breakdown-failed"]');
-      expect(notices).toHaveLength(1);
-      expect(notices[0].text()).toContain(
-        "Couldn't load: you don't have access to this data. Refresh to try again.",
-      );
-      expect(wrapper.findAll('[data-test="metrics-breakdown-failed-retry"]')).toHaveLength(1);
-      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
-      expect(wrapper.text()).not.toContain("Query failed");
+      expect(wrapper.findComponent({ name: "MetricsFailedLine" }).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't load");
+      expect(wrapper.text()).toContain("Each chart splits this metric by one label");
       expect(wrapper.emitted("failures")!.at(-1)).toEqual([
         { total: all.length, kept: null, lost: all.length },
       ]);
 
-      const before = all[0].props("retryToken");
-      await wrapper.find('[data-test="metrics-breakdown-failed-retry"]').trigger("click");
-      expect(tiles(wrapper).every((tile) => tile.props("retryToken") === before + 1)).toBe(true);
+      await wrapper.setProps({ retryToken: 7 });
+      expect(tiles(wrapper).every((tile) => tile.props("retryToken") === 7)).toBe(true);
     });
 
     it("leaves a failed refresh over kept charts to the page's one sentence, and says nothing here", async () => {
@@ -2121,26 +2115,20 @@ describe("MetricBreakdown", () => {
       return focusedTile;
     };
 
-    it("says a failed focused chart once, for the chart and its table, with no word or dash in any stat cell (N2)", async () => {
+    it("leaves a failed focused chart to the tile, with no line of its own and no word or dash in any stat cell (N2)", async () => {
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
       const focusedTile = await failFocused(wrapper);
       expect(focusedTile.props("parentReportsFailures")).toBe(true);
 
-      const notices = wrapper.findAll('[data-test="metrics-breakdown-focused-failed"]');
-      expect(notices).toHaveLength(1);
-      expect(notices[0].text()).toContain(
-        "Couldn't load: you don't have access to this data. Refresh to try again.",
-      );
-      expect(wrapper.findAll('[role="alert"]')).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "MetricsFailedLine" }).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't load");
       const table = wrapper.find('[data-test="metrics-breakdown-values"]');
       expect(table.findAllComponents({ name: "OValue" })).toHaveLength(0);
-      expect(table.text()).not.toContain("Couldn't load");
       expect(table.text()).not.toContain("—");
 
-      const before = focusedTile.props("retryToken");
-      await wrapper.find('[data-test="metrics-breakdown-focused-failed-retry"]').trigger("click");
-      expect(focusedTile.props("retryToken")).toBe(before + 1);
+      await wrapper.setProps({ retryToken: 7 });
+      expect(focusedTile.props("retryToken")).toBe(7);
     });
 
     it("reports a failed focused chart to the page, so it never says Updated over it (CS8)", async () => {
@@ -2159,7 +2147,7 @@ describe("MetricBreakdown", () => {
         },
       ]);
       // A kept chart's failure is the page's one sentence; nothing is said here.
-      expect(wrapper.find('[data-test="metrics-breakdown-focused-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     });
 
     it("reports the focused chart's loading as busy, so the page's range status waits for it (CS2)", async () => {
@@ -2172,31 +2160,6 @@ describe("MetricBreakdown", () => {
       focusedTile.vm.$emit("busy", false);
       await flushPromises();
       expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
-    });
-
-    it("offers no Retry of its own when the page's Retry already reloads these charts (N5)", async () => {
-      wrapper = mountBreakdown({ pageRetries: true });
-      await flushPromises();
-      for (const tile of tiles(wrapper)) tile.vm.$emit("failed", failure());
-      await flushPromises();
-      expect(wrapper.findAll('[data-test="metrics-breakdown-failed"]')).toHaveLength(1);
-      expect(wrapper.find('[data-test="metrics-breakdown-failed-retry"]').exists()).toBe(false);
-    });
-
-    it("keeps the refresh hint out of sight beside its Retry: short words, the cause in the tooltip (N5)", async () => {
-      wrapper = mountBreakdown();
-      await flushPromises();
-      for (const tile of tiles(wrapper)) tile.vm.$emit("failed", failure());
-      await flushPromises();
-      const line = wrapper.findComponent({ name: "MetricsFailedLine" });
-      const shown = line
-        .findAll('[aria-hidden="true"]')
-        .map((el) => el.text())
-        .filter(Boolean);
-      expect(shown).toEqual(["Couldn't load"]);
-      expect(line.findComponent({ name: "OTooltip" }).props("content")).toBe(
-        "Couldn't load: you don't have access to this data. Refresh to try again.",
-      );
     });
 
     it("adds no words of its own while the page announces a range change, but still reports busy", async () => {
@@ -2257,7 +2220,7 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-no-labels"]').exists()).toBe(true);
     });
 
-    it("draws no grid-wide line: each tile draws its own panel line and leaves its failure to the grid", async () => {
+    it("draws no grid-wide line: each tile draws its own panel line", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
       expect(wrapper.find('[data-test="metrics-detail-progress"]').exists()).toBe(false);
