@@ -183,8 +183,10 @@ fn is_on_histogram_origin_grid(origin: &Arc<dyn PhysicalExpr>, width_micros: i64
 fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
     let interval = expr.downcast_ref::<Literal>()?.value();
     match interval {
-        // a month has no fixed width, and the index can only count fixed-width buckets
-        ScalarValue::IntervalMonthDayNano(Some(interval)) if interval.months == 0 => {
+        // the index counts fixed widths in whole microseconds, and a month has no fixed width
+        ScalarValue::IntervalMonthDayNano(Some(interval))
+            if interval.months == 0 && interval.nanoseconds % 1_000 == 0 =>
+        {
             // convert interval to nanoseconds
             let microseconds =
                 interval.nanoseconds / 1_000 + interval.days as i64 * 24 * 60 * 60 * 1_000_000;
@@ -345,6 +347,21 @@ mod tests {
         table_provider::empty_table::NewEmptyTable,
         udf::time::histogram,
     };
+
+    #[test]
+    fn test_only_a_whole_microsecond_fixed_width_can_use_the_index() {
+        let width = |months, days, nanoseconds| -> Option<u64> {
+            let interval = arrow::datatypes::IntervalMonthDayNano::new(months, days, nanoseconds);
+            let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(
+                ScalarValue::IntervalMonthDayNano(Some(interval)),
+            ));
+            get_histogram_interval(&expr)
+        };
+        assert_eq!(width(0, 30, 0), Some(2_592_000_000_000));
+        assert_eq!(width(0, 0, 1_000_000_000), Some(1_000_000));
+        assert_eq!(width(1, 0, 0), None);
+        assert_eq!(width(0, 0, 1_000_000_001), None);
+    }
 
     #[test]
     fn test_only_an_origin_on_the_histogram_grid_can_use_the_index() {

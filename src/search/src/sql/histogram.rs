@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::ControlFlow;
+
 use config::{
     HISTOGRAM_BREAKDOWN_FIELDS,
     meta::stream::StreamType,
@@ -22,9 +24,11 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes};
-use regex::Regex;
 use sqlparser::{
-    ast::{SetExpr, Statement, VisitMut},
+    ast::{
+        Expr, FunctionArg, FunctionArgExpr, FunctionArguments, SetExpr, Statement, Value, VisitMut,
+        visit_expressions_mut,
+    },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -109,26 +113,46 @@ pub fn histogram_offset_micros(sql: &str, timezone: Option<&str>, end_time: i64)
 
 /// Replaces named zones by their offset at the request end, so partitions and deltas agree.
 pub fn pin_histogram_timezone(sql: &mut String, timezone: &mut Option<String>, end_time: i64) {
-    if let Some(tz) = histogram_timezone_arg(sql)
-        && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
+    let sql_zone = histogram_timezone_arg(sql);
+    if sql_zone.is_some_and(|tz| fixed_offset_of_named_zone(&tz, end_time).is_some())
+        && let Ok(mut statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql)
     {
-        // the literal after two commas of the call, not an equal string elsewhere in the SQL
-        let pattern = format!(
-            r#"(?is)(\bhistogram\s*\(.*?,.*?,\s*['"]){}(['"])"#,
-            regex::escape(&tz)
-        );
-        if let Ok(re) = Regex::new(&pattern) {
-            *sql = re
-                .replace_all(sql, |caps: &regex::Captures| {
-                    format!("{}{fixed}{}", &caps[1], &caps[2])
-                })
-                .into_owned();
+        // on the parsed SQL, so an equal string elsewhere in the query stays as it is
+        for statement in &mut statements {
+            let _ = visit_expressions_mut(statement, |expr| {
+                pin_named_zone_argument(expr, end_time);
+                ControlFlow::<()>::Continue(())
+            });
         }
+        *sql = statements
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
     }
     if let Some(tz) = timezone.as_deref()
         && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
     {
         *timezone = Some(fixed);
+    }
+}
+
+fn pin_named_zone_argument(expr: &mut Expr, end_time: i64) {
+    let Expr::Function(func) = expr else {
+        return;
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return;
+    }
+    let FunctionArguments::List(list) = &mut func.args else {
+        return;
+    };
+    if let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(literal)))) =
+        list.args.get_mut(2)
+        && let Some(tz) = literal.value.clone().into_string()
+        && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
+    {
+        literal.value = Value::SingleQuotedString(fixed);
     }
 }
 
@@ -397,6 +421,7 @@ mod tests {
             "SELECT histogram (_timestamp, '1 day', '+05:30') FROM t",
             "SELECT histogram((_timestamp), '1 day', '+05:30') FROM t",
             "SELECT HISTOGRAM ( (_timestamp) , '1 day' , '+05:30' ) FROM t",
+            "SELECT histogram/*bucket*/(_timestamp, '1 day', $$+05:30$$) FROM t",
         ] {
             assert_eq!(
                 histogram_timezone_arg(sql).as_deref(),
@@ -422,7 +447,14 @@ mod tests {
         pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
         assert_eq!(
             sql,
-            "SELECT histogram (_timestamp, '1 day', '+05:30') FROM t WHERE tz = 'Asia/Kolkata'"
+            "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t WHERE tz = 'Asia/Kolkata'"
+        );
+        let mut sql =
+            "SELECT histogram/*bucket*/(_timestamp, '1 day', $$Asia/Kolkata$$) FROM t".to_string();
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t"
         );
         let mut sql = "SELECT histogram((_timestamp), '1 day', 'Asia/Kolkata') FROM t".to_string();
         pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);

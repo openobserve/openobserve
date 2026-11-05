@@ -62,6 +62,8 @@ pub struct CacheQueryRequest {
     pub histogram_interval: i64,
     /// Offset east of UTC that hit labels carry, in microseconds.
     pub ts_offset: i64,
+    /// The row limit of the query; 0 or less means none.
+    pub limit: i64,
     pub is_descending: bool,
     /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
     /// When true, cache file timestamps must be calculated by scanning all hits,
@@ -222,6 +224,7 @@ mod tests {
             ts_column: "timestamp".to_string(),
             histogram_interval: 100,
             ts_offset: 0,
+            limit: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };

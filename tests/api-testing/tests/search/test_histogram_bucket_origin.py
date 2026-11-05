@@ -48,6 +48,11 @@ def _label(ts):
     return moment.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _micros(label):
+    moment = dt.datetime.strptime(label, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
+    return int(moment.timestamp()) * 1_000_000
+
+
 def _expected_rows(events, start, end, interval, offset=0):
     rows = {}
     for ts in events:
@@ -403,3 +408,24 @@ def test_other_valid_spellings_of_a_month_bucket_skip_the_cache(fixture, call):
             expected[label] = expected.get(label, 0) + 1
     fixture.search(sql, fixture.start, fixture.end, use_cache=True)
     assert _rows(fixture.search(sql, fixture.start, shorter_end, use_cache=True)) == expected
+
+
+@pytest.mark.parametrize("direction", ["ASC", "DESC"])
+def test_a_limit_with_a_non_time_order_recounts_a_narrower_range(uneven_fixture, direction):
+    data = uneven_fixture
+    sql = (
+        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
+        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt {direction}, ts {direction} LIMIT 3'
+    )
+    sign = 1 if direction == "ASC" else -1
+
+    def top_rows(end):
+        rows = _expected_rows(data.events, data.start, end, HOUR)
+        ranked = sorted(rows.items(), key=lambda row: (sign * row[1], sign * _micros(row[0])))
+        return dict(ranked[:3])
+
+    _warm_cache(data, sql, data.start, data.end, top_rows(data.end))
+    # 2 events of the newest bucket fall before this end, so it now ranks first for ASC.
+    shorter_end = data.end - HOUR + 150_000_000
+    assert _rows(data.search(sql, data.start, shorter_end)) == top_rows(shorter_end)
+    assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == top_rows(shorter_end)

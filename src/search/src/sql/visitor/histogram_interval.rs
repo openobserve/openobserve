@@ -16,7 +16,7 @@
 use std::ops::ControlFlow;
 
 use infra::errors::{Error, ErrorCodes};
-use sqlparser::ast::{Expr, FunctionArguments, VisitorMut};
+use sqlparser::ast::{Expr, FunctionArg, FunctionArgExpr, FunctionArguments, VisitorMut};
 
 #[derive(Debug)]
 pub struct HistogramIntervalVisitor {
@@ -73,16 +73,21 @@ impl VisitorMut for HistogramIntervalVisitor {
                             validate_and_adjust_histogram_interval(seconds, self.time_range)
                         });
                 // third is the timezone
-                self.timezone = args.next().map(|timezone| {
-                    timezone
-                        .to_string()
-                        .trim_matches(|v| v == '\'' || v == '"')
-                        .to_string()
-                });
+                self.timezone = args.next().and_then(string_literal);
             }
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
+    }
+}
+
+/// The decoded text of a string argument, in any quote style.
+fn string_literal(arg: &FunctionArg) -> Option<String> {
+    match arg {
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(value))) => {
+            value.value.clone().into_string()
+        }
+        _ => None,
     }
 }
 

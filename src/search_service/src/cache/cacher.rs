@@ -238,6 +238,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 ts_offset,
+                limit: sql.limit,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -325,6 +326,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 ts_offset,
+                limit: sql.limit,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -534,6 +536,14 @@ fn trim_cached_response(
     cache_req: &CacheQueryRequest,
 ) -> bool {
     let (q_start, q_end) = (cache_req.q_start_time, cache_req.q_end_time);
+    // the limit hid other buckets of this range, and a narrower range can rank them higher
+    if cache_req.is_histogram_non_ts_order
+        && cache_req.limit > 0
+        && response.hits.len() as i64 >= cache_req.limit
+        && (meta.start_time < q_start || meta.end_time > q_end)
+    {
+        return false;
+    }
     let (data_start, data_end) = cached_hits_time_range(response, cache_req);
     // convert histogram interval to microseconds
     let interval = response.histogram_interval.unwrap_or_default() * 1_000_000;
@@ -1451,6 +1461,7 @@ mod tests {
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
             ts_offset: 0,
+            limit: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1490,6 +1501,7 @@ mod tests {
             ts_column: "ts".to_string(),
             histogram_interval: DAY,
             ts_offset: 0,
+            limit: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         }
@@ -1594,6 +1606,37 @@ mod tests {
         assert!(trim_cached_response(&mut response, &mut meta, &req));
         assert_eq!(response.hits.len(), 2);
         assert_eq!(meta.end_time, d0 + 2 * DAY);
+    }
+
+    #[test]
+    fn test_trim_misses_a_narrower_request_when_a_limit_hid_buckets() {
+        let d0 = EDGE_30D;
+        let labels = [(d0, 100), (d0 + 2 * DAY, 90), (d0 + 4 * DAY, 80)];
+        let mut meta = agg_meta(d0, d0 + 5 * DAY);
+        let mut req = histogram_cache_req(d0, d0 + 4 * DAY + DAY / 2);
+        req.is_histogram_non_ts_order = true;
+        req.limit = 3;
+        let mut response = cached_buckets(86_400, &labels);
+        assert!(!trim_cached_response(&mut response, &mut meta, &req));
+
+        // a request that does not narrow the entry can still use it
+        req.q_end_time = d0 + 5 * DAY;
+        let mut response = cached_buckets(86_400, &labels);
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+
+        // no bucket is hidden while the rows stay under the limit
+        req.q_end_time = d0 + 4 * DAY + DAY / 2;
+        req.limit = 10;
+        let mut response = cached_buckets(86_400, &labels);
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 2);
+
+        // a time order keeps the existing trim, and a delta fills the rest
+        req.is_histogram_non_ts_order = false;
+        req.limit = 3;
+        let mut response = cached_buckets(86_400, &labels);
+        let mut meta = agg_meta(d0, d0 + 5 * DAY);
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
     }
 
     #[test]
