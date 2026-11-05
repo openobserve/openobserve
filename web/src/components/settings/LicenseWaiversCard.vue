@@ -21,8 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="license-waivers-card"
   >
     <OCardSection role="body">
-      <div class="text-xl font-semibold">{{ t("about.waivers_title") }}</div>
-      <div class="text-text-secondary mt-1 mb-3 text-sm">{{ t("about.waivers_from_key") }}</div>
+      <div class="text-xl font-semibold" data-test="license-waivers-title">
+        {{ t("about.waivers_title") }}
+      </div>
+      <div class="text-text-secondary mt-1 mb-3 text-sm" data-test="license-waivers-description">
+        {{ t("about.waivers_from_key") }}
+      </div>
       <OTable
         :data="rows"
         :columns="columns"
@@ -30,18 +34,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="none"
         sorting="none"
         :frame="false"
+        :default-columns="false"
+        :dense="false"
+        wrap
         :show-global-filter="false"
         table-id="license-waivers"
         data-test="license-waivers-table"
       >
         <template #cell-waiver="{ row }">
-          <span class="flex items-center gap-2" :data-test="`license-waiver-row-${row.id}`">
-            <span>{{ kindLabel(row) }}</span>
-            <OTag type="licenseWaiverStatus" :value="waiverStatus(row, nowUs)" />
-          </span>
+          <div :data-test="`license-waiver-row-${row.id}`">
+            <div
+              class="flex flex-wrap items-center gap-2"
+              :data-test="`license-waiver-heading-${row.id}`"
+            >
+              <span :data-test="`license-waiver-label-${row.id}`">{{
+                waiverKindLabel(row, t, locale)
+              }}</span>
+              <OTag
+                type="licenseWaiverStatus"
+                :value="waiverStatus(row, nowUs)"
+                :label="
+                  row.type === 'breach_days' && waiverStatus(row, nowUs) === 'ended'
+                    ? t('about.waiver_expired')
+                    : undefined
+                "
+                :data-test="`license-waiver-status-${row.id}`"
+              />
+            </div>
+            <div
+              v-if="waiverSummary(row, nowUs, locale, t)"
+              class="text-text-secondary mt-1 text-xs"
+              :data-test="`license-waiver-summary-${row.id}`"
+            >
+              {{ waiverSummary(row, nowUs, locale, t) }}
+            </div>
+          </div>
         </template>
-        <template #cell-window="{ row }">{{ windowLabel(row) }}</template>
+        <template #cell-window="{ row }">
+          <span :data-test="`license-waiver-window-${row.id}`">{{
+            waiverWindowLabel(row, nowUs, locale, t)
+          }}</span>
+        </template>
+        <template #cell-note="{ row }">
+          <span :data-test="`license-waiver-note-${row.id}`">{{ row.note }}</span>
+        </template>
       </OTable>
+      <div
+        v-if="!canUpdate"
+        class="text-text-secondary mt-3 text-sm"
+        data-test="license-waivers-ask-admin"
+      >
+        {{ t("about.waivers_ask_admin") }}
+      </div>
     </OCardSection>
   </OCard>
 </template>
@@ -55,15 +99,22 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
-  boundaryDelayMs,
-  formatUtc,
+  MAX_TIMEOUT_MS,
+  breachRetentionEndUs,
+  waiverSummary,
+  waiverKindLabel,
+  waiverWindowLabel,
   knownWaivers,
-  lastCoveredDayUs,
   waiverStatus,
   type LicenseWaiver,
 } from "@/utils/licenseWaivers";
 
-const props = defineProps<{ waivers: LicenseWaiver[] | undefined }>();
+const props = withDefaults(
+  defineProps<{ waivers: LicenseWaiver[] | undefined; canUpdate?: boolean }>(),
+  { canUpdate: true },
+);
+
+const emit = defineEmits<{ boundary: [atUs: number] }>();
 
 const { t, locale } = useI18nTyped();
 
@@ -72,20 +123,37 @@ const nowUs = ref(Date.now() * 1000);
 const rows = computed(() => knownWaivers(props.waivers));
 
 let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+let armedBoundary: number | undefined;
 
 const clearBoundaryTimer = () => {
   if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
   boundaryTimer = undefined;
+  armedBoundary = undefined;
+};
+
+// far boundaries re-arm in steps, so only a timer that reached its boundary reports it
+const onBoundaryTimer = () => {
+  const reached = armedBoundary;
+  armBoundaryTimer();
+  if (reached !== undefined && reached <= nowUs.value) emit("boundary", reached);
 };
 
 const armBoundaryTimer = () => {
   clearBoundaryTimer();
   nowUs.value = Date.now() * 1000;
   const upcoming = rows.value
-    .flatMap((w) => [w.starts_at, w.ends_at])
+    .flatMap((w) => [
+      w.starts_at,
+      w.ends_at,
+      ...(w.type === "breach_days" ? [breachRetentionEndUs(w)] : []),
+    ])
     .filter((b) => b > nowUs.value);
   if (!upcoming.length) return;
-  boundaryTimer = setTimeout(armBoundaryTimer, boundaryDelayMs(Math.min(...upcoming), nowUs.value));
+  armedBoundary = Math.min(...upcoming);
+  boundaryTimer = setTimeout(
+    onBoundaryTimer,
+    Math.min(Math.ceil((armedBoundary - nowUs.value) / 1000), MAX_TIMEOUT_MS),
+  );
 };
 
 watch(rows, armBoundaryTimer, { immediate: true });
@@ -93,7 +161,7 @@ watch(rows, armBoundaryTimer, { immediate: true });
 onBeforeUnmount(clearBoundaryTimer);
 
 const columns = computed<OTableColumnDef[]>(() => [
-  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 240 },
+  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 360 },
   { id: "window", header: t("about.waiver_col_window"), cell: " ", size: 220 },
   {
     id: "note",
@@ -102,20 +170,4 @@ const columns = computed<OTableColumnDef[]>(() => [
     meta: { autoWidth: true, fillRemaining: true },
   },
 ]);
-
-function kindLabel(w: LicenseWaiver): string {
-  if (w.type === "search_unblock") return t("about.waiver_kind_search_unblock");
-  if (w.limit?.typ === "Unlimited") return t("about.waiver_kind_ingestion_unlimited");
-  return t("about.waiver_kind_ingestion_limit", { limit: w.limit?.value ?? 0 });
-}
-
-function windowLabel(w: LicenseWaiver): string {
-  if (w.type === "search_unblock") {
-    return t("about.waiver_window_until", { end: formatUtc(w.ends_at, locale.value, true) });
-  }
-  return t("about.waiver_window_days", {
-    start: formatUtc(w.starts_at, locale.value, false),
-    end: formatUtc(lastCoveredDayUs(w), locale.value, false),
-  });
-}
 </script>

@@ -1,9 +1,12 @@
 import UIKit
 import OpenObserveRUM
+import OpenObserveLogs
 
 class MainViewController: UIViewController {
     // A URLSession built with the instrumented delegate → its requests are tracked as RUM resources.
     private let session = URLSession(configuration: .default, delegate: O2SessionDelegate(), delegateQueue: nil)
+    // Module-qualified because os.Logger shares the name.
+    private lazy var logger = OpenObserveLogs.Logger.create(with: .init(name: "o2-e2e"))
 
     private func fetch(_ url: String) {
         guard let u = URL(string: url) else { return }
@@ -41,6 +44,7 @@ class MainViewController: UIViewController {
         stack.addArrangedSubview(button("Go to Checkout", #selector(goToCheckout)))
         stack.addArrangedSubview(button("Fetch resource 200", #selector(fetch200)))
         stack.addArrangedSubview(button("Fetch resource 404", #selector(fetch404)))
+        stack.addArrangedSubview(button("Send logs", #selector(sendLogs)))
         stack.addArrangedSubview(button("Trigger native crash", #selector(triggerCrash)))
     }
 
@@ -50,6 +54,14 @@ class MainViewController: UIViewController {
 
     @objc func fetch200() { fetch("https://jsonplaceholder.typicode.com/todos/1") }
     @objc func fetch404() { fetch("https://jsonplaceholder.typicode.com/this-path-does-not-exist-404") }
+
+    // Several logs per tap so the SDK uploads a multi-event batch (#16229).
+    @objc func sendLogs() {
+        let burst: [String: Encodable] = ["log_burst": String(Int(Date().timeIntervalSince1970 * 1000))]
+        logger.info("O2 log burst info", attributes: burst)
+        logger.warn("O2 log burst warn", attributes: burst)
+        logger.error("O2 log burst error", attributes: burst)
+    }
 
     @objc func handledError() {
         RUMMonitor.shared().addError(
