@@ -328,7 +328,7 @@ function strokeOf(edge: EdgeProps) {
     stroke: edge.data.color,
     strokeWidth: edge.data.width + (selected ? 1.5 : 0),
     // An undirected edge is a quiet line, lit like the rest when its card or itself is hovered.
-    opacity: faded ? (hovered.value ? 0.08 : 0.2) : lit ? 1 : edge.data.directed ? 0.65 : 0.4,
+    opacity: faded ? (hovered.value ? 0.15 : 0.2) : lit ? 1 : edge.data.directed ? 0.65 : 0.4,
     filter: selected ? `drop-shadow(0 0 0.25rem ${edge.data.color})` : undefined,
     transition: "opacity 0.15s ease",
   };
@@ -492,10 +492,9 @@ function onKeydown(event: KeyboardEvent) {
               data.clickable
                 ? 'hover:border-border-strong cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:outline-none'
                 : '',
-              dimmed(id) ? 'opacity-30' : '',
+              dimmed(id) ? 'opacity-55' : '',
             ]"
             :style="CARD_SIZE"
-            :title="data.title"
             :role="data.clickable ? 'button' : undefined"
             :tabindex="data.clickable ? 0 : undefined"
             :aria-label="data.clickable ? openLabel(data) : undefined"
@@ -518,6 +517,7 @@ function onKeydown(event: KeyboardEvent) {
                 {{ summaryOf(data) }}
               </div>
             </div>
+            <OTooltip side="top" :content="raw(data.title)" />
             <Handle
               v-for="h in HANDLES"
               :id="h.id"
