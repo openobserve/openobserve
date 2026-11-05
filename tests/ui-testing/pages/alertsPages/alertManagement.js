@@ -11,6 +11,11 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
+
+const alertDetailUrl = (id) => new RegExp(`/api/v2/[^/]+/alerts/${id}(\\?|$)`);
+const isAlertCreate = (r) => r.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(r.url());
 
 export class AlertManagement {
     constructor(page, commonActions, locators) {
@@ -76,6 +81,37 @@ export class AlertManagement {
         await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
     }
 
+    rowLastOutcome(alertName) {
+        return this.page.locator(`[data-test="alert-list-${alertName}-last-outcome"]`);
+    }
+
+    async openAlertListAndSearch(search, org = getOrgIdentifier()) {
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=default`);
+        await this.searchAlert(search);
+    }
+
+    async expectRowsFiring(org, search, names) {
+        await expect(async () => {
+            await this.openAlertListAndSearch(search, org);
+            for (const name of names) {
+                await expect(this.rowLastOutcome(name)).toHaveText(/firing/i, { timeout: 5000 });
+            }
+        }).toPass({ timeout: 60000 });
+    }
+
+    /** Parks the alert's detail GET; returns { requested, release }. */
+    async holdAlertDetailLoad(alertId) {
+        return holdGet(this.page, alertDetailUrl(alertId));
+    }
+
+    waitForAlertDetailLoad(alertId) {
+        return this.page.waitForResponse(alertDetailUrl(alertId));
+    }
+
+    alertDetailUrl(alertId) {
+        return alertDetailUrl(alertId);
+    }
+
     /**
      * The dialog's Save button.
      *
@@ -93,6 +129,20 @@ export class AlertManagement {
 
     async submitCloneDialog() {
         await this.page.locator(this.locators.cloneSubmitButton).click();
+    }
+
+    /** Submits the clone dialog, expects the create to answer 200, and returns the body it sent. */
+    async saveCloneDialog() {
+        const saved = this.page.waitForResponse((r) => isAlertCreate(r.request()));
+        await this.submitCloneDialog();
+        const response = await saved;
+        expect(response.status(), await response.text()).toBe(200);
+        return response.request().postDataJSON();
+    }
+
+    // A late load's continuation runs after its response event, so let queued UI tasks land before reading the form.
+    async settlePendingUiTasks() {
+        await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))));
     }
 
     async cancelCloneDialog() {
