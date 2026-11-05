@@ -406,8 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-activity="{ row }">
                   <SessionActivitySparkline
                     :session-id="row.session_id"
-                    :start-time="row.start_time"
-                    :end-time="row.end_time"
+                    :start-time="row.start_time ?? row.rum_start_time"
+                    :end-time="row.end_time ?? row.rum_end_time"
                     :is-bounce="row.is_bounce"
                     :has-frustration-field="!!schemaMapping['action_frustration_type']"
                   />
@@ -609,8 +609,11 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
+// SDK telemetry rows carry no session_id and must not group into a phantom session.
+const SESSION_ROWS_FILTER = "session_id IS NOT NULL AND session_id <> ''";
+
 // Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
-const fieldListBaseFilter = "1 = 1";
+const fieldListBaseFilter = SESSION_ROWS_FILTER;
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -1036,7 +1039,7 @@ const getSessions = () => {
       "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
   }
 
-  let whereClause = "1 = 1";
+  let whereClause = SESSION_ROWS_FILTER;
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1112,6 +1115,8 @@ const getSessions = () => {
           // _rumdata-derived fallback (us → ms) for sessions with no replay recording;
           // getSessionTimeFromReplay overwrites it with the replay-authoritative value.
           time_spent: (hit.zo_sql_end_timestamp - hit.zo_sql_timestamp) / 1000,
+          rum_start_time: Math.floor(hit.zo_sql_timestamp / 1000),
+          rum_end_time: Math.ceil(hit.zo_sql_end_timestamp / 1000),
         };
       });
 
@@ -1504,7 +1509,7 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: isSessionLive(row.end_time, Date.now()),
+    is_active: isSessionLive(row.end_time ?? row.rum_end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),
@@ -1766,8 +1771,10 @@ const handleCellClick = (payload: any) => {
     name: "SessionViewer",
     params: { id: payload.row.session_id },
     query: {
-      start_time: payload.row.start_time * 1000,
-      end_time: payload.row.end_time * 1000,
+      // A session without a replay recording has only its _rumdata bounds.
+      start_time: (payload.row.start_time ?? payload.row.rum_start_time) * 1000,
+      end_time: (payload.row.end_time ?? payload.row.rum_end_time) * 1000,
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };

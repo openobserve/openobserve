@@ -65,6 +65,8 @@ export interface StatItem {
    * display (not a clickable filter) — e.g. a "Total" tile. Defaults to true.
    */
   selectable?: boolean;
+  /** Holds this tile's skeleton while its own value is still on its way, whatever the strip's `loading` says. */
+  loading?: boolean;
   /** data-test hook for the tile root. */
   dataTest?: string;
 }
