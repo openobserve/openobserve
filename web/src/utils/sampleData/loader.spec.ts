@@ -499,3 +499,27 @@ describe("loadSampleData ingest retries", () => {
     expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("loadSampleData while a removal is finishing", () => {
+  const stillRemoving = "Sample data is still being removed. Try again in a few minutes.";
+  beforeEach(() => vi.clearAllMocks());
+
+  it("explains a refused ingest into a stream that is being deleted", async () => {
+    mocks.sampleData.ingestLogs.mockRejectedValueOnce({
+      response: {
+        status: 500,
+        data: { code: 500, message: "stream [o2_demo_app] is being deleted" },
+      },
+    });
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(stillRemoving);
+    expect(mocks.sampleData.ingestLogs).toHaveBeenCalledTimes(2);
+  });
+
+  it("explains a 200 that skipped the stream", async () => {
+    const skipped = {
+      data: { code: 200, status: [{ name: "s", successful: 0, failed: 0 }], stream_skipped: true },
+    };
+    mocks.sampleData.ingestLogs.mockResolvedValueOnce(skipped);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(stillRemoving);
+  });
+});

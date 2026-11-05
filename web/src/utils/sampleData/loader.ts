@@ -143,7 +143,10 @@ const jsonOutcome = (res: any, sent: number): IngestOutcome => {
   if (!Array.isArray(status)) return { accepted: sent };
   return {
     accepted: status.reduce((n, s) => n + (Number(s.successful) || 0), 0),
-    error: status.find((s) => s.error)?.error ?? res.data.error,
+    error:
+      status.find((s) => s.error)?.error ??
+      res.data.error ??
+      (res.data.stream_skipped ? STILL_REMOVING : undefined),
   };
 };
 
@@ -160,6 +163,10 @@ const tracesOutcome = (res: any, sent: number): IngestOutcome => {
 const SIGNALS = ["app logs", "access logs", "metrics", "spans"] as const;
 
 const RETRY_DELAYS_MS = [1000, 3000];
+const STILL_REMOVING = "Sample data is still being removed. Try again in a few minutes.";
+// the text core/ingestion/mod.rs returns while the compactor is still deleting the stream
+const isStreamDeleting = (e: any) =>
+  /is being deleted/.test(e?.response?.data?.message ?? e?.message ?? "");
 
 // only a dropped connection or a server fault is worth sending again; a 4xx would fail the same way
 const withRetry = async <T>(send: () => Promise<T>): Promise<T> => {
@@ -167,6 +174,7 @@ const withRetry = async <T>(send: () => Promise<T>): Promise<T> => {
     try {
       return await send();
     } catch (e: any) {
+      if (isStreamDeleting(e)) throw new Error(STILL_REMOVING);
       const status = e?.response?.status;
       const transient = !e?.response || status >= 500;
       if (!transient || attempt >= RETRY_DELAYS_MS.length) throw e;
