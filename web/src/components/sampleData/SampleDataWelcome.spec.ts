@@ -69,7 +69,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     error: ref(null),
     forbidden: ref(false),
     welcomeOpen: ref(false),
-    welcomeDeciding: ref(false),
+    welcomeDeciding: ref(0),
     tour: ref(null),
     start: vi.fn((org: string) => {
       s.loadingOrg.value = org;
@@ -109,7 +109,7 @@ const session = useSampleDataSession() as unknown as {
   error: { value: string | null };
   loadingOrg: { value: string };
   welcomeOpen: { value: boolean };
-  welcomeDeciding: { value: boolean };
+  welcomeDeciding: { value: number };
   tour: { value: { org: string; index: number } | null };
   start: ReturnType<typeof vi.fn>;
   welcomeSeen: ReturnType<typeof vi.fn>;
@@ -190,6 +190,7 @@ describe("SampleDataWelcome finish", () => {
   };
   const pushSpy = () => vi.spyOn(router, "push");
   const view = () => wrapper!.find("[data-view]").attributes("data-view");
+  const deciding = () => session.welcomeDeciding.value > 0;
 
   beforeEach(() => {
     mockConfig.isCloud = "true";
@@ -204,7 +205,7 @@ describe("SampleDataWelcome finish", () => {
     session.error.value = null;
     session.forbidden.value = false;
     session.welcomeOpen.value = false;
-    session.welcomeDeciding.value = false;
+    session.welcomeDeciding.value = 0;
     session.tour.value = null;
     session.welcomeSeen.mockImplementation(() => false);
     localStorage.clear();
@@ -230,11 +231,47 @@ describe("SampleDataWelcome finish", () => {
     vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
     const mounting = mountAtHome();
     await flushPromises();
-    expect(session.welcomeDeciding.value).toBe(true);
+    expect(deciding()).toBe(true);
     answer(false);
     await mounting;
     expect(session.welcomeOpen.value).toBe(true);
-    expect(session.welcomeDeciding.value).toBe(false);
+    expect(deciding()).toBe(false);
+  });
+
+  it("stays deciding until the full config arrives, and until it unmounts if it never does", async () => {
+    await mountAtHome({});
+    expect(deciding()).toBe(true);
+    store.state.zoConfig = { version: "v0.0.0", sample_data_onboarding_enabled: false };
+    await flush();
+    expect(deciding()).toBe(false);
+    expect(session.welcomeOpen.value).toBe(false);
+
+    await mountAtHome({});
+    expect(deciding()).toBe(true);
+    wrapper!.unmount();
+    wrapper = undefined;
+    await flush();
+    expect(deciding()).toBe(false);
+  });
+
+  it("stays deciding until the last of two overlapping checks ends", async () => {
+    let first!: (hasData: boolean) => void;
+    let second!: (hasData: boolean) => void;
+    vi.mocked(fetchHasUserStreams)
+      .mockReturnValueOnce(new Promise((r) => (first = r)))
+      .mockReturnValueOnce(new Promise((r) => (second = r)));
+    const mounting = mountAtHome();
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "empty-org", label: "Empty" };
+    await flush();
+    first(true);
+    await mounting;
+    await flush();
+    expect(deciding()).toBe(true);
+    second(false);
+    await flush();
+    expect(deciding()).toBe(false);
+    expect(session.welcomeOpen.value).toBe(true);
   });
 
   it("drops a late answer for an org the user has left", async () => {

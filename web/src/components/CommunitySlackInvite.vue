@@ -88,7 +88,7 @@ onMounted(() => {
   };
   // the welcome mounts first, so its stream check for this org has started by now
   const settled = () =>
-    !!store.state.selectedOrganization?.identifier && !session.welcomeDeciding.value;
+    !!store.state.selectedOrganization?.identifier && session.welcomeDeciding.value === 0;
   if (settled()) {
     show();
     return;

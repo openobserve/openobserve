@@ -311,7 +311,7 @@ describe("CommunitySlackInvite", () => {
 
     afterEach(() => {
       session.welcomeOpen.value = false;
-      session.welcomeDeciding.value = false;
+      session.welcomeDeciding.value = 0;
     });
 
     it("stays closed while the welcome is open, until a later visit", async () => {
@@ -330,13 +330,13 @@ describe("CommunitySlackInvite", () => {
 
     it("waits for the welcome's stream check and stays closed when the welcome opens", async () => {
       setPendingDay2(25);
-      session.welcomeDeciding.value = true;
+      session.welcomeDeciding.value = 1;
 
       wrapper = buildWrapper();
       await flushPromises();
       expect(dialogOpen()).toBe("false");
       session.welcomeOpen.value = true;
-      session.welcomeDeciding.value = false;
+      session.welcomeDeciding.value = 0;
       await flushPromises();
 
       expect(dialogOpen()).toBe("false");
@@ -345,11 +345,11 @@ describe("CommunitySlackInvite", () => {
 
     it("opens once the welcome's stream check ends without a welcome", async () => {
       setPendingDay2(25);
-      session.welcomeDeciding.value = true;
+      session.welcomeDeciding.value = 1;
 
       wrapper = buildWrapper();
       await flushPromises();
-      session.welcomeDeciding.value = false;
+      session.welcomeDeciding.value = 0;
       await flushPromises();
 
       expect(dialogOpen()).toBe("true");
@@ -424,6 +424,59 @@ describe("CommunitySlackInvite", () => {
         onboarding_flow_enabled: true,
         sample_data_onboarding_enabled: false,
       });
+    });
+
+    it("waits for the full config before it shows, as in the main layout", async () => {
+      const full = store.state.zoConfig;
+      const { version: _version, ...bootstrap } = full;
+      store.commit("setConfig", bootstrap);
+      let answer!: (hasData: boolean) => void;
+      vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", name: "home", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      await router.isReady();
+      setPendingDay2(25);
+      try {
+        wrapper = mount(
+          {
+            components: { SampleDataWelcome, CommunitySlackInvite },
+            template: "<div><SampleDataWelcome /><CommunitySlackInvite /></div>",
+          },
+          {
+            global: {
+              plugins: [store, i18n, router],
+              stubs: { ODialog: ODialogStub, WelcomeChoices: true, SampleDataProgress: true },
+            },
+          },
+        );
+        const invite = () =>
+          wrapper
+            .findComponent(CommunitySlackInvite)
+            .find('[data-test="o-dialog-stub"]')
+            .attributes("data-open");
+        await flushPromises();
+        expect(invite()).toBe("false");
+        store.commit("setConfig", {
+          ...full,
+          onboarding_flow_enabled: false,
+          sample_data_onboarding_enabled: true,
+        });
+        await flushPromises();
+        answer(false);
+        await flushPromises();
+
+        expect(session.welcomeOpen.value).toBe(true);
+        expect(invite()).toBe("false");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "community_slack_prompt_shown",
+          expect.anything(),
+        );
+      } finally {
+        store.commit("setConfig", full);
+      }
     });
 
     it("hides, without counting a dismissal, while a welcome opens over it", async () => {

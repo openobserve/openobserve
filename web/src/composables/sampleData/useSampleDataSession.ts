@@ -61,8 +61,8 @@ const steps = reactive<Record<SampleStepId, SampleStepStatus>>(
   >,
 );
 const welcomeOpen = ref(false);
-// true while the welcome checks whether to open, so other first-visit dialogs wait for it
-const welcomeDeciding = ref(false);
+// welcome checks still deciding whether to open; other first-visit dialogs wait while any runs
+const welcomeDeciding = ref(0);
 const tour = ref<TourState | null>(readTour());
 const flagCache = ref<Record<string, boolean>>({});
 

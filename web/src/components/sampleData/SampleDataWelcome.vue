@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -177,7 +177,7 @@ import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import { isFirstLoginOf, redirectPending } from "@/components/onboarding/onboardingFlow";
-import { sampleDataFlowOn } from "@/utils/firstRunFlow";
+import { flowsKnown, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -312,8 +312,16 @@ const browseAll = () => {
   }
 };
 
-// the switches come only with the full org config; the bootstrap /config has no version
-const flowOn = () => !!store.state.zoConfig?.version && sampleDataFlowOn(store.state.zoConfig);
+const flowOn = () => sampleDataFlowOn(store.state.zoConfig);
+
+// the switches come only with the full org config; unmounting also ends the wait for it
+let configArrived!: () => void;
+const fullConfig = new Promise<void>((resolve) => (configArrived = resolve));
+watch(
+  () => flowsKnown(store.state.zoConfig),
+  (known) => known && configArrived(),
+  { immediate: true },
+);
 
 let greetToken = 0;
 
@@ -323,14 +331,17 @@ const maybeGreet = async () => {
   // a newer check, an org switch, leaving Home or a switch-off makes an answer stale
   const stale = () =>
     token !== greetToken || id !== org.value || route.name !== "home" || !flowOn();
-  if (store.state.kioskMode || !flowOn()) return;
+  if (store.state.kioskMode || (flowsKnown(store.state.zoConfig) && !flowOn())) return;
   // a tour left open in another org is hidden here, so only this org's tour holds the welcome back
   if (!id || route.name !== "home" || session.welcomeSeen(id) || session.tour.value?.org === id) {
     return;
   }
   if (session.status.value === "loading") return;
-  session.welcomeDeciding.value = true;
+  // the Slack invite waits on this count, so it also covers the wait for the full config
+  session.welcomeDeciding.value++;
   try {
+    await fullConfig;
+    if (stale()) return;
     const hasData = await fetchHasUserStreams(id);
     if (stale()) return;
     // the Slack invite day-2 clock starts on the first Home visit, data or not
@@ -346,7 +357,7 @@ const maybeGreet = async () => {
   } catch {
     // an org whose streams cannot be read gets no welcome
   } finally {
-    session.welcomeDeciding.value = false;
+    session.welcomeDeciding.value--;
   }
 };
 
@@ -369,4 +380,8 @@ watch([org, () => route.name, () => session.status.value === "loading", flowOn],
 // a deployment that turns the flow off gets no welcome, and closing it records no skip
 watch(flowOn, (on) => !on && session.closeWelcome());
 onMounted(maybeGreet);
+onBeforeUnmount(() => {
+  greetToken++;
+  configArrived();
+});
 </script>
