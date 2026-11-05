@@ -66,6 +66,11 @@ const run = (windowEnd: number, emittedAt: number, findings: number): RunRow => 
   coverage_stream_substrate_empty: false,
 });
 
+const serverError = (status: number, data: unknown) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data },
+  });
+
 const mountPage = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -160,6 +165,17 @@ describe("AlertCalibrationDigests", () => {
     expect(wrapper.find('[data-test="alert-calibration-last-run-failed"]').text()).toContain(
       "query timed out",
     );
+    wrapper.unmount();
+  });
+
+  it("a failed runs read shows the plain error copy, never the server's words", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
+    const wrapper = await mountPage();
+    expect(wrapper.text()).toContain("Runs unavailable");
+    expect(wrapper.text()).toContain(
+      "Alert calibration runs couldn't be loaded. Try again in a moment.",
+    );
+    expect(wrapper.text()).not.toContain("internal");
     wrapper.unmount();
   });
 

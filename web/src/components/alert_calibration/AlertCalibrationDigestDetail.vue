@@ -261,6 +261,7 @@ import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/us
 import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { readErrorCopy } from "@/services/alert_calibration";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
@@ -341,7 +342,7 @@ const skipsCapped = computed(
 
 const loadError = computed<I18nText | null>(() => {
   if (records.error.value) {
-    return t("alertCalibration.detail.loadFailed", { message: raw(records.error.value) });
+    return readErrorCopy(t, records.error.value, "run");
   }
   if (records.data.value && !run.value) {
     return t("alertCalibration.detail.noRecords");

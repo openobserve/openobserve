@@ -11750,6 +11750,13 @@
       "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged.",
       "errorClassesUnassessed": "Error types were not read for {count} alert, so its card shows counts only. | Error types were not read for {count} alerts, so their cards show counts only."
     },
+    "readError": {
+      "forbidden": "You don't have access to Alert Calibration. Ask an org admin for read access to Alert Calibration.",
+      "unreachable": "Couldn't reach the server. Check your connection and try again.",
+      "runs": "Alert calibration runs couldn't be loaded. Try again in a moment.",
+      "run": "This run couldn't be loaded. Try again in a moment.",
+      "settings": "Alert calibration settings couldn't be loaded. Try again in a moment."
+    },
     "digests": {
       "schedule": "Schedule",
       "off": "Off",
@@ -11784,7 +11791,6 @@
       "back": "Digests",
       "unavailableTitle": "Digest unavailable",
       "noRecords": "No records were found for this run.",
-      "loadFailed": "The digest could not be loaded: {message}",
       "backToDigests": "Back to digests",
       "partialCoverage": "Partial coverage",
       "partialCoverageDesc": "This run could not see the whole window, so the counts below are a floor, not a total, and no finding is not a clearance.",
@@ -11866,7 +11872,6 @@
       "savedFirstRun": "Saved. The first run is due now.",
       "savedCadence": "Saved. The new cadence applies from the next run, and a shorter one can bring that run forward.",
       "saveFailed": "The settings could not be saved: {message}",
-      "loadFailed": "The settings could not be loaded: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
       "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",

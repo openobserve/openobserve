@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           :row-key="runKey"
           :loading="runs.loading.value"
-          :error="runs.error.value"
+          :error="runsError"
           pagination="client"
           :page-size="20"
           sorting="client"
@@ -178,13 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #error="{ message }">
+          <template #error>
             <OEmptyState
               size="hero"
               illustration="broken-panel"
               variant="error"
               :title="t('alertCalibration.digests.errorTitle')"
-              :description="raw(message)"
+              :description="runsError ?? undefined"
               :action-label="t('alertCalibration.retry')"
               action-icon="refresh"
               @action="refresh"
@@ -223,6 +223,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -268,6 +269,7 @@ const runs = useLatestRead(async () => {
   return { emissions: emissions.length, rows: latestPerWindow(emissions) };
 });
 const rows = computed(() => runs.data.value?.rows ?? []);
+const runsError = computed(() => (runs.error.value ? readErrorCopy(t, runs.error.value) : null));
 
 const search = ref("");
 const scope = ref<Scope>("all");

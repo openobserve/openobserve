@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isAxiosError } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 import type {
   DismissalPage,
   DismissalView,
@@ -62,6 +64,9 @@ export interface DismissalListParams {
 /** The digest reads, as paths under `/digests`: runs, runs flagging an alert, one run's records, and per-rule tallies. */
 export type DigestRead = "" | "/alerts" | "/records" | "/rules";
 
+/** What a failed read was loading, named in its error copy. */
+export type ReadSubject = "runs" | "run" | "settings";
+
 interface HttpErrorLike {
   name?: string;
   message?: string;
@@ -78,6 +83,17 @@ export function errorMessage(error: unknown): string {
   const body =
     typeof data === "object" && data !== null ? (data as { message?: unknown }).message : data;
   return typeof body === "string" && body ? body : (e?.message ?? "");
+}
+
+/** The one copy for a failed calibration read; the server's own words never reach the reader. */
+export function readErrorCopy(
+  t: TranslateFn,
+  error: unknown,
+  subject: ReadSubject = "runs",
+): I18nText {
+  if (httpStatus(error) === 403) return t("alertCalibration.readError.forbidden");
+  if (isAxiosError(error) && !error.response) return t("alertCalibration.readError.unreachable");
+  return t(`alertCalibration.readError.${subject}`);
 }
 
 export const isAbort = (error: unknown): boolean => {

@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         illustration="broken-panel"
         variant="error"
         :title="t('alertCalibration.digests.errorTitle')"
-        :description="raw(data.error.value)"
+        :description="readErrorCopy(t, data.error.value)"
         :action-label="t('alertCalibration.retry')"
         action-icon="refresh"
         @action="refresh"
@@ -339,6 +339,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
