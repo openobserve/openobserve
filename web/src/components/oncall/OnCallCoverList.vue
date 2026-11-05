@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pagination="client"
       :show-global-filter="false"
       :column-visibility="{ reason: false }"
+      :persist-columns="true"
       table-id="oncall-team-covers"
       data-test="oncall-cover-table"
     >

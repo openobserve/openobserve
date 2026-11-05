@@ -575,19 +575,14 @@ describe("OnCallCoverForm — taking a cover", () => {
       { user_email: string; start_at: number; end_at: number; rotation_id?: string } | undefined;
   }
 
-  // Save does nothing without a person, so it waits for one and says why.
-  it("blocks Save, with the reason, until somebody is covering", async () => {
+  // Save stays enabled; submitting with nobody picked names the missing field instead.
+  it("refuses a cover with nobody covering, saying so on the person field", async () => {
     const empty = renderCover({ gap: GAP, defaultUser: "" });
     await flushPromises();
-    expect(empty.find('[data-test="dialog-primary"]').attributes("disabled")).toBeDefined();
-    expect(empty.find('[data-test="oncall-cover-save-blocked"]').text()).toBe(
-      "Choose who is covering",
-    );
+    expect(empty.find('[data-test="dialog-primary"]').attributes("disabled")).toBeUndefined();
 
-    const picked = renderCover({ gap: GAP });
-    await flushPromises();
-    expect(picked.find('[data-test="dialog-primary"]').attributes("disabled")).toBeUndefined();
-    expect(picked.find('[data-test="oncall-cover-save-blocked"]').exists()).toBe(false);
+    expect(await save(empty)).toBeUndefined();
+    expect(empty.find('[data-test-field="user_email"]').text()).toBe("Choose who is covering");
   });
 
   it("emits the window as the start_at / end_at pair the API takes", async () => {

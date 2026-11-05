@@ -311,13 +311,7 @@ export class OnCallRoutingPage {
     this._conditionsWritten = index + 1;
   }
 
-  /**
-   * The rule editor is an ODialog, not a drawer, so its Save is
-   * `o-dialog-primary-btn` — scoped to the editor's own panel, which ODialog
-   * stamps with the consumer's `data-test` precisely so this scoping works.
-   */
-  /** Repoint an existing condition row at another field, which empties its value. */
-  /** `label` narrows the list first: the field picker offers the whole catalogue, and OSelect only renders a window of it. */
+  /** Repoint a row at another field, which empties its value; `label` narrows the picker, which only renders a window of the catalogue. */
   async changeConditionField(index, name, label = null) {
     await this.selectOption(this.conditionField(index), name, label);
   }
@@ -344,6 +338,7 @@ export class OnCallRoutingPage {
     await expect(this.getSaveRuleButton()).toBeDisabled();
   }
 
+  /** The editor is an ODialog, so Save is its `o-dialog-primary-btn`, scoped to the editor's own panel. */
   async saveRule() {
     await this.page
       .locator(`${this.locators.ruleEditor} [data-test="o-dialog-primary-btn"]`)

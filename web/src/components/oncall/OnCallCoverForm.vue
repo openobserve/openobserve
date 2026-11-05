@@ -31,18 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('oncall.cancel')"
     :form-id="mode === 'swap' ? undefined : FORM_ID"
     :primary-button-loading="saving"
-    :primary-button-disabled="mode === 'swap' ? !swapReady : !userValue"
+    :primary-button-disabled="mode === 'swap' ? !swapReady : false"
     data-test="oncall-cover-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="mode === 'swap' ? submitSwap() : undefined"
     @click:secondary="close"
   >
-    <template v-if="mode !== 'swap' && !userValue" #footer-left>
-      <OText variant="meta" data-test="oncall-cover-save-blocked">
-        {{ t("oncall.coverWhoRequired") }}
-      </OText>
-    </template>
-
     <!-- Two shapes of the same errand — "somebody stands in" and "these two
          trade weeks" — because a swap expressed as two covers is two dialogs,
          two datetime ranges and a chance to get the second one wrong. -->
@@ -198,7 +192,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { DateTimeRangeValue } from "@/lib/forms/DateTime/OFormDateTimeRange.types";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";

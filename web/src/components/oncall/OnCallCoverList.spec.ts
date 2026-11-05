@@ -32,7 +32,7 @@ const service = vi.mocked(oncallService);
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
+    props: ["data", "columns", "persistColumns", "tableId", "columnVisibility"],
     template: `<div>
       <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
@@ -133,6 +133,21 @@ describe("OnCallCoverList", () => {
     // Both facts the calendar annotation could not carry.
     expect(text).toContain("ana@o2.ai");
     expect(text).toContain("dentist");
+  });
+
+  // OTable only renders its column toggle with all three of these, so a hidden Reason stays reachable.
+  it("hides Reason by default behind a column toggle the reader can flip", async () => {
+    service.listOverrides.mockResolvedValue(ok([cover({ reason: "dentist" })]));
+
+    const wrapper = render();
+    await flushPromises();
+
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("persistColumns")).toBe(true);
+    expect(table.props("tableId")).toBe("oncall-team-covers");
+    expect(table.props("columnVisibility")).toEqual({ reason: false });
+    const reason = table.props("columns").find((c: { id: string }) => c.id === "reason");
+    expect(reason.hideable).toBe(true);
   });
 
   /// Both are optional on the wire, and legitimately so: "cover tonight" is a
