@@ -154,6 +154,8 @@ async fn alias(org_id: &str, name: &str) -> Result<Option<String>, TemplateError
 
 pub async fn set(template: Template) -> Result<Template, TemplateError> {
     let saved = table::templates::put(template).await?;
+    // Read-your-own-write on this node; the watcher catches up after the broadcast.
+    apply_template_cache_event(&format!("{}/{}", saved.org_id, saved.name), Some(&saved));
 
     // trigger watch event to update in-memory cache
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
@@ -185,6 +187,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     if !table::templates::delete(org_id, name).await? {
         return Err(TemplateError::NotFound);
     }
+    apply_template_cache_event(&format!("{org_id}/{name}"), None);
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{org_id}/{name}");
 
     // trigger watch event to update in-memory cache
@@ -1006,5 +1009,41 @@ mod tests {
         }
 
         assert_eq!(held, [name]);
+    }
+
+    #[tokio::test]
+    async fn test_list_reads_its_own_set_and_delete_without_the_watcher() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let org_id = format!("t_tpl_ryow_{suffix}");
+        let name = format!("t_tpl_ryow_{suffix}");
+        let key = format!("{org_id}/{name}");
+        let listed = |templates: Vec<Template>| templates.iter().any(|t| t.name == name);
+
+        set(custom_template(
+            &org_id,
+            &name,
+            r#"{"text":"{alert_name}"}"#,
+        ))
+        .await
+        .unwrap();
+        let cached_after_set = ALERTS_TEMPLATES.contains_key(&key);
+        let listed_after_set = listed(list(&org_id).await.unwrap());
+        delete(&org_id, &name).await.unwrap();
+        let cached_after_delete = ALERTS_TEMPLATES.contains_key(&key);
+        let listed_after_delete = listed(list(&org_id).await.unwrap());
+
+        assert!(cached_after_set, "set() must cache {key} on this node");
+        assert!(listed_after_set, "list() right after set() misses {name}");
+        assert!(
+            !cached_after_delete,
+            "delete() must evict {key} on this node"
+        );
+        assert!(
+            !listed_after_delete,
+            "list() right after delete() still has {name}"
+        );
     }
 }
