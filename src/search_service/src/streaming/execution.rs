@@ -101,6 +101,12 @@ pub async fn do_partitioned_search(
             "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
+    // every partition below must bucket with the offset of the request end
+    crate::sql::histogram::pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    );
     // for new_start_time & new_end_time
     let modified_start_time = req.query.start_time;
     let modified_end_time = req.query.end_time;
@@ -672,6 +678,7 @@ pub async fn get_partitions(
         histogram_interval: req.query.histogram_interval,
         sampling_ratio: req.query.sampling_ratio,
         search_type: req.search_type,
+        timezone: req.query.timezone.clone(),
     };
 
     let res = SearchService::search_partition(

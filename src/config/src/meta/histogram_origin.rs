@@ -34,9 +34,9 @@ pub fn histogram_origin_skew(interval_secs: i64) -> i64 {
     DATE_BIN_ORIGIN_SECS % interval_secs
 }
 
-/// How far `ts_micros` lies past the `histogram()` bucket edge at or before it.
-pub fn histogram_bucket_offset(ts_micros: i64, interval_micros: i64) -> i64 {
-    (ts_micros - DATE_BIN_ORIGIN_SECS * 1_000_000).rem_euclid(interval_micros)
+/// How far `ts_micros` lies past its `histogram()` bucket edge; `tz_offset_micros` is east of UTC.
+pub fn histogram_bucket_offset(ts_micros: i64, interval_micros: i64, tz_offset_micros: i64) -> i64 {
+    (ts_micros + tz_offset_micros - DATE_BIN_ORIGIN_SECS * 1_000_000).rem_euclid(interval_micros)
 }
 
 #[cfg(test)]
@@ -161,10 +161,30 @@ mod tests {
         ];
         for (ts, interval, expected) in cases {
             assert_eq!(
-                histogram_bucket_offset(ts, interval),
+                histogram_bucket_offset(ts, interval, 0),
                 expected,
                 "ts={ts}, interval={interval}"
             );
         }
+    }
+
+    #[test]
+    fn a_bucket_offset_follows_the_timezone_offset() {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        let origin = DATE_BIN_ORIGIN_SECS * 1_000_000;
+        // 18:30 UTC starts the next local day at +05:30
+        let ist = 5 * HOUR + HOUR / 2;
+        assert_eq!(
+            histogram_bucket_offset(origin + 18 * HOUR + HOUR / 2, DAY, ist),
+            0
+        );
+        assert_eq!(histogram_bucket_offset(origin, DAY, ist), ist);
+        // 08:00 UTC starts the next local day at -08:00
+        assert_eq!(
+            histogram_bucket_offset(origin + 8 * HOUR, DAY, -8 * HOUR),
+            0
+        );
+        assert_eq!(histogram_bucket_offset(origin, DAY, -8 * HOUR), 16 * HOUR);
     }
 }

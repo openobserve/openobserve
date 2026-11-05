@@ -526,6 +526,7 @@ pub async fn search(
             c_resp.is_descending,
             req.clear_cache,
             is_histogram_non_ts_order,
+            c_resp.ts_offset,
         )
         .await;
     }
@@ -559,6 +560,12 @@ pub async fn prepare_cache_response(
     req: &mut search::Request,
     use_cache: bool,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
+    // the cache key and every delta below must use the offset of the request end
+    crate::sql::histogram::pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    );
     let mut origin_sql = req.query.sql.clone();
     let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
@@ -632,6 +639,19 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
+    }
+    // a request timezone is not in the SQL, and an hourly grid cannot tell two offsets apart
+    let ts_offset = if is_complex_query && sql.histogram_interval.is_some() {
+        crate::sql::histogram::histogram_offset_micros(
+            &origin_sql,
+            req.query.timezone.as_deref(),
+            req.query.end_time,
+        )
+    } else {
+        0
+    };
+    if ts_offset != 0 {
+        hash_body.push(format!("ts_offset={ts_offset}"));
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -707,6 +727,7 @@ pub async fn prepare_cache_response(
             order_by: sql.order_by,
             limit: sql.limit,
             file_path,
+            ts_offset,
             ..Default::default()
         }
     };
@@ -1034,6 +1055,7 @@ pub async fn write_results(
     is_descending: bool,
     clear_cache: bool,
     is_histogram_non_ts_order: bool,
+    ts_offset: i64,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1045,6 +1067,7 @@ pub async fn write_results(
             req_query_start_time,
             req_query_end_time,
             interval * 1000 * 1000,
+            ts_offset,
         ),
         _ => (req_query_start_time, req_query_end_time, false),
     };
@@ -1092,12 +1115,14 @@ pub async fn write_results(
     let is_time_ordered = !is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
-    if data_start_time < accept_start_time || data_end_time > accept_end_time {
+    if data_start_time - ts_offset < accept_start_time
+        || data_end_time - ts_offset > accept_end_time
+    {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
-                let item_ts = hit_ts_datetime.timestamp_micros();
+                let item_ts = hit_ts_datetime.timestamp_micros() - ts_offset;
                 // only keep the records within the accept time range
                 item_ts >= accept_start_time && item_ts <= accept_end_time
             } else {
@@ -1172,14 +1197,19 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
-fn histogram_cacheable_range(start: i64, end: i64, interval: i64) -> (i64, i64, bool) {
-    let start_offset = histogram_bucket_offset(start, interval);
+fn histogram_cacheable_range(
+    start: i64,
+    end: i64,
+    interval: i64,
+    tz_offset: i64,
+) -> (i64, i64, bool) {
+    let start_offset = histogram_bucket_offset(start, interval, tz_offset);
     let start = if start_offset == 0 {
         start
     } else {
         start - start_offset + interval
     };
-    let end_offset = histogram_bucket_offset(end, interval);
+    let end_offset = histogram_bucket_offset(end, interval, tz_offset);
     if end_offset == 0 {
         (start, end, false)
     } else {
@@ -1498,11 +1528,29 @@ mod tests {
         ];
         for (start, end, interval, expected) in cases {
             assert_eq!(
-                histogram_cacheable_range(start, end, interval),
+                histogram_cacheable_range(start, end, interval, 0),
                 expected,
                 "start={start}, end={end}, interval={interval}"
             );
         }
+    }
+
+    #[test]
+    fn test_histogram_cacheable_range_follows_the_timezone() {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        let utc_midnight = 1_787_011_200_000_000;
+        let ist = 5 * HOUR + HOUR / 2;
+        // the IST day edges fall at 18:30 UTC
+        let ist_edge = utc_midnight + 18 * HOUR + HOUR / 2;
+        assert_eq!(
+            histogram_cacheable_range(utc_midnight, utc_midnight + 3 * DAY, DAY, ist),
+            (ist_edge, ist_edge + DAY, true),
+        );
+        assert_eq!(
+            histogram_cacheable_range(ist_edge, ist_edge + 2 * DAY, DAY, ist),
+            (ist_edge, ist_edge + 2 * DAY, false),
+        );
     }
 
     #[test]

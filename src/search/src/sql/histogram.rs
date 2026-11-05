@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    HISTOGRAM_BREAKDOWN_FIELDS, meta::stream::StreamType, utils::sql::is_eligible_for_histogram,
+    HISTOGRAM_BREAKDOWN_FIELDS,
+    meta::stream::StreamType,
+    utils::{
+        sql::is_eligible_for_histogram,
+        time::{now_micros, parse_timezone_to_offset_at, parse_timezone_to_offset_opt},
+    },
 };
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
@@ -55,11 +60,57 @@ pub fn handle_histogram(
             .to_string()
     };
     let field = args.first().unwrap_or(&"_timestamp");
+    let timezone = args
+        .get(2)
+        .map_or_else(String::new, |value| format!(",'{value}'"));
 
     *origin_sql = origin_sql.replace(
         captures.get(0).unwrap().as_str(),
-        &format!("histogram({field},'{interval}')"),
+        &format!("histogram({field},'{interval}'{timezone})"),
     );
+}
+
+/// The timezone argument of the first `histogram()` in the SQL.
+pub fn histogram_timezone_arg(sql: &str) -> Option<String> {
+    let args = RE_HISTOGRAM.captures(sql)?.get(1)?.as_str();
+    let tz = args.split(',').nth(2)?;
+    Some(tz.trim().trim_matches(['\'', '"']).to_string())
+}
+
+/// The offset east of UTC that `histogram()` buckets use; the SQL argument beats the request.
+pub fn histogram_offset_micros(sql: &str, timezone: Option<&str>, end_time: i64) -> i64 {
+    let sql_timezone = histogram_timezone_arg(sql);
+    let Some(tz) = sql_timezone.as_deref().or(timezone) else {
+        return 0;
+    };
+    let reference = if end_time > 0 { end_time } else { now_micros() };
+    parse_timezone_to_offset_at(tz, reference).unwrap_or_default() * 1_000_000
+}
+
+/// Replaces named zones by their offset at the request end, so partitions and deltas agree.
+pub fn pin_histogram_timezone(sql: &mut String, timezone: &mut Option<String>, end_time: i64) {
+    if let Some(tz) = histogram_timezone_arg(sql)
+        && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
+    {
+        *sql = RE_HISTOGRAM
+            .replace_all(sql, |caps: &regex::Captures| caps[0].replace(&tz, &fixed))
+            .into_owned();
+    }
+    if let Some(tz) = timezone.as_deref()
+        && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
+    {
+        *timezone = Some(fixed);
+    }
+}
+
+fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
+    if parse_timezone_to_offset_opt(tz).is_some() {
+        return None;
+    }
+    let reference = if end_time > 0 { end_time } else { now_micros() };
+    let secs = parse_timezone_to_offset_at(tz, reference)?;
+    let (sign, secs) = if secs < 0 { ('-', -secs) } else { ('+', secs) };
+    Some(format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60))
 }
 
 /// Converts an original query to a histogram query
@@ -232,6 +283,73 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const JUL_2026: i64 = 1_782_864_000_000_000;
+    const JAN_2026: i64 = 1_767_225_600_000_000;
+
+    #[test]
+    fn test_handle_histogram_keeps_the_timezone() {
+        let mut sql = "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t".to_string();
+        handle_histogram(&mut sql, (0, 0), 0);
+        assert_eq!(sql, "SELECT histogram(_timestamp,'1 day','+05:30') FROM t");
+        let mut sql = "SELECT histogram(_timestamp, '1 day', 'Asia/Kolkata') FROM t".to_string();
+        handle_histogram(&mut sql, (0, 0), 3600);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp,'3600 second','Asia/Kolkata') FROM t"
+        );
+    }
+
+    #[test]
+    fn test_histogram_offset_prefers_the_sql_argument() {
+        const HOUR: i64 = 3_600_000_000;
+        let sql = "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t";
+        assert_eq!(
+            histogram_offset_micros(sql, Some("-08:00"), JUL_2026),
+            5 * HOUR + HOUR / 2
+        );
+        let plain = "SELECT histogram(_timestamp, '1 day') FROM t";
+        assert_eq!(
+            histogram_offset_micros(plain, Some("-08:00"), JUL_2026),
+            -8 * HOUR
+        );
+        assert_eq!(histogram_offset_micros(plain, None, JUL_2026), 0);
+        assert_eq!(histogram_offset_micros(plain, Some("UTC"), JUL_2026), 0);
+        // daylight saving: the offset is the one in effect at the request end
+        let named = Some("America/Los_Angeles");
+        assert_eq!(histogram_offset_micros(plain, named, JUL_2026), -7 * HOUR);
+        assert_eq!(histogram_offset_micros(plain, named, JAN_2026), -8 * HOUR);
+    }
+
+    #[test]
+    fn test_pin_histogram_timezone_fixes_named_zones_at_the_request_end() {
+        let mut sql =
+            "SELECT histogram(_timestamp, '1 day', 'America/Los_Angeles') FROM t".to_string();
+        let mut timezone = Some("Asia/Kolkata".to_string());
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp, '1 day', '-07:00') FROM t"
+        );
+        assert_eq!(timezone.as_deref(), Some("+05:30"));
+        // pinned once, a partition with an earlier end cannot move the offset
+        pin_histogram_timezone(&mut sql, &mut timezone, JAN_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp, '1 day', '-07:00') FROM t"
+        );
+        assert_eq!(timezone.as_deref(), Some("+05:30"));
+    }
+
+    #[test]
+    fn test_pin_histogram_timezone_leaves_fixed_and_invalid_values() {
+        let original = "SELECT histogram(_timestamp, '1 day', '+08:00') FROM t".to_string();
+        let mut sql = original.clone();
+        let mut timezone = Some("Not/AZone".to_string());
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(sql, original);
+        assert_eq!(timezone.as_deref(), Some("Not/AZone"));
+    }
 
     #[test]
     fn test_handle_histogram() {

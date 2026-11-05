@@ -29,7 +29,7 @@ use proto::cluster_rpc;
 use crate::{
     cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
     partition::aggregate::is_streaming_aggregate,
-    sql::Sql,
+    sql::{Sql, histogram::histogram_offset_micros},
 };
 
 /// SQL-derived context for a search partition request.
@@ -44,6 +44,7 @@ pub struct PartitionSqlContext {
     pub use_single_partition: bool,
     pub is_histogram_eligible: bool,
     pub sql_order_by: OrderBy,
+    pub histogram_offset: i64,
 }
 
 impl PartitionSqlContext {
@@ -57,9 +58,12 @@ impl PartitionSqlContext {
             end_time: req.end_time,
             sql: req.sql.to_string(),
             histogram_interval: req.histogram_interval,
+            timezone: req.timezone.clone(),
             ..Default::default()
         };
         let sql = Sql::new(&query, org_id, stream_type, None).await?;
+        let histogram_offset =
+            histogram_offset_micros(&req.sql, req.timezone.as_deref(), req.end_time);
 
         let is_explain = is_explain_query(&req.sql);
         let is_complex = is_complex_query(&req.sql).unwrap_or(false);
@@ -101,6 +105,7 @@ impl PartitionSqlContext {
             use_single_partition,
             is_histogram_eligible,
             sql_order_by,
+            histogram_offset,
         })
     }
 
@@ -174,6 +179,7 @@ mod tests {
             use_single_partition: false,
             is_histogram_eligible: false,
             sql_order_by: OrderBy::Desc,
+            histogram_offset: 0,
         }
     }
 
@@ -182,28 +188,32 @@ mod tests {
         const SECS: i64 = 1_000_000;
         const DAY: i64 = 86_400;
         let may_2026 = 1_778_302_800 * SECS;
-        for interval in [3_600, DAY, 2 * DAY, 3 * DAY, 5 * DAY, 7 * DAY, 30 * DAY] {
-            let interval_micros = interval * SECS;
-            for start_shift in [0, 1, 17 * 3_600 * SECS, interval_micros / 2] {
-                for buckets in [2, 3, 7, 30, 61] {
-                    let start = may_2026 + start_shift;
-                    let end = start + buckets * interval_micros + 3 * SECS;
-                    let mut ctx = mk(vec![], true, Some(interval), Some("_timestamp"));
-                    ctx.sql.time_range = (start, end);
-                    let total_secs = ((end - start) / SECS) as usize;
-                    let settings = calculate_partition_settings("t", total_secs, &ctx, true, 0);
-                    let mut partitions = generate_partitions(&ctx, &settings);
-                    partitions.sort();
-                    assert_eq!(partitions.first().unwrap()[0], start);
-                    assert_eq!(partitions.last().unwrap()[1], end);
-                    for pair in partitions.windows(2) {
-                        assert_eq!(pair[0][1], pair[1][0], "gap or overlap: {partitions:?}");
-                        assert_eq!(
-                            histogram_bucket_offset(pair[0][1], interval_micros),
-                            0,
-                            "interval {interval}s: edge {} is inside a bucket",
-                            pair[0][1]
-                        );
+        let intervals = [3_600, DAY, 2 * DAY, 3 * DAY, 5 * DAY, 7 * DAY, 30 * DAY];
+        for tz_offset in [0, 19_800 * SECS, -28_800 * SECS] {
+            for interval in intervals {
+                let interval_micros = interval * SECS;
+                for start_shift in [0, 1, 17 * 3_600 * SECS, interval_micros / 2] {
+                    for buckets in [2, 3, 7, 30, 61] {
+                        let start = may_2026 + start_shift;
+                        let end = start + buckets * interval_micros + 3 * SECS;
+                        let mut ctx = mk(vec![], true, Some(interval), Some("_timestamp"));
+                        ctx.sql.time_range = (start, end);
+                        ctx.histogram_offset = tz_offset;
+                        let total_secs = ((end - start) / SECS) as usize;
+                        let settings = calculate_partition_settings("t", total_secs, &ctx, true, 0);
+                        let mut partitions = generate_partitions(&ctx, &settings);
+                        partitions.sort();
+                        assert_eq!(partitions.first().unwrap()[0], start);
+                        assert_eq!(partitions.last().unwrap()[1], end);
+                        for pair in partitions.windows(2) {
+                            assert_eq!(pair[0][1], pair[1][0], "gap or overlap: {partitions:?}");
+                            assert_eq!(
+                                histogram_bucket_offset(pair[0][1], interval_micros, tz_offset),
+                                0,
+                                "interval {interval}s: edge {} is inside a bucket",
+                                pair[0][1]
+                            );
+                        }
                     }
                 }
             }

@@ -44,7 +44,12 @@ pub fn generate_partitions(
 
     if ctx.sql.histogram_interval.is_some() {
         generate_partitions_aligned_with_histogram_interval(
-            start_time, end_time, step, order_by, min_step,
+            start_time,
+            end_time,
+            step,
+            order_by,
+            min_step,
+            ctx.histogram_offset,
         )
     } else if ctx.is_complex_query {
         vec![[start_time, end_time]]
