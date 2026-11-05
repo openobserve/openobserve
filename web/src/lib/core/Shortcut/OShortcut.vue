@@ -6,6 +6,7 @@ import { getShortcutDisplay } from "@/lib/vue-shortcut-manager/shortcutRegistry"
 
 const props = withDefaults(defineProps<ShortcutProps>(), {
   size: "sm",
+  tone: "default",
 });
 
 const isMac = isMacOS();
@@ -82,7 +83,8 @@ const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
       :key="i"
       :class="[
         'inline-flex items-center justify-center',
-        'rounded-default border-kbd-border bg-kbd-bg text-kbd-text border',
+        'rounded-default border-kbd-border bg-kbd-bg border',
+        tone === 'strong' ? 'text-text-body' : 'text-kbd-text',
         'leading-none font-medium whitespace-nowrap shadow-md',
         sizeClasses[size],
       ]"

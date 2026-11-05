@@ -1,0 +1,64 @@
+[
+  {
+    "role": "user",
+    "content": "How many checkout errors?",
+    "sentAt": 1772418660000,
+    "turnId": "t-red-1"
+  },
+  {
+    "role": "assistant",
+    "content": "There were 1,287 checkout errors in the last hour.",
+    "contentBlocks": [
+      {
+        "type": "tool_call",
+        "tool": "SearchSQL",
+        "message": "Querying logs",
+        "context": {
+          "sql": "SELECT count(*) FROM checkout WHERE level='error'"
+        },
+        "call_id": "call_r1",
+        "stepState": "done",
+        "success": true,
+        "resultMessage": "",
+        "summary": {
+          "count": 1287,
+          "took": 31
+        },
+        "callArgs": {
+          "sql": "SELECT count(*) FROM checkout"
+        },
+        "result": {
+          "hits": [
+            {
+              "count": "1287"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tool_call",
+        "tool": "SearchSQL",
+        "message": "Querying the audit stream",
+        "context": {
+          "sql": "SELECT * FROM payments_audit"
+        },
+        "call_id": "call_r2",
+        "stepState": "done",
+        "success": true,
+        "resultMessage": "",
+        "summary": "3 rows about card 4111",
+        "callArgs": {
+          "sql": "SELECT * FROM payments_audit"
+        }
+      },
+      {
+        "type": "text",
+        "text": "There were 1,287 checkout errors in the last hour."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

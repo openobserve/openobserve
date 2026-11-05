@@ -225,15 +225,28 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_add_first_event_at_to_ai_chat_turns;
 mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
 mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_add_health_to_org_ai_toolsets;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261020_000002_create_ai_grants;
+mod m20261020_000003_create_ai_actions;
+mod m20261020_000004_create_ai_access_requests;
+mod m20261020_000005_create_ai_turn_marks;
+mod m20261021_000001_add_history_to_ai_chat_sessions;
 mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261021_000002_add_versions_to_ai_chat_turns;
+mod m20261021_000003_add_hide_attachments_to_ai_chat_shares;
+mod m20261021_000004_create_ai_chat_feedback;
+mod m20261021_000005_create_ai_chat_imports;
+mod m20261021_000006_create_paid_overage_attribution;
+mod m20261021_000007_create_ai_approvals;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
 mod m20261025_000001_add_firing_started_at_to_alert_states;
 mod m20261025_000002_create_alert_acks;
@@ -249,6 +262,7 @@ mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261028_000001_add_llm_dataset_item_write_version;
 mod m20261029_000001_add_budget_to_online_eval_jobs;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_agent_to_ai_chat_turns;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
@@ -908,13 +922,20 @@ impl MigratorTrait for Migrator {
             Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
             Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
             Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
-            Box::new(m20261103_000002_add_run_class_to_synthetics::Migration),
-            Box::new(m20261103_000003_status_page_notice_false_alarm::Migration),
-            Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
-            Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
-            Box::new(m20261220_000001_create_service_identity_tables::Migration),
-            Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
-            Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
+            Box::new(m20261030_000001_add_agent_to_ai_chat_turns::Migration),
+            Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
+            Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
+            Box::new(m20261020_000002_create_ai_grants::Migration),
+            Box::new(m20261020_000003_create_ai_actions::Migration),
+            Box::new(m20261020_000004_create_ai_access_requests::Migration),
+            Box::new(m20261020_000005_create_ai_turn_marks::Migration),
+            Box::new(m20261021_000001_add_history_to_ai_chat_sessions::Migration),
+            Box::new(m20261021_000002_add_versions_to_ai_chat_turns::Migration),
+            Box::new(m20261021_000003_add_hide_attachments_to_ai_chat_shares::Migration),
+            Box::new(m20261021_000004_create_ai_chat_feedback::Migration),
+            Box::new(m20261021_000005_create_ai_chat_imports::Migration),
+            Box::new(m20261021_000006_create_paid_overage_attribution::Migration),
+            Box::new(m20261021_000007_create_ai_approvals::Migration),
         ]
     }
 }
@@ -1039,19 +1060,12 @@ mod tests {
         (148, "m20261218_000001_add_security_case_to_alert_incidents"),
         (149, "m20261219_000001_add_historical_to_alert_incidents"),
         (150, "m20261029_000001_add_budget_to_online_eval_jobs"),
-        (151, "m20261103_000002_add_run_class_to_synthetics"),
-        (152, "m20261103_000003_status_page_notice_false_alarm"),
-        (153, "m20261103_000003_add_gap_state_to_synthetics"),
-        (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
-        (155, "m20261220_000001_create_service_identity_tables"),
-        (
-            156,
-            "m20261221_000001_add_last_detection_at_to_alert_incidents",
-        ),
-        (
-            157,
-            "m20261222_000001_incident_membership_and_catalog_cleanup",
-        ),
+        (151, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (152, "m20261020_000005_create_ai_turn_marks"),
+        (153, "m20261021_000005_create_ai_chat_imports"),
+        (154, "m20261021_000006_create_paid_overage_attribution"),
+        (155, "m20261021_000007_create_ai_approvals"),
+        (156, "m20261030_000001_add_agent_to_ai_chat_turns"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1223,6 +1237,10 @@ mod tests {
                 "m20261006_000001_create_ai_chat_shares",
             ),
             (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261030_000001_add_agent_to_ai_chat_turns",
+            ),
+            (
                 "m20261006_000001_create_ai_chat_shares",
                 "m20261007_000002_add_redact_tools_to_ai_chat_shares",
             ),
@@ -1265,6 +1283,26 @@ mod tests {
             (
                 "m20260720_000001_create_workflow_run_data_table",
                 "m20261102_000001_add_workflow_run_data_run_id_index",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261016_000001_add_first_event_at_to_ai_chat_turns",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261020_000001_add_health_to_org_ai_toolsets",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261021_000002_add_versions_to_ai_chat_turns",
+            ),
+            (
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+                "m20261021_000003_add_hide_attachments_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261021_000001_add_history_to_ai_chat_sessions",
             ),
         ] {
             assert!(

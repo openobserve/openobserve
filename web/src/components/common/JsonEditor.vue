@@ -1,7 +1,16 @@
 <template>
-  <div class="dark:bg-surface-base flex h-[calc(100vh-3.75rem)] min-h-0">
+  <div
+    :ref="docked ? docked.dockSlot : undefined"
+    class="dark:bg-surface-base flex h-[calc(100vh-3.75rem)] min-h-0"
+  >
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div class="flex min-h-0 flex-1 flex-col">
+      <div ref="editorArea" :class="['flex min-h-0 flex-1 flex-col', docked ? 'relative' : '']">
+        <AssistantDiffBlock
+          v-if="docked?.proposal.pending.value"
+          :key="docked.proposal.pending.value.id"
+          :proposal="docked.proposal.pending.value"
+          class="absolute inset-0 z-1000"
+        />
         <QueryEditor
           data-test="common-json-editor"
           ref="queryEditorRef"
@@ -29,6 +38,13 @@
       </div>
 
       <div class="flex shrink-0 justify-end gap-2 p-3">
+        <AiLabel
+          v-if="docked?.proposal.label.value"
+          :state="docked.proposal.label.value"
+          class="me-auto"
+          @revert="docked.proposal.revert"
+          @ask-again="docked.dock.askAgain"
+        />
         <OButton
           variant="outline"
           size="sm-action"
@@ -45,8 +61,9 @@
         >
       </div>
     </div>
+    <AssistantDock v-if="docked" :host="docked.adapter" />
     <!-- o2aichat enabled -->
-    <div v-if="store.state.isAiChatEnabled" class="ms-2 h-full w-[25vw]">
+    <div v-else-if="store.state.isAiChatEnabled" class="ms-2 h-full w-[25vw]">
       <O2AIChat
         class="h-full"
         :is-open="store.state.isAiChatEnabled"
@@ -66,13 +83,14 @@ import {
   defineAsyncComponent,
   type PropType,
 } from "vue";
-import { type I18nText, useI18nTyped } from "@/types/i18n";
+import { type I18nText, raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useTheme from "@/composables/useTheme";
+import { isAssistantV2, useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
 
 export default defineComponent({
   name: "JsonEditor",
@@ -80,6 +98,14 @@ export default defineComponent({
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     O2AIChat,
     OButton,
+    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
+    AssistantDiffBlock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+    ),
+    AssistantDock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+    ),
   },
   props: {
     data: {
@@ -206,12 +232,66 @@ export default defineComponent({
       });
 
       jsonContent.value = JSON.stringify(props.data, null, 2);
+      openedWith = jsonContent.value;
     });
     //whenever user clicks on save button , we need to save the changes
     //we need to merge the stored fields with the parsed content
     //and then emit the saveJson event
 
+    const editorArea = ref<HTMLElement | null>(null);
+    let openedWith = "";
+    const docked: DockedEditor | null = isAssistantV2() ? jsonHost() : null;
+
+    function landWithProtectedFields(text: string): { text: string; kept: boolean } {
+      try {
+        const parsed = JSON.parse(text);
+        const kept = protectedFields.value.some(
+          (field) => storedFields.value[field] && parsed?.[field] !== storedFields.value[field],
+        );
+        if (!kept) return { text, kept };
+        return { text: JSON.stringify({ ...parsed, ...storedFields.value }, null, 2), kept };
+      } catch {
+        return { text, kept: false };
+      }
+    }
+
+    function jsonHost(): DockedEditor {
+      const isAlert = props.type === "alerts";
+      const name = () => String(props.data?.name ?? "");
+      return useDockedEditor({
+        id: "json_editor",
+        objectKind: isAlert ? "alert" : "pipeline_node",
+        objectTitle: () =>
+          isAlert
+            ? name()
+              ? t("assistant.editor.title.alert", { name: raw(name()) })
+              : t("assistant.editor.title.alertNew")
+            : name()
+              ? t("assistant.editor.title.pipeline", { name: raw(name()) })
+              : t("assistant.editor.title.pipelineNew"),
+        language: () => "json",
+        getBuffer: () => jsonContent.value,
+        getContext: () =>
+          isAlert
+            ? { ...(props.data?.id && { alertId: String(props.data.id) }) }
+            : { ...(props.data?.pipeline_id && { pipelineId: String(props.data.pipeline_id) }) },
+        isDirty: () => !!openedWith && jsonContent.value !== openedWith,
+        focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+        write(text) {
+          const landed = landWithProtectedFields(text);
+          jsonContent.value = landed.text;
+          queryEditorRef.value?.replaceValue?.(landed.text);
+          return {
+            text: landed.text,
+            ...(landed.kept && { note: "assistant.editor.protectedFields" as const }),
+          };
+        },
+        area: () => editorArea.value,
+      });
+    }
+
     const saveChanges = () => {
+      docked?.proposal.clear();
       try {
         const parsedContent = JSON.parse(jsonContent.value);
         // Merge back the stored fields
@@ -279,6 +359,8 @@ export default defineComponent({
       getBtnLogo,
       protectedFields,
       storedFields,
+      docked,
+      editorArea,
     };
   },
 });

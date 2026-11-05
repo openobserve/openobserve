@@ -25,8 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown.stop
   >
     <template #header-right>
+      <AiEntryButton
+        v-if="queryDock"
+        appearance="toggle"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="pipeline_node"
+        thread="current"
+        dock-host="scheduled_query"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+        :pressed="queryDock.pressed.value"
+        :build="queryDock.build"
+        data-test="ai-entry-scheduled-query-ask"
+        @closed="queryDock.close"
+      />
       <OButton
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+        v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         variant="ghost"
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
@@ -136,7 +151,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  ref,
+  watch,
+  type Ref,
+  onActivated,
+  provide,
+} from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
@@ -160,6 +184,7 @@ import { makeQuerySchema, type QueryForm } from "./Query.schema";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isAssistantV2, useAssistantDockToggle } from "@/composables/assistant/pure";
 
 interface RouteCondition {
   column: string;
@@ -224,6 +249,11 @@ const props = defineProps({
 });
 
 const { t } = useI18nTyped();
+// The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const queryDock = isAssistantV2() ? useAssistantDockToggle("scheduled_query") : null;
 
 const store = useStore();
 

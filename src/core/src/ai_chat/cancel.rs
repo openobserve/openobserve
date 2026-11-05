@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use o2_enterprise::enterprise::ai::{
     chat::registry::{self, CancelReason},
-    client::get_agent_client,
+    client::{CancelBy, get_agent_client},
 };
 
 /// How long a cancel waits for o2-ai before stopping the turn on this node.
@@ -56,10 +56,11 @@ pub async fn cancel_chat_turn(
                 session_id.to_string(),
                 auth_header.to_string(),
             );
-            let task =
-                tokio::spawn(
-                    async move { client.cancel_session(&session_id, &org_id, &auth).await },
-                );
+            let task = tokio::spawn(async move {
+                client
+                    .cancel_session(&session_id, &org_id, &auth, CancelBy::User)
+                    .await
+            });
             Some(tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await)
         }
         None => None,

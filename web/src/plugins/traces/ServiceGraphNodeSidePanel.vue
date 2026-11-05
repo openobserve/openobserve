@@ -40,20 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :version="agentEnvVersion.version"
           data-test="service-graph-node-agent-badges"
         />
-        <span class="text-text-secondary text-xs">{{ t("serviceVersions.panel.health") }}</span>
-        <span
-          v-if="selectedNode?.health_withheld"
-          class="text-text-muted"
-          data-test="service-health-none"
-          >{{ raw("—") }}<OTooltip :content="t('serviceVersions.catalog.healthNoTraffic')"
-        /></span>
-        <OTag
-          v-else
-          type="serviceStatus"
-          :value="serviceHealth.status"
-          data-test="service-health-badge"
-          >{{ serviceHealth.text }}</OTag
-        >
+        <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{
+          serviceHealth.text
+        }}</OTag>
+        <AiEntryButton
+          v-if="assistantV2"
+          v-bind="serviceDoor"
+          :appearance="mdUp ? 'button' : 'toolbar-icon'"
+        />
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -108,50 +102,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="panel-content bg-surface-base dark:bg-graph-panel-scrim flex-1 overflow-x-hidden overflow-y-auto py-2.5"
     >
-      <!-- Own line, held from first paint: the title can't squeeze the chips, and chips that land later move nothing. -->
-      <div
-        v-if="versionsEnabled && !isInferred"
-        class="px-page-edge flex min-h-8 min-w-0 flex-nowrap items-center gap-2 overflow-hidden pb-2"
-        data-test="svcver-panel-identity"
+      <ul
+        v-if="dependencies.length > 0"
+        class="px-page-edge border-border-default mb-2 flex flex-col gap-1 border-b pb-2"
+        :aria-label="t('assistant.entry.dependencies')"
+        data-test="service-graph-node-panel-dependencies"
       >
-        <OTruncatedText
-          v-if="identityNotReported || identityAbsent"
-          class="text-text-secondary min-w-0 text-xs"
-          data-test="svcver-panel-identity-not-reported"
-          >{{ t("serviceVersions.panel.identityNotReported") }}</OTruncatedText
+        <li
+          v-for="dep in dependencies"
+          :key="dep.key"
+          class="text-text-body flex items-center gap-2 text-sm"
         >
-        <template v-else-if="headerIdentity">
-          <span v-if="!placeWithoutSpans" class="flex min-w-0 shrink"
-            ><ServiceEnvChip :identity="headerIdentity" :service="headerIdentity.service_name"
-          /></span>
-          <span class="flex min-w-0 shrink">
-            <ODimensionChip
-              v-if="pickedPlace"
-              dim-key="where"
-              :key-label="t('serviceVersions.compare.whereChip')"
-              :value="whereText(headerIdentity.where_key, headerIdentity.where, t)"
-              :value-tooltip="false"
-              removable
-              :remove-label="t('serviceVersions.panel.clearPlace')"
-              remove-data-test="svcver-panel-place-clear"
-              data-test="svcver-panel-place"
-              @remove="clearPickedPlace" /><ServiceScopeChip
-              v-else
-              facet="where"
-              :where-key="headerIdentity.where_key"
-              :place="headerIdentity.where"
-          /></span>
-          <span v-if="!placeWithoutSpans" class="flex min-w-0 shrink"
-            ><ServiceScopeChip facet="version" :value="headerVersion"
-          /></span>
-        </template>
-        <OSkeleton
-          v-else-if="panelVersions.isLoading.value"
-          type="text"
-          class="h-3.5 w-64!"
-          data-test="svcver-panel-identity-loading"
-        />
-      </div>
+          <OTruncatedText class="min-w-0 flex-1">{{ dep.name }}</OTruncatedText>
+          <AiEntryButton v-bind="dependencyDoor(dep)" appearance="toolbar-icon" />
+        </li>
+      </ul>
       <!-- RED Charts Section -->
       <div
         v-if="streamFilter !== 'all'"
@@ -844,13 +809,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  isOutsideK8s,
-  versionImageLabel,
-  versionPlaces,
-  whereSentence,
-  whereText,
-} from "@/utils/serviceVersionsCopy";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -858,6 +818,8 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -1203,6 +1165,7 @@ export default defineComponent({
     ServiceEnvChip,
     ServiceScopeChip,
     OTag,
+    OTruncatedText,
     OSeparator,
     OSkeleton,
     ODimensionChip,
@@ -1227,6 +1190,9 @@ export default defineComponent({
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
     OAgentBadges,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   props: {
     selectedNode: {
@@ -1266,6 +1232,93 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
+
+    // The selection card's door: the service with its inbound and outbound calls over the window.
+    const assistantV2 = isAssistantV2();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => props.graphData,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const { mdUp } = useBreakpoint();
+    const serviceDoor = computed(() => {
+      const node = props.selectedNode ?? {};
+      const id = node.id;
+      const sum = (edges: any[]) => edges.reduce((n, e) => n + (e.total_requests || 0), 0);
+      const inbound = sum(props.graphData.edges.filter((e: any) => e.to === id));
+      const outbound = sum(props.graphData.edges.filter((e: any) => e.from === id));
+      return {
+        verb: "explain" as const,
+        entryKind: "object_verb" as const,
+        boundOrg: loadedOrg?.value,
+        objectKind: "service_edge" as const,
+        label: t("assistant.entry.explainService"),
+        tooltip: t("assistant.entry.tooltip.explainService"),
+        dataTest: "ai-entry-service-edge-explain" as const,
+        build: async () =>
+          (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+            org: store.state.selectedOrganization?.identifier ?? "",
+            source: String(node.name || node.label || id || ""),
+            inbound,
+            outbound,
+            range: {
+              from: Math.round(props.timeRange.startTime / 1000),
+              to: Math.round(props.timeRange.endTime / 1000),
+            },
+            timeZone: store.state.timezone || "UTC",
+          }),
+      };
+    });
+    // Each edge touching the selected node, so every dependency has its own named door.
+    const dependencies = computed(() => {
+      const id = props.selectedNode?.id;
+      if (!assistantV2 || id === undefined) return [];
+      const nameOf = (nodeId: unknown) => {
+        const node = props.graphData.nodes?.find((n: any) => n.id === nodeId);
+        return String(node?.name || node?.label || nodeId || "");
+      };
+      return (props.graphData.edges ?? [])
+        .filter((e: any) => e.from != null && (e.from === id || e.to === id) && e.from !== e.to)
+        .map((e: any) => {
+          const source = nameOf(e.from);
+          const target = nameOf(e.to);
+          return {
+            key: `${e.from}->${e.to}`,
+            name: `${source} → ${target}`,
+            source,
+            target,
+            edge: e,
+          };
+        });
+    });
+    const dependencyDoor = (dep: { name: string; source: string; target: string; edge: any }) => ({
+      verb: "explain" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg?.value,
+      objectKind: "service_edge" as const,
+      label: t("assistant.entry.explainDependencyNamed", { name: dep.name }),
+      tooltip: t("assistant.entry.tooltip.explainEdge"),
+      dataTest: "ai-entry-service-edge-explain" as const,
+      build: async () => {
+        const requests = Number(dep.edge.total_requests) || 0;
+        const failed = Number(dep.edge.failed_requests) || 0;
+        const p95 = Number(dep.edge.p95_latency_ns) || 0;
+        return (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          source: dep.source,
+          target: dep.target,
+          requests,
+          ...(requests > 0 && { errorRate: failed / requests }),
+          ...(p95 > 0 && { p95Ms: p95 / 1e6 }),
+          range: {
+            from: Math.round(props.timeRange.startTime / 1000),
+            to: Math.round(props.timeRange.endTime / 1000),
+          },
+          timeZone: store.state.timezone || "UTC",
+        });
+      },
+    });
     const router = useRouter();
     const versionPanel = useServicePanelRoute();
     const routeOwnsNode = computed(() => versionPanel.owns(props.selectedNode));
@@ -3171,6 +3224,11 @@ export default defineComponent({
     }
 
     return {
+      assistantV2,
+      serviceDoor,
+      mdUp,
+      dependencies,
+      dependencyDoor,
       raw,
       t,
       whereUnscopedNotice,

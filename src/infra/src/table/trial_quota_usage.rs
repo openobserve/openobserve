@@ -37,6 +37,14 @@ pub enum Spend {
     Exhausted { used: i64, limit: i64 },
 }
 
+/// One consent change: the pool it is for, the new value and the authenticated user making it.
+#[derive(Debug, Clone, Copy)]
+pub struct PaidOverageConsent<'a> {
+    pub pool: &'a str,
+    pub enabled: bool,
+    pub actor: &'a str,
+}
+
 /// One settled window's free steps per pool. `month` scopes the status pool alone.
 pub struct SyntheticsDeltas {
     pub browser: i64,
@@ -318,24 +326,63 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
 /// on existing rows, so quota accounting and administrator limits survive.
 pub async fn set_paid_overage_enabled_for_features(
     org_id: &str,
+    consent: PaidOverageConsent<'_>,
     features: &[&str],
-    enabled: bool,
 ) -> Result<(), sea_orm::DbErr> {
-    set_paid_overage_enabled_for_features_in(get_orm_client_rw().await, org_id, features, enabled)
+    set_paid_overage_enabled_for_features_in(get_orm_client_rw().await, org_id, consent, features)
         .await
 }
 
 async fn set_paid_overage_enabled_for_features_in<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
+    consent: PaidOverageConsent<'_>,
     features: &[&str],
-    enabled: bool,
 ) -> Result<(), sea_orm::DbErr> {
-    if features.is_empty() {
+    let PaidOverageConsent {
+        pool,
+        enabled,
+        actor,
+    } = consent;
+    let Some(seed) = features.first() else {
         return Ok(());
-    }
+    };
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
+    // The cumulative flag is the seed row's, as `fold_paid_overage` reads it.
+    let was_enabled = trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.eq(*seed))
+        .one(&txn)
+        .await?
+        .is_some_and(|row| row.paid_overage_enabled);
+    upsert_consent_rows(&txn, org_id, features, enabled, now).await?;
+    if enabled {
+        // A repeat enable keeps the first enabler; an enable is never stored without one.
+        if !was_enabled {
+            super::paid_overage_attribution::record_in(&txn, org_id, pool, true, actor, now)
+                .await?;
+        }
+        return txn.commit().await;
+    }
+    txn.commit().await?;
+    // Best effort after the commit: a failed attribution write must never undo a revoke.
+    if let Err(e) =
+        super::paid_overage_attribution::record_in(conn, org_id, pool, false, actor, now).await
+    {
+        log::warn!("[TRIAL_QUOTA] revoke attribution not recorded for org={org_id}: {e}");
+    }
+    Ok(())
+}
+
+/// Upserts `enabled` on every feature row, touching only consent and `updated_at` on existing rows.
+async fn upsert_consent_rows<C: ConnectionTrait>(
+    txn: &C,
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
     for feature in features {
         let active_model = trial_quota_usage::ActiveModel {
             org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
@@ -360,10 +407,10 @@ async fn set_paid_overage_enabled_for_features_in<C: ConnectionTrait + Transacti
                 .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
                 .to_owned(),
             )
-            .exec(&txn)
+            .exec(txn)
             .await?;
     }
-    txn.commit().await
+    Ok(())
 }
 
 /// Load every exact consent row for startup and periodic reconciliation.
@@ -672,6 +719,23 @@ mod tests {
 
     /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
     async fn db() -> DatabaseConnection {
+        let db = quota_only_db().await;
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(
+            backend.build(
+                &schema.create_table_from_entity(
+                    crate::table::entity::paid_overage_attribution::Entity,
+                ),
+            ),
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    /// No `paid_overage_attribution` table, so every attribution write fails.
+    async fn quota_only_db() -> DatabaseConnection {
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
         let db = Database::connect(opts).await.unwrap();
@@ -681,6 +745,25 @@ mod tests {
             .await
             .unwrap();
         db
+    }
+
+    fn consent(enabled: bool) -> PaidOverageConsent<'static> {
+        consent_by(enabled, "admin@acme.io")
+    }
+
+    fn consent_by(enabled: bool, actor: &str) -> PaidOverageConsent<'_> {
+        PaidOverageConsent {
+            pool: "ai_credits",
+            enabled,
+            actor,
+        }
+    }
+
+    async fn enabler_of(db: &DatabaseConnection) -> Option<String> {
+        crate::table::paid_overage_attribution::get_in(db, ORG, "ai_credits")
+            .await
+            .unwrap()
+            .and_then(|row| row.enabled_by_email)
     }
 
     async fn seed(db: &DatabaseConnection, org_id: &str, feature: &str, usage_count: i64) {
@@ -828,7 +911,7 @@ mod tests {
         let db = db().await;
         seed_row(&db, ORG, AI, 340, Some(10_000)).await;
 
-        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(true), AI_FEATURES)
             .await
             .unwrap();
 
@@ -838,17 +921,22 @@ mod tests {
         let ai = row_of(&db, ORG, AI).await;
         assert_eq!(ai.usage_count, 340);
         assert_eq!(ai.usage_limit, Some(10_000));
+        let actor = crate::table::paid_overage_attribution::get_in(&db, ORG, "ai_credits")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(actor.enabled_by_email.as_deref(), Some("admin@acme.io"));
     }
 
     #[tokio::test]
     async fn revoking_paid_overage_disables_every_backing_row_without_resetting_usage() {
         let db = db().await;
         seed_row(&db, ORG, AI, 340, Some(10_000)).await;
-        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(true), AI_FEATURES)
             .await
             .unwrap();
 
-        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, false)
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(false), AI_FEATURES)
             .await
             .unwrap();
 
@@ -858,11 +946,17 @@ mod tests {
         let ai = row_of(&db, ORG, AI).await;
         assert_eq!(ai.usage_count, 340);
         assert_eq!(ai.usage_limit, Some(10_000));
+        let actor = crate::table::paid_overage_attribution::get_in(&db, ORG, "ai_credits")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(actor.enabled_by_email, None);
+        assert_eq!(actor.disabled_by_email.as_deref(), Some("admin@acme.io"));
     }
     #[tokio::test]
     async fn ordinary_usage_upsert_preserves_paid_overage() {
         let db = db().await;
-        set_paid_overage_enabled_for_features_in(&db, ORG, &[AI], true)
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(true), &[AI])
             .await
             .unwrap();
 
@@ -875,17 +969,94 @@ mod tests {
 
     #[tokio::test]
     async fn paid_overage_bundle_uses_one_transaction() {
-        let db = mock_db(DatabaseBackend::Sqlite, AI_FEATURES.len());
+        let seed_read = 1;
+        let attribution = 1;
+        let writes = seed_read + AI_FEATURES.len() + attribution;
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([Vec::<trial_quota_usage::Model>::new()])
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                };
+                AI_FEATURES.len() + attribution
+            ])
+            .into_connection();
 
-        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(true), AI_FEATURES)
             .await
             .unwrap();
 
         assert_one_transaction(
             &db.into_transaction_log(),
-            AI_FEATURES.len(),
+            writes,
             "set_paid_overage_enabled_for_features_in",
         );
+    }
+
+    #[tokio::test]
+    async fn a_revoke_commits_even_when_its_attribution_cannot_be_written() {
+        let db = quota_only_db().await;
+        seed_row(&db, ORG, AI, 340, None).await;
+        trial_quota_usage::Entity::update_many()
+            .col_expr(
+                trial_quota_usage::Column::PaidOverageEnabled,
+                Expr::value(true),
+            )
+            .exec(&db)
+            .await
+            .unwrap();
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, consent(false), AI_FEATURES)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(!row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_enable_without_its_enabler_is_rolled_back() {
+        let db = quota_only_db().await;
+        seed_row(&db, ORG, AI, 340, None).await;
+
+        assert!(
+            set_paid_overage_enabled_for_features_in(&db, ORG, consent(true), AI_FEATURES)
+                .await
+                .is_err()
+        );
+
+        assert!(!row_of(&db, ORG, AI).await.paid_overage_enabled);
+        assert!(has_no_row(&db, ORG, "new_incident").await);
+    }
+
+    #[tokio::test]
+    async fn a_repeat_enable_keeps_the_first_enabler_until_a_revoke() {
+        let db = db().await;
+        for (enabled, actor) in [(true, "first@acme.io"), (true, "second@acme.io")] {
+            set_paid_overage_enabled_for_features_in(
+                &db,
+                ORG,
+                consent_by(enabled, actor),
+                AI_FEATURES,
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(enabler_of(&db).await.as_deref(), Some("first@acme.io"));
+
+        for (enabled, actor) in [(false, "owner@acme.io"), (true, "second@acme.io")] {
+            set_paid_overage_enabled_for_features_in(
+                &db,
+                ORG,
+                consent_by(enabled, actor),
+                AI_FEATURES,
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(enabler_of(&db).await.as_deref(), Some("second@acme.io"));
     }
 
     /// A leaked org or a leaked feature is a grant spent against the wrong pool.

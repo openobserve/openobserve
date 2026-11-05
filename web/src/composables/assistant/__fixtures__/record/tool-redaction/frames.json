@@ -1,0 +1,82 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "hidden": {
+    "call_r2": {
+      "reason": "stream_forbidden",
+      "stream": "payments_audit"
+    }
+  },
+  "turns": [
+    {
+      "turn_id": "t-red-1",
+      "created": 1772418660000000,
+      "user": {
+        "text": "How many checkout errors?"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchSQL",
+          "message": "Querying logs",
+          "context": {
+            "sql": "SELECT count(*) FROM checkout WHERE level='error'"
+          },
+          "call_id": "call_r1"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchSQL",
+          "success": true,
+          "call_id": "call_r1",
+          "summary": {
+            "count": 1287,
+            "took": 31
+          },
+          "call_args": {
+            "sql": "SELECT count(*) FROM checkout"
+          },
+          "response": {
+            "hits": [
+              {
+                "count": 1287
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchSQL",
+          "message": "Querying the audit stream",
+          "context": {
+            "sql": "SELECT * FROM payments_audit"
+          },
+          "call_id": "call_r2"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchSQL",
+          "success": true,
+          "call_id": "call_r2",
+          "summary": "3 rows about card 4111",
+          "call_args": {
+            "sql": "SELECT * FROM payments_audit"
+          }
+        },
+        {
+          "type": "message_delta",
+          "content": "There were 1,287 checkout errors in the last hour."
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 8
+    }
+  ]
+}

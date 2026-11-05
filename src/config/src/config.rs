@@ -148,16 +148,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
 // 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
 // 150: add budget to online_eval_jobs.
-// 151: add last_run_class, last_run_class_at and last_tested_at to synthetics.
-// 152: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
-// 153: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
-// 154: add synthetics.status_recovered_at and status_streak_sig, and
-//      status_page_notices.false_alarm_recovered_at.
-// 155: create the service version, identity, alias, deploy and verdict tables.
-// 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-// 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
-//      service_streams rows named by the metric-name label that list no trace stream.
-pub const DB_SCHEMA_VERSION: u64 = 157;
+// 151: add first_event_at to ai_chat_turns.
+// 152: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 153: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 154: create paid_overage_attribution.
+// 155: create ai_approvals.
+// 156: add agent to ai_chat_turns.
+pub const DB_SCHEMA_VERSION: u64 = 156;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3057,6 +3054,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

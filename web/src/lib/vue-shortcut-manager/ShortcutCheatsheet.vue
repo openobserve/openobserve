@@ -220,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from "vue";
+import { computed, effectScope, ref, shallowRef, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -233,6 +233,7 @@ import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
 import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import config from "@/aws-exports";
+import { isAssistantV2, useAssistantName } from "@/composables/assistant/pure";
 
 const props = withDefaults(
   defineProps<{
@@ -251,6 +252,18 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+// Loaded only with the flag on, so the legacy path neither builds nor downloads the assistant runtime.
+const assistantCanChat = shallowRef<(() => boolean) | null>(null);
+// A child of this component's scope, so the reader built after the import stops on unmount.
+const assistantScope = effectScope();
+if (isAssistantV2()) {
+  void import("@/composables/assistant").then(({ useAssistantCapability }) => {
+    if (!assistantScope.active) return;
+    const capability = assistantScope.run(() => useAssistantCapability());
+    if (capability) assistantCanChat.value = () => capability.assistantCanChat.value;
+  });
+}
+onUnmounted(() => assistantScope.stop());
 
 // Edition + `/config` flags that decide which feature pages the build can reach.
 const capabilities = computed<ShortcutCapabilities>(() => ({
@@ -265,6 +278,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
   aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
   downtimesEnabled: store.state.zoConfig?.downtimes_enabled === true,
+  assistantCanChat: assistantCanChat.value?.() ?? false,
 }));
 
 const open = computed({
@@ -299,6 +313,15 @@ const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
  */
 const PAGE_TITLE_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
   "shortcuts.pages.rumSessions": { product: raw("RUM") },
+  "shortcuts.pages.assistant": useAssistantName(),
+  "shortcuts.pages.assistantComposer": useAssistantName(),
+};
+
+// The same rule for module titles and shortcut labels that name a product.
+const LABEL_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
+  "shortcuts.modules.assistant": useAssistantName(),
+  "shortcuts.actions.assistantClose": useAssistantName(),
+  "shortcuts.actions.assistantOpen": useAssistantName(),
 };
 
 /**
@@ -312,7 +335,7 @@ function entryDisplay(e: ShortcutEntry): string {
 const allModules = computed<DisplayModule[]>(() => {
   const caps = capabilities.value;
   return SHORTCUT_MODULES.map((m) => ({
-    title: m.title ? raw(m.title) : t(m.titleKey),
+    title: m.title ? raw(m.title) : t(m.titleKey, LABEL_PARAMS[m.titleKey] ?? {}),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
       if (!group || (group.visible && !group.visible(caps))) return [];
@@ -325,7 +348,7 @@ const allModules = computed<DisplayModule[]>(() => {
             .map((s) => ({
               id: s.id,
               display: entryDisplay(s),
-              label: t(s.descriptionKey),
+              label: t(s.descriptionKey, LABEL_PARAMS[s.descriptionKey] ?? {}),
             })),
         },
       ];

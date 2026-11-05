@@ -238,3 +238,18 @@ describe("OInput — password reveal", () => {
     expect(mountPassword().get('[data-test="secret-reveal"]').attributes("tabindex")).toBe("-1");
   });
 });
+
+describe("OInput — inputAttrs", () => {
+  it("puts the attributes on the native input, after its own, so an accessible name and description stick", () => {
+    const wrapper = mount(OInput, {
+      props: {
+        modelValue: "",
+        inputAttrs: { "aria-label": "Ask", "aria-describedby": "line-1" },
+      },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("aria-label")).toBe("Ask");
+    expect(input.attributes("aria-describedby")).toBe("line-1");
+    expect(wrapper.element.getAttribute("aria-label")).toBeNull();
+  });
+});

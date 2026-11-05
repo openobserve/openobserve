@@ -71,6 +71,7 @@ markup — don't guess a prop name.
 | Side panel / large or contextual form                | `ODrawer`                                                                                                            | overlay-navigation      |
 | Menu of actions                                      | `ODropdown` (+ `ODropdownItem`)                                                                                      | overlay-navigation      |
 | Freeform floating content                            | `OPopover`                                                                                                           | overlay-navigation      |
+| Bottom sheet below `lg` that keeps the page visible  | `OSheet` (snaps `peek`/`half`/`full`, non-modal)                                                                     | overlay-navigation      |
 | Hover hint (that adds information)                   | `OTooltip` — not for repeating cut text; use `OTruncatedText`                                                       | overlay-navigation      |
 | Switch between content sections                      | `OTabs` (+ `OTab`/`OTabPanel`); `ORouteTab` for route-driven                                                         | overlay-navigation      |
 | Multi-step wizard                                    | `OStepper` (+ `OStep`)                                                                                               | overlay-navigation      |

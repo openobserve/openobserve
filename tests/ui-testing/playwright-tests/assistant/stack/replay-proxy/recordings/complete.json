@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "scenario": "complete",
+  "steps": [
+    {
+      "content": "## Replayed answer\n\nThis answer comes from the replay proxy. Stack flows assert its structure, never this text.\n\n- One list item\n- Another list item"
+    }
+  ]
+}

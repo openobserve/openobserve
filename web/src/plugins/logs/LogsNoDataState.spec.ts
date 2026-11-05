@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { h } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
@@ -21,6 +21,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoDataState from "./LogsNoDataState.vue";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 let wrapper: VueWrapper;
 
@@ -46,6 +47,17 @@ const shellProps = () => wrapper.findComponent(OEmptyState).vm.$.vnode.props ?? 
 
 afterEach(() => {
   wrapper?.unmount();
+});
+
+// These cases cover the legacy AI buttons, so a local VITE_ASSISTANT_V2 must not swap in the doors.
+beforeEach(() => {
+  window.__O2_ASSISTANT_V2__ = false;
+  resetAssistantV2ForTests();
+});
+
+afterEach(() => {
+  delete window.__O2_ASSISTANT_V2__;
+  resetAssistantV2ForTests();
 });
 
 describe("LogsNoDataState", () => {

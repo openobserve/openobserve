@@ -1,19 +1,38 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import OFile from "./OFile.vue";
+
+const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 
 describe("OFile", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
     wrapper?.unmount();
+    toast.mockReset();
   });
 
   function makeFile(name: string, sizeBytes: number, type = "text/plain") {
     return new File(["x".repeat(sizeBytes)], name, { type });
   }
+
+  it("toasts a rejected type by default and stays quiet with typeErrorToast false", async () => {
+    const pick = async (props: Record<string, unknown>) => {
+      wrapper = mount(OFile, { props: { accept: "image/png", ...props } });
+      const input = wrapper.find("input[type='file']").element as HTMLInputElement;
+      Object.defineProperty(input, "files", { value: [makeFile("a.txt", 4)], configurable: true });
+      await wrapper.find("input[type='file']").trigger("change");
+      return wrapper.emitted("type-error");
+    };
+    expect(await pick({})).toHaveLength(1);
+    expect(toast).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+    expect(await pick({ typeErrorToast: false })).toHaveLength(1);
+    expect(toast).toHaveBeenCalledTimes(1);
+  });
 
   it("renders without errors", () => {
     wrapper = mount(OFile);
@@ -97,5 +116,14 @@ describe("OFile", () => {
   it("renders the error message", () => {
     wrapper = mount(OFile, { props: { errorMessage: "Required" } });
     expect(wrapper.text()).toContain("Required");
+  });
+
+  it("exposes open() to a control that hides the field behind its own button", () => {
+    wrapper = mount(OFile);
+    const input = wrapper.get('input[type="file"]').element as HTMLInputElement;
+    let clicked = 0;
+    input.addEventListener("click", () => (clicked += 1));
+    (wrapper.vm as unknown as { open(): void }).open();
+    expect(clicked).toBe(1);
   });
 });

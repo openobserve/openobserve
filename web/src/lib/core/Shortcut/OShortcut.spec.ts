@@ -93,4 +93,15 @@ describe("OShortcut", () => {
     expect(cls).toContain("border-kbd-border");
     expect(cls).toContain("text-kbd-text");
   });
+
+  it("uses body text on the keycap with tone strong, and the kbd token by default", () => {
+    const strong = mount(OShortcut, { props: { keys: "shift+enter", tone: "strong" } });
+    expect(strong.get("kbd").classes()).toContain("text-text-body");
+    expect(strong.get("kbd").classes()).not.toContain("text-kbd-text");
+    expect(
+      mount(OShortcut, { props: { keys: "enter" } })
+        .get("kbd")
+        .classes(),
+    ).toContain("text-kbd-text");
+  });
 });

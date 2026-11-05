@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { ShareView } from "@/services/ai_chat_share";
-import { formatMicros } from "./chatShare";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { formatOrgTime } from "@/utils/formatters";
 
 const props = defineProps<{
   share: ShareView;
@@ -133,7 +133,7 @@ const confirmPending = () => {
         <span class="text-text-secondary text-xs">
           {{
             share.expires_at
-              ? t("aiChatShare.expiresAt", { time: formatMicros(share.expires_at) })
+              ? t("aiChatShare.expiresAt", { time: formatOrgTime(share.expires_at / 1000) })
               : t("aiChatShare.neverExpires")
           }}
         </span>

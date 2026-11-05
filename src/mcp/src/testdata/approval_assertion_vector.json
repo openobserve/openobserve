@@ -1,0 +1,15 @@
+{
+  "comment": "One signed approval both repos verify (identical copies): o2-ai tests/fixtures/approval_assertion_vector.json and openobserve src/mcp/src/testdata/approval_assertion_vector.json.",
+  "secret": "o2-shared-test-secret",
+  "key_hex": "cb0e801d76e0406ceb3c46e0b09e4be6491c339722be521aed3b694ba3cc6b09",
+  "org_id": "acme",
+  "user": "Alice@acme.io",
+  "session_id": "0199E7B2-6f0c-7a3e-a1b2-c3d4e5f60718",
+  "approval_id": "apr_0123456789abcdef0123",
+  "tool": "UpdateAlert",
+  "arguments": {"alert_id": "a1", "request_body": {"name": "Disk é", "enabled": true, "threshold": 3, "tags": ["x", "y"]}},
+  "canonical_arguments": "{\"alert_id\":\"a1\",\"request_body\":{\"enabled\":true,\"name\":\"Disk é\",\"tags\":[\"x\",\"y\"],\"threshold\":3}}",
+  "arguments_sha256": "59e3bc204779c4a611d876cde9c76605b31881aa4663a38e1ec554e62b8ddbb0",
+  "expiry": 1760000060,
+  "assertion": "apr_0123456789abcdef0123.1760000060.946c2e432cb5527c9ae488abe7dc41dd5035ce460357dd5e16ab82cb994be57e"
+}

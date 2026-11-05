@@ -1,0 +1,103 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-approve-1",
+      "created": 1772417580000000,
+      "user": {
+        "text": "Delete the stale alert"
+      },
+      "frames": [
+        {
+          "type": "status",
+          "message": "Thinking"
+        },
+        {
+          "type": "title",
+          "title": "Delete stale alert"
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchAlerts",
+          "message": "Listing alerts",
+          "context": {
+            "query": "disabled > 30d"
+          },
+          "call_id": "call_a1"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchAlerts",
+          "success": true,
+          "call_id": "call_a1",
+          "summary": {
+            "count": 1
+          },
+          "response": {
+            "alerts": [
+              {
+                "name": "checkout-latency-old"
+              }
+            ]
+          }
+        },
+        {
+          "type": "message_delta",
+          "content": "I found **checkout-latency-old**. Deleting it needs your approval."
+        },
+        {
+          "type": "confirmation_required",
+          "id": "apr_1",
+          "tool": "o2_delete",
+          "kind": "delete",
+          "operation": "Delete 1 alert",
+          "destructive": true,
+          "targets": [
+            {
+              "type": "alert",
+              "id": "2Yx9alert",
+              "name": "checkout-latency-old"
+            }
+          ],
+          "args": {
+            "items": [
+              {
+                "resource_type": "alert",
+                "name": "checkout-latency-old",
+                "id": "2Yx9alert"
+              }
+            ]
+          },
+          "message": "Do you really want to delete the \"checkout-latency-old\" alert?"
+        },
+        {
+          "type": "confirmation_resolved",
+          "id": "apr_1",
+          "approved": true,
+          "by": "you",
+          "at": 1772417671000
+        },
+        {
+          "type": "tool_result",
+          "tool": "o2_delete",
+          "success": true,
+          "summary": {
+            "deleted": 1
+          },
+          "call_id": "call_a2"
+        },
+        {
+          "type": "message_delta",
+          "content": "Done — the alert was deleted."
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 11
+    }
+  ]
+}

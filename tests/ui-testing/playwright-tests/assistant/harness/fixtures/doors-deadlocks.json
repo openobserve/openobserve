@@ -1,0 +1,46 @@
+{
+  "hits": [
+    {
+      "id": "dl-1",
+      "timestamp": 0,
+      "db_system": "postgresql",
+      "db_instance": "orders-db",
+      "db_namespace": "shop",
+      "victim_pid": 4311,
+      "participant_count": 2,
+      "partial": false,
+      "query_shape": "fp1|fp2",
+      "objects": [
+        "orders",
+        "order_items"
+      ],
+      "participants": [
+        {
+          "pid": 4311,
+          "transaction_id": "1430",
+          "query": "UPDATE orders SET status = 'paid' WHERE id = $1",
+          "fingerprint": "fp1",
+          "application": "checkout-api",
+          "user": "app",
+          "lock_mode": "ShareLock",
+          "lock_target": "transaction 1431",
+          "victim": true
+        },
+        {
+          "pid": 4312,
+          "transaction_id": "1431",
+          "query": "UPDATE order_items SET qty = qty - 1 WHERE order_id = $1",
+          "fingerprint": "fp2",
+          "application": "inventory-worker",
+          "user": "app",
+          "lock_mode": "ShareLock",
+          "lock_target": "transaction 1430",
+          "victim": false
+        }
+      ],
+      "raw": "ERROR: deadlock detected"
+    }
+  ],
+  "total": 1,
+  "stream": "postgres_logs"
+}

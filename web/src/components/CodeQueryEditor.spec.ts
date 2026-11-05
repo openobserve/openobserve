@@ -17,6 +17,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { onGoToRequest } from "@/composables/goto/goToRequests";
+import { GO_TO_EDITOR_ACTION_ID } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
 // Stable model instance. CodeQueryEditor's completion provider answers only for
 // its OWN model (`if (own && model !== own) return { suggestions: [] }`), so a
@@ -42,6 +45,7 @@ const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  addAction: vi.fn(() => ({ dispose: vi.fn() })),
   onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
@@ -121,6 +125,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     UpArrow: 16,
     DownArrow: 18,
     KeyI: 39,
+    KeyK: 41,
     KeyN: 44,
     KeyP: 46,
     KeyZ: 56,
@@ -754,6 +759,100 @@ describe("CodeQueryEditor", () => {
     // The shortcut is bound via onKeyDown rather than addCommand: monaco's
     // addCommand discards the disposable it gets back, so its CommandsRegistry
     // entry outlives the editor and retains this component.
+    const assistantAction = () =>
+      (mockEditorObj.addAction.mock.calls as unknown as [any][])
+        .map(([action]) => action)
+        .find((action) => action.id === "o2.assistantHelper");
+
+    it("binds the assistant chord as an editor action that wins over Monaco's own Ctrl+I", async () => {
+      const chord = vi.fn(() => true);
+      await mountAndSetup({ assistantChord: chord });
+      const action = assistantAction();
+      expect(action.keybindings).toEqual([2048 | 39]);
+      action.run();
+      expect(chord).toHaveBeenCalled();
+      expect(mockEditorObj.trigger).not.toHaveBeenCalled();
+    });
+
+    it("keeps Monaco's suggest on the chord where the door does not render", async () => {
+      await mountAndSetup({ assistantChord: () => false });
+      const action = assistantAction();
+      action.run();
+      expect(mockEditorObj.trigger).toHaveBeenCalledWith(
+        "keyboard",
+        "editor.action.triggerSuggest",
+        {},
+      );
+    });
+
+    it("leaves Ctrl+Space to Monaco's suggest when the assistant chord is bound", async () => {
+      await mountAndSetup({ assistantChord: vi.fn(() => true) });
+      const action = assistantAction();
+      expect(action.keybindings).toEqual([2048 | 39]);
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      const preventDefault = vi.fn();
+      handler({
+        keyCode: 10,
+        ctrlKey: true,
+        metaKey: false,
+        preventDefault,
+        stopPropagation: vi.fn(),
+      });
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(mockEditorObj.trigger).not.toHaveBeenCalled();
+    });
+
+    it("binds no assistant action without a chord", async () => {
+      await mountAndSetup();
+      expect(assistantAction()).toBeUndefined();
+    });
+
+    describe("Go to chord", () => {
+      const goToAction = () =>
+        (mockEditorObj.addAction.mock.calls as unknown as [any][])
+          .map(([action]) => action)
+          .find((action) => action.id === GO_TO_EDITOR_ACTION_ID);
+
+      afterEach(() => {
+        delete window.__O2_ASSISTANT_V2__;
+        resetAssistantV2ForTests();
+      });
+
+      it("binds ⌘K as the o2.goTo action under v2 and asks the layout for Go to", async () => {
+        window.__O2_ASSISTANT_V2__ = true;
+        resetAssistantV2ForTests();
+        const sources: string[] = [];
+        const off = onGoToRequest((source) => sources.push(source));
+        await mountAndSetup();
+        const action = goToAction();
+        expect(action.id).toBe("o2.goTo");
+        expect(action.keybindings).toEqual([2048 | 41]);
+        action.run();
+        expect(sources).toEqual(["editor"]);
+        off();
+      });
+
+      it("leaves ⌘K to Monaco when v2 is off", async () => {
+        window.__O2_ASSISTANT_V2__ = false;
+        resetAssistantV2ForTests();
+        await mountAndSetup();
+        expect(goToAction()).toBeUndefined();
+      });
+
+      it("disposes the action with the editor", async () => {
+        window.__O2_ASSISTANT_V2__ = true;
+        resetAssistantV2ForTests();
+        const dispose = vi.fn();
+        mockEditorObj.addAction.mockImplementation((() => ({ dispose })) as any);
+        const wrapper = await mountAndSetup();
+        expect(goToAction()).toBeDefined();
+        wrapper.unmount();
+        shortcutWrapper = null;
+        expect(dispose).toHaveBeenCalled();
+        mockEditorObj.addAction.mockImplementation(() => ({ dispose: vi.fn() }));
+      });
+    });
+
     it("should bind the shortcut through onKeyDown, not addCommand", async () => {
       await mountAndSetup();
       expect(mockEditorObj.onKeyDown).toHaveBeenCalled();

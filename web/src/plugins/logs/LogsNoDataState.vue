@@ -120,8 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           {{ raw("Windows") }}
         </EmptyStateIngestionChip>
+        <slot v-if="assistantV2" name="ai-door" />
         <EmptyStateIngestionChip
-          v-if="aiEnabled"
+          v-else-if="aiEnabled"
           variant="ai"
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
@@ -143,6 +144,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
@@ -154,6 +156,8 @@ const props = defineProps<{
 defineSlots<{
   /** A line between the description and the cards. */
   status?(): unknown;
+  /** With the assistant on: the page's own door in place of the legacy Ask AI chip. */
+  "ai-door"?(): unknown;
 }>();
 
 const emit = defineEmits<{
@@ -164,6 +168,7 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const { aiIconSrc } = useAiIcon();
+const assistantV2 = isAssistantV2();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,

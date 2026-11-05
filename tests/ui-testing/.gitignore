@@ -24,3 +24,6 @@ test-output.log
 
 # test-assist-ci throwaway specs (generated per run, deleted after)
 playwright-tests/_ci_tmp/
+
+# Assistant harness run output (captures, axe reports, telemetry exports)
+playwright-tests/assistant/harness/out/

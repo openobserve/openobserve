@@ -63,8 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
+        <template v-if="assistantV2">
+          <AiEntryButton
+            v-if="windowHasStreamData && !jumpTarget"
+            v-bind="emptyResultDoor"
+            appearance="chip"
+          />
+        </template>
         <OButton
-          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+          v-else-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
           data-test="traces-no-events-ask-ai-btn"
@@ -81,8 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -122,6 +131,23 @@ const emit = defineEmits<{
 const aiEnabled = computed(() => !!props.aiEnabled);
 
 const { searchObj } = useTraces();
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const emptyResultDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "empty_result" as const,
+  label: t("assistant.entry.troubleshootNoResults"),
+  tooltip: t("assistant.entry.tooltip.emptyResult"),
+  dataTest: "ai-entry-empty-result-troubleshoot" as const,
+  build: tracingQueryBuild(
+    () => tracesDoorBase(searchObj, store.state),
+    () => "",
+  ),
+}));
 
 // --- filter detection -------------------------------------------------------
 

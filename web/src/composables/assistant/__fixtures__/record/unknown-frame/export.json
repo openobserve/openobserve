@@ -1,0 +1,22 @@
+[
+  {
+    "role": "user",
+    "content": "Why 5xx?",
+    "sentAt": 1772418180000,
+    "turnId": "t-unk-1"
+  },
+  {
+    "role": "assistant",
+    "content": "The 5xx come from payments.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "The 5xx come from payments."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

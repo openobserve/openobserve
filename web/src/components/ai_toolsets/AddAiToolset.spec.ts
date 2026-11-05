@@ -503,5 +503,34 @@ describe("AddAiToolset", () => {
       );
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
     });
+
+    it("round-trips masked headers as the merge marker and a changed one as typed", async () => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "tool-1",
+          name: "existing_tool",
+          kind: "mcp",
+          description: "",
+          data: {
+            url: "https://edit.example.com/mcp/",
+            timeout_seconds: 60,
+            headers: { Authorization: "***", "X-Team": "***" },
+          },
+        },
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      getForm().setFieldValue("mcp.headers[1].value", "team-7");
+      await getForm().handleSubmit();
+      await flushPromises();
+
+      const body = vi.mocked(aiToolsetsService.update).mock.calls[0][2] as {
+        data: { headers: Record<string, string> };
+      };
+      expect(body.data.headers).toEqual({ Authorization: "***", "X-Team": "team-7" });
+      expect(Object.values(body.data.headers).filter((v) => v !== "***")).toEqual(["team-7"]);
+    });
   });
 });

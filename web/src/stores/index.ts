@@ -28,7 +28,7 @@ import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/draft
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import config from "@/aws-exports";
-import { setDeployTimeZone } from "@/utils/deployTimeZone";
+import { setOrgTimeZoneSource } from "@/utils/formatters";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -357,6 +357,10 @@ const store = createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
+    setRegexPatternHandoff(state, payload: { prompt: string; testValue: string }) {
+      state.organizationData.regexPatternPrompt = payload.prompt;
+      state.organizationData.regexPatternTestValue = payload.testValue;
+    },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
     },
@@ -645,5 +649,6 @@ const store = createStore({
 
 // Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
 setPickerTimezoneSource(() => store.state.timezone);
+setOrgTimeZoneSource(() => store.state.timezone);
 
 export default store;

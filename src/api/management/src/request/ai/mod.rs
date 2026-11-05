@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod access_requests;
+pub mod activity;
+pub mod capabilities;
 pub mod chat;
 pub mod chats;
+pub mod error;
+pub mod grants;
+pub mod settings;
 pub mod shares;
 pub mod toolsets;
+pub mod turn_marks;

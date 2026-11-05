@@ -332,7 +332,7 @@ function handleRemove(e: MouseEvent): void {
         'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
         'disabled:pointer-events-none disabled:opacity-40',
       ]"
-      data-test="o2-badge-remove"
+      :data-test="removeDataTest ?? 'o2-badge-remove'"
       @click="handleRemove"
     >
       <OIcon name="close" size="xs" />

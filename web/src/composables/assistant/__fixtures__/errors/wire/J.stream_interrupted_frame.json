@@ -1,0 +1,8 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:1371-1374",
+  "shape": "J",
+  "body": {
+    "type": "error",
+    "error": "Stream interrupted: error decoding response body"
+  }
+}

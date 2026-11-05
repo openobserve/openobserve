@@ -20,6 +20,7 @@ pub mod read;
 pub mod resolution;
 pub mod resolve;
 pub mod schedule;
+pub mod services_trend;
 pub mod sql;
 pub mod state;
 pub mod writer;

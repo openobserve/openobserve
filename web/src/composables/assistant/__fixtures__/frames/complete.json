@@ -1,0 +1,24 @@
+{
+  "_source": "o2-ai src/server/stream_helpers.py complete frame; o2-enterprise ai/chat/turn.rs mark_persisted adds persisted",
+  "_item": "today",
+  "frame": {
+    "type": "complete",
+    "history": [
+      {
+        "role": "assistant",
+        "content": "Done."
+      }
+    ],
+    "compacted": false,
+    "usage": {
+      "input_tokens": 18342,
+      "output_tokens": 612,
+      "total_tokens": 18954,
+      "cached_tokens": 12288,
+      "llm_calls": 3,
+      "cost": 0.0213
+    },
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "persisted": true
+  }
+}

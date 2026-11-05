@@ -1,0 +1,8 @@
+{
+  "_source": "o2-ai src/opencode/events.py message_delta frame",
+  "_item": "today",
+  "frame": {
+    "type": "message_delta",
+    "content": "## Checkout 5xx spike "
+  }
+}

@@ -934,7 +934,8 @@ export default defineComponent({
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
-      const folderId = event.folderId || listFolderId.value;
+      if (event.type === "alerts_changed") return;
+      const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
         // The AI agent just changed this folder, so refetch rather than serving
         // the cached list.

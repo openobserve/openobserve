@@ -28,6 +28,20 @@ interface ConsentRequest {
 /** Where a prompt renders. "chat" falls back to the dialog while no chat is open. */
 export type ConsentSurface = "dialog" | "chat";
 
+/** The additive form: the global dialog, or the consent card of an assistant session. */
+export interface ConsentPromptOptions {
+  surface: "dialog" | { sid: string };
+  signal?: AbortSignal;
+}
+
+/** The assistant's consent runtime: shows the card on that session and settles with the user's answer. */
+export type SessionConsentSurface = (
+  sid: string,
+  orgId: string,
+  feature: PaidOverageFeature,
+  status: PaidOverageStatus,
+) => Promise<boolean>;
+
 interface SharedConsentRequest {
   promise: Promise<boolean>;
   subscribers: number;
@@ -41,6 +55,7 @@ const acknowledgementChecked = ref(false);
 const isSubmitting = ref(false);
 const errorMessage = ref("");
 const openChats = ref(0);
+let sessionSurface: SessionConsentSurface | null = null;
 
 const showInChat = computed(() => activeRequest.value?.surface === "chat" && openChats.value > 0);
 const showInDialog = computed(() => !!activeRequest.value && !showInChat.value);
@@ -107,6 +122,31 @@ function withAbort(
   return abortable;
 }
 
+/** The assistant registers its session card here; a session caller never touches the module-global queue. */
+export function registerSessionConsentSurface(surface: SessionConsentSurface | null): void {
+  sessionSurface = surface;
+}
+
+/** The organizations a status still needs paid usage enabled on, member first, then payer. */
+export function missingOrganizationsOf(status: PaidOverageStatus | null | undefined) {
+  if (!status) return [];
+  return [status.organization, status.payer]
+    .filter((organization) => organization && !organization.enabled)
+    .map((organization) => organization!);
+}
+
+/** PUTs every missing organization, then reads the status back: the one enable sequence. */
+export async function enablePaidOverage(
+  orgId: string,
+  feature: PaidOverageFeature,
+  status: PaidOverageStatus,
+): Promise<PaidOverageStatus> {
+  for (const organization of missingOrganizationsOf(status)) {
+    await paidOverage.update(organization.org_id, feature, true);
+  }
+  return (await paidOverage.get(orgId, feature)).data;
+}
+
 export function isPaidOverageConsentError(
   status: number,
   body: unknown,
@@ -128,10 +168,18 @@ export function usePaidOverageConsent() {
     orgId: string,
     feature: PaidOverageFeature,
     status: PaidOverageStatus,
-    signal?: AbortSignal,
-    surface: ConsentSurface = "dialog",
+    signalOrOptions?: AbortSignal | ConsentPromptOptions,
+    legacySurface: ConsentSurface = "dialog",
   ): Promise<boolean> => {
+    const options = isPromptOptions(signalOrOptions) ? signalOrOptions : null;
+    const signal = options ? options.signal : (signalOrOptions as AbortSignal | undefined);
     if (signal?.aborted) return Promise.resolve(false);
+    if (options && typeof options.surface === "object") {
+      return sessionSurface
+        ? sessionSurface(options.surface.sid, orgId, feature, status)
+        : Promise.resolve(false);
+    }
+    const surface: ConsentSurface = options ? "dialog" : legacySurface;
 
     const key = `${orgId}\u001f${feature}`;
     const existing = sharedRequests.get(key);
@@ -171,13 +219,7 @@ export function usePaidOverageConsent() {
     return withAbort(shared, key, signal);
   };
 
-  const missingOrganizations = computed(() => {
-    const status = activeRequest.value?.status;
-    if (!status) return [];
-    return [status.organization, status.payer]
-      .filter((organization) => organization && !organization.enabled)
-      .map((organization) => organization!);
-  });
+  const missingOrganizations = computed(() => missingOrganizationsOf(activeRequest.value?.status));
 
   const canEnable = computed(
     () =>
@@ -194,10 +236,7 @@ export function usePaidOverageConsent() {
     isSubmitting.value = true;
     errorMessage.value = "";
     try {
-      for (const organization of missingOrganizations.value) {
-        await paidOverage.update(organization.org_id, request.feature, true);
-      }
-      const refreshed = (await paidOverage.get(request.orgId, request.feature)).data;
+      const refreshed = await enablePaidOverage(request.orgId, request.feature, request.status);
       if (!activeRequest.value || activeRequest.value.key !== request.key) return;
       activeRequest.value.status = refreshed;
       if (refreshed.effective) {
@@ -229,6 +268,10 @@ export function usePaidOverageConsent() {
     accept,
     decline,
   };
+}
+
+function isPromptOptions(value: unknown): value is ConsentPromptOptions {
+  return !!value && typeof value === "object" && "surface" in value;
 }
 
 export default usePaidOverageConsent;

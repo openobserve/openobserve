@@ -1,0 +1,59 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "Asia/Kolkata",
+  "turns": [
+    {
+      "turn_id": "t-deny-1",
+      "created": 1772417700000000,
+      "user": {
+        "text": "Raise the checkout threshold to 900 ms"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "confirmation_required",
+          "id": "apr_2",
+          "tool": "o2_update",
+          "kind": "update",
+          "operation": "Update 1 alert",
+          "targets": [
+            {
+              "type": "alert",
+              "id": "a_checkout",
+              "name": "checkout-latency"
+            }
+          ],
+          "before": {
+            "threshold": 500
+          },
+          "after": {
+            "threshold": 900
+          },
+          "args": {
+            "threshold": 900
+          },
+          "message": "Update the alert threshold?"
+        },
+        {
+          "type": "confirmation_resolved",
+          "id": "apr_2",
+          "approved": false,
+          "by": "you",
+          "at": 1772417765000
+        },
+        {
+          "type": "message_delta",
+          "content": "Understood, I left the alert unchanged."
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 6
+    }
+  ]
+}

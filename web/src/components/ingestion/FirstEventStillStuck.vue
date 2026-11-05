@@ -15,15 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, inject } from "vue";
+import { computed, defineAsyncComponent, inject } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
+import { FIRST_EVENT_ASK_AI, type AskAiContext } from "./firstEventAskAi";
 
 const props = defineProps<{
   guideName: string;
   docUrl?: string;
   askAiQuery?: string;
+  askAiContext?: AskAiContext;
+  doorShown?: boolean;
 }>();
 
 // template whitespace between elements is condensed away, so the spaces live in the separator itself
@@ -33,6 +36,25 @@ const { t } = useI18nTyped();
 const askAi = inject(FIRST_EVENT_ASK_AI, null);
 
 const showAskAi = computed(() => !!askAi && !!props.askAiQuery);
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The door sends the English builder's prompt, never the localised guide text.
+const ingestionDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "ingestion" as const,
+  label: t("assistant.entry.setUpIngestion"),
+  tooltip: t("assistant.entry.tooltip.ingestion"),
+  dataTest: "ai-entry-ingestion-troubleshoot" as const,
+  build: async () => {
+    const context = props.askAiContext;
+    if (!context) throw new Error("no diagnosis");
+    return (await import("@/utils/assistant/prompts")).buildIngestionPrompt(context);
+  },
+}));
 const docsLabel = computed(() =>
   props.guideName
     ? t("ingestion.firstEvent.guideDocs", { guide: raw(props.guideName) })
@@ -47,7 +69,11 @@ const onAskAi = () => {
 <template>
   <span class="text-text-secondary" data-test="first-event-diagnosis-still-stuck">
     {{ t("ingestion.firstEvent.stillStuck") }}
-    <template v-if="showAskAi">
+    <template v-if="assistantV2 && askAiContext && doorShown">
+      <AiEntryButton v-bind="ingestionDoor" appearance="chip" />
+      <span v-if="docUrl" aria-hidden="true">{{ SEPARATOR }}</span>
+    </template>
+    <template v-else-if="!assistantV2 && showAskAi">
       <OButton
         variant="ghost-primary"
         size="xs"

@@ -24,8 +24,13 @@
           </OIcon>
         </template>
         <template #right>
+          <AiEntryButton
+            v-if="assistantV2 && !hideAiAssist"
+            v-bind="testDoor('query')"
+            appearance="toolbar-icon"
+          />
           <O2AIContextAddBtn
-            v-if="!hideAiAssist"
+            v-else-if="!hideAiAssist"
             @send-to-ai-chat="sendToAiChat(inputQuery)"
             imageHeight="24"
             imageWidth="24"
@@ -166,9 +171,14 @@
           </OIcon>
         </template>
         <template #right>
+          <AiEntryButton
+            v-if="assistantV2 && !hideAiAssist"
+            v-bind="testDoor('events')"
+            appearance="toolbar-icon"
+          />
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
-            v-if="!hideAiAssist"
+            v-else-if="!hideAiAssist"
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
@@ -287,6 +297,7 @@ import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -823,6 +834,62 @@ function highlightSpecificEvent() {
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// Each edit is a new object to the door, so an edited query or event can be added again.
+const testRevision = ref(0);
+if (assistantV2) watch([inputQuery, inputEvents], () => testRevision.value++);
+
+// The events pane is parsed once here, so the chip holds the events and not their JSON text.
+function testEvents(): Record<string, unknown>[] {
+  try {
+    const parsed: unknown = JSON.parse(inputEvents.value || "[]");
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.filter((e): e is Record<string, unknown> => !!e && typeof e === "object");
+  } catch {
+    return [];
+  }
+}
+
+const testDoor = (pane: "query" | "events") => ({
+  verb: "add_to_chat" as const,
+  entryKind: "object_verb" as const,
+  objectKind: "log_row" as const,
+  thread: "current" as const,
+  dockHost: "function" as const,
+  label: t(pane === "query" ? "assistant.entry.addToChat" : "assistant.entry.addTestEvent"),
+  tooltip: t("assistant.entry.tooltip.add"),
+  dataTest: "ai-entry-function-test-add" as const,
+  objectKey: `${pane}:${testRevision.value}`,
+  build: async () => {
+    const prompts = await import("@/utils/assistant/prompts");
+    const org = store.state.selectedOrganization?.identifier ?? "";
+    if (pane === "query") {
+      if (!inputQuery.value.trim()) throw new Error("no query");
+      const stream = selectedStream.value?.name || undefined;
+      const chip = prompts.queryChip({ org, query: inputQuery.value, language: "SQL", stream });
+      return { chips: [chip], text: "" };
+    }
+    const events = testEvents();
+    if (events.length === 0) throw new Error("no events");
+    const now = Date.now();
+    const base = {
+      org,
+      stream: selectedStream.value?.name || "test",
+      range: { from: now - 15 * 60_000, to: now },
+      timeZone: store.state.timezone || "UTC",
+      mode: "sql" as const,
+      query: inputQuery.value,
+    };
+    const source = { kind: "function" as const, name: String(props.vrlFunction?.name ?? "") };
+    return events.length === 1
+      ? prompts.buildLogRowPrompt({ ...base, row: events[0], source })
+      : prompts.buildLogRowsPrompt({ ...base, rows: events });
+  },
+});
 
 defineExpose({
   testFunction,

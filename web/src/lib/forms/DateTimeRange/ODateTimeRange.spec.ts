@@ -1,8 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ODateTimeRange from "./ODateTimeRange.vue";
+import { O_DROPDOWN_NESTED_KEY } from "@/lib/overlay/Dropdown/ODropdown.context";
 
 describe("ODateTimeRange", () => {
   let wrapper: VueWrapper;
@@ -165,5 +166,31 @@ describe("ODateTimeRange", () => {
     // Popup should not appear
     const popup = document.body.querySelector('[data-test="datetimerange-popup"]');
     expect(popup).toBeNull();
+  });
+
+  it("registers its popup as a nested overlay, so a parent OPopover is not dismissed by a calendar click", async () => {
+    const release = vi.fn();
+    const registry = { open: vi.fn(() => release) };
+    const wrapper = mount(ODateTimeRange, {
+      global: { provide: { [O_DROPDOWN_NESTED_KEY as symbol]: registry } },
+      attachTo: document.body,
+    });
+    await wrapper.get('[data-test="datetimerange-trigger"]').trigger("click");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(registry.open).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+    expect(release).toHaveBeenCalled();
+  });
+
+  it("opens from the keyboard with Enter or Space on the trigger", async () => {
+    for (const key of ["Enter", " "]) {
+      wrapper = mount(ODateTimeRange, { attachTo: document.body });
+      await wrapper.get('[data-test="datetimerange-trigger"]').trigger("keydown", { key });
+      await flushPromises();
+      expect(wrapper.get('[data-test="datetimerange-trigger"]').attributes("aria-expanded")).toBe(
+        "true",
+      );
+      wrapper.unmount();
+    }
   });
 });
