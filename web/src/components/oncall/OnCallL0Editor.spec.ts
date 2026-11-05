@@ -196,4 +196,39 @@ describe("OnCallL0Editor", () => {
       "gate",
     );
   });
+
+  // The closed select names the mode alone; the sentence describing it only belongs to the open list.
+  it("shows only the mode's label in the closed select", () => {
+    const wrapper = mount(OnCallL0Editor, {
+      props: { l0: l0() },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OSelect: {
+            name: "OSelect",
+            props: ["modelValue"],
+            template: `<div><slot name="trigger" :value="modelValue" /></div>`,
+          },
+        },
+      },
+    });
+    const p2 = wrapper.find('[data-test="oncall-l0-mode-p2"]').text();
+    expect(p2).toBe(String(i18n.global.t("oncall.l0OptionGate")));
+  });
+
+  it("ends each permission row with its switch", () => {
+    const wrapper = render();
+    for (const key of ["promotion", "downgrade", "suppress"]) {
+      const row = wrapper.find(`[data-test="oncall-l0-row-${key}"]`);
+      const last = row.element.lastElementChild as HTMLElement;
+      expect(last.getAttribute("data-test")).toMatch(/^oncall-l0-allow-/);
+    }
+  });
+
+  // The switch is the state, so no row carries a second line explaining it.
+  it("labels each permission row with its name alone", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-l0-row-suppress"]').text()).toBe("Suppress the page");
+  });
 });

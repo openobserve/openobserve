@@ -376,7 +376,7 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
   it("shows the pick, the pill, Copy command and Open the guide on an empty org", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
     seedLists({
-      logs: [{ name: "usage", stream_type: "logs" }],
+      logs: [{ name: "usage", stream_type: "logs", is_internal: true }],
       metrics: [],
       traces: [],
       profiles: [],

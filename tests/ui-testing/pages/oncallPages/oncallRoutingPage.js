@@ -26,8 +26,8 @@ const { settleRows } = require('../../playwright-tests/utils/oncall-settle.js');
 
 /** Rules and signals are plain rows, not an OTable, so each tab has its own hook. */
 const ROUTING_ROWS = {
-  rules: '[data-test^="oncall-routing-row-"]',
-  signals: '[data-test^="oncall-routing-signal-"]',
+  rules: '[data-test^="oncall-routing-says-"]',
+  signals: '[data-test^="oncall-unrouted-path-"]',
 };
 
 /**
@@ -61,24 +61,14 @@ export class OnCallRoutingPage {
       error: '[data-test="oncall-routing-error"]',
       unavailable: '[data-test="oncall-routing-unavailable"]',
 
-      // The rules list (OnCallRoutingList) — shared with the team's routing tab.
-      list: '[data-test="oncall-routing-list"]',
-      listAdd: '[data-test="oncall-routing-list-add"]',
-      rulesScroll: '[data-test="oncall-routing-rules-scroll"]',
-      emptyState: '[data-test="oncall-routing-empty-state"]',
+      refresh: '[data-test="oncall-routing-refresh"]',
+      search: '[data-test="oncall-routing-search"]',
+      // The shared rules list (OnCallOwnershipRules) on both the org page and a team's tab.
       catchAll: '[data-test="oncall-routing-catch-all"]',
       catchAllTeam: '[data-test="oncall-routing-catch-all-team"]',
-      catchAllSelect: '[data-test="oncall-routing-catch-all-select"]',
       catchAllSet: '[data-test="oncall-routing-catch-all-set"]',
-      catchAllSave: '[data-test="oncall-routing-catch-all-save"]',
-      catchAllVolume: '[data-test="oncall-routing-catch-all-volume"]',
-      unclaimed: '[data-test="oncall-routing-unclaimed"]',
-      unclaimedRows: '[data-test="oncall-routing-unclaimed-rows"]',
-      claimAll: '[data-test="oncall-routing-claim-all"]',
-      reviewClaim: '[data-test="oncall-routing-review-claim"]',
+      teamUnclaimed: '[data-test="oncall-ownership-unclaimed"]',
 
-      // The stats table (OnCallOwnershipRules) — where `health` is rendered.
-      ownershipTable: '[data-test="oncall-ownership-table"]',
       ownershipRules: '[data-test="oncall-ownership-rules"]',
       ownershipHeader: '[data-test="oncall-ownership-header"]',
       ownershipAddRule: '[data-test="oncall-ownership-add-rule"]',
@@ -87,70 +77,51 @@ export class OnCallRoutingPage {
       // The rule editor drawer.
       ruleEditor: '[data-test="oncall-rule-editor"]',
       ruleEditorTeam: '[data-test="oncall-rule-editor-team"]',
-      ruleEditorScope: '[data-test="oncall-rule-editor-scope"]',
-      // The scope picker the editor opens on, and its way out to the
-      // dimension-by-dimension builder.
-      scopePicker: '[data-test="oncall-scope-picker"]',
-      scopeModeAdvanced: '[data-test="oncall-scope-mode-advanced"]',
       ruleEditorSentence: '[data-test="oncall-rule-editor-sentence"]',
+      ruleEditorSignals: '[data-test="oncall-rule-editor-signals"]',
       ruleEditorConditions: '[data-test="oncall-rule-editor-conditions"]',
       ruleEditorAddCondition: '[data-test="oncall-rule-editor-add-condition"]',
-      ruleEditorConfirmCondition: '[data-test="oncall-rule-editor-confirm-condition"]',
-      ruleEditorCancelCondition: '[data-test="oncall-rule-editor-cancel-condition"]',
-      ruleEditorDimensionName: '[data-test="oncall-rule-editor-dimension-name"]',
-      ruleEditorDimensionValue: '[data-test="oncall-rule-editor-dimension-value"]',
-      ruleEditorDimensionProblem: '[data-test="oncall-rule-editor-dimension-problem"]',
-      ruleEditorConflict: '[data-test="oncall-rule-editor-conflict"]',
-      ruleEditorConflictNow: '[data-test="oncall-rule-editor-conflict-now"]',
-      ruleEditorConflictOutcome: '[data-test="oncall-rule-editor-conflict-outcome"]',
-      ruleEditorPrecedence: '[data-test="oncall-rule-editor-precedence"]',
+      ruleEditorOutcome: '[data-test="oncall-rule-editor-outcome"]',
       ruleEditorSaveProblem: '[data-test="oncall-rule-editor-save-problem"]',
-      ruleEditorCatch: '[data-test="oncall-rule-editor-catch"]',
-      ruleEditorCatchCount: '[data-test="oncall-rule-editor-catch-count"]',
-      ruleEditorCatchSummary: '[data-test="oncall-rule-editor-catch-summary"]',
 
-      // Unrouted-signal filters, which are server-side.
+      // Server-side filters on the "Needs an owner" tab.
       unroutedFilterBoth: '[data-test="oncall-unrouted-filter-both"]',
       unroutedFilterDefault: '[data-test="oncall-unrouted-filter-default"]',
       unroutedFilterNobody: '[data-test="oncall-unrouted-filter-nobody"]',
       unroutedShowDismissed: '[data-test="oncall-unrouted-show-dismissed"]',
       unroutedError: '[data-test="oncall-unrouted-error"]',
 
-      // The unrouted queue (OnCallUnroutedQueue) — a DIFFERENT component from the
-      // `oncall-routing-signal-*` rows above, rendered on the signals tab with
-      // `show-header=false`. Its rows are keyed by the SIGNAL id.
+      // The unrouted queue (OnCallUnroutedQueue) on the "Needs an owner" tab, keyed by SIGNAL id.
       unrouted: '[data-test="oncall-unrouted"]',
       unroutedTable: '[data-test="oncall-unrouted-table"]',
       unroutedHeader: '[data-test="oncall-unrouted-header"]',
       unroutedEmpty: '[data-test="oncall-unrouted-empty"]',
       unroutedClaimAll: '[data-test="oncall-unrouted-claim-all"]',
+      // Org-level bulk claim: header button, then a team picker dialog stating the outcome.
+      claimAll: '[data-test="oncall-routing-claim-all"]',
+      claimAllDialog: '[data-test="oncall-routing-claim-all-dialog"]',
+      claimAllTeam: '[data-test="oncall-routing-claim-all-team"]',
+      claimAllOutcome: '[data-test="oncall-routing-claim-all-outcome"]',
 
-      // The dry-run simulator, which lives in the tester drawer.
+      // Test routing (OnCallRoutingSimulator), in the tester drawer. Rows share OnCallConditionRows.
       simulator: '[data-test="oncall-routing-simulator"]',
       simulatorEmpty: '[data-test="oncall-simulator-empty"]',
-      simulatorAddDimension: '[data-test="oncall-simulator-add-dimension"]',
-      simulatorAdder: '[data-test="oncall-simulator-adder"]',
-      simulatorDimensionName: '[data-test="oncall-simulator-dimension-name"]',
-      simulatorDimensionValue: '[data-test="oncall-simulator-dimension-value"]',
-      simulatorDimensionConfirm: '[data-test="oncall-simulator-dimension-confirm"]',
+      simulatorStart: '[data-test="oncall-simulator-start"]',
+      simulatorAddCondition: '[data-test="oncall-simulator-add-condition"]',
       simulatorPriority: '[data-test="oncall-simulator-priority"]',
-      simulatorPriorityChip: '[data-test="oncall-simulator-chip-priority"]',
-      simulatorRun: '[data-test="oncall-simulator-run"]',
       simulatorResult: '[data-test="oncall-simulator-result"]',
-      simulatorSpecificity: '[data-test="oncall-simulator-specificity"]',
+      simulatorAnswer: '[data-test="oncall-simulator-answer"]',
+      simulatorWon: '[data-test="oncall-simulator-won"]',
+      simulatorAlsoCount: '[data-test="oncall-simulator-also"]',
       simulatorTeam: '[data-test="oncall-simulator-team"]',
-      simulatorLadder: '[data-test="oncall-simulator-ladder"]',
       simulatorResponder: '[data-test="oncall-simulator-responder"]',
+      simulatorNext: '[data-test="oncall-simulator-next"]',
+      ruleEditorOnCall: '[data-test="oncall-rule-editor-on-call"]',
       simulatorSendTest: '[data-test="oncall-simulator-send-test"]',
 
-      // The org's catch-all nomination (OnCallDefaultTeamCard). NOTHING
-      // auto-creates it: until a human nominates a team there is no default,
-      // and an unmatched signal reaches the unrouted queue instead.
-      defaultTeamCard: '[data-test="oncall-default-team-card"]',
-      defaultTeamOpen: '[data-test="oncall-default-team-open"]',
+      // The org's catch-all nomination dialog (OnCallDefaultTeamCard), opened from the pinned row.
       defaultTeamDialog: '[data-test="oncall-default-team-dialog"]',
       defaultTeamSelect: '[data-test="oncall-default-team-select"]',
-      defaultTeamSave: '[data-test="oncall-default-team-save"]',
       defaultTeamUnset: '[data-test="oncall-default-team-unset"]',
 
       confirmDialog: '[data-test="confirm-dialog"]',
@@ -160,17 +131,26 @@ export class OnCallRoutingPage {
   }
 
   // Row-scoped selectors carry the rule id or the signal id, never a name.
-  ruleRow(ruleId) { return `[data-test="oncall-routing-row-${ruleId}"]`; }
+  ruleRow(ruleId) { return `[data-test="oncall-routing-says-${ruleId}"]`; }
   ruleSays(ruleId) { return `[data-test="oncall-routing-says-${ruleId}"]`; }
-  ruleNote(ruleId) { return `[data-test="oncall-routing-note-${ruleId}"]`; }
+  ruleNote(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleCaught(ruleId) { return `[data-test="oncall-routing-caught-${ruleId}"]`; }
-  ruleElsewhere(ruleId) { return `[data-test="oncall-routing-elsewhere-${ruleId}"]`; }
   ruleEdit(ruleId) { return `[data-test="oncall-routing-edit-${ruleId}"]`; }
+  ruleMore(ruleId) { return `[data-test="oncall-routing-more-${ruleId}"]`; }
+  ruleTest(ruleId) { return `[data-test="oncall-routing-test-${ruleId}"]`; }
 
+  /** The Health cell; a shadowed verdict names the team taking its pages. */
   ruleHealth(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
-  ownershipEdit(ruleId) { return `[data-test="oncall-ownership-edit-${ruleId}"]`; }
+  ownershipEdit(ruleId) { return this.ruleEdit(ruleId); }
   ownershipDelete(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
+
+  // Rule editor condition rows are indexed by position.
+  conditionField(index) { return `[data-test="oncall-rule-editor-field-${index}"]`; }
+  conditionOp(index) { return `[data-test="oncall-rule-editor-op-${index}"]`; }
+  conditionValue(index) { return `[data-test="oncall-rule-editor-value-${index}"]`; }
+  conditionRemove(index) { return `[data-test="oncall-rule-editor-remove-${index}"]`; }
+  conditionPickValue(index) { return `[data-test="oncall-rule-editor-pick-value-${index}"]`; }
 
   unroutedPath(signalId) { return `[data-test="oncall-unrouted-path-${signalId}"]`; }
   unroutedNobody(signalId) { return `[data-test="oncall-unrouted-nobody-${signalId}"]`; }
@@ -178,13 +158,17 @@ export class OnCallRoutingPage {
   unroutedClaim(signalId) { return `[data-test="oncall-unrouted-claim-${signalId}"]`; }
   unroutedDismiss(signalId) { return `[data-test="oncall-unrouted-dismiss-${signalId}"]`; }
   unroutedDismissed(signalId) { return `[data-test="oncall-unrouted-dismissed-${signalId}"]`; }
-  simulatorChip(name) { return `[data-test="oncall-simulator-chip-${name}"]`; }
+  simulatorRow(index) { return `[data-test="oncall-simulator-row-${index}"]`; }
+  simulatorField(index) { return `[data-test="oncall-simulator-field-${index}"]`; }
+  simulatorValue(index) { return `[data-test="oncall-simulator-value-${index}"]`; }
+  simulatorRemove(index) { return `[data-test="oncall-simulator-remove-${index}"]`; }
   simulatorAlso(ruleId) { return `[data-test="oncall-simulator-also-${ruleId}"]`; }
 
-  signalRow(signalId) { return `[data-test="oncall-routing-signal-${signalId}"]`; }
-  signalClaim(signalId) { return `[data-test="oncall-routing-claim-${signalId}"]`; }
-  signalDismiss(signalId) { return `[data-test="oncall-routing-dismiss-${signalId}"]`; }
-  signalAbsorbed(signalId) { return `[data-test="oncall-routing-signal-absorbed-${signalId}"]`; }
+  // Unclaimed signals live only on the org page's "Needs an owner" tab.
+  signalRow(signalId) { return this.unroutedPath(signalId); }
+  signalClaim(signalId) { return this.unroutedClaim(signalId); }
+  signalDismiss(signalId) { return this.unroutedDismiss(signalId); }
+  signalAbsorbed(signalId) { return this.unroutedDefaulted(signalId); }
 
   // ------------------------------------------------------------- element getters
 
@@ -234,17 +218,15 @@ export class OnCallRoutingPage {
   /**
    * @param {'rules'|'signals'} key
    *
-   * OToggleGroup, so the switch is assertable via `data-state` rather than
-   * assumed — and the tab decides which controls exist: "New rule" is rendered
-   * only on `rules`, the landing filters only on `signals`.
+   * An OToggleGroup, so the switch is assertable via `data-state="on"` — and the tab
+   * decides which controls exist: "New rule" only on `rules`, the landing
+   * filters only on `signals`.
    */
   async selectTab(key) {
     const tab = this.page.locator(key === 'rules' ? this.locators.tabRules : this.locators.tabSignals);
     await tab.waitFor({ state: 'visible', timeout: 20000 });
     await tab.click();
     await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    // Routing does NOT use OTable, so the shared default row hook matches nothing
-    // here and would settle instantly on an empty sample — pass this screen's own.
     await settleRows(this.page, { rowSelector: ROUTING_ROWS[key] });
   }
 
@@ -253,11 +235,13 @@ export class OnCallRoutingPage {
   async openRuleEditor() {
     await this.page.locator(this.locators.addRule).click();
     await expect(this.page.locator(this.locators.ruleEditor)).toBeVisible({ timeout: 20000 });
+    this._conditionsWritten = 0;
   }
 
   async openRuleEditorFor(ruleId) {
     await this.page.locator(this.ruleEdit(ruleId)).click();
     await expect(this.page.locator(this.locators.ruleEditor)).toBeVisible({ timeout: 20000 });
+    this._conditionsWritten = await this.page.locator('[data-test^="oncall-rule-editor-row-"]').count();
   }
 
   /**
@@ -299,82 +283,75 @@ export class OnCallRoutingPage {
   }
 
   /**
-   * Leave the scope picker for the dimension-by-dimension builder.
+   * Fill one condition row: [field] [is | starts with] [value].
    *
-   * THE EDITOR DOES NOT OPEN ON THE BUILDER. It opens on `OnCallScopePicker`,
-   * which offers the three claims almost every rule is — "this cluster", "this
-   * namespace", "this service wherever it runs" — built from dimensions the org
-   * has actually SEEN. A freshly-seeded service is not in that catalogue, so a
-   * spec claiming one has to take the picker's own way out
-   * (`oncall-scope-mode-advanced`) before `oncall-rule-editor-add-condition`
-   * exists at all: it renders under `v-else-if="!scoped"`.
-   */
-  async useAdvancedRuleScope() {
-    const advanced = this.page.locator(this.locators.scopeModeAdvanced);
-    if (await advanced.count()) {
-      await advanced.first().click();
-    }
-    // Leaving the picker opens the builder with its first pair already being
-    // entered, so what proves the switch took is the dimension field itself —
-    // `oncall-rule-editor-add-condition` is the button for the NEXT pair and
-    // does not exist while one is in progress.
-    await expect(this.page.locator(this.locators.ruleEditorDimensionName))
-      .toBeVisible({ timeout: 20000 });
-  }
-
-  /**
-   * Add one dimension pair to the rule under edit.
+   * A new rule opens on one empty row; every later condition clicks "+ and"
+   * first. The value is a searchable OSelect that also accepts a typed value,
+   * so a service the org has not emitted yet is typed and committed with Enter.
    *
-   * Every pair must match for the rule to apply, which is also what makes one
-   * rule more specific than another — and specificity is what decides which
-   * team is woken when two rules match (§5.5).
+   * @param {'is'|'prefix'} [op]
    */
-  async addCondition(name, value) {
-    // Two states, one method: the editor shows the draft pair's fields as soon
-    // as it enters the builder, and shows "Add condition" only once no pair is
-    // in progress. Clicking the button when the fields are already open would
-    // time out; skipping it when they are not would type into nothing.
-    const adder = this.page.locator(this.locators.ruleEditorDimensionName);
-    if ((await adder.count()) === 0) {
+  async addCondition(name, value, op = 'is') {
+    const index = this._conditionsWritten ?? 0;
+    if (index > 0) {
       await this.page.locator(this.locators.ruleEditorAddCondition).click();
     }
-    await this.selectOption(this.locators.ruleEditorDimensionName, name);
+    await this.selectOption(this.conditionField(index), name);
+    if (op !== 'is') await this.selectOption(this.conditionOp(index), op);
 
-    // The VALUE is an OCombobox, not an OSelect — deliberately: the dimension
-    // name is a closed vocabulary, but the value is data and a rule may claim a
-    // service the org has not emitted yet. Its editable part is `-input`, and it
-    // has no `-trigger` and no `-field`.
-    const valueInput = this.page
-      .locator(part(this.locators.ruleEditorDimensionValue, 'input')).first();
-    await valueInput.waitFor({ state: 'visible', timeout: 20000 });
-    await valueInput.fill(value);
-
-    await this.page.locator(this.locators.ruleEditorConfirmCondition).click();
+    const field = this.conditionValue(index);
+    await this.page.locator(part(field, 'trigger')).first().click();
+    const search = this.page.locator(part(field, 'search')).first();
+    await search.waitFor({ state: 'visible', timeout: 20000 });
+    await search.fill(value);
+    const option = this.page.locator(`${part(field, 'option')}[data-test-value="${value}"]`).first();
+    if (await option.count()) await option.click();
+    else await search.press('Enter');
+    await expect(this.page.locator(part(field, 'popover'))).toBeHidden({ timeout: 20000 });
+    this._conditionsWritten = index + 1;
   }
 
-  /**
-   * The rule editor is an ODialog, not a drawer, so its Save is
-   * `o-dialog-primary-btn` — scoped to the editor's own panel, which ODialog
-   * stamps with the consumer's `data-test` precisely so this scoping works.
-   */
+  /** Repoint a row at another field, which empties its value; `label` narrows the picker, which only renders a window of the catalogue. */
+  async changeConditionField(index, name, label = null) {
+    await this.selectOption(this.conditionField(index), name, label);
+  }
+
+  async removeCondition(index) {
+    await this.page.locator(this.conditionRemove(index)).click();
+  }
+
+  getSaveRuleButton() {
+    return this.page.locator(`${this.locators.ruleEditor} [data-test="o-dialog-primary-btn"]`);
+  }
+
+  async cancelRule() {
+    await this.page
+      .locator(`${this.locators.ruleEditor} [data-test="o-dialog-secondary-btn"]`)
+      .click();
+    await expect(this.page.locator(this.locators.ruleEditor)).toBeHidden({ timeout: 20000 });
+  }
+
+  /** A row naming a field with no value blocks Save, on the row and in the footer. */
+  async expectConditionNeedsValue(index) {
+    await expect(this.page.locator(this.conditionPickValue(index))).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.locators.ruleEditorSaveProblem)).toBeVisible();
+    await expect(this.getSaveRuleButton()).toBeDisabled();
+  }
+
+  /** The editor is an ODialog, so Save is its `o-dialog-primary-btn`, scoped to the editor's own panel. */
   async saveRule() {
     await this.page
       .locator(`${this.locators.ruleEditor} [data-test="o-dialog-primary-btn"]`)
       .click();
   }
 
-  /** "Remove rule" is the dialog's NEUTRAL button, and only exists when editing. */
-  async removeRuleFromEditor() {
-    await this.page
-      .locator(`${this.locators.ruleEditor} [data-test="o-dialog-neutral-btn"]`)
-      .click();
-  }
 
   async openSignalTester() {
     await this.page.locator(this.locators.testSignal).click();
     await expect(this.page.locator(this.locators.testerDrawer)).toBeVisible({ timeout: 20000 });
   }
 
+  /** Delete lives in the row's ⋯ menu. */
   async deleteRule(ruleId) {
     await this.page.locator(this.ownershipDelete(ruleId)).click();
     const confirm = this.page.locator(this.locators.confirmOk);
@@ -407,12 +384,12 @@ export class OnCallRoutingPage {
 
   /** The rule ids drawn, in the order the engine consults them — most specific first. */
   async readRuleIds() {
-    const rows = this.page.locator('[data-test^="oncall-routing-row-"]');
+    const rows = this.page.locator('[data-test^="oncall-routing-says-"]');
     const count = await rows.count();
     const ids = [];
     for (let i = 0; i < count; i++) {
       const attr = await rows.nth(i).getAttribute('data-test');
-      if (attr) ids.push(attr.replace('oncall-routing-row-', ''));
+      if (attr) ids.push(attr.replace('oncall-routing-says-', ''));
     }
     return ids;
   }
@@ -459,17 +436,14 @@ export class OnCallRoutingPage {
     return text.split('\n').map((line) => line.trim()).filter(Boolean);
   }
 
-  /** The signal ids currently in the unrouted queue. */
+  /** The signal ids currently in the unrouted queue ("Needs an owner" tab). */
   async readSignalIds() {
-    const rows = this.page.locator('[data-test^="oncall-routing-signal-"]');
+    const rows = this.page.locator(ROUTING_ROWS.signals);
     const count = await rows.count();
     const ids = [];
     for (let i = 0; i < count; i++) {
       const attr = await rows.nth(i).getAttribute('data-test');
-      // `-absorbed-` rows share the prefix; they are a tag on a row, not a row.
-      if (attr && !attr.startsWith('oncall-routing-signal-absorbed-')) {
-        ids.push(attr.replace('oncall-routing-signal-', ''));
-      }
+      if (attr) ids.push(attr.replace('oncall-unrouted-path-', ''));
     }
     return ids;
   }
@@ -496,13 +470,7 @@ export class OnCallRoutingPage {
     await expect(this.page.locator(this.ruleRow(ruleId))).toHaveCount(0, { timeout: 30000 });
   }
 
-  /**
-   * The ORG routing screen draws `OnCallOwnershipRules` — the stats table, keyed
-   * `oncall-rule-team-{id}` / `oncall-rule-health-{id}`. `oncall-routing-row-{id}`
-   * belongs to `OnCallRoutingList`, which is what the TEAM's routing tab renders.
-   * The two are different components over the same rules, so a spec must ask the
-   * one that is actually on screen.
-   */
+  /** Org page and team tab draw the same list, so a row is found by its team cell on either. */
   async expectOrgRuleRowVisible(ruleId) {
     await expect(this.page.locator(this.ruleTeam(ruleId))).toBeVisible({ timeout: 30000 });
   }
@@ -515,9 +483,9 @@ export class OnCallRoutingPage {
     await expect(this.page.locator(this.ruleTeam(ruleId))).toContainText(teamName, { timeout: 30000 });
   }
 
-  /** A rule repointed at another team says so, rather than claiming it pages us. */
+  /** A rule repointed at another team leaves this team's tab, which lists only its own rules. */
   async expectRulePagesElsewhere(ruleId) {
-    await expect(this.page.locator(this.ruleElsewhere(ruleId))).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.ruleRow(ruleId))).toHaveCount(0, { timeout: 30000 });
   }
 
   /** Saving a rule whose path another team already owns is refused, and the editor says why. */
@@ -538,30 +506,52 @@ export class OnCallRoutingPage {
   // ------------------------------------------------------------- the simulator
 
   /**
-   * Add one dimension pair to the hypothetical signal.
+   * Replace the drawer's pre-filled conditions with one `name is value` row.
    *
-   * The name is a SEMANTIC GROUP ID and the picker is closed vocabulary —
-   * `service`, `k8s-namespace`, `environment` — while the rows a rule matches
-   * against carry the underlying column (`service`, `namespace`). The group
-   * definition is what joins the two, which is why a typo here would produce a
-   * confident "nothing matches" for a dimension nothing ever emits.
+   * The drawer opens on a real alert shape, so the seeded rows are cleared first;
+   * removing the last row leaves one empty row, which is the one filled here.
    */
   async addSimulatorDimension(name, value) {
-    await this.page.locator(this.locators.simulatorAddDimension).click();
-    await expect(this.page.locator(this.locators.simulatorAdder)).toBeVisible({ timeout: 20000 });
-    await this.selectOption(this.locators.simulatorDimensionName, name);
-    await this.page.locator(part(this.locators.simulatorDimensionValue, 'field')).first().fill(value);
-    await this.page.locator(this.locators.simulatorDimensionConfirm).click();
-    await expect(this.page.locator(this.simulatorChip(name))).toBeVisible({ timeout: 20000 });
+    const rows = this.page.locator('[data-test^="oncall-simulator-row-"]');
+    await rows.first().waitFor({ state: 'visible', timeout: 20000 });
+    while ((await rows.count()) > 1) {
+      await this.page.locator(this.simulatorRemove(0)).click();
+    }
+    await this.page.locator(this.simulatorRemove(0)).click();
+    await this.selectOption(this.simulatorField(0), name);
+    this.pendingAnswer = this.page.waitForResponse((response) => {
+      const request = response.request();
+      if (request.method() !== 'POST' || !response.url().includes('/oncall/routing/preview')) return false;
+      try {
+        return JSON.parse(request.postData() ?? '{}')?.dimensions?.[name] === value;
+      } catch {
+        return false;
+      }
+    }, { timeout: 30000 });
+    const field = this.simulatorValue(0);
+    await this.page.locator(part(field, 'trigger')).first().click();
+    const search = this.page.locator(part(field, 'search')).first();
+    await search.waitFor({ state: 'visible', timeout: 20000 });
+    await search.fill(value);
+    const option = this.page.locator(`${part(field, 'option')}[data-test-value="${value}"]`).first();
+    if (await option.count()) await option.click();
+    else await search.press('Enter');
+    await expect(this.page.locator(part(field, 'popover'))).toBeHidden({ timeout: 20000 });
   }
 
-
+  /** The answer is live (debounced); this waits for the one asked by addSimulatorDimension, not the seed's. */
   async runSimulator() {
-    await this.page.locator(this.locators.simulatorRun).click();
-    await expect(this.page.locator(this.locators.simulatorResult)).toBeVisible({ timeout: 30000 });
+    if (this.pendingAnswer) {
+      await this.pendingAnswer;
+      this.pendingAnswer = null;
+    }
+    await expect(
+      this.page.locator(`${this.locators.simulatorResult}:not([aria-busy="true"])`),
+    ).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.simulatorAnswer)).toBeVisible({ timeout: 30000 });
   }
 
-  /** Every field of the rendered verdict, as one object a spec can compare. */
+  /** Every field of the rendered verdict; the winning rule is an inline line under the answer. */
   async readSimulatorResult() {
     const textOf = async (selector) => {
       const node = this.page.locator(selector);
@@ -570,13 +560,29 @@ export class OnCallRoutingPage {
     };
     return {
       matched: await textOf(this.locators.simulatorResult),
-      specificity: await textOf(this.locators.simulatorSpecificity),
+      won: await textOf(this.locators.simulatorWon),
       team: await textOf(this.locators.simulatorTeam),
-      ladder: await textOf(this.locators.simulatorLadder),
+      ladder: await textOf(this.locators.simulatorNext),
       responder: await textOf(this.locators.simulatorResponder),
     };
   }
 
+  /** The emails of everyone the verdict says it wakes; each name carries its email only in a hover tooltip. */
+  async readSimulatorResponderEmails() {
+    const people = this.page.locator(`${this.locators.simulatorResponder} [data-test="oncall-simulator-responder-person"]`);
+    const tooltip = this.page.locator('[data-test="oncall-person-name-tooltip"]');
+    const emails = [];
+    for (let i = 0; i < (await people.count()); i++) {
+      await people.nth(i).hover();
+      await expect(tooltip.first()).toBeVisible({ timeout: 10000 });
+      const text = await tooltip.first().innerText();
+      const email = text.match(/\S+@\S+/)?.[0] ?? text.trim();
+      emails.push(email);
+      await this.page.mouse.move(0, 0);
+      await expect(tooltip).toHaveCount(0, { timeout: 10000 });
+    }
+    return emails;
+  }
 
   /** The simulator names the team it would page, by NAME rather than by id. */
   async expectSimulatorTeamNames(teamName) {
@@ -589,26 +595,17 @@ export class OnCallRoutingPage {
   // -------------------------------------------------------- the default team
 
   /**
-   * THE ORG ROUTING SCREEN RENDERS THIS COMPONENT IN `dialog` MODE, and the two
-   * modes draw different DOM. In dialog mode there is NO
-   * `oncall-default-team-card` and NO `oncall-default-team-save`: the trigger is
-   * `oncall-default-team-open`, whose own LABEL names the current answer, and
-   * the save is the ODialog's primary button. `oncall-default-team-card` and
-   * `-save` only exist in the inline (card) mode used elsewhere.
-   *
-   * And `oncall-default-team-unset` is NOT a control. It is the warning
-   * PARAGRAPH the dialog shows while no default is nominated — clicking it does
-   * nothing. Nor is there another: the dialog's "none" entry carries an EMPTY
-   * value, which OSelect does not stamp as `data-test-value=""`, so a nominated
-   * default cannot be un-nominated from this screen at all.
+   * The catch-all is the pinned last row of the rules list; its Change button
+   * opens OnCallDefaultTeamCard's dialog (the card draws no trigger here). The
+   * dialog's Save is its ODialog primary button, and `oncall-default-team-unset`
+   * is the warning paragraph inside it, not a control.
    */
   async expectDefaultTeamControlVisible() {
-    await expect(this.page.locator(this.locators.defaultTeamOpen)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.catchAllSet)).toBeVisible({ timeout: 30000 });
   }
 
-
   async openDefaultTeamDialog() {
-    await this.page.locator(this.locators.defaultTeamOpen).click();
+    await this.page.locator(this.locators.catchAllSet).click();
     await expect(this.page.locator(this.locators.defaultTeamDialog)).toBeVisible({ timeout: 20000 });
   }
 
@@ -638,7 +635,7 @@ export class OnCallRoutingPage {
   }
 
   async expectDefaultTeamLabelNames(teamName) {
-    await expect(this.page.locator(this.locators.defaultTeamOpen)).toContainText(teamName, { timeout: 30000 });
+    await expect(this.page.locator(this.locators.catchAllTeam)).toContainText(teamName, { timeout: 30000 });
   }
 
   // ------------------------------------------------------ the unrouted queue

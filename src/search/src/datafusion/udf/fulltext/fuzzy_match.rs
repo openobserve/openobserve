@@ -37,7 +37,7 @@ use datafusion::{
 /// Implementation of fuzzy_match
 pub static FUZZY_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        super::FUZZY_MATCH_UDF_NAME,
+        crate::datafusion::udf::FUZZY_MATCH_UDF_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8, DataType::Int64],
         // returns boolean

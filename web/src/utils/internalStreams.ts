@@ -13,48 +13,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** Every stream name O2 writes itself; the const of the same name in src/config/src/meta/self_reporting/usage.rs must hold the same names. */
-export const INTERNAL_STREAM_NAMES = [
-  "usage",
-  "audit",
-  "stats",
-  "triggers",
-  "errors",
-  "data_retention_usage",
-  "cloud_events",
-  "_agent_signals",
-  "_redaction_evidence",
-  "_evaluator",
-  "_llm_scores",
-  "_llm_experiment",
-  "_anomalies",
+/** Streams the server marks is_internal that hold the customer's own data; USER_SOURCED_STREAM_NAMES in usage.rs must hold the same names. */
+export const USER_SOURCED_STREAM_NAMES = [
+  "_o2_dbm_server",
+  "_rumdata",
+  "_rumlog",
+  "_sessionreplay",
+  "synthetics_results",
+  "synthetics_step_results",
 ] as const;
 
-export const INTERNAL_STREAM_PREFIXES = ["_o2_"] as const;
-
-/** RUM streams (_rumdata, _rumlog, _sessionreplay) are logs, so they count as user data. */
 export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces", "profiles"] as const;
 
 export type UserDataStreamType = (typeof USER_DATA_STREAM_TYPES)[number];
 
-const INTERNAL_NAMES: ReadonlySet<string> = new Set(INTERNAL_STREAM_NAMES);
-
-export function isInternalStreamName(name: string): boolean {
-  return INTERNAL_NAMES.has(name) || INTERNAL_STREAM_PREFIXES.some((p) => name.startsWith(p));
+/** The stream-list row fields that decide whether a stream holds user data. */
+export interface StreamOwnership {
+  name?: string;
+  stream_type?: string;
+  is_internal?: boolean;
 }
+
+const USER_SOURCED_NAMES: ReadonlySet<string> = new Set(USER_SOURCED_STREAM_NAMES);
 
 export function isUserDataStreamType(streamType: string): streamType is UserDataStreamType {
   return (USER_DATA_STREAM_TYPES as readonly string[]).includes(streamType);
 }
 
-/** True only for a logs, metrics, traces or profiles stream that O2 does not write itself. */
-export function isUserDataStream(name: string, streamType: string): boolean {
-  return isUserDataStreamType(streamType) && !isInternalStreamName(name);
+/** Mirrors is_user_data_stream in usage.rs: the server's is_internal already depends on the org, so meta-only names stay user data elsewhere. */
+export function isUserDataStream(
+  stream: StreamOwnership | null | undefined,
+  fallbackType = "",
+): boolean {
+  return (
+    isUserDataStreamType(stream?.stream_type ?? fallbackType) &&
+    (stream?.is_internal !== true || USER_SOURCED_NAMES.has(stream?.name ?? ""))
+  );
 }
 
 /** The rows of a stream list that hold user data. */
-export function userDataStreams<T extends { name?: string; stream_type?: string }>(
+export function userDataStreams<T extends StreamOwnership>(
   list: readonly T[] | undefined | null,
 ): T[] {
-  return (list ?? []).filter((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? ""));
+  return (list ?? []).filter((s) => isUserDataStream(s));
+}
+
+interface OrgSummaryStreams {
+  num_streams?: number | null;
+  num_user_streams?: number | null;
+}
+
+/** Whether an org summary reports a user data stream; a summary without num_user_streams counts every stream. */
+export function summaryHasUserData(
+  summary: { streams?: OrgSummaryStreams | null } | null | undefined,
+): boolean {
+  const streams = summary?.streams;
+  return !!(streams?.num_user_streams ?? streams?.num_streams);
 }

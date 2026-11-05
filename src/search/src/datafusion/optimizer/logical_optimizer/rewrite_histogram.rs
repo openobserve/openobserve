@@ -36,7 +36,7 @@ use datafusion::{
 };
 
 use crate::{
-    datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME,
+    datafusion::udf::time::histogram::HISTOGRAM_UDF_NAME,
     sql::visitor::histogram_interval::generate_histogram_interval,
 };
 
@@ -288,7 +288,7 @@ mod tests {
     };
 
     use crate::datafusion::{
-        optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
+        optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::time::histogram,
     };
 
     #[test]
@@ -355,7 +355,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
         ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(0, 5, 0, None)));
 
         for item in sqls {
@@ -436,7 +436,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
         ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(
             0,
             ts,

@@ -372,8 +372,8 @@ describe("the real token sheets", () => {
   it("finds a token in every sheet, so no case below passes vacuously", () => {
     expect(colorTokens(THEMES.light).length).toBeGreaterThan(900);
     expect(colorTokens(THEMES.dark).length).toBeGreaterThan(900);
-    // One token exists only under .dark; everything else is an override.
-    expect(colorTokens(THEMES.dark).length).toBeGreaterThan(colorTokens(THEMES.light).length);
+    // No token exists only under .dark; every dark declaration overrides a light one.
+    expect(colorTokens(THEMES.dark).length).toBe(colorTokens(THEMES.light).length);
   });
 
   it("resolves an oklch token declared in base.css", () => {
@@ -389,7 +389,7 @@ describe("the real token sheets", () => {
   });
 
   describe.each([
-    ["light", 1087, 1075],
+    ["light", 1088, 1076],
     ["dark", 1088, 1076],
   ] as const)("%s theme", (theme, total, resolved) => {
     const scope = THEMES[theme];
