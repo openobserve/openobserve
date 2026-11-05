@@ -713,6 +713,7 @@ async fn search_window(
         search_event_context: None,
         // Chat history must reflect the committed watermark exactly, never a cached result.
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

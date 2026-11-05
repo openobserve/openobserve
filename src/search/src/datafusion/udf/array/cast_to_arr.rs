@@ -27,6 +27,8 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 
+use crate::datafusion::udf::stringify_json_value;
+
 /// The name of the cast_to_arr UDF given to DataFusion.
 pub const CAST_TO_ARR_UDF_NAME: &str = "cast_to_arr";
 
@@ -66,7 +68,7 @@ pub fn cast_to_arr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Col
         if let Some(arr) = string.and_then(|s| json::from_str::<json::Value>(s).ok()) {
             if let Some(arr) = arr.as_array().filter(|arr| !arr.is_empty()) {
                 arr.iter()
-                    .map(super::stringify_json_value)
+                    .map(stringify_json_value)
                     .filter(|field| !field.is_empty())
                     .for_each(|field| {
                         list_builder.values().append_value(field);

@@ -182,7 +182,7 @@ mod tests {
     use datafusion::{catalog::MemTable, prelude::SessionContext};
 
     use super::*;
-    use crate::datafusion::udf::match_all_udf;
+    use crate::datafusion::udf::fulltext::match_all;
 
     #[tokio::test]
     async fn test_is_simple_topn() {
@@ -207,7 +207,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         // sql, can_optimizer, except_condition
         let cases = vec![
@@ -365,7 +365,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
         ctx.register_table("hits", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         let cases = vec![
             // Valid: two-field GROUP BY with count(*) ORDER BY cnt DESC LIMIT 10
@@ -483,7 +483,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("logs", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         let cases = vec![
             // Different limit values
@@ -546,7 +546,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("events", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         let cases = vec![
             // Ascending order tests
@@ -612,7 +612,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("metrics", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
 
         let cases = vec![
             // Valid: field not in index_fields should return None

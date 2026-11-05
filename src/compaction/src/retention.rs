@@ -22,8 +22,8 @@ use config::{
     meta::{
         cluster::Role,
         stream::{
-            FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamType,
-            TimeRange,
+            FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamSettings,
+            StreamType, TimeRange,
         },
     },
     utils::{
@@ -558,8 +558,71 @@ pub async fn delete_by_date(
         return Err(e);
     }
 
+    // only tidies the settings, the next deletion retries
+    if let Err(e) = prune_partition_time_level(org_id, stream_type, stream_name).await {
+        log::warn!(
+            "[COMPACTOR] prune partition level history [{org_id}/{stream_type}/{stream_name}] failed: {e}"
+        );
+    }
+
     // mark delete done
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
+}
+
+/// Drops the partition level changes that only describe days retention has deleted.
+async fn prune_partition_time_level(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    let cached = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    if cached.is_none_or(|settings| settings.partition_time_level.changes.len() < 2) {
+        return Ok(());
+    }
+    // a whole-settings write must start from what is stored, not from a cached copy
+    let schema = infra::schema::get_from_db(org_id, stream_name, stream_type).await?;
+    let Some(mut settings) = infra::schema::unwrap_stream_settings(&schema) else {
+        return Ok(());
+    };
+    let Some(cutoff) = level_prune_cutoff(
+        &settings,
+        get_config().compact.data_retention_days,
+        config::utils::time::now_micros(),
+    ) else {
+        return Ok(());
+    };
+    if settings.partition_time_level.prune(cutoff) {
+        schema::save_stream_settings(org_id, stream_name, stream_type, settings).await?;
+    }
+    Ok(())
+}
+
+/// The stream's retention, else the default; not positive means none.
+pub(crate) fn retention_days(settings: &StreamSettings, default_retention_days: i64) -> i64 {
+    if settings.data_retention > 0 {
+        settings.data_retention
+    } else {
+        default_retention_days
+    }
+}
+
+/// Days before this hold no files; extended ranges still do, `None` means no retention.
+fn level_prune_cutoff(
+    settings: &StreamSettings,
+    default_retention_days: i64,
+    now: i64,
+) -> Option<i64> {
+    let retention_days = retention_days(settings, default_retention_days);
+    if retention_days <= 0 {
+        return None;
+    }
+    let retention_cutoff = now - retention_days * day_micros(1);
+    let extended_start = settings
+        .extended_retention_days
+        .iter()
+        .map(|r| r.start)
+        .min();
+    Some(extended_start.map_or(retention_cutoff, |start| start.min(retention_cutoff)))
 }
 
 pub async fn delete_from_file_list(
@@ -1435,5 +1498,32 @@ mod tests {
                 "ranges overlap or are out of order"
             );
         }
+    }
+
+    #[test]
+    fn test_level_prune_cutoff_keeps_the_days_extended_retention_holds() {
+        let now = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let days_ago = |days: i64| now - days * day_micros(1);
+        let settings = |data_retention, extended: &[(i64, i64)]| StreamSettings {
+            data_retention,
+            extended_retention_days: extended
+                .iter()
+                .map(|&(start, end)| TimeRange::new(days_ago(start), days_ago(end)))
+                .collect(),
+            ..Default::default()
+        };
+        let cutoff = |s: &StreamSettings, default_days| level_prune_cutoff(s, default_days, now);
+
+        assert_eq!(cutoff(&settings(0, &[]), 30), Some(days_ago(30)));
+        assert_eq!(cutoff(&settings(7, &[]), 30), Some(days_ago(7)));
+        // no retention anywhere: no day is gone, whatever the history holds
+        assert_eq!(cutoff(&settings(0, &[]), 0), None);
+        // an extended range older than the cutoff still holds files, the earliest one counts
+        assert_eq!(
+            cutoff(&settings(7, &[(20, 18), (90, 80)]), 30),
+            Some(days_ago(90))
+        );
+        // one inside the retention window changes nothing
+        assert_eq!(cutoff(&settings(30, &[(5, 3)]), 30), Some(days_ago(30)));
     }
 }

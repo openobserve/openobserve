@@ -29,6 +29,8 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 
+use crate::datafusion::udf::stringify_json_value;
+
 /// The name of the arrzip UDF given to DataFusion.
 pub const ARR_ZIP_UDF_NAME: &str = "arrzip";
 
@@ -83,10 +85,8 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
                                         let zipped_arrs: Vec<String> =
                                             zip(field1.iter(), field2.iter())
                                                 .map(|(field1, field2)| {
-                                                    let field1 =
-                                                        super::stringify_json_value(field1);
-                                                    let field2 =
-                                                        super::stringify_json_value(field2);
+                                                    let field1 = stringify_json_value(field1);
+                                                    let field2 = stringify_json_value(field2);
                                                     format!("{field1}{delim}{field2}")
                                                 })
                                                 .collect();
