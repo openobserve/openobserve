@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
-use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -26,7 +24,7 @@ use crate::{
     get,
     path = "/{org_id}/sample_data",
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Sample Data",
     operation_id = "GetSampleData",
     summary = "Get the sample data window",
     description = "Returns the time window the organization's sample data was loaded into, in microseconds since the epoch. An organization without sample data gets `{\"status\":\"none\"}`.",
@@ -56,10 +54,10 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
     put,
     path = "/{org_id}/sample_data",
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Sample Data",
     operation_id = "PutSampleData",
     summary = "Save the sample data window",
-    description = "Records the time window the organization's sample data was loaded into. `status` must be `loaded` and `start_time` lower than `end_time`, both in microseconds since the epoch. The server sets `updated_at` and `updated_by`.",
+    description = "Records the time window the organization's sample data was loaded into. `start_time` must be lower than `end_time`, both in microseconds since the epoch. A saved window always reads back as `loaded`.",
     security(
         ("Authorization"= [])
     ),
@@ -69,7 +67,7 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
     request_body(content = PutSampleDataRequest, description = "Sample data window", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SampleDataState),
-        (status = 400, description = "Status is not loaded, or start_time is not lower than end_time", content_type = "application/json", body = ()),
+        (status = 400, description = "start_time is not lower than end_time", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -77,12 +75,8 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn put(
-    Path(org_id): Path<String>,
-    Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<PutSampleDataRequest>,
-) -> Response {
-    match sample_data::put(&org_id, req, &user_email.user_id).await {
+pub async fn put(Path(org_id): Path<String>, Json(req): Json<PutSampleDataRequest>) -> Response {
+    match sample_data::put(&org_id, req).await {
         Ok(state) => MetaHttpResponse::json(state),
         Err(e @ SampleDataError::Invalid(_)) => MetaHttpResponse::bad_request(e),
         Err(SampleDataError::Store(e)) => MetaHttpResponse::internal_error(e),
@@ -93,7 +87,7 @@ pub async fn put(
     delete,
     path = "/{org_id}/sample_data",
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Sample Data",
     operation_id = "DeleteSampleData",
     summary = "Clear the sample data window",
     description = "Clears the organization's sample data window, so the state reads `{\"status\":\"none\"}`. Clearing a missing state also succeeds.",
@@ -122,7 +116,6 @@ pub async fn delete(Path(org_id): Path<String>) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
-    use openobserve_core::sample_data::SampleDataStatus;
 
     use super::*;
 
@@ -130,14 +123,10 @@ mod tests {
     async fn put_with_a_window_that_does_not_move_forward_is_400() {
         for (start_time, end_time) in [(200, 100), (100, 100)] {
             let req = PutSampleDataRequest {
-                status: SampleDataStatus::Loaded,
                 start_time,
                 end_time,
             };
-            let user = Headers(UserEmail {
-                user_id: "user@example.com".to_string(),
-            });
-            let resp = put(Path("default".to_string()), user, Json(req)).await;
+            let resp = put(Path("default".to_string()), Json(req)).await;
             assert_eq!(
                 resp.status(),
                 StatusCode::BAD_REQUEST,

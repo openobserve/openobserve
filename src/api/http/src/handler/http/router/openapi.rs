@@ -1089,6 +1089,7 @@ use crate::{
         (name = "Reports", description = "Report management"),
         (name = "Resources", description = "Resources available for role permissions"),
         (name = "Roles", description = "Role management"),
+        (name = "Sample Data", description = "Sample data state for the onboarding tour"),
         (name = "ScoreConfigs", description = "Score configurations for LLM evaluation (enterprise)"),
         (name = "Scorers", description = "LLM evaluation scorers (enterprise)"),
         (name = "ServiceAccounts", description = "Service account management"),

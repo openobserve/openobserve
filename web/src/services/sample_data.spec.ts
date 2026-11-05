@@ -61,7 +61,6 @@ describe("sampleData state calls", () => {
   it("saves the window as a loaded state", async () => {
     await sampleData.putState("acme", 10, 20);
     expect(client.put).toHaveBeenCalledWith("/api/acme/sample_data", {
-      status: "loaded",
       start_time: 10,
       end_time: 20,
     });

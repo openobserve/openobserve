@@ -1464,7 +1464,6 @@ fn service_route_table() -> Router {
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
         .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
         .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
-        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
 
         .merge(report_routes())
 
@@ -1496,6 +1495,9 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
+
+        // Sample data
+        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))

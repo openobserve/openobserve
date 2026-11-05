@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::{json, time::now_micros};
+use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -37,15 +37,10 @@ pub struct SampleDataState {
     pub start_time: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_by: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct PutSampleDataRequest {
-    pub status: SampleDataStatus,
     pub start_time: i64,
     pub end_time: i64,
 }
@@ -69,13 +64,7 @@ pub async fn get(org_id: &str) -> Result<SampleDataState, anyhow::Error> {
 pub async fn put(
     org_id: &str,
     req: PutSampleDataRequest,
-    user_id: &str,
 ) -> Result<SampleDataState, SampleDataError> {
-    if req.status != SampleDataStatus::Loaded {
-        return Err(SampleDataError::Invalid(
-            "status must be loaded; DELETE clears the state",
-        ));
-    }
     if req.start_time >= req.end_time {
         return Err(SampleDataError::Invalid(
             "start_time must be lower than end_time",
@@ -85,8 +74,6 @@ pub async fn put(
         status: SampleDataStatus::Loaded,
         start_time: Some(req.start_time),
         end_time: Some(req.end_time),
-        updated_at: Some(now_micros()),
-        updated_by: Some(user_id.to_string()),
     };
     let value = json::to_vec(&state).map_err(anyhow::Error::from)?;
     kv::set(org_id, KV_KEY, value.into()).await?;
@@ -117,7 +104,6 @@ mod tests {
 
     fn window(start_time: i64, end_time: i64) -> PutSampleDataRequest {
         PutSampleDataRequest {
-            status: SampleDataStatus::Loaded,
             start_time,
             end_time,
         }
@@ -139,40 +125,25 @@ mod tests {
     async fn put_refuses_a_window_that_does_not_move_forward() {
         let org = setup().await;
         for (start, end) in [(200, 100), (100, 100)] {
-            let err = put(&org, window(start, end), "user@example.com")
-                .await
-                .unwrap_err();
+            let err = put(&org, window(start, end)).await.unwrap_err();
             assert!(matches!(err, SampleDataError::Invalid(_)), "{start}..{end}");
         }
-        let none = PutSampleDataRequest {
-            status: SampleDataStatus::None,
-            ..window(100, 200)
-        };
-        let err = put(&org, none, "user@example.com").await.unwrap_err();
-        assert!(matches!(err, SampleDataError::Invalid(_)));
         assert_eq!(get(&org).await.unwrap(), SampleDataState::default());
     }
 
     #[tokio::test]
     async fn get_after_put_returns_the_saved_window() {
         let org = setup().await;
-        let before = now_micros();
-        let saved = put(&org, window(100, 200), "user@example.com")
-            .await
-            .unwrap();
+        let saved = put(&org, window(100, 200)).await.unwrap();
         assert_eq!(saved.status, SampleDataStatus::Loaded);
         assert_eq!((saved.start_time, saved.end_time), (Some(100), Some(200)));
-        assert_eq!(saved.updated_by.as_deref(), Some("user@example.com"));
-        assert!(saved.updated_at.unwrap() >= before);
         assert_eq!(get(&org).await.unwrap(), saved);
     }
 
     #[tokio::test]
     async fn get_after_delete_is_status_none_and_delete_is_idempotent() {
         let org = setup().await;
-        put(&org, window(100, 200), "user@example.com")
-            .await
-            .unwrap();
+        put(&org, window(100, 200)).await.unwrap();
         delete(&org).await.unwrap();
         assert_eq!(get(&org).await.unwrap(), SampleDataState::default());
         delete(&org).await.unwrap();

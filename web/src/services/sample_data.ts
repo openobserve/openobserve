@@ -70,8 +70,6 @@ export interface SampleDataState {
   status: "none" | "loaded";
   start_time?: number;
   end_time?: number;
-  updated_at?: number;
-  updated_by?: string;
 }
 
 // windows whose save failed, so this tab's tour still has the absolute range
@@ -89,7 +87,6 @@ const sampleData = {
   },
   putState: (org: string, startUs: number, endUs: number) =>
     http().put<SampleDataState>(`/api/${org}/sample_data`, {
-      status: "loaded",
       start_time: startUs,
       end_time: endUs,
     }),
