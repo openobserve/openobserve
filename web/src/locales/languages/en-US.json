@@ -11366,6 +11366,10 @@
         "empty_scope": "empty scope",
         "source_inactive": "source inactive"
       },
+      "badge": "Dismissed",
+      "byActor": "Dismissed by {actor}",
+      "foldUntil": "Hidden until {date}",
+      "foldUntilReopened": "Hidden until reopened",
       "emptyTitle": "No dismissed findings",
       "emptyDescription": "Findings you dismiss are listed here until they end or are reopened.",
       "loadFailedTitle": "Dismissed findings couldn't be loaded",
@@ -11377,7 +11381,9 @@
       "reopenChanged": "This dismissal changed since you loaded it. The list was refreshed; check it and try again.",
       "reopenDenied": "You don't have permission to reopen findings. Ask an admin for edit access to Alert Calibration.",
       "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
-      "reopenFailed": "The finding couldn't be reopened. Try again."
+      "reopenFailed": "The finding couldn't be reopened. Try again.",
+      "stat": "Dismissed",
+      "statSub": "Hidden from this run"
     },
     "tabs": {
       "runs": "Runs",

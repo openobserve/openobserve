@@ -267,4 +267,46 @@ test.describe("Alert Calibration dismiss and reopen", () => {
       });
     },
   );
+
+  test(
+    "E6 dismisses from the digest detail card, folds it in place, and reopens it",
+    { tag: ["@alert-calibration", "@all"] },
+    async ({ page }) => {
+      const findingId = calibrationFindingId(org, "no_destination", "alert", alertId);
+      const run = await pm.alertCalibrationPage.routeDigestFixture(org, {
+        alertId,
+        alertName,
+        findingId,
+      });
+      await pm.alertCalibrationPage.navigateToDigest(run);
+      const { dismiss } = pm.alertCalibrationPage;
+      const card = page.locator(dismiss.card);
+      const fold = card.locator(dismiss.cardFold);
+      await expect(fold).toHaveCount(0);
+      await card.locator(dismiss.cardDismiss).click();
+      await expect(page.locator(dismiss.dialog)).toBeVisible({ timeout: 10000 });
+      await pm.alertCalibrationPage.fillDismissForm({ reason: "known_issue", duration: "30" });
+      await pm.alertCalibrationPage.submitDismiss();
+      await pm.alertCalibrationPage.expectDialogClosed();
+
+      await expect(fold).toContainText("Dismissed by", { timeout: 15000 });
+      await expect(fold).toContainText("Known issue, handled elsewhere");
+      await expect(fold).toContainText("Hidden until");
+      await expect(card.locator(dismiss.cardBadge)).toHaveText("Dismissed");
+      await expect(card.locator(dismiss.cardDismiss)).toHaveCount(0);
+      expect((await dismissals(page, alertId)).items).toHaveLength(1);
+
+      await fold.locator(dismiss.cardReopen).click();
+      await pm.alertCalibrationPage.expectToast(
+        "success",
+        "Reopened. The finding is eligible for the next analysis.",
+      );
+      await expect(fold).toHaveCount(0, { timeout: 15000 });
+      await expect(card.locator(dismiss.cardBadge)).toHaveCount(0);
+      await expect(card.locator(dismiss.cardDismiss)).toBeVisible();
+      // The dialog closed itself before the fold, so unfolding must not open it again.
+      await expect(page.locator(dismiss.dialog)).toBeHidden();
+      expect((await dismissals(page, alertId)).items).toHaveLength(0);
+    },
+  );
 });

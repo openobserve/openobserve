@@ -23,14 +23,20 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: { listByFolderId: vi.fn() } });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/alert_calibration", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
+  return { ...actual, default: { ...actual.default, reopenDismissal: vi.fn() } };
+});
 
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
+import alertCalibration from "@/services/alert_calibration";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
+import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import type { FindingRecord } from "./digests";
 
 const listByFolderId = vi.mocked(alertsService.listByFolderId);
@@ -898,5 +904,192 @@ describe("AlertCalibrationFindingCard", () => {
     expect(actionRows(v1).map(([test]) => test)).toEqual([
       "alert-calibration-finding-action-AttachDestination",
     ]);
+  });
+
+  it("a_card_offers_dismiss_and_folds_when_dismissed", async () => {
+    const id = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+    const record = finding({
+      schema_version: 2,
+      kind: "finding",
+      rule_id: "no_destination",
+      title: "ops_cpu fired with no destination",
+      alert_id: "a1",
+      alert_name: "ops_cpu",
+      actions: undefined,
+      insight_actions: JSON.stringify([{ type: "review_alert", alert_id: "a1" }]),
+      finding_id: id,
+      scope_kind: "alert",
+      scope_key: "a1",
+    });
+    const open = mountCard(record);
+    const panel = open.find('[data-test="alert-calibration-finding-actions"]');
+    const buttons = panel.findAll("button");
+    expect(buttons[buttons.length - 1].attributes("data-test")).toBe(
+      "alert-calibration-finding-dismiss",
+    );
+    expect(buttons[buttons.length - 1].text()).toBe("Dismiss");
+    expect(open.find('[data-test="alert-calibration-finding-dismissed"]').exists()).toBe(false);
+    open.unmount();
+
+    const alone = mountCard({ ...record, insight_actions: JSON.stringify([]) });
+    const lonePanel = alone.find('[data-test="alert-calibration-finding-actions"]');
+    expect(lonePanel.findAll("button").map((b) => b.text())).toEqual(["Dismiss"]);
+    alone.unmount();
+
+    const folded = mount(AlertCalibrationFindingCard, {
+      props: {
+        finding: record,
+        dismissal: {
+          id,
+          rule_id: "no_destination",
+          pattern: null,
+          scope_kind: "alert",
+          scope_key: "a1",
+          state: "active",
+          revision: 2,
+          reason: "known_issue",
+          note: null,
+          has_note: false,
+          actor: "u-ops@example.com",
+          dismissed_at: 1,
+          duration_days: 90,
+          expires_at: new Date(2027, 1, 3).getTime() * 1000,
+          reopened_at: null,
+          reopened_by: null,
+          updated_at: 1,
+          alert_name: "ops_cpu",
+        },
+      },
+      global: { plugins: [store] },
+    });
+    expect(folded.find('[data-test="alert-calibration-finding-dismissed"]').text()).toBe(
+      "Dismissed",
+    );
+    const fold = folded.find('[data-test="alert-calibration-finding-fold"]');
+    expect(fold.text()).toContain("Dismissed by u-ops@example.com");
+    expect(fold.text()).toContain("Known issue, handled elsewhere");
+    expect(fold.text()).toContain("Hidden until Feb 3, 2027");
+    expect(fold.find('[data-test="alert-calibration-finding-reopen"]').text()).toBe("Reopen");
+    expect(folded.find("dl").exists()).toBe(false);
+    expect(folded.find('[data-test="alert-calibration-finding-actions"]').exists()).toBe(false);
+    expect(folded.find('[data-test="alert-calibration-finding-dismiss"]').exists()).toBe(false);
+    expect(folded.text()).toContain("ops_cpu fired with no destination");
+    const row = folded.props("dismissal");
+    folded.unmount();
+
+    const ended = mount(AlertCalibrationFindingCard, {
+      props: { finding: record, dismissal: { ...row!, state: "expired" } },
+      global: { plugins: [store] },
+    });
+    expect(ended.find('[data-test="alert-calibration-finding-fold"]').exists()).toBe(false);
+    expect(ended.find('[data-test="alert-calibration-finding-dismissed"]').exists()).toBe(false);
+    expect(ended.find('[data-test="alert-calibration-finding-dismiss"]').exists()).toBe(true);
+    ended.unmount();
+
+    const v1 = mountCard(finding({ rule_id: "noise", alert_id: "a1", finding_id: id }));
+    expect(v1.find('[data-test="alert-calibration-finding-dismiss"]').exists()).toBe(false);
+    v1.unmount();
+  });
+
+  it("a_folding_card_keeps_its_dialog_until_the_dialog_closes", async () => {
+    const id = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+    const record = finding({
+      schema_version: 2,
+      kind: "finding",
+      rule_id: "noise",
+      title: "ops_cpu fires too often",
+      alert_id: "a1",
+      alert_name: "ops_cpu",
+      finding_id: id,
+      scope_kind: "alert",
+      scope_key: "a1",
+    });
+    const wrapper = mount(AlertCalibrationFindingCard, {
+      props: { finding: record },
+      global: { plugins: [store] },
+    });
+    const dialog = () => wrapper.findComponent(AlertCalibrationDismissDialog);
+    expect(dialog().exists()).toBe(false);
+    await wrapper.find('[data-test="alert-calibration-finding-dismiss"]').trigger("click");
+    expect(dialog().props("open")).toBe(true);
+
+    await wrapper.setProps({
+      dismissal: {
+        id,
+        rule_id: "noise",
+        pattern: null,
+        scope_kind: "alert",
+        scope_key: "a1",
+        state: "active",
+        revision: 1,
+        reason: "expected",
+        note: null,
+        has_note: false,
+        actor: "u-ops@example.com",
+        dismissed_at: 1,
+        duration_days: 90,
+        expires_at: new Date(2027, 1, 3).getTime() * 1000,
+        reopened_at: null,
+        reopened_by: null,
+        updated_at: 1,
+        alert_name: "ops_cpu",
+      },
+    });
+    expect(dialog().exists()).toBe(true);
+    dialog().vm.$emit("update:open", false);
+    await nextTick();
+
+    await wrapper.setProps({ dismissal: null });
+    expect(dialog().props("open")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("reopen_from_a_folded_card_sends_the_rows_revision", async () => {
+    const id = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+    const record = finding({
+      schema_version: 2,
+      kind: "finding",
+      rule_id: "noise",
+      title: "ops_cpu fires too often",
+      alert_id: "a1",
+      alert_name: "ops_cpu",
+      finding_id: id,
+      scope_kind: "alert",
+      scope_key: "a1",
+    });
+    const dismissal = {
+      id,
+      rule_id: "noise",
+      pattern: null,
+      scope_kind: "alert",
+      scope_key: "a1",
+      state: "active" as const,
+      revision: 7,
+      reason: "expected" as const,
+      note: null,
+      has_note: false,
+      actor: "u-ops@example.com",
+      dismissed_at: 1,
+      duration_days: null,
+      expires_at: null,
+      reopened_at: null,
+      reopened_by: null,
+      updated_at: 1,
+      alert_name: "ops_cpu",
+    };
+    vi.mocked(alertCalibration.reopenDismissal).mockResolvedValue({
+      data: { ...dismissal, state: "reopened", revision: 8 },
+    } as never);
+    const wrapper = mount(AlertCalibrationFindingCard, {
+      props: { finding: record, dismissal },
+      global: { plugins: [store] },
+    });
+    expect(wrapper.find('[data-test="alert-calibration-finding-fold"]').text()).toContain(
+      "Hidden until reopened",
+    );
+    await wrapper.find('[data-test="alert-calibration-finding-reopen"]').trigger("click");
+    await flushPromises();
+    expect(alertCalibration.reopenDismissal).toHaveBeenCalledWith("default", id, 7);
+    wrapper.unmount();
   });
 });

@@ -17,8 +17,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
+import { queryClient } from "@/composables/query/queryClient";
+import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import alertCalibration from "@/services/alert_calibration";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AlertCalibrationDigestDetail from "./AlertCalibrationDigestDetail.vue";
@@ -31,7 +34,10 @@ vi.mock("@/aws-exports", async (importOriginal) => {
 
 vi.mock("@/services/alert_calibration", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
-  return { ...actual, default: { ...actual.default, readDigests: vi.fn() } };
+  return {
+    ...actual,
+    default: { ...actual.default, readDigests: vi.fn(), listDismissals: vi.fn() },
+  };
 });
 
 const WINDOW_START = 1_000_000_000;
@@ -91,6 +97,10 @@ const finding = (total: number, n: number): DigestRecord => ({
 
 const mountDetail = async (records: DigestRecord[]) => {
   vi.mocked(alertCalibration.readDigests).mockResolvedValue(records);
+  // The page waits for the dismissals read, so every mount answers it.
+  vi.mocked(alertCalibration.listDismissals).mockResolvedValue({
+    data: { items: [], next_cursor: null, total: 0 },
+  } as never);
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -313,6 +323,141 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
     expect(wrapper.text()).toContain(
       "Alert definition checks need AutoObserve, which is off. The other checks ran.",
     );
+    wrapper.unmount();
+  });
+});
+
+describe("AlertCalibrationDigestDetail dismissed tile", () => {
+  beforeEach(() => {
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+    };
+  });
+
+  const tile = (wrapper: VueWrapper) =>
+    (wrapper.findComponent(OStatStrip).props("items") as StatItem[]).find(
+      (item) => item.key === "dismissed",
+    );
+
+  it("the_detail_tile_shows_the_runs_dismissed_count_only_when_written", async () => {
+    const written = await mountDetail([{ ...finding(1, 1), dismissed_count: 2 }]);
+    await flushPromises();
+    expect(tile(written)?.value).toBe(2);
+    expect(tile(written)?.sub).toBe("Hidden from this run");
+    expect(tile(written)?.label).toBe("Dismissed");
+    written.unmount();
+
+    const scoped = await mountDetail([{ ...finding(1, 1), dismissed_count: null }]);
+    await flushPromises();
+    expect(tile(scoped)?.value).toBe("—");
+    expect(tile(scoped)?.sub).toBe("Shown only with access to every alert");
+    expect(tile(scoped)?.subIcon).toBe("info-outline");
+    scoped.unmount();
+
+    const before = await mountDetail([finding(1, 1)]);
+    await flushPromises();
+    expect(tile(before)).toBeUndefined();
+    before.unmount();
+  });
+});
+
+describe("AlertCalibrationDigestDetail dismissals", () => {
+  const ID = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+  const dismissable = (): DigestRecord => ({
+    ...finding(1, 1),
+    finding_id: ID,
+    scope_kind: "alert",
+    scope_key: "a1",
+  });
+  const page = (items: unknown[]) => ({ data: { items, next_cursor: null, total: items.length } });
+  const active = {
+    id: ID,
+    rule_id: "noise",
+    pattern: null,
+    scope_kind: "alert",
+    scope_key: "a1",
+    state: "active",
+    revision: 1,
+    reason: "known_issue",
+    note: null,
+    has_note: false,
+    actor: "u-ops@example.com",
+    dismissed_at: 1,
+    duration_days: null,
+    expires_at: null,
+    reopened_at: null,
+    reopened_by: null,
+    updated_at: 1,
+    alert_name: "queue_001",
+  };
+  const card = (wrapper: VueWrapper) =>
+    wrapper.find('[data-test="alert-calibration-finding-noise"]');
+
+  beforeEach(() => {
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+    };
+  });
+
+  it("the_card_paints_once_already_folded_after_a_fresh_dismissals_read", async () => {
+    // A board visit before the dismiss left a cached list without this finding.
+    queryClient.setQueryData(alertCalibrationKeys.dismissals("default"), {
+      items: [],
+      total: 0,
+      capped: false,
+    });
+    let answer: (value: unknown) => void = () => {};
+    vi.mocked(alertCalibration.listDismissals).mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)) as never,
+    );
+    const wrapper = await mountDetail([dismissable()]);
+    await flushPromises();
+    expect(card(wrapper).exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-digest-stats"]').exists()).toBe(false);
+    expect(wrapper.findComponent(OSkeleton).exists()).toBe(true);
+
+    answer(page([active]));
+    await flushPromises();
+    expect(card(wrapper).find('[data-test="alert-calibration-finding-dismissed"]').text()).toBe(
+      "Dismissed",
+    );
+    expect(card(wrapper).find('[data-test="alert-calibration-finding-fold"]').text()).toContain(
+      "Dismissed by u-ops@example.com",
+    );
+    expect(card(wrapper).find("dl").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("a_failed_first_dismissals_read_shows_states_unknown_with_retry", async () => {
+    queryClient.setQueryDefaults(["org"], { retry: false });
+    vi.mocked(alertCalibration.listDismissals).mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new Error("HTTP 500"), { response: { status: 500 } })),
+    );
+    const wrapper = await mountDetail([dismissable()]);
+    await flushPromises();
+    const unknown = wrapper.find('[data-test="alert-calibration-digest-states-unknown"]');
+    expect(unknown.text()).toContain(
+      "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
+    );
+    expect(
+      wrapper.findAllComponents(OBanner).find((b) => b.props("variant") === "error"),
+    ).toBeTruthy();
+    expect(card(wrapper).find('[data-test="alert-calibration-finding-fold"]').exists()).toBe(false);
+
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(page([active]) as never);
+    const before = vi.mocked(alertCalibration.listDismissals).mock.calls.length;
+    await wrapper.find('[data-test="alert-calibration-digest-states-retry"]').trigger("click");
+    await flushPromises();
+    expect(vi.mocked(alertCalibration.listDismissals).mock.calls.length).toBe(before + 1);
+    expect(wrapper.find('[data-test="alert-calibration-digest-states-unknown"]').exists()).toBe(
+      false,
+    );
+    expect(card(wrapper).find('[data-test="alert-calibration-finding-fold"]').exists()).toBe(true);
+    queryClient.setQueryDefaults(["org"], {});
     wrapper.unmount();
   });
 });

@@ -37,6 +37,12 @@ export function useActiveDismissals(
   const orgId = useOrgId();
   const query = useQuery(() => activeDismissalsQuery(orgId.value));
   const active = computed(() => activeIds(query.data.value));
+  const byId = computed(
+    () =>
+      new Map(
+        (query.data.value?.items ?? []).filter((v) => v.state === "active").map((v) => [v.id, v]),
+      ),
+  );
   // A refetch with no data returns the query to pending, so "settled" counts any answer, not the current status.
   const settled = computed(() =>
     options.freshOnMount
@@ -59,7 +65,7 @@ export function useActiveDismissals(
     );
   }
 
-  return { query, active, settled, unknown };
+  return { query, active, byId, settled, unknown };
 }
 
 /** One click, no confirmation (P5a-D8): reopening hides nothing, and dismissing again undoes it. */

@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     pad-y
     data-test="alert-calibration-digest-page"
   >
-    <div v-if="records.loading.value && !run" class="flex flex-col gap-3">
+    <div
+      v-if="(records.loading.value && !run) || !dismissals.settled.value"
+      class="flex flex-col gap-3"
+    >
       <OSkeleton class="rounded-default h-16 w-full" />
       <OSkeleton class="rounded-default h-40 w-full" />
     </div>
@@ -120,10 +123,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alertCalibration.detail.perSubjectNote") }}
         </OText>
         <div class="flex flex-col gap-3">
+          <OBanner
+            v-if="dismissals.unknown.value"
+            variant="error"
+            icon="error"
+            inline-actions
+            data-test="alert-calibration-digest-states-unknown"
+          >
+            {{ t("alertCalibration.dismiss.statesUnknown") }}
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="alert-calibration-digest-states-retry"
+                @click="dismissals.query.refetch()"
+              >
+                {{ t("alertCalibration.retry") }}
+              </OButton>
+            </template>
+          </OBanner>
           <AlertCalibrationFindingCard
             v-for="finding in visibleFindings"
             :key="finding.finding_id ?? `${finding.rule_id}:${finding.alert_id}`"
             :finding="finding"
+            :dismissal="finding.finding_id ? dismissals.byId.value.get(finding.finding_id) : null"
+            :refresh="records.load"
           />
         </div>
       </div>
@@ -222,6 +246,7 @@ import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -233,6 +258,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
+import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
@@ -248,6 +274,7 @@ import {
   visibilityCopy,
   type DigestRecord,
   type RuleId,
+  type RunRow,
 } from "./digests";
 import { COVERAGE_BADGE, formatMinutes, skipDetailLabel, skipReasonLabel } from "./format";
 import { isRuleId, ruleLabelKey, rulesOfVersion } from "./rules";
@@ -259,6 +286,7 @@ useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const route = useRoute();
 const { search, orgId } = useDigestSearch();
+const dismissals = useActiveDismissals({ reportRefetchFailure: true, freshOnMount: true });
 
 const windowStart = computed(() => Number(props.windowStart));
 const windowEnd = computed(() => Number(props.windowEnd));
@@ -382,6 +410,7 @@ const stats = computed<StatItem[]>(() => {
       subTooltip: t("alertCalibration.detail.statDeclinedTooltip"),
       icon: "block",
     },
+    ...dismissedStat(r),
     {
       key: "window",
       label: t("alertCalibration.detail.statWindow"),
@@ -390,6 +419,24 @@ const stats = computed<StatItem[]>(() => {
     },
   ];
 });
+
+/** A run from before dismissals never wrote the count, so it gets no tile; a scoped reader's is withheld. */
+const dismissedStat = (r: RunRow): StatItem[] => {
+  if (r.dismissed_count === undefined) return [];
+  const hidden = r.dismissed_count === null;
+  return [
+    {
+      key: "dismissed",
+      label: t("alertCalibration.dismiss.stat"),
+      value: countOrDash(r.dismissed_count),
+      sub: hidden
+        ? t("alertCalibration.visibility.orgTotalHidden")
+        : t("alertCalibration.dismiss.statSub"),
+      subIcon: hidden ? "info-outline" : undefined,
+      icon: "visibility-off",
+    },
+  ];
+};
 
 const noneFoundReason = computed<I18nText>(() => {
   const r = run.value;

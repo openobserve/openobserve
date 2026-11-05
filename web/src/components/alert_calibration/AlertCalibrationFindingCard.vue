@@ -58,6 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-calibration-finding-rule"
             >{{ t(ruleLabelKey(finding.rule_id, schemaVersion(finding))) }}</OBadge
           >
+          <OBadge
+            v-if="folded"
+            variant="default-soft"
+            size="xs"
+            shape="rounded"
+            data-test="alert-calibration-finding-dismissed"
+          >
+            {{ t("alertCalibration.dismiss.badge") }}
+          </OBadge>
         </div>
         <OText
           v-if="qualityReasons"
@@ -83,7 +92,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <OCardSection role="body" class="flex flex-col gap-3 pt-3">
+    <OCardSection
+      v-if="folded && dismissal"
+      role="body"
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3"
+      data-test="alert-calibration-finding-fold"
+    >
+      <OText variant="meta" as="p" class="flex min-w-0 flex-wrap gap-x-1.5">
+        <template v-for="(part, index) in dismissCopy.foldParts(dismissal)" :key="index">
+          <span v-if="index > 0" aria-hidden="true">·</span>
+          <span>{{ part }}</span>
+        </template>
+      </OText>
+      <OButton
+        variant="outline"
+        size="xs"
+        class="shrink-0"
+        :loading="isPending(dismissal.id)"
+        data-test="alert-calibration-finding-reopen"
+        @click="reopen(dismissal)"
+      >
+        {{ t("alertCalibration.dismiss.reopen") }}
+      </OButton>
+    </OCardSection>
+
+    <OCardSection v-else role="body" class="flex flex-col gap-3 pt-3">
       <dl class="flex flex-wrap gap-x-8 gap-y-2">
         <div
           v-for="row in evidence"
@@ -174,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        v-if="actions.length"
+        v-if="actions.length || dismissable"
         class="rounded-default bg-surface-subtle border-s-border-strong flex flex-col gap-1 border-s-4 px-3 py-2"
         data-test="alert-calibration-finding-actions"
       >
@@ -198,6 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-body text-xs font-medium">{{ action.label }}</span>
           <OText v-if="action.description" variant="meta" as="span">{{ action.description }}</OText>
         </div>
+        <div v-if="dismissable" class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <OButton
+            variant="outline"
+            size="xs"
+            data-test="alert-calibration-finding-dismiss"
+            @click="openDismiss"
+          >
+            {{ dismissCopy.button() }}
+          </OButton>
+        </div>
       </div>
     </OCardSection>
 
@@ -206,6 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="applyOpen"
       :action="applyAction"
       :finding="finding"
+    />
+    <AlertCalibrationDismissDialog
+      v-if="dismissTarget && dismissRequested"
+      :key="dismissTarget.finding_id"
+      v-model:open="dismissOpen"
+      :finding="dismissTarget"
+      :refresh="refresh"
     />
   </OCard>
 </template>
@@ -256,6 +306,9 @@ import {
   resourceOptions,
 } from "./format";
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
+import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
+import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
+import { dismissalCopy, isDismissable, type DismissalView } from "./dismissals";
 import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
 import {
   applyCopy,
@@ -265,7 +318,13 @@ import {
   type ReviewAlertAction,
 } from "./applySuggestion";
 
-const props = defineProps<{ finding: FindingRecord }>();
+const props = defineProps<{
+  finding: FindingRecord;
+  /** This finding's active dismissal, which folds the card. */
+  dismissal?: DismissalView | null;
+  /** Re-reads the records behind the dismiss dialog after a 404 or 409. */
+  refresh?: () => void;
+}>();
 
 const LAG_COLUMNS: { field: keyof LagRow; labelKey: I18nKey }[] = [
   { field: "skipped_windows", labelKey: "alertCalibration.evidence.skippedWindows" },
@@ -278,6 +337,20 @@ const router = useRouter();
 const orgId = useOrgId();
 
 const meta = computed(() => RULE_META[props.finding.rule_id]);
+
+const dismissCopy = computed(() => dismissalCopy(t, locale.value));
+const folded = computed(() => props.dismissal?.state === "active");
+const dismissTarget = computed(() => (isDismissable(props.finding) ? props.finding : null));
+// The fold must not unmount an open dialog, or its close is lost and Reopen would show it again.
+const dismissable = computed(() => (folded.value ? null : dismissTarget.value));
+const { reopen, isPending } = useReopenDismissal();
+// The dialog mounts on first use, so a page of many cards holds no idle forms.
+const dismissRequested = ref(false);
+const dismissOpen = ref(false);
+const openDismiss = () => {
+  dismissRequested.value = true;
+  dismissOpen.value = true;
+};
 
 /** Version-2 fields, shown only when the record carries a value this build knows. */
 const tier = computed(() => {

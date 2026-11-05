@@ -311,6 +311,13 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
       view.alert_name ? raw(view.alert_name) : t("alertCalibration.dismiss.deletedAlert"),
     byAgo: (view: Pick<DismissalView, "actor" | "dismissed_at">): I18nText =>
       t("alertCalibration.dismiss.byAgo", { actor: raw(view.actor), time: ago(view.dismissed_at) }),
+    foldParts: (view: Pick<DismissalView, "actor" | "reason" | "expires_at">): I18nText[] => [
+      t("alertCalibration.dismiss.byActor", { actor: raw(view.actor) }),
+      reasonLabel(view.reason),
+      view.expires_at === null
+        ? t("alertCalibration.dismiss.foldUntilReopened")
+        : t("alertCalibration.dismiss.foldUntil", { date: date(view.expires_at) }),
+    ],
     reopened: () => t("alertCalibration.dismiss.reopened"),
   };
 }
