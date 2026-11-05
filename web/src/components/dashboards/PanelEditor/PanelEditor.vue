@@ -356,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @series-limit-update="handleSeriesLimitUpdate"
                         @region-join-update="handleRegionJoinUpdate"
                         @sankey-notice-update="handleSankeyNoticeUpdate"
+                        @shared-bucket-rows-update="handleSharedBucketRowsUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -719,6 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @series-limit-update="handleSeriesLimitUpdate"
                           @region-join-update="handleRegionJoinUpdate"
                           @sankey-notice-update="handleSankeyNoticeUpdate"
+                          @shared-bucket-rows-update="handleSharedBucketRowsUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -1015,6 +1017,7 @@ const {
   handleSeriesLimitUpdate,
   handleRegionJoinUpdate,
   handleSankeyNoticeUpdate,
+  handleSharedBucketRowsUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,

@@ -314,6 +314,10 @@ export default defineComponent({
       type: Object as PropType<SankeyNotice | null>,
       default: null,
     },
+    sharedBucketRows: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
     serverPartial: {
       type: Boolean,
       default: false,
@@ -397,6 +401,7 @@ export default defineComponent({
             serverPartial: props.serverPartial,
           }),
           sankeyNotice: props.sankeyNotice,
+          sharedBucketRows: props.sharedBucketRows,
           serverPartial: props.serverPartial,
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,

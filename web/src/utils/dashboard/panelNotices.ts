@@ -26,6 +26,7 @@ export type PanelNoticeId =
   | "unmatched-regions"
   | "return-links"
   | "skipped-rows"
+  | "shared-bucket-rows"
   | "partial"
   | "interrupted";
 
@@ -50,6 +51,7 @@ export interface PanelNoticeInput {
   seriesLimitMessage?: string;
   seriesTotalBound?: SeriesTotalBound;
   sankeyNotice?: SankeyNotice | null;
+  sharedBucketRows?: number | null;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
@@ -226,6 +228,19 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
       chipLabel: t("dashboard.panelErrorButtons.skippedRowsChip", { count }, skippedRows),
       title: t("dashboard.panelErrorButtons.skippedRowsTitle"),
       body: t("dashboard.panelErrorButtons.skippedRowsBody", { count }, skippedRows),
+      details: [],
+    });
+  }
+
+  if (input.sharedBucketRows) {
+    const count = addCommasToNumber(input.sharedBucketRows);
+    notices.push({
+      id: "shared-bucket-rows",
+      tone: "warning",
+      icon: "visibility-off",
+      chipLabel: t("dashboard.panelErrorButtons.sharedBucketRowsChip", { count }),
+      title: t("dashboard.panelErrorButtons.sharedBucketRowsTitle"),
+      body: t("dashboard.panelErrorButtons.sharedBucketRowsBody", { count }),
       details: [],
     });
   }

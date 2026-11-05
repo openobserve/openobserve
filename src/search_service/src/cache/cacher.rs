@@ -114,11 +114,6 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     Ok(filtered_responses)
 }
 
-/// A hit label carries the timezone shift, and the stream minimum is in UTC.
-fn bucket_outlives(label: i64, interval: i64, ts_offset: i64, stream_min_ts: i64) -> bool {
-    label - ts_offset + interval > stream_min_ts
-}
-
 #[tracing::instrument(
     name = "service:search:cache:cacher:check_cache",
     skip_all,
@@ -520,77 +515,12 @@ pub async fn get_cached_results(
     })
 }
 
-/// An entry from another grid, such as a 1970-grid one from an older version, holds no whole
-/// bucket.
+/// Whether a cache entry's edges sit on the histogram grid; non-aggregate entries always do.
 pub(crate) fn is_on_histogram_grid(meta: &ResultCacheMeta, interval: i64, ts_offset: i64) -> bool {
     !meta.is_aggregate
         || interval <= 0
         || (histogram_bucket_offset(meta.start_time, interval, ts_offset) == 0
             && histogram_bucket_offset(meta.end_time, interval, ts_offset) == 0)
-}
-
-/// Keeps the hits the request fully covers and shrinks the meta to them; false when none remain.
-fn trim_cached_response(
-    response: &mut Response,
-    meta: &mut ResultCacheMeta,
-    cache_req: &CacheQueryRequest,
-) -> bool {
-    let (q_start, q_end) = (cache_req.q_start_time, cache_req.q_end_time);
-    // the limit hid other buckets of this range, and a narrower range can rank them higher
-    if cache_req.is_histogram_non_ts_order
-        && cache_req.limit > 0
-        && response.hits.len() as i64 >= cache_req.limit
-        && (meta.start_time < q_start || meta.end_time > q_end)
-    {
-        return false;
-    }
-    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
-    // convert histogram interval to microseconds
-    let interval = response.histogram_interval.unwrap_or_default() * 1_000_000;
-    // a bucket that ends after the request holds counts from outside it, even if its label fits
-    let fits_end = |ts: i64| {
-        if interval > 0 {
-            ts + interval <= q_end
-        } else {
-            ts < q_end
-        }
-    };
-    if data_start >= q_start && fits_end(data_end) {
-        return true;
-    }
-    response.hits.retain(|hit| {
-        let hit_ts = cached_hit_utc_ts(hit, cache_req);
-        fits_end(hit_ts) && hit_ts >= q_start
-    });
-    if response.hits.is_empty() {
-        return false;
-    }
-    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
-    meta.start_time = data_start;
-    meta.end_time = data_end + interval;
-    true
-}
-
-/// Hit labels carry the timezone shift, and every bound they meet is in UTC.
-fn cached_hit_utc_ts(hit: &json::Value, cache_req: &CacheQueryRequest) -> i64 {
-    get_ts_value(&cache_req.ts_column, hit) - cache_req.ts_offset
-}
-
-/// Hits sorted by another column need a full scan, since the ends of the list are not the ends.
-fn cached_hits_time_range(response: &Response, cache_req: &CacheQueryRequest) -> (i64, i64) {
-    let ts_of = |hit| cached_hit_utc_ts(hit, cache_req);
-    if cache_req.is_histogram_non_ts_order {
-        return response
-            .hits
-            .iter()
-            .map(ts_of)
-            .fold((i64::MAX, i64::MIN), |(min, max), ts| {
-                (min.min(ts), max.max(ts))
-            });
-    }
-    let first_ts = ts_of(response.hits.first().unwrap());
-    let last_ts = ts_of(response.hits.last().unwrap());
-    (first_ts.min(last_ts), first_ts.max(last_ts))
 }
 
 pub fn calculate_deltas(
@@ -992,6 +922,75 @@ pub async fn delete_cache(
 
     disk::remove_result_cache_metas(&remove_files).await;
     Ok(true)
+}
+
+/// A hit label carries the timezone shift, and the stream minimum is in UTC.
+fn bucket_outlives(label: i64, interval: i64, ts_offset: i64, stream_min_ts: i64) -> bool {
+    label - ts_offset + interval > stream_min_ts
+}
+
+/// Keeps the hits the request fully covers and shrinks the meta to them; false when none remain.
+fn trim_cached_response(
+    response: &mut Response,
+    meta: &mut ResultCacheMeta,
+    cache_req: &CacheQueryRequest,
+) -> bool {
+    let (q_start, q_end) = (cache_req.q_start_time, cache_req.q_end_time);
+    // the limit hid other buckets of this range, and a narrower range can rank them higher
+    if cache_req.is_histogram_non_ts_order
+        && cache_req.limit > 0
+        && response.hits.len() as i64 >= cache_req.limit
+        && (meta.start_time < q_start || meta.end_time > q_end)
+    {
+        return false;
+    }
+    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
+    // convert histogram interval to microseconds
+    let interval = response.histogram_interval.unwrap_or_default() * 1_000_000;
+    // a bucket that ends after the request holds counts from outside it, even if its label fits
+    let fits_end = |ts: i64| {
+        if interval > 0 {
+            ts + interval <= q_end
+        } else {
+            ts < q_end
+        }
+    };
+    if data_start >= q_start && fits_end(data_end) {
+        return true;
+    }
+    response.hits.retain(|hit| {
+        let hit_ts = cached_hit_utc_ts(hit, cache_req);
+        fits_end(hit_ts) && hit_ts >= q_start
+    });
+    if response.hits.is_empty() {
+        return false;
+    }
+    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
+    meta.start_time = data_start;
+    meta.end_time = data_end + interval;
+    true
+}
+
+/// Hit labels carry the timezone shift, and every bound they meet is in UTC.
+fn cached_hit_utc_ts(hit: &json::Value, cache_req: &CacheQueryRequest) -> i64 {
+    get_ts_value(&cache_req.ts_column, hit) - cache_req.ts_offset
+}
+
+/// Hits sorted by another column need a full scan, since the ends of the list are not the ends.
+fn cached_hits_time_range(response: &Response, cache_req: &CacheQueryRequest) -> (i64, i64) {
+    let ts_of = |hit| cached_hit_utc_ts(hit, cache_req);
+    if cache_req.is_histogram_non_ts_order {
+        return response
+            .hits
+            .iter()
+            .map(ts_of)
+            .fold((i64::MAX, i64::MIN), |(min, max), ts| {
+                (min.min(ts), max.max(ts))
+            });
+    }
+    let first_ts = ts_of(response.hits.first().unwrap());
+    let last_ts = ts_of(response.hits.last().unwrap());
+    (first_ts.min(last_ts), first_ts.max(last_ts))
 }
 
 fn calculate_deltas_multi(

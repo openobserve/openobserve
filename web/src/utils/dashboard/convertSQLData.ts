@@ -514,6 +514,11 @@ export const convertMultiSQLData = async (
         options[0].extras = options[0].extras ?? {};
         addHeatmapWarning(options[0].extras, message);
       }
+      const sharedRows = opt?.extras?.sharedBucketRows;
+      if (sharedRows) {
+        options[0].extras = options[0].extras ?? {};
+        options[0].extras.sharedBucketRows = (options[0].extras.sharedBucketRows ?? 0) + sharedRows;
+      }
     });
 
     options[0].extras = options[0].extras ?? {};

@@ -33,6 +33,7 @@ export const usePanelNotices = (timezone: () => string) => {
   const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
   const regionJoin = shallowRef<RegionJoinInfo | null>(null);
   const sankeyNotice = shallowRef<SankeyNotice | null>(null);
+  const sharedBucketRows = shallowRef<number | null>(null);
   // Writable, so a host can still clear it with its other warnings.
   const maxQueryRangeWarning = ref("");
 
@@ -68,12 +69,17 @@ export const usePanelNotices = (timezone: () => string) => {
     sankeyNotice.value = notice;
   };
 
+  const handleSharedBucketRowsUpdate = (rows: number | null) => {
+    sharedBucketRows.value = rows;
+  };
+
   const resetNotices = () => {
     resultMetadata.value = null;
     panelDiagnostics.value = null;
     seriesLimit.value = null;
     regionJoin.value = null;
     sankeyNotice.value = null;
+    sharedBucketRows.value = null;
     maxQueryRangeWarning.value = "";
   };
 
@@ -82,6 +88,7 @@ export const usePanelNotices = (timezone: () => string) => {
     seriesLimit: seriesLimit.value,
     regionJoin: regionJoin.value,
     sankeyNotice: sankeyNotice.value,
+    sharedBucketRows: sharedBucketRows.value,
     serverPartial: panelDiagnostics.value?.serverPartial ?? false,
     rowsCapped: panelDiagnostics.value?.rowsCapped ?? false,
     serverPartialReasons: panelDiagnostics.value?.partialReasons ?? [],
@@ -99,6 +106,7 @@ export const usePanelNotices = (timezone: () => string) => {
     handleSeriesLimitUpdate,
     handleRegionJoinUpdate,
     handleSankeyNoticeUpdate,
+    handleSharedBucketRowsUpdate,
     resetNotices,
   };
 };

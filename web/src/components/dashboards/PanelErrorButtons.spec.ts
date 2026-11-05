@@ -481,6 +481,27 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("explains rows that share a time bucket in their own chip without a Top N action", async () => {
+      const wrapper = mountAttached({ sharedBucketRows: 4, canEdit: true, canRefresh: true });
+      const chip = wrapper.find('[data-test="panel-notice-chip-shared-bucket-rows"]');
+      expect(chip.text()).toBe("4 rows share a bucket");
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("Rows share a time bucket");
+      expect(bubble()?.querySelector('[data-test^="panel-notice-action-"]')).toBeNull();
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("keeps the shared bucket chip when a real series cap also fires", () => {
+      const wrapper = mountAttached({
+        sharedBucketRows: 4,
+        seriesLimit: { shown: 100, total: 1000, cap: 100 },
+      });
+      expect(wrapper.find('[data-test="panel-notice-chip-shared-bucket-rows"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(true);
+      wrapper.unmount();
+    });
+
     it("uses the singular for one return link and no chip for none", async () => {
       const wrapper = mountAttached({ sankeyNotice: { returnLinks: 1, skippedRows: 0 } });
       expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').text()).toBe(

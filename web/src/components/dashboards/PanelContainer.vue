@@ -576,6 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-limit-update="handleSeriesLimitUpdate"
         @region-join-update="handleRegionJoinUpdate"
         @sankey-notice-update="handleSankeyNoticeUpdate"
+        @shared-bucket-rows-update="handleSharedBucketRowsUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -1014,6 +1015,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleSharedBucketRowsUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -1104,6 +1106,7 @@ export default defineComponent({
         !!noticeProps.value.regionJoin ||
         !!sankeyNotice.value?.returnLinks ||
         !!sankeyNotice.value?.skippedRows ||
+        !!noticeProps.value.sharedBucketRows ||
         !!panelDiagnostics.value?.serverPartial ||
         injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
@@ -1678,6 +1681,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleSharedBucketRowsUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       panelNoticeProps,

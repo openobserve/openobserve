@@ -80,19 +80,6 @@ pub fn handle_histogram(
     );
 }
 
-/// Reads the first `histogram()` from the parsed SQL, because a regex misses valid spellings.
-fn first_histogram_call(sql: &str) -> Option<HistogramIntervalVisitor> {
-    if !sql.to_ascii_lowercase().contains("histogram") {
-        return None;
-    }
-    let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
-    let mut visitor = HistogramIntervalVisitor::new((0, 0));
-    for mut statement in statements {
-        let _ = statement.visit(&mut visitor);
-    }
-    visitor.is_histogram.then_some(visitor)
-}
-
 /// Whether the first `histogram()` uses an interval without a fixed width, such as a month.
 pub fn has_calendar_histogram_interval(sql: &str) -> bool {
     first_histogram_call(sql).is_some_and(|call| call.error.is_none() && call.interval.is_none())
@@ -137,35 +124,6 @@ pub fn pin_histogram_timezone(sql: &mut String, timezone: &mut Option<String>, e
     {
         *timezone = Some(fixed);
     }
-}
-
-fn pin_named_zone_argument(expr: &mut Expr, end_time: i64) {
-    let Expr::Function(func) = expr else {
-        return;
-    };
-    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
-        return;
-    }
-    let FunctionArguments::List(list) = &mut func.args else {
-        return;
-    };
-    if let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(literal)))) =
-        list.args.get_mut(2)
-        && let Some(tz) = literal.value.clone().into_string()
-        && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
-    {
-        literal.value = Value::SingleQuotedString(fixed);
-    }
-}
-
-fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
-    if parse_timezone_to_offset_opt(tz).is_some() {
-        return None;
-    }
-    let reference = if end_time > 0 { end_time } else { now_micros() };
-    let secs = parse_timezone_to_offset_at(tz, reference)?;
-    let (sign, secs) = if secs < 0 { ('-', -secs) } else { ('+', secs) };
-    Some(format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60))
 }
 
 /// Converts an original query to a histogram query
@@ -333,6 +291,48 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
         ));
         Err(error)
     }
+}
+
+/// Reads the first `histogram()` from the parsed SQL, because a regex misses valid spellings.
+fn first_histogram_call(sql: &str) -> Option<HistogramIntervalVisitor> {
+    if !sql.to_ascii_lowercase().contains("histogram") {
+        return None;
+    }
+    let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
+    let mut visitor = HistogramIntervalVisitor::new((0, 0));
+    for mut statement in statements {
+        let _ = statement.visit(&mut visitor);
+    }
+    visitor.is_histogram.then_some(visitor)
+}
+
+fn pin_named_zone_argument(expr: &mut Expr, end_time: i64) {
+    let Expr::Function(func) = expr else {
+        return;
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return;
+    }
+    let FunctionArguments::List(list) = &mut func.args else {
+        return;
+    };
+    if let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(literal)))) =
+        list.args.get_mut(2)
+        && let Some(tz) = literal.value.clone().into_string()
+        && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
+    {
+        literal.value = Value::SingleQuotedString(fixed);
+    }
+}
+
+fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
+    if parse_timezone_to_offset_opt(tz).is_some() {
+        return None;
+    }
+    let reference = if end_time > 0 { end_time } else { now_micros() };
+    let secs = parse_timezone_to_offset_at(tz, reference)?;
+    let (sign, secs) = if secs < 0 { ('-', -secs) } else { ('+', secs) };
+    Some(format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60))
 }
 
 #[cfg(test)]
