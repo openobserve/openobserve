@@ -17,6 +17,7 @@ import {
 import OSelectItem from "./OSelectItem.vue";
 import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -70,7 +71,7 @@ type NormalizedOption = {
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
-  icon?: string;
+  icon?: IconName;
   /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
@@ -104,7 +105,7 @@ type NormalizedOption = {
   headerAction?: I18nText;
   headerActionAriaLabel?: I18nText;
   keepOnSearch?: boolean;
-  /** The header option as passed in, handed back by `header-action`. */
+  /** The option as passed in: handed back by `header-action`, and to the `#option` slot. */
   source?: SelectOption;
 };
 
@@ -265,7 +266,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
-    icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
+    icon: typeof rawIcon === "string" && rawIcon ? (rawIcon as IconName) : undefined,
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
@@ -284,6 +285,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       : undefined,
     searchText:
       typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
+    source: option as SelectOption,
     listLabel: option.listLabel ? raw(String(option.listLabel)) : undefined,
     suffix: option.suffix ? raw(String(option.suffix)) : undefined,
   };
@@ -735,10 +737,18 @@ function handleCreateFromInput() {
   const term = searchTerm.value.trim();
   if (!term) return;
 
-  const hasExisting = normalizedOptions.value.some(
+  const matches = normalizedOptions.value.filter(
     (opt) => opt.label === term || String(opt.value) === term,
   );
-  if (hasExisting) return;
+  if (matches.length) {
+    const pick = matches.find((opt) => !opt.header && !opt.disabled && !opt.expandable);
+    if (!pick) return;
+    // Enter on a typed exact match picks it; a multi-select only adds, never toggles it off.
+    if (!props.multiple) handleListboxUpdate(toRekaString(pick.value));
+    else if (!selectedValues.value.includes(pick.value))
+      emit("update:modelValue", [...selectedValues.value, pick.value]);
+    return;
+  }
 
   emit("create", term);
 }
@@ -1379,15 +1389,16 @@ const fieldWidthClass = computed(() => {
       @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
-      <OIcon
+      <!-- The tooltip goes first so it anchors to this focusable wrapper, not the icon's svg, and opens on Tab too. -->
+      <span
         v-if="$slots.tooltip"
-        name="info-outline"
-        size="sm"
-        :label="tooltipIconLabel"
+        tabindex="0"
+        role="img"
+        :aria-label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help"
-        ><slot name="tooltip"
-      /></OIcon>
+        class="rounded-default focus-visible:ring-focus-ring-accent inline-flex cursor-help focus-visible:ring-2 focus-visible:outline-none"
+        ><slot name="tooltip" /><OIcon name="info-outline" size="sm"
+      /></span>
     </label>
 
     <template v-if="listboxModeEnabled">
@@ -1886,9 +1897,21 @@ const fieldWidthClass = computed(() => {
                             />
                           </template>
 
+                          <template v-if="$slots.option && filteredOptions[vRow.index].source">
+                            <OIcon
+                              v-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span class="flex min-w-0 flex-1 items-center">
+                              <slot name="option" :option="filteredOptions[vRow.index].source!" />
+                            </span>
+                          </template>
+
                           <!-- Inline subLabel: name – url on a single row -->
                           <template
-                            v-if="
+                            v-else-if="
                               filteredOptions[vRow.index].subLabel &&
                               filteredOptions[vRow.index].subLabelInline
                             "
@@ -2251,6 +2274,9 @@ const fieldWidthClass = computed(() => {
                 :value="opt.value"
                 :label="opt.label"
                 :disabled="opt.disabled || opt.expandable"
+                :icon="opt.icon"
+                :icon-component="opt.iconComponent"
+                :reserve-icon-space="!!iconKey"
               />
             </template>
 

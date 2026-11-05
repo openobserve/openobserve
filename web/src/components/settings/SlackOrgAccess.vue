@@ -241,9 +241,6 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.orgAccess.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.orgAccess.description", { team }) }}
-        </p>
       </div>
       <span v-if="view" class="text-text-secondary text-sm" data-test="slack-org-access-count">{{
         t("slackApp.orgAccess.count", { selected: selectedCount, total })

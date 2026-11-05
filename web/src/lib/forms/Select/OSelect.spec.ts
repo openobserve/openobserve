@@ -2,9 +2,11 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { h } from "vue";
 import OSelect from "./OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 describe("OSelect", () => {
   let wrapper: VueWrapper;
@@ -230,6 +232,71 @@ describe("OSelect", () => {
     input!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flushPromises();
     expect(wrapper.emitted("create")).toBeFalsy();
+  });
+
+  describe("Enter on a typed term when creatable", () => {
+    async function typeAndEnter(props: Record<string, unknown>, term: string) {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { searchable: true, creatable: true, ...props },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const input = document.body.querySelector(
+        'input[placeholder="Search..."]',
+      ) as HTMLInputElement;
+      input.value = term;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+    }
+
+    const options = [
+      { label: "Existing", value: "ex" },
+      { label: "Locked", value: "locked", disabled: true },
+    ];
+
+    it("selects an exact label match instead of creating it", async () => {
+      await typeAndEnter({ options }, "Existing");
+      expect(wrapper.emitted("create")).toBeFalsy();
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["ex"]);
+    });
+
+    it("matches case-sensitively, so a differently cased term is created", async () => {
+      await typeAndEnter({ options }, "existing");
+      expect(wrapper.emitted("create")?.at(-1)).toEqual(["existing"]);
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
+
+    it("emits create once for a term with no match", async () => {
+      await typeAndEnter({ options }, "brand-new");
+      expect(wrapper.emitted("create")).toEqual([["brand-new"]]);
+    });
+
+    it("neither selects nor creates an exact match on a disabled option", async () => {
+      await typeAndEnter({ options }, "Locked");
+      expect(wrapper.emitted("create")).toBeFalsy();
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
+
+    it("adds an exact match to a multi-select without removing the selection", async () => {
+      await typeAndEnter(
+        {
+          options: [...options, { label: "Other", value: "o" }],
+          multiple: true,
+          modelValue: ["o"],
+        },
+        "Existing",
+      );
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([["o", "ex"]]);
+    });
+
+    it("leaves a multi-select unchanged when the match is already selected", async () => {
+      await typeAndEnter({ options, multiple: true, modelValue: ["ex"] }, "Existing");
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+      expect(wrapper.emitted("create")).toBeFalsy();
+    });
   });
 
   describe("close on scroll", () => {
@@ -525,6 +592,22 @@ describe("OSelect", () => {
       expect(trigger.attributes("aria-labelledby")).toBeUndefined();
     });
 
+    it("puts the label's info icon in the Tab order so its tooltip opens on keyboard focus", async () => {
+      wrapper = mount(OSelect, {
+        props: { label: "Country", options },
+        attrs: { "data-test": "country" },
+        slots: { tooltip: () => h(OTooltip, { content: "Where the team works", delay: 10 }) },
+        attachTo: document.body,
+      });
+      const info = wrapper.find('[data-test="country-info"]');
+      expect(info.attributes("tabindex")).toBe("0");
+      expect(info.attributes("aria-label")).toBeTruthy();
+      info.element.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await flushPromises();
+      expect(document.body.textContent).toContain("Where the team works");
+    });
+
     it("adds no labelledby without an outside label", () => {
       wrapper = mount(OSelect, { props: { options } });
       expect(wrapper.find('button[role="combobox"]').attributes("aria-labelledby")).toBeUndefined();
@@ -623,6 +706,44 @@ describe("OSelect", () => {
       await flushPromises();
       expect(trigger.attributes("aria-expanded")).toBe("true");
       expect(document.body.textContent).toContain("1 day ago");
+    });
+  });
+
+  describe("simple (non-searchable) mode option icons", () => {
+    const options = [
+      { label: "Firing", value: "firing", icon: "warning" },
+      { label: "Resolved", value: "resolved", icon: "check-circle" },
+      { label: "All", value: "all" },
+    ];
+
+    const openSimple = async (props: Record<string, unknown>) => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { searchable: false, options, "data-test": "status", ...props },
+      });
+      await wrapper.find('button[role="combobox"]').trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      return Array.from(document.body.querySelectorAll<HTMLElement>('[data-test="status-option"]'));
+    };
+
+    it("shows each option's icon and a spacer for an iconless option when icon-key is set", async () => {
+      const rows = await openSimple({ iconKey: "icon" });
+      expect(rows).toHaveLength(3);
+      const icons = wrapper.findAllComponents(OIcon).filter((c) => c.props("size") === "sm");
+      expect(icons.map((c) => c.props("name"))).toEqual(
+        expect.arrayContaining(["warning", "check-circle"]),
+      );
+      expect(rows[0].querySelector("[aria-hidden='true']")).not.toBeNull();
+      expect(rows[2].querySelector(":scope > span.size-4")).not.toBeNull();
+    });
+
+    it("renders options without icons or spacers when icon-key is absent", async () => {
+      const rows = await openSimple({});
+      expect(rows).toHaveLength(3);
+      for (const row of rows) {
+        expect(row.querySelector(":scope > span.size-4")).toBeNull();
+        expect(row.classList.contains("gap-2")).toBe(false);
+      }
     });
   });
 });
