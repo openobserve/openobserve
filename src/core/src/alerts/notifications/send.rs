@@ -15,6 +15,8 @@
 
 //! Renders one template for one destination and sends it; the alert loop and `notify` share it.
 
+use std::time::Duration;
+
 use config::meta::destinations::{DestinationType, Email, Template, TemplateKind, TemplateType};
 
 use super::{
@@ -31,6 +33,8 @@ use crate::alerts::{
     },
     destinations::{note_skipped, org_member_split},
 };
+
+const CONNECT_TIMEOUT_SECS: u64 = 10;
 
 /// Where the subject of an email or SNS message comes from (Backend section 5, subject rule).
 #[derive(Clone, Copy, Debug)]
@@ -55,6 +59,15 @@ pub enum SendError {
     NoOrgMemberRecipient(Vec<String>),
     #[error("{0}")]
     Render(String),
+}
+
+/// A hanging endpoint must not stall the alert that sends to it.
+pub(crate) fn destination_client_builder(skip_tls_verify: bool) -> reqwest::ClientBuilder {
+    let timeout = config::get_config().limit.alert_notification_timeout;
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(timeout))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .danger_accept_invalid_certs(skip_tls_verify)
 }
 
 /// Carry the episode id into a platform's own correlation field, so the resolve

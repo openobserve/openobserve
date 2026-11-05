@@ -22,7 +22,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JsonValue as Json, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    JsonValue as Json, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::{
@@ -76,6 +76,20 @@ pub async fn names_using_template<C: ConnectionTrait>(
         .order_by_asc(anomaly_detection_config::Column::Name)
         .into_tuple::<(String, String)>()
         .all(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
+}
+
+/// Configs in a folder, by the `folders.id` key they store.
+pub async fn count_in_folder<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_pk: &str,
+) -> Result<u64> {
+    anomaly_detection_config::Entity::find()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .filter(anomaly_detection_config::Column::FolderId.eq(folder_pk))
+        .count(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
 }
