@@ -215,6 +215,33 @@ pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     (new_ts, ts > 0 && new_ts == ts)
 }
 
+/// The shortest anomaly detection schedule; a stored row below it runs at this cadence.
+pub const MIN_ANOMALY_SCHEDULE_SECONDS: i64 = 60;
+
+/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
+pub fn parse_interval(interval: &str) -> Result<i64, anyhow::Error> {
+    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
+        (stripped, 1)
+    } else if let Some(stripped) = interval.strip_suffix('m') {
+        (stripped, 60)
+    } else if let Some(stripped) = interval.strip_suffix('h') {
+        (stripped, 3600)
+    } else if let Some(stripped) = interval.strip_suffix('d') {
+        (stripped, 86400)
+    } else {
+        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
+    };
+    let value: i64 = value.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
+        )
+    })?;
+    // A positive wrap lands on a plausible schedule that clears every downstream guard.
+    value
+        .checked_mul(unit_seconds)
+        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
+}
+
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
     let chars = s.chars().collect::<Vec<char>>();
 
