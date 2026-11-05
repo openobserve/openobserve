@@ -2064,7 +2064,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
                 .await
                 .ok()
                 .flatten()
-                .is_some_and(|c| c.confirm_failures);
+                .is_some_and(|c| c.confirms_failures());
         let run_trigger = run_trigger_type(conn, &check.run_id).await;
         if wants_confirm_job(
             status_db,

@@ -85,6 +85,24 @@ export function splitConfirms<T extends ExecutionSlot>(
 }
 
 /**
+ * Each scheduled execution's status after its confirm job. A browser confirm job re-tests every
+ * device of a location and the server votes per job, so one failed device in the confirm job
+ * keeps the failure in that location, even when the failed device's own re-test passed.
+ */
+export function confirmedStatuses<T extends ExecutionSlot>(
+  primary: readonly T[],
+  confirms: readonly ConfirmPair<T>[],
+): ExecutionStatus[] {
+  const failedAt = new Set(
+    confirms.filter((c) => c.confirm.status === "fail").map((c) => c.confirm.location),
+  );
+  const confirmOf = new Map(confirms.filter((c) => c.of).map((c) => [c.of!, c.confirm] as const));
+  return primary.map((e) =>
+    failedAt.has(e.location) ? e.status : confirmedStatus(e.status, confirmOf.get(e)?.status),
+  );
+}
+
+/**
  * A failure counts only when its confirm job fails too. A passing confirm job
  * turns it into a warning (flaky); a confirm job that did not test the site
  * leaves the failure standing.

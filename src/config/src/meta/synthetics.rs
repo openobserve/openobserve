@@ -203,9 +203,11 @@ pub struct Synthetic {
     /// `scheduled_ts` of the first run in the current `last_run_class`, in microseconds.
     #[serde(default)]
     pub last_run_class_at: i64,
-    /// Re-test a failed scheduled job once from a second location before the failure counts.
-    #[serde(default = "default_true")]
-    pub confirm_failures: bool,
+    /// Re-test a failed scheduled job once from the failed location before the failure counts.
+    /// `None` from a client that does not send it: a new check turns it on, and an update keeps
+    /// the stored value. Use [`Synthetic::confirms_failures`] to read it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirm_failures: Option<bool>,
     /// Which runs fire a failure alert. `None` on a check saved before the rule existed, which
     /// keeps alerting on any location; a new check is created with [`AlertOn::Down`].
     #[serde(default)]
@@ -219,6 +221,12 @@ pub struct Synthetic {
     pub created_at: i64,
     #[serde(default)]
     pub updated_at: i64,
+}
+
+impl Synthetic {
+    pub fn confirms_failures(&self) -> bool {
+        self.confirm_failures.unwrap_or(true)
+    }
 }
 
 // ── SyntheticType ───────────────────────────────────────────────────────────────

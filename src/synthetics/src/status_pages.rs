@@ -442,15 +442,18 @@ async fn apply_engine_actions(
 }
 
 /// Checks whose newest auto-incident was marked a false alarm during the failure that is still
-/// going on: the run class has not changed since the mark. A new failure after a recovery
-/// changes the class, so it opens a new incident. This replaces the old six-hour snooze.
+/// going on: the mark closed the incident, and the run class has not changed since. A new failure
+/// after a recovery changes the class, so it opens a new incident. Marking an incident that was
+/// already over holds nothing. This replaces the old six-hour snooze.
 fn false_alarm_holds(
     notices: &[status_page_notices::Model],
     states: &[table::CheckStateRow],
 ) -> HashSet<String> {
     let mut marked: HashMap<&str, i64> = HashMap::new();
     for n in notices {
-        if let (Some(check_id), Some(at)) = (n.auto_check_id.as_deref(), n.false_alarm_at) {
+        if let (Some(check_id), Some(at)) = (n.auto_check_id.as_deref(), n.false_alarm_at)
+            && n.resolved_at == Some(at)
+        {
             let e = marked.entry(check_id).or_insert(at);
             *e = (*e).max(at);
         }
@@ -953,7 +956,13 @@ mod fast_pass_tests {
         // Not a false alarm: never held.
         let mut real = row("real", 3);
         real.last_run_class_at = 400;
-        let held = false_alarm_holds(&notices, &[same, new, real]);
+        // An incident over at 300, marked at 500, while a new failure began at 400: not held.
+        let mut old_notice = notice("old", Some(500));
+        old_notice.resolved_at = Some(300);
+        let notices = [notices, vec![old_notice]].concat();
+        let mut old = row("old", 3);
+        old.last_run_class_at = 400;
+        let held = false_alarm_holds(&notices, &[same, new, real, old]);
         assert_eq!(held, HashSet::from(["same".to_string()]));
     }
 

@@ -214,9 +214,67 @@ pub fn check_event(
 /// not hold it, or the working destinations get the notice again on every sweep.
 #[cfg(feature = "enterprise")]
 pub async fn notify_gap(resp: GapNotification) {
+    use openobserve_synthetics::alerting::GapNotice;
+
+    if !send_gap_notice(&resp).await {
+        return;
+    }
+    let conn = infra::db::get_orm_client_rw().await;
+    let marked = match resp.notice {
+        GapNotice::Opened { since } => {
+            let now = config::utils::time::now_micros();
+            let marked = infra::table::synthetics_checks::mark_gap_notified(
+                conn,
+                &resp.synthetics_id,
+                since,
+                now,
+            )
+            .await;
+            // The gap closed while its notice was on the way, so no run owes the resumed notice.
+            // The owner got the gap notice, so send it here, once.
+            if matches!(marked, Ok(false)) {
+                let state =
+                    infra::table::synthetics_checks::get_alert_state(conn, &resp.synthetics_id)
+                        .await;
+                if let Ok(Some(state)) = state
+                    && gap_closed_during_delivery(state.gap_since, since)
+                {
+                    let resumed = GapNotification {
+                        notice: GapNotice::Resumed { since, until: now },
+                        ..resp
+                    };
+                    send_gap_notice(&resumed).await;
+                }
+                return;
+            }
+            marked
+        }
+        GapNotice::Resumed { since, .. } => {
+            infra::table::synthetics_checks::clear_resumed_gap(conn, &resp.synthetics_id, since)
+                .await
+        }
+    };
+    if let Err(e) = marked {
+        log::error!(
+            "[synthetics] mark gap notice check={}: {e}",
+            resp.synthetics_id
+        );
+    }
+}
+
+/// A gap that the row no longer holds closed before its notice could be marked. The same gap with
+/// a mark in place means that another sender got there first.
+#[cfg(feature = "enterprise")]
+fn gap_closed_during_delivery(stored_since: i64, since: i64) -> bool {
+    stored_since != since
+}
+
+/// Sends one gap notice to every destination. True when at least one took or skipped it.
+#[cfg(feature = "enterprise")]
+async fn send_gap_notice(resp: &GapNotification) -> bool {
     use crate::alerts::notifications::notify::{NotifyError, notify};
 
-    let ctx = gap_notification_context(&resp);
+    let ctx = gap_notification_context(resp);
     let mut delivered = false;
     for dest_name in &resp.destinations {
         let mut ctx = ctx.clone();
@@ -228,31 +286,7 @@ pub async fn notify_gap(resp: GapNotification) {
             ),
         }
     }
-    if !delivered {
-        return;
-    }
-    let conn = infra::db::get_orm_client_rw().await;
-    let marked = match resp.notice {
-        openobserve_synthetics::alerting::GapNotice::Opened { since } => {
-            infra::table::synthetics_checks::mark_gap_notified(
-                conn,
-                &resp.synthetics_id,
-                since,
-                config::utils::time::now_micros(),
-            )
-            .await
-        }
-        openobserve_synthetics::alerting::GapNotice::Resumed { since, .. } => {
-            infra::table::synthetics_checks::clear_resumed_gap(conn, &resp.synthetics_id, since)
-                .await
-        }
-    };
-    if let Err(e) = marked {
-        log::error!(
-            "[synthetics] mark gap notice check={}: {e}",
-            resp.synthetics_id
-        );
-    }
+    delivered
 }
 
 /// The shared path's context for a gap notice: the check's variables, with the notice's words.
@@ -1580,6 +1614,13 @@ async fn clear_down(location_id: &str) {
     if let Err(e) = infra::table::synthetics_locations::clear_down_notification(location_id).await {
         log::error!("[synthetics] staleness watcher: clear down flag for {location_id}: {e}");
     }
+    #[test]
+    fn a_gap_that_closed_during_delivery_owes_its_resumed_notice() {
+        assert!(gap_closed_during_delivery(0, 100));
+        assert!(gap_closed_during_delivery(200, 100));
+        assert!(!gap_closed_during_delivery(100, 100));
+    }
+
     #[test]
     fn a_gap_notice_is_informational_and_carries_its_own_words() {
         use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationEvent};

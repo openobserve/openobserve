@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { confirmedStatus, splitConfirms, type ExecutionSlot } from "./confirmJobs";
+import {
+  confirmedStatus,
+  confirmedStatuses,
+  splitConfirms,
+  type ExecutionSlot,
+} from "./confirmJobs";
+import type { ExecutionStatus } from "./rollUpStatus";
 
 const exec = (location: string, status: ExecutionSlot["status"], timestamp: number) => ({
   location,
@@ -104,5 +110,37 @@ describe("confirmedStatus", () => {
     expect(confirmedStatus("fail", "error")).toBe("fail");
     expect(confirmedStatus("fail")).toBe("fail");
     expect(confirmedStatus("pass", "fail")).toBe("pass");
+  });
+});
+
+describe("confirmedStatuses", () => {
+  const slot = (device: string, status: ExecutionStatus, scheduledTs: number) => ({
+    location: "aws-us-east-1",
+    browser: "chromium",
+    device,
+    environment: "",
+    scheduledTs,
+    timestamp: scheduledTs,
+    status,
+  });
+
+  it("should keep the failure when another device of the confirm job failed", () => {
+    const { primary, confirms } = splitConfirms([
+      slot("Desktop", "fail", 100),
+      slot("Mobile", "pass", 100),
+      slot("Desktop", "pass", 200),
+      slot("Mobile", "fail", 200),
+    ]);
+    expect(confirmedStatuses(primary, confirms)).toEqual(["fail", "pass"]);
+  });
+
+  it("should turn a failure into a warning when the whole confirm job passed", () => {
+    const { primary, confirms } = splitConfirms([
+      slot("Desktop", "fail", 100),
+      slot("Mobile", "pass", 100),
+      slot("Desktop", "pass", 200),
+      slot("Mobile", "pass", 200),
+    ]);
+    expect(confirmedStatuses(primary, confirms)).toEqual(["warning", "pass"]);
   });
 });

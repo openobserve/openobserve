@@ -1168,7 +1168,7 @@ import {
   type AggregateStatus,
   type StatusTally,
 } from "@/utils/synthetics/rollUpStatus";
-import { confirmedStatus, splitConfirms } from "@/utils/synthetics/confirmJobs";
+import { confirmedStatuses, splitConfirms } from "@/utils/synthetics/confirmJobs";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -1850,7 +1850,7 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
     const confirmOf = new Map(
       confirms.filter((c) => c.of).map((c) => [c.of!.run, c.confirm] as const),
     );
-    const statuses = primary.map((e) => confirmedStatus(e.status, confirmOf.get(e.run)?.status));
+    const statuses = confirmedStatuses(primary, confirms);
     const status = rollUpStatus(statuses);
     const tally = tallyStatuses(statuses);
 
@@ -1885,7 +1885,12 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
 
     const execDetails: TimelineExecution[] = primary.map((slot, i) => {
       const e = slot.run;
-      const confirm = confirmOf.get(e);
+      // A confirm row with no failure to pair with shows under its own device.
+      const confirm =
+        confirmOf.get(e) ??
+        confirms.find(
+          (c) => !c.of && c.confirm.location === e.location && c.confirm.device === e.device,
+        )?.confirm;
       return {
         location: locationLabel(e.location),
         browserEngine: e.browser,

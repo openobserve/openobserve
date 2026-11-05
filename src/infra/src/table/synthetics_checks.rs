@@ -161,7 +161,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             last_check_status,
             last_run_class: m.last_run_class,
             last_run_class_at: m.last_run_class_at,
-            confirm_failures: settings.confirm_failures,
+            confirm_failures: Some(settings.confirm_failures),
             alert_on: settings.alert_on,
             owner: m.owner,
             created_at: m.created_at,
@@ -1414,7 +1414,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         session_replay: check.session_replay,
         start: check.start,
         environments: check.environments.clone(),
-        confirm_failures: check.confirm_failures,
+        confirm_failures: check.confirms_failures(),
         alert_on: check.alert_on,
     })?)
 }

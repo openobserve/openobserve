@@ -661,12 +661,20 @@ async fn keep_stored_type(
         return Ok(None);
     };
     body.check_type = stored.check_type.clone();
-    // A client that does not send the alert rule keeps the stored one, so an edit from an older
-    // UI never turns "any location" into "down only".
+    keep_stored_settings(body, &stored);
+    Ok(Some(stored.check_type))
+}
+
+/// A client that does not send a setting keeps the stored one, so an edit from an older UI never
+/// turns "any location" into "down only", and an editor without the confirm setting never turns
+/// it back on.
+fn keep_stored_settings(body: &mut Synthetic, stored: &Synthetic) {
     if body.alert_on.is_none() {
         body.alert_on = stored.alert_on;
     }
-    Ok(Some(stored.check_type))
+    if body.confirm_failures.is_none() {
+        body.confirm_failures = stored.confirm_failures;
+    }
 }
 
 async fn holds_browser_check(
@@ -863,8 +871,8 @@ mod tests {
 
     use super::{
         composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
-        delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_type,
-        needs_composition_lock, run_composition_mutation,
+        delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_settings,
+        keep_stored_type, needs_composition_lock, run_composition_mutation,
     };
     use crate::service::{
         composition::{CompositionError, tests::db_with_synthetics_defaults, validate_for_save},
@@ -1100,6 +1108,20 @@ mod tests {
             parents_before
         );
         assert_eq!(refs_before["parent"], ["child"]);
+    }
+
+    #[test]
+    fn an_update_that_omits_the_confirm_setting_keeps_the_stored_one() {
+        let mut stored = check("c", SyntheticType::Http);
+        stored.confirm_failures = Some(false);
+        let mut body = check("c", SyntheticType::Http);
+        body.confirm_failures = None;
+        keep_stored_settings(&mut body, &stored);
+        assert_eq!(body.confirm_failures, Some(false));
+        // A client that sends it wins.
+        body.confirm_failures = Some(true);
+        keep_stored_settings(&mut body, &stored);
+        assert_eq!(body.confirm_failures, Some(true));
     }
 
     #[tokio::test]

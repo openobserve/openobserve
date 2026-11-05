@@ -810,7 +810,8 @@ async fn replay_streaks<C: ConnectionTrait>(
         run_ts: cur.run_ts,
         run_class: cur.run_class,
         run_class_at: cur.run_class_at,
-        tested_at: cur.tested_at,
+        // A late run can be the newest one that tested the site.
+        tested_at: cur.tested_at.max(replayed.tested_at),
     })
 }
 
@@ -1382,6 +1383,20 @@ mod tests {
             completed_at(&db, "a").await.is_some(),
             "the late run itself still completes"
         );
+    }
+
+    #[tokio::test]
+    async fn a_late_run_that_tested_the_site_moves_the_tested_time() {
+        let db = db().await;
+        run_with_jobs(&db, "a", 100, 1).await;
+        run_with_jobs(&db, "b", 200, 1).await;
+        // The newer run did not test the site.
+        ack(&db, "b", 0, 4, 300).await.unwrap();
+        assert_eq!(check_row(&db).await.0.tested_at, 0);
+        ack(&db, "a", 0, 1, 400).await.unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.tested_at, 100);
+        assert_eq!(row.run_ts, 200);
     }
 
     #[tokio::test]
