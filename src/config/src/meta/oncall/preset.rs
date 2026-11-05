@@ -269,14 +269,14 @@ impl std::fmt::Display for PresetError {
             ),
             Self::EmptyGroup { field } => write!(
                 f,
-                "`{field}` has nobody in it, so the layer it builds would page nobody"
+                "`{field}` has nobody in it, so the shift rule it builds would page nobody"
             ),
             Self::TooManyMembers { field, max, got } => write!(
                 f,
                 "`{field}` holds {got} members, which is more than the {max} a rotation may have"
             ),
             Self::BlankName { field } => {
-                write!(f, "`{field}` is blank; a layer needs a name to be told apart from the others on a calendar")
+                write!(f, "`{field}` is blank; a shift rule needs a name to be told apart from the others on a calendar")
             }
             Self::DuplicateMember { field, email } => write!(
                 f,
@@ -288,7 +288,7 @@ impl std::fmt::Display for PresetError {
             ),
             Self::EmptyWindow { field, minute } => write!(
                 f,
-                "`{field}` starts and ends at minute {minute}, so the layer would apply at no instant at all"
+                "`{field}` starts and ends at minute {minute}, so the shift rule would apply at no instant at all"
             ),
             Self::DayOutOfRange { field, got } => write!(
                 f,
@@ -307,7 +307,7 @@ impl std::fmt::Display for PresetError {
                 minute,
             } => write!(
                 f,
-                "`{first}` and `{second}` both cover minute {minute} of the day; regional layers must not overlap, or which of them holds that hour is arbitrary"
+                "`{first}` and `{second}` both cover minute {minute} of the day; regional shift rules must not overlap, or which of them holds that hour is arbitrary"
             ),
             Self::BoundaryAtWeekStart => f.write_str(
                 "`boundary_day` 0 with `boundary_minute` 0 is the start of the week, which gives `first` none of it; split somewhere inside the week",
@@ -407,9 +407,7 @@ impl PresetSpec {
 
 /// The rotations a preset builds, top layer first.
 ///
-/// Pure: the timezone decides where the weekly handover falls on the local
-/// calendar, the anchor is passed in rather than read from a clock, and the
-/// result is the `Vec<ShiftRule>` of one rotation.
+/// Pure: the anchor is used as given, and the result is the shift rules of one rotation.
 ///
 /// One rotation, deliberately. Every preset shape is a set of rules over a
 /// single position — follow-the-sun is one person on call across three
@@ -420,20 +418,17 @@ impl PresetSpec {
 /// forget: one way in, and it either refuses or returns something resolvable.
 pub fn build(
     spec: &PresetSpec,
-    tz: chrono_tz::Tz,
     anchor_micros: i64,
     handover_micros: i64,
 ) -> Result<Vec<ShiftRule>, PresetError> {
     validate(spec, handover_micros)?;
-    // Handovers are a wall-clock fact, so the cycle starts at the top of a local week.
-    let anchor = week_start(anchor_micros, tz);
 
     let layer = |name: String, members: &[String], priority: i32, restrictions: Vec<TimeWindow>| {
         ShiftRule {
             name,
             members: members.to_vec(),
             shift_micros: handover_micros,
-            anchor_micros: anchor,
+            anchor_micros,
             priority,
             restrictions,
             starts_at: None,
@@ -463,7 +458,7 @@ pub fn build(
                 None => everyone(groups.iter().map(|g| g.members.as_slice())),
             };
             out.push(layer(
-                group_name(catch_all.as_ref(), "Follow-the-sun catch-all"),
+                group_name(catch_all.as_ref(), "Everything else"),
                 &fallback,
                 CATCH_ALL_PRIORITY,
                 Vec::new(),
@@ -496,14 +491,14 @@ pub fn build(
             boundary_minute,
         } => vec![
             layer(
-                group_name(Some(first), "First half of the week"),
+                group_name(Some(first), "Start of the week"),
                 &first.members,
                 RESTRICTED_PRIORITY,
                 first_half_windows(*boundary_day, *boundary_minute),
             ),
             // The second half is whatever the first does not claim, so no second boundary drifts.
             layer(
-                group_name(Some(second), "Second half of the week"),
+                group_name(Some(second), "Rest of the week"),
                 &second.members,
                 CATCH_ALL_PRIORITY,
                 Vec::new(),
@@ -517,7 +512,7 @@ pub fn build(
             end_minute,
         } => vec![
             layer(
-                group_name(Some(business_hours), "Business hours"),
+                group_name(Some(business_hours), "Working hours"),
                 &business_hours.members,
                 RESTRICTED_PRIORITY,
                 vec![TimeWindow {
@@ -527,13 +522,18 @@ pub fn build(
                 }],
             ),
             layer(
-                group_name(Some(after_hours), "Nights and weekends"),
+                group_name(Some(after_hours), "Out of hours"),
                 &after_hours.members,
                 CATCH_ALL_PRIORITY,
                 Vec::new(),
             ),
         ],
     })
+}
+
+/// A chosen anchor as given; an absent one is `now` snapped to the local week. [pure]
+pub fn resolve_anchor(anchor_micros: Option<i64>, now: i64, tz: chrono_tz::Tz) -> i64 {
+    anchor_micros.unwrap_or_else(|| week_start(now, tz))
 }
 
 /// The windows covering Monday 00:00 up to `(boundary_day, boundary_minute)`.
@@ -555,30 +555,6 @@ fn first_half_windows(boundary_day: u8, boundary_minute: u32) -> Vec<TimeWindow>
             start_minute: 0,
             end_minute: boundary_minute,
         });
-    }
-    out
-}
-
-fn group_name(group: Option<&Group>, fallback: &str) -> String {
-    group
-        .and_then(|g| g.name.as_deref())
-        .map(str::trim)
-        .filter(|n| !n.is_empty())
-        .unwrap_or(fallback)
-        .to_string()
-}
-
-/// Everybody named across the layers, first appearance wins, compared without
-/// case so one person spelled two ways does not get two turns.
-fn everyone<'a>(groups: impl Iterator<Item = &'a [String]>) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    let mut out = Vec::new();
-    for g in groups {
-        for m in g {
-            if seen.insert(m.trim().to_ascii_lowercase()) {
-                out.push(m.clone());
-            }
-        }
     }
     out
 }
@@ -608,6 +584,30 @@ fn week_start(at: i64, tz: chrono_tz::Tz) -> i64 {
         LocalResult::Ambiguous(dt, _) => dt.timestamp_micros(),
         LocalResult::None => at,
     }
+}
+
+fn group_name(group: Option<&Group>, fallback: &str) -> String {
+    group
+        .and_then(|g| g.name.as_deref())
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+/// Everybody named across the layers, first appearance wins, compared without
+/// case so one person spelled two ways does not get two turns.
+fn everyone<'a>(groups: impl Iterator<Item = &'a [String]>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for g in groups {
+        for m in g {
+            if seen.insert(m.trim().to_ascii_lowercase()) {
+                out.push(m.clone());
+            }
+        }
+    }
+    out
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -940,11 +940,11 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
             id: PresetId::FollowTheSun,
             name: "Follow the sun".to_string(),
             description:
-                "Two to four regional layers, each covering its own hours of the team's day, over one layer that covers everything they miss."
+                "Two to four regional shift rules, each covering its own hours of the team's day, over one shift rule that covers everything they miss."
                     .to_string(),
             layers: vec![
-                "one layer per group, restricted to that group's hours".to_string(),
-                "Follow-the-sun catch-all — no restriction, so no hour is uncovered".to_string(),
+                "one shift rule per region, restricted to that region's hours".to_string(),
+                "Everything else — no restriction, so no hour is uncovered".to_string(),
             ],
             inputs: with_common(vec![
                 PresetInput::new(
@@ -977,7 +977,7 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
             id: PresetId::WeekdayWeekend,
             name: "Weekdays and weekend".to_string(),
             description:
-                "A Monday-to-Friday layer over a weekend layer, so the two halves of the week rotate independently."
+                "A Monday-to-Friday shift rule over a weekend shift rule, so the two halves of the week rotate independently."
                     .to_string(),
             layers: vec![
                 "Weekdays — Mon–Fri, all day".to_string(),
@@ -1007,8 +1007,8 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
                 "The week cut at one boundary you choose, each half to a different group."
                     .to_string(),
             layers: vec![
-                "First half of the week — Monday 00:00 up to the boundary".to_string(),
-                "Second half of the week — no restriction, so it holds the rest".to_string(),
+                "Start of the week — Monday 00:00 up to the boundary".to_string(),
+                "Rest of the week — no restriction, so it holds the rest".to_string(),
             ],
             inputs: with_common(vec![
                 PresetInput::new(
@@ -1041,11 +1041,11 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
             id: PresetId::BusinessHoursPlusNights,
             name: "Business hours plus nights".to_string(),
             description:
-                "A working-hours layer over an out-of-hours layer that takes every other hour, nights and weekends included."
+                "A working-hours shift rule over an out-of-hours shift rule that takes every other hour, nights and weekends included."
                     .to_string(),
             layers: vec![
-                "Business hours — the chosen days and window".to_string(),
-                "Nights and weekends — no restriction, so it holds everything else".to_string(),
+                "Working hours — the chosen days and window".to_string(),
+                "Out of hours — no restriction, so it holds everything else".to_string(),
             ],
             inputs: with_common(vec![
                 PresetInput::new(
@@ -1079,24 +1079,15 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
     ]
 }
 
-/// The three fields every preset takes, appended to each descriptor so the UI
+/// The two fields every preset takes, appended to each descriptor so the UI
 /// can build a whole form from one entry instead of remembering a preamble.
 fn with_common(mut inputs: Vec<PresetInput>) -> Vec<PresetInput> {
-    inputs.push(
-        PresetInput::new(
-            "timezone",
-            PresetInputKind::Timezone,
-            "Timezone",
-            "The one zone every window below is read in. Absent means the team's own zone — never UTC.",
-        )
-        .optional(),
-    );
     inputs.push(
         PresetInput::new(
             "handover_micros",
             PresetInputKind::DurationMicros,
             "Hand over every",
-            "How long one shift lasts, for every layer this builds.",
+            "How long one shift lasts, for every shift rule this builds.",
         )
         .bounded(MIN_HANDOVER_MICROS, MAX_HANDOVER_MICROS)
         .defaulting(serde_json::json!(DEFAULT_HANDOVER_MICROS)),
@@ -1118,8 +1109,8 @@ fn group_fields(members_help: &str) -> Vec<PresetInput> {
         PresetInput::new(
             "name",
             PresetInputKind::Text,
-            "Layer name",
-            "What this layer is called on the calendar. Absent takes a sensible default.",
+            "Shift rule name",
+            "What this shift rule is called on the calendar. Absent takes a sensible default.",
         )
         .optional(),
         members_input(members_help),
@@ -1240,7 +1231,7 @@ mod tests {
             chrono_tz::America::New_York,
         ] {
             for (id, spec) in every_preset() {
-                let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+                let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
                 for hour in 0..(7 * 24) {
                     let at = MONDAY + hour * MICROS_PER_HOUR;
                     let slots = resolve_on_call(&[of(&rotations)], &[], &[], at, tz);
@@ -1265,7 +1256,7 @@ mod tests {
         ];
         for (tz, monday) in weeks {
             for (id, spec) in every_preset() {
-                let rotations = build(&spec, tz, monday, DEFAULT_HANDOVER_MICROS).unwrap();
+                let rotations = build(&spec, monday, DEFAULT_HANDOVER_MICROS).unwrap();
                 // Some zones transition mid-hour, and an hourly walk would step over it.
                 for step in 0..(7 * 24 * 4) {
                     let at = monday + step * (MICROS_PER_HOUR / 4);
@@ -1287,7 +1278,6 @@ mod tests {
         let tz = chrono_tz::America::New_York;
         let rotations = build(
             &business_hours(),
-            tz,
             1_772_600_400_000_000,
             DEFAULT_HANDOVER_MICROS,
         )
@@ -1305,10 +1295,10 @@ mod tests {
                     .map(|s| s.rule.clone())
                     .unwrap()
             };
-            assert_eq!(who(at(8, 59)), "Nights and weekends", "{y}-{m}-{d} 08:59");
-            assert_eq!(who(at(9, 0)), "Business hours", "{y}-{m}-{d} 09:00");
-            assert_eq!(who(at(16, 59)), "Business hours", "{y}-{m}-{d} 16:59");
-            assert_eq!(who(at(17, 0)), "Nights and weekends", "{y}-{m}-{d} 17:00");
+            assert_eq!(who(at(8, 59)), "Out of hours", "{y}-{m}-{d} 08:59");
+            assert_eq!(who(at(9, 0)), "Working hours", "{y}-{m}-{d} 09:00");
+            assert_eq!(who(at(16, 59)), "Working hours", "{y}-{m}-{d} 16:59");
+            assert_eq!(who(at(17, 0)), "Out of hours", "{y}-{m}-{d} 17:00");
         }
     }
 
@@ -1342,26 +1332,26 @@ mod tests {
             (
                 split_the_week(),
                 &[
-                    (0, "First half of the week"),
-                    (3 * 24 + 11, "First half of the week"),
-                    (3 * 24 + 12, "Second half of the week"),
-                    (6 * 24 + 23, "Second half of the week"),
+                    (0, "Start of the week"),
+                    (3 * 24 + 11, "Start of the week"),
+                    (3 * 24 + 12, "Rest of the week"),
+                    (6 * 24 + 23, "Rest of the week"),
                 ],
             ),
             (
                 business_hours(),
                 &[
-                    (8, "Nights and weekends"),
-                    (9, "Business hours"),
-                    (16, "Business hours"),
-                    (17, "Nights and weekends"),
-                    (5 * 24 + 10, "Nights and weekends"),
+                    (8, "Out of hours"),
+                    (9, "Working hours"),
+                    (16, "Working hours"),
+                    (17, "Out of hours"),
+                    (5 * 24 + 10, "Out of hours"),
                 ],
             ),
         ];
         for (spec, samples) in cases {
             let id = spec.id();
-            let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+            let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for (hour, expected) in samples {
                 let slots = resolve_on_call(
                     &[of(&rotations)],
@@ -1383,13 +1373,7 @@ mod tests {
     /// named above in the order they were named.
     #[test]
     fn test_follow_the_sun_catch_all_defaults_to_everybody() {
-        let rotations = build(
-            &follow_the_sun(),
-            chrono_tz::UTC,
-            MONDAY,
-            DEFAULT_HANDOVER_MICROS,
-        )
-        .unwrap();
+        let rotations = build(&follow_the_sun(), MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         let catch_all = rotations.last().unwrap();
         assert_eq!(catch_all.restrictions, Vec::new());
         assert_eq!(catch_all.priority, CATCH_ALL_PRIORITY);
@@ -1417,7 +1401,7 @@ mod tests {
             ],
             catch_all: Some(g(Some("Everyone"), &["dee@o2.ai"])),
         };
-        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         let at = |h: i64| MONDAY + h * MICROS_PER_HOUR;
         for (hour, expected) in [(2, "naoto@o2.ai"), (12, "dee@o2.ai"), (20, "kelly@o2.ai")] {
             assert_eq!(
@@ -1437,7 +1421,7 @@ mod tests {
     #[test]
     fn test_every_preset_generates_exactly_one_unrestricted_layer() {
         for (id, spec) in every_preset() {
-            let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+            let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             let unrestricted: Vec<_> = rotations
                 .iter()
                 .filter(|r| r.restrictions.is_empty())
@@ -1460,7 +1444,7 @@ mod tests {
     #[test]
     fn test_generated_rotations_are_ordinary_rotations() {
         for (id, spec) in every_preset() {
-            let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+            let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for r in &rotations {
                 r.validate().unwrap_or_else(|e| panic!("{id}: {e}"));
                 let json = serde_json::to_value(r).unwrap();
@@ -1494,7 +1478,7 @@ mod tests {
     #[test]
     fn test_no_preset_generates_two_equally_ranked_layers() {
         for (id, spec) in every_preset() {
-            let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+            let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             let mut seen = std::collections::HashSet::new();
             for r in &rotations {
                 assert!(
@@ -1505,26 +1489,42 @@ mod tests {
         }
     }
 
-    /// The handover lands on a local Monday midnight, not on whenever the
-    /// request happened to arrive.
+    /// Only an absent anchor snaps to the local week; a chosen one is the caller's handover.
     #[test]
-    fn test_the_anchor_snaps_back_to_a_local_week_boundary() {
-        use chrono::{Datelike, TimeZone, Timelike};
+    fn test_only_an_absent_anchor_snaps_to_the_local_monday() {
+        use chrono::TimeZone;
         let tz = chrono_tz::Asia::Kolkata;
-        // A Wednesday afternoon, in the middle of everything.
-        let requested = tz
-            .with_ymd_and_hms(2026, 1, 7, 14, 37, 12)
+        let local = |d, h, m| {
+            tz.with_ymd_and_hms(2026, 1, d, h, m, 0)
+                .unwrap()
+                .timestamp_micros()
+        };
+        let now = local(7, 14, 37);
+        let cases = [
+            (None, local(5, 0, 0)),
+            (Some(local(7, 23, 30)), local(7, 23, 30)),
+            (Some(now), now),
+        ];
+        for (anchor, expected) in cases {
+            assert_eq!(resolve_anchor(anchor, now, tz), expected, "{anchor:?}");
+        }
+    }
+
+    /// An anchor the caller chose, such as a rotation's Wed 23:30 handover, is kept as given.
+    #[test]
+    fn test_an_explicit_anchor_is_kept_as_given() {
+        use chrono::TimeZone;
+        let tz = chrono_tz::Asia::Kolkata;
+        let wednesday = tz
+            .with_ymd_and_hms(2026, 1, 7, 23, 30, 0)
             .unwrap()
             .timestamp_micros();
-        let rotations = build(&weekday_weekend(), tz, requested, DEFAULT_HANDOVER_MICROS).unwrap();
-        for r in &rotations {
-            let local = tz.from_utc_datetime(
-                &chrono::DateTime::from_timestamp_micros(r.anchor_micros)
-                    .unwrap()
-                    .naive_utc(),
+        for (id, spec) in every_preset() {
+            let rules = build(&spec, wednesday, DEFAULT_HANDOVER_MICROS).unwrap();
+            assert!(
+                rules.iter().all(|r| r.anchor_micros == wednesday),
+                "{id} moved the anchor"
             );
-            assert_eq!(local.weekday().num_days_from_monday(), 0);
-            assert_eq!((local.hour(), local.minute(), local.second()), (0, 0, 0));
         }
     }
 
@@ -1608,7 +1608,7 @@ mod tests {
                     catch_all: None,
                 },
                 DEFAULT_HANDOVER_MICROS,
-                "so the layer would apply at no instant at all",
+                "so the shift rule would apply at no instant at all",
             ),
             (
                 "a minute past the end of the day",
@@ -1683,8 +1683,7 @@ mod tests {
         ];
 
         for (why, spec, handover, expected) in cases {
-            let err = build(&spec, chrono_tz::UTC, MONDAY, handover)
-                .expect_err(&format!("{why} must be refused"));
+            let err = build(&spec, MONDAY, handover).expect_err(&format!("{why} must be refused"));
             let msg = err.to_string();
             assert!(
                 msg.contains(expected),
@@ -1713,14 +1712,20 @@ mod tests {
             assert!(!e.name.is_empty(), "{} has no name", e.id);
             assert!(!e.description.is_empty(), "{} has no description", e.id);
             assert!(!e.layers.is_empty(), "{} describes no layers", e.id);
-            // Every preset takes the three common fields plus its own.
-            for common in ["timezone", "handover_micros", "anchor_micros"] {
+            // Every preset takes the two common fields plus its own.
+            for common in ["handover_micros", "anchor_micros"] {
                 assert!(
                     e.inputs.iter().any(|i| i.field == common),
                     "{} does not advertise `{common}`",
                     e.id
                 );
             }
+            // The drawer reads the team's zone; a timezone input would be a control it never draws.
+            assert!(
+                e.inputs.iter().all(|i| i.field != "timezone"),
+                "{} still advertises `timezone`",
+                e.id
+            );
             for input in &e.inputs {
                 assert!(!input.label.is_empty(), "{}.{}", e.id, input.field);
                 assert!(!input.description.is_empty(), "{}.{}", e.id, input.field);
@@ -1745,6 +1750,80 @@ mod tests {
         let groups = fts.inputs.iter().find(|i| i.field == "groups").unwrap();
         assert_eq!(groups.min, Some(MIN_FOLLOW_THE_SUN_GROUPS as i64));
         assert_eq!(groups.max, Some(MAX_FOLLOW_THE_SUN_GROUPS as i64));
+    }
+
+    /// A rule saved with its default name must carry the title the drawer showed on its row.
+    #[test]
+    fn test_default_rule_names_are_the_drawer_row_titles() {
+        let entries = catalogue();
+        let label = |id: PresetId, field: &str| -> String {
+            entries
+                .iter()
+                .find(|e| e.id == id)
+                .and_then(|e| e.inputs.iter().find(|i| i.field == field))
+                .map(|i| i.label.clone())
+                .unwrap()
+        };
+        let cases: Vec<(PresetSpec, Vec<String>)> = vec![
+            (
+                follow_the_sun(),
+                vec![
+                    "APAC".to_string(),
+                    "EMEA".to_string(),
+                    "AMER".to_string(),
+                    label(PresetId::FollowTheSun, "catch_all"),
+                ],
+            ),
+            (
+                weekday_weekend(),
+                vec![
+                    label(PresetId::WeekdayWeekend, "weekdays"),
+                    label(PresetId::WeekdayWeekend, "weekend"),
+                ],
+            ),
+            (
+                split_the_week(),
+                vec![
+                    label(PresetId::SplitTheWeek, "first"),
+                    label(PresetId::SplitTheWeek, "second"),
+                ],
+            ),
+            (
+                business_hours(),
+                vec![
+                    label(PresetId::BusinessHoursPlusNights, "business_hours"),
+                    label(PresetId::BusinessHoursPlusNights, "after_hours"),
+                ],
+            ),
+        ];
+        for (spec, expected) in cases {
+            let names: Vec<String> = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS)
+                .unwrap()
+                .into_iter()
+                .map(|r| r.name)
+                .collect();
+            assert_eq!(names, expected, "{}", spec.id());
+        }
+    }
+
+    /// The drawer says "shift rule", so the catalogue never says "layer".
+    #[test]
+    fn test_the_catalogue_never_says_layer() {
+        fn walk(inputs: &[PresetInput], out: &mut Vec<String>) {
+            for i in inputs {
+                out.push(i.label.clone());
+                out.push(i.description.clone());
+                walk(&i.fields, out);
+            }
+        }
+        for e in catalogue() {
+            let mut text = vec![e.name.clone(), e.description.clone()];
+            text.extend(e.layers.iter().cloned());
+            walk(&e.inputs, &mut text);
+            for t in text {
+                assert!(!t.to_lowercase().contains("layer"), "{}: `{t}`", e.id);
+            }
+        }
     }
 
     /// A length and an instant are not the same control, and this catalogue is
@@ -1785,7 +1864,7 @@ mod tests {
         .unwrap();
         assert_eq!(spec.id(), PresetId::WeekdayWeekend);
         assert_eq!(spec.members(), vec!["ana@o2.ai", "sam@o2.ai"]);
-        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         assert_eq!(rotations[1].name, "Saturdays and Sundays");
     }
 
@@ -1799,7 +1878,7 @@ mod tests {
                 "after_hours":{"members":["bo@o2.ai"]}}"#,
         )
         .unwrap();
-        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         assert_eq!(
             rotations[0].restrictions,
             vec![TimeWindow {
@@ -1831,7 +1910,7 @@ mod tests {
                 "second":{"members":["bo@o2.ai"]}}"#,
         )
         .unwrap();
-        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         assert_eq!(
             rotations[0].restrictions,
             vec![TimeWindow {
@@ -1853,7 +1932,7 @@ mod tests {
             ],
             catch_all: None,
         };
-        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(&spec, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
         for (hour, expected) in [(0, "Night"), (7, "Day"), (23, "Night")] {
             assert_eq!(
                 resolve_on_call(

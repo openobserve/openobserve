@@ -63,6 +63,7 @@ pub use preset::{
     MAX_GROUP_MEMBERS, MAX_HANDOVER_MICROS, MIN_FOLLOW_THE_SUN_GROUPS, MIN_HANDOVER_MICROS,
     PresetDescriptor, PresetError, PresetId, PresetInput, PresetInputKind, PresetSpec,
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
+    resolve_anchor as preset_anchor,
 };
 pub use rca::RcaContext;
 pub use response::{
