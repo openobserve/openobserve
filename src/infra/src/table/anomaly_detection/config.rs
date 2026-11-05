@@ -311,8 +311,12 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.band_k = Set(src.band_k);
     active.seasonality = Set(src.seasonality);
     active.is_trained = Set(src.is_trained);
-    // Both regions claimed: each attempt keeps its own token, or neither could publish its model.
-    if stored_field(&active.status) != Some(STATUS_TRAINING) || src.status != STATUS_TRAINING {
+    // Both regions claimed the same query: each keeps its token, or neither could publish. A new
+    // query replaces the token, so an attempt on the old query cannot publish against it.
+    if shape_changed
+        || stored_field(&active.status) != Some(STATUS_TRAINING)
+        || src.status != STATUS_TRAINING
+    {
         active.training_started_at = Set(src.training_started_at);
     }
     active.training_completed_at = Set(src.training_completed_at);
@@ -1155,6 +1159,13 @@ mod tests {
         let mut active = local.clone().into_active_model();
         patch_all_fields(&mut active, peer.clone());
         assert_eq!(active.training_started_at.clone().unwrap(), Some(100));
+
+        // A parallel claim on a new query takes the old attempt's authority away.
+        let mut new_query = peer.clone();
+        new_query.custom_sql = Some("SELECT 2".to_string());
+        let mut active = local.clone().into_active_model();
+        patch_all_fields(&mut active, new_query);
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(200));
 
         // Any peer row that is not a parallel claim still replaces the token.
         peer.status = 1;
