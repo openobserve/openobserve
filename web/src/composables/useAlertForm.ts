@@ -200,6 +200,7 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    incident_title_template: "",
     // Off by default: a recovery is a new outbound message class, so it is opted into.
     notify_on_recovery: false,
     recovery_destinations: [],
@@ -1271,6 +1272,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
+        incident_title_template: source.creates_incident
+          ? String(source.incident_title_template ?? "").trim() || undefined
+          : undefined,
         workflows: source.workflows ?? [],
         priority: source.priority ?? null,
         tags: source.tags ?? [],
@@ -2681,6 +2685,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // form inputs expect strings/arrays, so normalize them here.
       data.description ??= "";
       data.template ??= "";
+      data.incident_title_template ??= "";
       data.tags ??= [];
       data.composite_condition ??= {
         expression: "",

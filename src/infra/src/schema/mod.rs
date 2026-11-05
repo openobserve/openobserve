@@ -21,7 +21,7 @@ use std::{
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, COMPACT_DYNAMIC_MERGE_STREAM_TYPES,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, DYNAMIC_PARTITION_STREAM_TYPES,
     ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
@@ -398,12 +398,6 @@ pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: Str
     false
 }
 
-/// Whether the compactor merges this stream's closed days across hours.
-pub async fn get_dynamic_merge(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
-    let settings = get_settings(org_id, stream_name, stream_type).await;
-    get_stream_setting_dynamic_merge(stream_type, &settings)
-}
-
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;
@@ -447,15 +441,27 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     }
 }
 
-/// The stream setting `dynamic_merge` when set, else the type's presence in the env list.
-pub fn get_stream_setting_dynamic_merge<T: std::borrow::Borrow<StreamSettings>>(
+/// The level of the stream's day holding `ts`; types without a history stay at the type's level.
+pub fn get_partition_time_level_at(
     stream_type: StreamType,
-    settings: &Option<T>,
-) -> bool {
+    settings: Option<&StreamSettings>,
+    ts: i64,
+) -> PartitionTimeLevel {
     settings
-        .as_ref()
-        .and_then(|settings| settings.borrow().dynamic_merge)
-        .unwrap_or_else(|| COMPACT_DYNAMIC_MERGE_STREAM_TYPES.contains(&stream_type))
+        .filter(|_| stream_type.support_dynamic_partition())
+        .and_then(|settings| settings.partition_time_level.level_at(ts))
+        .unwrap_or_else(|| get_partition_time_level(stream_type))
+}
+
+/// Whether the classifier decides the stream's level: its own switch, else its type in the env.
+pub fn get_stream_setting_dynamic_partition(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+) -> bool {
+    stream_type.support_dynamic_partition()
+        && settings
+            .and_then(|settings| settings.partition_time_level.dynamic)
+            .unwrap_or_else(|| DYNAMIC_PARTITION_STREAM_TYPES.contains(&stream_type))
 }
 
 pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSettings>>(
@@ -570,25 +576,17 @@ pub fn get_stream_setting_bloom_filter_fields<T: std::borrow::Borrow<StreamSetti
 pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
     stream_type: StreamType,
-    created_at: Option<i64>,
     fields: &[String],
     distinct_fields_updated_at: i64,
 ) -> i64 {
     if fields.is_empty() {
         return 0;
     }
-    let created_at = match created_at {
-        Some(created_at) => created_at,
-        None => {
-            log::warn!("created_at not found in schema metadata");
-            Utc::now().timestamp_micros()
-        }
-    };
     let default_updated_at = match settings {
         Some(settings) if settings.borrow().index_updated_at > 0 => {
             settings.borrow().index_updated_at
         }
-        _ => created_at,
+        _ => BASE_TIME.timestamp_micros(),
     };
     fields
         .iter()
@@ -1295,6 +1293,23 @@ mod tests {
     }
 
     #[test]
+    fn test_first_settings_save_keeps_env_approx_partition() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.common.use_stream_settings_for_partitions_enabled = true;
+        config::CONFIG.store(Arc::new(cfg));
+
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+        let metadata =
+            HashMap::from([("settings".to_string(), json::to_string(&settings).unwrap())]);
+        let reloaded = unwrap_stream_settings(&schema.with_metadata(metadata)).unwrap();
+
+        config::CONFIG.store(saved);
+        assert!(reloaded.approx_partition);
+    }
+
+    #[test]
     fn test_unwrap_stream_created_at() {
         // Test with created_at in metadata
         let mut metadata = HashMap::new();
@@ -1517,7 +1532,6 @@ mod tests {
     fn test_get_stream_setting_index_updated_at_for_distinct_fields() {
         use config::meta::stream::DistinctField;
 
-        let created_at = 1_700_000_000_000_000;
         let added_ts = 1_755_000_000_000_000;
         let settings = StreamSettings {
             index_updated_at: 1_750_000_000_000_000,
@@ -1533,7 +1547,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1544,7 +1557,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             cutoff,
         );
@@ -1558,7 +1570,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_both),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1572,7 +1583,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_disabled),
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1582,7 +1592,6 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_updated_at_for_fields() {
         let base_time = BASE_TIME.timestamp_micros();
-        let created_at = 1_700_000_000_000_000;
         let mut stream_settings = StreamSettings {
             index_updated_at: 1_750_000_000_000_000,
             ..Default::default()
@@ -1594,58 +1603,37 @@ mod tests {
 
         // no referenced fields -> no cutoff
         let fields = Vec::new();
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 0);
 
         // a field with its own entry uses it
         let fields = vec!["user_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // a field without an entry falls back to the stream-level value
         let fields = vec!["level".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_750_000_000_000_000);
 
         // multiple fields use the max
         let fields = vec!["user_id".to_string(), "level".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
-        // None settings falls back to created_at
+        // None settings falls back to BASE_TIME
         let fields = vec!["user_id".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
-        assert_eq!(result, created_at);
+        assert_eq!(result, base_time);
 
         // default-enabled index fields always resolve to BASE_TIME, even with an entry
         stream_settings
@@ -1653,19 +1641,13 @@ mod tests {
             .insert("trace_id".to_string(), 1_760_000_000_000_000);
         let settings = Some(stream_settings);
         let fields = vec!["trace_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, base_time);
         let fields = vec!["service_name".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
             StreamType::Logs,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1673,13 +1655,8 @@ mod tests {
 
         // a default field combined with a configured field still uses the max
         let fields = vec!["trace_id".to_string(), "user_id".to_string()];
-        let result = get_stream_setting_index_updated_at_for_fields(
-            &settings,
-            StreamType::Logs,
-            Some(created_at),
-            &fields,
-            0,
-        );
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, StreamType::Logs, &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // metrics streams have no built-in default index fields, so the field's own entry wins
@@ -1687,7 +1664,6 @@ mod tests {
         let result = get_stream_setting_index_updated_at_for_fields(
             &settings,
             StreamType::Metrics,
-            Some(created_at),
             &fields,
             0,
         );
@@ -1924,23 +1900,53 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stream_setting_dynamic_merge() {
-        // the env list is empty in tests, so only the stream setting can enable it
-        let unset = Some(StreamSettings::default());
-        assert!(!get_stream_setting_dynamic_merge(
-            StreamType::Metrics,
-            &unset
-        ));
-        let on = Some(StreamSettings {
-            dynamic_merge: Some(true),
+    fn test_get_stream_setting_dynamic_partition() {
+        use config::meta::stream::StreamPartitionTimeLevel;
+        let with = |dynamic| StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic,
+                changes: Vec::new(),
+            },
             ..Default::default()
-        });
-        assert!(get_stream_setting_dynamic_merge(StreamType::Traces, &on));
-        let off = Some(Arc::new(StreamSettings {
-            dynamic_merge: Some(false),
+        };
+        let check = get_stream_setting_dynamic_partition;
+        // the env list is empty in tests, so only the stream's own switch turns it on
+        assert!(!check(StreamType::Logs, None));
+        assert!(!check(StreamType::Logs, Some(&with(None))));
+        assert!(!check(StreamType::Logs, Some(&with(Some(false)))));
+        assert!(check(StreamType::Traces, Some(&with(Some(true)))));
+        assert!(!check(StreamType::Profiles, Some(&with(Some(true)))));
+    }
+
+    #[test]
+    fn test_get_partition_time_level_at_reads_the_history_of_merged_types() {
+        use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
+        let daily_from_100 = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic: None,
+                changes: vec![PartitionTimeLevelChange {
+                    since: 100,
+                    level: PartitionTimeLevel::Daily,
+                }],
+            },
             ..Default::default()
-        }));
-        assert!(!get_stream_setting_dynamic_merge(StreamType::Logs, &off));
+        };
+        let at = |stream_type, settings, ts| get_partition_time_level_at(stream_type, settings, ts);
+        let history = Some(&daily_from_100);
+        for stream_type in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
+            assert_eq!(at(stream_type, history, 100), PartitionTimeLevel::Daily);
+            assert_eq!(at(stream_type, history, 99), PartitionTimeLevel::Hourly);
+            assert_eq!(at(stream_type, None, 100), PartitionTimeLevel::Hourly);
+        }
+        // a history on other types does not count; the file-list stream stays daily
+        assert_eq!(
+            at(StreamType::Profiles, history, 100),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            at(StreamType::Filelist, None, 100),
+            PartitionTimeLevel::Daily
+        );
     }
 
     fn empty_cache() -> SchemaCache {

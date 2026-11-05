@@ -508,6 +508,33 @@ describe("usePanelDrilldown", () => {
     );
   });
 
+  it("a gauge dial standing in for a blank label drills down with the blank, not (empty)", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "gauge";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Dial",
+        type: "byUrl",
+        data: { url: "https://example.com/?axis=${series.__axisValue}&v=${series.__value}" },
+      },
+    ];
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const api = usePanelDrilldown(deps as any);
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      seriesName: "series",
+      name: "(empty)",
+      value: 88,
+      data: { name: "(empty)", rawName: "", value: 88 },
+    });
+    await api.openDrilldown(0);
+    const url = new URL(String(openSpy.mock.calls[0]?.[0]));
+    openSpy.mockRestore();
+    expect(url.searchParams.get("axis")).toBe("");
+    expect(url.searchParams.get("v")).toBe("88");
+  });
+
   describe("heatmap drilldown", () => {
     const heatmapDeps = (options: any, extras: any = {}) => {
       const deps = makeDeps();

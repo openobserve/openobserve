@@ -33,7 +33,7 @@ export default function useSessionHeatmap() {
   const openingSessionId = ref("");
 
   // The window always reaches back to the session so an old session's page is still in the list.
-  async function openSessionHeatmap(sessionId: string, sessionStartUs: number) {
+  async function openSessionHeatmap(sessionId: string, sessionStartUs?: number) {
     if (!sessionId || opening.value) return;
     opening.value = true;
     openingSessionId.value = sessionId;

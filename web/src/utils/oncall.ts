@@ -1535,6 +1535,30 @@ export function formatZonedRange(
   }
 }
 
+const DAY_RANGE_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+};
+
+/** `Sat 7 – Mon 9 Nov` on one clock; `to` is exclusive, so the range names the last day it holds. [pure] */
+export function formatDayRange(
+  from: number,
+  to: number,
+  timezone: string,
+  locale?: string,
+): string {
+  const last = Math.max(from, to - 1);
+  try {
+    return new Intl.DateTimeFormat(locale, { ...DAY_RANGE_OPTS, timeZone: timezone }).formatRange(
+      new Date(from / 1000),
+      new Date(last / 1000),
+    );
+  } catch {
+    return `${formatInZone(from, timezone, DAY_RANGE_OPTS, locale)} – ${formatInZone(last, timezone, DAY_RANGE_OPTS, locale)}`;
+  }
+}
+
 /** Weekday, date and 24-hour time in the schedule's timezone: the drawer's one stamp for an instant. [pure] */
 export function formatStamp(micros: number, timezone: string): string {
   return formatInZone(micros, timezone, {
@@ -1676,7 +1700,7 @@ function windowWords(window: TimeWindow, t: TranslateFn): string {
   const everyDay = new Set(window.days ?? []).size % 7 === 0;
   const days = everyDay ? t("oncall.ruleHoursEveryDay") : describeDays(window.days, t);
   const { start_minute: start, end_minute: end } = window;
-  if (start === 0 && end === MINUTES_PER_DAY) return t("oncall.restrictionWindowAllDay", { days });
+  if (start === 0 && end === MINUTES_PER_DAY) return t("oncall.ruleHoursDaysAllDay", { days });
   const key = end < start ? "oncall.ruleHoursWindowNextDay" : "oncall.restrictionWindow";
   return t(key, { days, from: formatMinuteOfDay(start), to: formatMinuteOfDay(end) });
 }
@@ -2207,6 +2231,40 @@ export function zonedMidnight(micros: number, timezone: string, days = 0): numbe
   // A skipped 00:00 resolves to the day before; the day starts at the jump, read at the old offset.
   const jumpedTo = date.getTime() * 1000 - offsetMicrosAt(midnight, timezone);
   return offsetChangeAt(midnight, jumpedTo, timezone);
+}
+
+/** A shift's span in one format: days alone when both ends fall on the team's midnight, else days with times. [pure] */
+export function formatShiftRange(
+  from: number,
+  to: number,
+  timezone: string,
+  locale?: string,
+): string {
+  const midnight = (micros: number) => toZonedInputValue(micros, timezone).endsWith("T00:00");
+  if (midnight(from) && midnight(to)) return formatDayRange(from, to, timezone, locale);
+  const opts: Intl.DateTimeFormatOptions = {
+    ...DAY_RANGE_OPTS,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+  try {
+    return new Intl.DateTimeFormat(locale, { ...opts, timeZone: timezone }).formatRange(
+      new Date(from / 1000),
+      new Date(to / 1000),
+    );
+  } catch {
+    return `${formatInZone(from, timezone, opts, locale)} – ${formatInZone(to, timezone, opts, locale)}`;
+  }
+}
+
+/** Next Monday 00:00 to the Monday after, on `timezone`'s calendar; on a Monday it is the coming one. [pure] */
+export function nextWeekRange(now: number, timezone: string): { from: number; to: number } {
+  const weekday = anchorWeekdayTime(now, timezone).weekday;
+  return {
+    from: zonedMidnight(now, timezone, 7 - weekday),
+    to: zonedMidnight(now, timezone, 14 - weekday),
+  };
 }
 
 /**

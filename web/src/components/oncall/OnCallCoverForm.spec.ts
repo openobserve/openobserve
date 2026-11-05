@@ -21,7 +21,7 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
-import { toZonedInputValue } from "@/utils/oncall";
+import { formatDayRange, formatShiftRange, toZonedInputValue } from "@/utils/oncall";
 import type { UpcomingShift } from "./OnCallCoverForm.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { orgUsersQuery } from "@/services/users.queries";
@@ -300,7 +300,7 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     await flushPromises();
 
     expect(fieldText(wrapper)).not.toContain("UTC");
-    expect(summaryOf(wrapper)).toContain("ana@o2.ai covers Platform.");
+    expect(summaryOf(wrapper)).toContain("ana@o2.ai covers Platform, ");
     expect(summaryOf(wrapper)).not.toMatch(/\d{2}:\d{2}/);
     expect(wrapper.find('[data-test="oncall-cover-summary-team-zone"]').exists()).toBe(false);
   });
@@ -476,9 +476,11 @@ describe("OnCallCoverForm — swapping", () => {
     await pick(wrapper, 0, 0);
     await pick(wrapper, 1, 0);
 
-    const text = wrapper.find('[data-test="oncall-swap-summary"]').text();
-    expect(text).toContain("bo@o2.ai takes ana@o2.ai's shift");
-    expect(text).toContain("ana@o2.ai takes bo@o2.ai's");
+    // U19: both ranges, with their times when a handover is mid-day, and nothing about reordering.
+    const range = (one: UpcomingShift) => formatShiftRange(one.startMicros, one.endMicros, "UTC");
+    expect(wrapper.find('[data-test="oncall-swap-summary"]').text()).toBe(
+      `bo@o2.ai takes ${range(SHIFTS[0])}; ana@o2.ai takes ${range(SHIFTS[1])}.`,
+    );
   });
 
   /// Two shifts of the same person writes two covers that change nothing —
@@ -630,10 +632,9 @@ describe("OnCallCoverForm — taking a cover", () => {
     });
     await flushPromises();
 
-    const summary = wrapper.find('[data-test="oncall-cover-summary"]').text();
-    expect(summary).toContain("bo@o2.ai");
-    expect(summary).toContain("Platform");
-    expect(summary).not.toContain("ana@o2.ai");
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').text()).toContain(
+      "bo@o2.ai covers ana@o2.ai on Platform, ",
+    );
   });
 
   // Names are what a person recognises; the email tells two namesakes apart, so it is the row's second line and the name's tooltip.
@@ -678,7 +679,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     ]);
     expect(wrapper.find('[data-test="oncall-cover-currently"]').exists()).toBe(false);
     const summary = wrapper.find('[data-test="oncall-cover-summary"]');
-    expect(summary.text()).toContain("Bo Lin covers Platform");
+    expect(summary.text()).toContain("Bo Lin covers Ana on Platform");
     expect(summary.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("bo@o2.ai");
     queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });
@@ -828,7 +829,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     const wrapper = renderCover({ gap: GAP, teamName: "Platform" });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-cover-summary"]').element.textContent).toMatch(
-      /Platform\.\s+Outside that window/,
+      /\.\s+After that the normal rota continues\.$/,
     );
   });
 
@@ -858,6 +859,25 @@ describe("OnCallCoverForm — taking a cover", () => {
 
       const saved = (await save(wrapper)) as Record<string, unknown>;
       expect(saved).toMatchObject({ rotation_id: "rot_s", covering_for: "raj@o2.ai" });
+    });
+
+    // U19: the summary names who covers whom, on which rotation, over which days.
+    it("says who covers whom on which rotation, and that the rota then carries on", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+        currentHolder: "raj@o2.ai",
+        defaultUser: "ana@o2.ai",
+      });
+      await flushPromises();
+      const words = (text: string) => text.replace(/\s+/g, " ");
+      expect(words(wrapper.find('[data-test="oncall-cover-summary"]').text())).toBe(
+        words(
+          `ana@o2.ai covers raj@o2.ai on Secondary, ${formatDayRange(GAP.from, GAP.to, "UTC")}. After that the normal rota continues.`,
+        ),
+      );
     });
 
     it("names the picked rotation's holder now, without claiming whose hours they are", async () => {

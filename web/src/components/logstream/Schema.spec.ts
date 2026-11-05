@@ -3863,5 +3863,65 @@ describe("Schema Component Tests", () => {
       // Should have been called
       expect(mockUpdateSettings).toHaveBeenCalled();
     });
+
+    it("should always send the dynamic partition switch and no unchanged level", async () => {
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+      expect(wrapper.vm.showDynamicPartitionSettings).toBe(true);
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      const settings = mockUpdateSettings.mock.calls[0][3];
+      expect(settings.dynamic_partition).toBe(false);
+      expect(settings).not.toHaveProperty("partition_time_level");
+    });
+
+    it("should send a changed partition level only while dynamic partition is off", async () => {
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+      wrapper.vm.dynamicPartition = false;
+      wrapper.vm.partitionTimeLevel = "daily";
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+      expect(mockUpdateSettings.mock.calls[0][3]).toEqual(
+        expect.objectContaining({ dynamic_partition: false, partition_time_level: "daily" }),
+      );
+
+      mockUpdateSettings.mockClear();
+      wrapper.vm.dynamicPartition = true;
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+      const settings = mockUpdateSettings.mock.calls[0][3];
+      expect(settings.dynamic_partition).toBe(true);
+      expect(settings).not.toHaveProperty("partition_time_level");
+    });
+
+    it("should read the switch and the last recorded level from the stream", async () => {
+      const stream = await mockGetStream();
+      wrapper.vm.setSchema({
+        ...stream,
+        settings: {
+          ...stream.settings,
+          partition_time_level: {
+            dynamic: false,
+            changes: [
+              { since: 1, level: "hourly" },
+              { since: 2, level: "daily" },
+            ],
+          },
+        },
+      });
+      expect(wrapper.vm.dynamicPartition).toBe(false);
+      expect(wrapper.vm.partitionTimeLevel).toBe("daily");
+
+      wrapper.vm.setSchema({
+        ...stream,
+        settings: { ...stream.settings, partition_time_level: { dynamic: true } },
+      });
+      expect(wrapper.vm.dynamicPartition).toBe(true);
+      expect(wrapper.vm.partitionTimeLevel).toBe("hourly");
+    });
   });
 });

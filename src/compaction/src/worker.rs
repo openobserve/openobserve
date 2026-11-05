@@ -49,6 +49,8 @@ pub struct MergeJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
+    /// A daily job holds the stream until it ends; another job must not free it.
+    pub holds_stream: bool,
 }
 
 /// JobScheduler is a worker that processes jobs
@@ -133,13 +135,15 @@ impl JobScheduler {
                                 );
                             }
                             // release locked stream
-                            let key = format!(
-                                "{}/{}/{}",
-                                job.org_id,
-                                job.stream_type.as_str(),
-                                job.stream_name
-                            );
-                            db::compact::stream::clear_running(&key);
+                            if job.holds_stream {
+                                let key = format!(
+                                    "{}/{}/{}",
+                                    job.org_id,
+                                    job.stream_type.as_str(),
+                                    job.stream_name
+                                );
+                                db::compact::stream::clear_running(&key);
+                            }
                         }
                     }
                 }

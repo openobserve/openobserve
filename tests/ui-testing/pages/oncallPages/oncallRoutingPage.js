@@ -317,8 +317,9 @@ export class OnCallRoutingPage {
    * stamps with the consumer's `data-test` precisely so this scoping works.
    */
   /** Repoint an existing condition row at another field, which empties its value. */
-  async changeConditionField(index, name) {
-    await this.selectOption(this.conditionField(index), name);
+  /** `label` narrows the list first: the field picker offers the whole catalogue, and OSelect only renders a window of it. */
+  async changeConditionField(index, name, label = null) {
+    await this.selectOption(this.conditionField(index), name, label);
   }
 
   async removeCondition(index) {

@@ -189,21 +189,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon-left="notifications-active"
           :loading="sending"
-          :disabled="!canConfigure || pagesNobody"
-          :focusable-unavailable="pagesNobody"
+          :disabled="!canConfigure || !!testUnavailable"
+          :focusable-unavailable="!!testUnavailable"
           data-test="oncall-simulator-send-test"
           @click="sendTest(preview.team_id)"
         >
           {{ t("oncall.simulatorSendTest") }}
-          <template v-if="pagesNobody" #unavailable-reason>{{
-            t("oncall.simulatorSendTestNobody", { priority: raw(priority) })
-          }}</template>
+          <template v-if="testUnavailable" #unavailable-reason>{{ testUnavailable }}</template>
         </OButton>
-        <OTooltip
-          v-if="pagesNobody"
-          side="bottom"
-          :content="t('oncall.simulatorSendTestNobody', { priority: raw(priority) })"
-        />
+        <OTooltip v-if="testUnavailable" side="bottom" :content="testUnavailable" />
       </span>
 
       <div
@@ -563,8 +557,13 @@ function wakesFromResponder(): { emails: string[]; channels: string } | null {
   return { emails: [person.user_email], channels };
 }
 
-/// A test page at a priority whose ladder pages nobody would only report that, so the button waits for a priority that pages.
-const pagesNobody = computed(() => !!ladderEntry.value && !ladderEntry.value.pages_anyone);
+/// A test page goes to the first step only, so one that reaches nobody would send nothing; unloaded data never disables.
+const testUnavailable = computed<I18nText | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) {
+    return t("oncall.simulatorSendTestNobody", { priority: raw(priority.value) });
+  }
+  return firstStep.value?.resolves_to_nobody ? t("oncall.simulatorSendTestNobodyOnCall") : null;
+});
 
 const responderNote = computed<I18nText>(() => {
   if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");

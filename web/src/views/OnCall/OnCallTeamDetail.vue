@@ -261,6 +261,7 @@
           <OnCallScheduleAnswer
             :positions="onCallNow"
             :has-members="hasMembers !== false"
+            :rotation-count="teamRotations.length"
             @assign-secondary="onAssignSecondary"
             @add-people="activeTab = 'members'"
           />
@@ -279,6 +280,7 @@
               :self-email="selfEmail"
               :swap-rotations="swapRotationIds"
               :shift-spans="shiftSpans"
+              :policy="policy"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
@@ -286,8 +288,9 @@
               @duplicate="openScheduleEditor({ mode: 'duplicate', id: $event })"
               @override="openCoverFor"
               @delete="rotationToDelete = $event"
-              @presets="presetsOpen = true"
+              @presets="openPresets"
               @shift-action="onShiftAction"
+              @clear-away="awayToClear = $event"
             />
 
             <OnCallCoverList
@@ -299,13 +302,13 @@
               @changed="onCoversChanged"
             />
 
-            <!-- Stored rotations always pass validation, so the first is the one the server's preset rewrites. -->
             <OnCallSchedulePresets
               v-model:open="presetsOpen"
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
-              :primary-rotation-name="schedule?.rotations?.[0]?.name ?? ''"
+              :rotations="teamRotations"
+              :start-on="presetsStartOn"
               @applied="onScheduleSaved"
             />
 
@@ -398,6 +401,30 @@
     />
 
     <!-- Named from the loaded preview: the first step can be the whole team, so this is the last look at who gets woken. -->
+    <ODialog
+      :open="!!clearingAway"
+      size="sm"
+      :title="t('oncall.awayClear')"
+      :primary-button-label="t('oncall.awayClearConfirm')"
+      :secondary-button-label="t('oncall.cancel')"
+      data-test="oncall-away-clear-confirm"
+      @update:open="(isOpen: boolean) => !isOpen && (awayToClear = null)"
+      @click:primary="confirmClearAway"
+      @click:secondary="awayToClear = null"
+    >
+      <i18n-t
+        v-if="clearingAway"
+        keypath="oncall.awayClearMessage"
+        tag="p"
+        scope="global"
+        class="text-sm"
+        data-test="oncall-away-clear-message"
+      >
+        <template #name><OnCallPersonName :email="clearingAway.user_email" /></template>
+        <template #range>{{ clearingAwayRange }}</template>
+      </i18n-t>
+    </ODialog>
+
     <ODialog
       v-model:open="testPageOpen"
       size="sm"
@@ -531,6 +558,7 @@ import analytics from "@/services/product_analytics";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
+  deleteUnavailabilityMutation,
   escalationPreviewQuery,
   oncallTeamQuery,
   oncallTeamsQuery,
@@ -570,7 +598,7 @@ import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   channelList,
-  formatInZone,
+  formatDayRange,
   isOnCallUnavailable,
   upcomingShifts,
   winningRule,
@@ -655,6 +683,8 @@ async function refreshCoverage() {
   await Promise.allSettled([fetchSegments(), coverListRef.value?.refresh() ?? Promise.resolve()]);
 }
 const presetsOpen = ref(false);
+/// The rotation id a template replaces; empty adds a new rotation.
+const presetsStartOn = ref("");
 /// The rotation the reader asked to delete, held until they confirm it.
 /// The rotation's **id**. The confirm dialog needs its name, which is looked
 /// up rather than carried: a name is renameable and two rotations may share
@@ -1346,6 +1376,40 @@ async function onAwaySaved() {
   await Promise.allSettled([fetchSegments(), fetchAbsences()]);
 }
 
+const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
+/// The absence the away lane asked to clear; it applies on every team, so it is confirmed first.
+const awayToClear = ref<string | null>(null);
+const clearingAway = computed(
+  () => teamAbsences.value.find((absence) => absence.id === awayToClear.value) ?? null,
+);
+const clearingAwayRange = computed(() => {
+  const absence = clearingAway.value;
+  if (!absence) return raw("");
+  return raw(formatDayRange(absence.start_at, absence.end_at, team.value?.timezone ?? "UTC"));
+});
+
+/// The Members tab's removal, reached from the away lane.
+async function confirmClearAway() {
+  const absenceId = awayToClear.value;
+  awayToClear.value = null;
+  if (!absenceId) return;
+  try {
+    await deleteAbsenceWrite.mutateAsync(absenceId);
+    toast({ variant: "success", message: t("oncall.awayRemoved") });
+    await onAwaySaved();
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
+    toast({
+      variant: "error",
+      message:
+        statusOf(err) === 403
+          ? t("oncall.configDenied")
+          : raw(serverMessageOf(err)) || t("oncall.awayRemoveFailed"),
+    });
+  }
+}
+
 /// The header offers to cover a shift, so the reader is the person being
 /// pre-filled — the dialog opens on the answer they came to give. The window is
 /// left blank
@@ -1492,25 +1556,24 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
   }
 }
 
-/// In the TEAM's zone, not the browser's: a cover arranged from another office
-/// is still a night on the team's calendar, and that is the night being agreed.
-function coverSavedMessage(value: { user_email: string; start_at: number; end_at: number }) {
-  const zone = team.value?.timezone ?? "UTC";
-  // Named, always. The reader picked those hours on their OWN clock, and a
-  // confirmation restating them on the team's without saying so is how a cover
-  // reads as five and a half hours wrong to the person who just arranged it.
-  const at = (micros: number) =>
-    formatInZone(micros, zone, {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
-  return t("oncall.coverSaved", {
+/// The dialog's own summary sentence on the team's calendar, so the toast and the form say one thing.
+function coverSavedMessage(value: {
+  user_email: string;
+  start_at: number;
+  end_at: number;
+  rotation_id?: string;
+  covering_for?: string;
+}) {
+  const rotation =
+    teamRotations.value.find((one) => one.id === value.rotation_id)?.name ?? team.value?.name;
+  const params = {
     name: raw(nameOf(value.user_email)),
-    team: raw(team.value?.name ?? ""),
-    range: raw(`${at(value.start_at)} – ${at(value.end_at)}`),
-  });
+    rotation: raw(rotation ?? ""),
+    when: raw(formatDayRange(value.start_at, value.end_at, team.value?.timezone ?? "UTC")),
+  };
+  return value.covering_for
+    ? t("oncall.coverSummaryFor", { ...params, holder: raw(nameOf(value.covering_for)) })
+    : t("oncall.coverSummaryOn", params);
 }
 
 /// A cover takes a slot for a window; outside it the rotation resolves exactly
@@ -1584,6 +1647,11 @@ async function fetchPreview(force = false) {
 async function onPolicySaved() {
   editingPolicy.value = false;
   await fetchAll();
+}
+
+function openPresets(rotationId?: string) {
+  presetsStartOn.value = rotationId ?? "";
+  presetsOpen.value = true;
 }
 
 async function onScheduleSaved() {

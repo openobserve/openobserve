@@ -37,6 +37,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
 
+      <i18n-t
+        v-if="email"
+        keypath="oncall.awayConsequence"
+        tag="p"
+        scope="global"
+        class="text-text-secondary text-sm"
+        data-test="oncall-members-away-consequence"
+      >
+        <template #name><OnCallPersonName :email="email" /></template>
+      </i18n-t>
+
       <!-- Absolute only, as Cover a shift: an absence is forward-looking. -->
       <div>
         <OFormDateTimeRange
@@ -116,6 +127,7 @@ import {
   apiErrorMessage,
   apiErrorStatus,
   formatZonedRange,
+  nextWeekRange,
   toZonedInputValue,
   zonedMidnight,
 } from "@/utils/oncall";
@@ -160,6 +172,7 @@ const PRESETS = [
   { key: "rest-of-day", labelKey: "oncall.coverRestOfDay" },
   { key: "tomorrow", labelKey: "oncall.coverTomorrow" },
   { key: "next-7-days", labelKey: "oncall.coverNext7Days" },
+  { key: "next-week", labelKey: "oncall.awayNextWeek" },
 ] as const satisfies ReadonlyArray<{ key: string; labelKey: I18nKey }>;
 type PresetKey = (typeof PRESETS)[number]["key"];
 
@@ -212,6 +225,7 @@ function applyPreset(key: PresetKey) {
     "rest-of-day": { from: now, to: zonedMidnight(now, zone, 1) },
     tomorrow: { from: zonedMidnight(now, zone, 1), to: zonedMidnight(now, zone, 2) },
     "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
+    "next-week": nextWeekRange(now, zone),
   };
   form.setFieldValue("window", { type: "absolute", ...ranges[key] });
   presetApplied = { key, ...ranges[key] };

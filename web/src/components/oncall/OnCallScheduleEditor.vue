@@ -127,7 +127,7 @@
     <ODrawer
       :open="editing"
       :width="60"
-      :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
+      :title="drawerTitle"
       :persistent="!draftsActive && wouldDiscardEdits"
       :close-guard="draftsActive ? guardDrawerClose : undefined"
       :show-close="false"
@@ -303,6 +303,7 @@
                     :overlap-names="overlapNames(ruleIndex)"
                     :overlap-count="overlapCount(ruleIndex)"
                     :overlap-choice="overlapChoice(ruleIndex)"
+                    :all-other-hours="!rule.restrictions?.length && ruleNarrowed(ruleIndex)"
                     :set-members="setMembers"
                     :away-clashes-for="awayClashesFor"
                     :short-date="shortDate"
@@ -330,6 +331,8 @@
           :now-micros="nowMicros"
           :timezone="props.timezone"
           :error="preview.error.value"
+          :policy="policy ?? null"
+          :is-new="isNew"
           :show-empty="!preview.hasValidRule.value || preview.loaded.value"
           :name-of="nameOf"
         />
@@ -398,6 +401,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { dropRotationDrafts, newRotationVariant, rotationDraftId } from "./scheduleDrafts";
+import { nextRotationName } from "./OnCallSchedulePresets.target";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -434,7 +438,6 @@ import type {
 } from "@/ts/interfaces/oncall";
 import {
   BASE_SHIFT_RULE_NAME,
-  DEFAULT_ROTATION_NAME,
   MAX_ROTATION_NAME_CHARS,
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
@@ -650,6 +653,14 @@ const wouldDiscardEdits = computed(() => {
   return JSON.stringify(rotation) !== openedAs.value;
 });
 
+/// The stored name, so the title does not retype itself while the name field is edited.
+const drawerTitle = computed<I18nText>(() => {
+  if (isNew.value) return t("oncall.rotationAddTitle");
+  const id = active.value?.id;
+  const stored = props.schedule?.rotations.find((rotation) => rotation.id === id);
+  return t("oncall.rotationEditTitle", { name: raw(stored?.name ?? active.value?.name ?? "") });
+});
+
 /// Blocks Save: two rotations with one name make every level, menu and cover that names one ambiguous.
 const nameClash = computed<I18nText | "">(() => {
   const rotation = active.value;
@@ -812,21 +823,35 @@ function setOverlapWinner(index: number, wins: boolean) {
   });
 }
 
+/// Rivals take some of this rule's minutes but not all; a rival that counts always takes some.
+function ruleNarrowed(index: number): boolean {
+  const named = namedShiftRules.value;
+  return (
+    effectiveWeekCoverage(named, index, nowMicros.value).length > 0 &&
+    effectiveRivals(named, index, nowMicros.value).length > 0
+  );
+}
+
 /// The rule's hours, then who wins where it overlaps another rule.
 function ruleSummary(index: number): I18nText {
   const rules = active.value?.shift_rules ?? [];
   const nameList = (indices: number[]) =>
     indices.map((k) => namedShiftRules.value[k].name).join(", ");
   const { winsOver, losesTo } = overlapStanding(rules, index);
-  const parts: string[] = [ruleHoursSummary(rules[index], t)];
+  const effective = effectiveWeekCoverage(namedShiftRules.value, index, nowMicros.value);
+  const narrowed = ruleNarrowed(index);
+  // A rule with no window of its own holds exactly what its rivals leave, so that is its hours.
+  const unrestricted = !rules[index].restrictions?.length;
+  const parts: string[] = [
+    narrowed && unrestricted
+      ? coverageHoursSummary(effective, t)
+      : ruleHoursSummary(rules[index], t),
+  ];
   if (winsOver.length) parts.push(t("oncall.ruleWinsOver", { names: raw(nameList(winsOver)) }));
   if (losesTo.length) {
     parts.push(t("oncall.ruleLosesTo", { names: raw(nameList(losesTo)) }, losesTo.length));
   }
-  const named = namedShiftRules.value;
-  const effective = effectiveWeekCoverage(named, index, nowMicros.value);
-  // A rival that counts always takes some minutes, so rivals mean the hours differ.
-  if (effective.length && effectiveRivals(named, index, nowMicros.value).length) {
+  if (narrowed && !unrestricted) {
     parts.push(t("oncall.ruleOnCallOnly", { hours: coverageHoursSummary(effective, t) }));
   }
   const endsAt = rules[index].ends_at;
@@ -990,9 +1015,10 @@ watch(
 /// edits one roster and not the other they drift, and `config-risks` reports
 /// the collision rather than a hidden rule preventing it.
 function addRotation() {
-  const name = draft.value.length
-    ? String(t("oncall.rotationNthName", { n: draft.value.length + 1 }))
-    : DEFAULT_ROTATION_NAME;
+  const name = nextRotationName(
+    draft.value.map((r) => r.name),
+    (n) => String(t("oncall.rotationNthName", { n })),
+  );
   const rotation: Rotation = {
     id: mintRotationId(),
     name,

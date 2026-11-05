@@ -175,9 +175,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
-        <i18n-t keypath="oncall.coverSummaryWho" tag="span" scope="global">
+        <i18n-t
+          :keypath="summary.holder ? 'oncall.coverSummaryFor' : 'oncall.coverSummaryOn'"
+          tag="span"
+          scope="global"
+        >
           <template #name><OnCallPersonName :email="summary.who" /></template>
-          <template #team>{{ summary.team }}</template>
+          <template v-if="summary.holder" #holder>
+            <OnCallPersonName :email="summary.holder" />
+          </template>
+          <template #rotation>{{ summary.rotation }}</template>
+          <template #when>{{ summary.when }}</template>
         </i18n-t>
         {{ raw(" ") }}
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
@@ -221,7 +229,9 @@ export interface UpcomingShift extends Shift {
   rotationName: string;
 }
 import {
+  formatDayRange,
   formatInZone,
+  formatShiftRange,
   formatZonedRange,
   fromZonedInputValue,
   toZonedInputValue,
@@ -621,15 +631,27 @@ const windowLabel = computed<string>(() => {
   );
 });
 
-/// Who takes the shift; the window itself is said once, by the field.
-const summary = computed<{ who: string; team: I18nText } | null>(() => {
+/// Who takes whose shift, on which rotation, over which days; the times are said once, by the field.
+const summary = computed<{
+  who: string;
+  holder?: string;
+  rotation: I18nText;
+  when: I18nText;
+} | null>(() => {
   const window = windowValue.value;
   const who = String(userValue.value ?? "");
   // A half-picked range is not a cover yet, nor is a range with nobody against it.
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
   if (!who) return null;
-  // The person TAKING the shift, not `currentHolder` — whoever is being relieved.
-  return { who, team: raw(props.teamName ?? "") };
+  const rotationId = String(rotationValue.value ?? "");
+  const rotation = props.rotations.find((one) => one.id === rotationId)?.name ?? props.teamName;
+  return {
+    // The person TAKING the shift; `holder` is whoever is being relieved.
+    who,
+    holder: coveredPerson(who),
+    rotation: raw(rotation ?? ""),
+    when: raw(formatDayRange(window.from, window.to, props.timezone)),
+  };
 });
 
 /// ── Swap ──────────────────────────────────────────────────────────────────
@@ -740,7 +762,7 @@ const swapSummary = computed<{
   const pair = swapPair.value;
   if (!pair || swapProblem.value) return null;
   const when = (shift: UpcomingShift) =>
-    raw(formatInZone(shift.startMicros, props.timezone, SHIFT_STAMP));
+    raw(formatShiftRange(shift.startMicros, shift.endMicros, props.timezone));
   return {
     first: pair.first.member,
     second: pair.second.member,

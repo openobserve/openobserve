@@ -223,7 +223,12 @@
       "rum-15190-paths-build-funnel.spec.js",
       "rum-15230-paths-drawer-user.spec.js",
       "rum-15304-overview-synthetic-counts.spec.js",
-      "rum-15269-list-view-state.spec.js"
+      "rum-15269-list-view-state.spec.js",
+      "rum-3268-session-link-no-nan.spec.js",
+      "rum-3268-heatmap-no-view-id.spec.js",
+      "rum-3268-trace-duration-skew.spec.js",
+      "rum-3268-no-widen-at-30d.spec.js",
+      "rum-3268-analytics-header-1200.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",

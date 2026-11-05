@@ -263,6 +263,7 @@ mod m20261211_000001_add_templates_to_downtime_notifications;
 mod m20261212_000001_add_templates_to_oncall_response_events;
 mod m20261213_000001_retire_compiled_default_templates;
 mod m20261214_000001_templates_columns_to_text;
+mod m20261215_000001_add_alert_incident_title_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -367,6 +368,11 @@ pub(crate) async fn create_composite_alert_tables_for_test(
     manager
         .alter_table(update::get_update_stmt_composites())
         .await?;
+    manager
+        .alter_table(
+            m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+        )
+        .await?;
     Ok(())
 }
 
@@ -387,6 +393,11 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .to_string(),
         backend
             .build(&update::get_update_stmt_composites())
+            .to_string(),
+        backend
+            .build(
+                &m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+            )
             .to_string(),
     ];
     sql.extend(
@@ -828,6 +839,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
             Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
+            Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
         ]
     }
 }
@@ -946,6 +958,7 @@ mod tests {
         ),
         (143, "m20261213_000001_retire_compiled_default_templates"),
         (144, "m20261214_000001_templates_columns_to_text"),
+        (145, "m20261215_000001_add_alert_incident_title_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

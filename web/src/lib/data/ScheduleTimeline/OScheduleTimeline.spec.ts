@@ -66,6 +66,7 @@ describe("OScheduleBand", () => {
     [1, "bg-schedule-band-1-bg"],
     [6, "bg-schedule-band-6-bg"],
     ["gap", "bg-schedule-gap-bg"],
+    ["off", "bg-surface-subtle"],
   ] as const)("paints tone %s from its own token", (tone, expected) => {
     const w = mount(OScheduleBand, { props: { band: band({ tone }) } });
     expect(w.classes().join(" ")).toContain(expected);

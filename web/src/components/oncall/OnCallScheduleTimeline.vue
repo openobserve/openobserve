@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- A template rewrites the first rotation; the drawer it opens names which one. -->
+        <!-- Both items add a rotation; replacing an existing one's rules lives on its lane. -->
         <ODropdown align="end">
           <template #trigger>
             <OButton
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-timeline-add-template"
             @select="emit('presets')"
           >
-            {{ rotations.length ? t("oncall.presetsTitle") : t("oncall.addRotationFromTemplate") }}
+            {{ t("oncall.addRotationFromTemplate") }}
           </ODropdownItem>
           <ODropdownItem
             icon-left="edit"
@@ -184,6 +184,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ laneOf(track).cadence }}
           </OText>
+          <OText
+            v-if="laneOf(track).alongside"
+            variant="meta"
+            class="max-md:order-last"
+            :data-test="`oncall-lane-alongside-${track.key}`"
+          >
+            {{ laneOf(track).alongside }}
+          </OText>
+          <span
+            v-if="!laneOf(track).escalated"
+            class="text-status-warning-text text-xs max-md:order-last"
+            :data-test="`oncall-lane-no-escalation-${track.key}`"
+          >
+            {{ t("oncall.laneNoEscalation") }}
+          </span>
 
           <span class="ms-auto flex items-center gap-1">
             <!-- Stated in the words that describe the consequence, not as a
@@ -224,14 +239,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`oncall-lane-menu-${track.key}`"
                 />
               </template>
-              <!-- A template rewrites the first rotation only, so only its lane offers one; the drawer names what it replaces. -->
               <ODropdownItem
-                v-if="laneOf(track).index === 0"
                 icon-left="restart-alt"
                 :data-test="`oncall-lane-presets-${track.key}`"
-                @select="emit('presets')"
+                @select="emit('presets', laneOf(track).id)"
               >
-                {{ t("oncall.presetsStartOver") }}
+                {{ t("oncall.presetsReplaceRules") }}
               </ODropdownItem>
               <ODropdownItem
                 icon-left="person-add"
@@ -286,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The tooltip follows the band, so it anchors to the band itself, not to the menu around it. -->
       <template #band="{ band }">
         <ODropdown
-          v-if="shiftActions(band.key).length"
+          v-if="bandActions(band.key).length"
           align="start"
           @update:open="(isOpen: boolean) => trackMenu(`band:${band.key}`, isOpen)"
         >
@@ -300,11 +313,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <ODropdownItem
-            v-for="action in shiftActions(band.key)"
+            v-for="action in bandActions(band.key)"
             :key="action.id"
             :icon-left="action.icon"
             :data-test="`oncall-shift-menu-${action.id}`"
-            @select="onShiftAction(action.id, band.key)"
+            @select="onBandAction(action.id, band.key)"
           >
             {{ action.label }}
           </ODropdownItem>
@@ -341,6 +354,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               aria-hidden="true"
             />
             {{ t("oncall.legendNobody") }}
+          </span>
+          <span
+            v-if="hasOff"
+            class="text-text-secondary flex items-center gap-1.5 text-xs"
+            data-test="oncall-timeline-legend-off"
+          >
+            <span
+              class="bg-surface-subtle border-border-strong size-2 rounded-full border border-dashed"
+              aria-hidden="true"
+            />
+            {{ t("oncall.timelineOff") }}
           </span>
           <span
             v-if="awayTrack"
@@ -403,7 +427,14 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OScheduleBand from "@/lib/data/ScheduleTimeline/OScheduleBand.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { ResolvedSegment, Rotation, TimeWindow, Unavailability } from "@/ts/interfaces/oncall";
+import type {
+  OnCallPolicy,
+  ResolvedSegment,
+  Rotation,
+  ShiftRule,
+  TimeWindow,
+  Unavailability,
+} from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -418,6 +449,14 @@ import {
 import { formatMicrosDuration } from "@/utils/formatters";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { segmentSpanKey } from "./resolvedShifts";
+import type { LaneCadence } from "./OnCallScheduleTimeline.lanes";
+import {
+  isOffStretch,
+  laneCadence,
+  pagedAlone,
+  pagedAtAll,
+  pagedTogether,
+} from "./OnCallScheduleTimeline.lanes";
 
 export type ShiftAction = "cover" | "swap" | "away";
 
@@ -446,6 +485,8 @@ const props = withDefaults(
     swapRotations?: string[];
     /** The whole shift behind a band the window's edges cut, keyed by `segmentSpanKey`. */
     shiftSpans?: Record<string, { from: number; to: number }>;
+    /** Decides whether a lane's empty stretch is a gap or Off; null keeps every one a gap. */
+    policy?: OnCallPolicy | null;
   }>(),
   {
     rotations: () => [],
@@ -458,14 +499,17 @@ const props = withDefaults(
     selfEmail: "",
     swapRotations: () => [],
     shiftSpans: () => ({}),
+    policy: null,
   },
 );
 
 const emit = defineEmits<{
   (e: "fill-gap", gap: ResolvedSegment): void;
   (e: "add"): void;
-  (e: "presets"): void;
+  /// Carries the lane's rotation id when its rules are to be replaced; none adds a rotation.
+  (e: "presets", rotationId?: string): void;
   (e: "shift-action", action: ShiftAction, segment: ResolvedSegment): void;
+  (e: "clear-away", absenceId: string): void;
   /// Carries the rotation's **id**, not its name: a name is renameable and two
   /// rotations may share one, so a name cannot say which row was meant.
   (e: "edit" | "duplicate" | "override" | "delete" | "assign-people", rotationId: string): void;
@@ -593,26 +637,29 @@ function dayRange(window: TimeWindow): string {
     : days.map(name).join(", ");
 }
 
-function cadenceWord(shiftMicros: number): string {
-  if (shiftMicros === MICROS_PER_DAY) return String(t("oncall.laneCadenceDaily"));
-  if (shiftMicros === 7 * MICROS_PER_DAY) return String(t("oncall.laneCadenceWeekly"));
-  return String(t("oncall.laneCadenceEvery", { duration: raw(formatMicrosDuration(shiftMicros)) }));
-}
-
-/// The next instant this rotation hands over to somebody else, taken from the
-/// SEGMENTS rather than from `anchor + n * shift`: a cover or a restriction
-/// ends the current shift somewhere the cadence alone would not put it.
-function nextHandover(rotationId: string): number | null {
-  const current = props.segments.find(
-    (segment) =>
-      segment.rotation_id === rotationId &&
-      segment.from <= nowMicros.value &&
-      segment.to > nowMicros.value,
-  );
-  if (!current) return null;
-  const whole = props.shiftSpans[segmentSpanKey(current)];
-  if (whole) return whole.to;
-  return endsInWindow(current) ? current.to : null;
+/// The cadence in words; true on any day, unlike a next-handover instant a restriction can make meaningless.
+function cadenceWords(cadence: LaneCadence): string {
+  switch (cadence.kind) {
+    case "weekly":
+      return String(
+        t("oncall.laneCadenceWeekly", {
+          when: raw(`${WEEKDAYS.value[cadence.weekday]} ${formatMinuteOfDay(cadence.minute)}`),
+        }),
+      );
+    case "daily":
+      return String(t("oncall.laneCadenceDaily", { time: raw(formatMinuteOfDay(cadence.minute)) }));
+    case "days":
+      return String(
+        t("oncall.laneCadenceDays", {
+          count: cadence.days,
+          time: raw(formatMinuteOfDay(cadence.minute)),
+        }),
+      );
+    case "every":
+      return String(
+        t("oncall.laneCadenceEvery", { duration: raw(formatMicrosDuration(cadence.micros)) }),
+      );
+  }
 }
 
 /// The real start and end of the shift behind a segment, which the window's edges may have cut.
@@ -636,68 +683,86 @@ interface Lane {
   notPaging: boolean;
   /** The endpoint did not resolve this rotation at all. */
   unanswered: boolean;
+  /** Some level pages this rotation alone, so its empty stretches are gaps rather than Off. */
+  alone: boolean;
+  /** Some step names this rotation, or no policy is loaded to say otherwise. */
+  escalated: boolean;
+  /** "paged alongside <first>" when one level pages both; empty otherwise. */
+  alongside: I18nText | "";
+  /** What an Off band's tooltip says. */
+  offTip: I18nText;
 }
 
 const lanes = computed<Lane[]>(() =>
-  // ONE LANE PER ROTATION, and only from `props.rotations`. There is no
-  // fallback to the segments any more: a team with no rotations gets `[]`
-  // back rather than one long gap attributed to nothing, so there is no
-  // nameless lane left to invent — and inventing one gave its Edit and menu a
-  // rotation that does not exist to point at.
+  // ONE LANE PER ROTATION, and only from `props.rotations`: a team with no rotations gets no nameless lane to point a menu at.
   props.rotations.map((rotation, index) => {
-    const parts: string[] = [];
-    // The header describes the rotation's WINNING shape, which for the
-    // ordinary one-rule rotation is that rule. A rotation with several is
-    // follow-the-sun and cannot be summarised in one cadence, so it says how
-    // many rules it has instead of picking one to speak for the rest.
-    const rules = rotation.shift_rules ?? [];
-    const only = rules.length === 1 ? rules[0] : null;
-    const window = only?.restrictions?.[0];
-
-    if (only && window) {
-      const range = dayRange(window);
-      if (range) parts.push(range);
-      parts.push(
-        String(t("oncall.laneShifts", { duration: raw(formatMicrosDuration(only.shift_micros)) })),
-      );
-      // 0 -> 1440 covers the entire day; without this a full-day layer and a
-      // zero-length one both read "00:00 / 00:00".
-      if (window.start_minute === 0 && window.end_minute === MINUTES_PER_DAY) {
-        parts.push(String(t("oncall.laneAllDay")));
-      } else {
-        parts.push(
-          `${formatMinuteOfDay(window.start_minute)} / ${formatMinuteOfDay(window.end_minute)}`,
-        );
-      }
-    } else if (only) {
-      parts.push(cadenceWord(only.shift_micros));
-      const handover = nextHandover(rotation.id);
-      if (handover) {
-        parts.push(
-          String(
-            t("oncall.laneHandsOver", {
-              when: raw(fmt(handover, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
-            }),
-          ),
-        );
-      }
-    } else if (rules.length) {
-      parts.push(String(t("oncall.laneRuleCount", { count: rules.length }, rules.length)));
-    }
-
+    const first = props.rotations[0];
     const count = rotationMembers(rotation).length;
-    parts.push(String(t("oncall.lanePeople", { count }, count)));
-
     return {
       index,
       id: rotation.id,
       name: rotation.name,
-      cadence: raw(parts.join(" · ")),
+      cadence: raw(
+        [...cadenceParts(rotation), String(t("oncall.lanePeople", { count }, count))].join(" · "),
+      ),
       notPaging: count === 0,
       unanswered: !answeredRotations.value.has(rotation.id),
+      alone: pagedAlone(props.policy, rotation.id),
+      escalated: pagedAtAll(props.policy, rotation.id),
+      alongside:
+        index > 0 && pagedTogether(props.policy, rotation.id, first.id)
+          ? t("oncall.lanePagedAlongside", { name: raw(first.name) })
+          : "",
+      offTip: offTipOf(rotation.shift_rules ?? []),
     };
   }),
 );
+
+/// What the rotation's rules say, then the cadence they share; never the current bar, which a cover or absence cuts short.
+function cadenceParts(rotation: Rotation): string[] {
+  const now = nowMicros.value;
+  const all = rotation.shift_rules ?? [];
+  const rules = all.filter((rule) => (rule.ends_at ?? Infinity) > now);
+  const only = rules.length === 1 ? rules[0] : null;
+  const window = only?.restrictions?.[0];
+  const parts: string[] = [];
+  if (only && window) parts.push(...windowParts(window));
+  // Numbered by place in the full list, as the editor names them, so a stopped rule keeps its number.
+  else if (!only) parts.push(...rules.map((rule) => ruleName(rule, all.indexOf(rule))));
+  const cadence = laneCadence(rules, now, props.timezone);
+  if (cadence) parts.push(cadenceWords(cadence));
+  return parts;
+}
+
+/// A one-rule rotation restricted to a window: its days and its hours.
+function windowParts(window: TimeWindow): string[] {
+  const parts: string[] = [];
+  const range = dayRange(window);
+  if (range) parts.push(range);
+  // 0 -> 1440 covers the entire day; without this a full-day rule and a zero-length one both read "00:00–00:00".
+  if (window.start_minute === 0 && window.end_minute === MINUTES_PER_DAY) {
+    parts.push(String(t("oncall.laneAllDay")));
+  } else {
+    parts.push(`${formatMinuteOfDay(window.start_minute)}–${formatMinuteOfDay(window.end_minute)}`);
+  }
+  return parts;
+}
+
+function ruleName(rule: ShiftRule, index: number): string {
+  return rule.name?.trim() || String(t("oncall.shiftRuleNthName", { n: index + 1 }));
+}
+
+/// An unrestricted rule holds every hour, so a rotation with one has no hours to be outside of.
+function offTipOf(rules: ShiftRule[]): I18nText {
+  if (!rules.length || rules.some((rule) => !rule.restrictions?.length)) {
+    return t("oncall.timelineOff");
+  }
+  const hours = rules
+    .flatMap((rule) => rule.restrictions ?? [])
+    .map((window) => windowParts(window).join(", "))
+    .join("; ");
+  return t("oncall.timelineOffTip", { hours: raw(hours) });
+}
 
 const laneByKey = computed(() => new Map(lanes.value.map((lane) => [lane.id, lane])));
 
@@ -713,6 +778,10 @@ function laneOf(track: ScheduleTrack): Lane {
       cadence: raw(""),
       notPaging: false,
       unanswered: false,
+      alone: true,
+      escalated: true,
+      alongside: "",
+      offTip: t("oncall.timelineOff"),
     }
   );
 }
@@ -749,11 +818,12 @@ const rotationTracks = computed<ScheduleTrack[]>(() =>
         const who = segment.user_email ?? "";
         const whoLabel = who ? nameOf(who) : "";
         const isNow = segment.from <= nowMicros.value && segment.to > nowMicros.value;
+        const off = isOff(segment, lane);
 
         // The band the reader is actually looking for says so, and says when it
         // ends — the two facts they came to the tab for, on the span itself
         // rather than only in the line above the chart.
-        let label: I18nText = raw(whoLabel);
+        let label: I18nText = off ? t("oncall.timelineOff") : raw(whoLabel);
         if (who && segment.override_id) {
           label = t("oncall.schedBandOverride", { who: raw(whoLabel) });
         } else if (who && isNow && endsInWindow(segment)) {
@@ -782,9 +852,7 @@ const rotationTracks = computed<ScheduleTrack[]>(() =>
           // Hue is the ROTATION, not the person: the question this chart is read
           // for is "which layer decided this", and a colour per person answered
           // a question nobody was asking while making two lanes look alike.
-          tone: who
-            ? (((lane.index % SCHEDULE_BAND_TONE_COUNT) + 1) as ScheduleBand["tone"])
-            : "gap",
+          tone: bandTone(lane, who, off),
           // A cover keeps the lane's hue — it is still that rotation's time —
           // but hollow, because the roster did not produce it.
           variant: segment.override_id ? "outline" : "solid",
@@ -792,6 +860,16 @@ const rotationTracks = computed<ScheduleTrack[]>(() =>
       }),
   })),
 );
+
+/// Outside every rule's hours in a lane no level pages alone; an empty stretch inside a rule's hours is always a gap.
+function isOff(segment: ResolvedSegment, lane: Lane | undefined): boolean {
+  return !!lane && isOffStretch(segment, lane.alone);
+}
+
+function bandTone(lane: Lane, who: string, off: boolean): ScheduleBand["tone"] {
+  if (who) return ((lane.index % SCHEDULE_BAND_TONE_COUNT) + 1) as ScheduleBand["tone"];
+  return off ? "off" : "gap";
+}
 
 const bandRange = (start: number, end: number) => ({
   from: raw(fmt(start, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
@@ -821,6 +899,10 @@ const awayTrack = computed<ScheduleTrack | null>(() => {
   return bands.length ? { key: AWAY_TRACK, label: t("oncall.timelineAwayLane"), bands } : null;
 });
 
+const hasOff = computed(() =>
+  rotationTracks.value.some((track) => track.bands.some((band) => band.tone === "off")),
+);
+
 const tracks = computed<ScheduleTrack[]>(() =>
   awayTrack.value ? [...rotationTracks.value, awayTrack.value] : rotationTracks.value,
 );
@@ -848,12 +930,15 @@ function bandTip(bandKey: string): I18nText | undefined {
   const segment = segmentByBand.value.get(bandKey);
   if (segment?.user_email) {
     const whole = realSpanOf(segment);
-    return t("oncall.shiftBandTip", {
-      person: tooltipOf(segment.user_email),
-      range: tipRange(whole.from, whole.to),
-    });
+    const person = tooltipOf(segment.user_email);
+    const range = tipRange(whole.from, whole.to);
+    return segment.rotation
+      ? t("oncall.shiftBandTipRule", { person, rule: raw(segment.rotation), range })
+      : t("oncall.shiftBandTip", { person, range });
   }
-  const absence = props.absences.find((one) => `away-${one.id}` === bandKey);
+  const lane = segment ? laneByKey.value.get(segment.rotation_id) : undefined;
+  if (segment && lane && isOff(segment, lane)) return lane.offTip;
+  const absence = absenceByBand(bandKey);
   if (!absence) return undefined;
   return t("oncall.shiftBandTip", {
     person: tooltipOf(absence.user_email),
@@ -861,16 +946,33 @@ function bandTip(bandKey: string): I18nText | undefined {
   });
 }
 
+type BandAction = ShiftAction | "clear-away";
+
 interface ShiftMenuItem {
-  id: ShiftAction;
+  id: BandAction;
   icon: IconName;
   label: I18nText;
+}
+
+const absenceByBand = (bandKey: string) =>
+  props.absences.find((one) => `away-${one.id}` === bandKey);
+
+/// A shift's acts, or an absence's undo for whoever could have marked it; anything already over offers nothing.
+function bandActions(bandKey: string): ShiftMenuItem[] {
+  const absence = absenceByBand(bandKey);
+  if (!absence) return shiftActions(bandKey);
+  const mayMark =
+    props.canMarkAway || absence.user_email.toLowerCase() === props.selfEmail.toLowerCase();
+  if (!mayMark || absence.end_at <= nowMicros.value) return [];
+  return [{ id: "clear-away", icon: "event-available", label: t("oncall.awayClear") }];
 }
 
 /// Only what this reader can do to this shift; a shift that is already over offers nothing.
 function shiftActions(bandKey: string): ShiftMenuItem[] {
   const segment = segmentByBand.value.get(bandKey);
   if (!segment || segment.to <= nowMicros.value) return [];
+  // Nobody needs an Off stretch covered, as its missing "Fill this gap" says.
+  if (isOff(segment, laneByKey.value.get(segment.rotation_id))) return [];
   const who = segment.user_email ?? "";
   const items: ShiftMenuItem[] = [];
   if (props.canCover) {
@@ -895,7 +997,12 @@ function shiftActions(bandKey: string): ShiftMenuItem[] {
   return items;
 }
 
-function onShiftAction(action: ShiftAction, bandKey: string) {
+function onBandAction(action: BandAction, bandKey: string) {
+  if (action === "clear-away") {
+    const absence = absenceByBand(bandKey);
+    if (absence) emit("clear-away", absence.id);
+    return;
+  }
   const segment = segmentByBand.value.get(bandKey);
   if (segment) emit("shift-action", action, segment);
 }
@@ -974,12 +1081,16 @@ const hoverLabel = computed(() =>
   hoverAt.value === null ? undefined : stamp(from.value + hoverAt.value * span.value),
 );
 
-/// The first stretch nobody covers. One is enough to act on, and a legend
+/// The first stretch nobody covers that a level needs covered. One is enough to act on, and a legend
 /// listing every gap is one nobody reads.
 const firstGap = computed<ResolvedSegment | null>(
   () =>
     props.segments.find(
-      (segment) => !segment.user_email && segment.to > from.value && segment.from < to.value,
+      (segment) =>
+        !segment.user_email &&
+        segment.to > from.value &&
+        segment.from < to.value &&
+        !isOff(segment, laneByKey.value.get(segment.rotation_id)),
     ) ?? null,
 );
 
