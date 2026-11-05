@@ -2486,15 +2486,9 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
-        name = "ZO_ONBOARDING_FLOW_ENABLED",
-        default = true,
-        help = "Send a new user to the full-page first-run onboarding. Cloud only. Takes precedence over the sample-data welcome."
-    )]
-    pub onboarding_flow_enabled: bool,
-    #[env_config(
         name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
-        default = true,
-        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. Shown when the full-page onboarding is off or not available."
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
     )]
     pub sample_data_onboarding_enabled: bool,
     #[env_config(

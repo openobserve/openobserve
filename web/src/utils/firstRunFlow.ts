@@ -16,20 +16,19 @@
 import config from "@/aws-exports";
 import { isFullConfigLoaded } from "@/services/config.queries";
 
-/** The `/config` switches (ZO_ONBOARDING_FLOW_ENABLED, ZO_SAMPLE_DATA_ONBOARDING_ENABLED) that pick the first-run flow. */
+/** The `/config` switch (ZO_SAMPLE_DATA_ONBOARDING_ENABLED, default off) that picks the first-run flow. */
 type FirstRunConfig = {
   version?: string;
-  onboarding_flow_enabled?: boolean;
   sample_data_onboarding_enabled?: boolean;
 };
 
-/** The switches come only with the full config (the bootstrap subset lacks them), so until it loads no flow is on. */
+/** The switch comes only with the full config (the bootstrap subset lacks it), so until it loads no flow is on. */
 export const flowsKnown = (cfg?: FirstRunConfig): boolean => isFullConfigLoaded(cfg);
 
-/** The full-page onboarding exists on cloud only; it wins when on, and a backend without the switch counts as on. */
-export const onboardingFlowOn = (cfg?: FirstRunConfig): boolean =>
-  flowsKnown(cfg) && config.isCloud === "true" && cfg?.onboarding_flow_enabled !== false;
-
-/** The sample-data welcome shows whenever the full-page onboarding does not; a backend without the switch counts as on. */
+/** The sample-data welcome shows on every build when the switch is on; a backend without the switch counts as off. */
 export const sampleDataFlowOn = (cfg?: FirstRunConfig): boolean =>
-  flowsKnown(cfg) && cfg?.sample_data_onboarding_enabled !== false && !onboardingFlowOn(cfg);
+  flowsKnown(cfg) && cfg?.sample_data_onboarding_enabled === true;
+
+/** The full-page onboarding is cloud only and shows when the sample-data flow does not. */
+export const onboardingFlowOn = (cfg?: FirstRunConfig): boolean =>
+  flowsKnown(cfg) && config.isCloud === "true" && !sampleDataFlowOn(cfg);

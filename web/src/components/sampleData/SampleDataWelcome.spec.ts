@@ -120,7 +120,6 @@ const session = useSampleDataSession() as unknown as {
 const makeStore = (
   zoConfig: Record<string, unknown> = {
     version: "v0.0.0",
-    onboarding_flow_enabled: false,
     sample_data_onboarding_enabled: true,
   },
 ) =>
@@ -312,7 +311,6 @@ describe("SampleDataWelcome finish", () => {
     await mountAtHome({});
     store.state.zoConfig = {
       version: "v0.0.0",
-      onboarding_flow_enabled: false,
       sample_data_onboarding_enabled: true,
     };
     await flush();
@@ -426,7 +424,6 @@ describe("SampleDataWelcome finish", () => {
   it("locks a chip whose guide the license locks, and a click picks nothing", async () => {
     await mountAtHome({
       version: "v0.0.0",
-      onboarding_flow_enabled: false,
       sample_data_onboarding_enabled: true,
       features: { rum: "locked" },
     });

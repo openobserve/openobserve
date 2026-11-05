@@ -79,7 +79,7 @@ describe("useSetupTarget", () => {
     wrapper.unmount();
   });
 
-  it.each([["the onboarding flow is off", { onboarding_flow_enabled: false }]])(
+  it.each([["the sample-data flow is on", { sample_data_onboarding_enabled: true }]])(
     "on cloud, keeps the guide's route when %s",
     async (_, flags) => {
       config.isCloud = "true";

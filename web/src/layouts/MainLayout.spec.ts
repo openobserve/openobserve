@@ -2052,12 +2052,11 @@ describe("MainLayout — first-time cloud login", () => {
     (config as any).isCloud = "false";
     vi.mocked(stream.nameList).mockRestore();
     vi.mocked(billings.submit_new_user_info).mockRestore();
-    delete store.state.zoConfig.onboarding_flow_enabled;
     delete store.state.zoConfig.sample_data_onboarding_enabled;
   });
 
   it("leaves a first login to the sample data welcome when the deployment runs it", async () => {
-    store.state.zoConfig.onboarding_flow_enabled = false;
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
@@ -2090,7 +2089,7 @@ describe("MainLayout — first-time cloud login", () => {
 
   // the header Try marks the welcome seen, so the welcome never ends this first login
   it("ends a first login when sample data starts loading outside the welcome, as a sample start", async () => {
-    store.state.zoConfig.onboarding_flow_enabled = false;
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
     const session = useSampleDataSession();
     const { wrapper } = await mountAtHome();
     expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
@@ -2110,23 +2109,13 @@ describe("MainLayout — first-time cloud login", () => {
   });
 
   it("holds Home for a first login only while the onboarding flow is on", async () => {
-    store.state.zoConfig.onboarding_flow_enabled = false;
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
     const { wrapper, router } = await mountAtHome();
     const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
     await router.push({ name: "logs", query: { org_identifier: "org1" } });
     await router.push({ name: "home", query: { org_identifier: "org1" } });
     expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
     expect(hold()).toBe(false);
-    wrapper.unmount();
-  });
-
-  it("with both first-run flows off, sends no one to onboarding and ends the first login", async () => {
-    store.state.zoConfig.onboarding_flow_enabled = false;
-    store.state.zoConfig.sample_data_onboarding_enabled = false;
-    const { wrapper, replace } = await mountAtHome();
-    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
-    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
     wrapper.unmount();
   });
 
@@ -2301,6 +2290,7 @@ describe("MainLayout — first-time cloud login", () => {
 
   it("keeps the flag off cloud for the sample data welcome, with no onboarding page", async () => {
     (config as any).isCloud = "false";
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);

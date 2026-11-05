@@ -138,26 +138,26 @@ describe("OnboardingView", () => {
     sessionStorage.clear();
   });
 
-  // both switches off means no first-run flow, so a bookmark or typed URL must not open it
-  it("sends the user Home when the deployment turns onboarding off", async () => {
-    store.commit("setConfig", { ...store.state.zoConfig, onboarding_flow_enabled: false });
+  // the sample-data flow replaces onboarding, so a bookmark or typed URL must not open it
+  it("sends the user Home when the deployment runs the sample-data flow instead", async () => {
+    store.commit("setConfig", { ...store.state.zoConfig, sample_data_onboarding_enabled: true });
     try {
       const { router, wrapper } = await mountAt("/onboarding/logs", { inRouterView: true });
       expect(router.currentRoute.value.name).toBe("home");
       expect(wrapper.find('[data-test="onboarding-view"]').exists()).toBe(false);
     } finally {
-      delete store.state.zoConfig.onboarding_flow_enabled;
+      delete store.state.zoConfig.sample_data_onboarding_enabled;
     }
   });
 
-  it("stays while the full config is unknown, and goes Home once it lands with onboarding off", async () => {
+  it("stays while the full config is unknown, and goes Home once it lands with the sample-data flow on", async () => {
     const full = { ...store.state.zoConfig };
     const { version: _version, ...bootstrap } = full;
     store.commit("setConfig", bootstrap);
     try {
       const { router } = await mountAt("/onboarding", { inRouterView: true });
       expect(router.currentRoute.value.name).toBe("onboarding");
-      store.commit("setConfig", { ...full, onboarding_flow_enabled: false });
+      store.commit("setConfig", { ...full, sample_data_onboarding_enabled: true });
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("home");
     } finally {

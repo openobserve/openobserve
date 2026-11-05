@@ -78,14 +78,12 @@ describe("HomeNoDataState", () => {
     awsConfig.isCloud = "true";
     store.state.zoConfig = {
       ...store.state.zoConfig,
-      onboarding_flow_enabled: false,
       sample_data_onboarding_enabled: true,
     };
 
     expect(await clickCard("logs")).toEqual({ name: "curl", query: org });
     store.state.zoConfig = {
       ...store.state.zoConfig,
-      onboarding_flow_enabled: true,
       sample_data_onboarding_enabled: false,
     };
   });

@@ -24,31 +24,24 @@ describe("first-run flow switches", () => {
     config.isCloud = CLOUD;
   });
 
-  const flags = [undefined, true, false];
   const cases = ["true", "false"].flatMap((cloud) =>
-    flags.flatMap((onb) =>
-      flags.map((sample) => {
-        const onboarding = cloud === "true" && onb !== false;
-        return [cloud, onb, sample, onboarding, sample !== false && !onboarding] as const;
-      }),
-    ),
+    [undefined, true, false].map((sample) => {
+      const sampleOn = sample === true;
+      return [cloud, sample, cloud === "true" && !sampleOn, sampleOn] as const;
+    }),
   );
 
   it.each(cases)(
-    "isCloud=%s onboarding=%s sample=%s -> onboarding %s, sample %s",
-    (cloud, onb, sample, onboarding, sampleOn) => {
+    "isCloud=%s sample=%s -> onboarding %s, sample %s",
+    (cloud, sample, onboarding, sampleOn) => {
       config.isCloud = cloud;
-      const cfg = {
-        version: "v0.0.0",
-        onboarding_flow_enabled: onb,
-        sample_data_onboarding_enabled: sample,
-      };
+      const cfg = { version: "v0.0.0", sample_data_onboarding_enabled: sample };
       expect(onboardingFlowOn(cfg)).toBe(onboarding);
       expect(sampleDataFlowOn(cfg)).toBe(sampleOn);
     },
   );
 
-  it("counts a backend without the switches as both on, once the full config has loaded", () => {
+  it("counts a backend without the switch as off: cloud gets onboarding, others neither", () => {
     config.isCloud = "true";
     expect([onboardingFlowOn({ version: "" }), sampleDataFlowOn({ version: "" })]).toEqual([
       true,
@@ -57,18 +50,14 @@ describe("first-run flow switches", () => {
     config.isCloud = "false";
     expect([onboardingFlowOn({ version: "" }), sampleDataFlowOn({ version: "" })]).toEqual([
       false,
-      true,
+      false,
     ]);
   });
 
-  // the bootstrap config has no switches, so a failed full config must not read as "on"
+  // the bootstrap config has no switch, so a failed full config must not read as "on"
   it.each(["true", "false"])("isCloud=%s: no flow until the full config is known", (cloud) => {
     config.isCloud = cloud;
-    for (const cfg of [
-      undefined,
-      {},
-      { onboarding_flow_enabled: true, sample_data_onboarding_enabled: true },
-    ]) {
+    for (const cfg of [undefined, {}, { sample_data_onboarding_enabled: true }]) {
       expect([onboardingFlowOn(cfg), sampleDataFlowOn(cfg)]).toEqual([false, false]);
     }
   });

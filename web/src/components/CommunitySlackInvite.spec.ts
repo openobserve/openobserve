@@ -392,7 +392,6 @@ describe("CommunitySlackInvite", () => {
     it("never shows next to the welcome when both mount on Home, as in the main layout", async () => {
       store.commit("setConfig", {
         ...store.state.zoConfig,
-        onboarding_flow_enabled: false,
         sample_data_onboarding_enabled: true,
       });
       let answer!: (hasData: boolean) => void;
@@ -435,7 +434,6 @@ describe("CommunitySlackInvite", () => {
       );
       store.commit("setConfig", {
         ...store.state.zoConfig,
-        onboarding_flow_enabled: true,
         sample_data_onboarding_enabled: false,
       });
     });
@@ -475,7 +473,6 @@ describe("CommunitySlackInvite", () => {
         expect(invite()).toBe("false");
         store.commit("setConfig", {
           ...full,
-          onboarding_flow_enabled: false,
           sample_data_onboarding_enabled: true,
         });
         await flushPromises();

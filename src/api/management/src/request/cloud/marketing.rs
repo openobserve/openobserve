@@ -103,7 +103,7 @@ fn attribution_event_data(
     let company = if attribution.company.trim().is_empty() {
         email
             .rsplit_once('@')
-            .map_or(String::new(), |(_, domain)| domain.to_string())
+            .map_or(String::new(), |(_, domain)| domain.trim().to_lowercase())
     } else {
         attribution.company
     };
@@ -161,6 +161,11 @@ mod tests {
         let attribution: NewUserAttribution =
             json::from_str(r#"{"from":"","company":"  "}"#).unwrap();
         let data = attribution_event_data(attribution, "jane@acme.io", "2026-10-22");
+        assert_eq!(data["company"], json::json!("acme.io"));
+
+        let attribution: NewUserAttribution =
+            json::from_str(r#"{"from":"","company":""}"#).unwrap();
+        let data = attribution_event_data(attribution, " jane@ACME.io ", "2026-10-22");
         assert_eq!(data["company"], json::json!("acme.io"));
 
         let attribution: NewUserAttribution =
