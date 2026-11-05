@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -1174,6 +1174,12 @@ describe("AddTemplate - playground Kind drives the variables", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The panel's 300ms debounced preview would otherwise overwrite the emitted groups on a slow run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows common plus the previewed kind in the guide and the chips", async () => {

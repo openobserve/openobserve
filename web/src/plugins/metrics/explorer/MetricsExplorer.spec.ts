@@ -73,6 +73,7 @@ const grid = vi.hoisted(() => {
     clearFilters: vi.fn(),
     loadLabelNames: vi.fn(),
     loadLabelValues: vi.fn(),
+    labelValueScope: { value: "" },
     addLabelFilter: vi.fn(async () => {}),
     removeLabelFilter: vi.fn(),
     ensureSchemas: vi.fn(),
