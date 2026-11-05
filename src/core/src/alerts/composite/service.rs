@@ -961,7 +961,7 @@ mod tests {
                 .unwrap();
             children.push(child.id.unwrap());
         }
-        let expression = format!("{{{}}} AND {{{}}}", children[0], children[1]);
+        let expression = format!("{{{}}} && {{{}}}", children[0], children[1]);
         common::infra::config::DESTINATIONS.insert(
             format!("{org}/real"),
             Destination {
