@@ -57,10 +57,19 @@ const props = defineProps({
   },
 });
 
-// resource : resource_url
-// error : error_message
-// view : view_referrer -> view_ur
-// action :  <ns>_action_target_text : <ns>_action_target_selector  (_o2_ or _oo_)
+const targetText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
+const targetSelector = (value: unknown): string => {
+  try {
+    const target: unknown = typeof value === "string" ? JSON.parse(value) : value;
+    return target && typeof target === "object" && "selector" in target
+      ? targetText(target.selector)
+      : "";
+  } catch {
+    return "";
+  }
+};
+
 const getDescription = computed(() => {
   if (props.column["type"] === "resource") {
     return props.column["resource_url"];
@@ -72,11 +81,13 @@ const getDescription = computed(() => {
     }
     return props.column["view_url"];
   } else if (props.column["type"] === "action") {
-    return (
-      rumField(props.column, "action_target_text") +
-      " : " +
-      rumField(props.column, "action_target_selector")
-    );
+    const name =
+      targetText(props.column.action_target_name) ||
+      targetText(rumField(props.column, "action_target_text"));
+    const selector =
+      targetText(rumField(props.column, "action_target_selector")) ||
+      targetSelector(rumField(props.column, "action_target"));
+    return [name, selector].filter(Boolean).join(" : ") || "—";
   }
   return "";
 });
