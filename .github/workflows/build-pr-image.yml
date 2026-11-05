@@ -90,6 +90,9 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: cd web && npm run build
 
+      - name: Check login-page bundle budget
+        run: cd web && npm run check:bundle-budget
+
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
