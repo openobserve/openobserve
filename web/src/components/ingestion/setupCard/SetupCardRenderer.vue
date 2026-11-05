@@ -194,6 +194,7 @@ const allInputs = computed(() =>
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
+
 // Substitute live values (stream + free-form inputs) into authored code at
 // display/copy time (kept out of build-time subs because they change as the user
 // types). Build-time {url}/{org}/{token} are already resolved.
@@ -878,7 +879,7 @@ function fireConfetti() {
                 @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
                 @token-click="openTokenPicker?.()"
               >
-                <template v-if="displayCode(step)?.downloadEnv && tokenState === 'ready'" #actions>
+                <template v-if="displayCode(step)?.downloadEnv" #actions>
                   <OButton
                     data-test="ai-code-env-btn"
                     variant="ghost"
