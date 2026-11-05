@@ -778,6 +778,9 @@ pub struct TestSendRequest {
     /// The name of an already-saved template to test-send. Exactly one of
     /// `definition` / `template_name` must be set.
     pub template_name: Option<String>,
+    /// Which producer's sample to render with; absent means alert.
+    #[serde(default)]
+    pub kind: config::meta::alerts::notification_kind::NotificationKind,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -899,7 +902,7 @@ pub async fn test_send(
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
 
-    match core_test_send(&org_id, destination_type, &spec).await {
+    match core_test_send(&org_id, destination_type, &spec, req.kind).await {
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,

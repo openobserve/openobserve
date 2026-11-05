@@ -488,6 +488,9 @@ fn composite_input(
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
         pending_period_sec: alert.pending_period_sec,
+        incident_title_template: alert
+            .incident_title_template
+            .filter(|t| !t.trim().is_empty()),
     }
 }
 
@@ -647,6 +650,7 @@ async fn composite_detail_response(
         "children": children,
         "evaluation": evaluation_json,
         "pending_period_sec": definition.pending_period_sec,
+        "incident_title_template": definition.incident_title_template,
     }))
 }
 
@@ -1360,6 +1364,7 @@ async fn create_anomaly_alert(
         alert_window_fire_pct: anomaly_fields.alert_window_fire_pct,
         alert_window_recover_pct: anomaly_fields.alert_window_recover_pct,
         alert_enabled: anomaly_fields.alert_enabled,
+        template: anomaly_fields.template,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
         // The route's permission gate resolves `?folder=`, so the write must use the same value — a
@@ -2243,6 +2248,7 @@ async fn build_and_run_anomaly_update(
         alert_window_recover_pct: fields.alert_window_recover_pct,
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
+        template: fields.template,
         alert_destinations: Some(alert.destinations),
         enabled: fields.enabled,
         folder_id: fields.folder_id,

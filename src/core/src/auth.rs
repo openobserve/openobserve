@@ -392,12 +392,12 @@ where
             return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
-        // This is case for ingestion endpoints where we need to check
-        // permissions on the stream. Classified against the authoritative
-        // ingestion-route table (method + exact path shape) rather than
-        // substring-matching an ingestion word, so only real writes take the
-        // stream-level bypass.
-        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
+        // Only a matched ingestion route takes the stream-level bypass, never a look-alike path.
+        let route = parts
+            .extensions
+            .get::<axum::extract::MatchedPath>()
+            .map(|route| route.as_str());
+        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path, route) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
@@ -1022,19 +1022,34 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn ingestion_write_carries_its_route_feature() {
-        use axum::extract::FromRequestParts;
+        use axum::{Router, body::Body, routing::post};
         use config::meta::feature::Feature;
+        use tower::ServiceExt;
 
-        let (mut parts, _) = axum::http::Request::post("/myorg/v1/logs")
-            .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
-            .body(())
-            .unwrap()
-            .into_parts();
-        let Ok(auth) = AuthExtractor::from_request_parts(&mut parts, &()).await else {
-            panic!("an ingestion write with credentials must extract");
-        };
-        assert!(auth.bypass_check);
-        assert_eq!(auth.feature, Some(&[Feature::Logs][..]));
+        // `MatchedPath` only exists on a routed request, so the extractor runs behind a router.
+        let app = Router::new()
+            .route(
+                "/{org_id}/v1/logs",
+                post(|auth: AuthExtractor| async move {
+                    (auth.bypass_check && auth.feature == Some(&[Feature::Logs][..])).to_string()
+                }),
+            )
+            .route(
+                "/{org_id}/kv/{key}",
+                post(|auth: AuthExtractor| async move { auth.bypass_check.to_string() }),
+            );
+        for (uri, expected) in [("/myorg/v1/logs", "true"), ("/myorg/kv/_json", "false")] {
+            let request = axum::http::Request::post(uri)
+                .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
+                .body(Body::empty())
+                .unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(response.status(), axum::http::StatusCode::OK, "{uri}");
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(body, expected, "{uri}");
+        }
     }
 
     #[tokio::test]

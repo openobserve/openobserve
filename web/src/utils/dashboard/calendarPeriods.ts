@@ -91,6 +91,24 @@ export const resolveCalendarPeriod = (
   return { startTime: startMs * 1000, endTime: endMs * 1000 };
 };
 
+/** First and last civil day of a calendar period, plus today, as UTC-held dates in the given zone; a current period spans its whole length, not just the part elapsed. */
+export const resolveCalendarCivilSpan = (
+  token: unknown,
+  timezone?: string | null,
+  nowMs: number = Date.now(),
+): { unit: CalendarUnit; first: Date; last: Date; today: Date } | null => {
+  const period = parseCalendarToken(token);
+  if (!period) return null;
+  const bounds = civilBounds(period, safeTimezone(timezone), nowMs);
+  if (!bounds) return null;
+  return {
+    unit: period.unit,
+    first: bounds.start,
+    last: new Date(bounds.next.getTime() - 86_400_000),
+    today: bounds.today,
+  };
+};
+
 /** Trigger-button label for a calendar token, e.g. "This month", "Oct 6", "Q2 2026". */
 export const formatCalendarLabel = (
   token: unknown,

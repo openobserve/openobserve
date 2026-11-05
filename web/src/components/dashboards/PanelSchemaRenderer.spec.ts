@@ -182,6 +182,7 @@ import {
 } from "@/utils/dashboard/convertCustomChartData";
 import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import searchService from "@/services/search";
 import { DASHBOARD_ANNOTATION_SOURCES_KEY } from "@/composables/dashboard/usePanelAnnotationSources";
 import {
   alertCreationDialog,
@@ -840,6 +841,13 @@ describe("PanelSchemaRenderer", () => {
 
     // The table's search icon opens the logs drawer; the public page turns drilldowns off.
     const exploreFromTable = async (allowDrilldown: boolean) => {
+      const resultSchema = vi.spyOn(searchService, "result_schema").mockResolvedValue({
+        data: {
+          where_clause: "rev = 1793591100",
+          cross_links: { stream_links: [], org_links: [] },
+        },
+      } as any);
+      onTestFinished(() => resultSchema.mockRestore());
       const router = createRouter({
         history: createMemoryHistory(),
         routes: [{ path: "/", component: { template: "<div />" } }],
@@ -862,13 +870,46 @@ describe("PanelSchemaRenderer", () => {
         .findComponent({ name: "TableRenderer" })
         .vm.$emit("explore-cell", { columnId: "count", value: 7, row: {} });
       await flushPromises();
-      return { drawerOpen: wrapper.vm.cellDrawer.open, query: router.currentRoute.value.query };
+      return {
+        drawerOpen: wrapper.vm.cellDrawer.open,
+        baseWhere: wrapper.vm.cellDrawer.baseWhere,
+        query: router.currentRoute.value.query,
+        resultSchema,
+      };
     };
 
     it("opens the logs drawer from a table cell when drilldowns are on", async () => {
       const { drawerOpen, query } = await exploreFromTable(true);
       expect(drawerOpen).toBe(true);
       expect(query.cell_value).toBe("7");
+    });
+
+    it("filters the cell drawer by the panel WHERE even with cross-linking off", async () => {
+      expect(store.state.zoConfig.enable_cross_linking).toBeFalsy();
+      const { baseWhere, resultSchema } = await exploreFromTable(true);
+      expect(resultSchema).toHaveBeenCalledTimes(1);
+      expect(resultSchema.mock.calls[0][0].cross_linking).toBe(false);
+      expect(baseWhere).toBe("rev = 1793591100");
+    });
+
+    // PanelContainer's Go To Logs reads these off the renderer ref.
+    it("exposes the panel WHERE through ensureDrilldownSchema on the instance", async () => {
+      const resultSchema = vi.spyOn(searchService, "result_schema").mockResolvedValue({
+        data: { where_clause: "rev = 1", where_by_stream: {} },
+      } as any);
+      onTestFinished(() => resultSchema.mockRestore());
+      wrapper = createWrapper();
+      await wrapper.vm.ensureDrilldownSchema(0, true);
+      expect(resultSchema).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.panelBaseWhere).toBe("rev = 1");
+    });
+
+    it("makes no result_schema call on a chart click with cross-linking off", async () => {
+      const resultSchema = vi.spyOn(searchService, "result_schema");
+      onTestFinished(() => resultSchema.mockRestore());
+      wrapper = withDrilldown();
+      await wrapper.vm.onPanelClick(click);
+      expect(resultSchema).not.toHaveBeenCalled();
     });
 
     it("does not open the logs drawer from a table cell when drilldowns are off", async () => {

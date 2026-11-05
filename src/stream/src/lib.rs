@@ -195,12 +195,7 @@ pub fn stream_res(
         None
     };
 
-    let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    if settings == StreamSettings::default() {
-        settings.approx_partition = get_config()
-            .common
-            .use_stream_settings_for_partitions_enabled;
-    }
+    let settings = unwrap_stream_settings(&schema).unwrap_or_default();
 
     #[cfg(not(feature = "vectorscan"))]
     let pattern_associations = vec![];

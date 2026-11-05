@@ -42,11 +42,9 @@ describe("buildCompareResult", () => {
       r.metrics.every((m) => !m.flagged || m.key === "p99" || m.verdict === "insufficient"),
     ).toBe(true);
   });
-  // 500-sample arrays through three real 10k-iter bootstraps (p50/p95/cost) is
-  // genuinely heavy — a few seconds on slow CI — so give this case extra
-  // headroom over the 5s default rather than weaken its coverage.
+  // flagged and p99's null CI do not depend on the samples; 500 of them made three 10k-iter bootstraps take 9-30 s.
   it("flags {errorRate,p50,p95,p99,cost} (all colored by direction); volume stays neutral", () => {
-    const durs = Array.from({ length: 500 }, (_, i) => 100 + i);
+    const durs = Array.from({ length: 20 }, (_, i) => 100 + i);
     const r = buildCompareResult(
       kpi(500, 100, 50),
       kpi(500, 20, 30),
@@ -63,9 +61,10 @@ describe("buildCompareResult", () => {
     // p99 is directional-only — flagged, but no CI.
     expect(r.metrics.find((m) => m.key === "p99")!.ci).toBeNull();
     expect(r.metrics.find((m) => m.key === "volume")!.flagged).toBe(false);
-  }, 20000);
+  });
   it("marks results associative in sinceRollout mode", () => {
-    const durs = Array.from({ length: 200 }, (_, i) => i + 1);
+    // associative comes from windows.mode alone; tiny samples keep the three 10k-iter bootstraps cheap.
+    const durs = [1, 2, 3];
     const r = buildCompareResult(
       kpi(200, 10, 5),
       kpi(200, 8, 5),

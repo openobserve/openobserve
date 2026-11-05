@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from "vue";
+import { ref, nextTick, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
@@ -120,9 +120,8 @@ async function onDateChange(value: any) {
   );
 }
 
-onMounted(() => {
-  // Precedence: URL > shared state (cross-page persisted) > default relative.
-  // The shared state is already loaded from localStorage by the composable.
-  mountResolve();
-});
+// Precedence: URL > shared state (cross-page persisted) > default relative. Resolved in
+// setup, not onMounted: the date picker seeds from dateState in its own onMounted, which
+// runs first and replays that window into the URL.
+mountResolve();
 </script>

@@ -1,0 +1,228 @@
+{
+  "slack_firing": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme|🔴 High error rate firing>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "Error rate above 5% for 5 minutes"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nP2"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nFiring"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Stream*\nweb-logs"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Threshold*\n &gt; 5"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Value*\n12.4"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "`host` web-1 · `errors` 9\n`host` web-2 · `errors` 3"
+        }
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+            "style": "primary"
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme|🟢 High error rate resolved>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "All linked alerts recovered"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nP2"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nResolved"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Stream*\nweb-logs"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Threshold*\n &gt; 5"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Value*\n12.4"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+            "style": "primary"
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "🔴 High error rate firing",
+    "body_markdown": "Error rate above 5\\% for 5 minutes",
+    "fields": {
+      "Level": "P2",
+      "Event": "Firing",
+      "Stream": "web-logs",
+      "Threshold": "> 5",
+      "Value": "12.4",
+      "Time": "2026-11-02 10:05:00 UTC"
+    },
+    "rows": [
+      {
+        "host": "web-1",
+        "errors": 9
+      },
+      {
+        "host": "web-2",
+        "errors": 3
+      }
+    ],
+    "links": [
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": "logs",
+      "stream_name": "web-logs",
+      "alert_name": "High error rate",
+      "alert_type": null,
+      "alert_period": null,
+      "alert_operator": ">",
+      "alert_threshold": "5",
+      "alert_count": null,
+      "alert_agg_value": "12.4",
+      "alert_level": "P2",
+      "alert_status": "firing",
+      "episode_id": "inc_7f3a",
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": "N/A",
+      "alert_end_time": "N/A",
+      "alert_url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+      "alert_trigger_time_str": "2026-11-02 10:05:00",
+      "alert_time": "2026-11-02 10:05:00",
+      "alert_description": "Error rate above 5% for 5 minutes",
+      "kind": "incident",
+      "notification_kind": "incident",
+      "notification_event": "firing",
+      "notification_kind_label": "Incident",
+      "notification_event_label": "Firing",
+      "status_dot": "🔴",
+      "alert_level_label": "P2",
+      "alert_trigger_time_utc": "2026-11-02 10:05:00 UTC",
+      "cluster_name": "o2-acme",
+      "alert_start_time_millis": "N/A",
+      "alert_end_time_millis": "N/A",
+      "alert_trigger_time": "1793613900000000",
+      "alert_trigger_time_millis": "1793613900000",
+      "alert_trigger_time_seconds": "1793613900",
+      "alert_promql_operator": null,
+      "alert_promql_value": null,
+      "host": [
+        "web-1",
+        "web-2"
+      ],
+      "errors": [
+        "9",
+        "3"
+      ],
+      "incident_id": "inc_7f3a",
+      "incident_title": "High error rate on web-logs",
+      "incident_event": "new_incident_created",
+      "incident_severity": "P2",
+      "incident_service": "checkout",
+      "incident_url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme"
+    }
+  },
+  "email_firing": {
+    "subject": "🔴 High error rate firing",
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 High error rate firing</h2><div style=\"margin:16px 0;color:#202124;\"><p>Error rate above 5% for 5 minutes</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Level</td><td style=\"padding:4px 0;color:#202124;\">P2</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Stream</td><td style=\"padding:4px 0;color:#202124;\">web-logs</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Threshold</td><td style=\"padding:4px 0;color:#202124;\">&gt; 5</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Value</td><td style=\"padding:4px 0;color:#202124;\">12.4</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><th align=\"left\" style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#5F6368;font-weight:600;\">host</th><th align=\"left\" style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#5F6368;font-weight:600;\">errors</th></tr><tr><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">web-1</td><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">9</td></tr><tr><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">web-2</td><td style=\"padding:6px 12px 6px 0;border-bottom:1px solid #DADCE0;color:#202124;\">3</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔴 High error rate firing\n\nError rate above 5% for 5 minutes\n\nLevel: P2\nEvent: Firing\nStream: web-logs\nThreshold: > 5\nValue: 12.4\nTime: 2026-11-02 10:05:00 UTC\n\nhost: web-1 | errors: 9\nhost: web-2 | errors: 3\n\nView in OpenObserve: https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme\n\nSent by OpenObserve."
+  },
+  "sns_firing": {
+    "subject": "🔴 High error rate firing",
+    "message": "🔴 High error rate firing\n\nError rate above 5% for 5 minutes\n\nLevel: P2\nEvent: Firing\nStream: web-logs\nThreshold: > 5\nValue: 12.4\nTime: 2026-11-02 10:05:00 UTC\n\nhttps://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme"
+  }
+}

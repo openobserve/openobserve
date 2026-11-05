@@ -455,6 +455,28 @@ describe("AnalyticsOverview", () => {
     expect(useProductAnalytics().state.datetime.relativeTimePeriod).toBe("30d");
   });
 
+  it.each([
+    ["30d", true],
+    ["90d", true],
+    ["1d", false],
+    ["15m", false],
+  ])("empty state at period %s hides the widen action: %s", async (period, hidden) => {
+    routes = [
+      [/va_rows/, [{ ...SUMMARY, sessions: 0 }]],
+      [/AS app, COUNT/, [{ app: "web", sessions: 0 }]],
+    ];
+    respond();
+    await mountOverview();
+    useProductAnalytics().setScope({
+      datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+    });
+    await flushPromises();
+    expect(wrapper!.find('[data-test="rum-analytics-overview-empty"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-overview-widen-range-btn"]').exists()).toBe(
+      !hidden,
+    );
+  });
+
   it("explains missing click tracking while pages still render (AC-8)", async () => {
     routes = baseRoutes().map(([re, v]) =>
       String(re) === String(/AS clicks/) ? [re, []] : [re, v],

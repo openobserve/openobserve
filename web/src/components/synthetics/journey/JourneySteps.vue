@@ -193,7 +193,7 @@ function stepDetail(row: TData): string {
 // ── Status dot rendering ───────────────────────────────────────────
 function dotClass(state: StepDotState | undefined): string {
   if (!state) {
-    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-secondary text-text-secondary text-xs font-semibold";
   }
   switch (state) {
     case "active":

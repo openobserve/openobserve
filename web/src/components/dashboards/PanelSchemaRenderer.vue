@@ -2620,7 +2620,7 @@ export default defineComponent({
       const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
 
       // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
-      await ensureDrilldownSchema(qi);
+      await ensureDrilldownSchema(qi, true);
 
       const cell = getCellDrilldownField(qi, alias);
       const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
@@ -2742,6 +2742,8 @@ export default defineComponent({
       cellDrawer,
       onCellSendToAiChat,
       exploreCellInLogs,
+      ensureDrilldownSchema,
+      panelBaseWhere,
       onCellDrawerOpenChange,
       exemplarsEligible,
       exemplarsEnabled,

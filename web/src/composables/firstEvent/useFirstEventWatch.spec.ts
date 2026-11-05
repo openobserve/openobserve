@@ -94,6 +94,7 @@ interface WatchOpts {
   filter?: string;
   match?: "exact" | "keyword";
   autoDiagnosis?: boolean;
+  diagnosisAtMs?: number;
 }
 const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
   scope = effectScope();
@@ -105,6 +106,7 @@ const watchOf = (signal?: StreamSignal, opts: WatchOpts = {}) => {
       filter: ref(opts.filter),
       match: ref(opts.match),
       ...(opts.autoDiagnosis === undefined ? {} : { autoDiagnosis: ref(opts.autoDiagnosis) }),
+      ...(opts.diagnosisAtMs === undefined ? {} : { diagnosisAtMs: ref(opts.diagnosisAtMs) }),
     }),
   )!;
 };
@@ -1508,6 +1510,17 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.state.value).toBe("waiting");
     expect(w.diagnosis.value).toBeUndefined();
     expect(probeCalls()).toBeGreaterThan(100);
+  });
+
+  it("waits the caller's longer delay before its first automatic read (coding-agent tab)", async () => {
+    const w = watchOf("logs", { diagnosisAtMs: 15 * 60_000 });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(14 * 60_000);
+    expect(recentRejections).not.toHaveBeenCalled();
+    expect(w.state.value).toBe("waiting");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
+    expect(w.diagnosis.value).toMatchObject({ trigger: "auto" });
   });
 
   it("stops every request once data is received", async () => {

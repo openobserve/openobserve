@@ -130,6 +130,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     cooldown_mins: cooldownMins ?? 0,
 
     destinations: notifications.destinations,
+    template: check.template ?? null,
 
     variables: (variables ?? []).map(({ id: _id, name, value, secure, example }) => ({
       name,
@@ -258,6 +259,7 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
     cooldown_mins: check.cooldownMins ?? 0,
 
     destinations: check.notifications.destinations,
+    template: check.template ?? null,
 
     variables: (check.variables ?? []).map(({ name, value, secure, example }) => ({
       name,
@@ -378,6 +380,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     wait_before_retry_secs,
     alert_if_fails,
     cooldown_mins,
+    template,
     target,
     folder_id,
     variables,
@@ -408,6 +411,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     notifications: {
       destinations: destinations ?? [],
     },
+    template: (template as string | null | undefined) ?? null,
 
     retries: retries ?? 0,
     waitBeforeRetrySecs: wait_before_retry_secs ?? 5,

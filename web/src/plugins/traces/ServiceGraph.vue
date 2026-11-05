@@ -1631,6 +1631,14 @@ export default defineComponent({
           edges,
         };
 
+        // The side panel reads the clicked node's numbers, so it follows the refreshed node or closes when the node is gone.
+        const selectedId = selectedNode.value?.id;
+        if (selectedId) {
+          const refreshed = nodes.find((n: any) => n.id === selectedId);
+          if (refreshed) selectedNode.value = refreshed;
+          else handleCloseSidePanel();
+        }
+
         // Calculate stats
         const totalRequests = graphData.value.edges.reduce(
           (sum: number, e: any) => sum + e.total_requests,

@@ -88,6 +88,10 @@ pub enum FolderError {
     #[error("{0}")]
     DeleteFleet(String),
 
+    /// A fleet holds collectors or live tokens, which the refusal counts.
+    #[error("{0}")]
+    FleetInUse(String, config::meta::fleet::References),
+
     /// A fleet's revisions kept changing while it was being deleted.
     #[error("{0}")]
     FleetChanged(String),
@@ -490,6 +494,9 @@ async fn delete_fleet(org_id: &str, folder_id: &str) -> Result<(), FolderError> 
     Err(match e.downcast_ref::<FleetError>() {
         Some(FleetError::FleetNotFound(_)) => FolderError::NotFound,
         Some(FleetError::Invalid(message)) => FolderError::DeleteFleet(message.clone()),
+        Some(FleetError::FleetInUse(_, references)) => {
+            FolderError::FleetInUse(e.to_string(), references.clone())
+        }
         Some(FleetError::RolloutState { .. }) => {
             FolderError::FleetChanged(format!("fleet {folder_id} is changing; retry"))
         }

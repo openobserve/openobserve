@@ -122,6 +122,7 @@ describe("AppAnalytics shell", () => {
     replaceSpy = vi.spyOn(router, "replace");
     setSavedDateSpy = vi.fn();
     wrapper = mount(keepAlive ? KeptAliveRoot : { template: "<router-view />" }, {
+      attachTo: document.body,
       global: {
         plugins: [router, store],
         stubs: {
@@ -133,7 +134,6 @@ describe("AppAnalytics shell", () => {
           ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
         },
       },
-      attachTo: document.body,
     });
     await flushPromises();
     await flushPromises();
@@ -164,7 +164,13 @@ describe("AppAnalytics shell", () => {
     ]);
   });
 
+  const defaultWidth = window.innerWidth;
+  beforeEach(() => {
+    window.innerWidth = 1600;
+  });
+
   afterEach(() => {
+    window.innerWidth = defaultWidth;
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
@@ -429,6 +435,86 @@ describe("AppAnalytics shell", () => {
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.overview);
     expect(router.currentRoute.value.query.app).toBe("web");
     expect(router.currentRoute.value.query.period).toBe("7d");
+  });
+
+  describe("header filters by page width (#3268)", () => {
+    const FILTER = '[data-test="rum-analytics-app-select"], [data-test="rum-analytics-app-label"]';
+
+    it("keeps the filters inline in the header actions on a wide page, with no band", async () => {
+      await mountAt("/product-analytics/overview?app=web&period=7d");
+      const header = wrapper!.find(".app-page-header");
+      const host = header.find('[data-test="rum-analytics-filters"]');
+      expect(host.classes()).toContain("contents");
+      expect(host.find(FILTER).exists()).toBe(true);
+    });
+
+    it("renders the filters as a wrapping band in the body on a narrow page, none in the header", async () => {
+      window.innerWidth = 1000;
+      await mountAt("/product-analytics/overview?app=web&period=7d");
+      const band = wrapper!.find('[data-test="rum-analytics-filters"]');
+      expect(band.classes()).toContain("flex-wrap");
+      expect(band.find(FILTER).exists()).toBe(true);
+      const header = wrapper!.find(".app-page-header");
+      expect(header.find(FILTER).exists()).toBe(false);
+      expect(header.find('[data-test="rum-analytics-date-picker"]').exists()).toBe(true);
+      expect(wrapper!.findAll(FILTER)).toHaveLength(1);
+    });
+
+    it("hides the band on a narrow page when there is nothing to filter", async () => {
+      window.innerWidth = 1000;
+      usePerformance().performanceState.data.streams._rumdata = { name: "_rumdata", schema: {} };
+      respond([[/AS app, COUNT/, []]]);
+      await mountAt("/product-analytics/overview");
+      const band = wrapper!.find('[data-test="rum-analytics-filters"]');
+      expect(band.element.childElementCount).toBe(0);
+      expect(band.classes()).toContain("empty:hidden");
+    });
+
+    it("follows the page container width, keeps the same filter nodes across the cutoff and ignores a zero width", async () => {
+      let width = 1500;
+      const observers: ((entries: unknown[]) => void)[] = [];
+      const notify = () => observers.forEach((cb) => cb([]));
+      const page = {
+        get clientWidth() {
+          return width;
+        },
+      };
+      const originalRO = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class {
+        constructor(cb: (entries: unknown[]) => void) {
+          observers.push(cb);
+        }
+        observe() {}
+        disconnect() {}
+      } as never;
+      const closest = vi
+        .spyOn(HTMLElement.prototype, "closest")
+        .mockImplementation(((sel: string) =>
+          String(sel).includes("@container/page") ? page : null) as never);
+      try {
+        await mountAt("/product-analytics/overview?app=web&period=7d");
+        const header = () => wrapper!.find(".app-page-header");
+        const node = wrapper!.find(FILTER).element;
+        expect(header().find(FILTER).exists()).toBe(true);
+        width = 1100;
+        notify();
+        await flushPromises();
+        expect(header().find(FILTER).exists()).toBe(false);
+        expect(wrapper!.find(FILTER).element).toBe(node);
+        width = 0;
+        notify();
+        await flushPromises();
+        expect(header().find(FILTER).exists()).toBe(false);
+        width = 1500;
+        notify();
+        await flushPromises();
+        expect(header().find(FILTER).exists()).toBe(true);
+        expect(wrapper!.find(FILTER).element).toBe(node);
+      } finally {
+        closest.mockRestore();
+        globalThis.ResizeObserver = originalRO;
+      }
+    });
   });
 
   it("states data through on the refresh tooltip and the SDK sampling caveat beside the title (AC-54)", async () => {

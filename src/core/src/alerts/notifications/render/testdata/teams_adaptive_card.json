@@ -1,36 +1,28 @@
 {
+  "type": "message",
   "attachments": [
     {
+      "contentType": "application/vnd.microsoft.card.adaptive",
+      "contentUrl": null,
       "content": {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-        "actions": [
-          {
-            "title": "Runbook",
-            "type": "Action.OpenUrl",
-            "url": "https://rb.example/x"
-          },
-          {
-            "style": "positive",
-            "title": "View in OpenObserve",
-            "type": "Action.OpenUrl",
-            "url": "https://o2.example/short/abc"
-          }
-        ],
+        "type": "AdaptiveCard",
+        "version": "1.4",
         "body": [
           {
-            "color": "attention",
-            "size": "Large",
+            "type": "TextBlock",
             "text": "CPU \"high\" & <fire> on web-1",
-            "type": "TextBlock",
             "weight": "Bolder",
+            "size": "Large",
             "wrap": true
           },
           {
-            "text": "Value 92.5 exceeded 80 — see runbook\n\n<script>alert(1)</script>",
             "type": "TextBlock",
+            "text": "Value 92.5 exceeded 80 — see runbook\n\n<script>alert(1)</script>",
             "wrap": true
           },
           {
+            "type": "FactSet",
             "facts": [
               {
                 "title": "host",
@@ -40,21 +32,28 @@
                 "title": "cpu",
                 "value": "92.5"
               }
-            ],
-            "type": "FactSet"
+            ]
           },
           {
-            "text": "host: web-1 · cpu: 92.5",
             "type": "TextBlock",
+            "text": "host: web-1 · cpu: 92.5",
             "wrap": true
           }
         ],
-        "type": "AdaptiveCard",
-        "version": "1.4"
-      },
-      "contentType": "application/vnd.microsoft.card.adaptive",
-      "contentUrl": null
+        "actions": [
+          {
+            "type": "Action.OpenUrl",
+            "title": "Runbook",
+            "url": "https://rb.example/x"
+          },
+          {
+            "type": "Action.OpenUrl",
+            "title": "View in OpenObserve",
+            "url": "https://o2.example/short/abc",
+            "style": "positive"
+          }
+        ]
+      }
     }
-  ],
-  "type": "message"
+  ]
 }

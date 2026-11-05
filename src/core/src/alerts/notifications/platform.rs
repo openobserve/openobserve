@@ -85,6 +85,17 @@ pub fn stamp_key(
     Ok(value.to_string())
 }
 
+/// The prefix of a resolve answer that found no open record for the key.
+pub const NOTHING_TO_CLOSE: &str = "nothing to close";
+
+/// A non 2xx platform answer; the text is what the alert recovery logged before.
+#[derive(Debug, thiserror::Error)]
+#[error("status {status}{}", body.as_deref().map(|b| format!(": {b}")).unwrap_or_default())]
+pub struct PlatformRejected {
+    pub status: reqwest::StatusCode,
+    pub body: Option<String>,
+}
+
 /// Close whatever the firing opened; ServiceNow needs two, updating only by `sys_id`.
 pub async fn send_resolve(
     platform: Platform,
@@ -141,9 +152,10 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
         .iter()
         .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
         .collect();
+    // A resolve of a key that opened nothing, or closed already, is done (D8).
     if sys_ids.is_empty() {
-        return Err(anyhow::anyhow!(
-            "no open incident carries correlation_id {episode_id}"
+        return Ok(format!(
+            "{NOTHING_TO_CLOSE}: no open incident carries correlation_id {episode_id}"
         ));
     }
 
@@ -229,10 +241,12 @@ async fn request(
     let text = resp.text().await.unwrap_or_default();
     if status.is_success() {
         Ok(text)
-    } else if hide_body {
-        Err(anyhow::anyhow!("status {status}"))
     } else {
-        Err(anyhow::anyhow!("status {status}: {text}"))
+        Err(PlatformRejected {
+            status,
+            body: (!hide_body).then_some(text),
+        }
+        .into())
     }
 }
 
