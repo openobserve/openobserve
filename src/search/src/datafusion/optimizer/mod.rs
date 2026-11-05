@@ -182,15 +182,6 @@ pub fn generate_optimizer_rules(
     // PushDownLimit
     rules.push(Arc::new(PushDownLimit::new()));
     rules.push(Arc::new(PushDownFilter::new()));
-    // after PushDownFilter, which moves a filter below aliases so its columns name the table
-    if req.use_index
-        && cfg.search.inverted_index_enabled
-        && cfg.search.inverted_index_like_optimizer_enabled
-    {
-        rules.push(Arc::new(RewriteLikeToStrMatch::new(stream_index_fields(
-            sql,
-        ))));
-    }
     rules.push(Arc::new(SingleDistinctToGroupBy::new()));
     // The previous optimizations added expressions and projections,
     // that might benefit from the following rules
@@ -202,15 +193,24 @@ pub fn generate_optimizer_rules(
     rules.push(Arc::new(OptimizeProjections::new()));
 
     // *********** custom rules ***********
+    // should after PushDownFilter, which moves a filter below aliases so its columns name the table
+    if req.use_index
+        && cfg.search.inverted_index_enabled
+        && cfg.search.inverted_index_like_optimizer_enabled
+    {
+        let index_fields = stream_index_fields(sql);
+        rules.push(Arc::new(RewriteLikeToStrMatch::new(index_fields)));
+    }
+
     // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
     // require the join's on columns, and if filter have join keys, it should be pushed down
-    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows > 0
-    {
-        rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.search.feature_join_right_side_max_rows,
-            sql.stream_type,
-        )));
+    if cfg.search.feature_join_match_one_enabled {
+        let max_rows = cfg.search.feature_join_right_side_max_rows;
+        if max_rows > 0 {
+            rules.push(Arc::new(LimitJoinRightSide::new(max_rows, sql.stream_type)));
+        }
     }
+
     // Must be last so it sees the copies after every pushdown of this pass.
     if cfg.search.feature_shared_cte_enabled {
         rules.push(Arc::new(StripDivergedSharedSubplanRule::new()));
@@ -276,9 +276,8 @@ pub fn generate_physical_optimizer_rules(
 
     // should after remote scan
     if req.use_index {
-        rules.push(Arc::new(LeaderIndexOptimizerRule::new(
-            stream_index_fields(sql),
-        )));
+        let index_fields = stream_index_fields(sql);
+        rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
     }
 
     rules.push(Arc::new(LimitPushdown::new()));
