@@ -1748,6 +1748,7 @@
     "billings": "การเรียกเก็บเงิน",
     "rum": "RUM",
     "settings": "การตั้งค่า",
+    "allSettings": "การตั้งค่าทั้งหมด",
     "iam": "การจัดการสิทธิ์ (IAM)",
     "report": "รายงาน",
     "pipeline": "ไปป์ไลน์ (Pipelines)",

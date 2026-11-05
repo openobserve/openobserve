@@ -47,6 +47,12 @@ const dataGroup = (entries: RailEntry[]) =>
       e.type === "linkGroup" && e.item.name === "data",
   );
 
+const settingsGroup = (entries: RailEntry[]) =>
+  entries.find(
+    (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+      e.type === "linkGroup" && e.item.name === "settings",
+  );
+
 // Infra is standalone — it absorbs nothing, so it appears on every rail rather
 // than only when one of its members is present.
 const infraGroup = (entries: RailEntry[]) =>
@@ -83,8 +89,7 @@ describe("groupNavLinks", () => {
       "link:dashboards",
       "linkGroup:reliability",
       "linkGroup:infra",
-      "link:iam",
-      "link:settings",
+      "linkGroup:settings",
     ]);
   });
 
@@ -545,7 +550,7 @@ describe("groupNavLinks", () => {
     expect(entries.every((e) => e.type === "link" || e.item.name === "infra")).toBe(true);
   });
 
-  it("renders AI / IAM / Management as plain links (no submenu)", () => {
+  it("renders AI as a plain link and folds IAM into the Settings tile", () => {
     const entries = groupNavLinks([
       link("home"),
       link("aiObservability"),
@@ -555,15 +560,24 @@ describe("groupNavLinks", () => {
     expect(keysWithoutInfra(entries)).toEqual([
       "link:home",
       "link:aiObservability",
-      "link:iam",
-      "link:settings",
+      "linkGroup:settings",
     ]);
-    // None of THEM carry a hover submenu anymore (Infra is a group by design,
-    // and is not one of the items under test here).
-    expect(entries.some((e) => e.type === "linkGroup" && e.item.name !== "infra")).toBe(false);
+    const settings = settingsGroup(entries);
+    expect(settings?.item.link).toBe("/settings");
+    expect(settings?.children.map((c) => c.name)).toEqual(["settings", "iam"]);
     // Traces is still the only top-level LINK with a subnav flyout — Infra's
     // flyout comes from NAV_GROUPS, not from a top-level item.
     expect(Object.keys(NAV_SUBNAV)).toEqual(["traces"]);
+  });
+
+  it("keeps Settings the last tile when Cloud inserts Billing between IAM and Settings", () => {
+    const entries = groupNavLinks([link("home"), link("iam"), link("billings"), link("settings")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:billings", "linkGroup:settings"]);
+  });
+
+  it("leaves Settings a plain link when IAM is hidden", () => {
+    const entries = groupNavLinks([link("home"), link("settings")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:settings"]);
   });
 
   it("emits Infra as a link+subnav tile with Hosts declared FIRST", () => {
@@ -756,7 +770,8 @@ describe("groupNavLinks", () => {
     const surfaced = entries.flatMap((e) =>
       e.type === "group" || e.type === "linkGroup" ? [] : [e.item.name],
     );
-    const expectedNonCollapsed = input.map((i) => i.name).filter((n) => n !== "incidentList");
+    const collapsed = new Set(["incidentList", "iam", "settings"]);
+    const expectedNonCollapsed = input.map((i) => i.name).filter((n) => !collapsed.has(n));
     expect(surfaced.sort()).toEqual(expectedNonCollapsed.sort());
 
     const reliability = entries.find(
