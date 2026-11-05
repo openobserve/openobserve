@@ -3043,7 +3043,7 @@ export default defineComponent({
               message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
             await reloadRca();
-          } else {
+          } else if (store.state.zoConfig?.incidents_rca_enabled === true) {
             const reanalysisCost = aiCreditCosts.value?.incident_reanalysis;
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),

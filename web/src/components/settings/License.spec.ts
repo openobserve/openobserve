@@ -8,6 +8,7 @@ import i18n from "@/locales";
 import type { AxiosResponse } from "axios";
 import zo_config from "@/services/config";
 import { LICENSE_BOUNDARY_RETRY_MS, LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
@@ -98,7 +99,7 @@ vi.mock("@/enterprise/components/billings/LicensePeriod.vue", () => ({
   default: {
     name: "LicensePeriod",
     template: '<div data-test="license-period">License Period</div>',
-    emits: ["updateLicense"],
+    emits: ["renew"],
   },
 }));
 
@@ -138,6 +139,7 @@ describe("License.vue", () => {
     },
     ingestion_used: 45.5,
     ingestion_exceeded: 2,
+    can_update_license: true,
   };
 
   const createWrapper = (options = {}) => {
@@ -1600,15 +1602,24 @@ describe("License.vue", () => {
     const mountWith = async (
       license: Record<string, unknown>,
       features: object = configFeatures,
+      response: object = {},
     ) => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({
           ...mockLicenseData,
+          ...response,
           license: { ...mockLicenseData.license, ...license },
         }),
       );
       store = createStore({
-        state: { zoConfig: { license_server_url: "https://license.example.com", features } },
+        state: {
+          zoConfig: {
+            license_server_url: "https://license.example.com",
+            version: "v0.70.0",
+            feature_revision: 1,
+            features,
+          },
+        },
       });
       wrapper = mount(License, {
         global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
@@ -1626,7 +1637,7 @@ describe("License.vue", () => {
       await flushPromises();
     };
     const licenseUrl =
-      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123";
+      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123&o2_version=v0.70.0&feature_revision=1&features=sso";
 
     it("summarises unlocked of paid features and the free count", async () => {
       await mountWith({ features: ["sso"], feature_definition: featureDefinition });
@@ -1670,8 +1681,18 @@ describe("License.vue", () => {
     it("reads 0 of N for an empty features list", async () => {
       await mountWith({ features: [], feature_definition: featureDefinition });
 
-      expect(find("-summary").text()).toContain("0 of 3 paid features");
+      expect(find("-summary").text()).toContain("0 of 2 paid features");
+      expect(items("free-not-included")).toEqual(["sso"]);
       expect(find("-unlocked").exists()).toBe(false);
+    });
+
+    it("passes evaluated_at 0 down, so a stale enabled key stays missing", async () => {
+      await mountWith({ features: [], feature_definition: featureDefinition }, configFeatures, {
+        evaluated_at: 0,
+      });
+
+      expect(find("-free-not-included").exists()).toBe(false);
+      expect(items("missing")).toContain("sso");
     });
 
     it("shows only the all-features summary for a license without a features list", async () => {
@@ -1732,6 +1753,39 @@ describe("License.vue", () => {
       expect(open).toHaveBeenCalledTimes(2);
       for (const call of open.mock.calls) expect(call).toEqual([licenseUrl, "_blank"]);
       open.mockRestore();
+    });
+
+    it("sends no event as a parameter from any request link", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+      await wrapper.find("[data-test=request-new-license-btn]").trigger("click");
+      wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+      expect(open).toHaveBeenCalledTimes(3);
+      for (const [url] of open.mock.calls) {
+        expect([...new URL(String(url)).searchParams.keys()]).toEqual([
+          "base_url",
+          "license_id",
+          "o2_version",
+          "feature_revision",
+          "features",
+        ]);
+      }
+      open.mockRestore();
+    });
+
+    it("hides the action row from a viewer who cannot update the license", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: false }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=request-new-license-btn]").exists()).toBe(false);
+      expect(wrapper.find("[data-test=add-license-key-btn]").exists()).toBe(false);
+      expect(wrapper.find("[data-test=refresh-license-limits-btn]").exists()).toBe(false);
     });
 
     it("lets the masked license key wrap while the reveal button keeps its size", async () => {
@@ -1812,7 +1866,10 @@ describe("License.vue", () => {
         const open = vi.spyOn(window, "open").mockReturnValue(null);
         await find("-request-access").trigger("click");
 
-        expect(open).toHaveBeenCalledWith(licenseUrl, "_blank");
+        expect(open).toHaveBeenCalledWith(
+          licenseUrl.replace("features=sso", "features=ai%2Crbac%2Csso"),
+          "_blank",
+        );
         open.mockRestore();
       });
 
@@ -2062,6 +2119,228 @@ describe("License.vue", () => {
       await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 2);
       expect(errorToasts()).toBe(3);
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe("Applying a key that makes something worse", () => {
+    // Signed with the license test key; all claims are placeholders.
+    const SIGNED_KEY =
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJPcGVuT2JzZXJ2ZSIsInZlcnNpb24iOjIsImluc3RhbGxhdGlvbl9pZCI6Imluc3RfdGVzdCIsImxpY2Vuc2VfaWQiOiJsaWNfdGVzdCIsImFjdGl2ZSI6dHJ1ZSwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMDAwMDAwMCwiZXhwaXJlc19hdCI6NDEwMjQ0NDgwMDAwMDAwMCwibXN2IjoiMC4wLjAiLCJjb21wYW55IjoiVGVzdCBDbyIsImFkZHJlc3MiOiIxIFRlc3QgV2F5IiwiY29udGFjdF9uYW1lIjoiVGVzdCBVc2VyIiwiY29udGFjdF9lbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJhZGRpdGlvbmFsX2VtYWlscyI6W10sImJhc2VfdXJscyI6W10sImxpbWl0cyI6eyJJbmdlc3Rpb24iOnsidHlwIjoiUGVyRGF5Q291bnQiLCJ2YWx1ZSI6MTAwfX0sImNvbXBhbnlfaWQiOiIiLCJlbnZpcm9ubWVudF90eXBlIjoiYWlyZ2FwcGVkIiwibGltaXRfYnJlYWNoX2FsbG93ZWRfY291bnQiOjMsImFsbG93X3NlYXJjaF9hZnRlcl9saW1pdF9leGNlZWRlZCI6ZmFsc2UsInZhbGlkYXRvcl91cmwiOiIiLCJ2YWxpZGF0b3JfYXV0aCI6IiIsIm5vX3VzYWdlX3JlcG9ydF9hbGxvd2VkX2R1cmF0aW9uIjo2MDQ4MDAwMDAwMDAsImZlYXR1cmVzIjpbImFpX2Fzc2lzdGFudCJdLCJmZWF0dXJlX2RlZmluaXRpb24iOnsidmVyc2lvbiI6IjEiLCJyZWxlYXNlIjoidGVzdCIsImZlYXR1cmVzIjp7ImFpX2Fzc2lzdGFudCI6eyJkaXNwbGF5X25hbWUiOiJBSSBBc3Npc3RhbnQiLCJnYXRlIjp0cnVlfSwib25jYWxsIjp7ImRpc3BsYXlfbmFtZSI6Ik9uLUNhbGwiLCJnYXRlIjp0cnVlfSwiYWxlcnRzIjp7ImRpc3BsYXlfbmFtZSI6IkFsZXJ0cyIsImdhdGUiOmZhbHNlfX19fQ.k_brgZLB6lFm7Of456aYnKMSQSEnZgzv2ISIMN6sIy2ws5drROQ-suCq4GilBY4Liuo9L36EqxjOzFWFDrd7V42uoYaKDFR8i9swOpkuvkji7OUwqp2_2mNV7S7rp1Vq9fSWWfNRkyanHRnqfjD0H7-6heNf9GEghZ6bWqK00lgtocvsmbj4RpRzFoytSIVbG_SF5Jb8wj22-4ODZeUkDt_9p2d7DKjXt94EUGOZ0plAF2Dmam3R0sMct7c0XY8SYcGbb5vqPpLdLX9oTbmHpNu56tGQxSRYiqJtXj1kxjudg-UqCI_8zi8SDivWIL79xDIRVxGWdXHsJMqTViEnsA";
+    const { currentDialog, handleCancel, handleConfirm } = useConfirmDialog();
+
+    const b64url = (claims: object) => btoa(JSON.stringify(claims)).replace(/=+$/, "");
+    const keyWith = (claims: object) => `eyJhbGciOiJSUzI1NiJ9.${b64url(claims)}.c2lnbmF0dXJl`;
+    const lines = () => currentDialog.value?.lines?.map(String);
+
+    const mountCurrent = async (license: Record<string, unknown> | null) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, license }),
+      );
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      store = createStore({
+        state: {
+          zoConfig: {
+            license_server_url: "https://license.example.com",
+            feature_names: { oncall: "On-Call", ai_assistant: "AI Assistant" },
+            features: {},
+          },
+        },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    };
+
+    const allFeatures = {
+      ...mockLicenseData.license,
+      expires_at: 4200000000000000,
+      limits: { Ingestion: { typ: "Unlimited", value: 0 } },
+    };
+
+    afterEach(() => handleCancel());
+
+    it("decodes a real signed key and names every loss in a destructive dialog", async () => {
+      await mountCurrent(allFeatures);
+
+      void wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+
+      expect(currentDialog.value).toMatchObject({
+        title: "Apply this license key?",
+        message: "This key replaces your current license.",
+        linesDataTest: "license-key-losses",
+        confirmLabel: "Yes, update license",
+        cancelLabel: "No, keep current",
+        confirmVariant: "destructive",
+        focusCancel: true,
+      });
+      const date = (us: number) =>
+        new Date(us / 1000).toLocaleDateString("en-us", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      expect(lines()).toEqual([
+        "You will lose: On-Call",
+        "Daily limit goes from Unlimited to 100 GB/day",
+        `Expiry moves from ${date(4200000000000000)} to ${date(4102444800000000)}`,
+      ]);
+    });
+
+    it("cancel sends no POST and leaves the form", async () => {
+      await mountCurrent(allFeatures);
+      wrapper.vm.showUpdateForm = true;
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      handleCancel();
+      await applying;
+
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+
+      void wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      expect(currentDialog.value).not.toBeNull();
+    });
+
+    it("confirm sends the POST", async () => {
+      await mountCurrent(allFeatures);
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+      await flushPromises();
+      handleConfirm();
+      await applying;
+
+      expect(licenseServer.update_license).toHaveBeenCalledWith(SIGNED_KEY);
+    });
+
+    it("an upgrade sends the POST with no dialog", async () => {
+      await mountCurrent({
+        ...mockLicenseData.license,
+        expires_at: 1000,
+        features: ["ai_assistant"],
+        limits: { Ingestion: { typ: "PerDayCount", value: 50 } },
+      });
+
+      await wrapper.vm.updateLicense({ licenseKey: SIGNED_KEY });
+
+      expect(currentDialog.value).toBeNull();
+      expect(licenseServer.update_license).toHaveBeenCalledWith(SIGNED_KEY);
+    });
+
+    it("warns about an expired first key", async () => {
+      await mountCurrent(null);
+      const expiredKey = keyWith({ expires_at: 1000000000000000 });
+
+      const applying = wrapper.vm.updateLicense({ licenseKey: expiredKey });
+      await flushPromises();
+
+      expect(lines()).toEqual([
+        expect.stringMatching(/^This key expired on .* The free limit of 50 GB\/day will apply\.$/),
+      ]);
+      handleConfirm();
+      await applying;
+      expect(licenseServer.update_license).toHaveBeenCalledWith(expiredKey);
+    });
+
+    it.each([
+      ["no separators", "not-a-key"],
+      ["a payload that is not base64", "a.%%.c"],
+      ["a payload that is not JSON", `a.${btoa("nope")}.c`],
+      ["a payload of null", `a.${btoa("null")}.c`],
+      ["features that are not a list", `a.${btoa('{"features":"x","expires_at":1}')}.c`],
+    ])("skips the dialog for %s and lets the server answer", async (_name, key) => {
+      await mountCurrent(allFeatures);
+
+      await wrapper.vm.updateLicense({ licenseKey: key });
+
+      expect(currentDialog.value).toBeNull();
+      expect(licenseServer.update_license).toHaveBeenCalledWith(key);
+    });
+  });
+
+  describe("Expired Unlimited license", () => {
+    it("is not reported as unlimited", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          expired: true,
+          license: {
+            ...mockLicenseData.license,
+            limits: { Ingestion: { typ: "Unlimited", value: 0 } },
+          },
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isIngestionUnlimited).toBe(false);
+    });
+  });
+
+  describe("Usage chart limit line", () => {
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 0,
+      allowed_days: 3,
+      limit_today_gb: null,
+      used_today_gb: 0,
+      waiver_ids_applied: [],
+    };
+    const limitLine = async (typ: string, value: number, expired: boolean) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          key: "anonymised-key",
+          license: { ...mockLicenseData.license, limits: { Ingestion: { typ, value } } },
+          installation_id: "inst_test",
+          expired,
+          ingestion_used: 0,
+          ingestion_exceeded: 0,
+          waivers: [],
+          decision,
+          base: decision,
+          evaluated_at: 0,
+          env_key_active: false,
+          env_key_in_use: false,
+          can_update_license: true,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      return wrapper.vm.usageDashboardData.tabs[0].panels[0].config.mark_line.map(
+        (line: { value: number }) => line.value,
+      );
+    };
+
+    it.each([
+      ["a live 200 GB key at its own limit", "PerDayCount", 200, false, [204800]],
+      ["an expired 200 GB key at the free limit", "PerDayCount", 200, true, [51200]],
+      ["an expired Unlimited key at the free limit", "Unlimited", 0, true, [51200]],
+      ["a live Unlimited key without a line", "Unlimited", 0, false, []],
+    ])("draws %s", async (_name, typ, value, expired, expected) => {
+      expect(await limitLine(typ, value, expired)).toEqual(expected);
+    });
+
+    it("says the same limit in the summary as the line draws for an expired key", async () => {
+      expect(await limitLine("Unlimited", 0, true)).toEqual([51200]);
+
+      expect(wrapper.text()).toContain("50 GB of data ingestion per day");
+    });
+
+    it("places the line in the panel's megabytes and labels it in GB", async () => {
+      await limitLine("PerDayCount", 200, false);
+
+      const panel = wrapper.vm.usageDashboardData.tabs[0].panels[0];
+      expect(panel.config.unit).toBe("megabytes");
+      expect(panel.config.mark_line[0]).toMatchObject({
+        value: 200 * 1024,
+        label_formatter: "{b}:200 GB",
+      });
     });
   });
 

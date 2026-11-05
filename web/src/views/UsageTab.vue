@@ -25,10 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gap below only appears when a banner is actually shown. -->
       <div class="flex shrink-0 flex-col gap-2 not-empty:mb-3 empty:hidden">
         <TrialPeriod></TrialPeriod>
-        <LicensePeriod
-          v-if="!showUsageReportBanner"
-          @update-license="goToLicensePage"
-        ></LicensePeriod>
+        <LicensePeriod v-if="!showUsageReportBanner" @renew="goToLicensePage"></LicensePeriod>
         <UsageReportBanner></UsageReportBanner>
         <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
       </div>
@@ -516,10 +513,12 @@ import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { useLicensePage } from "@/composables/useLicensePage";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const { goToLicensePage } = useLicensePage();
 const { isLocked, lockedReason } = useLicenseLocks();
 
 const viewLabel = (feature: string) =>
@@ -919,10 +918,6 @@ const pipelinesPanelData = computed(() => {
     ],
   };
 });
-
-const goToLicensePage = () => {
-  router.push({ name: "license" });
-};
 
 const formattedAnimatedEventsCount = computed(() => {
   return animatedEventsCount.value > 0

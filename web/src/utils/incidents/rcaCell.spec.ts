@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Incident, RcaSummary } from "@/services/incidents";
-import { gt } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 import { isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
@@ -398,6 +398,41 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
   it.each(cases)("%s", (_name, row, rcaEnabled, expected) => {
     const model = rcaCellModel(row, { rcaEnabled, now: NOW });
     expect(model).toMatchObject(expected);
+  });
+
+  it("names the license lock in place of RCA disabled", () => {
+    const row = { rca: null, rca_off_reason: "l0_off", severity: "P4" } as Row;
+    const lockedReason = raw("Locked: needs AI Assistant");
+
+    const model = rcaCellModel(row, { rcaEnabled: false, lockedReason, now: NOW });
+
+    expect(model).toMatchObject({
+      kind: "state",
+      label: "Locked: needs AI Assistant",
+      tone: "muted",
+      locked: true,
+      showAnalyzeOnHover: false,
+    });
+    expect(rcaCellModel(row, { rcaEnabled: false, now: NOW })).toMatchObject({
+      label: "RCA disabled",
+      locked: false,
+    });
+  });
+
+  it("ignores the lock reason while RCA is on and for a past run", () => {
+    const lockedReason = raw("Locked: needs AI Assistant");
+
+    expect(
+      rcaCellModel(
+        { rca: null, rca_off_reason: null, severity: "P2" },
+        { rcaEnabled: true, lockedReason, now: NOW },
+      ).kind,
+    ).toBe("analyze");
+    const past = { rca: rca({ state: "failed" }), severity: "P2" } as Row;
+    expect(rcaCellModel(past, { rcaEnabled: false, lockedReason, now: NOW })).toMatchObject({
+      label: "Failed",
+      locked: false,
+    });
   });
 
   it("shows persisted progress instead of elapsed time once the stage is known", () => {

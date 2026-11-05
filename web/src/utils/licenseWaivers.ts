@@ -154,6 +154,14 @@ export function formatUtc(us: number, locale: string, withTime: boolean): string
   }).format(new Date(us / 1000));
 }
 
+export function formatLicenseDay(us: number, locale: string): string {
+  return new Date(us / 1000).toLocaleDateString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function quotaPercent(d: LicenseDecision): number | null {
   if (d.limit_today_gb == null || d.limit_today_gb <= 0) return null;
   return Math.round((d.used_today_gb / d.limit_today_gb) * 100);
