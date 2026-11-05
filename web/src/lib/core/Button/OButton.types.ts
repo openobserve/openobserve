@@ -116,6 +116,8 @@ export interface ButtonProps extends PrimitiveProps {
   descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
+  /** `false` keeps the busy state but never spins, for a control whose region already shows one spinner. */
+  spinner?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
   active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */

@@ -37,6 +37,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "./OTable.types";
 import { raw } from "@/types/i18n";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 
 interface TestRow {
   id: number;
@@ -52,6 +53,13 @@ function makeColumns(): OTableColumnDef<TestRow>[] {
     { id: "email", header: "Email", accessorKey: "email", size: 250 },
     { id: "status", header: "Status", accessorKey: "status", size: 100 },
   ];
+}
+
+// Region loaders (skeleton, progress line) appear only once a load outlasts LOADER_DELAY_MS; needs fake timers.
+async function passLoaderDelay(): Promise<void> {
+  await nextTick();
+  vi.advanceTimersByTime(LOADER_DELAY_MS);
+  await nextTick();
 }
 
 function makeRows(count: number = 10): TestRow[] {
@@ -1200,7 +1208,8 @@ describe("OTable", () => {
   // ── Loading State ──────────────────────────────────────────
 
   describe("loading state", () => {
-    it("shows loading when loading is true and no rows", () => {
+    it("shows loading when loading is true and no rows", async () => {
+      vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: {
           data: [],
@@ -1208,6 +1217,8 @@ describe("OTable", () => {
           loading: true,
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       // OTableLoading renders a skeleton tbody with data-test="o2-table-skeleton-body"
       expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
@@ -2453,7 +2464,8 @@ describe("OTable", () => {
   // ── Streaming Indicator ─────────────────────────────────────
 
   describe("streaming", () => {
-    it("shows streaming indicator when streaming with data", () => {
+    it("shows streaming indicator when streaming with data", async () => {
+      vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: {
           data: makeRows(3),
@@ -2461,6 +2473,8 @@ describe("OTable", () => {
           streaming: true,
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
     });
 
@@ -2495,7 +2509,8 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
 
-    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", () => {
+    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", async () => {
+      vi.useFakeTimers();
       // An empty slot still counts as "provided" — consumers can opt out of the default banner entirely.
       wrapper = mount(OTable, {
         props: {
@@ -2507,6 +2522,8 @@ describe("OTable", () => {
           "loading-banner": "",
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       expect(wrapper.findAll('[data-test="o2-table-loading-banner"]').length).toBe(0);
       expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
     });
@@ -3133,6 +3150,7 @@ describe("OTable", () => {
 
   describe("data refresh", () => {
     it("shows skeleton body when loading is true while data exists", async () => {
+      vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: {
           data: makeRows(5),
@@ -3140,13 +3158,16 @@ describe("OTable", () => {
           loading: true,
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       // When loading=true, heldLoading activates and the skeleton replaces rows
       expect(wrapper.find('[data-test="o2-table"]').exists()).toBe(true);
       // OTableLoading (skeleton) is shown instead of actual rows
       expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
-    it("shows skeleton body when loading with no data", () => {
+    it("shows skeleton body when loading with no data", async () => {
+      vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: {
           data: [],
@@ -3154,6 +3175,8 @@ describe("OTable", () => {
           loading: true,
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       // OTableLoading skeleton renders inside the table with data-test="o2-table-skeleton-body"
       expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
@@ -3295,6 +3318,7 @@ describe("OTable", () => {
     });
 
     it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
+      vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: {
           data: [],
@@ -3305,6 +3329,8 @@ describe("OTable", () => {
           loading: true,
         },
       });
+      await passLoaderDelay();
+      vi.useRealTimers();
       await wrapper.setProps({ data: makeRows(20), loading: false });
       await nextTick();
       await nextTick();

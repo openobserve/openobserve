@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="xs"
             :disabled="searchObj.loading"
+            focusable-unavailable
             @click="$emit('drill-down')"
           >
             <template #icon-left>
@@ -92,6 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
             <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
           </OButton>
+          <span
+            v-else-if="drillDownSlot"
+            class="invisible inline-flex"
+            aria-hidden="true"
+            inert
+            data-test="insights-button-placeholder"
+          >
+            <OButton variant="outline" size="xs" tabindex="-1">
+              <template #icon-left>
+                <OIcon name="timeline" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
+            </OButton>
+          </span>
 
           <!-- Show search controls only when not on Service Graph or Services Catalog -->
           <template
@@ -321,10 +336,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-all="openRecentSearches"
           />
           <div>
-            <div class="flex items-center">
+            <div ref="runControlRef" class="flex items-center">
               <OButton
                 v-if="config.isEnterprise == 'true' && isLoading"
                 variant="ghost"
+                aria-busy="true"
                 data-test="traces-search-bar-cancel-btn"
                 :title="t('search.cancel')"
                 class="bg-cancel-query-bg! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
@@ -630,10 +646,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @example="applyRecentExample"
           @dismiss="dismissRecentFocus"
         />
+        <!-- Until the stream loads, a query from the link or a saved view may still arrive, so nothing types first. -->
         <div
           v-if="
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
+            !searchObj.loadingStream &&
             !recentFocusOpen &&
             !nlpMode
           "
@@ -1341,7 +1359,10 @@ export default defineComponent({
     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
     const _traceFieldValues = computed(() => props.fieldValues ?? {});
     const _traceSqlMode = computed(() => false);
-    const _traceNoStream = computed(() => !searchObj.data.stream.selectedStream?.value);
+    // The typewriter keeps typing while hidden, so "Select a stream first" must not start before the stream list could pick one.
+    const _traceNoStream = computed(
+      () => !searchObj.loadingStream && !searchObj.data.stream.selectedStream?.value,
+    );
     const { placeholder: traceEditorPlaceholder } = useQueryPlaceholder(
       _traceStreamFields,
       _traceFieldValues,
@@ -1526,7 +1547,22 @@ export default defineComponent({
     };
 
     // Responsive toolbar — shared composable tracks available left-section width
-    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive({
+      keepWidthWhenDetached: true,
+    });
+
+    // Run and Cancel swap elements, so focus follows the swap instead of dropping to the page.
+    const runControlRef = ref<HTMLElement | null>(null);
+    watch(
+      () => props.isLoading,
+      async () => {
+        const control = runControlRef.value;
+        if (!control || !control.contains(document.activeElement)) return;
+        await nextTick();
+        control.querySelector<HTMLElement>("button")?.focus();
+      },
+      { flush: "pre" },
+    );
     const { lgUp } = useBreakpoint();
     const { isPinned, togglePin } = useToolbarPins("traces");
 
@@ -1554,6 +1590,11 @@ export default defineComponent({
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,
     );
+    const drillDownSlot = computed(
+      () =>
+        isSearchMode.value &&
+        (searchObj.loadingStream || searchObj.data.stream.streamLists.length > 0),
+    );
     const serviceGraphAccess = useLockedAffordance("enterprise");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
@@ -1570,7 +1611,7 @@ export default defineComponent({
       tracesToolbarLayout({
         available: availableLeftWidth.value,
         serviceGraph: serviceGraphAccess.value.visible,
-        drillDown: showDrillDown.value,
+        drillDown: drillDownSlot.value,
         reset: isSearchMode.value,
         pinnedWidth: pinnedGroupWidth.value,
       }),
@@ -1655,10 +1696,12 @@ export default defineComponent({
       traceEditorPlaceholder,
       toolbarLeftRef,
       toolbarRightRef,
+      runControlRef,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
       toolbarMoveResetToMenu,
       showDrillDown,
+      drillDownSlot,
       isSearchMode,
       isPinned,
       togglePin,

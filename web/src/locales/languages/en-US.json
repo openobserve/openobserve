@@ -766,6 +766,13 @@
     }
   },
   "common": {
+    "loadingNoun": "Loading {noun}…",
+    "loadingNouns": {
+      "spans": "spans",
+      "traces": "traces",
+      "logs": "logs",
+      "charts": "charts"
+    },
     "dismiss": "Dismiss",
     "exitFullscreen": "Exit full screen",
     "moreActions": "More actions",
@@ -1040,6 +1047,7 @@
       "redirecting": "Redirecting..."
     },
     "copied": "Copied",
+    "couldntCopy": "Couldn't copy",
     "copiedExclaim": "Copied!",
     "clearAll": "Clear All",
     "unknown": "Unknown",
@@ -11201,6 +11209,22 @@
     }
   },
   "alerts": {
+    "rowAction": {
+      "leftFilter": "No longer matches filter",
+      "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
+      "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
+      "forbiddenCause": "you need edit permission in the {folder} folder",
+      "noResponseCause": "the server didn't respond",
+      "pauseNoResponse": "Couldn't pause: the server didn't respond. Try again.",
+      "pauseFailed": "Couldn't pause: {reason}.",
+      "resumeNoResponse": "Couldn't resume: the server didn't respond. Try again.",
+      "resumeFailed": "Couldn't resume: {reason}.",
+      "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
+      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed",
+      "bulkFailedShort": "{failed} failed",
+      "details": "Details",
+      "detailsItem": "{name}: {reason}"
+    },
     "moreActions": "More actions",
     "promRuleMode": "Rule mode",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
@@ -13178,6 +13202,8 @@
     "sloColumn": "SLO",
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
+    "configNotSet": "Not set",
+    "openSlo": "Open SLO",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
     "seconds": "Seconds",
@@ -14515,7 +14541,9 @@
           "empty": "No related metrics",
           "sharedLabels": "Shares {labels}",
           "noSharedLabels": "No shared labels"
-        }
+        },
+        "previewStatus": "Showing list preview · loading full chart",
+        "previewKept": "Showing list preview"
       },
       "variants": {
         "stddev": "Std dev",
@@ -16032,6 +16060,9 @@
     "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
+    "noLogStreamForTrace": "No log stream has logs for this trace.",
+    "openLogsTab": "Open Logs tab",
+    "findingLogsForTrace": "Finding logs for this trace…",
     "noData": {
       "title": "Start sending traces to {product}",
       "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
@@ -16045,6 +16076,7 @@
     "openFields": "Open Fields",
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
     "fetchingTraces": "Loading Traces...",
+    "loadingChart": "Loading chart",
     "noStream": {
       "title": "Pick a stream to start exploring",
       "description": "Choose a trace stream, then press <strong>Run query</strong>. You can filter by service, duration, span status, and more once results load.",
@@ -16070,7 +16102,6 @@
     "errorSpans": "Error Spans",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
-    "updatingResults": "Updating results",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
     "success": "SUCCESS",
@@ -20430,6 +20461,39 @@
       "notGrouped": "{name} is selected without being grouped or aggregated. Add it to {groupBy}, or remove it from the selected columns."
     }
   },
+  "dataAge": {
+    "updated": "Updated {time}",
+    "withZone": "{age} · {timeZone}",
+    "refreshUpdated": "Refresh, updated {time} {timeZone}",
+    "refreshFailed": "Refresh failed at {failedAt} · showing data from {dataFrom}",
+    "refreshFailedCharts": "Refresh failed at {failedAt} for {count} of {total} chart · showing data from {dataFrom} | Refresh failed at {failedAt} for {count} of {total} charts · showing data from {dataFrom}",
+    "refreshFailedShort": "Refresh failed"
+  },
+  "regionStatus": {
+    "elapsed": "{status} {seconds} s",
+    "searchingPartitions": "Searching {done} of {total} partitions · {seconds} s",
+    "stillLoading": "Still loading {noun}, {seconds} seconds",
+    "partitions": "{done} of {total} partitions",
+    "partialTooltip": "The search stopped after {done} of {total} partitions, so the count and rows cover only those. Narrow the time range to search everything.",
+    "found": "{count} {noun} found",
+    "foundPartial": "{count} {noun} found, partial: {done} of {total} partitions",
+    "rangeChange": "Showing last {from} · loading last {to}",
+    "rangeChangeSpoken": "Showing last {from}, loading last {to}",
+    "rangeSettled": "Charts updated for last {to}",
+    "chartsLoaded": "Charts loaded",
+    "rangeLength": {
+      "seconds": "{count} s",
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "days": "{count} d"
+    },
+    "rangeLengthSpoken": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
+    }
+  },
   "refreshButton": {
     "justNow": "just now",
     "secondsAgo": "{sec}s ago",
@@ -22369,6 +22433,14 @@
     }
   },
   "components": {
+    "value": {
+      "noValue": "No value",
+      "couldntLoad": "Couldn't load",
+      "couldntLoadTooltip": "Couldn't load: {cause}. Refresh to try again.",
+      "causeTimeout": "the request timed out",
+      "causeServer": "the server returned an error",
+      "causeAccess": "you don't have access to this data"
+    },
     "codeBlock": {
       "terminal": "Terminal",
       "tokenLink": "org token · {name}",
@@ -22871,6 +22943,9 @@
         "past": "Past days",
         "ended": "Ended"
       }
+    },
+    "chartPlaceholder": {
+      "loading": "Loading chart"
     }
   },
   "functions": {

@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OIcon>
                   </span>
                   <span v-else-if="row.aggregateStatus === 'processing'">
-                    <OIcon name="sync" size="sm" class="animate-spin">
+                    <OIcon name="sync" size="sm" class="o2-motion-keep animate-spin">
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 18.75rem">

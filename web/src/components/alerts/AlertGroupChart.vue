@@ -57,7 +57,9 @@
       </OToggleGroup>
     </div>
 
-    <div class="h-62.5 w-full">
+    <div class="relative h-62.5 w-full">
+      <!-- The renderer's own line only starts once a schema exists, so this one covers the alert GET and generate_sql. -->
+      <LoadingProgress :loading="pending" :loading-progress-percentage="0" />
       <PanelSchemaRenderer
         v-if="chartData"
         :height="5"
@@ -68,6 +70,7 @@
         searchType="ui"
         data-test="alerts-alertgroupchart-panel"
       />
+      <PanelChartPlaceholder v-else-if="pending" data-test="alerts-alertgroupchart-placeholder" />
       <div
         v-else-if="chartError"
         class="flex h-full flex-col items-center justify-center gap-2"
@@ -95,9 +98,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import alertsService from "@/services/alerts";
 import {
@@ -110,7 +115,7 @@ import {
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { parseSearchError } from "@/utils/query/searchError";
 
-const props = defineProps<{ alert: any }>();
+const props = defineProps<{ alert: any | null }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -119,6 +124,10 @@ const chartData = ref<any>(null);
 const chartError = ref<string | null>(null);
 const selectedTimeObj = ref<any>(null);
 const range = ref<string>("1h");
+// A count, not a flag: an earlier build settling must not end a newer build's line.
+const buildsInFlight = ref(0);
+// The page mounts this before the alert GET lands, so a missing alert is still loading.
+const pending = computed(() => !props.alert || buildsInFlight.value > 0);
 
 const rangeOptions = computed(() => [
   { value: "1h", label: t("alerts.groups.range1h") },
@@ -142,6 +151,15 @@ const onRangeChange = (value: unknown) => {
 };
 
 const build = async () => {
+  buildsInFlight.value++;
+  try {
+    await buildChart();
+  } finally {
+    buildsInFlight.value--;
+  }
+};
+
+const buildChart = async () => {
   const agg = aggregation.value;
   const orgId = store.state.selectedOrganization?.identifier;
   chartError.value = null;

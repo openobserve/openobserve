@@ -462,6 +462,26 @@ describe("IndexList Component", () => {
       const streamSelect = wrapper.find('[data-test="log-search-index-list-select-stream"]');
       expect(streamSelect.exists()).toBe(true);
     });
+
+    it("holds back the select-stream label while the list loads, so picking the stream shifts nothing", async () => {
+      const label = () =>
+        wrapper
+          .findAllComponents({ name: "OSelect" })
+          .find((c) => c.attributes("data-test") === "log-search-index-list-select-stream")
+          ?.props("label");
+      wrapper.unmount();
+      mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+      mockSearchObj.loadingStream = true;
+      wrapper = mountIndexList();
+      await flushPromises();
+      expect(label()).toBe("");
+
+      wrapper.unmount();
+      mockSearchObj.loadingStream = false;
+      wrapper = mountIndexList();
+      await flushPromises();
+      expect(label()).toBeTruthy();
+    });
   });
 
   describe("Field Search", () => {

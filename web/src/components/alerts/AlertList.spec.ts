@@ -32,6 +32,15 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
   return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
 });
 
+// Passthrough spy: the real live region still speaks, and specs can count what was said.
+vi.mock("@/lib/feedback/RegionStatus/announcer", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    announcePolite: vi.fn((...args: unknown[]) => actual.announcePolite(...args)),
+  };
+});
+
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
@@ -73,6 +82,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
 });
 
 import AlertList from "@/components/alerts/AlertList.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -81,6 +91,7 @@ import AlertService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
@@ -486,6 +497,14 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
+  it("keeps the footer's Records per page label beside the bulk-failure note, so the range never moves", async () => {
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.exists()).toBe(true);
+    expect(table.props("keepPageSizeLabel")).toBe(true);
+  });
+
   it("titles itself with the SECTION, so the peer tabs never move", async () => {
     // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
     // is NOT "Alerts": a per-page title sizes the title block and shifts the
@@ -772,6 +791,24 @@ describe("AlertList - row actions", () => {
 
     const updated = (wrapper.vm as any).filteredResults.find((r: any) => r.uuid === first.uuid);
     expect(updated.enabled).toBe(!initial);
+  });
+
+  it("makes the row actions' tooltips exclusive, so one never stays open beside a row error marker", async () => {
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+
+    const rowTips = wrapper
+      .findAllComponents(OTooltip)
+      .filter((tip) =>
+        [
+          i18n.global.t("alerts.pause"),
+          i18n.global.t("alerts.start"),
+          i18n.global.t("alerts.edit"),
+          i18n.global.t("alerts.clone"),
+        ].includes(tip.props("content")),
+      );
+    expect(rowTips.length).toBeGreaterThan(0);
+    expect(rowTips.every((tip) => tip.props("exclusive") === true)).toBe(true);
   });
 
   it("opens clone dialog and submits successfully", async () => {
@@ -1106,6 +1143,918 @@ describe("AlertList - pagination restoration", () => {
 
     expect(wrapper.vm.currentPage).toBe(1);
     expect(useListViewState("alerts", {}).currentPage).toBe(1);
+  });
+});
+
+// Rulings 15, 16: confirmed row writes, in-row failures, off-filter rows and a refresh that keeps the view.
+describe("AlertList - row actions keep the view", () => {
+  const deferred = <T>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+  const pageIndex = (wrapper: any) => wrapper.vm.oTableRef.table.getState().pagination.pageIndex;
+  const names = (wrapper: any) => wrapper.vm.displayedAlerts.map((r: any) => r.name);
+  const toggleBtn = (wrapper: any, name: string) =>
+    wrapper.find(`[data-test="alert-list-${name}-pause-start-alert"]`);
+  const errorToasts = () =>
+    (toast as any).mock.calls.filter(([opts]: any[]) => opts?.variant === "error");
+
+  // 25 active alerts, five a page, opened on page 2 under the Active tile.
+  const mountOnPageTwo = async (stateFilter: string | null = "active") => {
+    // An earlier test's navigation can still land after beforeEach blanked the query.
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    router.currentRoute.value.name = "alertList";
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 25 }, (_, i) => makeAlert(i + 1, { enabled: true }));
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 2, stateFilter });
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(pageIndex(wrapper)).toBe(1);
+    return wrapper;
+  };
+
+  it("pauses under the Active tile as a confirmed write: busy at once, the row stays tagged, counts move, page and selection kept", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    const before = names(wrapper);
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    const btn = toggleBtn(wrapper, "Alert 6");
+    expect(btn.attributes("aria-busy")).toBe("true");
+    expect(btn.attributes("aria-disabled")).toBe("true");
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(wrapper.vm.stateCounts.active).toBe(25);
+
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    expect(names(wrapper)).toEqual(before);
+    const tag = wrapper.find('[data-test="alert-list-Alert 6-left-filter"]');
+    expect(tag.exists()).toBe(true);
+    expect(tag.text()).toBe("No longer matches filter");
+    expect(wrapper.vm.stateCounts.active).toBe(24);
+    expect(wrapper.vm.stateCounts.paused).toBe(1);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+    expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
+    expect(toggleBtn(wrapper, "Alert 6").attributes("data-row-action")).toBe("resume");
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+  });
+
+  it("announces a row leaving the filter once, politely, with no toast", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const wrapper = await mountOnPageTwo();
+      vi.mocked(announcePolite).mockClear();
+      (toast as any).mockClear();
+
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
+      vi.advanceTimersByTime(100);
+
+      expect(announcePolite).toHaveBeenCalledTimes(1);
+      expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
+      expect(document.querySelector('[data-test="region-announcer"]')?.textContent).toBe(
+        "Alert 6 paused. No longer matches filter",
+      );
+      expect(
+        document.querySelector('[data-test="region-announcer"]')?.getAttribute("aria-live"),
+      ).toBe("polite");
+      expect(toast).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the resume when a resumed row leaves the Paused tile", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    wrapper.vm.onStatSelect("paused");
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("Alert 6 resumed. No longer matches filter");
+  });
+
+  it("says nothing when the toggled row still matches the filter", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    vi.mocked(announcePolite).mockClear();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(announcePolite).not.toHaveBeenCalled();
+  });
+
+  it("announces a bulk write once, naming one row and counting many", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7"], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
+
+    wrapper.vm.selectedAlertIds = ["alert-8", "alert-9", "alert-10"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-8", "alert-9", "alert-10"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("3 alerts paused. No longer match filter");
+  });
+
+  it("counts a many-row resume the same way", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    wrapper.vm.onStatSelect("paused");
+    await flushPromises();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("resume");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("2 alerts resumed. No longer match filter");
+  });
+
+  it("says nothing when a bulk write is refused for every row", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).not.toHaveBeenCalled();
+  });
+
+  it("does not announce a row write that settles after the page is left", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    vi.mocked(announcePolite).mockClear();
+
+    wrapper.unmount();
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    expect(announcePolite).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-test="region-announcer"]')?.textContent ?? "").toBe("");
+  });
+
+  it.each([
+    ["one row", ["alert-6"]],
+    ["several rows", ["alert-6", "alert-7"]],
+  ])(
+    "does not announce a bulk write of %s that settles after the page is left",
+    async (_c, ids) => {
+      const wrapper = await mountOnPageTwo();
+      wrapper.vm.selectedAlertIds = ids;
+      await flushPromises();
+      const write = deferred<any>();
+      alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+      const pending = wrapper.vm.bulkToggleAlerts("pause");
+      vi.mocked(announcePolite).mockClear();
+
+      wrapper.unmount();
+      write.resolve({ data: { successful: ids, unsuccessful: [], err: null } });
+      await pending;
+      await flushPromises();
+
+      expect(announcePolite).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["with a selection", ["alert-6", "alert-7", "alert-8"]],
+    ["without a selection", []],
+  ])(
+    "reserves the summary's slot, so nothing on the footer changes when it appears, %s",
+    async (_case, selection) => {
+      const wrapper = await mountOnPageTwo();
+      wrapper.vm.selectedAlertIds = selection;
+      await flushPromises();
+      const bar = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
+      const slot = bar().find('[data-test="alert-list-bulk-error-slot"]');
+      expect(slot.exists()).toBe(true);
+      expect(slot.classes()).toEqual(expect.arrayContaining(["min-w-[7.5rem]", "flex-1"]));
+      expect(slot.attributes("aria-hidden")).toBe("true");
+      const shape = () => ({
+        yields: bar().attributes("data-label-yield"),
+        selection: bar().find('[data-test="o2-table-pagination-selection"]').exists(),
+        classes: [
+          "o2-table-pagination-info",
+          "o2-table-pagination-divider",
+          "o2-table-page-size-label",
+          "o2-table-page-size",
+          "o2-table-next-page-btn",
+        ].map((id) => bar().find(`[data-test="${id}"]`).attributes("class")),
+      });
+      const empty = shape();
+      expect(empty.selection).toBe(selection.length > 0);
+
+      wrapper.vm.bulkActionFailure = {
+        action: "pause",
+        total: 3,
+        names: ["Alert 7", "Alert 8"],
+        ids: ["alert-7", "alert-8"],
+        cause: null,
+      };
+      await flushPromises();
+
+      const line = bar().find('[data-test="alert-list-bulk-error"]');
+      expect(line.exists()).toBe(true);
+      expect(line.classes()).toEqual(expect.arrayContaining(["min-w-[7.5rem]", "flex-1"]));
+      expect(bar().find('[data-test="alert-list-bulk-error-slot"]').exists()).toBe(false);
+      expect(shape()).toEqual(empty);
+    },
+  );
+
+  it("keeps the red error icon at every step of the bulk summary", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    const line = wrapper.find('[data-test="alert-list-bulk-error"]');
+    const pill = line.find(".bg-status-error-bg");
+    expect(pill.classes()).toContain("text-status-error-text");
+    const icon = line
+      .findAllComponents({ name: "OIcon" })
+      .find((c) => c.props("name") === "error-outline");
+    expect(icon).toBeDefined();
+    expect(icon!.classes().filter((c) => c.includes("hidden"))).toEqual([]);
+    const order = Array.from(pill.element.children);
+    expect(order.indexOf(icon!.element as Element)).toBeLessThan(
+      order.indexOf(line.find('[data-test="alert-list-bulk-error-short"]').element),
+    );
+  });
+
+  it("drops the off-filter row and its tag on the next filter change", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(false);
+  });
+
+  it("drops the off-filter row on the next fetch", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("drops the off-filter tag when a second toggle brings the row back into the filter", async () => {
+    const wrapper = await mountOnPageTwo();
+    const tag = () => wrapper.find('[data-test="alert-list-Alert 6-left-filter"]');
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: false } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(tag().exists()).toBe(true);
+
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(tag().exists()).toBe(false);
+  });
+
+  it("clears a row's failed pause once a bulk pause of that row succeeds", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const rowError = () => wrapper.find('[data-test="alert-list-Alert 6-row-error"]');
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
+      response: { status: 503, data: { message: "Temporarily unavailable" } },
+    });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(rowError().exists()).toBe(true);
+
+    wrapper.vm.selectedAlertIds = ["alert-6"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(rowError().exists()).toBe(false);
+  });
+
+  it("shows a forbidden pause in the row, red and announced, without flipping it or toasting", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+
+    const message = wrapper.find('[data-test="alert-list-Alert 6-row-error"]');
+    expect(message.exists()).toBe(true);
+    expect(message.attributes("role")).toBe("alert");
+    expect(message.text()).toContain(
+      "Couldn't pause: you need edit permission in the Default folder.",
+    );
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(toggleBtn(wrapper, "Alert 6").exists()).toBe(true);
+    expect(errorToasts()).toHaveLength(0);
+
+    await wrapper.find('[data-test="alert-list-Alert 6-row-error-dismiss"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+  });
+
+  it("names the server's reason for another 4xx, and the lost connection when nothing answered", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
+      response: { status: 409, data: { message: "Alert is being edited" } },
+    });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').text()).toContain(
+      "Couldn't pause: alert is being edited.",
+    );
+
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce(new Error("Network Error"));
+    await toggleBtn(wrapper, "Alert 7").trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-Alert 7-row-error"]').text()).toContain(
+      "Couldn't pause: the server didn't respond. Try again.",
+    );
+    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(true);
+  });
+
+  it("clears a row's failure when its retry starts", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(true);
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+  });
+
+  it("sums up a partly failed bulk pause in one line with the names under Details", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7", "alert-8"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7", "alert-8"], err: null },
+    });
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    const line = wrapper.find('[data-test="alert-list-bulk-error"]');
+    expect(line.attributes("role")).toBe("alert");
+    expect(line.text()).toContain("2 of 3 alerts couldn't be paused");
+    expect(wrapper.findAll('[data-test="alert-list-bulk-error"]')).toHaveLength(1);
+    expect(wrapper.vm.bulkActionFailure.names).toEqual(["Alert 7", "Alert 8"]);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 7").enabled).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(errorToasts()).toHaveLength(0);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-8"]);
+    const bar = wrapper.find('[data-test="o2-table-pagination-bottom"]');
+    expect(bar.find('[data-test="o2-table-selected-count"]').exists()).toBe(true);
+    const note = '[data-test="o2-table-pagination-status-note"]';
+    expect(bar.find(`${note} [data-test="alert-list-bulk-error"]`).exists()).toBe(true);
+    expect(line.find(".sr-only").text()).toBe("2 of 3 alerts couldn't be paused");
+    expect(line.find('[data-test="alert-list-bulk-error-short"]').text()).toBe("2 failed ·");
+    expect(line.find('[data-test="alert-list-bulk-error-details-short"]').text()).toBe("2 failed");
+    expect(line.classes()).toContain("min-w-[7.5rem]");
+    expect(line.find('[data-test="alert-list-bulk-error-text"]').attributes("aria-hidden")).toBe(
+      "true",
+    );
+
+    wrapper.vm.selectedAlertIds = [];
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-selected-count"]').exists()).toBe(false);
+    expect(wrapper.find(`${note} [data-test="alert-list-bulk-error"]`).exists()).toBe(true);
+
+    await wrapper.find('[data-test="alert-list-bulk-error-dismiss"]').trigger("click");
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+  });
+
+  it("counts every alert when the whole bulk request fails, with the reason for Details", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockRejectedValueOnce({ response: { status: 403 } });
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').text()).toContain(
+      "2 of 2 alerts couldn't be paused",
+    );
+    expect(wrapper.vm.bulkActionFailure.cause).toBe(
+      "you need edit permission in the Default folder",
+    );
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6", "alert-7"]);
+  });
+
+  it("shows no toast and no summary when the whole bulk pause lands", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: [] },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(wrapper.vm.selectedAlertIds).toEqual([]);
+  });
+
+  it("keeps a row paused and tagged when a refresh already in flight answers after the write", async () => {
+    const wrapper = await mountOnPageTwo();
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("tags the current row when a refresh replaced the row objects while the write ran", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const before = wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6")).not.toBe(before);
+
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+  });
+
+  it("tags bulk-paused rows when a refresh replaced the row objects while the write ran", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+    const bulk = wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(async () => ({ data: { list: stale } }));
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    write.resolve({ data: { successful: ["alert-6", "alert-7"], unsuccessful: [] } });
+    await bulk;
+    await flushPromises();
+    expect(names(wrapper)).toEqual(expect.arrayContaining(["Alert 6", "Alert 7"]));
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-Alert 7-left-filter"]').exists()).toBe(true);
+  });
+
+  it("lists every refused alert with its reason under Details, opened toward the start and closed by Escape back to Details", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: "Alert is being edited." },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    const details = wrapper.find('[data-test="alert-list-bulk-error-details"]');
+    const footer = wrapper.find('[data-test="o2-table-pagination-bottom"]');
+    const rect = (top: number, left: number, width: number, height: number) =>
+      ({
+        top,
+        left,
+        width,
+        height,
+        right: left + width,
+        bottom: top + height,
+        x: left,
+        y: top,
+      }) as DOMRect;
+    vi.spyOn(details.element, "getBoundingClientRect").mockReturnValue(rect(700, 600, 50, 26));
+    vi.spyOn(footer.element, "getBoundingClientRect").mockReturnValue(rect(690, 0, 1000, 43));
+    (details.element as HTMLElement).focus();
+    await details.trigger("keydown", { key: "Enter" });
+    await details.trigger("click");
+    await flushPromises();
+
+    expect(wrapper.vm.bulkDetailsPlace).toEqual({ align: "end", offset: 14 });
+    const items = Array.from(
+      document.querySelectorAll('[data-test="alert-list-bulk-error-details-list"] li'),
+    ).map((li) => li.textContent?.trim());
+    expect(items).toEqual(["Alert 6: alert is being edited", "Alert 7: alert is being edited"]);
+
+    (document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await flushPromises();
+    expect(document.querySelector('[data-test="alert-list-bulk-error-details-list"]')).toBeNull();
+    expect(document.activeElement).toBe(details.element);
+  });
+
+  describe.each(["row toggle", "bulk pause"] as const)(
+    "overlapping list reads around a confirmed %s",
+    (path) => {
+      const org = () => store.state.selectedOrganization.identifier;
+      const row6 = (wrapper: any) =>
+        wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6");
+      const cachedRow6 = (alertType = "") =>
+        (queryClient.getQueryData(alertKeys.list(org(), "default", "", alertType)) as any[])?.find(
+          (r: any) => r.alert_id === "alert-6",
+        );
+      // A read before the write answers with Alert 6 still active, plus a row only that answer carries.
+      const staleList = () => [
+        ...alertsDB.map((a) => ({ ...a, enabled: true })),
+        makeAlert(99, { name: "Old Read" }),
+      ];
+      const truthList = () =>
+        alertsDB.map((a) => ({ ...a, enabled: a.alert_id === "alert-6" ? false : a.enabled }));
+      const startWrite = async (wrapper: any) => {
+        const write = deferred<any>();
+        if (path === "row toggle") {
+          alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+          await toggleBtn(wrapper, "Alert 6").trigger("click");
+        } else {
+          wrapper.vm.selectedAlertIds = ["alert-6"];
+          await flushPromises();
+          alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+          void wrapper.vm.bulkToggleAlerts("pause");
+        }
+        await flushPromises();
+        return async () => {
+          alertsDB = alertsDB.map((a) => (a.alert_id === "alert-6" ? { ...a, enabled: false } : a));
+          write.resolve(
+            path === "row toggle"
+              ? { data: { enabled: false } }
+              : { data: { successful: ["alert-6"], unsuccessful: [] } },
+          );
+          await flushPromises();
+        };
+      };
+      // A is the folder refresh, B a read of another list key (the tab read), so neither joins the other.
+      const startReads = (wrapper: any) => {
+        const a = deferred<any>();
+        alertsSvc.listByFolderId.mockImplementationOnce(() => a.promise);
+        const aDone = wrapper.vm.refreshAlerts();
+        return {
+          a,
+          aDone,
+          startB: () => {
+            const b = deferred<any>();
+            alertsSvc.listByFolderId.mockImplementationOnce(() => b.promise);
+            const bDone = wrapper.vm.getAlertsFn(
+              store,
+              "default",
+              "",
+              true,
+              "scheduled",
+              true,
+              true,
+            );
+            return { b, bDone };
+          },
+        };
+      };
+      const settle = async (read: { promise: Promise<any> }, done: Promise<any>, list: any[]) => {
+        (read as any).resolve({ data: { list } });
+        await done;
+        await flushPromises();
+      };
+
+      it("drops the older read when both answer before the write settles, newer first", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        await settle(a, aDone, staleList());
+        expect(names(wrapper)).not.toContain("Old Read");
+        await settleWrite();
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+      });
+
+      it("keeps the write when the older read answers after it settles and the newer one answered before", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        await settleWrite();
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+      });
+
+      it("keeps the write when both answer after it settles, newer first, both begun before it", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settleWrite();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+        expect(cachedRow6("scheduled").enabled).toBe(false);
+      });
+
+      it("never restores the old state when a read begun after the write answers before an older one", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        await settleWrite();
+        const { b, bDone } = startB();
+        await settle(b, bDone, truthList());
+        expect(names(wrapper)).not.toContain("Alert 6");
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Alert 6");
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(cachedRow6().enabled).toBe(false);
+
+        await wrapper.vm.refreshAlerts();
+        await flushPromises();
+        expect(row6(wrapper).enabled).toBe(false);
+      });
+
+      it("never restores the old state when the older read answers first and a read begun after the write is still out", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        await settleWrite();
+        const { b, bDone } = startB();
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(cachedRow6().enabled).toBe(false);
+        await settle(b, bDone, truthList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Alert 6");
+      });
+
+      it("keeps the write for a read begun after it that shares the request already in flight", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        alertsSvc.listByFolderId.mockClear();
+        const a = deferred<any>();
+        alertsSvc.listByFolderId.mockImplementationOnce(() => a.promise);
+        const aDone = wrapper.vm.refreshAlerts();
+        await flushPromises();
+        await settleWrite();
+        const bDone = wrapper.vm.refreshAlerts();
+        await flushPromises();
+        expect(alertsSvc.listByFolderId).toHaveBeenCalledTimes(1);
+        a.resolve({ data: { list: staleList().filter((r) => r.alert_id !== "alert-99") } });
+        await Promise.all([aDone, bDone]);
+        await flushPromises();
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+      });
+    },
+  );
+
+  it("drops a cross-folder search answered after a newer folder read, and keeps the write in the search's cache", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const search = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => search.promise);
+    const searchDone = wrapper.vm.getAlertsFn(store, "default", "Alert", true, "", true, true);
+    await flushPromises();
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    const stale = alertsDB.map((a) => ({ ...a, enabled: true }));
+    const truth = alertsDB.map((a) => ({ ...a, enabled: a.alert_id !== "alert-6" }));
+    alertsSvc.listByFolderId.mockImplementationOnce(async () => ({ data: { list: truth } }));
+    await wrapper.vm.getAlertsFn(store, "default", "", true, "", true, true);
+    await flushPromises();
+    search.resolve({ data: { list: stale } });
+    await searchDone;
+    await flushPromises();
+
+    const org = store.state.selectedOrganization.identifier;
+    const searched = queryClient.getQueryData(alertKeys.list(org, "", "Alert", "")) as any[];
+    expect(searched.find((r: any) => r.alert_id === "alert-6").enabled).toBe(false);
+    expect(
+      wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6")?.enabled ?? false,
+    ).toBe(false);
+    expect(errorToasts()).toHaveLength(0);
+  });
+
+  it("carries the write into the folder copy that turning off a cross-folder search restores", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((r: any) => ({ ...r }));
+    await flushPromises();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const stored = (store.state as any).organizationData.allAlertsListByFolderId.default;
+    expect(stored.find((r: any) => r.alert_id === "alert-6").enabled).toBe(false);
+
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    wrapper.vm.searchAcrossFolders = false;
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6").enabled).toBe(
+      false,
+    );
+  });
+
+  it("holds the other bulk actions inactive while a bulk pause runs, so Resume can't overlap it", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-7").enabled = false;
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+
+    const pause = wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    for (const id of [
+      "alert-list-unpause-alerts-btn",
+      "alert-list-move-across-folders-btn",
+      "alert-list-export-alerts-btn",
+      "alert-list-delete-alerts-btn",
+    ]) {
+      expect(wrapper.find(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
+    }
+    expect(wrapper.find('[data-test="alert-list-pause-alerts-btn"]').attributes("aria-busy")).toBe(
+      "true",
+    );
+    await wrapper.vm.bulkToggleAlerts("resume");
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalledTimes(1);
+
+    write.resolve({ data: { successful: [], unsuccessful: ["alert-6"] } });
+    await pause;
+    await flushPromises();
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6"]);
+    expect(
+      wrapper.find('[data-test="alert-list-unpause-alerts-btn"]').attributes("aria-disabled"),
+    ).toBeUndefined();
+  });
+
+  it("refreshes over dimmed kept rows and keeps the page and selection", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-7", "alert-9"];
+    await flushPromises();
+    const read = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+
+    const done = wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.refreshing).toBe(true);
+    expect(wrapper.find('[data-test="o2-table-body"]').attributes("data-test-stale")).toBe("true");
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-9"]);
+
+    read.resolve({ data: { list: alertsDB } });
+    await done;
+    await flushPromises();
+    expect(wrapper.vm.refreshing).toBe(false);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-9"]);
+  });
+
+  it("keeps the refresh button's age while the table keeps rows, and spins only when it does not", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const refresh = () => wrapper.findComponent({ name: "ORefreshButton" });
+    expect(refresh().props("spinner")).toBe(true);
+    const read = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+
+    const done = wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.oTableRef.keepingRows).toBe(true);
+    expect(refresh().props("loading")).toBe(true);
+    expect(refresh().props("spinner")).toBe(false);
+    const button = wrapper.find('[data-test="alert-list-refresh-btn"]');
+    expect(button.attributes("aria-busy")).toBe("true");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(button.find(".animate-spin").exists()).toBe(false);
+    expect(button.html()).not.toContain("text-transparent");
+    expect(button.text()).toContain("just now");
+
+    read.resolve({ data: { list: alertsDB } });
+    await done;
+    await flushPromises();
+    expect(wrapper.vm.oTableRef.keepingRows).toBe(false);
+    expect(refresh().props("spinner")).toBe(true);
+  });
+
+  it("drops a selected alert that a refresh no longer returns", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-7", "alert-9"];
+    await flushPromises();
+    alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-9");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+    expect(pageIndex(wrapper)).toBe(1);
+  });
+
+  it("still starts a new tile filter on page 1", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    expect(pageIndex(wrapper)).toBe(0);
+    expect(wrapper.vm.currentPage).toBe(1);
   });
 });
 

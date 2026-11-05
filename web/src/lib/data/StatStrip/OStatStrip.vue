@@ -41,6 +41,8 @@ const props = withDefaults(
      * Leave off for the standard strip — long labels need the wider basis.
      */
     compact?: boolean;
+    /** What the numbers describe; a change shows the skeleton again on the next load instead of the old numbers. */
+    resetKey?: string | number | null;
   }>(),
   {
     items: () => [],
@@ -49,6 +51,7 @@ const props = withDefaults(
     selectedKey: null,
     defaultKey: null,
     compact: false,
+    resetKey: undefined,
   },
 );
 
@@ -60,6 +63,13 @@ watch(
   () => props.loading,
   (loading, wasLoading) => {
     if (wasLoading && !loading) settled.value = true;
+  },
+);
+// Opt-in: without a resetKey this never fires, so the latch behaves as before.
+watch(
+  () => props.resetKey,
+  () => {
+    settled.value = false;
   },
 );
 const showSkeleton = computed(() => props.loading && !settled.value);
