@@ -939,7 +939,8 @@ describe("IncidentList.vue", () => {
       listMock.mockResolvedValue({
         data: { incidents: [createIncident({ id: "1", rca: liveRca() })], total: 1 },
       });
-      const pushSpy = vi.spyOn(router, "push");
+      // No call-through: a real navigation lazy-loads the app's route pages, which took over 5 s on a loaded runner.
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       wrapper = createWrapper();
       await flushPromises();
 
@@ -954,7 +955,7 @@ describe("IncidentList.vue", () => {
           query: expect.objectContaining({ tab: "incidentAnalysis" }),
         }),
       );
-      await router.push({ query: {} });
+      pushSpy.mockRestore();
     });
 
     it("RR-34: one live row on the current page refetches after 30 s", async () => {

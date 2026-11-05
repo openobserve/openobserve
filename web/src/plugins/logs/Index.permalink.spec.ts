@@ -149,8 +149,14 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
       global: {
         provide: { store },
         plugins: [i18n, router],
-        // Monaco's delayed browser contributions are outside permalink lifecycle coverage.
-        stubs: { CodeQueryEditor: true },
+        // Monaco is out of scope, but getValue must exist: once the lazy QueryEditor mounts the free-text preview reads it, and a throw there aborted the stream-list load.
+        stubs: {
+          CodeQueryEditor: {
+            props: { query: String },
+            setup: (props: { query?: string }) => ({ getValue: () => props.query }),
+            template: "<div />",
+          },
+        },
       },
     });
     const logs = vi.fn();

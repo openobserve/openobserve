@@ -124,6 +124,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import searchService from "@/services/search";
+import i18n from "@/locales";
 import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
 
 const store = createStore({
@@ -173,7 +174,7 @@ describe("ClickHeatmap", () => {
     h.range = { startUs: 1_000_000_000_000, endUs: 1_000_000_000_000 + 24 * 3_600_000_000 };
     h.route = { name: "productAnalyticsHeatmaps", query: {} };
     h.getStream.mockImplementation(async (name: string) => ({
-      schema: name === "_sessionreplay" ? [{ name: "has_full_snapshot" }] : [],
+      schema: name === "_sessionreplay" ? [{ name: "view_id" }, { name: "has_full_snapshot" }] : [],
     }));
   });
 
@@ -433,13 +434,57 @@ describe("ClickHeatmap", () => {
   });
 
   it("skips the snapshot flag query when _sessionreplay has no has_full_snapshot column", async () => {
-    h.getStream.mockResolvedValue({ schema: [] });
+    h.getStream.mockResolvedValue({ schema: [{ name: "view_id" }] });
     answer({ "replay-views": () => ok([{ view_id: "v1" }, { view_id: "v2" }]) });
     await mountPage();
 
     expect(ids()).not.toContain("replay-flags");
     const segments = h.run.mock.calls.find((c) => c[0] === "replay-segments");
     expect(segments?.[1].sql).toContain("v1");
+  });
+
+  it("sends no view_id query and shows the no-replay state when _sessionreplay has no view_id", async () => {
+    h.getStream.mockImplementation(async (name: string) => ({
+      schema: name === "_sessionreplay" ? [{ name: "has_full_snapshot" }] : [],
+    }));
+    answer({ "replay-views": () => ok([{ view_id: "v1" }]) });
+    const wrapper = await mountPage();
+
+    expect(ids()).not.toContain("replay-views");
+    expect(ids()).not.toContain("replay-flags");
+    expect(ids()).not.toContain("replay-segments");
+    const notice = wrapper.find('[data-test="rum-heatmap-snapshot-error"]');
+    expect(notice.text()).toContain("Page snapshots need a newer RUM SDK");
+    expect(notice.text()).not.toContain("No session replay was recorded");
+  });
+
+  it("shows the no-replay state, not a failure, when the org has no _sessionreplay stream", async () => {
+    h.getStream.mockImplementation(async (name: string) => {
+      if (name === "_sessionreplay")
+        throw new Error(
+          i18n.global.t("logStream.streamNotFoundForType", { stream: name, type: "logs" }),
+        );
+      return { schema: [] };
+    });
+    const wrapper = await mountPage();
+
+    expect(ids()).not.toContain("replay-views");
+    const notice = wrapper.find('[data-test="rum-heatmap-snapshot-error"]');
+    expect(notice.text()).toContain("No session replay was recorded");
+    expect(notice.text()).not.toContain("Couldn't load the page snapshot");
+  });
+
+  it("shows the load failure, not the no-replay state, when the _sessionreplay schema fetch fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    h.getStream.mockImplementation(async (name: string) => {
+      if (name === "_sessionreplay") throw new Error("network");
+      return { schema: [] };
+    });
+    const wrapper = await mountPage();
+
+    const notice = wrapper.find('[data-test="rum-heatmap-snapshot-error"]');
+    expect(notice.text()).toContain("Couldn't load the page snapshot");
+    expect(notice.text()).not.toContain("No session replay was recorded");
   });
 
   it("runs the snapshot lookups through the real search helper without a stream rejection", async () => {
@@ -1090,13 +1135,17 @@ describe("ClickHeatmap", () => {
         step(n);
       });
     const scale = (1200 - 32) / 1440;
+    let noCanvas: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       // jsdom has no CSS.escape; browsers do.
       vi.stubGlobal("CSS", { escape: (v: string) => v.replace(/[^\w-]/g, (c) => `\\${c}`) });
+      // A 1440x6000 page makes every redraw recolour 8.6M mock-canvas pixels; these tests check geometry, not paint.
+      noCanvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     });
 
     afterEach(() => {
+      noCanvas.mockRestore();
       if (origWidth) Object.defineProperty(Element.prototype, "clientWidth", origWidth);
       if (origHeight) Object.defineProperty(Element.prototype, "clientHeight", origHeight);
       h.pageWidth = 0;
@@ -1133,7 +1182,6 @@ describe("ClickHeatmap", () => {
       wrapper.unmount();
     });
 
-    // Takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
     it("refits and redraws after entering and leaving full screen", async () => {
       const { wrapper } = await mountGeo();
       const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
@@ -1160,7 +1208,7 @@ describe("ClickHeatmap", () => {
       expect(scroller.scrollTop).toBe(0);
       expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
       wrapper.unmount();
-    }, 20000);
+    });
 
     const hitMove = async (w: any, x: number, y: number) => {
       const layer = w.find('[data-test="rum-heatmap-hit-layer"]');
