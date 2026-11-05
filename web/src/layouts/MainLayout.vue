@@ -819,11 +819,13 @@ export default defineComponent({
         config.isCloud !== "true" ||
         store.state.organizationData.isDataIngested === true ||
         // the store flag is still false at mount, so an org with data shows only in its stream lists
-        (await orgHasUserData(org)) === true;
+        (await orgHasUserData(org));
       // A user who left Home while the lists loaded keeps the flag too.
       if (notNow()) return;
       // The answer belongs to the org queried; after a switch, decide again for the org now selected.
       if (store.state.selectedOrganization?.identifier !== org) return firstLoginRedirect();
+      // a failed list, or streams with no stats yet, decide nothing; the next Home visit asks again
+      if (hasData === undefined) return;
       localStorage.removeItem("isFirstTimeLogin");
       if (hasData) return recordSkippedStart();
       markStartPending(store.state.userInfo?.email);

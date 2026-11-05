@@ -2151,6 +2151,27 @@ describe("MainLayout — first-time cloud login", () => {
     wrapper.unmount();
   });
 
+  // stats count flushed files only, so an org whose data just arrived lists streams without them
+  it("decides nothing while the org's streams have no stats yet, and decides on the next Home visit", async () => {
+    vi.mocked(stream.nameList).mockImplementation((async (_org: string, type: string) => ({
+      data: { list: type === "logs" ? [{ name: "default", stream_type: "logs", stats: {} }] : [] },
+    })) as never);
+    const { wrapper, router } = await mountAtHome();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    expect(startCalls()).toEqual([]);
+
+    streams(["default"]);
+    queryClient.clear();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
+    wrapper.unmount();
+  });
+
   it("onboards on the next Home visit in the session after a pending redirect, without a remount", async () => {
     sessionStorage.setItem("redirectURI", "/logs");
     const { wrapper, router } = await mountAtHome();
