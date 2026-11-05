@@ -31,6 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <section
       v-else
+      ref="panel"
+      tabindex="-1"
       class="bg-surface-base border-border-default rounded-surface fixed end-4 bottom-4 z-40 flex w-92 max-w-[calc(100vw-2rem)] flex-col gap-3 border p-4 shadow-lg"
       role="dialog"
       :aria-label="t('sampleData.tour.label')"
@@ -155,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -179,6 +181,7 @@ const router = useRouter();
 const session = useSampleDataSession();
 const tour = session.tour;
 const navigating = ref(false);
+const panel = ref<HTMLElement | null>(null);
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const active = computed(() => !!tour.value && tour.value.org === org.value);
@@ -199,6 +202,17 @@ const visible = computed(
 const index = computed(() => tour.value?.index ?? 0);
 const current = computed<SampleTourStep | undefined>(() => SAMPLE_TOUR_STEPS[index.value]);
 const capabilities = computed(() => [...new Set(SAMPLE_TOUR_STEPS.map((s) => s.capability))]);
+
+// a keyboard user lands in the tour, and the finale drops focus on its way out
+watch(panel, (el) => el?.focus());
+watch(
+  () => !!panel.value && !current.value,
+  async (finale) => {
+    if (!finale) return;
+    await nextTick();
+    panel.value?.querySelector<HTMLElement>('[data-test="sample-tour-finish"]')?.focus();
+  },
+);
 
 const positionLabel = computed(() =>
   current.value

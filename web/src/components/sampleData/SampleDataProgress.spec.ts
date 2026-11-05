@@ -86,4 +86,22 @@ describe("SampleDataProgress", () => {
     // no rows were sent in this session, so there is nothing real to replay
     expect(wrapper.findComponent({ name: "SampleLivePreview" }).exists()).toBe(false);
   });
+
+  it("keeps one live region in the page that announces done and failed", async () => {
+    const wrapper = mountProgress();
+    const region = wrapper.get('[data-test="sample-data-progress-announcer"]');
+    expect(region.attributes("role")).toBe("status");
+    expect(region.attributes("aria-live")).toBe("polite");
+    expect(region.text()).toBe("");
+    await wrapper.setProps({ done: true });
+    expect(wrapper.get('[data-test="sample-data-progress-announcer"]').element).toBe(
+      region.element,
+    );
+    expect(region.text()).toBe("Sample data loaded");
+    await wrapper.setProps({ done: false });
+    session.status.value = "failed";
+    await nextTick();
+    expect(region.text()).not.toBe("");
+    expect(region.text()).not.toBe("Sample data loaded");
+  });
 });

@@ -16,6 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-3 overflow-y-auto" data-test="sample-data-progress">
+    <span
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      data-test="sample-data-progress-announcer"
+      >{{ announcement }}</span
+    >
     <div class="flex shrink-0 flex-col gap-2">
       <div class="flex items-end justify-between gap-3">
         <strong class="text-text-heading text-sm">{{
@@ -106,6 +113,14 @@ const { t } = useI18nTyped();
 const store = useStore();
 const session = useSampleDataSession();
 const live = computed(() => !props.done && session.status.value === "loading");
+// the region stays in the page so the change of its text is announced
+const announcement = computed(() =>
+  props.done
+    ? t("sampleData.progress.done")
+    : session.status.value === "failed"
+      ? t("sampleData.toast.loadFailed")
+      : raw(""),
+);
 const percent = computed(() =>
   raw(`${props.done ? 100 : Math.round(session.fraction.value * 100)}%`),
 );

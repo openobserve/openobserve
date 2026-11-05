@@ -39,7 +39,7 @@ const ORG = "test-org";
 const session = useSampleDataSession();
 
 const mounted: { unmount: () => void }[] = [];
-const mountTour = async (start = "/") => {
+const mountTour = async (start = "/", attachTo?: HTMLElement) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -53,7 +53,7 @@ const mountTour = async (start = "/") => {
     state: { selectedOrganization: { identifier: ORG }, kioskMode: false },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale } });
-  const wrapper = mount(SampleDataTour, { global: { plugins: [store, router, i18n] } });
+  const wrapper = mount(SampleDataTour, { attachTo, global: { plugins: [store, router, i18n] } });
   mounted.push(wrapper);
   return { wrapper, router };
 };
@@ -161,5 +161,21 @@ describe("SampleDataTour", () => {
     release();
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
+  });
+
+  it("moves focus into the panel when the tour starts, and to Finish Tour on the last step", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    try {
+      session.startTour(ORG, 0);
+      const { wrapper } = await mountTour("/", host);
+      await flushPromises();
+      expect(document.activeElement).toBe(wrapper.get('[data-test="sample-tour-panel"]').element);
+      session.setTourIndex(SAMPLE_TOUR_STEPS.length);
+      await flushPromises();
+      expect(document.activeElement).toBe(wrapper.get('[data-test="sample-tour-finish"]').element);
+    } finally {
+      host.remove();
+    }
   });
 });
