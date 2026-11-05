@@ -302,7 +302,11 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
             "/rest/api/2/issue",
             Some(json!({ "fields": fields })),
         )
-        .await?;
+        .await;
+    let issue = match issue {
+        Ok(issue) => issue,
+        Err(refused) => return Err(name_rejected_token(&jira, refused).await),
+    };
     let key = issue["key"].as_str().unwrap_or_default();
     if !key.is_empty() {
         *created = Some((key.to_string(), Instant::now()));
@@ -359,6 +363,21 @@ async fn comment_on(jira: &Jira, key: &str, ctx: &NotificationContext) -> Result
     )
     .await?;
     Ok(format!("commented on {key}"))
+}
+
+/// Jira Cloud treats a wrong token as anonymous, so only `/myself` can tell it from a bad project.
+async fn name_rejected_token(jira: &Jira, refused: anyhow::Error) -> anyhow::Error {
+    let has_status = |e: &anyhow::Error, status: u16| {
+        e.downcast_ref::<JiraRejected>()
+            .is_some_and(|r| r.status == status)
+    };
+    if !has_status(&refused, 400) {
+        return refused;
+    }
+    match jira.call(Method::GET, "/rest/api/2/myself", None).await {
+        Err(e) if has_status(&e, 401) => e,
+        _ => refused,
+    }
 }
 
 /// Answers the destination form's lookups with the credentials it typed, or the saved token.
@@ -1863,6 +1882,57 @@ mod tests {
                 assert_eq!(rejected.status, 401);
                 assert_eq!(rejected.message, REJECTED_TOKEN);
                 assert_eq!(err.to_string(), REJECTED_TOKEN);
+            },
+        );
+    }
+
+    /// A site that finds nothing, refuses every create with a 400 and answers `/myself` with `me`.
+    async fn refusing_site(me: axum::http::StatusCode) -> String {
+        let app = axum::Router::new()
+            .route(
+                "/rest/api/2/search/jql",
+                axum::routing::post(|| async { axum::Json(json!({"issues": []})) }),
+            )
+            .route(
+                "/rest/api/2/issue",
+                axum::routing::post(|| async {
+                    (
+                        axum::http::StatusCode::BAD_REQUEST,
+                        axum::Json(json!({"errors": {"project": "project is not valid"}})),
+                    )
+                }),
+            )
+            .route(
+                "/rest/api/2/myself",
+                axum::routing::get(move || async move { me }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        base
+    }
+
+    #[test]
+    fn a_wrong_token_that_jira_reads_as_anonymous_is_named_as_the_token() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_wrong_token_that_jira_reads_as_anonymous_is_named_as_the_token"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let ctx = anomaly_ctx("value", STATUS_FIRING);
+                let base = refusing_site(axum::http::StatusCode::UNAUTHORIZED).await;
+                let err = send(&endpoint(base), &ctx).await.unwrap_err();
+                let rejected = err.downcast_ref::<JiraRejected>().unwrap();
+                assert_eq!(rejected.status, 401);
+                assert_eq!(rejected.message, REJECTED_TOKEN);
+
+                let base = refusing_site(axum::http::StatusCode::OK).await;
+                let err = send(&endpoint(base), &ctx).await.unwrap_err();
+                let rejected = err.downcast_ref::<JiraRejected>().unwrap();
+                assert_eq!(rejected.status, 400);
+                assert_ne!(rejected.message, REJECTED_TOKEN);
             },
         );
     }
