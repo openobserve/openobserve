@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { queryClient } from "@/composables/query/queryClient";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
@@ -305,6 +306,16 @@ describe("OnCallSchedulePresets", () => {
     phone.on = false;
     service.listSchedulePresets.mockResolvedValue({ data: [preset, other, split] } as any);
     service.applySchedulePreset.mockResolvedValue({ data: {} } as any);
+  });
+
+  it("tells the page when the license refuses the catalogue", async () => {
+    queryClient.clear();
+    service.listSchedulePresets.mockRejectedValueOnce({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = await renderOpen();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
   });
 
   /// The first card is already chosen: an empty body charges a click for a shape nobody had rejected yet.

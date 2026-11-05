@@ -1098,7 +1098,7 @@ pub async fn retry_run(
 }
 
 // an error, not Ok, so alert history records the skipped delivery instead of a success
-fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
+pub(crate) fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
     if entitled {
         return Ok(());
     }

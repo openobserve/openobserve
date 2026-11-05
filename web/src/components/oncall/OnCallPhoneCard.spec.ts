@@ -252,6 +252,24 @@ describe("OnCallPhoneCard", () => {
     failed.unmount();
   });
 
+  it("tells the page when the license refuses the read, and not for any other failure", async () => {
+    queryClient.clear();
+    service.getContact.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const denied = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+    await flushPromises();
+    expect(denied.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    denied.unmount();
+
+    queryClient.clear();
+    service.getContact.mockRejectedValue({ response: { status: 403, data: {} } });
+    const failed = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+    await flushPromises();
+    expect(failed.emitted("licenseDenied")).toBeUndefined();
+    failed.unmount();
+  });
+
   it("empty: offers a number box and Send code", async () => {
     const w = await render(contact());
     expect(find(w, "input").exists()).toBe(true);

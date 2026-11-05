@@ -17,8 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- What has been sent to the reader: the open pages that still need them, then the history grouped by alert. -->
 <template>
   <div class="flex shrink-0 flex-col gap-5" data-test="oncall-my-deliveries">
+    <LicenseDeniedState
+      v-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-my-deliveries-license-denied"
+    />
+
     <OEmptyState
-      v-if="loadError !== null"
+      v-else-if="loadError !== null"
       size="inline"
       variant="error"
       :title="t('oncall.myDeliveriesLoadFailed')"
@@ -278,6 +284,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -303,6 +310,7 @@ import type { Channel, MyDelivery } from "@/ts/interfaces/oncall";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { apiErrorMessage, apiErrorText, formatOnCallInstant, isEscalating } from "@/utils/oncall";
 
 const props = withDefaults(
@@ -327,7 +335,12 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ unread: [count: number]; "test-page": []; "join-team": [] }>();
+const emit = defineEmits<{
+  unread: [count: number];
+  "test-page": [];
+  "join-team": [];
+  licenseDenied: [features: string[]];
+}>();
 
 /// The default page; the body is sized to exactly this many rows, and a larger page scrolls inside it.
 const PAGE_ROWS = 10;
@@ -567,6 +580,7 @@ let latestDeliveriesRead = 0;
 let loadedOnce = false;
 /// Set only when the first load fails, so "nothing was sent" is never said for a read that did not happen.
 const loadError = ref<string | null>(null);
+const licenseDenied = ref<string[] | null>(null);
 
 /// Pages where the loaded window shows them; sends the window did not reach still count, one each.
 function unreadPages(loaded: MyDelivery[], serverUnread: number): number {
@@ -597,10 +611,12 @@ async function fetchDeliveries(force = false, withOpen = true) {
     setUnread(unreadPages(allRows.value, data?.unread ?? 0));
     loadedOnce = true;
     loadError.value = null;
+    licenseDenied.value = null;
   } catch (err: unknown) {
     if (readId !== latestDeliveriesRead) return;
+    const denied = licenseDeniedFeatures(err);
     // A failed refresh keeps the inbox on screen rather than emptying it and zeroing the badge.
-    if (loadedOnce) {
+    if (loadedOnce && !denied) {
       toast({
         variant: "error",
         message: raw(apiErrorMessage(err)) || t("oncall.refreshFailed"),
@@ -610,7 +626,10 @@ async function fetchDeliveries(force = false, withOpen = true) {
     rows.value = [];
     allRows.value = [];
     setUnread(0);
-    loadError.value = apiErrorText(err);
+    licenseDenied.value = denied;
+    // The page owns the whole-body lock: a teams read answered from cache would not tell it.
+    if (denied) emit("licenseDenied", denied);
+    else loadError.value = apiErrorText(err);
   } finally {
     if (readId === latestDeliveriesRead) loading.value = false;
   }
