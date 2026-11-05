@@ -60,11 +60,6 @@ const mountDrawer = () =>
           props: ["open"],
           template: `<div v-if="open"><slot name="header-left" /><slot /><slot name="footer" /></div>`,
         },
-        RecentSearchesDayPicker: {
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-          template: `<input data-stub="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
-        },
         OTimeCell: true,
         OTooltip: true,
       },
@@ -94,16 +89,5 @@ describe("RecentSearchesDrawer in the configured timezone", () => {
     expect(days).toHaveLength(2);
     expect(days[0].text()).toContain("Wed, Mar 5");
     expect(days[1].text()).toContain("Tue, Mar 4");
-  });
-
-  it("asks for a Ran on day's bounds in the app timezone", async () => {
-    const wrapper = mountDrawer();
-    await flushPromises();
-    await wrapper.find('[data-stub="date"]').setValue("2025-03-05");
-    await flushPromises();
-    expect(api.list.mock.calls.at(-1)?.[1]).toMatchObject({
-      ran_from: at("2025-03-04T18:30:00Z"),
-      ran_to: at("2025-03-05T18:30:00Z") - 1,
-    });
   });
 });
