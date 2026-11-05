@@ -11312,6 +11312,73 @@
         }
       }
     },
+    "dismiss": {
+      "button": "Dismiss",
+      "title": "Dismiss finding on {alert}",
+      "alertFallback": "this alert",
+      "scope": "Hides \"{finding}\" for this alert from the next runs. The alert itself does not change.",
+      "reason": "Reason",
+      "reasons": {
+        "expected": "Expected for this alert",
+        "known_issue": "Known issue, handled elsewhere",
+        "not_useful": "Correct, but not worth acting on",
+        "false_positive": "The finding is wrong",
+        "other": "Other"
+      },
+      "reasonUnknown": "Another reason",
+      "reasonRequired": "Choose a reason.",
+      "note": "Note",
+      "noteHelp": "Required when the reason is Other. Seen by you and by people who can dismiss findings.",
+      "noteRequired": "Add a note when the reason is Other.",
+      "noteTooLong": "Shorten the note to 500 characters or fewer.",
+      "duration": "Hide for",
+      "untilReopened": "Until reopened",
+      "endsOn": "Hidden until {date}. After that, the finding shows again only if a later run still detects it.",
+      "endsNever": "Hidden until someone reopens it.",
+      "saved": "Dismissed until {date}. Find it under Dismissed.",
+      "savedNoEnd": "Dismissed until reopened. Find it under Dismissed.",
+      "error": {
+        "denied": "You don't have permission to dismiss findings. Ask an admin for edit access to Alert Calibration.",
+        "gone": "This alert no longer exists, or you can no longer see it. The page was refreshed.",
+        "changed": "This finding's dismissal changed while you were editing. The page now shows its current state; check it and dismiss again.",
+        "throttled": "Too many requests. Wait a moment, then try again.",
+        "failed": "The dismissal couldn't be saved. Your entries are kept; try again."
+      },
+      "filterOpen": "Open",
+      "filterDismissed": "Dismissed ({count}) | Dismissed ({count})",
+      "allOpenDismissed": "Nothing open. {count} dismissed finding is hidden; see Dismissed. | Nothing open. {count} dismissed findings are hidden; see Dismissed.",
+      "ruleAllDismissed": "Nothing open: {count} alert's finding is dismissed. | Nothing open: {count} alerts' findings are dismissed.",
+      "col": {
+        "alert": "Alert",
+        "finding": "Finding",
+        "reason": "Reason",
+        "note": "Note",
+        "by": "Dismissed by",
+        "until": "Hidden until"
+      },
+      "deletedAlert": "Deleted alert",
+      "noteHidden": "Hidden",
+      "noteHiddenHelp": "Only its author and people who can dismiss findings see the note.",
+      "byAgo": "{actor}, {time}",
+      "findingWithPattern": "{rule}: {pattern}",
+      "pattern": {
+        "ignored_matcher": "matcher ignored",
+        "empty_scope": "empty scope",
+        "source_inactive": "source inactive"
+      },
+      "emptyTitle": "No dismissed findings",
+      "emptyDescription": "Findings you dismiss are listed here until they end or are reopened.",
+      "loadFailedTitle": "Dismissed findings couldn't be loaded",
+      "statesUnknown": "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
+      "capped": "Showing {shown} of {total} dismissed finding. | Showing {shown} of {total} dismissed findings.",
+      "endedNote": "Ended dismissals are not listed. Their findings return only when a later run detects them again.",
+      "reopen": "Reopen",
+      "reopened": "Reopened. The finding is eligible for the next analysis.",
+      "reopenChanged": "This dismissal changed since you loaded it. The list was refreshed; check it and try again.",
+      "reopenDenied": "You don't have permission to reopen findings. Ask an admin for edit access to Alert Calibration.",
+      "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
+      "reopenFailed": "The finding couldn't be reopened. Try again."
+    },
     "tabs": {
       "runs": "Runs",
       "dashboard": "Dashboard"
@@ -11593,6 +11660,7 @@
     "dashboard": {
       "latestRunAgo": "Latest run {time}",
       "findings": "Findings",
+      "openFindings": "Open findings",
       "alertsInScope": "Alerts in scope",
       "coverage": "Coverage",
       "attention": "What needs attention",

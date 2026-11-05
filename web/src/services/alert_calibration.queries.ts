@@ -22,6 +22,20 @@ import alertCalibration, {
   type UpdateAlertCalibrationConfig,
 } from "./alert_calibration";
 import { alertCalibrationKeys } from "./alert_calibration.querykeys";
+import {
+  LIST_MAX_PAGES,
+  LIST_PAGE,
+  type DismissalView,
+  type DismissBody,
+} from "@/components/alert_calibration/dismissals";
+
+/** Every active dismissal the reader can see, up to the client's page cap. */
+export interface ActiveDismissals {
+  items: DismissalView[];
+  /** The full visible count, so it can exceed `items` once the cap is reached. */
+  total: number;
+  capped: boolean;
+}
 
 /** `null` until the org's first save: the server answers 404 for an org with no config row. */
 export const alertCalibrationConfigQuery = (org: string) =>
@@ -66,4 +80,52 @@ export const requestAlertCalibrationRunMutation = (org: string) =>
     mutationFn: () => alertCalibration.requestRun(org),
     // The caller says what happens next; a run only changes the digest stream, which is never cached.
     meta: { silentError: true },
+  });
+
+/** Pages the active list to the cap; `total` comes from the first page, which counts every visible row. */
+export const activeDismissalsQuery = (org: string) =>
+  queryOptions({
+    queryKey: alertCalibrationKeys.dismissals(org),
+    queryFn: async ({ signal }): Promise<ActiveDismissals> => {
+      const items: DismissalView[] = [];
+      let total = 0;
+      let cursor: string | null = null;
+      for (let page = 0; page < LIST_MAX_PAGES; page += 1) {
+        const res = await alertCalibration.listDismissals(
+          org,
+          { state: "active", limit: LIST_PAGE, ...(cursor ? { cursor } : {}) },
+          signal,
+        );
+        if (page === 0) total = res.data.total;
+        items.push(...res.data.items);
+        cursor = res.data.next_cursor;
+        if (!cursor) return { items, total, capped: false };
+      }
+      return { items, total, capped: true };
+    },
+    // A board folds findings by this list, so each mount reads it fresh.
+    staleTime: 0,
+  });
+
+/** Resolves only once the list refetch lands, so nothing folds before the server and the list agree. */
+export const dismissFindingMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async ({ findingId, body }: { findingId: string; body: DismissBody }) =>
+      (await alertCalibration.dismissFinding(org, findingId, body)).data,
+    meta: {
+      invalidates: [alertCalibrationKeys.dismissals(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
+  });
+
+export const reopenDismissalMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async ({ id, revision }: { id: string; revision: number }) =>
+      (await alertCalibration.reopenDismissal(org, id, revision)).data,
+    meta: {
+      invalidates: [alertCalibrationKeys.dismissals(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });

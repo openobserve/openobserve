@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type {
+  DismissalPage,
+  DismissalView,
+  DismissBody,
+} from "@/components/alert_calibration/dismissals";
 
 /** The stored row `GET` and `PUT /api/v2/{org}/alert_calibration/config` return. */
 export interface AlertCalibrationConfig {
@@ -44,6 +49,13 @@ export interface AlertCalibrationLastRun {
 
 export interface AlertCalibrationStatus {
   last_run: AlertCalibrationLastRun | null;
+}
+
+/** The list's query: `state` defaults to active on the server, and `cursor` is the previous page's `next_cursor`. */
+export interface DismissalListParams {
+  state?: "active" | "expired" | "reopened" | "all";
+  cursor?: string;
+  limit?: number;
 }
 
 /** The digest reads, as paths under `/digests`: runs, runs flagging an alert, one run's records, and per-rule tallies. */
@@ -90,6 +102,25 @@ const alertCalibration = {
     const res = await http().get<T[]>(`${base(org)}/digests${read}`, { params, signal });
     return res.data ?? [];
   },
+  // The dismissal calls render their own refusal, so the access boundary records no 403 (P5a-D5).
+  listDismissals: (org: string, params: DismissalListParams, signal?: AbortSignal) =>
+    http().get<DismissalPage>(`${base(org)}/dismissals`, {
+      params,
+      signal,
+      silentForbidden: true,
+    }),
+  dismissFinding: (org: string, findingId: string, body: DismissBody) =>
+    http().post<DismissalView>(
+      `${base(org)}/findings/${encodeURIComponent(findingId)}/dismiss`,
+      body,
+      { silentForbidden: true },
+    ),
+  reopenDismissal: (org: string, id: string, expectedRevision: number) =>
+    http().post<DismissalView>(
+      `${base(org)}/dismissals/${encodeURIComponent(id)}/reopen`,
+      { expected_revision: expectedRevision },
+      { silentForbidden: true },
+    ),
 };
 
 export default alertCalibration;

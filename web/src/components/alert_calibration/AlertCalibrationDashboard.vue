@@ -50,39 +50,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton class="rounded-surface h-56 w-full" />
     </div>
 
-    <OEmptyState
-      v-else-if="data.error.value"
-      size="hero"
-      illustration="broken-panel"
-      variant="error"
-      :title="t('alertCalibration.digests.errorTitle')"
-      :description="raw(data.error.value)"
-      :action-label="t('alertCalibration.retry')"
-      action-icon="refresh"
-      @action="refresh"
-    />
+    <!-- Dismissals outlive runs and the config, so they stay reachable when there is no board. -->
+    <div
+      v-else-if="data.error.value || !config?.enabled || !latest"
+      class="flex flex-col gap-3"
+      data-test="alert-calibration-dashboard-no-board"
+    >
+      <div v-if="dismissedReachable" class="flex justify-end">
+        <AlertCalibrationFindingsFilter
+          :model-value="view"
+          :dismissed-label="dismissedLabel"
+          @update:model-value="onView"
+        />
+      </div>
 
-    <OEmptyState
-      v-else-if="!config?.enabled"
-      size="hero"
-      illustration="schedule"
-      :title="t('alertCalibration.dashboard.notEnabledTitle')"
-      :description="t('alertCalibration.dashboard.notEnabledDescription')"
-      :action-label="t('alertCalibration.configure')"
-      action-icon="settings"
-      data-test="alert-calibration-dashboard-not-enabled"
-      @action="configure"
-    />
+      <AlertCalibrationDismissedList v-if="view === 'dismissed'" />
 
-    <OEmptyState
-      v-else-if="!latest"
-      size="hero"
-      illustration="history"
-      :title="t('alertCalibration.dashboard.emptyTitle', { days: RUNS_LOOKBACK_DAYS })"
-      :description="t('alertCalibration.dashboard.emptyDescription')"
-      hide-action
-      data-test="alert-calibration-dashboard-empty"
-    />
+      <OEmptyState
+        v-else-if="data.error.value"
+        size="hero"
+        illustration="broken-panel"
+        variant="error"
+        :title="t('alertCalibration.digests.errorTitle')"
+        :description="raw(data.error.value)"
+        :action-label="t('alertCalibration.retry')"
+        action-icon="refresh"
+        @action="refresh"
+      />
+
+      <OEmptyState
+        v-else-if="!config?.enabled"
+        size="hero"
+        illustration="schedule"
+        :title="t('alertCalibration.dashboard.notEnabledTitle')"
+        :description="t('alertCalibration.dashboard.notEnabledDescription')"
+        :action-label="t('alertCalibration.configure')"
+        action-icon="settings"
+        data-test="alert-calibration-dashboard-not-enabled"
+        @action="configure"
+      />
+
+      <OEmptyState
+        v-else
+        size="hero"
+        illustration="history"
+        :title="t('alertCalibration.dashboard.emptyTitle', { days: RUNS_LOOKBACK_DAYS })"
+        :description="t('alertCalibration.dashboard.emptyDescription')"
+        hide-action
+        data-test="alert-calibration-dashboard-empty"
+      />
+    </div>
 
     <div v-else class="flex flex-col gap-5" data-test="alert-calibration-dashboard">
       <AlertCalibrationLastRun only-failure />
@@ -112,28 +129,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="meta" as="p">{{
               t("alertCalibration.dashboard.attentionCaption")
             }}</OText>
+            <OText variant="meta" as="p" data-test="alert-calibration-dashboard-latest-age">
+              {{
+                t("alertCalibration.dashboard.latestRunAgo", {
+                  time: formatAgo(latest.emitted_at),
+                })
+              }}
+            </OText>
           </div>
-          <OText
-            variant="meta"
-            as="p"
-            class="shrink-0"
-            data-test="alert-calibration-dashboard-latest-age"
-          >
-            {{
-              t("alertCalibration.dashboard.latestRunAgo", { time: formatAgo(latest.emitted_at) })
-            }}
-          </OText>
+          <AlertCalibrationFindingsFilter
+            :model-value="view"
+            :dismissed-label="dismissedLabel"
+            @update:model-value="onView"
+          />
         </div>
 
+        <AlertCalibrationDismissedList v-if="view === 'dismissed'" />
+
         <OBanner
-          v-if="countsPending"
+          v-if="view === 'open' && dismissals.unknown.value"
+          variant="error"
+          icon="error"
+          inline-actions
+          data-test="alert-calibration-dashboard-states-unknown"
+        >
+          {{ t("alertCalibration.dismiss.statesUnknown") }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="alert-calibration-dashboard-states-retry"
+              @click="dismissals.query.refetch()"
+            >
+              {{ t("alertCalibration.retry") }}
+            </OButton>
+          </template>
+        </OBanner>
+
+        <OBanner
+          v-if="view === 'open' && countsPending"
           variant="warning"
           data-test="alert-calibration-dashboard-counts-pending"
         >
           {{ visibilityCopy(t, latest).pending.banner }}
         </OBanner>
         <OBanner
-          v-else-if="latest.finding_count === 0"
+          v-else-if="view === 'open' && allDismissed"
+          variant="default"
+          icon="info"
+          data-test="alert-calibration-dashboard-all-dismissed"
+        >
+          {{ copy.allOpenDismissed(hiddenTotal) }}
+        </OBanner>
+        <OBanner
+          v-else-if="view === 'open' && latest.finding_count === 0"
           :variant="isScoped(latest) ? 'info' : 'success'"
           :icon="isScoped(latest) ? 'info' : 'check-circle'"
         >
@@ -141,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
 
         <OCard
-          v-for="group in groups"
+          v-for="group in shownGroups"
           :key="group.rule_id"
           variant="glass"
           :data-test="`alert-calibration-dashboard-rule-${group.rule_id}`"
@@ -187,6 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText v-if="group.pending" variant="meta" as="p" class="px-4 pb-3">
               {{ visibilityCopy(t, latest).pending.banner }}
             </OText>
+            <OText
+              v-else-if="!group.findings.length && group.dismissedAlerts"
+              variant="meta"
+              as="p"
+              class="px-4 pb-3"
+              data-test="alert-calibration-dashboard-rule-all-dismissed"
+            >
+              {{ copy.ruleAllDismissed(group.dismissedAlerts) }}
+            </OText>
             <OText v-else-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
               {{
                 RULE_META[group.rule_id].clusterWide
@@ -223,6 +281,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("alertCalibration.dashboard.openAlert") }}
                   </OButton>
+                  <OButton
+                    v-if="isDismissable(finding)"
+                    variant="ghost-muted"
+                    size="xs"
+                    icon-left="visibility-off"
+                    data-test="alert-calibration-dashboard-dismiss"
+                    @click="openDismiss(finding)"
+                  >
+                    {{ copy.button() }}
+                  </OButton>
                 </li>
               </ul>
               <div class="border-border-default flex justify-end border-t px-3 py-1.5">
@@ -241,12 +309,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCard>
       </section>
     </div>
+
+    <AlertCalibrationDismissDialog
+      v-if="dismissTarget"
+      :key="dismissTarget.finding_id"
+      v-model:open="dismissOpen"
+      :finding="dismissTarget"
+      :refresh="data.load"
+    />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, shallowRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -264,9 +340,22 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
+import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
 import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
+import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
+import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
+import AlertCalibrationFindingsFilter from "./AlertCalibrationFindingsFilter.vue";
+import {
+  dismissalCopy,
+  dismissedSinceRun,
+  hiddenByRun,
+  isDismissable,
+  openCount,
+  openFindings,
+  type DismissableFinding,
+} from "./dismissals";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
   countOrDash,
@@ -289,10 +378,13 @@ import {
 import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
 import { RULE_META, ruleLabelKey, rulesShownFor } from "./rules";
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
+const route = useRoute();
 const { search, orgId } = useDigestSearch();
+const copy = computed(() => dismissalCopy(t, locale.value));
+const dismissals = useActiveDismissals({ reportRefetchFailure: true, freshOnMount: true });
 
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
@@ -326,8 +418,12 @@ const data = useLatestRead(async () => {
   };
 });
 
+/** Both reads settle before the first paint, so a finding never shows open and then folds (P5a-D3). */
 const loading = computed(
-  () => configQuery.isPending.value || (data.loading.value && !data.data.value),
+  () =>
+    configQuery.isPending.value ||
+    (data.loading.value && !data.data.value) ||
+    !dismissals.settled.value,
 );
 const latest = computed(() => data.data.value?.latest ?? null);
 const version = computed(() => latest.value?.schema_version ?? 1);
@@ -335,18 +431,66 @@ const version = computed(() => latest.value?.schema_version ?? 1);
 const countsPending = computed(
   () => !!data.data.value?.listPending || !!data.data.value?.recordsPending,
 );
+/** Folding follows the list query only, never a mutation in flight (no optimistic hide). */
+const open = computed(() => openFindings(data.data.value?.findings ?? [], dismissals.active.value));
+const hiddenSinceRun = computed(() =>
+  dismissedSinceRun(data.data.value?.findings ?? [], dismissals.active.value),
+);
+const openTotal = computed(() =>
+  latest.value
+    ? openCount(latest.value, data.data.value?.findings ?? [], dismissals.active.value)
+    : null,
+);
+/** A run after the dismissals has no records for them, so its own count of what it left out joins the later ones. */
+const hiddenTotal = computed(
+  () =>
+    hiddenSinceRun.value +
+    (latest.value ? hiddenByRun(latest.value, dismissals.query.data.value) : 0),
+);
+const allDismissed = computed(() => openTotal.value === 0 && hiddenTotal.value > 0);
+
+/** The list's own total, kept apart from the run's counts (P5a-Q4). */
+const dismissedLabel = computed(() =>
+  copy.value.filterDismissed(
+    dismissals.unknown.value ? null : (dismissals.query.data.value?.total ?? 0),
+  ),
+);
+const view = computed(() => (route.query.findings === "dismissed" ? "dismissed" : "open"));
+const dismissedReachable = computed(
+  () => view.value === "dismissed" || (dismissals.query.data.value?.total ?? 0) > 0,
+);
+const onView = (value: unknown) => {
+  if (!value || value === view.value) return;
+  const query = { ...route.query };
+  if (value === "dismissed") query.findings = "dismissed";
+  else delete query.findings;
+  void router.replace({ query });
+};
+
+const dismissTarget = shallowRef<DismissableFinding | null>(null);
+const dismissOpen = ref(false);
+const openDismiss = (finding: DismissableFinding) => {
+  dismissTarget.value = finding;
+  dismissOpen.value = true;
+};
+
 /** A scoped reader never gets the cluster rows, so a cluster rule would claim a clear it cannot see. */
 const groups = computed(() => {
   const scoped = !!latest.value && isScoped(latest.value);
   const rules = rulesShownFor(orgId.value, version.value).filter(
     (rule) => !(scoped && RULE_META[rule].clusterWide),
   );
+  const all = data.data.value?.findings ?? [];
+  const hidden = all.filter((f) => !open.value.includes(f));
   // An empty rule on a run whose counts are unknown has not been shown clear, only not yet read.
-  return findingsByRule(rules, data.data.value?.findings ?? []).map((group) => ({
+  return findingsByRule(rules, open.value).map((group) => ({
     ...group,
     pending: countsPending.value && !group.findings.length,
+    dismissedAlerts: alertCount(hidden.filter((f) => f.rule_id === group.rule_id)),
   }));
 });
+/** The Dismissed view replaces the groups, so none render under it. */
+const shownGroups = computed(() => (view.value === "open" ? groups.value : []));
 /** One alert can hold two findings of a rule, such as its errors and its missing source. */
 const alertCount = (findings: FindingRecord[]) =>
   new Set(findings.map((f) => f.alert_id ?? f.alert_name)).size;
@@ -359,14 +503,14 @@ const latestStats = computed<StatItem[]>(() => {
   return [
     {
       key: "findings",
-      label: t("alertCalibration.dashboard.findings"),
-      value: countsPending.value ? raw("—") : countOrDash(run.finding_count),
+      label: t("alertCalibration.dashboard.openFindings"),
+      value: countsPending.value ? raw("—") : countOrDash(openTotal.value),
       icon: "fact-check",
       tone: countsPending.value
         ? "neutral"
-        : (run.finding_count ?? 0) > 0
+        : (openTotal.value ?? 0) > 0
           ? "warning"
-          : isScoped(run)
+          : isScoped(run) || allDismissed.value
             ? "neutral"
             : "success",
     },
@@ -417,6 +561,7 @@ const viewEvidence = (rule: RuleId) => {
 function refresh() {
   void configQuery.refetch();
   void data.load();
+  void dismissals.query.refetch();
 }
 
 onMounted(() => void data.load());
