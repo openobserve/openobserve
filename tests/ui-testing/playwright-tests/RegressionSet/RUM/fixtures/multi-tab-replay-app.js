@@ -6,7 +6,12 @@ const APP_DIR = path.resolve(__dirname, 'multi-tab-replay');
 const CDN = 'https://browsersdk.openobserve.ai';
 const SDK_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const SDK_PATH_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*\.js$/;
-const PAGES = { '/orders.html': 'orders.html', '/catalogue.html': 'catalogue.html' };
+const PAGES = {
+  '/orders.html': 'orders.html',
+  '/catalogue.html': 'catalogue.html',
+  '/feed.html': 'feed.html',
+  '/report.html': 'report.html',
+};
 const STATIC = {
   '/rum-init.js': ['rum-init.js', 'text/javascript; charset=utf-8'],
   '/app.css': ['app.css', 'text/css; charset=utf-8'],
@@ -95,6 +100,8 @@ function startMultiTabReplayServer(opts) {
         origin,
         ordersUrl: `${origin}/orders.html`,
         catalogueUrl: `${origin}/catalogue.html`,
+        feedUrl: `${origin}/feed.html`,
+        reportUrl: `${origin}/report.html`,
         sdkUrl: `${CDN}/${opts.sdkVersion}/openobserve-rum.js`,
         sdkDownloadError: () => fetchSdkFile(opts.sdkVersion, 'openobserve-rum.js', cache).then(() => '', (err) => String(err?.message || err)),
         close: () => new Promise((done) => server.close(() => done())),
@@ -180,4 +187,11 @@ async function recordTwoTabSession(context, server, org) {
   };
 }
 
-module.exports = { startMultiTabReplayServer, recordTwoTabSession, ORDERS_TAB, CATALOGUE_TAB };
+module.exports = {
+  startMultiTabReplayServer,
+  recordTwoTabSession,
+  nextReplayUpload,
+  rumContext,
+  ORDERS_TAB,
+  CATALOGUE_TAB,
+};

@@ -96,6 +96,15 @@ export class RumPerformancePage {
         await this.tabLocator(value).click();
     }
 
+    /** Lists every address the page moved to, so a redirect that later settles elsewhere still shows; start it before the first goto. */
+    watchAddressChanges() {
+        const urls = [];
+        this.page.on('framenavigated', (frame) => {
+            if (frame === this.page.mainFrame()) urls.push(frame.url());
+        });
+        return urls;
+    }
+
     async expectActiveTab(value, timeoutMs = 10000) {
         await expect(this.tabLocator(value)).toHaveAttribute('data-state', 'on', {
             timeout: timeoutMs,

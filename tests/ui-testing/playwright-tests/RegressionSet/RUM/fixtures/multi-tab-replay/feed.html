@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order feed</title>
+  <!--O2_CONFIG-->
+  <script src="/sdk/openobserve-rum.js"></script>
+  <script src="/rum-init.js"></script>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <header class="bar" data-test="sg-heading"><strong>Order feed</strong><span>Page 1</span></header>
+  <main>
+    <section class="panel">
+      <p data-test="sg-entry-count">Entries: 0</p>
+      <button data-test="sg-add-entry-btn" type="button">Add entry</button>
+    </section>
+    <section class="panel">
+      <h2>Latest entries</h2>
+      <div data-test="sg-feed"></div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var count = 0;
+      var feed = document.querySelector('[data-test="sg-feed"]');
+      var label = document.querySelector('[data-test="sg-entry-count"]');
+      document.querySelector('[data-test="sg-add-entry-btn"]').addEventListener('click', function () {
+        count += 1;
+        label.textContent = 'Entries: ' + count;
+        var entry = document.createElement('p');
+        entry.textContent = 'Entry #' + count;
+        // appendChild is what makes the recorder name the parent by position, the reference a lost segment shifts.
+        feed.appendChild(entry);
+      });
+    })();
+  </script>
+</body>
+</html>

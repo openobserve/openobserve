@@ -23,6 +23,9 @@ const TAGS = tags('@P0');
 const SEARCH_URL = /\/api\/[^/]+\/_search(_stream)?(\?|$)/;
 // The app probe of an org that never ingested RUM answers 400 "stream not found" (code 20002) by design; the shell handles it.
 const STREAM_NOT_FOUND = /"code":\s*20002|Search stream not found/;
+const TRENDS_QUERY_URL = /\/_search_stream\?.*panel_id=rum-analytics-trends/;
+const APP_PROBE_SQL = /AS app, COUNT/;
+const APP_PROBE_HOLD_MS = 3000;
 
 /** Records every `_search` / `_search_stream` answered with HTTP 400 (SQL + message) and the SQL of every 200; start it before the first goto. */
 function watchSearch400(page) {
@@ -68,6 +71,15 @@ function watchSearch400(page) {
       page.off('response', onResponse);
     },
   };
+}
+
+/** Lists the SQL of every Trends chart query the page sends; start it before the first goto. */
+function watchTrendsQueries(page) {
+  const sql = [];
+  page.on('request', (r) => {
+    if (TRENDS_QUERY_URL.test(r.url())) sql.push(sqlOf(r));
+  });
+  return sql;
 }
 
 const describe400 = (bad) => bad.map((b) => `${b.message}\n${b.sql}`).join('\n---\n');
@@ -120,6 +132,16 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         (now) => buildMobileScreensSeed(runAppId('pa-vn-mob'), now),
       ], { has: ['view_name', 'session_has_replay', 'action_target_name', 'geo_info_country'] });
       [web, mob] = state.facts;
+    });
+
+    test('the Trends chart queries the selected app (ENT#3262)', {
+      tag: [...tags('@P1'), '@bug-3262'],
+    }, async ({ page }) => {
+      const pa = new PageManager(page).rumProductAnalyticsPage;
+      const trends = watchTrendsQueries(page);
+      await pa.goto('overview', { app: web.appId, period: '7d' }, { org: state.org });
+      await expect.poll(() => trends.length, { timeout: 30000, message: 'the Trends chart must send its query' }).toBeGreaterThan(0);
+      for (const sql of trends) expect(sql).toContain(`application_id = '${web.appId}'`);
     });
 
     test('a web app in an org with view_name loads Pages, Entry/Exit, the funnel and the quick starts (ENT#2798)', {
@@ -445,6 +467,27 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await w.attach(testInfo);
         w.stop();
       }
+    });
+
+    test('sends no Trends query while no app is known (ENT#3262)', {
+      tag: [...tags('@P1'), '@bug-3262'],
+    }, async ({ page }) => {
+      const pa = new PageManager(page).rumProductAnalyticsPage;
+      const trends = watchTrendsQueries(page);
+      let probesHeld = 0;
+      // The panel mounts while the app probe is pending, so a slow probe gives the invalid query all the time it needs.
+      await page.route(SEARCH_URL, async (route) => {
+        if (APP_PROBE_SQL.test(sqlOf(route.request()))) {
+          probesHeld += 1;
+          await new Promise((resolve) => setTimeout(resolve, APP_PROBE_HOLD_MS));
+        }
+        await route.fallback();
+      });
+      await pa.goto('overview', { period: '7d' }, { org: state.org });
+      await expect(pa.noData).toBeVisible({ timeout: 30000 });
+      await pa.waitForNetworkQuiet();
+      expect(probesHeld, 'Precondition: the page must have asked which apps exist').toBeGreaterThan(0);
+      expect(trends, 'No Trends query may be sent before an app is known').toEqual([]);
     });
   });
 });
