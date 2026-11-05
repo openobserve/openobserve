@@ -16,10 +16,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import alertsService from "@/services/alerts";
+import destinationService from "@/services/alert_destination";
+import templateService from "@/services/alert_templates";
 import commonService from "@/services/common";
 import dashboardService from "@/services/dashboards";
 import jsTransformService from "@/services/jstransform";
-import { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME, SAMPLE_FUNCTIONS } from "./catalog";
+import pipelineService from "@/services/pipelines";
+import {
+  SAMPLE_ALERT_DESTINATION,
+  SAMPLE_ALERT_TEMPLATE,
+  SAMPLE_DASHBOARD_TITLES,
+  SAMPLE_FOLDER_NAME,
+  SAMPLE_FUNCTIONS,
+  SAMPLE_PIPELINE,
+} from "./catalog";
 import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
 
 const accepted = (rows: unknown[]) => ({
@@ -333,6 +343,42 @@ describe("removeSampleData", () => {
     for (const call of vi.mocked(jsTransformService.delete).mock.calls) {
       expect(call).toEqual(["acme", expect.any(String)]);
     }
+    expect(mocks.streamDelete).toHaveBeenCalled();
+    expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
+  });
+
+  it("keeps a sample destination and template that something still uses, and still removes the rest", async () => {
+    vi.mocked(commonService.list_Folders).mockResolvedValue({
+      data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
+    } as any);
+    vi.mocked(dashboardService.list).mockResolvedValueOnce({
+      data: {
+        dashboards: [
+          { dashboard_id: "d1", title: SAMPLE_DASHBOARD_TITLES.overview, folder_id: "sf" },
+        ],
+      },
+    } as any);
+    vi.mocked(pipelineService.getPipelines).mockResolvedValueOnce({
+      data: { list: [{ name: SAMPLE_PIPELINE, pipeline_id: "p1" }] },
+    } as any);
+    vi.mocked(destinationService.delete).mockRejectedValueOnce({ response: { status: 409 } });
+    vi.mocked(templateService.delete).mockRejectedValueOnce({ response: { status: 409 } });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(removeSampleData("acme")).resolves.toEqual([
+        SAMPLE_ALERT_DESTINATION,
+        SAMPLE_ALERT_TEMPLATE,
+      ]);
+    } finally {
+      warn.mockRestore();
+      vi.mocked(commonService.list_Folders).mockResolvedValue({ data: { list: [] } } as any);
+    }
+    expect(dashboardService.delete).toHaveBeenCalledWith("acme", "d1", "sf");
+    expect(pipelineService.deletePipeline).toHaveBeenCalledWith({
+      pipeline_id: "p1",
+      org_id: "acme",
+    });
+    expect(jsTransformService.delete).toHaveBeenCalledTimes(SAMPLE_FUNCTIONS.length);
     expect(mocks.streamDelete).toHaveBeenCalled();
     expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
   });

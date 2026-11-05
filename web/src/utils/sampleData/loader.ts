@@ -359,11 +359,22 @@ const removeAlerts = async (org: string) => {
   }
 };
 
-const removeAlertDelivery = async (org: string) => {
-  await ignoreMissing(() =>
+// a user alert or destination that uses it blocks the delete (409); the rest must still go
+const deleteUnlessInUse = async (name: string, kept: string[], fn: () => Promise<unknown>) => {
+  try {
+    await ignoreMissing(fn);
+  } catch (e: any) {
+    if (e?.response?.status !== 409) throw e;
+    console.warn(`Sample asset "${name}" was kept`, e);
+    kept.push(name);
+  }
+};
+
+const removeAlertDelivery = async (org: string, kept: string[]) => {
+  await deleteUnlessInUse(SAMPLE_ALERT_DESTINATION, kept, () =>
     destinationService.delete({ org_identifier: org, destination_name: SAMPLE_ALERT_DESTINATION }),
   );
-  await ignoreMissing(() =>
+  await deleteUnlessInUse(SAMPLE_ALERT_TEMPLATE, kept, () =>
     templateService.delete({ org_identifier: org, template_name: SAMPLE_ALERT_TEMPLATE }),
   );
 };
@@ -378,11 +389,12 @@ const SAMPLE_STREAM_SET: { name: string; type: string }[] = [
 
 /**
  * Deletes everything the loader creates; each asset is found by its sample name, so it works from any browser.
- * Resolves to the sample functions it kept because something of the user's still uses them.
+ * Resolves to the sample assets it kept because something of the user's still uses them.
  */
 export const removeSampleData = async (org: string): Promise<string[]> => {
+  const kept: string[] = [];
   await removeAlerts(org);
-  await removeAlertDelivery(org);
+  await removeAlertDelivery(org, kept);
   await removeDashboards(org);
   const pipelineId = await findPipelineId(org);
   if (pipelineId) {
@@ -390,7 +402,6 @@ export const removeSampleData = async (org: string): Promise<string[]> => {
       pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
     );
   }
-  const kept: string[] = [];
   for (const name of SAMPLE_FUNCTIONS) {
     try {
       await ignoreMissing(() => jsTransformService.delete(org, name));
