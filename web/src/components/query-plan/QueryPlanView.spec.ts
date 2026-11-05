@@ -70,7 +70,6 @@ describe("QueryPlanView", () => {
       wrapper.find(`[data-test="query-profile-card-${opId("RemoteScanExec")}-badge"]`).text(),
     ).toBe("Stage 1");
     expect(wrapper.find('[data-test="query-profile-canvas"]').text()).not.toMatch(/%|rows/);
-    expect(wrapper.find('[data-test="query-profile-scope-toolbar"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test^="query-profile-variant-"]')).toHaveLength(0);
   });
 

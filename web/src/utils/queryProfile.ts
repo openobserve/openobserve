@@ -129,7 +129,7 @@ export interface SearchStreamResult {
 export type OperatorCategory =
   "scan" | "filter" | "join" | "agg" | "sort" | "exchange" | "projection" | "remote" | "other";
 
-/** "sum" | "max" | "node:<key>" — rescopes the numbers of operators that run on many nodes. */
+/** "sum" | "node:<key>" — rescopes the numbers of operators that run on many nodes. */
 export type StageScope = string;
 
 /** Which clusters the canvas shows: all merged, one leader per cluster, or a single cluster. */
@@ -1044,13 +1044,6 @@ export function scopedValue(op: ProfileOperator, scope: StageScope): ScopedValue
   if (!op.stageId || scope === "sum") {
     return { computeNs: op.totalComputeNs, rows: op.totalRows, on: true };
   }
-  if (scope === "max") {
-    return {
-      computeNs: Math.max(0, ...op.samples.map((s) => s.computeNs)),
-      rows: Math.max(0, ...op.samples.map((s) => s.rows)),
-      on: true,
-    };
-  }
   const sample = op.samples.find((s) => s.nodeKey === scopeNodeKey(scope));
   return sample
     ? { computeNs: sample.computeNs, rows: sample.rows, on: true }
@@ -1086,13 +1079,9 @@ function mergeMetrics(samples: OperatorSample[]): ProfileMetric[] {
   return [...byName.values()];
 }
 
-/** Metrics behind the detail sections: summed across nodes, the slowest node's, or one node's. */
+/** Metrics behind the detail sections: summed across nodes, or one node's. */
 export function metricsForScope(op: ProfileOperator, scope: StageScope): ProfileMetric[] {
   if (!op.stageId || scope === "sum") return mergeMetrics(op.samples);
-  if (scope === "max") {
-    const slowest = [...op.samples].sort((a, b) => b.computeNs - a.computeNs)[0];
-    return slowest?.metrics ?? [];
-  }
   return op.samples.find((s) => s.nodeKey === scopeNodeKey(scope))?.metrics ?? [];
 }
 

@@ -58,10 +58,9 @@ export function variantLabel(t: TranslateFn, variant: StageVariant): I18nText {
   return raw(extra > 0 ? `${names} +${extra}` : names);
 }
 
-/** Short marker of the active stage scope: sum, max, or the chosen node's name. */
+/** Short marker of the active stage scope: the sum, or the chosen node's name. */
 export function scopeTag(t: TranslateFn, model: ProfileModel, scope: StageScope): I18nText {
   if (scope === "sum") return t("search.queryProfile.scopeSumShort");
-  if (scope === "max") return t("search.queryProfile.scopeMaxShort");
   return raw(nodeName(model, scopeNodeKey(scope) ?? ""));
 }
 

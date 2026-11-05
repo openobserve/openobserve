@@ -290,10 +290,8 @@ describe("scopedValue", () => {
   const ingesterFilter = opsNamed(model, "FilterExec").find((op) => op.samples.length === 2)!;
   const leaderJoin = opsNamed(model, "HashJoinExec")[0];
 
-  it("sums by default and takes the largest node for max", () => {
+  it("sums across nodes by default", () => {
     expect(scopedValue(ingesterFilter, "sum").computeNs).toBeCloseTo((27 + 27 * 1.1) * MS);
-    expect(scopedValue(ingesterFilter, "max").computeNs).toBeCloseTo(27 * 1.1 * MS);
-    expect(scopedValue(ingesterFilter, "max").rows).toBe(Math.max(85_000, 85_000 * 1.1));
   });
 
   it("shows one node's sample, or dims when the node is not in the variant", () => {
@@ -323,11 +321,7 @@ describe("metricsForScope / metricSections / per-node rows", () => {
     expect(pruning.total).toBe(560 * 4);
   });
 
-  it("uses the slowest node for max and one node for a node scope", () => {
-    const slowest = metricsForScope(scan, "max");
-    expect(slowest.find((m) => m.name === "time_elapsed_processing")!.value).toBeCloseTo(
-      1480 * 2.2 * MS,
-    );
+  it("uses one node's metrics for a node scope", () => {
     expect(
       metricsForScope(scan, nodeScope("q-0")).find((m) => m.name === "output_rows")!.value,
     ).toBe(2_950_000);

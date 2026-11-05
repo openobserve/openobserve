@@ -56,6 +56,8 @@ export interface AnalyzeFact {
 export interface FoldNotice {
   text: I18nText;
   action: I18nText;
+  /** The action only rescopes the numbers, so the plan's layout and the view stay as they are. */
+  keepView?: boolean;
 }
 
 export interface AnalyzeNotice {

@@ -37,14 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-id="selectedId"
         :left-inset="leftInset"
         :plumbing="fold.plumbing"
-        :notice="clusterNotice ?? notice"
+        :notice="nodeNotice ?? clusterNotice ?? notice"
         @select="pick"
         @fold="act"
-        @notice-action="clusterNotice ? (clusterView = 'all') : onNoticeAction()"
+        @notice-action="onCanvasNotice"
       >
-        <template v-if="viewModel.stages.length" #toolbar>
+        <template v-if="clusters" #toolbar>
           <div
-            v-if="clusters"
             class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
             data-test="query-profile-cluster-toolbar"
           >
@@ -73,39 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </OToggleGroup>
           </div>
-          <div
-            class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
-            data-test="query-profile-scope-toolbar"
-          >
-            <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
-              t("search.queryProfile.stageMetrics")
-            }}</span>
-            <OToggleGroup
-              type="single"
-              :model-value="toggleValue"
-              :aria-label="t('search.queryProfile.stageMetrics')"
-              @update:model-value="onToggle"
-            >
-              <OToggleGroupItem value="sum" size="sm" data-test="query-profile-scope-sum">{{
-                t("search.queryProfile.scopeSum")
-              }}</OToggleGroupItem>
-              <OToggleGroupItem value="max" size="sm" data-test="query-profile-scope-max">{{
-                t("search.queryProfile.scopeMax")
-              }}</OToggleGroupItem>
-            </OToggleGroup>
-            <div class="w-40">
-              <OSelect
-                :model-value="selectedNode"
-                :options="nodeOptions"
-                size="sm"
-                searchable
-                clearable
-                :placeholder="t('search.queryProfile.scopeNode')"
-                data-test="query-profile-scope-node"
-                @update:model-value="onNodeSelect"
-              />
-            </div>
-          </div>
         </template>
       </ProfileCanvas>
     </template>
@@ -125,15 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  clusterNodes,
   clusterSummary,
   clusterViewOf,
   modelForClusterView,
-  nodeScope,
   scopeNodeKey,
   summarizeProfile,
   type ClusterView,
@@ -146,7 +108,7 @@ import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
 import type { FoldNotice } from "./profileStyles";
 import QueryPlanLayout from "./QueryPlanLayout.vue";
-import { roleLabel } from "./profileText";
+import { nodeName } from "./profileText";
 import { useProfileFold } from "./useProfileFold";
 
 const props = defineProps<{
@@ -180,24 +142,21 @@ const clusterNotice = computed<FoldNotice | null>(() => {
   return { text: t("search.queryProfile.oneClusterNote", { cluster, count, total }), action };
 });
 
-const nodeOptions = computed(() =>
-  clusterNodes(viewModel.value)
-    .filter((n) => !n.clusterEntry)
-    .map((n) => ({
-      label: raw([n.name, n.cluster, roleLabel(t, n.role)].filter(Boolean).join(" · ")),
-      value: n.key,
-    })),
-);
+const nodeNotice = computed<FoldNotice | null>(() => {
+  const key = scopeNodeKey(scope.value);
+  if (!key) return null;
+  const node = raw(nodeName(viewModel.value, key));
+  return {
+    text: t("search.queryProfile.nodeScopeNote", { node }),
+    action: t("search.queryProfile.showAllNodes"),
+    keepView: true,
+  };
+});
 
-const selectedNode = computed(() => scopeNodeKey(scope.value));
-const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
-
-function onToggle(value: unknown) {
-  if (value === "sum" || value === "max") scope.value = value;
-}
-
-function onNodeSelect(value: SelectModelValue) {
-  scope.value = typeof value === "string" && value ? nodeScope(value) : "sum";
+function onCanvasNotice() {
+  if (nodeNotice.value) scope.value = "sum";
+  else if (clusterNotice.value) clusterView.value = "all";
+  else onNoticeAction();
 }
 
 function onClusterView(value: unknown) {

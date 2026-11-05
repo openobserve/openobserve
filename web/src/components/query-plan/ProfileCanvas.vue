@@ -401,7 +401,7 @@ function collapseStage(stageId: string) {
 }
 
 function onNotice() {
-  pending = "fit";
+  if (!props.notice?.keepView) pending = "fit";
   emit("notice-action");
 }
 
