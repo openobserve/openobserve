@@ -951,36 +951,15 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
     subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
     await flushPromises();
   };
-  // Tracing is a folded optional step, so open it the way the user does first.
-  const mountK8s = async () => {
-    const w = mount(SetupCardRenderer, {
+  const mountK8s = () =>
+    mount(SetupCardRenderer, {
       props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
       global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
       attachTo: document.body,
     });
-    await w.find('[data-test="ai-step-fold-instrument"] > button').trigger("click");
-    await flushPromises();
-    return w;
-  };
-
-  it("puts the folded tracing step before the data check", () => {
-    wrapper = mount(SetupCardRenderer, {
-      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
-      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
-      attachTo: document.body,
-    });
-    expect(wrapper.findAllComponents(OStep).map((st) => st.props("title"))).toEqual([
-      "Quick install (recommended)",
-      "Optional: trace your apps",
-      "See which workloads talk to each other: eBPF network flows",
-      "Verify data in OpenObserve",
-    ]);
-    expect(wrapper.find('[data-test="ai-step-fold-instrument"]').exists()).toBe(true);
-    expect(subTabs().exists()).toBe(false);
-  });
 
   it("renders the nested language toggle under language libraries and switches code", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     expect(subTabs().exists()).toBe(true);
     for (const id of ["java", "dotnet", "nodejs", "python"]) {
       expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
@@ -998,7 +977,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
     await pickTop("ebpf");
     for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
@@ -1014,7 +993,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", " 8080, 9000-9100 ,,");
     await type("ebpfExe", "/app/it's*");
@@ -1027,7 +1006,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", "  ");
     await type("ebpfCmd", "*reports.py*");
@@ -1038,7 +1017,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("warns and hides the command when every selector is blank", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     await pickTop("ebpf");
     expect(warning().exists()).toBe(true);
     expect(warning().text()).toContain("Fill in at least one");
@@ -1046,7 +1025,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     await pickTop("ebpf");
     await type(
       "ebpfCmd",
@@ -1061,7 +1040,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("treats a field holding only commas and spaces as blank", async () => {
-    wrapper = await mountK8s();
+    wrapper = mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", " ,,, ");
     await type("ebpfExe", ",");
@@ -1396,21 +1375,19 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   it.each([
     ["no answer", { languages: [] }],
     ["a library with no known language", { traces: "library", languages: ["go"] }],
-  ] as [string, SetupCardPresets][])(
-    "shows the folded optional step for %s, as on the Data sources page",
-    (_, presets) => {
-      mountOnboarding(presets);
-      expect(titles()).toEqual([
-        "Quick install (recommended)",
-        "Optional: trace your apps",
-        "See which workloads talk to each other: eBPF network flows",
-        "Check Your Data",
-      ]);
-      expect(find("ai-step-fold-instrument").exists()).toBe(true);
-    },
-  );
+  ] as [string, SetupCardPresets][])("folds the optional steps for %s", (_, presets) => {
+    mountOnboarding(presets);
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Trace your applications: language libraries or eBPF",
+      "See which workloads talk to each other: eBPF network flows",
+      "Check Your Data",
+    ]);
+    expect(find("ai-step-fold-instrument").exists()).toBe(true);
+    expect(find("ai-step-fold-network").exists()).toBe(true);
+  });
 
-  it("keeps the verify step and the folded optional step on the Data sources page", () => {
+  it("keeps the verify step and folds nothing on the Data sources page", () => {
     wrapper = mount(SetupCardRenderer, {
       props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
       global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
@@ -1418,11 +1395,11 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
     });
     expect(titles()).toEqual([
       "Quick install (recommended)",
-      "Optional: trace your apps",
+      "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
       "Verify data in OpenObserve",
     ]);
-    expect(find("ai-step-fold-instrument").exists()).toBe(true);
+    expect(wrapper.find('[data-test^="ai-step-fold-"]').exists()).toBe(false);
     expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
   });
 });
@@ -1514,7 +1491,7 @@ describe("SetupCardRenderer — steps host", () => {
     });
     expect(setSteps.mock.lastCall![0].map((s: { title: string }) => s.title)).toEqual([
       "Quick install (recommended)",
-      "Optional: trace your apps",
+      "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",
     ]);

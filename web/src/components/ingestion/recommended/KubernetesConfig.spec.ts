@@ -83,11 +83,9 @@ describe("kubernetesCard builder", () => {
   it("builds the Kubernetes card metadata and step flow", async () => {
     const card = await buildCard();
     expect(card.provider.name).toBe("Kubernetes");
-    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Kubernetes events", "Traces"]);
-    // The optional steps (tracing, network flows) are folded, but sit before the data check: every
-    // setup step comes before the check, so the check is always last.
+    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Events", "Traces"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "instrument", "network", "verify"]);
-    expect(card.steps.map((s) => !!s.collapsed)).toEqual([false, true, true, false]);
+    expect(card.steps.map((s) => !!s.collapsed)).toEqual([false, false, false, false]);
     expect(card.detect).toMatchObject({
       streamType: "logs",
       streamName: "default",

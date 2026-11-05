@@ -568,9 +568,10 @@ describe("DataSourceSetupCard — onboarding's tracing answer", () => {
     expect(step.inputs.map((i: { id: string }) => i.id)).toEqual(["javaNamespace"]);
   });
 
-  it("keeps the folded optional step with no onboarding around it", () => {
+  it("folds the optional step only inside onboarding", () => {
+    expect(instrument(mountK8s({ languages: [] })).collapsed).toBe(true);
     const step = instrument(mountK8s());
-    expect(step.collapsed).toBe(true);
+    expect(step.collapsed).toBe(false);
     expect(step.inputs).toBeUndefined();
   });
 });

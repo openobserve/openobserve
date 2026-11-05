@@ -163,7 +163,7 @@ const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
 
 const ebpfChoice = (t: TranslateFn): RichCardStepVariant => ({
   id: "ebpf",
-  labelKey: "ingestion.setupCard.k8sEbpfAnyLanguageVariant",
+  labelKey: "ingestion.setupCard.k8sEbpfVariant",
   code: { lang: "bash", raw: EBPF_UPGRADE },
   inputs: [
     {
@@ -202,7 +202,7 @@ const ebpfChoice = (t: TranslateFn): RichCardStepVariant => ({
 const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepVariantGroup)[] => [
   {
     id: "libraries",
-    labelKey: "ingestion.setupCard.k8sLibraryPerLanguageVariant",
+    labelKey: "ingestion.setupCard.k8sLibrariesVariant",
     variants: instrumentVariants(t),
   },
   ebpfChoice(t),
@@ -236,9 +236,10 @@ const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardSte
   if (!langs.length) {
     return {
       ...step,
-      titleKey: "ingestion.setupCard.k8sOptionalTracesTitle",
-      descriptionKey: "ingestion.setupCard.k8sOptionalTracesDesc",
-      collapsed: true,
+      titleKey: "ingestion.setupCard.autoInstrumentTracesTitle",
+      descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
+      chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
+      collapsed: !!presets,
       variants: instrumentChoices(t),
     };
   }
@@ -320,12 +321,7 @@ export default function kubernetesCard(
       tone: "#326ce5",
       runtime: t("ingestion.setupCard.runtimeCluster"),
       setupTime: t("ingestion.setupCard.setupTime3Min"),
-      metaBadges: [
-        t("common.logs"),
-        t("common.metrics"),
-        t("ingestion.setupCard.pillKubernetesEvents"),
-        ...traces,
-      ],
+      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), ...traces],
     },
     steps: [
       {
@@ -354,8 +350,7 @@ export default function kubernetesCard(
         note: isCloud ? raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`) : undefined,
         variants: installVariants,
       },
-      // Every setup step comes before the data check, which is always last. Tracing is optional:
-      // folded on the Data sources page, shown as chosen in onboarding.
+      // The data check is always last; onboarding folds the optional steps.
       ...(instrument ? [instrument] : []),
       {
         id: "network",
@@ -363,7 +358,7 @@ export default function kubernetesCard(
         descriptionKey: "ingestion.setupCard.k8sNetworkFlowsDesc",
         chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
-        collapsed: true,
+        collapsed: !!presets,
         notProvenByDetect: true,
         code: { lang: "bash", raw: EBPF_NETWORK_UPGRADE },
         note: t("ingestion.setupCard.k8sNetworkFlowsNote"),
