@@ -63,7 +63,7 @@ impl SearchContextBuilder {
         let analyzer_rules = generate_analyzer_rules(sql);
         let optimizer_rules = generate_optimizer_rules(req, sql);
         let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
-        let mut ctx = DataFusionContextBuilder::new()
+        let ctx = DataFusionContextBuilder::new()
             .trace_id(&req.trace_id)
             .work_group(req.work_group.clone())
             .analyzer_rules(analyzer_rules)
@@ -74,7 +74,6 @@ impl SearchContextBuilder {
             .await?;
 
         register_udf(&ctx, &sql.org_id)?;
-        datafusion_functions_json::register_all(&mut ctx)?;
 
         Ok(ctx)
     }
@@ -101,7 +100,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
             .schema()
             .as_ref()
             .clone()
-            .with_metadata(Default::default());
+            .with_metadata(arrow_schema::Metadata::default());
         let stream_name = stream.to_quoted_string();
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))

@@ -144,8 +144,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn supports_limit_pushdown(&self) -> bool {
-        true
+    fn limit_behavior(&self) -> datafusion::physical_plan::LimitBehavior {
+        datafusion::physical_plan::LimitBehavior::CopyToChildren
     }
 
     fn execute(
@@ -469,7 +469,10 @@ mod tests {
     #[test]
     fn test_deduplication_exec_supports_limit_pushdown() {
         let exec = make_exec();
-        assert!(exec.supports_limit_pushdown());
+        assert_eq!(
+            exec.limit_behavior(),
+            datafusion::physical_plan::LimitBehavior::CopyToChildren
+        );
     }
 
     #[test]

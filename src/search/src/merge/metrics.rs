@@ -30,6 +30,7 @@ use futures::future::BoxFuture;
 use metrics_index::MetricsFileLayout;
 use parquet::arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter};
 use tokio::io::AsyncWriteExt;
+#[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -40,11 +41,14 @@ use vortex::{
     session::VortexSession,
 };
 
+#[cfg(feature = "vortex")]
+use super::metrics_index::{VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source};
 use super::{
     MergedFile, append_metadata,
-    metrics_index::{Blocks, SourceMetadata, VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source},
+    metrics_index::{Blocks, SourceMetadata},
     new_temp_file,
 };
+#[cfg(feature = "vortex")]
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 const MAX_SERIES_PER_FILE: usize = 1_000_000;
@@ -59,11 +63,13 @@ impl Drop for ReadTask {
     }
 }
 
+#[cfg(feature = "vortex")]
 struct VortexTask<T> {
     handle: tokio::task::JoinHandle<anyhow::Result<T>>,
     cancel: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
+#[cfg(feature = "vortex")]
 impl<T> Drop for VortexTask<T> {
     fn drop(&mut self) {
         self.cancel.take();
@@ -300,6 +306,7 @@ impl ActiveMetricsParquetWriter {
     }
 }
 
+#[cfg(feature = "vortex")]
 struct ActiveMetricsVortexWriter {
     writer: VortexWriter<'static>,
     data_path: tempfile::TempPath,
@@ -308,6 +315,7 @@ struct ActiveMetricsVortexWriter {
     schema: Arc<Schema>,
 }
 
+#[cfg(feature = "vortex")]
 impl ActiveMetricsVortexWriter {
     fn try_new(
         schema: &Arc<Schema>,
@@ -499,6 +507,21 @@ async fn write_parquet(
     Ok(files)
 }
 
+#[cfg(not(feature = "vortex"))]
+async fn write_vortex(
+    _schema: Arc<Schema>,
+    _metadata: FileMeta,
+    _split: FileSplit,
+    _output: MetricsOutput,
+    _rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    _read_task: ReadTask,
+) -> Result<Vec<MergedFile>> {
+    Err(DataFusionError::NotImplemented(
+        "vortex support is not compiled in".to_string(),
+    ))
+}
+
+#[cfg(feature = "vortex")]
 async fn write_vortex(
     schema: Arc<Schema>,
     metadata: FileMeta,
@@ -605,9 +628,15 @@ mod tests {
         meta::promql::{HASH_LABEL, VALUE_LABEL},
     };
     use futures::TryStreamExt;
+    #[cfg(feature = "vortex")]
     use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
+
+    #[cfg(feature = "vortex")]
+    const FORMATS: [FileFormat; 2] = [FileFormat::Parquet, FileFormat::Vortex];
+    #[cfg(not(feature = "vortex"))]
+    const FORMATS: [FileFormat; 1] = [FileFormat::Parquet];
 
     type SourceRow = (u64, i64, Option<u64>);
 
@@ -848,7 +877,7 @@ mod tests {
             "x", "x", "y", "y", "y", "y",
         ]));
         let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let mut output = block_output();
             output.file_format = format;
             let error = produce(&schema, vec![batch.slice(0, 1), batch.slice(1, 5)], output)
@@ -913,7 +942,7 @@ mod tests {
 
         let schema = block_schema(None, false);
         let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
-        for configured_format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for configured_format in FORMATS {
             for (ingester, closed_hour) in [(false, true), (false, false), (true, false)] {
                 let (mode, output) = if ingester {
                     (
@@ -999,7 +1028,7 @@ mod tests {
         let ingester =
             super::super::MergeOutput::for_ingester(config::meta::stream::StreamType::Metrics);
         assert_eq!(ingester.file_format, FileFormat::Parquet);
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let mut output = block_output();
             output.file_format = format;
             output.layout = MetricsFileLayout::HashMerged;
@@ -1018,7 +1047,7 @@ mod tests {
 
     #[tokio::test]
     async fn unsupported_schema_keeps_source_without_index() {
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let schema = block_schema(None, true);
             let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
 
@@ -1046,7 +1075,7 @@ mod tests {
         fields.push(Arc::new(Field::new("start_time", DataType::Utf8, true)));
         let schema = Arc::new(Schema::new(fields));
         let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let mut output = block_output();
             output.file_format = format;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
@@ -1060,7 +1089,7 @@ mod tests {
     #[tokio::test]
     async fn stale_marker_compacts_into_the_block() {
         let stale = config::meta::promql::STALE_NAN_BITS;
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let schema = block_schema(None, false);
             let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, None), (2, 20, None)];
             let mut output = block_output();
@@ -1117,6 +1146,7 @@ mod tests {
         assert_eq!(split.count, 1);
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn single_pass_vortex_blocks_preserve_bits_and_schema() {
         let schema = block_schema(Some("preserved semantic metadata".into()), false);
@@ -1204,6 +1234,7 @@ mod tests {
         assert_eq!(stored_rows, rows);
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn single_pass_vortex_splits_data_and_native_indexes_at_batch_boundaries() {
         let schema = block_schema(None, false);
@@ -1323,7 +1354,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_size_split_metrics_rotates_at_batch_boundary() {
-        for file_format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for file_format in FORMATS {
             assert_size_split_metrics_rotates_at_batch_boundary(file_format).await;
         }
     }
@@ -1459,6 +1490,9 @@ mod tests {
                     assert_eq!(footer.records, meta.records);
                     assert_eq!(footer.original_size, meta.original_size);
                 }
+                #[cfg(not(feature = "vortex"))]
+                FileFormat::Vortex => unreachable!(),
+                #[cfg(feature = "vortex")]
                 FileFormat::Vortex => {
                     let session = VortexSession::default().with_tokio();
                     let vxf = session
@@ -1524,6 +1558,7 @@ mod tests {
         assert!(!observed.exists());
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn vortex_writer_reports_read_only_output_error() {
         let (file, path) = new_temp_file().unwrap();

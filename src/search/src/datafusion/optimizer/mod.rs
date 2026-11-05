@@ -64,9 +64,9 @@ use datafusion::{
         limit_pushdown::LimitPushdown, limit_pushdown_past_window::LimitPushPastWindows,
         limited_distinct_aggregation::LimitedDistinctAggregation,
         output_requirements::OutputRequirements, projection_pushdown::ProjectionPushdown,
-        pushdown_sort::PushdownSort, sanity_checker::SanityCheckPlan,
-        topk_aggregation::TopKAggregation, topk_repartition::TopKRepartition,
-        update_aggr_exprs::OptimizeAggregateOrder, window_topn::WindowTopN,
+        pushdown_sort::PushdownSort, topk_aggregation::TopKAggregation,
+        topk_repartition::TopKRepartition, update_aggr_exprs::OptimizeAggregateOrder,
+        window_topn::WindowTopN,
     },
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
@@ -290,9 +290,6 @@ pub fn generate_physical_optimizer_rules(
         rules.push(Arc::new(SharedSubplanRule::new()));
     }
     // ************************************
-
-    // Validates the final plan, so custom rules cannot break order or distribution requirements
-    rules.push(Arc::new(SanityCheckPlan::new()));
 
     rules
 }
@@ -685,11 +682,9 @@ mod tests {
         let upstream = PhysicalOptimizer::new()
             .rules
             .iter()
-            .filter(|rule| rule.name() != "SanityCheckPlan")
             .map(|rule| format!("{rule:?}"))
             .collect::<Vec<_>>();
         let rules = generate_physical_optimizer_rules(&Request::default(), &test_sql(), vec![]);
-        assert_eq!(rules.last().unwrap().name(), "SanityCheckPlan");
         // Debug, not name(): both OutputRequirements modes share one name.
         let ours = rules[..upstream.len()]
             .iter()
@@ -822,7 +817,6 @@ mod tests {
         if config::get_config().search.feature_shared_cte_enabled {
             expected.push("SharedSubplanRule");
         }
-        expected.push("SanityCheckPlan");
         let actual = ctx
             .state()
             .physical_optimizers()

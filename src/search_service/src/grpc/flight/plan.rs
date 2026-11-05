@@ -72,7 +72,7 @@ pub(super) async fn decode_plan(
     let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = DataFusionContextBuilder::new()
+    let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
         .work_group(req.super_cluster_info.work_group.clone())
         .build(cfg.limit.cpu_num)
@@ -80,7 +80,6 @@ pub(super) async fn decode_plan(
 
     // register udf
     register_udf(&ctx, org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();
@@ -340,7 +339,7 @@ mod tests {
         let placeholder = NewEmptyTable::new("logs", schema.clone());
         for projection in [None, Some(vec![2]), Some(vec![2, 0]), Some(vec![])] {
             let plan = placeholder
-                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .scan(&ctx.state(), projection.as_deref(), &[], None)
                 .await?;
             let empty_exec = plan.downcast_ref::<NewEmptyExec>().unwrap();
             for table_count in [0, 1, 2] {

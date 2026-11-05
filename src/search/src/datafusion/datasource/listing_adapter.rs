@@ -101,7 +101,7 @@ impl TableProvider for ListingTableAdapter {
     async fn scan(
         &self,
         state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -150,10 +150,10 @@ impl TableProvider for ListingTableAdapter {
                 });
                 (Some(filter_projection), projection)
             } else {
-                (projection.cloned(), None)
+                (projection.map(<[usize]>::to_vec), None)
             };
-        let parquet_projection = parquet_projection.as_ref();
-        let filter_projection = filter_projection.as_ref();
+        let parquet_projection = parquet_projection.as_deref();
+        let filter_projection = filter_projection.as_deref();
 
         let parquet_exec = self
             .listing_table
@@ -300,14 +300,21 @@ mod tests {
         physical_plan::{collect, displayable},
     };
     use parquet::arrow::ArrowWriter;
+    #[cfg(feature = "vortex")]
     use vortex::{
         VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
         io::session::RuntimeSessionExt, session::VortexSession,
     };
+    #[cfg(feature = "vortex")]
     use vortex_datafusion::VortexFormat;
 
     use super::*;
     use crate::datafusion::exec::DataFusionContextBuilder;
+
+    #[cfg(feature = "vortex")]
+    const FORMATS: [FileFormat; 2] = [FileFormat::Parquet, FileFormat::Vortex];
+    #[cfg(not(feature = "vortex"))]
+    const FORMATS: [FileFormat; 1] = [FileFormat::Parquet];
 
     fn hash_sorted_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![
@@ -425,6 +432,9 @@ mod tests {
                 writer.write(&batch).unwrap();
                 writer.close().unwrap();
             }
+            #[cfg(not(feature = "vortex"))]
+            FileFormat::Vortex => unreachable!(),
+            #[cfg(feature = "vortex")]
             FileFormat::Vortex => {
                 let session = VortexSession::default().with_tokio();
                 let mut buf = Vec::new();
@@ -448,7 +458,7 @@ mod tests {
     /// per partition, merged by SortPreservingMergeExec without a SortExec.
     #[tokio::test]
     async fn test_hash_sorted_files_merge_without_sort_exec() {
-        for file_format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for file_format in FORMATS {
             assert_hash_sorted_files_merge_without_sort_exec(file_format).await;
         }
     }
@@ -487,6 +497,9 @@ mod tests {
 
         let datafusion_file_format: Arc<dyn DataFusionFileFormat> = match file_format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+            #[cfg(not(feature = "vortex"))]
+            FileFormat::Vortex => unreachable!(),
+            #[cfg(feature = "vortex")]
             FileFormat::Vortex => {
                 Arc::new(VortexFormat::new(VortexSession::default().with_tokio()))
             }
@@ -563,6 +576,7 @@ mod tests {
 
     // Utf8-typed vortex min with max dropped used to panic FilterExec interval analysis on a
     // Utf8View schema
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn test_vortex_utf8view_stats_plan_and_scan() {
         use arrow::array::StringArray;
@@ -669,6 +683,7 @@ mod tests {
         assert_eq!(counts, vec![3]);
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn test_vortex_numeric_file_columns_under_utf8_schema() {
         for string_type in [DataType::Utf8View, DataType::Utf8] {
@@ -676,6 +691,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "vortex")]
     async fn assert_vortex_numeric_file_columns_under_string_type(string_type: DataType) {
         use arrow::array::{Array, BooleanArray, Float64Array, StringArray};
 
@@ -812,7 +828,7 @@ mod tests {
                 .with_repartition_file_scans(false),
         );
         let state = ctx.state();
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+        for format in FORMATS {
             let dir = tempfile::tempdir().unwrap();
             for index in 0..8 {
                 write_hash_sorted_file(
@@ -828,6 +844,9 @@ mod tests {
                 for target in [1, 8] {
                     let file_format: Arc<dyn DataFusionFileFormat> = match format {
                         FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+                        #[cfg(not(feature = "vortex"))]
+                        FileFormat::Vortex => unreachable!(),
+                        #[cfg(feature = "vortex")]
                         FileFormat::Vortex => {
                             Arc::new(VortexFormat::new(VortexSession::default().with_tokio()))
                         }

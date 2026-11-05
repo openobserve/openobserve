@@ -1079,8 +1079,9 @@ mod tests {
 
     async fn assert_cluster_plan_is_sane(sql: &str) {
         let (ctx, plan) = cluster_plan(sql).await;
-        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
-        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+        let options = ctx.state().config_options().clone();
+        let check = datafusion::physical_optimizer::sanity_checker::check_plan_tree_sanity;
+        if let Err(e) = check(&plan, &options.optimizer) {
             panic!(
                 "{sql}: {e}\n{}",
                 datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
