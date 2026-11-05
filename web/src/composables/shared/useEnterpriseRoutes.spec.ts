@@ -690,6 +690,7 @@ describe("useEnterpriseRoutes.ts", () => {
       ["workflowRuns", "workflows"],
       ["onCallTeams", "oncall"],
       ["onCallTeamDetail", "oncall"],
+      ["onCallMine", "oncall"],
       ["incidentList", "incidents"],
       ["incidentDetail", "incidents"],
       ["groups", "rbac"],

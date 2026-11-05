@@ -12,6 +12,7 @@ use sea_orm::{
 };
 
 use super::entity::{alert_composite_children, alert_composites, alerts};
+use crate::errors::{DbError, Error};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i16)]
@@ -171,6 +172,42 @@ pub async fn list_by_org<C: ConnectionTrait>(
         .order_by_asc(alert_composites::Column::Name)
         .all(conn)
         .await
+}
+
+/// Composites in a folder, by the folder slug they store.
+pub async fn count_in_folder<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_id: &str,
+) -> Result<u64, Error> {
+    alert_composites::Entity::find()
+        .filter(alert_composites::Column::Org.eq(org))
+        .filter(alert_composites::Column::FolderId.eq(folder_id))
+        .count(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// `(org, name)` of each composite whose template is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, Error> {
+    let mut query = alert_composites::Entity::find()
+        .select_only()
+        .column(alert_composites::Column::Org)
+        .column(alert_composites::Column::Name)
+        .filter(alert_composites::Column::Template.eq(template));
+    if let Some(org) = org {
+        query = query.filter(alert_composites::Column::Org.eq(org));
+    }
+    query
+        .order_by_asc(alert_composites::Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 /// Total composite definitions across every org — the super-cluster startup

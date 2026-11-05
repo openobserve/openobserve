@@ -58,6 +58,8 @@ pub enum PipelineError {
     // conflict
     #[error("Pipeline with ID {0} modified by someone else. Please refresh.")]
     Modified(String),
+    #[error("Pipeline with ID {0} is running. Please retry after the run ends.")]
+    RunInProgress(String),
     // bad request
     #[error("A realtime pipeline with same source stream already exists")]
     StreamInUse,

@@ -113,6 +113,8 @@ pub enum CompositeServiceError {
     NegativePendingPeriod,
     #[error("{0}")]
     JiraDestinationNotSupported(String),
+    #[error(transparent)]
+    NotificationTarget(crate::alerts::alert::AlertError),
 }
 
 pub async fn create_composite(
@@ -338,6 +340,13 @@ async fn persist(
     if request.pending_period_sec < 0 {
         return Err(CompositeServiceError::NegativePendingPeriod);
     }
+    crate::alerts::alert::validate_template_and_destinations(
+        &request.org,
+        request.template.as_deref(),
+        &request.destinations,
+    )
+    .await
+    .map_err(CompositeServiceError::NotificationTarget)?;
     validate_jira_destinations(&request.org, &request.destinations, request.silence_seconds)
         .await?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
@@ -887,10 +896,116 @@ pub async fn startup_preflight() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::destinations::{Destination, DestinationType, Endpoint, Module};
+    use config::meta::destinations::{Destination, DestinationType, Endpoint, Module, Template};
 
-    use super::validate_jira_destinations;
+    use super::{CompositeCreate, create_composite, update_composite, validate_jira_destinations};
     use crate::alerts::notifications::jira;
+
+    fn composite_request(
+        org: &str,
+        expression: String,
+        destination: &str,
+        template: Option<&str>,
+    ) -> CompositeCreate {
+        CompositeCreate {
+            id: None,
+            org: org.to_string(),
+            folder_id: "default".to_string(),
+            name: "composite".to_string(),
+            description: None,
+            expression,
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: vec![destination.to_string()],
+            template: template.map(str::to_string),
+            context_attributes: None,
+            enabled: false,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows: vec![],
+            priority: None,
+            tags: vec![],
+            owner: None,
+            last_edited_by: None,
+            pending_period_sec: 0,
+            incident_title_template: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_composite_naming_a_missing_destination_or_template_is_refused() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("composite_targets_{}", config::utils::time::now_micros());
+        let org = org.as_str();
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org, folder, config::meta::folder::FolderType::Alerts)
+            .await
+            .unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut children = Vec::new();
+        for name in ["child_a", "child_b"] {
+            let mut child = config::meta::alerts::alert::Alert::default();
+            child.name = name.to_string();
+            let child = infra::table::alerts::create(conn, org, "default", child, false)
+                .await
+                .unwrap();
+            children.push(child.id.unwrap());
+        }
+        let expression = format!("{{{}}} && {{{}}}", children[0], children[1]);
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            Destination {
+                org_id: org.into(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        infra::table::templates::put(Template {
+            org_id: org.to_string(),
+            name: "real".to_string(),
+            body: r#"{"text":"{alert_name}"}"#.to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let request = |dest: &str, template: Option<&str>| {
+            composite_request(org, expression.clone(), dest, template)
+        };
+
+        let refused = create_composite(request("nope", None)).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+        let refused = create_composite(request("real", Some("nope"))).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert template nope not found".to_string())
+        );
+
+        let saved = create_composite(request("real", Some("real")))
+            .await
+            .unwrap();
+        let refused = update_composite(&saved.id, request("nope", Some("real"))).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+    }
 
     #[tokio::test]
     async fn jira_refuses_a_composite_silenced_under_ten_minutes() {

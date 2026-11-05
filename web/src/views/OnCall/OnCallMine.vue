@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
       <!-- Away only takes someone off a team's rotation, so a reader on no team has nothing to mark. -->
       <OButton
-        v-if="!unavailable && (!loaded || (mine?.teams ?? []).length)"
+        v-if="!unavailable && !licenseDenied && (!loaded || (mine?.teams ?? []).length)"
         variant="outline"
         size="sm"
         :disabled="!loaded"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
       </OButton>
       <OButton
-        v-if="!unavailable && myAway"
+        v-if="!unavailable && !licenseDenied && myAway"
         variant="outline"
         size="sm"
         :loading="awayClearing"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="event-available" size="sm" />{{ t("oncall.awayClear") }}
       </OButton>
       <ORefreshButton
-        v-if="!unavailable"
+        v-if="!unavailable && !licenseDenied"
         class="md:min-w-23"
         layout="inline"
         size="header"
@@ -66,13 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-mine-unavailable"
     />
 
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-mine-license-denied"
+    />
+
     <OContent
       v-else
       y
       class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto"
       data-test="oncall-mine-body"
     >
-      <OnCallSetupBanner ref="setupRef" class="shrink-0" />
+      <OnCallSetupBanner ref="setupRef" class="shrink-0" @license-denied="licenseDenied = $event" />
       <div class="grid shrink-0 grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
         <!-- The shift first: "am I on call, and until when" is the question this page opens on. -->
         <section
@@ -364,7 +370,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag variant="success-soft" size="sm">{{ t("oncall.reachAlwaysOn") }}</OTag>
             </template>
           </OnCallReachRow>
-          <OnCallPhoneCard ref="phoneRef" :admin="isAdmin" />
+          <OnCallPhoneCard
+            ref="phoneRef"
+            :admin="isAdmin"
+            @license-denied="licenseDenied = $event"
+          />
           <OnCallSlackCard v-if="slackOffered" ref="slackRef" :admin="isAdmin" />
         </section>
       </div>
@@ -378,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :no-team="loaded && loadError === null && !(mine?.teams ?? []).length"
         @test-page="askTestPage(testTeam?.team_id ?? '')"
         @join-team="openTeams"
+        @license-denied="licenseDenied = $event"
       />
     </OContent>
 
@@ -483,6 +494,7 @@ import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallHint from "@/components/oncall/OnCallHint.vue";
@@ -540,6 +552,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatMicrosDuration } from "@/utils/formatters";
 import {
   apiErrorMessage,
@@ -591,8 +604,16 @@ const shifts = ref<Record<string, ShiftFacts>>({});
 const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
+const licenseDenied = ref<string[] | null>(null);
 /// Set only when the first load fails; a failed refresh keeps the teams on screen instead.
 const loadError = ref<string | null>(null);
+
+// Any read can carry the denial, because the others may be answered from cache; the callers still see the error.
+const read: typeof readQuery = (options, force) =>
+  readQuery(options, force).catch((err: unknown) => {
+    licenseDenied.value = licenseDeniedFeatures(err) ?? licenseDenied.value;
+    throw err;
+  });
 
 /// Every team's name, not only the reader's own: a page handed over from another team still names its team.
 const orgTeamNames = ref<Record<string, string>>({});
@@ -605,7 +626,7 @@ const teamsState = ref<"pending" | "loaded" | "failed">("pending");
 
 async function fetchTeamNames(force = false) {
   try {
-    const teams = await readQuery(oncallTeamsQuery(orgId.value), force);
+    const teams = await read(oncallTeamsQuery(orgId.value), force);
     orgTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
     teamsState.value = "loaded";
   } catch {
@@ -772,9 +793,9 @@ async function fetchShifts(force = false) {
         const positions =
           team.on_call_now === false
             ? []
-            : await readQuery(whoIsOnCallQuery(orgId.value, team.team_id), force);
+            : await read(whoIsOnCallQuery(orgId.value, team.team_id), force);
         const held = positions.filter((p) => p.user_email.toLowerCase() === me);
-        const segments = await readQuery(
+        const segments = await read(
           resolvedScheduleQuery(
             orgId.value,
             team.team_id,
@@ -803,11 +824,13 @@ async function fetchShifts(force = false) {
 async function fetchMine(force = false) {
   try {
     const options = myOnCallQuery(orgId.value);
-    mine.value = await readQuery(options, force);
+    mine.value = await read(options, force);
     loadError.value = null;
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     await Promise.all([fetchShifts(force), fetchTeamNames(force), fetchMyAway(force)]);
   } catch (err: unknown) {
+    // Ahead of the refresh rule below: a lock says why the teams went, so nobody reads it as off duty.
+    if (licenseDenied.value) return;
     if (isOnCallUnavailable(err)) {
       unavailable.value = true;
       mine.value = null;
@@ -848,7 +871,7 @@ const coverWrite = useMutation(() =>
 );
 
 function resolveCoverRuns(rotationId: string, from: number, to: number) {
-  return readQuery(
+  return read(
     resolvedScheduleQuery(orgId.value, coverTeam.value?.team_id ?? "", from, to, rotationId),
     false,
   );
@@ -860,8 +883,8 @@ async function openCover(row: ShiftRow) {
   coverLoadingId.value = row.team_id;
   try {
     const [members, schedule] = await Promise.all([
-      readQuery(teamMembersQuery(orgId.value, row.team_id), false),
-      readQuery(teamScheduleQuery(orgId.value, row.team_id), false),
+      read(teamMembersQuery(orgId.value, row.team_id), false),
+      read(teamScheduleQuery(orgId.value, row.team_id), false),
     ]);
     coverTeam.value = row;
     coverMembers.value = members;
@@ -869,6 +892,7 @@ async function openCover(row: ShiftRow) {
     coverGap.value = { from: Math.max(Date.now() * 1000, nowMicros.value), to: row.until };
     coverOpen.value = true;
   } catch (err: unknown) {
+    if (licenseDenied.value) return;
     toast({
       variant: "error",
       message:
@@ -1013,7 +1037,7 @@ const awayDelete = useMutation(() => deleteUnavailabilityMutation(orgId.value));
 async function fetchMyAway(force = false) {
   const now = Date.now() * 1000;
   try {
-    const absences = await readQuery(
+    const absences = await read(
       unavailabilityQuery(orgId.value, viewerEmail.value, now, now + SHIFT_LOOKAHEAD_MICROS * 4),
       force,
     );
@@ -1069,6 +1093,13 @@ async function refreshPage() {
     refreshing.value = false;
   }
 }
+
+// A lock drawn behind an open form would be out of sight, and saving there can only be refused.
+watch(licenseDenied, () => {
+  coverOpen.value = false;
+  awayOpen.value = false;
+  testConfirmOpen.value = false;
+});
 
 // Wrapped, so nothing can ever pass `force` in.
 onMounted(() => fetchMine());
