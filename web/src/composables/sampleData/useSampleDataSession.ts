@@ -64,6 +64,8 @@ const welcomeOpen = ref(false);
 // welcome checks still deciding whether to open; other first-visit dialogs wait while any runs
 const welcomeDeciding = ref(0);
 const tour = ref<TourState | null>(readTour());
+// a removal leaves the load status alone, so pages showing the org's data watch this to read it again
+const removals = ref({ org: "", count: 0 });
 const flagCache = ref<Record<string, boolean>>({});
 
 const readStorage = (key: string) => {
@@ -165,6 +167,7 @@ const remove = async (org: string) => {
   }
   const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
   const keptFunctions = await observer.mutate();
+  removals.value = { org, count: removals.value.count + 1 };
   // the progress belongs to the last load's org; a load running elsewhere keeps it
   if (loadingOrg.value === org) {
     resetProgress();
@@ -253,6 +256,7 @@ export const useSampleDataSession = () => ({
   welcomeOpen,
   welcomeDeciding,
   tour,
+  removals,
   start,
   remove,
   startTour,

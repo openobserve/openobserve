@@ -1875,11 +1875,14 @@ watch(
   },
 );
 
-// A sample load that ends while Home is open must re-check the empty org, not wait for a reload
+// A sample load or removal that ends while Home is open must re-check the org, not wait for a reload
 const sampleSession = useSampleDataSession();
 watch(sampleSession.status, (now, was) => {
   if (was === "loading" && now !== "idle" && sampleSession.loadingOrg.value === orgId.value)
     loadAll(true);
+});
+watch(sampleSession.removals, ({ org }) => {
+  if (org === orgId.value) loadAll(true);
 });
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available

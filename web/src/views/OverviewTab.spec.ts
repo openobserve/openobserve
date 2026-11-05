@@ -61,6 +61,10 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 vi.mock("@/services/overview", () => ({ default: { getOrgOverview: vi.fn() } }));
+vi.mock("@/utils/sampleData/loader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sampleData/loader")>()),
+  removeSampleData: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/services/service_graph", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -1426,6 +1430,27 @@ describe("OverviewTab", () => {
         queryClient.clear();
         givenStreams(internalOnly);
         wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(true);
+      } finally {
+        localStorage.removeItem(firstDataStorageKey(org));
+      }
+    });
+
+    it("should show the hero again when this org's sample data is deleted while Home is open", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      localStorage.setItem(
+        firstDataStorageKey(org),
+        JSON.stringify({ lastVisit: Date.now(), hadData: false }),
+      );
+      try {
+        givenStreams({ logs: [{ name: "o2_demo_app_logs", stream_type: "logs" }] });
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(false);
+
+        givenStreams(internalOnly);
+        await useSampleDataSession().remove(org);
         await flushPromises();
         expect(wrapper.find(HERO).exists()).toBe(true);
       } finally {
