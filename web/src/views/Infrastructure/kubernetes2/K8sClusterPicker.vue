@@ -80,7 +80,11 @@ const choose = (name: string) => {
       <button
         type="button"
         class="border-border-default bg-surface-base hover:bg-dropdown-item-hover-bg focus-visible:ring-accent rounded-default flex h-9 w-full items-center gap-2 border px-2.5 text-start text-sm outline-none focus-visible:ring-2"
-        :aria-label="t('infra.k8s2.clusterPickerLabel')"
+        :aria-label="
+          current
+            ? t('infra.k8s2.clusterPickerTrigger', { name: raw(current.name) })
+            : t('infra.k8s2.clusterPickerLabel')
+        "
         data-test="k8s2-cluster-picker"
       >
         <span
@@ -90,7 +94,7 @@ const choose = (name: string) => {
           aria-hidden="true"
         />
         <OTruncatedText class="min-w-0 flex-1 font-semibold">{{
-          raw(current?.name ?? "")
+          current ? raw(current.name) : t("infra.k8s2.clusterPickerLabel")
         }}</OTruncatedText>
         <OIcon
           name="unfold-more"
@@ -111,17 +115,15 @@ const choose = (name: string) => {
     </div>
     <ul
       class="max-h-72 overflow-y-auto p-1.5"
-      role="listbox"
       :aria-label="t('infra.k8s2.clusterPickerLabel')"
       data-test="k8s2-cluster-picker-list"
     >
-      <li v-for="cluster in visible" :key="cluster.name" role="presentation">
+      <li v-for="cluster in visible" :key="cluster.name">
         <button
           type="button"
-          role="option"
           class="hover:bg-select-item-hover-bg focus-visible:ring-accent rounded-default flex w-full items-center gap-2 px-2 py-1.5 text-start text-sm outline-none focus-visible:ring-2"
           :class="cluster.name === active ? 'bg-select-item-selected-bg font-semibold' : ''"
-          :aria-selected="cluster.name === active"
+          :aria-current="cluster.name === active ? 'true' : undefined"
           :aria-label="
             t('infra.k8s2.hotbarTileLabel', {
               name: raw(cluster.name),

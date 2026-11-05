@@ -35,6 +35,8 @@ export interface MapNode {
   // Any CSS colour, so a theme token follows light and dark mode.
   color: string;
   clickable: boolean;
+  // A folded group: its click shows what it holds instead of opening details.
+  group?: boolean;
   // Bytes/s in and out.
   total: number;
 }
@@ -199,7 +201,11 @@ const labelled = computed(() => {
 });
 
 const openLabel = (node: MapNode) =>
-  t("infra.k8s2.depsOpenEnd", { name: node.label, detail: node.detail, summary: summaryOf(node) });
+  t(node.group ? "infra.k8s2.depsExpandEnd" : "infra.k8s2.depsOpenEnd", {
+    name: node.label,
+    detail: node.detail,
+    summary: summaryOf(node),
+  });
 
 function summaryOf(node: MapNode) {
   const count = neighbours.value.get(node.id)?.size ?? 0;

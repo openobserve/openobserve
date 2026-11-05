@@ -336,10 +336,8 @@ watch(
 );
 
 const paletteOpen = ref(false);
-const paletteGroup = ref<"clusters" | null>(null);
 
 const openPalette = () => {
-  paletteGroup.value = null;
   paletteOpen.value = true;
 };
 
@@ -711,7 +709,6 @@ k8s.loadStreams();
     <K8sCommandPalette
       v-if="ready"
       v-model:open="paletteOpen"
-      :group="paletteGroup"
       :items="paletteItems"
       :loading="paletteIndex.loading.value"
       :index-failed="paletteIndex.failed.value"

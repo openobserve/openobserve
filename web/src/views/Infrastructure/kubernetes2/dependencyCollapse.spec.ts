@@ -157,6 +157,37 @@ describe("collapseNamespaces", () => {
     expect(e.source.id < e.target.id).toBe(true);
   });
 
+  it("draws no arrow when both namespaces act as client equally", () => {
+    const [e] = collapseNamespaces(
+      [
+        edge(web, api, { forward: 1000, backward: 0, total: 1000 }),
+        edge(api, web2, { forward: 1000, backward: 0, total: 1000 }),
+      ],
+      state(),
+    );
+    expect(e.directed).toBe(false);
+  });
+
+  it("draws no arrow when most of the merged bytes have no known direction", () => {
+    const [e] = collapseNamespaces(
+      [
+        edge(web, api, { forward: 1, backward: 0, total: 1 }),
+        edge(web2, api, { directed: false, forward: 5000, backward: 5000, total: 10000 }),
+      ],
+      state(),
+    );
+    expect(e.directed).toBe(false);
+  });
+
+  it("keeps a namespace as its workloads when all of its traffic stays inside it", () => {
+    const db = workload("shop", "db");
+    const shop = workload("shop", "web");
+    const out = collapseNamespaces([edge(shop, db), edge(web, api)], state());
+    expect(out.map((e) => e.id)).toContain(edge(shop, db).id);
+    expect(out).toHaveLength(2);
+    expect(out.some((e) => e.source.namespace === "frontend" && e.source.group)).toBe(true);
+  });
+
   it("drops edges inside one namespace", () => {
     const out = collapseNamespaces([edge(web, web2), edge(web, api)], state());
     expect(out).toHaveLength(1);
