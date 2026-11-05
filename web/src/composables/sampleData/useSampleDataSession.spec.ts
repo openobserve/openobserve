@@ -39,6 +39,7 @@ vi.mock("@/services/sample_data.queries", async (importOriginal) => {
 const loaded = { counts: { logs: 10, spans: 2, metrics: 3 }, failedSteps: [] };
 
 describe("useSampleDataSession remove", () => {
+  let mod: typeof import("./useSampleDataSession");
   let session: ReturnType<typeof import("./useSampleDataSession").useSampleDataSession>;
   let finishLoad: (value: typeof loaded) => void;
 
@@ -50,7 +51,22 @@ describe("useSampleDataSession remove", () => {
       vars.onProgress({ step: "telemetry", fraction: 0.5, counts: loaded.counts });
       return new Promise((resolve) => (finishLoad = resolve));
     });
-    session = (await import("./useSampleDataSession")).useSampleDataSession();
+    mod = await import("./useSampleDataSession");
+    session = mod.useSampleDataSession();
+  });
+
+  it.each([
+    ["ends", () => Promise.resolve([])],
+    ["fails", () => Promise.reject(new Error("boom"))],
+  ])("marks a removal as running until it %s", async (_, finish) => {
+    let settle!: () => void;
+    mocks.remove.mockReturnValue(new Promise<void>((r) => (settle = r)).then(finish));
+    const removal = session.remove("org-a");
+    await flushPromises();
+    expect(session.removing.value).toBe(true);
+    settle();
+    await removal.catch(() => {});
+    expect(session.removing.value).toBe(false);
   });
 
   it("keeps another org's running load and its progress", async () => {
@@ -75,7 +91,7 @@ describe("useSampleDataSession remove", () => {
   it("refuses to remove the org whose load is still running, so the load cannot bring it back", async () => {
     const load = session.start("org-a");
     await flushPromises();
-    await expect(session.remove("org-a")).rejects.toThrow();
+    await expect(session.remove("org-a")).rejects.toBeInstanceOf(mod.SampleLoadRunningError);
     expect(mocks.remove).not.toHaveBeenCalled();
 
     finishLoad(loaded);

@@ -21,6 +21,7 @@ import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import { queryClient } from "@/composables/query/queryClient";
 import SampleDataHeaderChip from "./SampleDataHeaderChip.vue";
+import { SampleLoadRunningError } from "@/composables/sampleData/useSampleDataSession";
 
 const ORG = "test-org";
 
@@ -37,6 +38,7 @@ const data = vi.hoisted(() => ({
   own: false,
   loadingHere: false,
   loadingElsewhere: false,
+  removing: false,
   state: "loaded",
 }));
 vi.mock("@/services/sample_data", () => ({
@@ -56,13 +58,15 @@ vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
 const remove = vi.fn();
 const startTourAndShow = vi.fn();
 const loadInDialog = vi.fn();
-vi.mock("@/composables/sampleData/useSampleDataSession", () => ({
+vi.mock("@/composables/sampleData/useSampleDataSession", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/sampleData/useSampleDataSession")>()),
   useSampleDataSession: () => ({
     remove,
     startTourAndShow,
     loadInDialog,
     status: { value: data.loadingHere || data.loadingElsewhere ? "loading" : "idle" },
     loadingOrg: { value: data.loadingHere ? ORG : data.loadingElsewhere ? "other-org" : "" },
+    removing: { value: data.removing },
   }),
 }));
 
@@ -134,6 +138,7 @@ describe("SampleDataHeaderChip", () => {
       own: false,
       loadingHere: false,
       loadingElsewhere: false,
+      removing: false,
       state: "loaded",
     });
     remove.mockReset();
@@ -252,6 +257,24 @@ describe("SampleDataHeaderChip", () => {
     wrapper.findComponent(ConfirmStub).vm.$emit("update:ok");
     await flushPromises();
     expect(remove).not.toHaveBeenCalledWith("other-org");
+  });
+
+  it("disables Delete while a removal runs", () => {
+    expect(deleteItem().attributes("disabled")).toBeUndefined();
+    data.removing = true;
+    mountChip();
+    expect(deleteItem().attributes("disabled")).toBeDefined();
+  });
+
+  it("says to wait for the load when Delete is confirmed while it runs", async () => {
+    remove.mockRejectedValue(new SampleLoadRunningError());
+    await deleteItem().trigger("click");
+    await wrapper.find(".ok").trigger("click");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "error",
+      message: "Wait for sample data to finish loading.",
+    });
   });
 
   it("shows the server's message when deleting fails", async () => {

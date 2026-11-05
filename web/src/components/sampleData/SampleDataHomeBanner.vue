@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
-        :loading="removing"
+        :loading="session.removing.value"
         data-test="sample-data-cleanup-remove"
         @click="confirmRemove = true"
       >
@@ -64,7 +64,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import {
+  SampleLoadRunningError,
+  useSampleDataSession,
+} from "@/composables/sampleData/useSampleDataSession";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 
 const { t } = useI18nTyped();
@@ -73,7 +76,6 @@ const session = useSampleDataSession();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const presence = useSampleDataPresence(org);
-const removing = ref(false);
 const confirmRemove = ref(false);
 
 const mode = computed<"cleanup" | null>(() => {
@@ -85,17 +87,17 @@ const mode = computed<"cleanup" | null>(() => {
 
 const removeAll = async () => {
   confirmRemove.value = false;
-  removing.value = true;
   try {
     await session.remove(org.value);
     toast({ variant: "success", message: t("sampleData.toast.removed") });
   } catch (e: any) {
     toast({
       variant: "error",
-      message: raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
+      message:
+        e instanceof SampleLoadRunningError
+          ? t("sampleData.toast.removeWhileLoading")
+          : raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
     });
-  } finally {
-    removing.value = false;
   }
 };
 </script>

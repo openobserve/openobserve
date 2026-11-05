@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownSeparator />
       <ODropdownItem
         variant="destructive"
+        :disabled="session.removing.value"
         data-test="header-sample-data-delete"
         @select="askRemove"
       >
@@ -92,7 +93,10 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
-import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import {
+  SampleLoadRunningError,
+  useSampleDataSession,
+} from "@/composables/sampleData/useSampleDataSession";
 import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 
@@ -147,7 +151,10 @@ const removeAll = async () => {
   } catch (e: any) {
     toast({
       variant: "error",
-      message: raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
+      message:
+        e instanceof SampleLoadRunningError
+          ? t("sampleData.toast.removeWhileLoading")
+          : raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
     });
   }
 };

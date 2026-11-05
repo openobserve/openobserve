@@ -39,6 +39,9 @@ interface TourState {
   ownData?: boolean;
 }
 
+/** A removal refused because the org's load still runs, which would bring the streams back. */
+export class SampleLoadRunningError extends Error {}
+
 const TOUR_STORAGE_KEY = "o2_sample_tour";
 const WELCOME_SEEN_KEY = "o2_sample_welcome_seen";
 const TOUR_DONE_KEY = "o2_sample_tour_done";
@@ -66,6 +69,8 @@ const welcomeDeciding = ref(0);
 const tour = ref<TourState | null>(readTour());
 // a removal leaves the load status alone, so pages showing the org's data watch this to read it again
 const removals = ref({ org: "", count: 0 });
+// the header and the Home banner can both delete, so both stay disabled while one removal runs
+const removing = ref(false);
 const flagCache = ref<Record<string, boolean>>({});
 
 const readStorage = (key: string) => {
@@ -163,19 +168,24 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
 const remove = async (org: string) => {
   // the running load would recreate the streams and mark the org loaded again
   if (status.value === "loading" && loadingOrg.value === org) {
-    throw new Error("Sample data is still loading");
+    throw new SampleLoadRunningError("Sample data is still loading");
   }
-  const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
-  const keptFunctions = await observer.mutate();
-  removals.value = { org, count: removals.value.count + 1 };
-  // the progress belongs to the last load's org; a load running elsewhere keeps it
-  if (loadingOrg.value === org) {
-    resetProgress();
-    status.value = "idle";
+  removing.value = true;
+  try {
+    const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
+    const keptFunctions = await observer.mutate();
+    removals.value = { org, count: removals.value.count + 1 };
+    // the progress belongs to the last load's org; a load running elsewhere keeps it
+    if (loadingOrg.value === org) {
+      resetProgress();
+      status.value = "idle";
+    }
+    for (const flag of ORG_FLAGS) setOrgFlag(flag, org, false);
+    if (tour.value?.org === org) stopTour();
+    return keptFunctions;
+  } finally {
+    removing.value = false;
   }
-  for (const flag of ORG_FLAGS) setOrgFlag(flag, org, false);
-  if (tour.value?.org === org) stopTour();
-  return keptFunctions;
 };
 
 const persistTour = () =>
@@ -257,6 +267,7 @@ export const useSampleDataSession = () => ({
   welcomeDeciding,
   tour,
   removals,
+  removing,
   start,
   remove,
   startTour,

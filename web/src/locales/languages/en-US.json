@@ -30473,7 +30473,8 @@
       "loaded": "Sample data loaded. Happy exploring!",
       "loadFailed": "Could not load sample data",
       "removed": "Sample data removed",
-      "removeFailed": "Could not remove all sample data"
+      "removeFailed": "Could not remove all sample data",
+      "removeWhileLoading": "Wait for sample data to finish loading."
     },
     "entry": {
       "onboardingSource": "Explore sample data"
