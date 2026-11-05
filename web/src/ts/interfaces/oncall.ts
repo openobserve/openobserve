@@ -594,6 +594,8 @@ export interface OnCallResponse {
   reached_rung_micros?: number | null;
   /** Server-computed, and only present on a record somebody answered. */
   time_to_ack_micros?: number | null;
+  /** The linked incident's title; absent when the incident is gone, untitled or unreadable. */
+  incident_title?: string;
 }
 
 /**
@@ -1011,6 +1013,9 @@ export interface EscalationProgress {
   held_until_micros?: number | null;
 }
 
+/** `GET /oncall/responses/escalation` answers each record it could read, by id. */
+export type EscalationProgressEntry = EscalationProgress & { response_id: string };
+
 export interface OnCallResponseEvent {
   kind: ResponseEventKind;
   at: number;
@@ -1226,6 +1231,14 @@ export interface MyOnCall {
   /** True if any team is true. */
   on_call_now: boolean;
   teams: MyOnCallTeam[];
+}
+
+/** One team in `GET /oncall/teams/context`; a field the server could not read is absent, not empty. */
+export interface OnCallTeamContext {
+  team_id: string;
+  policy?: OnCallPolicy;
+  on_call?: OnCallPosition[];
+  schedule?: OnCallSchedule | null;
 }
 
 /** `GET /oncall/contacts/{email}` — the caller's own phone and whether a code can be sent to it. */

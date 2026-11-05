@@ -264,7 +264,7 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector is offline or does not accept restart commands", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn restart_collector(
@@ -1536,14 +1536,14 @@ pub async fn skip_rollout(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "RollbackFleetRollout",
-    summary = "Start an immediate rollout back to stable and mark this one rolled back",
+    summary = "Roll back to stable, or to the placeholder without one, and mark this rollout rolled back",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Rollout id"),
     ),
     responses(
-        (status = 200, description = "The rollout to stable", content_type = "application/json", body = config::meta::fleet::Rollout),
+        (status = 200, description = "The rollout to stable, or this rollout when the fleet has no stable version", content_type = "application/json", body = config::meta::fleet::Rollout),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
@@ -1637,6 +1637,10 @@ pub async fn get_pipelines(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // Fleet routes are outside the gated group, so this PromQL search checks the licence here.
+        if let Err(e) = search_service::check_org_search_allowed(&org_id) {
+            return MetaHttpResponse::too_many_requests(e);
+        }
         let user_id = &user_email.user_id;
         if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
@@ -2957,5 +2961,117 @@ mod tests {
         assert_eq!(recorded(&res), want, "{}", res.status());
         let res = rollback_rollout(at(), root()).await;
         assert_eq!(recorded(&res), want, "{}", res.status());
+    }
+
+    async fn pipelines_as(user_id: &str) -> Response {
+        pipelines_in(ORG, user_id).await
+    }
+
+    async fn pipelines_in(org: &str, user_id: &str) -> Response {
+        get_pipelines(
+            Path(org.to_string()),
+            Query(FlowQuery { window: None }),
+            Headers(UserEmail {
+                user_id: user_id.to_string(),
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn pipelines_answer_the_search_licence_429_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "blocked@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_as(custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body: serde_json::Value = serde_json::from_str(&body_text(res).await).unwrap();
+        assert_eq!(body["code"], 429);
+        let message = body["message"].as_str().unwrap();
+        assert!(
+            message.contains(
+                "Search is temporarily disabled due to exceeding allotted ingestion limit."
+            ) && message.ends_with("Please contact your administrator."),
+            "{message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn meta_org_pipelines_reach_the_fleet_check_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "meta@fleet-fleets-handlers.test";
+        seed_member(
+            custom,
+            config::meta::user::UserRole::User,
+            config::META_ORG_ID,
+        );
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_in(config::META_ORG_ID, custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, config::META_ORG_ID);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn pipelines_reach_the_fleet_check_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        let custom = "open@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let res = pipelines_as(custom).await;
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn the_audit_trail_is_not_licence_gated_while_search_is_blocked() {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::{self_reporting::usage::AUDIT_STREAM, stream::StreamType};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let (org, _) = audit_org("licence").await;
+        // without an audit schema the read returns before it searches
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("http_method", DataType::Utf8, true),
+            Field::new("http_path", DataType::Utf8, true),
+            Field::new("user_email", DataType::Utf8, true),
+        ]);
+        let now = config::utils::time::now_micros();
+        infra::schema::merge(
+            config::META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            &schema,
+            Some(now),
+        )
+        .await
+        .unwrap();
+        let gate = close_search_gate_for_tests().await;
+        let refusal = search_service::check_search_allowed(&org, None)
+            .expect_err("the org's own searches are blocked")
+            .to_string();
+        let res = list_audit(Path(org.clone()), Query(AuditQuery::default()), root()).await;
+        let audit = openobserve_core::fleet::list_audit(&org, AuditQuery::default(), None).await;
+        drop(gate);
+        // a unit test has no search backend, so only the licence refusal is ruled out
+        assert_ne!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = body_text(res).await;
+        assert!(!body.contains(&refusal), "{body}");
+        if let Err(e) = audit {
+            assert!(!e.to_string().contains(&refusal), "{e}");
+        }
     }
 }

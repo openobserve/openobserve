@@ -24,6 +24,7 @@ import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
+import searchService from "@/services/search";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -444,6 +445,21 @@ describe("TraceDetails", () => {
           }),
         );
         routerPushSpy.mockRestore();
+      }
+    });
+
+    it("should disable View Logs with a lock while logs is locked", async () => {
+      expect(wrapper.vm.logsLocked).toBe(false);
+      store.state.zoConfig.features = { logs: "locked" };
+      try {
+        await wrapper.vm.$nextTick();
+        const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
+        expect(wrapper.vm.logsLocked).toBe(true);
+        expect(wrapper.vm.isViewLogsDisabled).toBe(true);
+        expect(viewLogsBtn.attributes("disabled")).toBeDefined();
+        expect(viewLogsBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
       }
     });
   });
@@ -2107,6 +2123,25 @@ describe("TraceDetails", () => {
       expect(replayBtn.exists()).toBe(true);
     });
 
+    it("should render the session replay button disabled with a lock when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      try {
+        wrapper.vm.searchObj.data.traceDetails.spanList = [
+          {
+            ...tracesMockData.tracesDetails.traceSpans.hits[0],
+            rum_session_id: "session-123",
+            rum_session_has_replay: true,
+          },
+        ];
+        await wrapper.vm.$nextTick();
+        const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+        expect(replayBtn.attributes("disabled")).toBeDefined();
+        expect(replayBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+
     it("should not show session replay button when no RUM session exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
@@ -2665,6 +2700,52 @@ describe("TraceDetails", () => {
       expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(validSpanId);
 
       localWrapper.unmount();
+    });
+
+    it("stays on the page without a not-found redirect when the details call is a license denial", async () => {
+      // The unit-test http mock flattens error bodies, so reject with the shape production http rethrows.
+      vi.spyOn(searchService, "get_trace_details").mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "traces" } },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      const localWrapper = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "traces" }));
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
+      localWrapper.unmount();
+    });
+
+    it("skips the details call while traces is locked and makes it while licensed", async () => {
+      let detailCalls = 0;
+      globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => {
+            detailCalls++;
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+      store.state.zoConfig.features = { traces: "locked" };
+      try {
+        const locked = mountWithSpanQuery("any-span");
+        await flushPromises();
+        expect(detailCalls).toBe(0);
+        const lockedView = locked.find('[data-test="trace-details-license-locked"]');
+        expect(lockedView.exists()).toBe(true);
+        const denied = lockedView.findComponent({ name: "LicenseDeniedState" });
+        expect(denied.props("features")).toEqual(["traces"]);
+        const exempt = lockedView.find("[data-feature-lock-exempt]");
+        expect(exempt.find('[data-test="trace-details-back-btn"]').exists()).toBe(true);
+        locked.unmount();
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+      const licensed = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(detailCalls).toBeGreaterThan(0);
+      expect(licensed.find('[data-test="trace-details-license-locked"]').exists()).toBe(false);
+      licensed.unmount();
     });
 
     it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
@@ -3246,6 +3327,20 @@ describe("TraceDetails", () => {
       await pending;
 
       expect(viewSpanLogs).not.toHaveBeenCalled();
+    });
+
+    it("opens a plain logs search without a warning when correlation is license-locked", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      try {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+        const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+        await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+        await flushPromises();
+        expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
+      } finally {
+        delete store.state.zoConfig.features;
+      }
     });
   });
 

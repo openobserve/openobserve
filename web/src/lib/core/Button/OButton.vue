@@ -4,6 +4,7 @@ import { Primitive } from "reka-ui";
 import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
 
@@ -22,7 +23,11 @@ const props = withDefaults(defineProps<ButtonProps>(), {
 const emit = defineEmits<ButtonEmits>();
 const attrs = useAttrs();
 const id = useId();
-const unavailable = computed(() => props.disabled && props.focusableUnavailable);
+const { locked } = useFeatureLock();
+const isDisabled = computed(() => props.disabled || locked.value);
+// No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
+const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
+const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
@@ -292,6 +297,24 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
+  // row: list row whose content is itself the action.
+  row: [
+    "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
+    "h-auto! justify-between! gap-3! px-0! py-1.5!",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:text-text-disabled",
+  ].join(" "),
+  // locked-body: outlined prompt whose message is the action.
+  "locked-body": [
+    "bg-transparent text-button-outline-text border border-button-outline-border text-start",
+    "h-auto! justify-start! px-3! py-3! whitespace-normal!",
+    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
+    "enabled:active:bg-button-outline-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
+    "disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
@@ -366,6 +389,8 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "tint-blue": "opacity-60",
   "tint-orange": "opacity-60",
   cell: "opacity-60",
+  row: "text-text-disabled",
+  "locked-body": "opacity-50",
 };
 
 const unavailableClasses = computed(() => {
@@ -376,9 +401,10 @@ const unavailableClasses = computed(() => {
       .split(" ")
       .filter(
         (value) =>
-          !value.startsWith("enabled:") &&
-          !value.startsWith("disabled:") &&
-          !overriddenGroups.includes(value.split("-")[0]),
+          value === "text-start" ||
+          (!value.startsWith("enabled:") &&
+            !value.startsWith("disabled:") &&
+            !overriddenGroups.includes(value.split("-")[0])),
       ),
     ...disabledClasses,
     "cursor-not-allowed!",
@@ -449,9 +475,11 @@ const classes = computed<string[]>(() => [
   "outline-none",
   // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
-  unavailable.value ? "cursor-not-allowed!" : "disabled:cursor-not-allowed enabled:cursor-pointer",
+  unavailable.value || lockedLink.value
+    ? "cursor-not-allowed!"
+    : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  unavailable.value
+  unavailable.value || lockedLink.value
     ? unavailableClasses.value
     : props.active
       ? activeClasses
@@ -467,8 +495,8 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 
 function handleClick(event: MouseEvent): void {
-  if (props.disabled || props.loading) {
-    if (unavailable.value) {
+  if (isDisabled.value || props.loading) {
+    if (unavailable.value || lockedLink.value) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -486,9 +514,11 @@ function handleClick(event: MouseEvent): void {
     :class="classes"
     :type="as === 'button' ? type : undefined"
     :disabled="
-      as === 'button' ? (disabled && !focusableUnavailable) || (loading && !unavailable) : undefined
+      as === 'button'
+        ? (isDisabled && !focusableUnavailable) || (loading && !unavailable)
+        : undefined
     "
-    :aria-disabled="disabled || loading || undefined"
+    :aria-disabled="isDisabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
@@ -509,14 +539,24 @@ function handleClick(event: MouseEvent): void {
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
     <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
       <slot name="icon-left">
-        <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+        <OIcon
+          v-if="iconLeft"
+          :name="iconLeft"
+          size="sm"
+          :class="iconLeft === 'lock' ? 'lock-chip' : undefined"
+        />
       </slot>
       <slot />
       <span v-if="unavailable && !descriptionId" :id="reasonId" class="sr-only" aria-hidden="true"
         ><slot name="unavailable-reason"
       /></span>
       <slot name="icon-right">
-        <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+        <OIcon
+          v-if="iconRight"
+          :name="iconRight"
+          size="sm"
+          :class="iconRight === 'lock' ? 'lock-chip' : undefined"
+        />
       </slot>
     </span>
   </Primitive>

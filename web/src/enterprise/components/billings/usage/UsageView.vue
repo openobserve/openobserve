@@ -178,6 +178,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import BillingService, { type AiUsage } from "@/services/billings";
+import { featureState } from "@/utils/featureGate";
 import UsageOverview from "./UsageOverview.vue";
 import UsageOverviewSkeleton from "./UsageOverviewSkeleton.vue";
 import { mockMeteringResponse, USE_METERING_MOCK } from "./meteringMock";
@@ -330,6 +331,7 @@ let latestLoad = 0;
 
 const loadAiUsage = async (loadId: number) => {
   if (config.isCloud !== "true") return;
+  if (featureState(store.state.zoConfig?.features, "ai_assistant") !== "enabled") return;
   try {
     const usage = (await BillingService.get_ai_usage(store.state.selectedOrganization.identifier))
       .data;

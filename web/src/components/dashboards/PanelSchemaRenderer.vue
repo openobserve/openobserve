@@ -159,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :verdict="exemplarVerdict"
           :anchor="exemplarCardAnchor"
           :clamped="exemplarActiveClamp"
+          :locked-reason="tracesLocked ? tracesLockedReason : undefined"
           @enter="exemplarInteraction.onCardEnter"
           @leave="exemplarInteraction.onCardLeave"
           @open-trace="exemplarInteraction.openTrace"
@@ -267,6 +268,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
+            v-if="drilldownLockedReason(drilldown)"
+            class="text-dropdown-item-disabled flex cursor-not-allowed items-center px-4 py-2 text-sm"
+            aria-disabled="true"
+            tabindex="0"
+            :data-test="`drilldown-menu-item-${drilldown.name}`"
+          >
+            <OIcon
+              size="xs"
+              class="text-icon-locked me-2"
+              name="lock"
+              :data-test="`drilldown-menu-item-${drilldown.name}-lock`"
+            />
+            <span class="flex min-w-0 flex-col">
+              <span class="select-none">{{ drilldown.name }}</span>
+              <span
+                class="text-text-secondary text-xs select-none"
+                :data-test="`drilldown-menu-item-${drilldown.name}-reason`"
+                >{{ drilldownLockedReason(drilldown) }}</span
+              >
+            </span>
+          </div>
+          <div
+            v-else
             class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
@@ -303,6 +327,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :series-role="contextMenuData?.seriesRole"
         :unit="panelSchema?.config?.unit"
         :unit-custom="panelSchema?.config?.unit_custom"
+        :locked="alertsLocked"
+        :locked-reason="alertsLockedReason"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -350,6 +376,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
@@ -1116,7 +1143,9 @@ export default defineComponent({
       if (!Number.isFinite(start) || !Number.isFinite(end)) return [NaN, NaN];
       return [toExemplarChartX(start), toExemplarChartX(end)];
     });
+    const { locked: tracesLocked, lockedReason: tracesLockedReason } = useLicenseLock("traces");
     const navigateToExemplarTrace = (marker: ExemplarMarker, verdict: TraceVerdict) => {
+      if (tracesLocked.value) return;
       const target = buildExemplarTraceRoute(
         marker,
         verdict,
@@ -1328,6 +1357,7 @@ export default defineComponent({
 
     // Context menu state for alert creation (shared with usePanelAlertCreation)
     const contextMenuData = ref<any>(null);
+    const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 
     const {
       contextMenuVisible,
@@ -2298,6 +2328,7 @@ export default defineComponent({
       drilldownArray,
       onChartClick,
       openDrilldown,
+      drilldownLockedReason,
       hidePopupsAndOverlays,
       drilldownColumnAliases,
       drilldownAllColumns,
@@ -2589,7 +2620,7 @@ export default defineComponent({
       const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
 
       // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
-      await ensureDrilldownSchema(qi);
+      await ensureDrilldownSchema(qi, true);
 
       const cell = getCellDrilldownField(qi, alias);
       const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
@@ -2655,6 +2686,11 @@ export default defineComponent({
       drilldownArray,
       selectedAnnotationData,
       openDrilldown,
+      alertsLocked,
+      alertsLockedReason,
+      drilldownLockedReason,
+      tracesLocked,
+      tracesLockedReason,
       drilldownPopUpRef,
       annotationPopupRef,
       hidePopupsAndOverlays,
@@ -2706,6 +2742,8 @@ export default defineComponent({
       cellDrawer,
       onCellSendToAiChat,
       exploreCellInLogs,
+      ensureDrilldownSchema,
+      panelBaseWhere,
       onCellDrawerOpenChange,
       exemplarsEligible,
       exemplarsEnabled,

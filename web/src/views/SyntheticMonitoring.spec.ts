@@ -474,6 +474,15 @@ describe("SyntheticMonitoring", () => {
       expect(tabElements).toHaveLength(4);
     });
 
+    it("sits the section tabs in a lock-exempt container, so they stay live on a license-locked page", () => {
+      wrapper = mountPage();
+      const tabsWrapper = wrapper.find('[data-test="synthetic-monitoring-header-tabs"]');
+      expect(tabsWrapper.element.closest("[data-feature-lock-exempt]")).not.toBeNull();
+      const newCheck = wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]');
+      expect(newCheck.exists()).toBe(true);
+      expect(newCheck.element.closest("[data-feature-lock-exempt]")).toBeNull();
+    });
+
     it("hides the Private Locations tab when private locations are unavailable", () => {
       // Private locations are served by agents deployed inside the customer's
       // network, which is the one enterprise part of synthetics. An OSS build
@@ -619,6 +628,26 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
       expect((wrapper.vm as any).activeSection).toBe("status-pages");
       expect(mockStatusPagesList).toHaveBeenCalledTimes(1);
+    });
+
+    it("flags the status pages list as license-denied on a 40001 403", async () => {
+      mockStatusPagesList.mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+      });
+      mockRoute.query.section = "status-pages";
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).statusPagesForbidden).toEqual(["synthetics"]);
+    });
+
+    it("flags the private locations list as license-denied on a 40001 403", async () => {
+      mockRoute.query.section = "private";
+      mockServiceGetLocations.mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).locationsForbidden).toEqual(["synthetics"]);
     });
 
     it("lazy-loads private locations when the tab is reached through the URL", async () => {

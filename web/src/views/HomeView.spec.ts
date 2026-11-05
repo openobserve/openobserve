@@ -75,6 +75,8 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
 
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { raw } from "@/types/i18n";
 
 const mountHome = () =>
   mount(HomeView, {
@@ -110,6 +112,79 @@ describe("HomeView", () => {
     vi.restoreAllMocks();
   });
 
+  describe("a pinned home dashboard", () => {
+    const { homeDashboard } = useHomeDashboard(i18n.global.t as never);
+    const TAB = "dash:default:d1";
+
+    beforeEach(() => {
+      setFlag(false);
+      homeDashboard.value = { folderId: "default", dashboardId: "d1", label: raw("Pinned") };
+    });
+    afterEach(() => {
+      homeDashboard.value = null;
+    });
+
+    it("should show a lock on the pinned tab when dashboards are locked", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { dashboards: "locked" } });
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has(`home-tab-${TAB}`)).toBe(true);
+      expect(has(`home-tab-lock-${TAB}`)).toBe(true);
+    });
+
+    it("should show no lock on the pinned tab when dashboards are enabled", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { dashboards: "enabled" } });
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has(`home-tab-${TAB}`)).toBe(true);
+      expect(has(`home-tab-lock-${TAB}`)).toBe(false);
+    });
+  });
+
+  describe("the AI Assistant tab", () => {
+    beforeEach(() => setFlag(false));
+
+    it("should stay visible with a lock and show the denied state when ai_assistant is locked", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: false,
+        features: { ai_assistant: "locked" },
+      });
+      openTab("ai");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-ai")).toBe(true);
+      expect(has("home-tab-lock-ai")).toBe(true);
+      expect(has("home-ai-locked")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(false);
+    });
+
+    it("should be absent when ai_assistant is not offered", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false, features: {} });
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-ai")).toBe(false);
+    });
+
+    it("should mount the chat with no lock when ai_assistant is enabled", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+      openTab("ai");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("home-tab-lock-ai")).toBe(false);
+      expect(has("ai-chat-stub")).toBe(true);
+    });
+  });
+
   describe("with the empty-data flag off", () => {
     beforeEach(() => setFlag(false));
 
@@ -119,6 +194,13 @@ describe("HomeView", () => {
       expect(has("overview-tab-stub")).toBe(true);
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("first-data-panel")).toBe(false);
+    });
+
+    it("should run the Overview panel edge to edge by cancelling the body inset", () => {
+      wrapper = mountHome();
+      expect(wrapper.get('[data-test="home-overview-panel"]').classes()).toEqual(
+        expect.arrayContaining(["-mx-2.5", "-mb-2.5", "flex-1"]),
+      );
     });
 
     it("should render Usage as at BASE with no first-data panel around it", () => {

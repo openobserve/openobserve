@@ -636,6 +636,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -788,7 +789,13 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+    const {
+      isHome,
+      setHomeDashboard,
+      clearHomeDashboard,
+      homeDashboard,
+      load: loadHomeDashboard,
+    } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -1083,7 +1090,7 @@ export default defineComponent({
           // A newer folder switch cancelled this load; the newer one reports its own outcome.
           if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
-          forbidden.value = asCaughtError(error).response?.status === 403;
+          forbidden.value = forbiddenState(error);
           if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
@@ -1334,7 +1341,7 @@ export default defineComponent({
     };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1573,6 +1580,11 @@ export default defineComponent({
 
     const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
+      const org = store.state.selectedOrganization?.identifier;
+      // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
+      if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
+        await loadHomeDashboard(org, true);
+      }
     };
 
     const deleteFolder = async () => {

@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
@@ -518,6 +519,25 @@ describe("Header Component", () => {
       expect(aiButton.exists()).toBe(true);
       expect(aiButton.attributes("disabled")).toBeUndefined();
 
+      aiWrapper.unmount();
+    });
+
+    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
+      expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
     });
 

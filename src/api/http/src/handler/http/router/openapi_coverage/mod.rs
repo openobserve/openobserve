@@ -55,7 +55,8 @@ const ROUTER_PREFIXES: &[(&str, &str)] = &[
     ("splunk_collector_routes", ""),
     ("config_routes", "/config"),
     ("node_routes", "/node"),
-    ("service_routes", "/api"),
+    ("service_route_table", "/api"),
+    ("search_routes_with", "/api"),
     ("public_dashboard_admin_routes", "/api"),
     ("ai_chat_routes", "/api"),
     ("alert_calibration_routes", "/api"),
@@ -64,6 +65,7 @@ const ROUTER_PREFIXES: &[(&str, &str)] = &[
     ("oncall_routes", "/api"),
     ("fleet_router", "/api"),
     ("slack_routes", "/api"),
+    ("service_streams_routes", "/api"),
     ("es_compat_routes", "/api"),
     ("workflow_hook_routes", ""),
 ];
@@ -98,7 +100,7 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
         "application/x-protobuf",
         "none",
     ),
-    ("ent", "POST", "/api/license/refresh", "200", JSON, "string"),
+    ("ent", "POST", "/api/license/refresh", "200", JSON, "object"),
     (
         "all",
         "GET",

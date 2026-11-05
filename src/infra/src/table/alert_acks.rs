@@ -84,6 +84,15 @@ pub async fn unack_with_outbox(
     .await
 }
 
+/// [`unack_with_outbox`] only while `held.acked_by` still holds that firing's ack.
+pub async fn unack_held_with_outbox(
+    held: &AlertAck,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<bool, Error> {
+    unack_held_with_outbox_with(get_orm_client_rw().await, held, unacked_by, unacked_at).await
+}
+
 /// Applies a row from another region; false when the stored row is as new or newer.
 pub async fn apply_replicated(ack: &AlertAck) -> Result<bool, Error> {
     apply_replicated_with(get_orm_client_rw().await, ack).await
@@ -259,25 +268,45 @@ pub async fn unack_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
     unacked_by: &str,
     unacked_at: i64,
 ) -> Result<bool, Error> {
-    let txn = conn.begin().await?;
-    let result = Entity::update_many()
-        .col_expr(Column::UnackedAt, Expr::value(unacked_at))
-        .col_expr(Column::UnackedBy, Expr::value(unacked_by))
-        .col_expr(Column::UpdatedAt, Expr::value(unacked_at))
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::AlertId.eq(alert_id))
-        .filter(Column::GroupKey.eq(group_key))
-        .filter(Column::FiringStartedAt.eq(firing_started_at))
-        .filter(Column::UnackedAt.is_null())
-        .exec(&txn)
-        .await?;
-    let changed = result.rows_affected > 0;
-    if changed {
-        slack_alert_messages::bump_wanted_with(&txn, alert_id, group_key, firing_started_at)
-            .await?;
-    }
-    txn.commit().await?;
-    Ok(changed)
+    let row = Condition::all()
+        .add(Column::OrgId.eq(org_id))
+        .add(Column::AlertId.eq(alert_id))
+        .add(Column::GroupKey.eq(group_key))
+        .add(Column::FiringStartedAt.eq(firing_started_at));
+    unack_matching(
+        conn,
+        row,
+        alert_id,
+        group_key,
+        firing_started_at,
+        unacked_by,
+        unacked_at,
+    )
+    .await
+}
+
+pub async fn unack_held_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    held: &AlertAck,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<bool, Error> {
+    let row = Condition::all()
+        .add(Column::OrgId.eq(&held.org_id))
+        .add(Column::AlertId.eq(&held.alert_id))
+        .add(Column::GroupKey.eq(&held.group_key))
+        .add(Column::FiringStartedAt.eq(held.firing_started_at))
+        .add(Column::AckedBy.eq(&held.acked_by));
+    unack_matching(
+        conn,
+        row,
+        &held.alert_id,
+        &held.group_key,
+        held.firing_started_at,
+        unacked_by,
+        unacked_at,
+    )
+    .await
 }
 
 pub async fn apply_replicated_with<C: ConnectionTrait>(
@@ -346,6 +375,34 @@ pub async fn delete_ended_before_with<C: ConnectionTrait>(conn: &C, at: i64) -> 
 #[cfg(any(test, feature = "test-utils"))]
 pub async fn create_table_for_test<C: ConnectionTrait>(conn: &C) -> Result<(), sea_orm::DbErr> {
     super::migration::create_alert_acks_table(conn).await
+}
+
+/// Unacks the acked rows `row` matches and bumps the firing's Slack messages, in one transaction.
+async fn unack_matching<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    row: Condition,
+    alert_id: &str,
+    group_key: &str,
+    firing_started_at: i64,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<bool, Error> {
+    let txn = conn.begin().await?;
+    let result = Entity::update_many()
+        .col_expr(Column::UnackedAt, Expr::value(unacked_at))
+        .col_expr(Column::UnackedBy, Expr::value(unacked_by))
+        .col_expr(Column::UpdatedAt, Expr::value(unacked_at))
+        .filter(row)
+        .filter(Column::UnackedAt.is_null())
+        .exec(&txn)
+        .await?;
+    let changed = result.rows_affected > 0;
+    if changed {
+        slack_alert_messages::bump_wanted_with(&txn, alert_id, group_key, firing_started_at)
+            .await?;
+    }
+    txn.commit().await?;
+    Ok(changed)
 }
 
 fn upsert() -> OnConflict {
@@ -604,6 +661,34 @@ mod tests {
         assert_eq!(stored.unacked_by.as_deref(), Some("eve@acme.com"));
         assert_eq!(stored.updated_at, 30);
         assert_eq!(wanted(&db, "d1", "", 10).await, 2);
+    }
+
+    #[tokio::test]
+    async fn a_held_unack_clears_only_while_the_holder_it_names_still_holds_it() {
+        let db = db().await;
+        put_with_outbox_with(&db, &ack("g", 10, 20)).await.unwrap();
+        let leaver = AlertAck {
+            acked_by: "lee@acme.com".into(),
+            ..ack("g", 10, 20)
+        };
+        assert!(
+            !unack_held_with_outbox_with(&db, &leaver, "o2-engine", 30)
+                .await
+                .unwrap(),
+            "someone else holds it"
+        );
+        let stored = get_with(&db, "acme", "a1", "g").await.unwrap().unwrap();
+        assert_eq!((stored.unacked_at, stored.updated_at), (None, 20));
+        assert!(
+            unack_held_with_outbox_with(&db, &ack("g", 10, 20), "o2-engine", 31)
+                .await
+                .unwrap()
+        );
+        let stored = get_with(&db, "acme", "a1", "g").await.unwrap().unwrap();
+        assert_eq!(
+            (stored.unacked_at, stored.unacked_by.as_deref()),
+            (Some(31), Some("o2-engine"))
+        );
     }
 
     #[tokio::test]

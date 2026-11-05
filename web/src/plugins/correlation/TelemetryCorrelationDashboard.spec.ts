@@ -980,4 +980,42 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(details.attributes("shortcuts-active")).toBe("true");
     });
   });
+
+  describe("View in Traces under the traces license", () => {
+    const VIEW_TRACES = '[data-test="correlation-view-traces-page"]';
+
+    const showDimensionTraces = async () => {
+      wrapper = createWrapper({ externalActiveTab: "traces" });
+      await flushPromises();
+      wrapper.vm.tracesLoading = false;
+      wrapper.vm.tracesError = null;
+      wrapper.vm.traceCorrelationMode = "dimension-based";
+      wrapper.vm.tracesForDimensions = [{ trace_id: "t1" }];
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      const { features: _features, ...rest } = store.state.zoConfig;
+      store.state.zoConfig = rest;
+    });
+
+    it("keeps the button enabled while traces is licensed", async () => {
+      await showDimensionTraces();
+      const btn = wrapper.find(VIEW_TRACES);
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeUndefined();
+    });
+
+    it("disables the button and opens nothing while traces is locked", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { traces: "locked" } };
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      await showDimensionTraces();
+      const btn = wrapper.find(VIEW_TRACES);
+      expect(btn.attributes("disabled")).toBeDefined();
+      await btn.trigger("click");
+      wrapper.vm.openTraceInNewWindow("t1");
+      expect(open).not.toHaveBeenCalled();
+      open.mockRestore();
+    });
+  });
 });
