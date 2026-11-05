@@ -854,7 +854,6 @@ describe("AlertCalibrationDashboard dismissals", () => {
     const listed = async (wrapper: VueWrapper) =>
       wrapper.findAll('[data-test="alert-calibration-dismissed-reopen"]').length;
 
-    // No run in the lookback.
     vi.mocked(alertCalibration.readDigests).mockResolvedValue([] as never);
     const noRun = await mountPage();
     await settle();
@@ -869,7 +868,6 @@ describe("AlertCalibrationDashboard dismissals", () => {
     expect(await listed(noRunList)).toBe(1);
     noRunList.unmount();
 
-    // The digest read failed.
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(new Error("HTTP 500"));
     const failed = await mountPage({ findings: "dismissed" });
     await settle();
@@ -877,7 +875,6 @@ describe("AlertCalibrationDashboard dismissals", () => {
     expect(await listed(failed)).toBe(1);
     failed.unmount();
 
-    // Calibration is switched off for the org.
     queryClient.clear();
     serve([nodest(1)], 1);
     vi.mocked(alertCalibration.getConfig).mockResolvedValue(config(false) as never);
@@ -887,7 +884,6 @@ describe("AlertCalibrationDashboard dismissals", () => {
     expect(await listed(off)).toBe(1);
     off.unmount();
 
-    // With nothing dismissed, the empty states stay as they were.
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
     const clean = await mountPage();
     await settle();
