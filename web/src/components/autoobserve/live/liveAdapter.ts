@@ -35,6 +35,7 @@ import {
 } from "../fixtures";
 import type { Msg, Request, RequestCopy } from "../v2/fixtures";
 import type { ChangeKind } from "../v2/changes";
+import { TIER_LABEL } from "@/components/alert_calibration/format";
 import {
   agoText,
   coverageWord,
@@ -43,6 +44,7 @@ import {
   type LiveFailure,
   type LiveStale,
 } from "./liveCopy";
+import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
 
 export type SourceStatus = "loading" | "error" | "ready";
 
@@ -162,6 +164,7 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: ChangeKind }> = {
   },
   silent_coverage: { label: "autoobserveLive.suggestions.kinds.silent_coverage", look: "tuning" },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
+  alert_not_working: { label: "alertCalibration.rules.notWorking", look: "fix" },
 };
 
 const NO_ABSENCE_KEY: Record<AutoObserveCellState, I18nKey> = {
@@ -512,8 +515,27 @@ const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): 
   };
 };
 
-const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion): Parts => {
+// The digest stamps when calibration analysed the alert, so the card dates its run (P5b-D3).
+const alertParts = (
+  t: TranslateFn,
+  locale: string,
+  s: AutoObserveSuggestion,
+  nowMs: number | undefined,
+): Parts => {
+  const runAt = num(s.last_seen_at);
+  return {
+    headline: alertFindingHeadline(t, s),
+    why:
+      runAt === null || nowMs === undefined
+        ? null
+        : analysedText(t, locale, Math.max(0, Math.floor((nowMs - runAt / 1000) / 60_000))),
+    body: alertFindingBody(s) ?? NO_DETAIL,
+  };
+};
+
+const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion, nowMs?: number): Parts => {
   const { locale, timeZone } = zone;
+  if (s.kind === "alert_not_working") return alertParts(t, locale, s, nowMs);
   if (s.kind === "blind_guardrail") return blindParts(t, zone, s);
   if (s.kind === "silent_coverage") return silentParts(t, locale, s);
   if (s.kind === "discovery_unusable")
@@ -578,6 +600,12 @@ const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] 
   const tags: { label: I18nText; variant: BadgeVariant }[] = [];
   const severity = severityTag(t, s);
   if (severity) tags.push(severity);
+  // A calibration finding states its tier the way the calibration page does, not an evidence level.
+  if (s.kind === "alert_not_working") {
+    if (s.tier && Object.hasOwn(TIER_LABEL, s.tier))
+      tags.push({ label: t(TIER_LABEL[s.tier]), variant: "default-soft" });
+    return tags;
+  }
   if (CONFIDENCE_KEY[s.confidence])
     tags.push({ label: t(CONFIDENCE_KEY[s.confidence]), variant: "default-soft" });
   return tags;
@@ -594,9 +622,10 @@ export const toRequests = (
   t: TranslateFn,
   zone: Zone,
   suggestions: AutoObserveSuggestion[],
+  nowMs = Date.now(),
 ): Request[] =>
   firstOfEachId(suggestions).map((s) => {
-    const parts = partsFor(t, zone, s);
+    const parts = partsFor(t, zone, s, nowMs);
     return {
       id: s.id,
       kind: "fromNowOn",

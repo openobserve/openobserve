@@ -23,6 +23,7 @@ use std::{
     str::FromStr,
 };
 
+use async_trait::async_trait;
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query, RawQuery, rejection::QueryRejection},
@@ -31,9 +32,10 @@ use axum::{
 use config::{meta::autoobserve::marks::ENTITY_TYPE_ALERT, utils::time::now_micros};
 use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::autoobserve::{
+    alert_findings::{AlertFindingsRead, DigestRun, RUN_LOOKBACK_US},
     api::{
         self, ApiError, CoverageView, DEFAULT_LIMIT, Deps, MarkFilter, MarkPut, MarkTarget, Page,
-        SuggestionFilter,
+        STORAGE_FAILED, SuggestionFilter,
     },
     contract::EntityRef,
     marks::MarkSource,
@@ -47,7 +49,10 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    request::alert_grants::{AlertAuthority, AlertGrants, LiveAuthority, org_wide_allows},
+    request::{
+        alert_calibration::digests::latest_alert_findings,
+        alert_grants::{AlertAuthority, AlertGrants, LiveAuthority, org_wide_allows},
+    },
     service::auth::UserEmail,
 };
 
@@ -150,6 +155,21 @@ impl<'a> Subject<'a> {
             .then(|| subject.key_dims.get(dims::ENTITY_ID).map(String::as_str))
             .flatten();
         Self { resource, alert_id }
+    }
+}
+
+/// The calibration digest, searched only through calibration's protected reader (P5b-D-read).
+struct LiveDigest;
+
+#[async_trait]
+impl AlertFindingsRead for LiveDigest {
+    async fn latest(&self, org: &str, now: i64) -> Result<Option<DigestRun>, ApiError> {
+        latest_alert_findings(org, now.saturating_sub(RUN_LOOKBACK_US), now)
+            .await
+            .map_err(|e| {
+                log::error!("[AUTOOBSERVE] org {org}: reading calibration findings failed: {e}");
+                ApiError::Storage(STORAGE_FAILED.into())
+            })
     }
 }
 
@@ -272,7 +292,7 @@ pub async fn coverage_history(
     tag = "AutoObserve",
     operation_id = "AutoObserveSuggestions",
     summary = "List suggestions",
-    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current).",
+    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), SuggestionsQuery),
     responses(
@@ -310,7 +330,16 @@ pub async fn suggestions(
     };
     serve(|deps| async move {
         let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
-        api::suggestions(&deps, &org_id, &filter, page, now_micros(), readable).await
+        api::suggestions(
+            &deps,
+            &org_id,
+            &filter,
+            page,
+            now_micros(),
+            readable,
+            &LiveDigest,
+        )
+        .await
     })
     .await
 }

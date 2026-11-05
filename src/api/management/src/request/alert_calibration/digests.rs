@@ -34,7 +34,10 @@ use config::{
     },
 };
 use infra::errors::{Error as InfraError, ErrorCodes};
-use o2_enterprise::enterprise::alert_calibration_service;
+use o2_enterprise::enterprise::{
+    alert_calibration_service::{self, dismissals::SCOPE_ALERT},
+    autoobserve::alert_findings::{DigestRun, FAILURE_RULE},
+};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::alerts::{
     alert_calibration::sink::DIGEST_STREAM,
@@ -64,6 +67,14 @@ pub(super) const RUN_COLUMNS: &str = "window_start, window_end, finding_count, s
      coverage_error_clusters_unattributed, coverage_stream_substrate_empty";
 const DEFAULT_SIZE: i64 = 100;
 const MAX_SIZE: i64 = 1000;
+/// Stamped on every version-2 record (ENT `run_identity`); they decide whether a run owns alerts.
+const OWNER_COLUMNS: [&str; 3] = [
+    "schema_version",
+    "coverage_definition_checks",
+    "coverage_definition_checks_truncated",
+];
+/// Only version 2 writes these, so a stream without one holds no record the alert read names.
+const FINDING_COLUMNS: [&str; 4] = ["kind", "rule_id", "scope_kind", "finding_id"];
 
 /// A time range in microseconds, and how many rows to return.
 #[derive(Deserialize, IntoParams)]
@@ -519,6 +530,27 @@ pub(super) fn record_filters(
     Ok(filters)
 }
 
+/// The newest run since `since` and its alert failure findings, every page, as the server.
+pub(crate) async fn latest_alert_findings(
+    org_id: &str,
+    since: i64,
+    now: i64,
+) -> Result<Option<DigestRun>, InfraError> {
+    let schema = alert_schema(org_id).await?;
+    let search = |sql, from, size| search_at(org_id, sql, (since, now + 1), from, size);
+    alert_findings_with(&schema, search).await
+}
+
+/// This node's cache can lag a column another node added, so a miss re-reads the stored schema.
+async fn alert_schema(org_id: &str) -> Result<Schema, InfraError> {
+    let cached = infra::schema::get(org_id, DIGEST_STREAM, StreamType::Logs).await?;
+    let held = |column: &&str| cached.field_with_name(column).is_ok();
+    if OWNER_COLUMNS.iter().chain(&FINDING_COLUMNS).all(held) {
+        return Ok(cached);
+    }
+    infra::schema::get_from_db(org_id, DIGEST_STREAM, StreamType::Logs).await
+}
+
 /// The switch, then the range, then the caller's visibility, so a refused read searches nothing.
 async fn admit(
     org_id: &str,
@@ -639,12 +671,22 @@ async fn search_response(
     end_time: i64,
     size: i64,
 ) -> Result<SearchResponse, InfraError> {
+    search_at(org_id, sql, (start_time, end_time), 0, size).await
+}
+
+async fn search_at(
+    org_id: &str,
+    sql: String,
+    (start_time, end_time): (i64, i64),
+    from: i64,
+    size: i64,
+) -> Result<SearchResponse, InfraError> {
     let request = SearchRequest {
         query: SearchQuery {
             sql,
             start_time,
             end_time,
-            from: 0,
+            from,
             size,
             ..Default::default()
         },
@@ -658,6 +700,127 @@ async fn search_response(
         search_service::search(&trace_id, org_id, StreamType::Logs, None, &request),
     )
     .await
+}
+
+/// Not `visible_search`: the rail masks items by AutoObserve's own alert grants (P5b-S7).
+async fn alert_findings_with<S, F>(
+    schema: &Schema,
+    search: S,
+) -> Result<Option<DigestRun>, InfraError>
+where
+    S: Fn(String, i64, i64) -> F,
+    F: Future<Output = Result<SearchResponse, InfraError>>,
+{
+    let held = |column: &str| schema.field_with_name(column).is_ok();
+    let runs = match search(alert_run_sql(&held), 0, 1).await {
+        // A failed partition may hold the newest run, so an older or missing one proves nothing.
+        Ok(response) if response.is_partial => {
+            return Err(InfraError::Message(
+                "the newest alert calibration run read came back partial".to_string(),
+            ));
+        }
+        Ok(response) => response.hits,
+        Err(InfraError::ErrorCode(code)) if Columns::Run.not_written_yet(&code) => Vec::new(),
+        Err(e) => return Err(e),
+    };
+    let Some(mut run) = runs.first().and_then(run_of) else {
+        return Ok(None);
+    };
+    if FINDING_COLUMNS.iter().all(|column| held(column)) {
+        run.records = alert_failure_records(&run, &search).await?;
+    }
+    Ok(Some(run))
+}
+
+/// Every page of the run's records; a partial page would hide findings, so it fails the read.
+async fn alert_failure_records<S, F>(run: &DigestRun, search: &S) -> Result<Vec<Value>, InfraError>
+where
+    S: Fn(String, i64, i64) -> F,
+    F: Future<Output = Result<SearchResponse, InfraError>>,
+{
+    let mut records = Vec::new();
+    let mut after = String::new();
+    loop {
+        let page = match search(alert_records_sql(run, &after), 0, MAX_SIZE).await {
+            Ok(page) => page,
+            Err(InfraError::ErrorCode(code)) if Columns::Finding.not_written_yet(&code) => break,
+            Err(e) => return Err(e),
+        };
+        if page.is_partial {
+            return Err(InfraError::Message(format!(
+                "the alert findings read of run {}..{} came back partial",
+                run.window_start, run.window_end
+            )));
+        }
+        let full = page.hits.len() >= MAX_SIZE as usize;
+        let last = page
+            .hits
+            .last()
+            .and_then(|hit| hit.get("finding_id"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        records.extend(page.hits);
+        match last {
+            Some(last) if full => after = last,
+            _ => break,
+        }
+    }
+    Ok(records)
+}
+
+/// Each emission of a window has its own `_timestamp`, so newest first finds the newest emission.
+fn alert_run_sql(held: &dyn Fn(&str) -> bool) -> String {
+    let owner: Vec<&str> = OWNER_COLUMNS
+        .into_iter()
+        .filter(|column| held(column))
+        .collect();
+    let mut columns = vec!["window_start", "window_end"];
+    columns.extend(owner);
+    format!(
+        "SELECT DISTINCT {}, _timestamp AS emitted_at FROM \"{DIGEST_STREAM}\" \
+         ORDER BY emitted_at DESC",
+        columns.join(", ")
+    )
+}
+
+/// One emission's records share `_timestamp`, so pages follow `finding_id`, the one unique order.
+fn alert_records_sql(run: &DigestRun, after: &str) -> String {
+    format!(
+        "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
+         AND kind = 'finding' AND rule_id = {} AND scope_kind = {} AND _timestamp = {} \
+         AND finding_id > {} ORDER BY finding_id ASC",
+        run.window_start,
+        run.window_end,
+        quote_sql_string(FAILURE_RULE),
+        quote_sql_string(SCOPE_ALERT),
+        run.emitted_at,
+        quote_sql_string(after)
+    )
+}
+
+/// A run row whose window or emission time is unreadable names no run, so nothing is owned.
+fn run_of(row: &Value) -> Option<DigestRun> {
+    let int = |key: &str| {
+        let value = row.get(key)?;
+        value.as_i64().or_else(|| value.as_f64().map(|n| n as i64))
+    };
+    let truncated = match row.get("coverage_definition_checks_truncated") {
+        Some(Value::Bool(truncated)) => *truncated,
+        Some(Value::String(text)) => text == "true",
+        _ => false,
+    };
+    Some(DigestRun {
+        emitted_at: int("emitted_at")?,
+        window_start: int("window_start")?,
+        window_end: int("window_end")?,
+        schema_version: int("schema_version").and_then(|v| u64::try_from(v).ok()),
+        definition_checks: row
+            .get("coverage_definition_checks")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        definition_checks_truncated: truncated,
+        records: Vec::new(),
+    })
 }
 
 fn respond(org_id: &str, hits: Result<Vec<Value>, InfraError>, columns: Columns) -> Response {
@@ -1029,6 +1192,252 @@ mod tests {
         let hits = read_runs(&V1_MARKERS, &stream).await;
         assert_eq!(hits, [v1_marker(), v1_marker()]);
         assert_eq!(stream.searches.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn the_alert_findings_read_names_only_alert_failure_findings() {
+        let all = |_: &str| true;
+        assert_eq!(
+            alert_run_sql(&all),
+            format!(
+                "SELECT DISTINCT window_start, window_end, schema_version, \
+                 coverage_definition_checks, coverage_definition_checks_truncated, \
+                 _timestamp AS emitted_at FROM \"{DIGEST_STREAM}\" ORDER BY emitted_at DESC"
+            )
+        );
+        let v1 = |column: &str| !OWNER_COLUMNS.contains(&column);
+        assert_eq!(
+            alert_run_sql(&v1),
+            format!(
+                "SELECT DISTINCT window_start, window_end, _timestamp AS emitted_at \
+                 FROM \"{DIGEST_STREAM}\" ORDER BY emitted_at DESC"
+            )
+        );
+        let run = DigestRun {
+            emitted_at: 30,
+            window_start: 10,
+            window_end: 20,
+            ..DigestRun::default()
+        };
+        assert_eq!(
+            alert_records_sql(&run, "ab'c"),
+            format!(
+                "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = 10 AND window_end = 20 \
+                 AND kind = 'finding' AND rule_id = 'failure' AND scope_kind = 'alert' \
+                 AND _timestamp = 30 AND finding_id > 'ab''c' ORDER BY finding_id ASC"
+            )
+        );
+    }
+
+    fn page(hits: Vec<Value>, is_partial: bool) -> SearchResponse {
+        SearchResponse {
+            hits,
+            is_partial,
+            ..SearchResponse::default()
+        }
+    }
+
+    fn run_row() -> Value {
+        serde_json::json!({
+            "window_start": 10, "window_end": 20, "emitted_at": 30.0, "schema_version": 2,
+            "coverage_definition_checks": "checked", "coverage_definition_checks_truncated": true,
+        })
+    }
+
+    fn every_column() -> Schema {
+        schema(&[
+            "window_start",
+            "window_end",
+            "schema_version",
+            "coverage_definition_checks",
+            "coverage_definition_checks_truncated",
+            "kind",
+            "rule_id",
+            "scope_kind",
+            "finding_id",
+        ])
+    }
+
+    fn finding_ids(n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("{i:064x}")).collect()
+    }
+
+    /// Answers the run read with `run_row`, and record pages from `records` finding ids.
+    struct Paged {
+        records: usize,
+        partial: bool,
+        reads: std::sync::Mutex<Vec<(String, i64, i64)>>,
+    }
+
+    impl Paged {
+        fn new(records: usize, partial: bool) -> Self {
+            Self {
+                records,
+                partial,
+                reads: Default::default(),
+            }
+        }
+
+        /// Rows tied on the SQL's order come back in another order on each read, as shards may.
+        async fn search(
+            &self,
+            sql: String,
+            from: i64,
+            size: i64,
+        ) -> Result<SearchResponse, InfraError> {
+            let reads = {
+                let mut reads = self.reads.lock().unwrap();
+                reads.push((sql.clone(), from, size));
+                reads.len()
+            };
+            if sql.contains("DISTINCT") {
+                return Ok(page(vec![run_row()], false));
+            }
+            let after = sql
+                .split("finding_id > '")
+                .nth(1)
+                .and_then(|rest| rest.split('\'').next())
+                .unwrap_or_default()
+                .to_string();
+            let mut ids: Vec<String> = finding_ids(self.records)
+                .into_iter()
+                .filter(|id| *id > after)
+                .collect();
+            if sql.ends_with("ORDER BY finding_id ASC") {
+                ids.sort();
+            } else if !ids.is_empty() {
+                let turn = (reads * 7) % ids.len();
+                ids.rotate_left(turn);
+            }
+            let hits = ids
+                .into_iter()
+                .skip(from as usize)
+                .take(size as usize)
+                .map(|id| serde_json::json!({ "finding_id": id }))
+                .collect();
+            Ok(page(hits, self.partial))
+        }
+    }
+
+    #[tokio::test]
+    async fn finding_pages_that_share_one_emission_time_list_each_finding_once() {
+        let records = 2 * MAX_SIZE as usize + 3;
+        let stream = Paged::new(records, false);
+        let run = alert_findings_with(&every_column(), |sql, from, size| {
+            stream.search(sql, from, size)
+        })
+        .await
+        .unwrap()
+        .unwrap();
+        let listed: Vec<&str> = run
+            .records
+            .iter()
+            .filter_map(|r| r["finding_id"].as_str())
+            .collect();
+        let unique: std::collections::BTreeSet<&str> = listed.iter().copied().collect();
+        assert_eq!((listed.len(), unique.len()), (records, records));
+    }
+
+    #[tokio::test]
+    async fn a_partial_run_read_fails_the_read() {
+        for hits in [Vec::new(), vec![run_row()]] {
+            let partial = |sql: String, _: i64, _: i64| {
+                let run_hits = hits.clone();
+                async move {
+                    if sql.contains("DISTINCT") {
+                        Ok(page(run_hits, true))
+                    } else {
+                        Ok(page(Vec::new(), false))
+                    }
+                }
+            };
+            let read = alert_findings_with(&every_column(), partial).await;
+            assert!(read.is_err(), "{} run rows: {read:?}", hits.len());
+        }
+    }
+
+    #[tokio::test]
+    async fn the_alert_findings_read_takes_every_page_and_refuses_a_partial_one() {
+        let every = every_column();
+        let stream = Paged::new(2 * MAX_SIZE as usize + 3, false);
+        let run = alert_findings_with(&every, |sql, from, size| stream.search(sql, from, size))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(run.records.len(), 2 * MAX_SIZE as usize + 3);
+        assert_eq!(
+            (
+                run.emitted_at,
+                run.window_start,
+                run.window_end,
+                run.schema_version
+            ),
+            (30, 10, 20, Some(2))
+        );
+        assert_eq!(run.definition_checks.as_deref(), Some("checked"));
+        assert!(run.definition_checks_truncated);
+        let ids = finding_ids(2 * MAX_SIZE as usize);
+        let afters = [
+            "",
+            &ids[MAX_SIZE as usize - 1],
+            &ids[2 * MAX_SIZE as usize - 1],
+        ];
+        let reads = stream.reads.lock().unwrap().clone();
+        assert_eq!(reads.len(), 4);
+        assert_eq!((reads[0].1, reads[0].2), (0, 1));
+        for ((sql, from, size), after) in reads[1..].iter().zip(afters) {
+            assert_eq!((*from, *size), (0, MAX_SIZE));
+            assert!(sql.contains(&format!("finding_id > '{after}'")), "{sql}");
+        }
+        let partial = Paged::new(3, true);
+        let read =
+            alert_findings_with(&every, |sql, from, size| partial.search(sql, from, size)).await;
+        assert!(read.is_err(), "{read:?}");
+        let markers_only = schema(&["window_start", "window_end", "kind"]);
+        let old = Paged::new(3, false);
+        let run = alert_findings_with(&markers_only, |sql, from, size| old.search(sql, from, size))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            run.records.is_empty(),
+            "no finding column, so no read that would fail on one"
+        );
+        assert_eq!(old.reads.lock().unwrap().len(), 1);
+        let missing = |_: String, _: i64, _: i64| async {
+            Err(InfraError::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                DIGEST_STREAM.to_string(),
+            )))
+        };
+        assert_eq!(alert_findings_with(&every, missing).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn the_alert_findings_read_runs_as_the_calibration_reader() {
+        infra::db::create_table().await.unwrap();
+        let now = now_micros();
+        let read = latest_alert_findings("ops", 0, now).await;
+        assert!(matches!(read, Ok(None)), "{read:?}");
+        let all = |_: &str| true;
+        let request = SearchRequest {
+            query: SearchQuery {
+                sql: alert_run_sql(&all),
+                start_time: 0,
+                end_time: now,
+                size: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let outside =
+            search_service::search("p5b-probe", "ops", StreamType::Logs, None, &request).await;
+        assert!(
+            matches!(
+                outside,
+                Err(InfraError::ErrorCode(ErrorCodes::SearchStreamProtected(ref s))) if s == DIGEST_STREAM
+            ),
+            "{outside:?}"
+        );
     }
 
     #[tokio::test]

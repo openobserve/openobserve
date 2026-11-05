@@ -49,6 +49,7 @@ profiling = ["cpu-profiling", "openobserve-core/profiling"]
 anyhow.workspace = true
 arrow-schema.workspace = true
 async-stream.workspace = true
+async-trait.workspace = true
 audit = { workspace = true, optional = true }
 axum.workspace = true
 axum-extra.workspace = true

@@ -29,7 +29,8 @@ export type AutoObserveSuggestionKind =
   | "silent_coverage"
   | "coverage_lost"
   | "blind_guardrail"
-  | "discovery_unusable";
+  | "discovery_unusable"
+  | "alert_not_working";
 
 export interface AutoObserveEvidence {
   monitor_kind: string;
