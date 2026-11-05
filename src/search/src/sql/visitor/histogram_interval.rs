@@ -63,13 +63,13 @@ impl VisitorMut for HistogramIntervalVisitor {
                 } else {
                     generate_histogram_interval(self.time_range).to_string()
                 };
-                let interval_seconds =
-                    convert_histogram_interval_to_seconds(&interval).unwrap_or_default();
-                // Validate and adjust the histogram interval
-                self.interval = Some(validate_and_adjust_histogram_interval(
-                    interval_seconds,
-                    self.time_range,
-                ));
+                // a month or a week has no width here, so nothing may treat it as a fixed grid
+                self.interval =
+                    convert_histogram_interval_to_seconds(&interval)
+                        .ok()
+                        .map(|seconds| {
+                            validate_and_adjust_histogram_interval(seconds, self.time_range)
+                        });
             }
             return ControlFlow::Break(());
         }

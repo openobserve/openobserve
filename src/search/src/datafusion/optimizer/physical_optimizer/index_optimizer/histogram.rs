@@ -182,11 +182,11 @@ fn is_on_histogram_origin_grid(origin: &Arc<dyn PhysicalExpr>, width_micros: i64
 fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
     let interval = expr.downcast_ref::<Literal>()?.value();
     match interval {
-        ScalarValue::IntervalMonthDayNano(Some(interval)) => {
+        // a month has no fixed width, and the index can only count fixed-width buckets
+        ScalarValue::IntervalMonthDayNano(Some(interval)) if interval.months == 0 => {
             // convert interval to nanoseconds
-            let microseconds = interval.nanoseconds / 1_000
-                + interval.days as i64 * 24 * 60 * 60 * 1_000_000
-                + interval.months as i64 * 30 * 24 * 60 * 60 * 1_000_000;
+            let microseconds =
+                interval.nanoseconds / 1_000 + interval.days as i64 * 24 * 60 * 60 * 1_000_000;
             Some(microseconds as u64)
         }
         _ => None,
@@ -454,6 +454,10 @@ mod tests {
                     1,
                     19800000000,
                 )),
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 month') as ts, count(*) as cnt from t group by ts",
+                None,
             ),
             // any origin off the 2001 grid must scan, because the index would relabel its rows
             (

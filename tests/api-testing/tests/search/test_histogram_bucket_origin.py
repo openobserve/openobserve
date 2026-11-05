@@ -31,7 +31,7 @@ ORIGIN_MICROS = 978_307_200 * 1_000_000
 HOUR = 3_600_000_000
 DAY = 24 * HOUR
 WINDOW_HOURS = int(os.environ.get("ZO_INGEST_ALLOWED_UPTO", "5"))
-FIXTURE_HOURS = min(WINDOW_HOURS - 1, 100 * 24)
+FIXTURE_HOURS = min(WINDOW_HOURS - 3, 100 * 24)
 EVENT_STEP = 6 * HOUR if FIXTURE_HOURS > 96 else HOUR // 4
 # Lets a local server flush files first, so the same rows also run through the index.
 SETTLE_SECS = int(os.environ.get("HISTOGRAM_ORIGIN_SETTLE_SECS", "0"))
@@ -273,3 +273,35 @@ def test_a_response_states_its_bucket_definition(fixture, use_cache):
         assert body["histogram_offset"] == 19_800
         results = fixture.search_stream(sql, first_edge, last_edge, use_cache=use_cache)
         assert results["histogram_offset"] == 19_800
+
+
+def _month_label(ts, offset=0):
+    moment = dt.datetime.fromtimestamp((ts + offset) / 1_000_000, tz=dt.timezone.utc)
+    return moment.strftime("%Y-%m-01T00:00:00")
+
+
+@pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
+@pytest.mark.parametrize("use_cache", [False, True], ids=["cache_off", "cache_on"])
+def test_month_buckets_use_calendar_months(fixture, filtered, use_cache):
+    where = " WHERE kind = 'origin'" if filtered else ""
+    sql = (
+        "SELECT histogram(_timestamp, '1 month') AS ts, count(*) AS cnt "
+        f'FROM "{fixture.stream}"{where} GROUP BY ts ORDER BY ts'
+    )
+    expected = {}
+    for ts in fixture.events:
+        label = _month_label(ts)
+        expected[label] = expected.get(label, 0) + 1
+    for _ in range(2):
+        body = fixture.search(sql, fixture.start, fixture.end, use_cache=use_cache)
+        assert _rows(body) == expected
+        results = fixture.search_stream(sql, fixture.start, fixture.end, use_cache=use_cache)
+        assert _rows(results) == expected
+    # A second, shorter range must not reuse the month counts of the longer one.
+    shorter_end = fixture.end - (fixture.end - fixture.start) // 3
+    expected = {}
+    for ts in fixture.events:
+        if ts < shorter_end:
+            label = _month_label(ts)
+            expected[label] = expected.get(label, 0) + 1
+    assert _rows(fixture.search(sql, fixture.start, shorter_end, use_cache=use_cache)) == expected

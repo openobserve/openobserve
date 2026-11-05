@@ -28,7 +28,12 @@ use sqlparser::{
     parser::Parser,
 };
 
-use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+use super::{
+    RE_HISTOGRAM,
+    visitor::histogram_interval::{
+        convert_histogram_interval_to_seconds, generate_histogram_interval,
+    },
+};
 
 pub fn handle_histogram(
     origin_sql: &mut String,
@@ -68,6 +73,19 @@ pub fn handle_histogram(
         captures.get(0).unwrap().as_str(),
         &format!("histogram({field},'{interval}'{timezone})"),
     );
+}
+
+/// Whether the first `histogram()` uses an interval without a fixed width, such as a month.
+pub fn has_calendar_histogram_interval(sql: &str) -> bool {
+    RE_HISTOGRAM
+        .captures(sql)
+        .and_then(|captures| {
+            let args = captures.get(1)?.as_str();
+            let interval = args.split(',').nth(1)?;
+            let interval = interval.trim().trim_matches(['\'', '"']);
+            Some(convert_histogram_interval_to_seconds(interval).is_err())
+        })
+        .unwrap_or(false)
 }
 
 /// The timezone argument of the first `histogram()` in the SQL.
@@ -286,6 +304,22 @@ mod tests {
 
     const JUL_2026: i64 = 1_782_864_000_000_000;
     const JAN_2026: i64 = 1_767_225_600_000_000;
+
+    #[test]
+    fn test_calendar_interval_detection() {
+        for interval in ["1 month", "2 months", "1 year", "1 week"] {
+            let sql = format!("SELECT histogram(_timestamp, '{interval}') FROM t");
+            assert!(has_calendar_histogram_interval(&sql), "{interval}");
+        }
+        for sql in [
+            "SELECT histogram(_timestamp, '30 days') FROM t",
+            "SELECT histogram(_timestamp, '1 hour', '+05:30') FROM t",
+            "SELECT histogram(_timestamp) FROM t",
+            "SELECT * FROM t",
+        ] {
+            assert!(!has_calendar_histogram_interval(sql), "{sql}");
+        }
+    }
 
     #[test]
     fn test_handle_histogram_keeps_the_timezone() {
