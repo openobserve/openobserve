@@ -1102,8 +1102,8 @@ describe("useStreams Composable", () => {
       mockStore.state.organizationData.isDataIngested = false;
 
       streamsInstance.setStreams("logs", [
-        { name: "usage", stream_type: "logs" },
-        { name: "_o2_db_stats", stream_type: "logs" },
+        { name: "usage", stream_type: "logs", is_internal: true },
+        { name: "_o2_db_stats", stream_type: "logs", is_internal: true },
       ]);
       streamsInstance.setStreams("metadata", [{ name: "default", stream_type: "metadata" }]);
 
@@ -1113,7 +1113,9 @@ describe("useStreams Composable", () => {
     it("should set isDataIngested for a RUM stream", () => {
       mockStore.state.organizationData.isDataIngested = false;
 
-      streamsInstance.setStreams("logs", [{ name: "_rumdata", stream_type: "logs" }]);
+      streamsInstance.setStreams("logs", [
+        { name: "_rumdata", stream_type: "logs", is_internal: true },
+      ]);
 
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
     });

@@ -321,7 +321,7 @@ mod tests {
             physical_optimizer::index_optimizer::utils::tests::get_partial_aggregate_plan,
         },
         table_provider::empty_table::NewEmptyTable,
-        udf::histogram_udf,
+        udf::time::histogram,
     };
 
     #[tokio::test]
@@ -348,7 +348,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("t", schema);
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
 
         let cases = vec![
             (
@@ -439,7 +439,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("t", schema);
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
 
         let index_fields = HashSet::from(["level".to_string()]);
 

@@ -180,7 +180,7 @@ mod tests {
     use crate::{
         datafusion::{
             optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
-            table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
+            table_provider::empty_table::NewEmptyTable, udf::time::histogram,
         },
         index::Condition,
     };
@@ -204,7 +204,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("default", schema.clone());
         ctx.register_table("default", Arc::new(provider)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
 
         let logical_plan = ctx
             .state()

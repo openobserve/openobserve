@@ -28,7 +28,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::datafusion::udf::str_match_udf;
+use crate::datafusion::udf::fulltext::str_match;
 
 // TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 pub(super) fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
@@ -167,9 +167,9 @@ pub(super) fn create_str_match_expr(
 
     let right = get_scalar_value(value, &data_type)?;
     let udf = if case_sensitive {
-        Arc::new(str_match_udf::STR_MATCH_UDF.clone())
+        Arc::new(str_match::STR_MATCH_UDF.clone())
     } else {
-        Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
+        Arc::new(str_match::STR_MATCH_IGNORE_CASE_UDF.clone())
     };
 
     let udf_expr = Arc::new(ScalarFunctionExpr::try_new(

@@ -31,6 +31,7 @@ import {
   markSlackInviteResolved,
   shouldOfferSlackInvite,
 } from "@/utils/slackCommunityInvite";
+import { summaryHasUserData } from "@/utils/internalStreams";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -143,7 +144,7 @@ const checkAndMaybeShow = async () => {
     // directly rather than trust it. Read through the shared cache so a
     // returning session doesn't re-fire the /summary request.
     const summary = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
-    const hasData = !!summary?.streams?.num_streams;
+    const hasData = summaryHasUserData(summary);
     if (hasData) {
       store.dispatch("setIsDataIngested", true);
       // Dedupe the summary lookup for the rest of this session — NOT sessionShownKey,

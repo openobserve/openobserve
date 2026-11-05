@@ -15,30 +15,15 @@
 
 use config::{meta::function::ZoFunction, utils::json};
 
-pub mod arr_descending_udf;
-pub mod arrcount_udf;
-pub mod arrindex_udf;
-pub mod arrjoin_udf;
-pub mod arrsort_udf;
-pub mod arrzip_udf;
-pub mod cast_to_arr_udf;
-pub mod cast_to_timestamp_udf;
+pub mod array;
 #[cfg(feature = "enterprise")]
 pub mod cipher_udf;
-pub mod date_format_udf;
 pub mod fold_native_frames_udf;
-pub mod fuzzy_match_udf;
-pub mod histogram_udf;
+pub mod fulltext;
 pub mod ip;
-pub mod match_all_hash_udf;
-pub mod match_all_udf;
-pub mod regexp_matches_udf;
-pub mod regexp_udf;
+pub mod regex;
 pub mod spath_udf;
-pub mod str_match_udf;
-pub mod string_to_array_v2_udf;
-pub mod time_range_udf;
-pub mod to_arr_string_udf;
+pub mod time;
 pub mod transform_udf;
 
 /// The name of the str_match UDF given to DataFusion.
@@ -100,7 +85,7 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 16] = [
         text: "re_matches(field, 'pattern')",
     },
     ZoFunction {
-        name: cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF_NAME,
+        name: time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF_NAME,
         text: "cast_to_timestamp('pattern')",
     },
     ZoFunction {
