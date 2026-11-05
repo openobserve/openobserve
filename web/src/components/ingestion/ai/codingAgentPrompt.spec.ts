@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 import { INSTRUMENT_SKILL_URL, buildCodingAgentPrompt } from "./codingAgentPrompt";
 
 describe("buildCodingAgentPrompt", () => {
-  it("names the skill URL, the org and the stream", () => {
+  it("names the skill URL, the org and the stream, and sends the user back to this page", () => {
     expect(buildCodingAgentPrompt("team1", "ai_traces")).toBe(
       `Instrument this app for OpenObserve with the openobserve-instrument skill (${INSTRUMENT_SKILL_URL}).\n` +
         "Use the .env in the project root, org team1, stream ai_traces.\n" +
-        "Run one sample request, then check the data.",
+        "Run one sample request, then tell me to check this OpenObserve page.",
     );
   });
 

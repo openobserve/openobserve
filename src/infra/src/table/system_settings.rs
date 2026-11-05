@@ -171,6 +171,21 @@ pub async fn list(
     Ok(results.into_iter().map(model_to_setting).collect())
 }
 
+/// `(org_id, value)` of every org scoped row of `key`.
+pub async fn list_org_values(key: &str) -> Result<Vec<(String, serde_json::Value)>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let rows = Entity::find()
+        .filter(Column::Scope.eq(SettingScope::Org.as_str()))
+        .filter(Column::SettingKey.eq(key))
+        .all(client)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|m| m.org_id.map(|org| (org, m.setting_value)))
+        .collect())
+}
+
 /// `(scope, org_id, user_id, setting_key)` of every setting row of the org, at any scope.
 pub async fn list_keys_by_org(org_id: &str) -> Result<Vec<SettingRowKey>, anyhow::Error> {
     use sea_orm::QuerySelect;

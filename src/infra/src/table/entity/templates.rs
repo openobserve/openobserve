@@ -14,6 +14,7 @@ pub struct Model {
     pub body: String,
     pub title: Option<String>,
     pub kind: String,
+    pub applies_to: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -45,6 +46,7 @@ mod tests {
             body: r#"{"text": "Alert: {{.Name}}"}"#.to_string(),
             title: None,
             kind: "custom".to_string(),
+            applies_to: "[]".to_string(),
         };
         assert_eq!(m.id, "tmpl-1");
         assert_eq!(m.org, "myorg");

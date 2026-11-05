@@ -36,6 +36,9 @@ pub struct DowntimeNotification {
     pub sent_at: i64,
     pub destinations: serde_json::Value,
     pub result: Option<String>,
+    /// Per destination, the template that rendered the send, as serialized JSON; set with the
+    /// result.
+    pub templates: Option<String>,
 }
 
 impl From<Model> for DowntimeNotification {
@@ -49,6 +52,7 @@ impl From<Model> for DowntimeNotification {
             sent_at: m.sent_at,
             destinations: m.destinations,
             result: m.result,
+            templates: m.templates,
         }
     }
 }
@@ -69,9 +73,13 @@ pub async fn list_for_downtime(
     list_for_downtime_with(client, org, downtime_id, limit).await
 }
 
-pub async fn set_result(id: &str, result: &str) -> Result<(), errors::Error> {
+pub async fn set_result(
+    id: &str,
+    result: &str,
+    templates: Option<String>,
+) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
-    set_result_with(client, id, result).await
+    set_result_with(client, id, result, templates).await
 }
 
 pub async fn delete_for_downtime(org: &str, downtime_id: &str) -> Result<u64, errors::Error> {
@@ -98,9 +106,11 @@ pub async fn set_result_with<C: ConnectionTrait>(
     conn: &C,
     id: &str,
     result: &str,
+    templates: Option<String>,
 ) -> Result<(), errors::Error> {
     Entity::update_many()
         .col_expr(Column::Result, Expr::value(result))
+        .col_expr(Column::Templates, Expr::value(templates))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
@@ -149,6 +159,7 @@ fn to_active_model(r: &DowntimeNotification) -> ActiveModel {
         sent_at: Set(r.sent_at),
         destinations: Set(r.destinations.clone()),
         result: Set(r.result.clone()),
+        templates: Set(r.templates.clone()),
     }
 }
 
@@ -175,6 +186,7 @@ mod tests {
             sent_at: window_start,
             destinations: serde_json::json!(["slack"]),
             result: None,
+            templates: None,
         }
     }
 
@@ -217,12 +229,16 @@ mod tests {
         ] {
             insert_if_absent_with(&db, &r).await.unwrap();
         }
-        set_result_with(&db, "n1", "slack: timed out")
+        let templates =
+            serde_json::json!([{"destination": "slack", "template_name": "card"}]).to_string();
+        set_result_with(&db, "n1", "slack: timed out", Some(templates.clone()))
             .await
             .unwrap();
         let rows = list_for_downtime_with(&db, "acme", "d1", 10).await.unwrap();
         assert_eq!(rows[0].result, None);
+        assert_eq!(rows[0].templates, None);
         assert_eq!(rows[1].result.as_deref(), Some("slack: timed out"));
+        assert_eq!(rows[1].templates, Some(templates));
     }
 
     #[tokio::test]
