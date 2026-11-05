@@ -24,7 +24,10 @@ vi.mock("./http", () => {
 });
 
 const fetchQuery = vi.hoisted(() => vi.fn());
-vi.mock("@/composables/query/queryClient", () => ({ queryClient: { fetchQuery } }));
+const invalidateQueries = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/query/queryClient", () => ({
+  queryClient: { fetchQuery, invalidateQueries },
+}));
 vi.mock("@/services/organizations.queries", () => ({
   ingestionTokensQuery: () => "tokens",
   orgPasscodeQuery: () => "passcode",
@@ -102,5 +105,51 @@ describe("sampleData ingest credential", () => {
       throw failure;
     });
     await expect(sampleData.ingestLogs("acme", "s", [{}])).rejects.toBe(failure);
+  });
+});
+
+describe("sampleData ingest 401", () => {
+  const client = (http as unknown as ReturnType<typeof vi.fn>)();
+  const bearer = (n: number) =>
+    atob((vi.mocked(http).mock.calls[n][0] as any).headers.Authorization.replace("Basic ", ""));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    client.post.mockReset();
+  });
+
+  it("reads the credential again and retries once when the token was rotated", async () => {
+    let token = "o2oi_old";
+    fetchQuery.mockImplementation(async (query: string) =>
+      query === "tokens"
+        ? { data: [{ token, enabled: true }] }
+        : { data: { user: "u", passcode: "p" } },
+    );
+    client.post.mockImplementationOnce(async () => {
+      token = "o2oi_new";
+      throw { response: { status: 401 } };
+    });
+    client.post.mockResolvedValueOnce({ data: {} });
+    await sampleData.ingestLogs("acme", "s", [{}]);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
+    expect(client.post).toHaveBeenCalledTimes(2);
+    expect(bearer(0)).toMatch(/:o2oi_old$/);
+    expect(bearer(1)).toMatch(/:o2oi_new$/);
+  });
+
+  it("fails when the retry is refused too", async () => {
+    fetchQuery.mockResolvedValue({ data: [{ token: "o2oi_x", enabled: true }] });
+    const refused = { response: { status: 401 } };
+    client.post.mockRejectedValue(refused);
+    await expect(sampleData.ingestMetrics("acme", [{}])).rejects.toBe(refused);
+    expect(client.post).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry other errors", async () => {
+    fetchQuery.mockResolvedValue({ data: [{ token: "o2oi_x", enabled: true }] });
+    const down = { response: { status: 500 } };
+    client.post.mockRejectedValue(down);
+    await expect(sampleData.ingestTraces("acme", "t", {})).rejects.toBe(down);
+    expect(client.post).toHaveBeenCalledTimes(1);
   });
 });

@@ -16,6 +16,7 @@
 import http from "./http";
 import { queryClient } from "@/composables/query/queryClient";
 import { ingestionTokensQuery, orgPasscodeQuery } from "@/services/organizations.queries";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import store from "@/stores";
 import { b64EncodeStandard } from "@/utils/formatters";
 
@@ -37,6 +38,29 @@ const ingestAuth = async (org: string) => {
   if (!secret) throw new Error("No ingestion credential for this user");
   const name = user ?? (store.state.userInfo as { email?: string } | null)?.email;
   return { Authorization: `Basic ${b64EncodeStandard(`${name}:${secret}`)}` };
+};
+
+// the cached token may have been rotated elsewhere: drop it, read it again and send once more
+const withFreshAuth = async <T>(
+  org: string,
+  send: (auth: Record<string, string>) => Promise<T>,
+) => {
+  try {
+    return await send(await ingestAuth(org));
+  } catch (e: any) {
+    if (e?.response?.status !== 401) throw e;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: organizationKeys.ingestionTokens(org),
+        refetchType: "none",
+      }),
+      queryClient.invalidateQueries({
+        queryKey: organizationKeys.passcode(org),
+        refetchType: "none",
+      }),
+    ]);
+    return send(await ingestAuth(org));
+  }
 };
 
 // a refused ingest credential fails the load, not the session; the load reports a 403 itself
@@ -73,22 +97,20 @@ const sampleData = {
     unsavedWindows.delete(org);
     return http().delete(`/api/${org}/sample_data`);
   },
-  ingestLogs: async (org: string, stream: string, rows: unknown[]) =>
-    http({ headers: await ingestAuth(org) }).post(`/api/${org}/${stream}/_json`, rows, keepSession),
-  ingestMetrics: async (org: string, rows: unknown[]) =>
-    http({ headers: await ingestAuth(org) }).post(
-      `/api/${org}/ingest/metrics/_json`,
-      rows,
-      keepSession,
+  ingestLogs: (org: string, stream: string, rows: unknown[]) =>
+    withFreshAuth(org, (headers) =>
+      http({ headers }).post(`/api/${org}/${stream}/_json`, rows, keepSession),
     ),
-  ingestTraces: async (org: string, stream: string, payload: unknown) =>
-    http({
-      headers: {
-        ...(await ingestAuth(org)),
-        "Content-Type": "application/json",
-        "stream-name": stream,
-      },
-    }).post(`/api/${org}/v1/traces`, payload, keepSession),
+  ingestMetrics: (org: string, rows: unknown[]) =>
+    withFreshAuth(org, (headers) =>
+      http({ headers }).post(`/api/${org}/ingest/metrics/_json`, rows, keepSession),
+    ),
+  ingestTraces: (org: string, stream: string, payload: unknown) =>
+    withFreshAuth(org, (headers) =>
+      http({
+        headers: { ...headers, "Content-Type": "application/json", "stream-name": stream },
+      }).post(`/api/${org}/v1/traces`, payload, keepSession),
+    ),
 };
 
 export default sampleData;
