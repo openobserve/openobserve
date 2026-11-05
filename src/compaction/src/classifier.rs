@@ -38,7 +38,7 @@ use infra::{
 /// Hashes to the one compactor that runs the classifier.
 const CLASSIFIER_NODE_KEY: &str = "dynamic_partition_classifier";
 
-/// The UTC day this node has classified the streams for.
+/// The newest closed day this node has classified the streams up to.
 static LAST_RUN_DAY: AtomicI64 = AtomicI64::new(0);
 
 /// The closed days a run looks at, ending with `newest_day`.
@@ -65,11 +65,11 @@ impl ClassifyWindow {
     }
 }
 
-/// Classifies all streams once per UTC day on one compactor; repeating a run changes nothing.
+/// Classifies all streams once per closed day on one compactor; repeating a run changes nothing.
 pub async fn run() -> Result<(), anyhow::Error> {
-    let now = now_micros();
-    let today = now - now % day_micros(1);
-    if LAST_RUN_DAY.load(Ordering::Relaxed) == today {
+    // keyed by the day, not by today: a tick before yesterday settles must not use up the day
+    let newest_day = newest_closed_day(now_micros(), crate::settle_micros());
+    if LAST_RUN_DAY.load(Ordering::Relaxed) == newest_day {
         return Ok(());
     }
     let Some(node_name) =
@@ -82,7 +82,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     let cfg = get_config();
     let window = ClassifyWindow {
-        newest_day: newest_closed_day(now, crate::settle_micros()),
+        newest_day,
         days: cfg.compact.dynamic_partition_window_days,
     };
     for (org_id, stream_types) in db::schema::list_all_streams_grouped().await {
@@ -95,7 +95,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     }
-    LAST_RUN_DAY.store(today, Ordering::Relaxed);
+    LAST_RUN_DAY.store(newest_day, Ordering::Relaxed);
     Ok(())
 }
 
