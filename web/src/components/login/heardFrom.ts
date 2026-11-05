@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, reactive, ref, type InjectionKey } from "vue";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 /** Provided by a page that asks the question itself, so the first-event bars inside it do not ask again. */
 export const HEARD_FROM_ASKED_BY_HOST: InjectionKey<boolean> = Symbol("heard-from-asked-by-host");
@@ -31,6 +32,21 @@ export const HEARD_FROM_VALUES = [
 ] as const;
 
 export type HeardFromValue = (typeof HEARD_FROM_VALUES)[number];
+
+/** The answers with their labels; the onboarding and sample data questions both show this list. */
+export function heardFromOptions(t: TranslateFn): { value: HeardFromValue; label: I18nText }[] {
+  const labels: Record<HeardFromValue, I18nText> = {
+    search_engine: t("login.heardFrom.searchEngine"),
+    friend_or_colleague: t("login.heardFrom.friendOrColleague"),
+    ai_assistant: t("login.heardFrom.aiAssistant"),
+    github: raw("GitHub"),
+    linkedin: raw("LinkedIn"),
+    reddit: raw("Reddit"),
+    youtube: raw("YouTube"),
+    other: t("login.heardFrom.other"),
+  };
+  return HEARD_FROM_VALUES.map((value) => ({ value, label: labels[value] }));
+}
 
 export const HEARD_FROM_PENDING_PREFIX = "o2.onboarding.heardFromPending.";
 

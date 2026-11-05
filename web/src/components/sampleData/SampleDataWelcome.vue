@@ -178,14 +178,14 @@ import {
   writeFirstSource,
   type FirstSourceId,
 } from "@/components/login/firstSourceOptions";
-import { HEARD_FROM_VALUES, type HeardFromValue } from "@/components/login/heardFrom";
+import { heardFromOptions } from "@/components/login/heardFrom";
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import { isFirstLoginOf, redirectPending } from "@/components/onboarding/onboardingFlow";
 import { flowsKnown, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -240,19 +240,7 @@ const startTour = () => startTourFor(org.value);
 const firstLogin = () => isFirstLoginOf(store.state.userInfo?.email);
 
 // the onboarding flow's codes and labels, so one answer is one value in the attribution data
-const heardLabels = computed<Record<HeardFromValue, I18nText>>(() => ({
-  search_engine: t("login.heardFrom.searchEngine"),
-  friend_or_colleague: t("login.heardFrom.friendOrColleague"),
-  ai_assistant: t("login.heardFrom.aiAssistant"),
-  github: raw("GitHub"),
-  linkedin: raw("LinkedIn"),
-  reddit: raw("Reddit"),
-  youtube: raw("YouTube"),
-  other: t("login.heardFrom.other"),
-}));
-const heardOptions = computed(() =>
-  HEARD_FROM_VALUES.map((value) => ({ value, label: heardLabels.value[value] })),
-);
+const heardOptions = computed(() => heardFromOptions(t));
 const heardFrom = ref<string>();
 // cloud only, on a first login: the answer goes to the cloud billing attribution endpoint
 const askHeard = ref(false);

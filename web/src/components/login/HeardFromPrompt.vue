@@ -52,14 +52,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { readFirstSource } from "./firstSourceOptions";
 import {
   HEARD_FROM_VALUES,
   clearHeardFromPending,
+  heardFromOptions,
   useHeardFromPending,
   useHeardFromSending,
-  type HeardFromValue,
 } from "./heardFrom";
 
 const props = defineProps<{ org: string }>();
@@ -71,19 +71,7 @@ const email = (): string | undefined => store.state.userInfo?.email;
 const visible = useHeardFromPending(email);
 const sending = useHeardFromSending(email);
 
-const labels = computed<Record<HeardFromValue, I18nText>>(() => ({
-  search_engine: t("login.heardFrom.searchEngine"),
-  friend_or_colleague: t("login.heardFrom.friendOrColleague"),
-  ai_assistant: t("login.heardFrom.aiAssistant"),
-  github: raw("GitHub"),
-  linkedin: raw("LinkedIn"),
-  reddit: raw("Reddit"),
-  youtube: raw("YouTube"),
-  other: t("login.heardFrom.other"),
-}));
-const options = computed(() =>
-  HEARD_FROM_VALUES.map((value) => ({ value, label: labels.value[value] })),
-);
+const options = computed(() => heardFromOptions(t));
 
 const answer = async (value: unknown) => {
   const from = HEARD_FROM_VALUES.find((v) => v === value);
