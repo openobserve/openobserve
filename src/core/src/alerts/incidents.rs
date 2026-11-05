@@ -5727,7 +5727,7 @@ mod tests {
             };
             let (old, new, ()) = tokio::join!(stale, takeover, script);
             let opened: Vec<String> = incidents_of(&org).await.into_iter().map(|i| i.id).collect();
-            assert_eq!(opened, [x.clone()], "one incident");
+            assert_eq!(opened, std::slice::from_ref(&x), "one incident");
             let holder = infra::table::alert_incidents::find_incident_with_firing(
                 &org,
                 &f.subject_id,
