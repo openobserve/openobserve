@@ -3,8 +3,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const crypto = require('crypto');
 
-const uniq = () => `${Date.now().toString(36).slice(-5)}${Math.random().toString(36).slice(2, 5)}`;
+// The suffix ends up in the viewer password, so it must not come from Math.random.
+const uniq = () => `${Date.now().toString(36).slice(-5)}${crypto.randomBytes(2).toString('hex').slice(0, 3)}`;
 
 test.describe(
   'Workflows HTTP endpoint RBAC',
