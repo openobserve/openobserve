@@ -228,7 +228,8 @@ pub fn create_wal_dir_datetime_filter(
                 if month == start_time.month() {
                     start_time.day()
                 } else {
-                    end_time.day()
+                    // A month shorter than the end day must not make the date invalid.
+                    end_time.day().min(days)
                 }
             }
         };
@@ -648,6 +649,18 @@ mod tests {
         // path has year+month only; day falls back to start.day=10
         // then hour is also missing → uses start.hour=2, which is in range
         assert!(f(PathBuf::from("2025/9")));
+    }
+
+    #[test]
+    fn test_filter_keeps_a_month_shorter_than_the_end_day() {
+        let f = make_filter((2026, 8, 2, 18), (2026, 10, 31, 18));
+        assert!(f(PathBuf::from("2026/9")));
+        assert!(f(PathBuf::from("2026/9/15/3")));
+        assert!(!f(PathBuf::from("2026/7")));
+        assert!(!f(PathBuf::from("2026/11")));
+
+        let f = make_filter((2025, 1, 15, 0), (2025, 3, 31, 0));
+        assert!(f(PathBuf::from("2025/2")));
     }
 
     #[test]
