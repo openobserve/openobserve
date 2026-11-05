@@ -167,5 +167,36 @@ describe("AIIntegrationDetail", () => {
       await flushPromises();
       expect(wrapper.find(agentPanel).exists()).toBe(true);
     });
+
+    it("writes the chosen tab to ?tab and keeps the other query params", async () => {
+      await router.push({ path: "/", query: { org_identifier: "acme" } });
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      await wrapper.find(agentTab).trigger("mousedown", { button: 0 });
+      await wrapper.find(agentTab).trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme", tab: "agent" });
+
+      const stepsTab = '[data-test="ai-integration-tab-step-by-step"]';
+      await wrapper.find(stepsTab).trigger("mousedown", { button: 0 });
+      await wrapper.find(stepsTab).trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme", tab: "steps" });
+      expect(wrapper.find(agentPanel).exists()).toBe(false);
+    });
+
+    it("leaves the next route's query alone when navigation drops ?tab=agent", async () => {
+      await router.push({ path: "/", query: { tab: "agent" } });
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      await flushPromises();
+      await router.push({ path: "/", query: { org_identifier: "acme" } });
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme" });
+    });
+
+    it("leaves the URL alone when the page opens on the default tab", async () => {
+      wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({});
+    });
   });
 });

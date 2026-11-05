@@ -285,6 +285,12 @@ export const convertMultiSQLData = async (
         Array.isArray(sparklineData) ? sparklineData[i] : undefined,
       ),
     );
+    // A bar gauge labels and orders each bar by the query it came from, after the dials are merged.
+    if (panelSchema.type === "gauge") {
+      options.at(-1)?.options?.series?.forEach((gauge: { _queryIndex?: number }) => {
+        gauge._queryIndex = panelQueryIndex;
+      });
+    }
   }
 
   const isAnnotationSeries = (series: any) => {

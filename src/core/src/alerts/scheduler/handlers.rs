@@ -9313,8 +9313,20 @@ mod tests {
             updated_at: None,
             evaluation_generation: 0,
             pending_period_sec: 0,
+            incident_title_template: None,
         };
         assert!(composite_downtime(&definition, now_micros()).is_none());
+
+        let definition = infra::table::entity::alert_composites::Model {
+            incident_title_template: Some("{alert_name}: {composite_expression}".to_string()),
+            ..definition
+        };
+        assert_eq!(
+            crate::alerts::composite::notification_alert(&definition)
+                .incident_title_template
+                .as_deref(),
+            Some("{alert_name}: {composite_expression}")
+        );
     }
 
     /// A lost claim and an ineligible row judged nothing, so neither can read as Normal.
