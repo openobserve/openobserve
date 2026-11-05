@@ -120,6 +120,12 @@ const onProgress = (p: SampleProgress) => {
   steps[p.step] = p.fraction < 1 ? "running" : p.failed ? "failed" : "done";
 };
 
+// the load runs only in this tab, so a reload or a closed tab stops it part-way
+const confirmLeave = (e: BeforeUnloadEvent) => {
+  e.preventDefault();
+  e.returnValue = true;
+};
+
 /** Runs the loader once per app; every surface watching this session sees the same progress. */
 const start = async (org: string, ingestAllowedUptoHours?: number) => {
   if (status.value === "loading") return;
@@ -127,6 +133,7 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
   error.value = null;
   loadingOrg.value = org;
   status.value = "loading";
+  window.addEventListener("beforeunload", confirmLeave);
   try {
     const observer = new MutationObserver(queryClient, loadSampleDataMutation(org));
     const res = await observer.mutate({ ingestAllowedUptoHours, onProgress });
@@ -142,6 +149,8 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
     error.value = e?.response?.data?.message ?? e?.message ?? "";
     status.value = "failed";
     return undefined;
+  } finally {
+    window.removeEventListener("beforeunload", confirmLeave);
   }
 };
 

@@ -83,6 +83,20 @@ describe("useSampleDataSession remove", () => {
     expect(session.status.value).toBe("loaded");
   });
 
+  it("asks the browser to confirm leaving only while a load runs", async () => {
+    const leave = () => {
+      const e = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    const load = session.start("org-a");
+    await flushPromises();
+    expect(leave()).toBe(true);
+    finishLoad(loaded);
+    await load;
+    expect(leave()).toBe(false);
+  });
+
   it("resets the session when it removes the org that was loaded", async () => {
     const load = session.start("org-a");
     await flushPromises();

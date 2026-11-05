@@ -34,6 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div class="min-w-56">
+      <ODropdownItem v-if="unfinished" data-test="header-sample-data-finish" @select="load">
+        {{ t("sampleData.header.finish") }}
+      </ODropdownItem>
       <ODropdownItem data-test="header-sample-data-tour" @select="startTour">
         {{ t("sampleData.welcome.ready.startTour") }}
       </ODropdownItem>
@@ -54,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="xs"
     class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple! max-md:hidden"
     data-test="header-sample-data-try"
-    @click="session.loadInDialog(org, store.state.zoConfig?.ingest_allowed_upto)"
+    @click="load"
   >
     <template #icon-left>
       <OIcon name="science" size="sm" />
@@ -79,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -89,6 +93,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 
 // the menu and its confirm dialog are siblings, so the header's class goes to the menu
@@ -102,6 +107,13 @@ const session = useSampleDataSession();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const presence = useSampleDataPresence(org);
 const shown = computed(() => presence.hasSample.value && !store.state.kioskMode);
+const state = useQuery(
+  computed(() => Object.assign(sampleDataStateQuery(org.value), { enabled: shown.value })),
+);
+// the window is saved after the telemetry, so a load stopped by a reload or closed tab has none
+const unfinished = computed(
+  () => state.data.value?.status === "none" && session.status.value !== "loading",
+);
 // an empty org gets the way in; once it holds data of its own the header stays clear
 const offerTry = computed(
   () =>
@@ -124,6 +136,8 @@ const askRemove = () => {
 watch(org, () => (confirmRemove.value = false));
 
 const startTour = () => session.startTourAndShow(org.value, () => org.value, router);
+// the assets of an earlier run are reused, so this also finishes a stopped load
+const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_allowed_upto);
 
 const removeAll = async () => {
   confirmRemove.value = false;

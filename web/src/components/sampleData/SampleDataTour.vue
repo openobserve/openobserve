@@ -170,6 +170,7 @@ import {
   type SampleTourStep,
   type SampleTourStepId,
 } from "@/utils/sampleData/tour";
+import { requestLogsReapply } from "@/utils/queryHistory/logs";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -237,9 +238,13 @@ const showStep = async () => {
     // a newer step was requested while this one resolved
     if (request !== stepRequest) return;
     const target = router.resolve(to);
-    // Logs reads its query from the URL only on mount, and the tour itself survives a reload
-    if (target.name === "logs" && route.name === "logs") window.location.assign(target.href);
-    else await router.push(to);
+    const logsToLogs = target.name === "logs" && route.name === "logs";
+    // Logs reads its URL only on mount and the tour survives a reload, but a sample load would not
+    if (logsToLogs && session.status.value !== "loading") window.location.assign(target.href);
+    else {
+      await router.push(to);
+      if (logsToLogs) requestLogsReapply(true);
+    }
   } catch {
     // a redundant navigation to the page already open is fine
   } finally {

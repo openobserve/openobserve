@@ -30485,7 +30485,8 @@
     },
     "header": {
       "label": "Sample Data",
-      "try": "Try Sample Data"
+      "try": "Try Sample Data",
+      "finish": "Finish Loading"
     },
     "dock": {
       "details": "Show Details"
@@ -30501,7 +30502,7 @@
       "continueInBackground": "Continue in the Background",
       "progress": {
         "title": "Building your sample store",
-        "body": "This takes about a minute. You can close this window and loading carries on."
+        "body": "This takes about a minute. You can close this dialog, but keep this tab open until loading ends."
       },
       "ready": {
         "title": "Your sample store is live",

@@ -22,6 +22,7 @@ import enLocale from "@/locales/languages/en-US.json";
 import SampleDataTour from "./SampleDataTour.vue";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { SAMPLE_TOUR_STEPS } from "@/utils/sampleData/tour";
+import { logsReapplyRequest } from "@/utils/queryHistory/logs";
 
 const resolveMock = vi.hoisted(() => vi.fn());
 vi.mock("@/utils/sampleData/tour", async (importOriginal) => ({
@@ -38,15 +39,16 @@ const ORG = "test-org";
 const session = useSampleDataSession();
 
 const mounted: { unmount: () => void }[] = [];
-const mountTour = async () => {
+const mountTour = async (start = "/") => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: "/", name: "home", component: { template: "<div />" } },
       { path: "/p/:id", name: "page", component: { template: "<div />" } },
+      { path: "/logs", name: "logs", component: { template: "<div />" } },
     ],
   });
-  await router.push("/");
+  await router.push(start);
   const store = createStore({
     state: { selectedOrganization: { identifier: ORG }, kioskMode: false },
   });
@@ -122,6 +124,26 @@ describe("SampleDataTour", () => {
     await flushPromises();
     expect(session.tour.value?.ownData).toBe(true);
     expect(wrapper.find('[data-test="sample-tour-next"]').exists()).toBe(true);
+  });
+
+  it("moves between two log chapters with the router while a load runs, so the load survives", async () => {
+    const logsIndex = SAMPLE_TOUR_STEPS.findIndex((s) => s.id === "logs");
+    resolveMock.mockImplementation(async (_org: string, id: string) => ({
+      name: "logs",
+      query: { step: id },
+    }));
+    session.startTour(ORG, logsIndex);
+    session.status.value = "loading";
+    try {
+      const { wrapper, router } = await mountTour("/logs?step=logs");
+      const seq = logsReapplyRequest.value.seq;
+      await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query.step).toBe(SAMPLE_TOUR_STEPS[logsIndex + 1].id);
+      expect(logsReapplyRequest.value).toEqual({ seq: seq + 1, run: true });
+    } finally {
+      session.status.value = "idle";
+    }
   });
 
   it("ending the tour while a step resolves does not navigate afterwards", async () => {

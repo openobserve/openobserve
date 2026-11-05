@@ -19,6 +19,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
+import { queryClient } from "@/composables/query/queryClient";
 import SampleDataHeaderChip from "./SampleDataHeaderChip.vue";
 
 const ORG = "test-org";
@@ -36,6 +37,10 @@ const data = vi.hoisted(() => ({
   own: false,
   loadingHere: false,
   loadingElsewhere: false,
+  state: "loaded",
+}));
+vi.mock("@/services/sample_data", () => ({
+  default: { getState: async () => ({ data: { status: data.state } }) },
 }));
 vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
   const { computed } = await import("vue");
@@ -124,7 +129,13 @@ describe("SampleDataHeaderChip", () => {
     push.mockClear();
     startTourAndShow.mockClear();
     loadInDialog.mockClear();
-    Object.assign(data, { sample: true, own: false, loadingHere: false, loadingElsewhere: false });
+    Object.assign(data, {
+      sample: true,
+      own: false,
+      loadingHere: false,
+      loadingElsewhere: false,
+      state: "loaded",
+    });
     remove.mockReset();
     remove.mockResolvedValue(undefined);
     mountChip();
@@ -175,6 +186,31 @@ describe("SampleDataHeaderChip", () => {
 
   it("offers only the guided tour and Delete Sample Data", () => {
     expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+  });
+
+  describe("after a load that never finished", () => {
+    // the beforeEach mount already cached the loaded state
+    beforeEach(() => queryClient.clear());
+
+    it("offers Finish Loading, which runs the load again", async () => {
+      data.state = "none";
+      mountChip();
+      await flushPromises();
+      expect(items().map((i) => i.text())).toEqual([
+        "Finish Loading",
+        "Start the Guided Tour",
+        "Delete Sample Data",
+      ]);
+      await items()[0].trigger("click");
+      expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
+    });
+
+    it("offers no Finish Loading while a load runs", async () => {
+      Object.assign(data, { state: "none", loadingHere: true });
+      mountChip();
+      await flushPromises();
+      expect(items().map((i) => i.text())).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+    });
   });
 
   it("keeps the menu for loaded sample data when the deployment runs another first-run flow", () => {
