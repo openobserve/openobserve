@@ -184,7 +184,7 @@ const hasAny = (name: string, phrases: string[]): boolean =>
 const allTokens = (scope: Map<string, string>): string[] =>
   [...scope.keys()].filter((name) => name.startsWith("--color-"));
 
-/** Union of both themes: one token is declared only under `.dark`. */
+/** Union of both themes, so a token declared in only one of them is still checked. */
 const TOKENS = [...new Set([...allTokens(THEMES.light), ...allTokens(THEMES.dark)])].sort();
 
 const MATCHED = TOKENS.filter((name) => hasAny(name, FOREGROUND_SEGMENTS));
