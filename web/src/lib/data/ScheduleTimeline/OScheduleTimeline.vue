@@ -205,7 +205,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
             </slot>
           </template>
 
-          <!-- Gutter mode's now marker, over the bands; lane mode uses the overlay below and, on phones, the next line. -->
+          <!-- Gutter mode's now marker, over the bands; lane mode draws the next one. -->
           <span
             v-if="
               now !== null && !laneHeaders && (nowTrackKey == null || nowTrackKey === track.key)
@@ -217,10 +217,10 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
             :aria-hidden="nowLabel ? undefined : 'true'"
             data-test="o2-schedule-timeline-now"
           />
-          <!-- Lane mode on a phone: the lane headers span the plot, so the line stays inside each strip. -->
+          <!-- Lane mode: the lane headers span the plot, so the line stays inside each strip rather than crossing their text. -->
           <span
             v-if="now !== null && laneHeaders"
-            class="bg-status-error-text absolute inset-y-0 z-1 w-px md:hidden"
+            class="bg-status-error-text ring-surface-base absolute inset-y-0 z-1 w-px ring-1"
             :style="inlineStart(now)"
             aria-hidden="true"
             data-test="o2-schedule-timeline-now-lane"
@@ -240,7 +240,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
       <div v-if="laneHeaders" class="pointer-events-none absolute inset-0 z-2">
         <!-- Where the pointer is. Grey, because it answers "which instant am I
            looking at" — a question about the reader, not about the schedule. -->
-        <template v-if="hover !== null">
+        <template v-if="hover !== null && !hideHover">
           <span
             class="bg-border-strong absolute inset-y-0 w-px"
             :style="inlineStart(hover)"
@@ -265,9 +265,9 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
         <!-- Now. Drawn last so it stays legible where the two cross, and always
            present: every instant on this chart is read relative to it. -->
         <template v-if="now !== null">
-          <!-- Unpainted below md, where the per-lane lines take over; it keeps the accessible name. -->
+          <!-- Unpainted: the per-lane lines draw it; this one keeps the accessible name. -->
           <span
-            class="bg-status-error-text absolute inset-y-0 z-1 w-px max-md:bg-transparent"
+            class="absolute inset-y-0 z-1 w-px bg-transparent"
             :style="inlineStart(now)"
             :role="nowLabel ? 'img' : undefined"
             :aria-label="nowLabel"
