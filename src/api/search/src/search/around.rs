@@ -244,8 +244,7 @@ pub(crate) async fn around(
     Ok(resp)
 }
 
-/// Backward hits (nearest last) then forward hits, through the search-time redaction the bare
-/// planner skips.
+/// Merges both halves through the search-time redaction the bare planner skips.
 async fn merge_and_redact(
     fw_req: &config::meta::search::Request,
     org_id: &str,
