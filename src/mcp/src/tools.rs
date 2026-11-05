@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use anyhow::{Ok, Result};
-use config::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
+use config::tantivy::tokenizer::{CollectType, O2Tokenizer};
 use serde::Deserialize;
 use serde_json::Value;
 use tantivy::{
@@ -24,8 +28,9 @@ use tantivy::{
     collector::TopDocs,
     query::QueryParser,
     schema::{
-        Field, IndexRecordOption, STORED, Schema, TEXT, TextFieldIndexing, TextOptions, Value as _,
+        Field, IndexRecordOption, STORED, Schema, TextFieldIndexing, TextOptions, Value as _,
     },
+    tokenizer::{Language, LowerCaser, Stemmer, TextAnalyzer},
 };
 use tokio::sync::OnceCell;
 use utoipa::openapi::OpenApi;
@@ -34,6 +39,18 @@ use super::{
     schema::simplify_schema,
     types::{MCPTool, SummaryFieldsConfig},
 };
+
+/// Extension key for MCP configuration
+const MCP_EXTENSION_KEY: &str = "x-o2-mcp";
+
+/// Analyzer of tool names: CamelCase split, lowercased, stemmed.
+const NAME_ANALYZER: &str = "o2_stem";
+
+/// Tantivy's built-in analyzer for descriptions and categories: lowercased, stemmed.
+const TEXT_ANALYZER: &str = "en_stem";
+
+/// Maximum allowed query length to prevent DoS via pathological inputs
+const MAX_SEARCH_QUERY_LEN: usize = 500;
 
 /// MCP extension configuration from x-o2-mcp OpenAPI extension
 ///
@@ -72,9 +89,6 @@ pub struct McpExtension {
 fn default_enabled() -> bool {
     true
 }
-
-/// Extension key for MCP configuration
-const MCP_EXTENSION_KEY: &str = "x-o2-mcp";
 
 /// Build the schema exposed to MCP clients from the schema retained for HTTP execution.
 fn public_tool_schema(http_path: &str, mut execution_schema: Value) -> Value {
@@ -176,37 +190,36 @@ struct ToolSearchIndex {
     tools_by_name: HashMap<String, Arc<MCPTool>>,
 }
 
-/// Build the tantivy search index from the list of MCP tools.
-fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
-    // Idempotent: skip if already initialized (e.g., by test init)
-    if TOOL_SEARCH_INDEX.get().is_some() {
-        log::debug!("Tool search index already initialized; skipping rebuild");
-        return Ok(());
-    }
+fn name_analyzer(collect_type: CollectType) -> TextAnalyzer {
+    TextAnalyzer::builder(O2Tokenizer::new(collect_type))
+        .filter(LowerCaser)
+        .filter(Stemmer::new(Language::English))
+        .build()
+}
 
-    let start = std::time::Instant::now();
-
-    // Use the O2 tokenizer for the name field to handle CamelCase splitting
-    // (e.g., "CreateDashboard" → "create", "dashboard"; "HTTPClient" → "http", "client")
-    let o2_text_opts = TextOptions::default().set_indexing_options(
-        TextFieldIndexing::default()
-            .set_index_option(IndexRecordOption::WithFreqsAndPositions)
-            .set_tokenizer(O2_TOKENIZER),
-    );
+/// Build a tantivy index over `tools`, independent of the process-wide index.
+fn build_index(tools: &[Arc<MCPTool>]) -> Result<ToolSearchIndex> {
+    let analyzed = |analyzer: &str| {
+        TextOptions::default().set_indexing_options(
+            TextFieldIndexing::default()
+                .set_index_option(IndexRecordOption::WithFreqsAndPositions)
+                .set_tokenizer(analyzer),
+        )
+    };
 
     let mut schema_builder = Schema::builder();
-    let name_field = schema_builder.add_text_field("name", o2_text_opts);
-    let description_field = schema_builder.add_text_field("description", TEXT);
-    let category_field = schema_builder.add_text_field("category", TEXT);
+    let name_field = schema_builder.add_text_field("name", analyzed(NAME_ANALYZER));
+    let description_field = schema_builder.add_text_field("description", analyzed(TEXT_ANALYZER));
+    let category_field = schema_builder.add_text_field("category", analyzed(TEXT_ANALYZER));
     let tool_name_field = schema_builder.add_text_field("tool_name", STORED);
     let schema = schema_builder.build();
 
     let index = Index::create_in_ram(schema);
 
-    // Register the O2 tokenizer for indexing (Ingest mode emits root + split tokens)
+    // Register the name analyzer for indexing (Ingest mode emits root + split tokens)
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
+        .register(NAME_ANALYZER, name_analyzer(CollectType::Ingest));
 
     let mut writer: IndexWriter = index.writer(15_000_000)?;
 
@@ -226,11 +239,10 @@ fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
     }
     writer.commit()?;
 
-    // Re-register with Search mode for query-time tokenization
-    // (Search mode emits only split tokens, no root token)
+    // Query-time mode keeps a CamelCase word whole, so it matches the root token only
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
+        .register(NAME_ANALYZER, name_analyzer(CollectType::Search));
 
     // Create a long-lived reader (avoids per-query reader creation)
     let reader = index
@@ -243,16 +255,28 @@ fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
         .map(|t| (t.name.clone(), Arc::clone(t)))
         .collect();
 
+    Ok(ToolSearchIndex {
+        index,
+        reader,
+        name_field,
+        description_field,
+        category_field,
+        tool_name_field,
+        tools_by_name,
+    })
+}
+
+/// Build the process-wide tool search index from the list of MCP tools.
+fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
+    // Idempotent: skip if already initialized (e.g., by test init)
+    if TOOL_SEARCH_INDEX.get().is_some() {
+        log::debug!("Tool search index already initialized; skipping rebuild");
+        return Ok(());
+    }
+
+    let start = std::time::Instant::now();
     TOOL_SEARCH_INDEX
-        .set(ToolSearchIndex {
-            index,
-            reader,
-            name_field,
-            description_field,
-            category_field,
-            tool_name_field,
-            tools_by_name,
-        })
+        .set(build_index(tools)?)
         .map_err(|_| anyhow::anyhow!("Tool search index should've been empty at this point"))?;
 
     log::info!(
@@ -264,12 +288,8 @@ fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
     Ok(())
 }
 
-/// Maximum allowed query length to prevent DoS via pathological inputs
-const MAX_SEARCH_QUERY_LEN: usize = 500;
-
-/// Search for tools matching a query string using BM25 scoring.
-/// Returns the top `limit` matching MCPTool objects with full schemas.
-pub fn tool_search(query: &str, limit: usize) -> Vec<MCPTool> {
+/// The top `limit` tools of `search_index` matching `query`, best BM25 score first.
+fn search_in(search_index: &ToolSearchIndex, query: &str, limit: usize) -> Vec<MCPTool> {
     // Validate input
     let query = query.trim();
     if query.is_empty() || limit == 0 {
@@ -293,14 +313,6 @@ pub fn tool_search(query: &str, limit: usize) -> Vec<MCPTool> {
         &query[..safe_len]
     } else {
         query
-    };
-
-    let search_index = match TOOL_SEARCH_INDEX.get() {
-        Some(idx) => idx,
-        None => {
-            log::error!("tool_search: search index not initialized");
-            return Vec::new();
-        }
     };
 
     // Use the cached reader instead of creating one per query
@@ -363,6 +375,39 @@ pub fn tool_search(query: &str, limit: usize) -> Vec<MCPTool> {
     results
 }
 
+/// URL of this node's own HTTP listener, which tool calls are looped back to.
+fn loopback_base_url(
+    scheme: &str,
+    bind_addr: &str,
+    ipv6_enabled: bool,
+    port: u16,
+    base_uri: &str,
+) -> Result<url::Url> {
+    // In IPv6 mode the server binds `[::]` and ignores `ZO_HTTP_ADDR` (see `server_addr`).
+    let specific_ip = bind_addr
+        .trim_matches(['[', ']'])
+        .parse::<IpAddr>()
+        .ok()
+        .filter(|ip| !ipv6_enabled && !ip.is_unspecified());
+    let authority = specific_ip.map_or_else(
+        || format!("localhost:{port}"),
+        |ip| SocketAddr::new(ip, port).to_string(),
+    );
+    url::Url::parse(&format!("{scheme}://{authority}{base_uri}"))
+        .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))
+}
+
+/// Top `limit` tools matching `query` by BM25 score, with their full input schemas.
+pub fn tool_search(query: &str, limit: usize) -> Vec<MCPTool> {
+    match TOOL_SEARCH_INDEX.get() {
+        Some(search_index) => search_in(search_index, query, limit),
+        None => {
+            log::error!("tool_search: search index not initialized");
+            Vec::new()
+        }
+    }
+}
+
 /// Initialize MCP tools from OpenAPI spec using rmcp-openapi
 ///
 /// OPTIMIZATION: Instead of creating 200+ HTTP clients (one per tool via `generate_openapi_tools`),
@@ -395,13 +440,13 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
 
     let zo_config = config::get_config();
     // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
-    let base_url = url::Url::parse(&format!(
-        "{}://localhost:{}{}",
-        config::cluster::get_http_schema(),
+    let base_url = loopback_base_url(
+        &config::cluster::get_http_schema(),
+        &zo_config.http.addr,
+        zo_config.http.ipv6_enabled,
         zo_config.http.port,
-        zo_config.common.base_uri
-    ))
-    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
+        &zo_config.common.base_uri,
+    )?;
 
     let mut mcp_marker =
         reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
@@ -689,53 +734,136 @@ pub async fn init_test_tools() {
 
     // Initialize empty search index for tests
     TOOL_SEARCH_INDEX
-        .get_or_init(|| async {
-            let o2_text_opts = TextOptions::default().set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_index_option(IndexRecordOption::WithFreqsAndPositions)
-                    .set_tokenizer(O2_TOKENIZER),
-            );
-
-            let mut schema_builder = Schema::builder();
-            let name_field = schema_builder.add_text_field("name", o2_text_opts);
-            let description_field = schema_builder.add_text_field("description", TEXT);
-            let category_field = schema_builder.add_text_field("category", TEXT);
-            let tool_name_field = schema_builder.add_text_field("tool_name", STORED);
-            let schema = schema_builder.build();
-
-            let index = Index::create_in_ram(schema);
-            index
-                .tokenizers()
-                .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
-
-            let mut writer: IndexWriter = index.writer(15_000_000).unwrap();
-            writer.commit().unwrap();
-
-            // Re-register with Search mode for query-time tokenization
-            index
-                .tokenizers()
-                .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
-
-            let reader = index.reader().unwrap();
-
-            ToolSearchIndex {
-                index,
-                reader,
-                name_field,
-                description_field,
-                category_field,
-                tool_name_field,
-                tools_by_name: HashMap::new(),
-            }
-        })
+        .get_or_init(|| async { build_index(&[]).unwrap() })
         .await;
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use serde_json::json;
 
-    use super::public_tool_schema;
+    use super::{ToolSearchIndex, build_index, loopback_base_url, public_tool_schema, search_in};
+    use crate::types::MCPTool;
+
+    fn tool(name: &str, description: &str, category: &str) -> Arc<MCPTool> {
+        Arc::new(MCPTool {
+            name: name.to_string(),
+            title: None,
+            description: Some(description.to_string()),
+            input_schema: json!({ "type": "object" }),
+            output_schema: None,
+            annotations: None,
+            http_method: "GET".to_string(),
+            http_path: String::new(),
+            category: Some(category.to_string()),
+            requires_confirmation: false,
+            pinned: false,
+        })
+    }
+
+    fn widget_index() -> ToolSearchIndex {
+        build_index(&[
+            tool("CreateWidget", "Create a new widget", "widgets"),
+            tool("ListWidgets", "List all widgets", "widgets"),
+            tool("DeleteGizmo", "Delete a gizmo by ID", "gizmos"),
+        ])
+        .unwrap()
+    }
+
+    fn found(index: &ToolSearchIndex, query: &str, limit: usize) -> Vec<String> {
+        search_in(index, query, limit)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect()
+    }
+
+    #[test]
+    fn exact_words_rank_the_matching_tool_first() {
+        let index = widget_index();
+        assert_eq!(found(&index, "list widgets", 3)[0], "ListWidgets");
+        assert_eq!(found(&index, "create widget", 3)[0], "CreateWidget");
+        assert_eq!(found(&index, "delete gizmo", 3)[0], "DeleteGizmo");
+    }
+
+    #[test]
+    fn a_camel_case_query_finds_that_tool() {
+        assert_eq!(found(&widget_index(), "ListWidgets", 1), ["ListWidgets"]);
+    }
+
+    #[test]
+    fn unmatched_blank_and_zero_limit_queries_find_nothing() {
+        let index = widget_index();
+        assert!(found(&index, "zebra", 3).is_empty());
+        assert!(found(&index, "   ", 3).is_empty());
+        assert!(found(&index, "widgets", 0).is_empty());
+    }
+
+    #[test]
+    fn the_limit_caps_the_results() {
+        assert_eq!(found(&widget_index(), "widgets", 1).len(), 1);
+    }
+
+    #[test]
+    fn a_singular_query_finds_plural_descriptions() {
+        let index = build_index(&[tool("Op1", "List all widgets", "misc")]).unwrap();
+        assert_eq!(found(&index, "widget", 3), ["Op1"]);
+    }
+
+    #[test]
+    fn a_singular_query_finds_plural_categories() {
+        let index = build_index(&[tool("Op1", "Do things", "widgets")]).unwrap();
+        assert_eq!(found(&index, "widget", 3), ["Op1"]);
+    }
+
+    #[test]
+    fn a_singular_query_finds_plural_names() {
+        let index = build_index(&[tool("ListWidgets", "", "")]).unwrap();
+        assert_eq!(found(&index, "widget", 3), ["ListWidgets"]);
+    }
+
+    #[test]
+    fn a_plural_query_finds_singular_words() {
+        let index = build_index(&[tool("GetGizmo", "Get a gizmo", "gizmo")]).unwrap();
+        assert_eq!(found(&index, "gizmos", 3), ["GetGizmo"]);
+    }
+
+    #[test]
+    fn verb_forms_find_the_same_tool() {
+        let index = widget_index();
+        for query in ["creating widgets", "created widget", "creates"] {
+            assert_eq!(found(&index, query, 3)[0], "CreateWidget", "{query}");
+        }
+    }
+
+    #[test]
+    fn loopback_targets_the_address_the_server_binds() {
+        // (scheme, ZO_HTTP_ADDR, ZO_HTTP_IPV6_ENABLED, ZO_BASE_URI, expected)
+        for (scheme, addr, ipv6, base_uri, expected) in [
+            ("http", "", false, "", "http://localhost:5080/"),
+            ("https", "", false, "/o2", "https://localhost:5080/o2"),
+            ("http", "0.0.0.0", false, "", "http://localhost:5080/"),
+            ("http", "[::]", false, "", "http://localhost:5080/"),
+            ("http", "10.1.2.3", false, "", "http://10.1.2.3:5080/"),
+            (
+                "http",
+                "127.0.0.2",
+                false,
+                "/o2",
+                "http://127.0.0.2:5080/o2",
+            ),
+            ("http", "[::1]", false, "", "http://[::1]:5080/"),
+            ("http", "10.1.2.3", true, "", "http://localhost:5080/"),
+        ] {
+            let url = loopback_base_url(scheme, addr, ipv6, 5080, base_uri).unwrap();
+            assert_eq!(
+                url.as_str(),
+                expected,
+                "{scheme} {addr:?} ipv6={ipv6} {base_uri:?}"
+            );
+        }
+    }
 
     #[test]
     fn organization_path_parameter_is_private() {

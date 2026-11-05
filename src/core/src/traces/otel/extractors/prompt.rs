@@ -28,15 +28,14 @@ use crate::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes};
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PromptAttribution {
     pub name: Option<String>,
-    pub version: Option<i64>,
+    pub version: Option<String>,
     pub label: Option<String>,
 }
 
 pub struct PromptExtractor;
 
 impl PromptExtractor {
-    /// Extracts prompt identity, accepting only positive integer versions and
-    /// falling back to Langfuse aliases when official attributes are absent.
+    /// Extracts prompt identity from GenAI attributes, falling back to legacy Langfuse aliases.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> PromptAttribution {
         PromptAttribution {
             name: string_with_fallback(
@@ -76,24 +75,47 @@ fn version_with_fallback(
     attributes: &HashMap<String, json::Value>,
     official: &str,
     fallback: &str,
-) -> Option<i64> {
+) -> Option<String> {
     match attributes.get(official) {
         Some(value) => parse_version(value),
         None => attributes.get(fallback).and_then(parse_version),
     }
 }
 
-fn parse_version(value: &json::Value) -> Option<i64> {
-    let version = match value {
-        json::Value::Number(value) => value.as_i64()?,
-        json::Value::String(value)
-            if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
-        {
-            value.parse().ok()?
+fn parse_version(value: &json::Value) -> Option<String> {
+    match value {
+        json::Value::String(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                log::warn!("Empty string gen_ai.prompt.version rejected");
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
         }
-        _ => return None,
-    };
-    (version > 0).then_some(version)
+        json::Value::Number(value) => {
+            if let Some(int_val) = value.as_i64() {
+                if int_val > 0 {
+                    Some(int_val.to_string())
+                } else {
+                    log::warn!(
+                        "Non-positive integer gen_ai.prompt.version '{int_val}' rejected; expected positive integer or string"
+                    );
+                    None
+                }
+            } else {
+                log::warn!(
+                    "Non-integer numeric gen_ai.prompt.version '{value}' rejected; expected positive integer or string"
+                );
+                None
+            }
+        }
+        json::Value::Null => None,
+        _ => {
+            log::warn!("Invalid gen_ai.prompt.version '{value}': expected string or integer");
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -118,10 +140,35 @@ mod tests {
             PromptExtractor.extract(&attrs),
             PromptAttribution {
                 name: Some("support-answer".to_string()),
-                version: Some(3),
+                version: Some("3".to_string()),
                 label: Some("production".to_string()),
             }
         );
+    }
+
+    #[test]
+    fn extracts_free_form_string_versions() {
+        for ver in ["v2", "1.0.0", "prod", "2025-05-01", "sha256-abc"] {
+            let attrs = HashMap::from([
+                (
+                    GenAiAttributes::PROMPT_NAME.to_string(),
+                    json::json!("support-answer"),
+                ),
+                (
+                    GenAiAttributes::PROMPT_VERSION.to_string(),
+                    json::json!(ver),
+                ),
+            ]);
+
+            assert_eq!(
+                PromptExtractor.extract(&attrs),
+                PromptAttribution {
+                    name: Some("support-answer".to_string()),
+                    version: Some(ver.to_string()),
+                    label: None,
+                }
+            );
+        }
     }
 
     #[test]
@@ -157,7 +204,7 @@ mod tests {
             PromptExtractor.extract(&attrs),
             PromptAttribution {
                 name: Some("official".to_string()),
-                version: Some(4),
+                version: Some("4".to_string()),
                 label: Some("candidate".to_string()),
             }
         );
@@ -184,7 +231,7 @@ mod tests {
             PromptExtractor.extract(&attrs),
             PromptAttribution {
                 name: Some("legacy".to_string()),
-                version: Some(7),
+                version: Some("7".to_string()),
                 label: Some("staging".to_string()),
             }
         );
@@ -196,9 +243,9 @@ mod tests {
             json::json!(0),
             json::json!(-1),
             json::json!(1.5),
-            json::json!("0"),
-            json::json!("-2"),
-            json::json!("v3"),
+            json::json!(""),
+            json::json!("   "),
+            json::json!(false),
         ] {
             let attrs = HashMap::from([
                 (GenAiAttributes::PROMPT_VERSION.to_string(), value),
