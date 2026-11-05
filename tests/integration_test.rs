@@ -7764,6 +7764,10 @@ mod tests {
                 Box::pin(e2e_retry_repairs_a_missing_trigger()),
             ),
             (
+                "retry_keeps_old_key_row",
+                Box::pin(e2e_retry_keeps_a_row_under_an_older_key()),
+            ),
+            (
                 "stale_unreadable",
                 Box::pin(e2e_stale_row_that_cannot_be_checked_writes_nothing(window)),
             ),
@@ -8251,6 +8255,28 @@ mod tests {
         assert_eq!(rows.len(), 1, "{rows:?}");
         assert_eq!(rows[0].module_key, row.module_key);
         e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_retry_keeps_a_row_under_an_older_key() {
+        let id = "retry_old_key_pl";
+        let (_, row) = e2e_create_scheduled(id, "retry_old_key_new", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+        let stale = e2e_push_stale_trigger(id, "retry_old_key_old", 444).await;
+
+        let stored = e2e_stored_pipeline(id).await;
+        assert_eq!(e2e_update_pipeline(&stored).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, stale);
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &stale)
+            .await
+            .unwrap();
+        openobserve_core::pipeline::delete_pipeline(id)
+            .await
+            .unwrap();
     }
 
     async fn e2e_stale_row_that_cannot_be_checked_writes_nothing(window: i64) {

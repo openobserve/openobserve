@@ -247,6 +247,12 @@ async fn repair_missing_trigger(pipeline: &mut Pipeline) -> Result<(), PipelineE
     {
         return Ok(());
     }
+    // A row under an older key may be running, and it moves to the current key by itself.
+    let suffix = format!("/{}", pipeline.id);
+    let rows = scheduler::list_by_org(&source.org_id, Some(TriggerModule::DerivedStream)).await?;
+    if rows.iter().any(|row| row.module_key.ends_with(&suffix)) {
+        return Ok(());
+    }
     let validated_source = validated_scheduled_source(pipeline).await?;
     write_trigger(None, pipeline, validated_source).await
 }
