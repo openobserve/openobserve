@@ -256,8 +256,6 @@ pub fn generate_physical_optimizer_rules(
     rules.push(Arc::new(EnsureCooperative::new()));
     // Must be near the end: later plan changes break the dynamic filters' source references
     rules.push(Arc::new(FilterPushdown::new_post_optimization()));
-    // Only validates the plan as left by the rules above it, not the custom rules below
-    rules.push(Arc::new(SanityCheckPlan::new()));
 
     // *********** custom rules ***********
     rules.push(Arc::new(JoinReorderRule::new()));
@@ -291,6 +289,8 @@ pub fn generate_physical_optimizer_rules(
     if config::get_config().search.feature_shared_cte_enabled {
         rules.push(Arc::new(SharedSubplanRule::new()));
     }
+    // Validates the final plan, so custom rules cannot break order or distribution requirements
+    rules.push(Arc::new(SanityCheckPlan::new()));
     // ************************************
 
     rules
@@ -677,9 +677,11 @@ mod tests {
         let upstream = PhysicalOptimizer::new()
             .rules
             .iter()
+            .filter(|rule| rule.name() != "SanityCheckPlan")
             .map(|rule| format!("{rule:?}"))
             .collect::<Vec<_>>();
         let rules = generate_physical_optimizer_rules(&Request::default(), &test_sql(), vec![]);
+        assert_eq!(rules.last().unwrap().name(), "SanityCheckPlan");
         // Debug, not name(): both OutputRequirements modes share one name.
         let ours = rules[..upstream.len()]
             .iter()
@@ -803,7 +805,6 @@ mod tests {
             "PushdownSort",
             "EnsureCooperative",
             "FilterPushdown(Post)",
-            "SanityCheckPlan",
             "JoinReorderRule",
             "RemoteScanRule",
             "AggregateTopkRule",
@@ -813,6 +814,7 @@ mod tests {
         if config::get_config().search.feature_shared_cte_enabled {
             expected.push("SharedSubplanRule");
         }
+        expected.push("SanityCheckPlan");
         let actual = ctx
             .state()
             .physical_optimizers()
