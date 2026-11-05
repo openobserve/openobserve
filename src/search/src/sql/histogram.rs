@@ -316,12 +316,19 @@ fn pin_named_zone_argument(expr: &mut Expr, end_time: i64) {
     let FunctionArguments::List(list) = &mut func.args else {
         return;
     };
-    if let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(literal)))) =
-        list.args.get_mut(2)
+    if let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(arg))) = list.args.get_mut(2)
+        && let Expr::Value(literal) = without_brackets(arg)
         && let Some(tz) = literal.value.clone().into_string()
         && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
     {
         literal.value = Value::SingleQuotedString(fixed);
+    }
+}
+
+fn without_brackets(expr: &mut Expr) -> &mut Expr {
+    match expr {
+        Expr::Nested(inner) => without_brackets(inner),
+        other => other,
     }
 }
 
@@ -430,6 +437,8 @@ mod tests {
             "SELECT histogram((_timestamp), '1 day', '+05:30') FROM t",
             "SELECT HISTOGRAM ( (_timestamp) , '1 day' , '+05:30' ) FROM t",
             "SELECT histogram/*bucket*/(_timestamp, '1 day', $$+05:30$$) FROM t",
+            "SELECT histogram(_timestamp, '1 day', ('+05:30')) FROM t",
+            "SELECT histogram(_timestamp, '1 day', (('+05:30'))) FROM t",
         ] {
             assert_eq!(
                 histogram_timezone_arg(sql).as_deref(),
@@ -469,6 +478,28 @@ mod tests {
         assert_eq!(
             sql,
             "SELECT histogram((_timestamp), '1 day', '+05:30') FROM t"
+        );
+        let mut sql = "SELECT histogram(_timestamp, '1 day', ('Asia/Kolkata')) FROM t".to_string();
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp, '1 day', ('+05:30')) FROM t"
+        );
+    }
+
+    #[test]
+    fn test_bracketed_timezone_sets_the_offset_and_stays_in_normalized_sql() {
+        let sql = "SELECT histogram(_timestamp, '1 day', ('+05:30')) FROM t";
+        assert_eq!(histogram_offset_micros(sql, None, JUL_2026), 19_800_000_000);
+        let mut normalized = sql.to_string();
+        handle_histogram(&mut normalized, (0, 0), 0);
+        assert_eq!(
+            normalized,
+            "SELECT histogram(_timestamp,'1 day',('+05:30')) FROM t"
+        );
+        assert_eq!(
+            histogram_timezone_arg(&normalized).as_deref(),
+            Some("+05:30")
         );
     }
 

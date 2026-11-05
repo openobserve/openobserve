@@ -83,10 +83,16 @@ impl VisitorMut for HistogramIntervalVisitor {
 
 /// The decoded text of a string argument, in any quote style.
 fn string_literal(arg: &FunctionArg) -> Option<String> {
-    match arg {
-        FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(value))) => {
-            value.value.clone().into_string()
-        }
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) = arg else {
+        return None;
+    };
+    // DataFusion removes the brackets at plan time, so `('+05:30')` executes as `+05:30`
+    let mut expr = expr;
+    while let Expr::Nested(inner) = expr {
+        expr = inner;
+    }
+    match expr {
+        Expr::Value(value) => value.value.clone().into_string(),
         _ => None,
     }
 }
