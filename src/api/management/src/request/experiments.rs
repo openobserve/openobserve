@@ -113,6 +113,11 @@ async fn experiment_body(
     ExperimentResponseBody::new(experiment, shown)
 }
 
+/// Scores come from search, so while it is blocked the list renders without them.
+fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
+    requested.unwrap_or(false) && search_service::check_org_search_allowed(org_id).is_ok()
+}
+
 fn experiment_error_response(error: ExperimentError) -> Response {
     match error {
         ExperimentError::Database(error) => {
@@ -711,7 +716,7 @@ pub async fn list_experiments(
             .collect::<Vec<_>>(),
         Err(error) => return experiment_error_response(error),
     };
-    let include_summary = query.include_summary.unwrap_or(false);
+    let include_summary = summary_wanted(query.include_summary, &org_id);
     let mut summaries = if include_summary {
         summary::load(&experiments).await
     } else {
@@ -2183,5 +2188,24 @@ mod tests {
                 .to_string()
                 .contains('7')
         );
+    }
+
+    #[tokio::test]
+    async fn summary_follows_the_request_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        assert!(summary_wanted(Some(true), "acme"));
+        assert!(!summary_wanted(None, "acme"));
+        assert!(!summary_wanted(Some(false), "acme"));
+    }
+
+    #[tokio::test]
+    async fn summary_is_skipped_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(!summary_wanted(Some(true), "acme"));
+        assert!(summary_wanted(Some(true), config::META_ORG_ID));
     }
 }

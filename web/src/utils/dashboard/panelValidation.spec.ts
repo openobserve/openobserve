@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  panelConfigRangeError,
   validateConditions,
   validateDashboardJson,
   validatePanel,
@@ -790,6 +791,42 @@ describe("validatePanel on distribution", () => {
     expect(run("distribution", y, { distribution_bucket_count: 5000 })).toHaveLength(1);
     expect(run("distribution", y, { distribution_bucket_size: 0 })).toHaveLength(1);
     expect(run("distribution", y, { distribution_bucket_offset: "x" })).toHaveLength(1);
+    expect(
+      run("distribution", y, { distribution_bucket_count: 0, distribution_bucket_size: 5 }),
+    ).toHaveLength(0);
+  });
+
+  it("gives a config field the same range message the save shows, only when it is out of range", () => {
+    const panel = (config: Record<string, unknown>) => ({ type: "distribution", config });
+    expect(
+      panelConfigRangeError(
+        gt,
+        panel({ distribution_bucket_count: 0 }),
+        "distribution_bucket_count",
+      ),
+    ).toBe("Bucket count must be between 1 and 1000");
+    expect(
+      panelConfigRangeError(
+        gt,
+        panel({ distribution_bucket_size: -2 }),
+        "distribution_bucket_size",
+      ),
+    ).toBe("Bucket size must be greater than 0");
+    expect(
+      panelConfigRangeError(
+        gt,
+        panel({ distribution_bucket_count: 20 }),
+        "distribution_bucket_count",
+      ),
+    ).toBe("");
+    expect(panelConfigRangeError(gt, panel({}), "distribution_bucket_size")).toBe("");
+    expect(
+      panelConfigRangeError(
+        gt,
+        { type: "bar", config: { distribution_bucket_count: 0 } },
+        "distribution_bucket_count",
+      ),
+    ).toBe("");
   });
 
   it("lists distribution as an importable panel type", () => {

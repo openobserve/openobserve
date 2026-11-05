@@ -835,7 +835,9 @@ fn validate_window(start_time: i64, end_time: i64) -> Result<(), &'static str> {
 async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(), Response> {
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream)) {
+        if let Err(e) =
+            search_service::check_search_allowed(org_id, Some((stream, StreamType::Traces)))
+        {
             return Err(MetaHttpResponse::too_many_requests(e.to_string()));
         }
         if let Some(denied) = openobserve_core::authz::check_stream_permissions(

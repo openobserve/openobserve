@@ -98,6 +98,8 @@ type NormalizedOption = {
   parentKey?: string;
   /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  listLabel?: I18nText;
+  suffix?: I18nText;
   headerCount?: I18nText;
   headerAction?: I18nText;
   headerActionAriaLabel?: I18nText;
@@ -282,6 +284,8 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       : undefined,
     searchText:
       typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
+    listLabel: option.listLabel ? raw(String(option.listLabel)) : undefined,
+    suffix: option.suffix ? raw(String(option.suffix)) : undefined,
   };
 }
 
@@ -1974,7 +1978,15 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
+                            <OTruncatedText class="min-w-0 flex-1">{{
+                              filteredOptions[vRow.index].listLabel ??
+                              filteredOptions[vRow.index].label
+                            }}</OTruncatedText>
+                            <span
+                              v-if="filteredOptions[vRow.index].suffix"
+                              class="text-text-secondary ms-auto shrink-0 text-xs tabular-nums"
+                              >{{ filteredOptions[vRow.index].suffix }}</span
+                            >
                           </template>
                         </ListboxItem>
                       </div>

@@ -122,6 +122,18 @@ const q = {
       },
       opts,
     ),
+  // SELECT * because naming the custom log_burst column fails with "unknown field" until a burst has landed.
+  logsUntil: (service, startMs, messagePrefix, predicate, opts) =>
+    pollUntil(
+      () =>
+        search(
+          `SELECT * FROM ${cfg.RUM_LOG_STREAM} ` +
+            `WHERE service='${esc(service)}' AND message LIKE '${esc(messagePrefix)}%' ORDER BY _timestamp DESC`,
+          startMs,
+        ),
+      predicate,
+      opts,
+    ),
   sessionForService: async (service, startMs, opts) => {
     const rows = await pollSearch(
       `SELECT session_id, _timestamp FROM ${cfg.RUM_STREAM} ` +

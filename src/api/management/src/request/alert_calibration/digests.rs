@@ -368,4 +368,10 @@ mod tests {
         assert!(Columns::Finding.not_written_yet(&field));
         assert!(!Columns::Finding.not_written_yet(&timeout));
     }
+
+    #[test]
+    fn digests_stay_gated_while_search_is_blocked() {
+        // OTLP ingest accepts customer writes here, so it must never join the allowlist
+        assert!(!search_service::is_operational_stream(DIGEST_STREAM));
+    }
 }

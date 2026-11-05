@@ -840,8 +840,13 @@ export const fleetMock: FleetApi = {
   },
   deleteFleet: (_org, id) => {
     if (id === "default") return fail(400, "the default fleet cannot be deleted");
-    if (store.collectors.some((c) => c.fleet.id === id))
-      return fail(409, "move or remove the fleet's collectors first");
+    const collectors = store.collectors.filter((c) => c.fleet.id === id).length;
+    const tokens = store.tokens.filter((t) => t.fleet?.id === id && !t.revoked).length;
+    if (collectors || tokens) {
+      return fail(409, "move or remove the fleet's collectors and revoke its tokens first", {
+        references: { fleets: 0, collectors, rollouts: 0, tokens },
+      });
+    }
     store.fleets = store.fleets.filter((f) => f.id !== id);
     return reply(undefined as unknown);
   },
