@@ -305,3 +305,66 @@ def test_month_buckets_use_calendar_months(fixture, filtered, use_cache):
             label = _month_label(ts)
             expected[label] = expected.get(label, 0) + 1
     assert _rows(fixture.search(sql, fixture.start, shorter_end, use_cache=use_cache)) == expected
+
+
+@pytest.mark.parametrize("sql_interval,interval", [("1 hour", HOUR), ("1 day", DAY)], ids=["1h", "1d"])
+@pytest.mark.parametrize("timezone,offset", TIMEZONES, ids=["ist", "pst"])
+def test_a_timezone_plain_count_keeps_every_row(fixture, sql_interval, interval, timezone, offset):
+    sql = (
+        f"SELECT histogram(_timestamp, '{sql_interval}', '{timezone}') AS ts, count(*) AS cnt "
+        f'FROM "{fixture.stream}" GROUP BY ts ORDER BY ts'
+    )
+    rows = _rows(fixture.search(sql, fixture.start, fixture.end))
+    assert sum(rows.values()) == len(fixture.events)
+    assert rows == _expected_rows(fixture.events, fixture.start, fixture.end, interval, offset)
+
+
+@pytest.fixture
+def uneven_fixture(create_session, base_url):
+    """Bucket 3 is the largest and bucket 5, the newest, is second, so neither end of a list sorted by count is the newest."""
+    if WINDOW_HOURS < 10:
+        pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds no 6-hour fixture")
+    data = Fixture(create_session, base_url)
+    data.end = (int(time.time()) // 3600 - 1) * HOUR
+    data.start = data.end - 6 * HOUR
+    extras = {3: 12, 5: 6}
+    data.events = []
+    for bucket in range(6):
+        for n in range(4 + extras.get(bucket, 0)):
+            data.events.append(data.start + bucket * HOUR + (n + 1) * 60_000_000)
+    data.ingest()
+    data.wait_until_searchable()
+    yield data
+    data.drop()
+
+
+def test_a_list_sorted_by_count_still_counts_only_the_request_range(uneven_fixture):
+    data = uneven_fixture
+    sql = (
+        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
+        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt DESC, ts DESC'
+    )
+    expected = _expected_rows(data.events, data.start, data.end, HOUR)
+    _warm_cache(data, sql, data.start, data.end, expected)
+
+    shorter_end = data.end - HOUR // 2 + 90_000_000
+    expected = _expected_rows(data.events, data.start, shorter_end, HOUR)
+    assert _rows(data.search(sql, data.start, shorter_end)) == expected
+    assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == expected
+
+
+def test_a_raw_query_excludes_a_row_at_exactly_the_end_time(fixture):
+    sql = f'SELECT _timestamp FROM "{fixture.stream}" ORDER BY _timestamp DESC'
+    start = fixture.start
+    inside = sorted(fixture.events)
+    for _ in range(30):
+        body = fixture.search(sql, start, fixture.end, use_cache=True, size=2000)
+        assert sorted(hit["_timestamp"] for hit in body["hits"]) == inside
+        if body.get("result_cache_ratio", 0) > 0:
+            break
+        time.sleep(1)
+    else:
+        pytest.fail("cache was never used for the raw query")
+    end_on_a_row = inside[len(inside) // 2]
+    body = fixture.search(sql, start, end_on_a_row, use_cache=True, size=2000)
+    assert sorted(hit["_timestamp"] for hit in body["hits"]) == [ts for ts in inside if ts < end_on_a_row]

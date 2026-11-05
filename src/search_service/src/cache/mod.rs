@@ -1117,7 +1117,10 @@ pub async fn write_results(
     // 5. skip the write when an existing entry already fully covers this range;
     // checked before the deep copy and serialization below so a covered write costs nothing
     let query_key = file_path.replace('/', "_");
-    if !clear_cache && is_range_already_cached(&query_key, &file_path, &meta).await {
+    let interval_micros = res.histogram_interval.unwrap_or_default() * 1000 * 1000;
+    if !clear_cache
+        && is_range_already_cached(&query_key, &file_path, &meta, interval_micros, ts_offset).await
+    {
         log::debug!(
             "[trace_id {trace_id}] Result cache already covers {accept_start_time} - {cache_end_time}, skip caching"
         );
@@ -1182,7 +1185,13 @@ pub async fn write_results(
     });
 }
 
-async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &ResultCacheMeta) -> bool {
+async fn is_range_already_cached(
+    query_key: &str,
+    file_path: &str,
+    meta: &ResultCacheMeta,
+    interval: i64,
+    ts_offset: i64,
+) -> bool {
     let covering = {
         let r = QUERY_RESULT_CACHE.read().await;
         r.get(query_key).map_or(Vec::new(), |metas| {
@@ -1193,6 +1202,8 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
                         && m.is_descending == meta.is_descending
                         && m.start_time <= meta.start_time
                         && m.end_time >= meta.end_time
+                        // a read rejects such an entry, so it must not stop this write
+                        && cacher::is_on_histogram_grid(m, interval, ts_offset)
                 })
                 .cloned()
                 .collect()
@@ -1551,6 +1562,33 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_an_entry_off_the_grid_does_not_cover_a_write() {
+        const DAY: i64 = 86_400_000_000;
+        let edge = 1_787_011_200_000_000;
+        let file_path = "covered_org/logs/covered_stream/hash";
+        let query_key = file_path.replace('/', "_");
+        let meta = |start_time, end_time| ResultCacheMeta {
+            start_time,
+            end_time,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        let off_grid = meta(edge - 13 * DAY, edge + 77 * DAY);
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![off_grid.clone()]);
+        let new = meta(edge, edge + 30 * DAY);
+        assert!(!is_range_already_cached(&query_key, file_path, &new, 30 * DAY, 0).await);
+        // a covering entry would be checked on disk and healed; this one is not even considered
+        let left = QUERY_RESULT_CACHE.read().await.get(&query_key).cloned();
+        assert_eq!(left, Some(vec![off_grid.clone()]));
+        // a 1-day grid fits the same entry, so it counts as covering and gets healed
+        assert!(!is_range_already_cached(&query_key, file_path, &new, DAY, 0).await);
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
     #[test]
     fn test_histogram_cacheable_range_follows_the_timezone() {
         const HOUR: i64 = 3_600_000_000;
@@ -1800,25 +1838,25 @@ mod tests {
             end_time: 4000,
             ..cached.clone()
         };
-        assert!(is_range_already_cached(&query_key, file_path, &inner).await);
+        assert!(is_range_already_cached(&query_key, file_path, &inner, 0, 0).await);
 
         let wider = ResultCacheMeta {
             end_time: 6000,
             ..inner.clone()
         };
-        assert!(!is_range_already_cached(&query_key, file_path, &wider).await);
+        assert!(!is_range_already_cached(&query_key, file_path, &wider, 0, 0).await);
 
         let ascending = ResultCacheMeta {
             is_descending: false,
             ..inner.clone()
         };
-        assert!(!is_range_already_cached(&query_key, file_path, &ascending).await);
+        assert!(!is_range_already_cached(&query_key, file_path, &ascending, 0, 0).await);
 
         // a covering meta whose file left the disk index no longer counts and is pruned
         infra::cache::file_data::disk::remove(&covering_file)
             .await
             .unwrap();
-        assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
+        assert!(!is_range_already_cached(&query_key, file_path, &inner, 0, 0).await);
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 

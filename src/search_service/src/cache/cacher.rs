@@ -448,20 +448,7 @@ pub async fn get_cached_results(
                 m.start_time,
                 m.end_time
             );
-            // check if the data is matching for histogram
-            if cache_req.is_aggregate
-                && cache_req.histogram_interval > 0
-                && (histogram_bucket_offset(
-                    m.start_time,
-                    cache_req.histogram_interval,
-                    cache_req.ts_offset,
-                ) != 0
-                    || histogram_bucket_offset(
-                        m.end_time,
-                        cache_req.histogram_interval,
-                        cache_req.ts_offset,
-                    ) != 0)
-            {
+            if !is_on_histogram_grid(m, cache_req.histogram_interval, cache_req.ts_offset) {
                 return false;
             }
             m.start_time <= cache_req.q_end_time && m.end_time >= cache_req.q_start_time
@@ -529,6 +516,15 @@ pub async fn get_cached_results(
         is_descending: cache_req.is_descending,
         limit: -1,
     })
+}
+
+/// An entry from another grid, such as a 1970-grid one from an older version, holds no whole
+/// bucket.
+pub(crate) fn is_on_histogram_grid(meta: &ResultCacheMeta, interval: i64, ts_offset: i64) -> bool {
+    !meta.is_aggregate
+        || interval <= 0
+        || (histogram_bucket_offset(meta.start_time, interval, ts_offset) == 0
+            && histogram_bucket_offset(meta.end_time, interval, ts_offset) == 0)
 }
 
 /// Keeps the hits the request fully covers and shrinks the meta to them; false when none remain.

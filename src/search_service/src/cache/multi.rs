@@ -17,7 +17,10 @@ use ::search::{CacheQueryRequest, ResultCacheSelectionStrategy};
 use infra::cache::file_data::disk::QUERY_RESULT_CACHE;
 use itertools::Itertools;
 
-use crate::cache::{CachedQueryResponse, cacher::select_cache_meta};
+use crate::cache::{
+    CachedQueryResponse,
+    cacher::{is_on_histogram_grid, select_cache_meta},
+};
 
 pub async fn get_cached_results(
     trace_id: &str,
@@ -36,6 +39,9 @@ pub async fn get_cached_results(
         );
         return res;
     };
+    // an entry off the grid must not win the selection and remove the entries it overlaps
+    cache_metas
+        .retain(|m| is_on_histogram_grid(m, cache_req.histogram_interval, cache_req.ts_offset));
     cache_metas.sort_by_key(|meta| meta.start_time);
 
     let selection_strategy = ResultCacheSelectionStrategy::from(
@@ -96,6 +102,30 @@ mod tests {
             is_descending: false,
             is_histogram_non_ts_order: false,
         }
+    }
+
+    #[tokio::test]
+    async fn test_an_entry_off_the_grid_does_not_hide_an_entry_on_the_grid() {
+        const DAY: i64 = 86_400_000_000;
+        let edge = 1_787_011_200_000_000; // a 30-day edge of the 2001 grid
+        let file_path = "multi_grid_org/logs/multi_grid_stream/hash";
+        let query_key = file_path.replace('/', "_");
+        let mut on_grid = create_test_cache_meta(edge, edge + 30 * DAY);
+        on_grid.is_aggregate = true;
+        // larger, so the selection would take it first
+        let mut off_grid = create_test_cache_meta(edge - 13 * DAY, edge + 77 * DAY);
+        off_grid.is_aggregate = true;
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![on_grid, off_grid.clone()]);
+        let mut req = create_test_cache_request(edge - 20 * DAY, edge + 100 * DAY);
+        req.is_aggregate = true;
+        req.histogram_interval = 30 * DAY;
+        assert!(get_cached_results("t", file_path, req).await.is_empty());
+        // the on-grid entry was tried and healed away because it has no file
+        let left = QUERY_RESULT_CACHE.read().await.get(&query_key).cloned();
+        assert_eq!(left, Some(vec![off_grid]));
     }
 
     #[test]
