@@ -457,6 +457,7 @@ import {
   fromZonedInputValue,
   toZonedInputValue,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 import OnCallMemberPicker from "./OnCallMemberPicker.vue";
 import {
@@ -488,7 +489,7 @@ const props = defineProps<{
   /** The rotation id the drawer opens on; empty opens on a new rotation. */
   startOn: string;
 }>();
-const emit = defineEmits<{ applied: [] }>();
+const emit = defineEmits<{ applied: []; licenseDenied: [features: string[]] }>();
 const open = defineModel<boolean>("open", { required: true });
 
 const { t } = useI18nTyped();
@@ -615,7 +616,9 @@ async function fetchPresets() {
     // Landing on a chosen shape: the screen's job is comparison, and an empty
     // right pane makes the first click cost a shape nobody had rejected yet.
     if (!chosen.value && presets.value[0]) choose(presets.value[0]);
-  } catch {
+  } catch (err) {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
     presets.value = [];
   } finally {
     loading.value = false;

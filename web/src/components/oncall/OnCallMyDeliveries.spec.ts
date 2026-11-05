@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
@@ -667,6 +668,54 @@ describe("OnCallMyDeliveries", () => {
 
     expect(wrapper.find('[data-test="oncall-my-deliveries-error"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-my-deliveries-empty"]').exists()).toBe(true);
+  });
+
+  describe("a license denial", () => {
+    const DENIAL = {
+      response: {
+        status: 403,
+        data: {
+          code: 40001,
+          message: "Features not included in your license: oncall",
+          error_detail: "oncall",
+        },
+      },
+    };
+
+    function expectLocked(wrapper: ReturnType<typeof render>) {
+      const lock = wrapper.findComponent(LicenseDeniedState);
+      expect(lock.props("features")).toEqual(["oncall"]);
+      expect(lock.attributes("data-test")).toBe("oncall-my-deliveries-license-denied");
+      expect(wrapper.find('[data-test="oncall-my-deliveries-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-table"]').exists()).toBe(false);
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    }
+
+    it("shows the lock and tells the page when the first load is denied", async () => {
+      queryClient.clear();
+      service.myDeliveries.mockRejectedValueOnce(DENIAL);
+      const wrapper = render();
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    it("shows the lock instead of keeping the inbox when a refresh is denied", async () => {
+      queryClient.clear();
+      service.myDeliveries.mockResolvedValue({
+        data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').exists()).toBe(true);
+
+      service.myDeliveries.mockRejectedValueOnce(DENIAL);
+      await (wrapper.vm as unknown as { refresh: () => Promise<void> }).refresh();
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').exists()).toBe(false);
+    });
   });
 
   /// A history row is placed against a deploy or a shift by its minute, so it shows the clock time.

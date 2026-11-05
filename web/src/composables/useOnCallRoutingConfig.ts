@@ -18,6 +18,7 @@ import { readonly, ref } from "vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { routingConfigQuery } from "@/services/oncall.queries";
 import type { RoutingConfig } from "@/ts/interfaces/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 /**
  * The org's catch-all team, read once and shared.
@@ -43,7 +44,8 @@ const config = ref<RoutingConfig | null>(null);
 /** True while a read is in flight, so a caller can tell "unset" from "not loaded yet". */
 const loading = ref(false);
 
-async function read(orgId: string, force: boolean): Promise<void> {
+/** Resolves to the missing features when the license refused the read, so the page can lock. */
+async function read(orgId: string, force: boolean): Promise<string[] | null> {
   const options = routingConfigQuery(orgId);
   loading.value = true;
   try {
@@ -55,10 +57,12 @@ async function read(orgId: string, force: boolean): Promise<void> {
       });
     }
     config.value = await queryClient.fetchQuery(options);
-  } catch {
+    return null;
+  } catch (err) {
     // Unset is the honest reading of "could not load": neither state claims a
     // catch-all exists, and a failed read must not make one appear or vanish.
     config.value = null;
+    return licenseDeniedFeatures(err);
   } finally {
     loading.value = false;
   }
@@ -66,12 +70,12 @@ async function read(orgId: string, force: boolean): Promise<void> {
 
 export function useOnCallRoutingConfig() {
   /** Cache-first: inside the tier this resolves without a request. */
-  function load(orgId: string): Promise<void> {
+  function load(orgId: string): Promise<string[] | null> {
     return read(orgId, false);
   }
 
   /** Re-reads unconditionally. Call after writing the config. */
-  function refresh(orgId: string): Promise<void> {
+  function refresh(orgId: string): Promise<string[] | null> {
     return read(orgId, true);
   }
 
