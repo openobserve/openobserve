@@ -176,6 +176,30 @@ describe("FleetAudit", () => {
     expect(lastParams().offset).toBe(0);
   });
 
+  it.each([
+    ["24h", DAY_MS],
+    ["7d", 7 * DAY_MS],
+    ["30d", 30 * DAY_MS],
+  ])("opens custom on the %s period it replaces", async (range, span) => {
+    await mountAudit();
+    await pick("fleet-audit-range", range);
+    await pick("fleet-audit-range", "custom");
+    const { from, to } = lastParams();
+    expect(to - from).toBe(span);
+    expect(lastParams().offset).toBe(0);
+  });
+
+  it("keeps a picked custom period when custom is chosen again", async () => {
+    await mountAudit();
+    await pick("fleet-audit-range", "custom");
+    wrapper
+      .findComponent('[data-test="fleet-audit-date-picker"]')
+      .vm.$emit("on:date-change", { startTime: 1_000_000_000, endTime: 2_000_000_000 });
+    await settle();
+    await pick("fleet-audit-range", "custom");
+    expect(lastParams()).toMatchObject({ from: 1_000_000, to: 2_000_000 });
+  });
+
   it("sends a custom period in epoch milliseconds", async () => {
     await mountAudit();
     await pick("fleet-audit-range", "custom");
@@ -194,9 +218,11 @@ describe("FleetAudit", () => {
     expect(auditText(wrapper)).toContain("O2_AUDIT_ENABLED");
   });
 
-  it("says entries arrive with the audit publish interval when the trail is empty", async () => {
+  it("points an empty default period at longer ones and the audit publish interval", async () => {
     vi.mocked(fleet.listAudit).mockResolvedValue({ data: { total: 0, items: [] } } as any);
     await mountAudit();
+    expect(auditText(wrapper)).toContain("No entries in the last 24 hours");
+    expect(auditText(wrapper)).toContain("Choose a longer period");
     expect(auditText(wrapper)).toContain("O2_AUDIT_PUBLISH_INTERVAL");
   });
 
