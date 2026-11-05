@@ -457,6 +457,7 @@ export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
   error_classes_timed_out: "alertCalibration.qualityReason.errorClassesTimedOut",
   error_classes_failed: "alertCalibration.qualityReason.errorClassesFailed",
   evaluation_times_unread: "alertCalibration.qualityReason.evaluationTimesUnread",
+  schedule_unreadable: "alertCalibration.qualityReason.scheduleUnreadable",
 };
 
 export type ProposedAction =

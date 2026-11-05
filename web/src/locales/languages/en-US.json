@@ -11535,7 +11535,23 @@
       "errorClassesCapped": "error types were not read: too many failing alerts",
       "errorClassesTimedOut": "error types were not read in time",
       "errorClassesFailed": "error types could not be read",
-      "evaluationTimesUnread": "evaluation times were not read"
+      "evaluationTimesUnread": "evaluation times were not read",
+      "scheduleUnreadable": "the alert's schedule could not be read"
+    },
+    "headroom": {
+      "title": "Alert calibration",
+      "highest": "Hasn't fired in the last day. Its highest value was {value}, against {threshold}. | Hasn't fired in the last {days} days. Its highest value was {value}, against {threshold}.",
+      "lowest": "Hasn't fired in the last day. Its lowest value was {value}, against {threshold}. | Hasn't fired in the last {days} days. Its lowest value was {value}, against {threshold}.",
+      "threshold": "a threshold of {value}",
+      "warningThreshold": "its warning threshold of {value}",
+      "atLeast": "at least {value}",
+      "sentinel": "Quiet by design: its value stayed at 0, against {threshold}.",
+      "edited": "It was edited in this period, so earlier values are compared with the current threshold.",
+      "source": "From the calibration run of {date}. This is information, not a problem.",
+      "short": "Highest value {value} of {threshold}",
+      "shortLowest": "Lowest value {value}, {threshold}",
+      "shortThreshold": "threshold {value}",
+      "shortWarningThreshold": "warning threshold {value}"
     },
     "severity": {
       "high": "High",
