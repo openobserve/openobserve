@@ -70,6 +70,7 @@ export class OnCallTeamDetailPage {
       overrideButton: '[data-test="oncall-team-override-btn"]',
       error: '[data-test="oncall-team-detail-error"]',
       notAvailable: '[data-test="oncall-team-detail-not-available"]',
+      notFound: '[data-test="oncall-team-detail-not-found"]',
       coverageTag: '[data-test="oncall-team-coverage"]',
       configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
@@ -152,6 +153,12 @@ export class OnCallTeamDetailPage {
       membersCoverage: '[data-test="oncall-members-coverage"]',
       membersAwayDialog: '[data-test="oncall-members-away-dialog"]',
       membersAwaySave: '[data-test="oncall-members-away-save"]',
+      membersAwayToDateGroup: '[data-test="oncall-members-away-to-date-group"]',
+      membersAwayToTime: '[data-test="oncall-members-away-to-time"]',
+      timePopup: '[data-test="otime-popup"]',
+      timeClockNumber: '[data-test="otime-clock-face"] g[role="button"]',
+      calendarDay: '[data-reka-calendar-cell-trigger]',
+      calendarDayInMonth: '[data-reka-calendar-cell-trigger]:not([data-outside-view]):not([data-disabled])',
 
       // Setup checklist / Quick start banner.
       setupChecklist: '[data-test="oncall-setup-checklist"]',
@@ -215,6 +222,7 @@ export class OnCallTeamDetailPage {
   memberRemove(memberId) { return `[data-test="oncall-members-remove-${memberId}"]`; }
   memberMarkAway(memberId) { return `[data-test="oncall-members-mark-away-${memberId}"]`; }
   memberShift(memberId) { return `[data-test="oncall-members-shift-${memberId}"]`; }
+  anyMemberMarkAway() { return '[data-test^="oncall-members-mark-away-"]:not([data-test$="-menu"])'; }
 
   /** The handover row's time select, indexed by rule position. */
   handoverTime(index) { return `[data-test="oncall-schedule-handover-${index}-time"]`; }
@@ -323,6 +331,10 @@ export class OnCallTeamDetailPage {
     await tab.click();
     await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 15000 });
     testLogger.info('On-call team tab opened', { tab: name });
+  }
+
+  async backToTeams() {
+    await this.page.locator('[data-test="app-page-header-back"]').click();
   }
 
   /** The tab the URL landed on, in its INTERNAL spelling (policy / ownership). */
@@ -753,7 +765,76 @@ export class OnCallTeamDetailPage {
     await expect(this.page.locator(this.locators.overrideButton)).toHaveCount(0, { timeout: 20000 });
   }
 
+  async openMarkAwayDialog() {
+    await this.page.locator(this.anyMemberMarkAway()).first().click();
+    await expect(this.page.locator(this.locators.membersAwayDialog)).toBeVisible({ timeout: 20000 });
+  }
+
+  async saveMarkAway() {
+    await this.page.locator(this.locators.membersAwaySave).click();
+  }
+
+  /** The From half must be set before Save enables; typed, because only Back on is under test. */
+  async fillAwayFrom(isoDate, time) {
+    const [year, month, day] = isoDate.split('-');
+    await this.page.locator('[data-test="oncall-members-away-from-date-group"] [data-reka-date-field-segment="month"]').click();
+    await this.page.keyboard.type(`${month}${day}${year}`);
+    await this.page.locator('[data-test="oncall-members-away-from-time"] input').first().fill(time);
+  }
+
+  getBackOnTimeInput() { return this.page.locator(`${this.locators.membersAwayToTime} input`).first(); }
+  getBackOnDateGroup() { return this.page.locator(this.locators.membersAwayToDateGroup); }
+  getTimePopup() { return this.page.locator(this.locators.timePopup); }
+  getCalendarDays() { return this.page.locator(this.locators.calendarDay); }
+
+  async openBackOnTimePicker() {
+    await this.page.locator(`${this.locators.membersAwayToTime} button`).first().click();
+    await expect(this.getTimePopup()).toBeVisible({ timeout: 10000 });
+  }
+
+  async openBackOnCalendar() {
+    await this.getBackOnDateGroup().locator('button').first().click();
+    await expect(this.getCalendarDays().first()).toBeVisible({ timeout: 10000 });
+  }
+
+  /** The next month's days can always be picked as an end date, whatever today is. */
+  async showNextCalendarMonth() {
+    const before = await this.getCalendarDays().first().getAttribute('data-value');
+    await this.page.getByRole('button', { name: 'Next page' }).click();
+    await expect(this.getCalendarDays().first()).not.toHaveAttribute('data-value', before);
+  }
+
+  getCalendarDay(date) { return this.page.locator(`${this.locators.calendarDay}[data-value="${date}"]`); }
+
+  /** Picking a day leaves the calendar open; Escape closes only the popup on top, not the dialog under it. */
+  async closeCalendar() {
+    await this.page.keyboard.press('Escape');
+    await expect(this.getCalendarDays()).toHaveCount(0);
+    await expect(this.page.locator(this.locators.membersAwayDialog)).toBeVisible();
+  }
+
+  /** Each element's centre and whether a click there would really land on it, which is what a clipped or covered popup breaks. */
+  async readHitTargets(selector) {
+    return this.page.locator(selector).evaluateAll((elements) => elements.map((el) => {
+      const box = el.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const top = document.elementFromPoint(x, y);
+      return {
+        label: el.getAttribute('aria-label') || el.textContent.trim(),
+        date: el.getAttribute('data-value'),
+        x,
+        y,
+        hit: Boolean(top) && (el === top || el.contains(top)),
+        onScreen: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
+      };
+    }));
+  }
+
   // ------------------------------------------------------- enterprise gating
+
+  getNotFound() { return this.page.locator(this.locators.notFound); }
+  getNotAvailable() { return this.page.locator(this.locators.notAvailable); }
 
   async isUnavailable() {
     return (await this.page.locator(this.locators.notAvailable).count()) > 0;
