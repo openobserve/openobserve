@@ -879,6 +879,7 @@ mod tests {
 
     #[test]
     fn template_skips_signals_the_engine_would_reject() {
+        // The engine parses the SQL, so a destructive word inside a name is not rejected.
         assert!(
             template(
                 "default",
@@ -886,9 +887,9 @@ mod tests {
                 RedSignal::Rate,
                 &ALL_COLS
             )
-            .is_none()
+            .is_some()
         );
-        assert!(template("dropzone", "svc", RedSignal::P95Latency, &ALL_COLS).is_none());
+        assert!(template("dropzone", "svc", RedSignal::P95Latency, &ALL_COLS).is_some());
         assert!(template("app-errors", "svc", RedSignal::Rate, &ALL_COLS).is_none());
         assert!(template("app-errors", "svc", RedSignal::ErrorRatio, &ALL_COLS).is_some());
         assert!(template("terror_logs", "svc", RedSignal::Rate, &ALL_COLS).is_some());
