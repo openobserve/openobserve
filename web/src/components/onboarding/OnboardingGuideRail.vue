@@ -80,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'flex items-center gap-1.5 text-xs',
               s.status.tone === 'ok'
-                ? 'text-success'
+                ? 'text-status-success-text'
                 : s.status.tone === 'attention'
-                  ? 'text-warning'
+                  ? 'text-status-warning-text'
                   : 'text-text-secondary',
             ]"
             :data-test="`onboarding-guide-rail-${s.id}-status`"

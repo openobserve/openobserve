@@ -29752,17 +29752,17 @@
       "languageTile": "Traces with the {otel} SDK, with automatic instrumentation where your language has it.",
       "aiIntegration": "Traces of your AI app's calls, with tokens and cost for model calls."
     },
-    "skipToApp": "Skip to app",
+    "skipToApp": "Skip to App",
     "chooseTitle": "What do you want to monitor first?",
     "back": "Back",
     "searchGuides": "Search {count} guide | Search {count} guides",
-    "showMore": "Show {count} more | Show {count} more",
+    "showMore": "Show {count} More | Show {count} More",
     "noMatch": "No guide matches \"{query}\" here.",
     "foundElsewhere": "Found in other choices:",
     "inChoice": "in {choice}",
     "tryShorter": "Try a shorter name. Any tool can also {link}.",
     "sendOverHttp": "send logs over HTTP",
-    "clearSearch": "Clear search",
+    "clearSearch": "Clear Search",
     "othersTitle": "Other ways to start",
     "whatYouGet": "What you get",
     "signals": {
@@ -29799,11 +29799,11 @@
       "downloadFile": "Download .md",
       "inviteTitle": "No access?",
       "inviteText": "Invite a teammate who can run the command.",
-      "inviteAction": "Invite a teammate",
+      "inviteAction": "Invite a Teammate",
       "loadFailed": "This guide did not load.",
       "openInApp": "Open it in Data sources",
       "languageText": "For {language}, add the {otelSdk}, with automatic instrumentation where {language} has it, then point it at {product} with the settings below.",
-      "languageLink": "{otel} {language} guide"
+      "languageLink": "{otel} {language} Guide"
     },
     "rail": {
       "label": "Setup Progress",

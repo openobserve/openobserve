@@ -115,8 +115,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   pick: [id: OnboardingChoiceId];
-  // Exits that leave onboarding; the view routes them, and records a data-source pick when there is one.
-  leave: [exit: { id: string; route: string; firstSource?: FirstSourceId }];
+  // Exits that leave onboarding; the view records the start and routes them.
+  leave: [exit: { route: string }];
   invite: [];
   agent: [];
 }>();
@@ -188,7 +188,7 @@ const others = computed<OtherWay[]>(() => [
 ]);
 
 const openOther = (other: OtherWay) => {
-  if (other.route) emit("leave", { id: other.id, route: other.route });
+  if (other.route) emit("leave", { route: other.route });
   else if (other.id === "agent") emit("agent");
   else emit("invite");
 };

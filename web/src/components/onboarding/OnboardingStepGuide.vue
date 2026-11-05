@@ -14,8 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Step 4: a guide inside onboarding, as its setup card or as its Data sources page. A rail on the
-     left tracks the setup and holds the page's one first-event status. -->
+<!-- Step 4: a guide inside onboarding, its setup card or Data sources page, beside a setup rail. -->
 <template>
   <!-- One card in two parts: on the left Back, the step nav and help; on the right the guide, with
        its own steps and the live data check. On phones the left part folds into the page. -->
@@ -216,14 +215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @state="onState"
               @status="pageHasStatus = $event"
             />
-            <!-- A page with no check of its own: watch the org for any new stream, as the coding agent page does. -->
-            <FirstEventStatus
-              v-if="pageHasStatus === false"
-              :org="org"
-              @detected="result = $event"
-              @state="onState"
-            />
           </template>
+          <!-- A page with no check, or a card behind its no-permission banner: watch the org for new streams. -->
+          <FirstEventStatus
+            v-if="orgWideCheck"
+            :org="org"
+            @detected="result = $event"
+            @state="onState"
+          />
         </div>
 
         <!-- The last step: what to do once data is here. -->
@@ -298,8 +297,6 @@ const store = useStore();
 // Loads the org passcode, so the guide's commands carry the token, as on the Data sources page.
 const credential = useOrgCredential();
 
-// The token picker from the Data sources header, for card and page guides alike. RUM uses its own
-// token, so the Data sources page hides the picker there.
 const tokenOptions = computed(() =>
   (store.state.organizationData?.orgTokens ?? [])
     .filter((token: { enabled?: boolean }) => token.enabled)
@@ -309,13 +306,9 @@ const selectedTokenName = computed<string>({
   get: () => credential.pickedName.value,
   set: (name) => credential.pickToken(name),
 });
+// Opens only when a token button asks, so RUM's snippets, which carry no org token, never open it.
 const tokenPickerAsked = ref(false);
-const showTokenPicker = computed(
-  () =>
-    tokenPickerAsked.value &&
-    props.guide.route !== "frontendMonitoring" &&
-    tokenOptions.value.length > 0,
-);
+const showTokenPicker = computed(() => tokenPickerAsked.value && tokenOptions.value.length > 0);
 const tokenSelectRef = ref<{ focus: () => void } | null>(null);
 provide(OPEN_TOKEN_PICKER, async () => {
   tokenPickerAsked.value = true;
@@ -328,11 +321,14 @@ const slug = computed(() => props.guide.cardSlug ?? "");
 const card = computed(() => getDataSourceCard(slug.value, { url: "", org: "", token: "" }, t));
 // Card names are product names, or text the card builder already translated.
 const sourceName = computed(() => (card.value ? raw(card.value.provider.name) : props.guide.name));
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
 // A guide that shows no title of its own (a banner in place of its card, a page with none) gets one.
 const hasOwnTitle = computed(() =>
   guideHasTitle(props.guide, {
     rumToken: !!store.state.organizationData?.rumToken?.rum_token,
-    passcodeForbidden: !!store.state.organizationData?.organizationPasscodeForbidden,
+    passcodeForbidden: passcodeForbidden.value,
   }),
 );
 
@@ -374,29 +370,33 @@ const navSteps = computed((): GuideNavStep[] => {
   // The step that holds the card's check; a card that names none checks at its last step.
   const anchor = cardSteps.value.findIndex((step) => step.detectionAnchor);
   const check = anchor >= 0 ? anchor : cardSteps.value.length - 1;
+  // Once data is here, Explore is the one current step.
   const steps: GuideNavStep[] = cardSteps.value.length
     ? cardSteps.value.map((step, i) =>
         i === check
-          ? { ...step, title: raw(step.title), done: received, status: checkStatus.value }
+          ? {
+              ...step,
+              title: raw(step.title),
+              done: received,
+              active: step.active && !received,
+              status: checkStatus.value,
+            }
           : {
               ...step,
               title: raw(step.title),
               // Data proves the steps before the check; the optional ones after it keep the card's state.
               done: step.done || (received && i < check && !step.notProvenByDetect),
+              active: step.active && !received,
             },
       )
     : [
-        {
-          id: "run",
-          title: t("onboarding.rail.run"),
-          done: state.value !== "idle" || received,
-          active: state.value === "idle" && !received,
-        },
+        // A page's own snippets report copies to its own check, never here, so only data ends Run.
+        { id: "run", title: t("onboarding.rail.run"), done: received, active: !received },
         {
           id: "check",
           title: t("onboarding.rail.check"),
           done: received,
-          active: state.value !== "idle" && !received,
+          active: false,
           status: checkStatus.value,
         },
       ];
@@ -419,11 +419,13 @@ const goToStep = (id: string) => {
 
 // Set by a Data sources page once it renders; with no check of its own, the org-wide one runs.
 const pageHasStatus = ref<boolean>();
+const orgWideCheck = computed(() =>
+  props.guide.cardSlug ? passcodeForbidden.value : pageHasStatus.value === false,
+);
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 // The help box's key, prompt and file restart the running check, the card's, the page's or the org-wide one.
 const restartCheck = provideBarsCopied();
 
-// An invitee lands on Home, so the inviter sends them this guide's link.
 // The coding agent help: the key goes into the terminal, and the prompt or file names it only.
 const EXPORT_LINE = 'export O2_ACCESS_KEY="[BASIC_PASSCODE]"';
 const { endpoint } = useIngestion();

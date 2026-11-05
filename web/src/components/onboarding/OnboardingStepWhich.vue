@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- The "which one?" page: guide tiles in groups, with a search box when there are many. -->
 <template>
   <div
+    ref="root"
     class="grid h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:h-auto max-md:min-h-full max-md:grid-cols-1 md:grid-rows-1"
     data-test="onboarding-step-which"
   >
@@ -53,25 +54,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ group.heading }}
             </h2>
             <!-- One full-width row each, as on steps 1 and 2, with each source's logo. -->
-            <div class="grid gap-2">
-              <OnboardingChoiceButton
-                v-for="g in group.guides"
-                :key="g.id"
-                :icon="row.icon"
-                :logo="guideLogo(g)"
-                :name="g.name"
-                :description="g.about"
-                :data-test="`onboarding-step-which-guide-${g.id}`"
-                @click="emit('open', { row, guide: g })"
-              />
-            </div>
+            <ul class="grid gap-2">
+              <li v-for="g in group.guides" :key="g.id">
+                <OnboardingChoiceButton
+                  :icon="row.icon"
+                  :logo="guideLogo(g)"
+                  :name="g.name"
+                  :description="g.about"
+                  :data-test="`onboarding-step-which-guide-${g.id}`"
+                  @click="emit('open', { row, guide: g })"
+                />
+              </li>
+            </ul>
             <OButton
               v-if="group.extra"
               variant="ghost-primary"
               size="sm"
               class="mt-2"
               data-test="onboarding-step-which-show-more"
-              @click="expanded.add(group.gi)"
+              @click="showMore(group.gi)"
             >
               {{ t("onboarding.showMore", group.extra) }}
             </OButton>
@@ -126,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="sm"
                 data-test="onboarding-step-which-curl"
-                @click="emit('open', { row: curlRow, guide: curlGuide, choice: 'logs' })"
+                @click="emit('open', { row: curlRow, choice: 'logs' })"
               >
                 {{ t("onboarding.sendOverHttp") }}
               </OButton>
@@ -137,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="mt-3"
             data-test="onboarding-step-which-clear"
-            @click="query = ''"
+            @click="clearSearch"
           >
             {{ t("onboarding.clearSearch") }}
           </OButton>
@@ -162,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -194,15 +195,28 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const query = ref("");
-// Groups the user has expanded, by index. Reset when the row changes.
+// Groups the user has expanded, by index.
 const expanded = ref(new Set<number>());
-watch(
-  () => props.row.id,
-  () => {
-    query.value = "";
-    expanded.value = new Set();
-  },
-);
+const root = ref<HTMLElement>();
+
+// The button vanishes on click, so focus goes to the first tile it revealed.
+const showMore = async (gi: number) => {
+  const first = groups.value[gi].guides[cap.value];
+  expanded.value.add(gi);
+  await nextTick();
+  root.value
+    ?.querySelector<HTMLElement>(`[data-test="onboarding-step-which-guide-${first.id}"]`)
+    ?.focus();
+};
+
+// The empty state vanishes on click, so focus goes back to the search box.
+const clearSearch = async () => {
+  query.value = "";
+  await nextTick();
+  root.value
+    ?.querySelector<HTMLElement>('[data-test="onboarding-step-which-search"] input')
+    ?.focus();
+};
 
 const groups = computed(() => props.row.groups ?? []);
 const total = computed(() => groups.value.reduce((n, g) => n + g.guides.length, 0));
@@ -243,15 +257,5 @@ const hits = computed(() =>
 // With no hit anywhere, the curl guide works for any tool.
 const curlRow = computed(() =>
   props.choices.find((c) => c.id === "logs")?.rows.find((r) => r.id === "over-http-with-curl"),
-);
-const curlGuide = computed<OnboardingGuide | undefined>(() =>
-  curlRow.value?.route
-    ? {
-        id: curlRow.value.id,
-        name: curlRow.value.name,
-        route: curlRow.value.route,
-        firstSource: curlRow.value.firstSource,
-      }
-    : undefined,
 );
 </script>

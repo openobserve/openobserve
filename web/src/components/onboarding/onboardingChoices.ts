@@ -756,14 +756,3 @@ export function guideHasTitle(
   const ai = aiCategories.flatMap((c) => c.integrations).find((i) => i.routeName === guide.route);
   return !!ai && !org.passcodeForbidden && !!getAICardRaw(ai.contentSlug ?? ai.slug);
 }
-
-/** The onboarding URL segments of the first guide for `route` that has a setup card. */
-export function cardGuidePath(choices: OnboardingChoice[], route: string): string[] | undefined {
-  for (const choice of choices) {
-    for (const row of choice.rows) {
-      const hit = rowGuides(row).find((g) => g.route === route && g.cardSlug);
-      if (hit) return guidePath(choice.id, row, hit);
-    }
-  }
-  return undefined;
-}

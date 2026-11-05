@@ -24,7 +24,6 @@ import type { TranslateFn } from "@/types/i18n";
 
 import {
   buildChoices,
-  cardGuidePath,
   findGuides,
   readTraces,
   resolvePath,
@@ -128,19 +127,6 @@ describe("onboardingChoices", () => {
       otelDocs: { slug, language },
     });
     expect(hasDataSourceCard("otlpTraces")).toBe(true);
-  });
-
-  it("finds the onboarding path of a guide with a card by its route", () => {
-    expect(cardGuidePath(choices, "ingestFromLinux")).toEqual([
-      "infrastructure",
-      "linux-windows-or-macos-host",
-      "linux",
-    ]);
-    expect(cardGuidePath(choices, "ingestFromKubernetes")).toEqual([
-      "infrastructure",
-      "kubernetes-cluster",
-    ]);
-    expect(cardGuidePath(choices, "curl")).toBeUndefined();
   });
 
   it("carries a row's card slug onto its guide", () => {

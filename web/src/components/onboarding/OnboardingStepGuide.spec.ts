@@ -98,7 +98,8 @@ const status = (emit: (event: "state" | "received", value: unknown) => void) =>
   });
 
 // The real card is covered by its own specs; here it only reports its state, its detection and,
-// when a test sets them, its steps and its stream to the page.
+// when a test sets them, its steps and its stream to the page. Like the real card, a forbidden
+// passcode puts a banner with no check in its place.
 const cardSteps = ref<SetupStepInfo[]>();
 const cardStream = ref<string>();
 const CardStub = defineComponent({
@@ -109,7 +110,10 @@ const CardStub = defineComponent({
     const host = inject(SETUP_STEPS_HOST, null);
     if (cardSteps.value) host?.setSteps(cardSteps.value);
     if (cardStream.value) host?.setStream(cardStream.value);
-    return () => h("div", [slots["hero-under-title"]?.(), snippet(), status(emit)]);
+    return () =>
+      store.state.organizationData.organizationPasscodeForbidden
+        ? h("div", { "data-test": "data-source-setup-card-passcode-forbidden" })
+        : h("div", [slots["hero-under-title"]?.(), snippet(), status(emit)]);
   },
 });
 
@@ -270,7 +274,7 @@ describe("OnboardingStepGuide", () => {
       const link = w.find('[data-test="onboarding-step-guide-language-docs"]');
       expect(link.attributes("href")).toBe(url);
       expect(link.attributes("target")).toBe("_blank");
-      expect(link.text()).toBe(`OpenTelemetry ${docs} guide`);
+      expect(link.text()).toBe(`OpenTelemetry ${docs} Guide`);
     },
   );
 
@@ -428,6 +432,45 @@ describe("OnboardingStepGuide", () => {
       const after = pg.steps.slice(anchor + 1).map((s) => s.id);
       expect(after).toContain("dbm-grant");
       for (const id of after) expect(done(id)).toBe("false");
+    });
+
+    it("colors the received and attention states with the status text tokens", async () => {
+      const w = await mountGuide();
+      card(w).vm.$emit("state", "rejected");
+      await flushPromises();
+      expect(navStatus(w, "check").classes()).toContain("text-status-warning-text");
+      card(w).vm.$emit("received", metrics);
+      card(w).vm.$emit("state", "received");
+      await flushPromises();
+      expect(navStatus(w, "check").classes()).toContain("text-status-success-text");
+    });
+
+    it("keeps Run current on a page guide until data arrives, since its copies do not reach the nav", async () => {
+      const w = await mountGuide(false, undefined, curl);
+      const step = (id: string) => w.find(`[data-test="onboarding-guide-rail-${id}"]`);
+      const current = () =>
+        w.findAll('[aria-current="step"]').map((b) => b.attributes("data-test"));
+      expect(step("run").attributes("data-done")).toBe("false");
+      expect(current()).toEqual(["onboarding-guide-rail-run-link"]);
+      w.findComponent(EmbeddedStub).vm.$emit("received", metrics);
+      await flushPromises();
+      expect(step("run").attributes("data-done")).toBe("true");
+      expect(step("check").attributes("data-done")).toBe("true");
+      expect(current()).toEqual(["onboarding-guide-rail-explore-link"]);
+    });
+
+    it("marks only Explore current once data arrives, not the card's own active step too", async () => {
+      cardSteps.value = [
+        { id: "install", title: "Quick install", done: false, active: true },
+        { id: "verify", title: "Check Your Data", done: false, active: false },
+      ];
+      const w = await mountGuide();
+      card(w).vm.$emit("received", metrics);
+      card(w).vm.$emit("state", "received");
+      await flushPromises();
+      expect(w.findAll('[aria-current="step"]').map((b) => b.attributes("data-test"))).toEqual([
+        "onboarding-guide-rail-explore-link",
+      ]);
     });
 
     it("drops the old result when the card's check starts waiting again", async () => {
@@ -622,6 +665,22 @@ describe("OnboardingStepGuide", () => {
     });
   });
 
+  it("watches the org for any new stream when a forbidden passcode hides the setup card", async () => {
+    // The card's own check is its one status.
+    expect((await mountGuide()).findAllComponents(OrgStatusStub)).toHaveLength(1);
+    store.state.organizationData.organizationPasscodeForbidden = true;
+    try {
+      const w = await mountGuide();
+      const orgStatus = w.findComponent(OrgStatusStub);
+      expect(orgStatus.props("org")).toBe("default");
+      orgStatus.vm.$emit("detected", metrics);
+      await flushPromises();
+      expect(navStatus(w, "check").text()).toBe("Data received");
+    } finally {
+      store.state.organizationData.organizationPasscodeForbidden = false;
+    }
+  });
+
   describe("the token picker", () => {
     const frontend = choices.find((c) => c.id === "frontend")!;
     const browserRow = frontend.rows.find((r) => r.id === "browser")!;
@@ -658,6 +717,21 @@ describe("OnboardingStepGuide", () => {
         guide: { id: browserRow.id, name: browserRow.name, route: browserRow.route! },
       });
       expect(w.findComponent(SelectStub).exists()).toBe(false);
+    });
+
+    it("opens on the RUM guide when the coding agent key's token button asks for it", async () => {
+      withSnippet.value = false;
+      const w = await mountGuide(false, undefined, {
+        choice: frontend,
+        row: browserRow,
+        guide: { id: browserRow.id, name: browserRow.name, route: browserRow.route! },
+      });
+      await w
+        .find('aside [data-test="ingestion-onboarding-agent-key-code-block-token-link"]')
+        .trigger("click");
+      await flushPromises();
+      expect(w.findComponent(SelectStub).exists()).toBe(true);
+      expect(focus).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -66,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :can-invite="canInvite"
         @back="guideBack"
         @invite="inviteOpen = true"
-        @agent="goTo(['agent'])"
       />
       <OnboardingAgentSetup v-else-if="resolved.step === 'agent'" @back="agentBack" />
     </div>
@@ -94,7 +93,6 @@ import OnboardingStepGuide from "@/components/onboarding/OnboardingStepGuide.vue
 import OnboardingStepTraces from "@/components/onboarding/OnboardingStepTraces.vue";
 import {
   buildChoices,
-  cardGuidePath,
   guidePath,
   readTraces,
   resolvePath,
@@ -289,31 +287,29 @@ const guideBack = () => {
   else goTo(at.row.route ? [at.choice.id] : [at.choice.id, at.row.id]);
 };
 
-// Every exit records the start; only a data-source pick ("Not sure?") also pins a first source.
-const leave = async ({
-  id,
-  route,
-  firstSource,
-}: {
-  id: string;
-  route: string;
-  firstSource?: FirstSourceId;
-}) => {
-  if (firstSource) launch(id, route, firstSource, undefined, cardGuidePath(choices.value, route));
-  else {
+// Both exits wait up to 3 s on the start record; a second click is ignored until the navigation settles.
+let exiting = false;
+
+const leave = async ({ route }: { route: string }) => {
+  if (exiting) return;
+  exiting = true;
+  try {
     await recordStartBounded(org.value, email.value, undefined, false);
-    router.push({ name: route, query: orgQuery.value });
+  } finally {
+    await router.push({ name: route, query: orgQuery.value }).finally(() => (exiting = false));
   }
 };
 
 const skip = async () => {
+  if (exiting) return;
+  exiting = true;
   analytics.track(fromFirstLogin ? "onboarding_skipped" : "onboarding_left", {
     step: resolved.value.step,
   });
   try {
     await recordStartBounded(org.value, email.value, undefined, true);
   } finally {
-    router.push({ name: "home", query: orgQuery.value });
+    await router.push({ name: "home", query: orgQuery.value }).finally(() => (exiting = false));
   }
 };
 provide(ONBOARDING_SKIP, skip);

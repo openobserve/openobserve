@@ -176,7 +176,7 @@ describe("OnboardingStepChoose", () => {
   it("emits leave for synthetic checks", async () => {
     const w = mountChoose();
     await w.find('[data-test="onboarding-step-choose-other-synthetics"]').trigger("click");
-    expect(w.emitted("leave")).toEqual([[{ id: "synthetics", route: "synthetics" }]]);
+    expect(w.emitted("leave")).toEqual([[{ route: "synthetics" }]]);
   });
 
   it("asks the view to open the invite dialog instead of leaving", async () => {

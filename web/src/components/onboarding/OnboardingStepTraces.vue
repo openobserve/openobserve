@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
         </ul>
-        <OnboardingStepFooter />
+        <OnboardingStepFooter :quiet="expanded" />
       </div>
     </section>
 
@@ -151,7 +151,12 @@ const panelId = useId();
 const expanded = ref(props.picked?.traces === "library");
 
 const form = useOForm<TracesForm>({
-  defaultValues: { languages: props.picked?.languages ?? [] },
+  // Only languages the card offers: the URL can carry any id.
+  defaultValues: {
+    languages: (props.picked?.languages ?? []).filter((id) =>
+      props.traces.languages.some((l) => l.id === id),
+    ),
+  },
   schema: makeTracesFormSchema(t),
   // Languages in the card's order, so the same pick always gives the same URL.
   onSubmit: ({ languages }) =>

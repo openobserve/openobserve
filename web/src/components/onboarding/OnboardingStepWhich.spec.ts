@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -49,7 +50,7 @@ describe("OnboardingStepWhich", () => {
     const firstGroup = w.findAll('[data-test="onboarding-step-which-group"]')[0];
     expect(firstGroup.findAll('[data-test^="onboarding-step-which-guide-"]')).toHaveLength(8);
     expect(firstGroup.find('[data-test="onboarding-step-which-show-more"]').text()).toBe(
-      `Show ${size - 8} more`,
+      `Show ${size - 8} More`,
     );
   });
 
@@ -112,5 +113,72 @@ describe("OnboardingStepWhich", () => {
     expect(tiles(w)).toHaveLength(8);
     await w.find('[data-test="onboarding-step-which-show-more"]').trigger("click");
     expect(tiles(w)).toHaveLength(14);
+  });
+  it("moves between tiles with the arrow keys", async () => {
+    const w = mount(OnboardingStepWhich, {
+      props: {
+        choices,
+        choice: choices.find((c) => c.id === "infrastructure")!,
+        row: choices
+          .find((c) => c.id === "infrastructure")!
+          .rows.find((r) => r.id === "databases")!,
+      },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    const items = tiles(w);
+    (items[0].element as HTMLElement).focus();
+    await items[0].trigger("keydown", { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items[1].element);
+    w.unmount();
+  });
+
+  it("moves focus to the first new tile after Show more", async () => {
+    const choice = choices[0];
+    const guides = Array.from({ length: 14 }, (_, i) => ({
+      id: `g${i}`,
+      name: raw(`Guide ${i}`),
+      route: "home",
+    }));
+    const row: OnboardingRow = { ...choice.rows[0], route: undefined, groups: [{ guides }] };
+    const w = mount(OnboardingStepWhich, {
+      props: { choices, choice, row },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    await w.find('[data-test="onboarding-step-which-show-more"]').trigger("click");
+    await nextTick();
+    expect(document.activeElement).toBe(tiles(w)[8].element);
+    w.unmount();
+  });
+
+  it("moves focus to the search box after Clear Search", async () => {
+    const w = mount(OnboardingStepWhich, {
+      props: {
+        choices,
+        choice: choices.find((c) => c.id === "infrastructure")!,
+        row: choices
+          .find((c) => c.id === "infrastructure")!
+          .rows.find((r) => r.id === "databases")!,
+      },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    await search(w, "zzzzqqq");
+    await w.find('[data-test="onboarding-step-which-clear"]').trigger("click");
+    await nextTick();
+    expect(document.activeElement).toBe(
+      w.find('[data-test="onboarding-step-which-search"] input').element,
+    );
+    w.unmount();
+  });
+
+  it("opens the curl row alone when nothing matches anywhere", async () => {
+    const w = mountWhich("infrastructure", "databases");
+    await search(w, "zzzzqqq");
+    await w.find('[data-test="onboarding-step-which-curl"]').trigger("click");
+    const payload = w.emitted("open")![0][0] as { row: { id: string }; guide?: unknown };
+    expect(payload.row.id).toBe("over-http-with-curl");
+    expect(payload.guide).toBeUndefined();
   });
 });

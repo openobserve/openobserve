@@ -59,7 +59,7 @@ const serveLogStreams = (logs: string[], docNum = 3) =>
 const GuideStub = defineComponent({
   name: "OnboardingStepGuide",
   props: ["choice", "row", "guide", "canInvite"],
-  emits: ["back", "invite", "agent"],
+  emits: ["back", "invite"],
   setup: () => {
     const presets = inject(SETUP_CARD_ONBOARDING, null);
     return () =>
@@ -186,13 +186,22 @@ describe("OnboardingView", () => {
     expect(wrapper.find('[data-test="onboarding-step-choose"]').exists()).toBe(true);
   });
 
-  it("routes Skip to app to home and tracks onboarding_skipped", async () => {
+  it("routes Skip to App to home and tracks onboarding_skipped", async () => {
     const { router, wrapper } = await mountAt("/onboarding");
     await wrapper.find('[data-test="onboarding-view-skip"]').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
     expect(analytics.track).toHaveBeenCalledTimes(1);
     expect(vi.mocked(analytics.track).mock.calls[0][0]).toBe("onboarding_skipped");
+  });
+
+  it("ignores a second Skip to App click while the first is pending", async () => {
+    const { wrapper } = await mountAt("/onboarding");
+    const btn = wrapper.find('[data-test="onboarding-view-skip"]');
+    await btn.trigger("click");
+    await btn.trigger("click");
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledTimes(1);
   });
 
   it("tracks onboarding_left, not a skip, for a user who came back from the app", async () => {
@@ -333,16 +342,6 @@ describe("OnboardingView", () => {
     wrapper.findComponent(GuideStub).vm.$emit("back");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
-  });
-
-  it("opens the coding agent page from the guide", async () => {
-    const { router, wrapper } = await mountAt("/onboarding/infrastructure/kubernetes-cluster");
-    const push = vi.spyOn(router, "push");
-    wrapper.findComponent(GuideStub).vm.$emit("agent");
-    await flushPromises();
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "onboarding", params: { path: ["agent"] } }),
-    );
   });
 
   it("renders the coding agent page, records the start once and goes back to step 1", async () => {

@@ -152,4 +152,19 @@ describe("OnboardingStepTraces", () => {
     await option(w, "library").trigger("focus");
     expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add Traces With Language Libraries"]);
   });
+
+  it("makes Skip to App quiet while the library list is open", async () => {
+    const w = mountTraces();
+    const skip = () => w.findComponent({ name: "OnboardingStepFooter" });
+    expect(skip().props("quiet")).toBeFalsy();
+    await option(w, "library").trigger("click");
+    expect(skip().props("quiet")).toBe(true);
+  });
+
+  it("drops unknown languages from the URL, so Continue asks for one", async () => {
+    const w = mountTraces({ traces: "library", languages: ["foo"] });
+    await submit(w);
+    await vi.waitFor(() => expect(panel(w).text()).toContain("Pick at least one language."));
+    expect(w.emitted("pick")).toBeUndefined();
+  });
 });

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The foot of every step's left column: Skip to app, pinned in view while the column scrolls.
+<!-- The foot of every step's left column: Skip to App, pinned in view while the column scrolls.
      It carries the column's bottom gap, since a scroll container's padding would show rows below it.
      It is the step's primary button, unless the step has its own (`quiet`). -->
 <template>
@@ -22,8 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       :variant="quiet ? 'outline' : 'primary'"
       icon-right="arrow-forward"
+      :loading="skipping"
       data-test="onboarding-view-skip"
-      @click="skip"
+      @click="onSkip"
     >
       {{ t("onboarding.skipToApp") }}
     </OButton>
@@ -31,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { inject } from "vue";
+import { inject, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -41,5 +42,16 @@ import { ONBOARDING_SKIP } from "./onboardingFlow";
 defineProps<{ quiet?: boolean }>();
 
 const { t } = useI18nTyped();
-const skip = inject(ONBOARDING_SKIP, () => {});
+const skip = inject(ONBOARDING_SKIP, async () => {});
+
+const skipping = ref(false);
+const onSkip = async () => {
+  if (skipping.value) return;
+  skipping.value = true;
+  try {
+    await skip();
+  } finally {
+    skipping.value = false;
+  }
+};
 </script>
