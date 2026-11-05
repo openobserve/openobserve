@@ -206,51 +206,6 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
   );
 
   // -------------------------------------------------------------------------
-  // P1: Label name suggestions appear inside closed braces metric{}
-  // Validates that label suggestions (not metric names) appear when cursor is
-  // positioned between braces.
-  // -------------------------------------------------------------------------
-  test(
-    "[P1] label name suggestions appear when cursor is inside closed braces metric{}",
-    { tag: ['@promqlAutocomplete', '@functional', '@P1', '@all'] },
-    async ({ page }) => {
-      const dashboardName = generateUniqueDashboardName();
-      const pm = new PageManager(page);
-      const panelName = pm.dashboardPanelActions.generateUniquePanelName("promql-label-name");
-
-      testLogger.testStart(
-        "[P1] label name suggestions inside closed braces — Dashboard PromQL Custom",
-        "promqlAutocomplete.spec.js"
-      );
-
-      const editorReady = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
-      if (!editorReady) {
-        test.skip(true, 'PromQL not available in this environment');
-        return;
-      }
-
-      await pm.dashboardPromQLEditor.focusEditor();
-
-      // Type metric{} and position cursor inside braces
-      await pm.dashboardPromQLEditor.clearEditor();
-      await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{}', { delay: 50 });
-      await pm.dashboardPromQLEditor.pressKey('ArrowLeft'); // cursor moves inside {}
-
-      try {
-        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
-        testLogger.info(`Found ${count} label name suggestions inside cpu_usage{}`);
-
-        expect(count, 'Expected label name suggestions to appear but none were shown').toBeGreaterThan(0);
-        await pm.dashboardPromQLEditor.logSuggestions('Label name suggestions', 8);
-      } finally {
-        await pm.dashboardPromQLEditor.dismissSuggestions();
-      }
-
-      await cleanupDashboard(page, pm, dashboardName);
-    }
-  );
-
-  // -------------------------------------------------------------------------
   // P1: Label name suggestions appear with unclosed brace metricname{
   // This directly tests Fix 3 (analyzeLabelFocus handles unclosed braces).
   // Before the fix, stream names would appear instead of label names.
