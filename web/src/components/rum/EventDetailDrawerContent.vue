@@ -227,6 +227,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-3"
           />
 
+          <!-- Failed request details -->
+          <div
+            v-if="event.type === 'failed_request'"
+            class="mb-3"
+            data-test="failed-request-details"
+          >
+            <div class="mb-1 text-sm font-bold">
+              {{ t("rum.playerEvents.failedRequestDetails") }}
+            </div>
+            <div>
+              <div
+                v-for="(field, index) in failedRequestFields"
+                :key="field.key"
+                class="flex px-1.5 py-1 text-xs"
+                :class="
+                  index < failedRequestFields.length - 1 || failedRequestTraceId
+                    ? 'border-card-glass-border border-b border-solid'
+                    : ''
+                "
+                :data-test="`failed-request-${field.key}`"
+              >
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ field.label }}
+                </div>
+                <div class="flex-1 break-all">
+                  <div v-for="line in field.lines" :key="line">{{ line }}</div>
+                  <div
+                    v-if="field.hint"
+                    class="text-text-secondary mt-0.5"
+                    :data-test="`failed-request-${field.key}-hint`"
+                  >
+                    {{ field.hint }}
+                  </div>
+                </div>
+              </div>
+              <div v-if="failedRequestTraceId" class="flex px-1.5 py-1 text-xs">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  :title="t('common.viewTraceDetails')"
+                  data-test="failed-request-view-trace-btn"
+                  :loading="isResolvingTraceNav"
+                  @click="navigateToSpecificTrace(failedRequestTraceId)"
+                >
+                  <OIcon name="account-tree" size="xs" />
+                  <span>{{ t("common.viewTrace") }}</span>
+                </OButton>
+              </div>
+            </div>
+          </div>
+
           <!-- Related Events for Actions -->
           <div v-if="event.type === 'action'" class="mb-3">
             <template v-if="isLoadingRelatedResources">
@@ -371,6 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="resource in networkResources"
               :key="resource.resource_id"
               class="bg-surface-accent rounded-default mb-2 p-2"
+              :class="isClickedRequest(resource) ? 'border-button-primary border border-solid' : ''"
+              :data-highlighted="isClickedRequest(resource) ? 'true' : undefined"
               data-test="network-resource-item"
             >
               <div class="mb-1 flex items-center">
@@ -570,22 +623,106 @@ const actionFields = computed(() => [
   },
 ]);
 
+// A failed request lists the requests around it: those of its action, else those of its view, both
+// limited to its session and to a minute either side of when the server received it (the search filters arrival
+// time, and the device's own date can be minutes off).
+const FAILED_REQUEST_WINDOW_US = 60_000_000;
+
+const isFailedRequest = computed(() => props.event?.type === "failed_request");
+
+// A resource's action_id is a JSON list of action ids ("[]" when it has none); a plain id is taken as is.
+const requestActionIds = (actionId: unknown): string[] => {
+  if (typeof actionId !== "string" || !actionId) return [];
+  try {
+    const parsed = JSON.parse(actionId);
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [actionId];
+  } catch {
+    return [actionId];
+  }
+};
+
+const canFetchRelated = (type: unknown): boolean => {
+  if (type === "action") return !!props.rawEvent?.action_id;
+  if (type === "failed_request")
+    return requestActionIds(props.rawEvent?.action_id).length > 0 || !!props.rawEvent?.view_id;
+  return false;
+};
+
+const relatedResourcesRequest = () => {
+  const raw = props.rawEvent;
+  const timestampColumn = store.state.zoConfig.timestamp_column;
+  const orderBy = `order by ${timestampColumn} desc`;
+  if (!isFailedRequest.value) {
+    const dateUs = raw.date * 1000;
+    return {
+      sql: `select * from "_rumdata" where (${sqlLike("action_id", raw.action_id)} or ${sqlEquals("action_id", raw.action_id)}) ${orderBy}`,
+      start_time: dateUs, // 5 mins/360 seconds before action
+      end_time: dateUs + 360000000, // 5 mins/360 seconds after action
+    };
+  }
+  const arrivalUs = Number(raw[timestampColumn]) || raw.date * 1000;
+  const window = {
+    start_time: arrivalUs - FAILED_REQUEST_WINDOW_US,
+    end_time: arrivalUs + FAILED_REQUEST_WINDOW_US,
+  };
+  const actionIds = requestActionIds(raw.action_id);
+  if (actionIds.length) {
+    // The other requests of the action hold it in their own action_id list, the action event as a plain id.
+    const ofActions = actionIds
+      .map((id) => `${sqlLike("action_id", id)} or ${sqlEquals("action_id", id)}`)
+      .join(" or ");
+    return {
+      sql: `select * from "_rumdata" where (${ofActions}) and ${sqlEquals("session_id", props.sessionId)} ${orderBy}`,
+      ...window,
+    };
+  }
+  return {
+    sql: `select * from "_rumdata" where ${sqlEquals("view_id", raw.view_id)} and ${sqlEquals("session_id", props.sessionId)} and type='resource' and resource_type in ('fetch','xhr') ${orderBy}`,
+    ...window,
+  };
+};
+
+// The clicked request is matched by id, else by url and date.
+const isClickedRequest = (resource: any): boolean => {
+  const raw = props.rawEvent;
+  if (!isFailedRequest.value || resource?.type !== "resource") return false;
+  if (resource.resource_id && raw?.resource_id) return resource.resource_id === raw.resource_id;
+  return (
+    !!raw?.resource_url && resource.resource_url === raw.resource_url && resource.date === raw.date
+  );
+};
+
+// Every fetch takes a number, and only the latest one may write; a slower earlier answer is dropped.
+let relatedRequestSeq = 0;
+
+const clearRelatedResources = () => {
+  relatedRequestSeq++;
+  relatedResources.value = [];
+  selectedResourceWithTrace.value = null;
+  isLoadingRelatedResources.value = false;
+};
+
 /**
  * Fetch resources related to an action by action_id
  * Resources triggered by an action will have the same action_id
+ * A failed request without an action lists the resources of its view instead
  */
 const fetchRelatedResources = async () => {
-  if (!props.rawEvent?.action_id || !props.sessionId) return;
+  if (!canFetchRelated(props.event?.type) || !props.sessionId) {
+    // Nothing to fetch, so nothing of the previous event may stay.
+    clearRelatedResources();
+    return;
+  }
 
+  const seq = ++relatedRequestSeq;
   isLoadingRelatedResources.value = true;
   relatedResources.value = [];
+  selectedResourceWithTrace.value = null;
 
   try {
     const req = {
       query: {
-        sql: `select * from "_rumdata" where (${sqlLike("action_id", props.rawEvent.action_id)} or ${sqlEquals("action_id", props.rawEvent.action_id)}) order by ${store.state.zoConfig.timestamp_column} desc`,
-        start_time: props.rawEvent.date * 1000, // 5 mins/360 seconds before action
-        end_time: props.rawEvent.date * 1000 + 360000000, // 5 mins/360 seconds after action
+        ...relatedResourcesRequest(),
         from: 0,
         size: 50,
       },
@@ -599,30 +736,162 @@ const fetchRelatedResources = async () => {
       },
       "RUM",
     );
+    if (seq !== relatedRequestSeq) return;
 
     relatedResources.value = res.data.hits || [];
+    if (
+      isFailedRequest.value &&
+      props.rawEvent?.type === "resource" &&
+      !relatedResources.value.some(isClickedRequest)
+    ) {
+      relatedResources.value = [props.rawEvent, ...relatedResources.value];
+    }
 
-    // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find((r: any) => rumField(r, "trace_id"));
+    // Auto-select first resource with trace_id for trace correlation, the clicked request first for a failed one
+    const resourceWithTrace =
+      relatedResources.value.find((r: any) => isClickedRequest(r) && rumField(r, "trace_id")) ??
+      relatedResources.value.find((r: any) => rumField(r, "trace_id"));
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
   } catch {
     // Failed to fetch related resources
   } finally {
-    isLoadingRelatedResources.value = false;
+    if (seq === relatedRequestSeq) isLoadingRelatedResources.value = false;
   }
 };
 
 watch(
   () => props.event,
   (val) => {
-    if (val?.type === "action" && props.rawEvent?.action_id) {
+    if (canFetchRelated(val?.type)) {
       fetchRelatedResources();
+    } else {
+      clearRelatedResources();
     }
   },
   { immediate: true },
 );
+
+const failedRequestTraceId = computed(() => rumField(props.rawEvent, "trace_id") || "");
+
+const TIMING_PHASES = [
+  { name: "dns", label: "rum.playerEvents.timingDns" },
+  { name: "connect", label: "rum.playerEvents.timingConnect" },
+  { name: "ssl", label: "rum.playerEvents.timingSsl" },
+  { name: "first_byte", label: "rum.playerEvents.timingFirstByte" },
+  { name: "download", label: "rum.playerEvents.timingDownload" },
+] as const;
+
+// A phase is either flattened to <name>_duration or kept as an object (or its JSON text) with a duration.
+const phaseNs = (name: string): number | null => {
+  const row = props.rawEvent ?? {};
+  let value: any = row[`resource_${name}_duration`] ?? row[`resource_${name}`];
+  if (typeof value === "string" && value.trim().startsWith("{")) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (value && typeof value === "object") value = value.duration;
+  if (value === null || value === undefined || value === "") return null;
+  const ns = Number(value);
+  return Number.isFinite(ns) ? ns : null;
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`;
+};
+
+const failedRequestFields = computed(() => {
+  const raw = props.rawEvent ?? {};
+  const fields: { key: string; label: string; lines: string[]; hint?: string }[] = [];
+  const add = (
+    key: string,
+    label: string,
+    lines: (string | undefined | null | false)[],
+    hint?: string,
+  ) => {
+    const shown = lines.filter((line): line is string => !!line);
+    if (shown.length) fields.push({ key, label, lines: shown, hint });
+  };
+
+  const code = raw.resource_status_code;
+  const aborted = raw.context_aborted === true || raw.context_aborted === "true";
+  const browserStatus =
+    code === undefined || code === null || code === ""
+      ? ""
+      : Number(code) === 0
+        ? t("rum.playerEvents.noResponseStatus")
+        : String(code);
+  add("browser-status", t("rum.playerEvents.browserStatus"), [
+    browserStatus &&
+      (aborted ? `${browserStatus}, ${t("rum.playerEvents.abortedByApp")}` : browserStatus),
+  ]);
+
+  const lookup = props.event?.server_lookup;
+  const service = props.event?.server_service;
+  const serverStatus =
+    lookup === "found" && props.event?.server_status
+      ? service
+        ? `${props.event.server_status} (${service})`
+        : String(props.event.server_status)
+      : lookup === "no_server_span"
+        ? t("rum.playerEvents.noServerSpanFound")
+        : lookup === "no_trace"
+          ? t("rum.playerEvents.unknownNoTrace")
+          : t("rum.playerEvents.unknown");
+  add(
+    "server-status",
+    t("rum.playerEvents.serverStatus"),
+    [serverStatus],
+    lookup === "no_server_span" ? t("rum.playerEvents.noServerSpanHint") : undefined,
+  );
+
+  add("method", t("rum.playerEvents.method"), [
+    raw.resource_method && String(raw.resource_method).toUpperCase(),
+  ]);
+  add("url", t("rum.playerEvents.url"), [raw.resource_url]);
+
+  const duration = Number(raw.resource_duration);
+  add("duration", t("rum.playerEvents.duration"), [
+    raw.resource_duration !== undefined &&
+      raw.resource_duration !== null &&
+      raw.resource_duration !== "" &&
+      Number.isFinite(duration) &&
+      formatDuration(duration / 1000000),
+  ]);
+
+  add(
+    "timing",
+    t("rum.playerEvents.timing"),
+    TIMING_PHASES.map(({ name, label }) => {
+      const ns = phaseNs(name);
+      return ns === null ? "" : `${t(label)}: ${formatDuration(ns / 1000000)}`;
+    }),
+  );
+
+  const size = Number(raw.resource_size);
+  add("size", t("rum.playerEvents.size"), [
+    raw.resource_size !== undefined &&
+      raw.resource_size !== null &&
+      raw.resource_size !== "" &&
+      Number.isFinite(size) &&
+      formatBytes(size),
+  ]);
+
+  const actionIds = requestActionIds(raw.action_id);
+  add("initiated-by", t("rum.playerEvents.initiatedBy"), [
+    actionIds.length > 0 &&
+      (raw.action_type && raw.action_target_name
+        ? t("rum.actionOnTarget", { action: raw.action_type, target: raw.action_target_name })
+        : actionIds.join(", ")),
+    raw.view_url && `${t("rum.playerEvents.view")}: ${raw.view_url}`,
+  ]);
+  return fields;
+});
 
 const viewResourceDetails = (resource: any) => {
   // Update selected resource for trace correlation
