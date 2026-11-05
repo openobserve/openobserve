@@ -478,6 +478,42 @@
                 <OText v-else variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
               </div>
 
+              <div
+                v-if="webhookEnabled && mailDestinations.length && !mailBannerDismissed"
+                class="border-border-default bg-surface-panel rounded-default flex items-center gap-2 border p-2 text-sm"
+                role="status"
+                data-test="oncall-policy-mail-banner"
+              >
+                <span class="flex-1">{{
+                  t("oncall.policyMailBanner", { names: mailDestinations.join(", ") })
+                }}</span>
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  data-test="oncall-policy-mail-banner-dismiss"
+                  @click="dismissMailBanner"
+                  >{{ t("common.dismiss") }}</OButton
+                >
+              </div>
+
+              <div
+                v-if="templateEnabled"
+                class="flex flex-wrap items-start gap-2"
+                data-test="oncall-policy-template"
+              >
+                <OText variant="label" class="w-32 shrink-0 pt-2">
+                  {{ t("alerts.templateOverride.label") }}
+                </OText>
+                <div class="w-72">
+                  <TemplateOverridePicker
+                    kind="on_call"
+                    :model-value="templateOverride"
+                    :destinations="templateDestinations"
+                    @update:model-value="templateOverride = $event"
+                  />
+                </div>
+              </div>
+
               <!-- C15/C16: WHERE the team is talked to, beside the policy list it
                      can override. `source` makes precedence visible — "I set the team
                      channel and pages still go to the old room" has to be answerable
@@ -617,6 +653,7 @@ import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -688,6 +725,7 @@ const emit = defineEmits<{
 interface PolicyDraftData {
   rungs: PriorityRung[];
   destinations: string[];
+  template?: string | null;
   repeatCount: number;
   finalAction: PolicyFinalAction;
   l0: L0Policy | null;
@@ -722,6 +760,31 @@ const teamMembers = computed(() => memberOptions.value.map((m) => m.value));
 /// preview then reports as a step reaching nobody.
 const onCallNow = ref<OnCallPosition[]>([]);
 const destinations = ref<string[]>([]);
+const templateOverride = ref<string | null>(null);
+// Destination name -> transport, for the mail banner and the picker's fit warning.
+const destinationTypes = ref<Record<string, string>>({});
+const mailDestinations = computed(() =>
+  destinations.value.filter((name) =>
+    ["email", "sns"].includes(destinationTypes.value[name] ?? ""),
+  ),
+);
+const mailBannerKey = computed(() => `oncall-mail-banner:${props.teamId}`);
+const mailBannerDismissed = ref(false);
+const readMailBanner = () => {
+  try {
+    mailBannerDismissed.value = localStorage.getItem(mailBannerKey.value) === "1";
+  } catch {
+    mailBannerDismissed.value = false;
+  }
+};
+const dismissMailBanner = () => {
+  mailBannerDismissed.value = true;
+  try {
+    localStorage.setItem(mailBannerKey.value, "1");
+  } catch {
+    // The banner shows again next time; nothing else depends on it.
+  }
+};
 /// Both are part of the ladder's shape, so both are draft state — reading them
 /// off `props.policy` is what made them read-only.
 const repeatCount = ref(1);
@@ -780,6 +843,24 @@ const teamChannelDirty = computed(() =>
     : JSON.stringify([...teamChannelDraft.value].sort()) !==
       JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
 );
+
+// The policy's list stands while the team has none of its own, as team_channel does on the server.
+const roomDestinations = computed(() =>
+  channelBackToPolicy.value || (teamChannel.value?.source === "policy" && !teamChannelDirty.value)
+    ? destinations.value
+    : teamChannelDraft.value,
+);
+
+// Room posts render with the policy's template too, so the picker shows without a webhook rung.
+const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.value.length > 0);
+
+const templateDestinations = computed(() => {
+  const paged = webhookEnabled.value ? destinations.value : [];
+  return [...new Set([...paged, ...roomDestinations.value])].map((name) => ({
+    name,
+    type: destinationTypes.value[name],
+  }));
+});
 
 // Picking a destination after "Use the policy's list" makes the list the team's own again.
 watch(teamChannelDraft, (draft) => {
@@ -1124,6 +1205,8 @@ function reset() {
   pendingUserStep.value = null;
   pendingRotation.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
+  templateOverride.value = props.policy?.template ?? null;
+  readMailBanner();
   // `repeat_count` 1 means the ladder runs once; there is no zero.
   repeatCount.value = props.policy?.repeat_count ?? 1;
   finalAction.value = props.policy?.final_action ?? "stop";
@@ -1135,6 +1218,7 @@ function reset() {
 const policyContent = (): PolicyDraftData => ({
   rungs: draft.value,
   destinations: destinations.value,
+  template: templateOverride.value,
   repeatCount: repeatCount.value,
   finalAction: finalAction.value,
   l0: l0Touched.value ? l0Draft.value : null,
@@ -1149,6 +1233,7 @@ const markOpened = () => {
 function applyPolicyDraft(data: PolicyDraftData) {
   draft.value = data.rungs;
   destinations.value = data.destinations;
+  templateOverride.value = data.template ?? null;
   repeatCount.value = data.repeatCount;
   finalAction.value = data.finalAction;
   l0Draft.value = data.l0;
@@ -1173,6 +1258,7 @@ const policyDraft = useEditorDraft<PolicyDraftData>({
     repeat_count: props.policy?.repeat_count ?? 1,
     final_action: props.policy?.final_action ?? "stop",
     l0: props.policy?.l0 ?? null,
+    template: props.policy?.template ?? null,
   }),
   hasChanges: () => !!props.open && stableStringify(policyContent()) !== contentAtOpen,
   save: () => save(),
@@ -1249,6 +1335,9 @@ async function fetchDestinations() {
       destinationsQuery(orgId.value, "alert", false, ["jira"]),
     );
     // A Slack app destination cannot carry a page; the team's room is a webhook (7.1).
+    destinationTypes.value = Object.fromEntries(
+      list.map((d: { name: string; type?: string }) => [d.name, d.type ?? ""]),
+    );
     availableDestinations.value = list
       .filter((d: { type?: string }) => !isSlackAppDestination(d))
       .map((d: { name: string }) => d.name)
@@ -1334,6 +1423,7 @@ async function save(): Promise<boolean> {
     await savePolicyWrite.mutateAsync({
       rungs: draft.value,
       destinations: destinations.value,
+      template: templateOverride.value,
       repeat_count: repeatCount.value,
       final_action: finalAction.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),

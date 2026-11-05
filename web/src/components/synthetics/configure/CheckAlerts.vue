@@ -20,6 +20,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -40,6 +41,13 @@ const localDestinations = computed({
   get: () => props.check.notifications.destinations,
   set: (v: string[]) =>
     emit("update:check", { ...props.check, notifications: { destinations: v } }),
+});
+
+// ─── template override ────────────────────────────────────────────────────────
+
+const templateOverride = computed({
+  get: () => props.check.template ?? null,
+  set: (v: string | null) => emit("update:check", { ...props.check, template: v }),
 });
 
 // ─── failure threshold ────────────────────────────────────────────────────────
@@ -85,6 +93,25 @@ const silenceMinutes = computed({
         @update:destinations="localDestinations = $event"
         @refresh="emit('refresh:destinations')"
       />
+
+      <div
+        v-if="localDestinations.length"
+        class="flex flex-wrap items-start gap-2"
+        data-test="synthetics-check-alerts-template"
+      >
+        <label class="text-text-heading flex h-9 w-47.5 items-center font-semibold">{{
+          t("alerts.templateOverride.label")
+        }}</label>
+        <div class="min-w-0 flex-1 basis-60">
+          <TemplateOverridePicker
+            kind="synthetics"
+            :model-value="templateOverride"
+            :destinations="localDestinations"
+            :server-error="props.validationErrors?.template ?? null"
+            @update:model-value="templateOverride = $event"
+          />
+        </div>
+      </div>
 
       <!-- ── Alert threshold ──────────────────────────────────────────── -->
       <div class="flex flex-nowrap items-center gap-2">

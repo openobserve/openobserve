@@ -1037,6 +1037,9 @@ pub struct AckResponse {
     /// The downtime that muted this run; server-side only, since the ack body goes to a probe.
     #[serde(skip)]
     pub suppressed_by: Option<String>,
+    /// The check's template override; server-side only.
+    #[serde(skip)]
+    pub template: Option<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1646,6 +1649,7 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
         suppressed_by: None,
+        template: None,
     }
 }
 
@@ -1887,6 +1891,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         usage_events,
         failing_environments,
         suppressed_by,
+        template: synthetic.template.clone(),
     })
 }
 
