@@ -18,6 +18,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { isFullConfigLoaded } from "@/services/config.queries";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 
 /** Enterprise or cloud plus `alert_calibration_enabled`, the rule of the route guards, the nav gate and the settings item. */
 export function useAlertCalibrationEnabled() {
@@ -40,9 +41,11 @@ export function useLeaveIfAlertCalibrationOff(routeName: "general" | "alertList"
   );
 }
 
-/** Off only once `/config` has loaded, so a load still in flight never bounces the page. */
+/** Off only once `/config` has loaded, so a load still in flight never bounces the page; a license lock renders the page locked instead. */
 export const isAlertCalibrationOff = (zoConfig: Record<string, unknown> | undefined): boolean =>
-  isFullConfigLoaded(zoConfig) && !isAlertCalibrationEnabled(zoConfig);
+  isFullConfigLoaded(zoConfig) &&
+  !isAlertCalibrationEnabled(zoConfig) &&
+  featureState(zoConfig?.features as FeatureStates | undefined, "alerts") !== "locked";
 
 export function isAlertCalibrationEnabled(zoConfig: Record<string, unknown> | undefined): boolean {
   return (

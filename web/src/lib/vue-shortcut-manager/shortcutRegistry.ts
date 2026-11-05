@@ -44,6 +44,8 @@ export interface ShortcutEntry {
   allowInInput?: boolean;
   /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
   skipInInput?: boolean;
+  /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
+  allowInDialog?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -266,8 +268,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
       },
-      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
-      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      // J/K also step through rows while the row-detail drawer is open.
+      {
+        id: "logsNextRow",
+        key: "j",
+        descriptionKey: "shortcuts.actions.logsNextRow",
+        allowInDialog: true,
+      },
+      {
+        id: "logsPrevRow",
+        key: "k",
+        descriptionKey: "shortcuts.actions.logsPrevRow",
+        allowInDialog: true,
+      },
       {
         id: "logsRowFocusMove",
         display: "↑ / ↓",
@@ -490,18 +503,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traceDetail",
     scope: "trace-detail",
+    // Trace details is also embedded in drawers (log detail, service side panel), where these must work.
     shortcuts: [
       {
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
         descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
+        allowInDialog: true,
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
         descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
+        allowInDialog: true,
       },
     ],
   },
@@ -1260,6 +1276,7 @@ export interface ShortcutDef {
   keys?: string[];
   allowInInput?: boolean;
   skipInInput?: boolean;
+  allowInDialog?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1284,6 +1301,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keys: e.keys,
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
+        allowInDialog: e.allowInDialog,
       });
     }
   }

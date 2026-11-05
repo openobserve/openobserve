@@ -3,6 +3,7 @@
 
 import type { SliderProps, SliderEmits, SliderSlots } from "./OSlider.types";
 import { computed, useAttrs, useId } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -28,6 +29,8 @@ const props = withDefaults(defineProps<SliderProps>(), {
 const emit = defineEmits<SliderEmits>();
 
 defineSlots<SliderSlots>();
+
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
@@ -132,14 +135,14 @@ const resolvedSize = computed(() => props.size ?? "md");
     <div
       :class="[
         'relative flex w-full items-center',
-        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+        isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       ]"
     >
       <div
         :class="[
           'absolute right-0 left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+          isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
         ]"
         aria-hidden="true"
       />
@@ -147,7 +150,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'absolute left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+          isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
         ]"
         :style="{ width: fillPercent + '%' }"
         aria-hidden="true"
@@ -161,7 +164,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :max="max"
         :step="step"
         :value="currentValue"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         :class="[
@@ -169,7 +172,7 @@ const resolvedSize = computed(() => props.size ?? "md");
           'relative z-10 m-0 w-full appearance-none bg-transparent',
           'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
           trackHeight[resolvedSize],
-          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+          isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         ]"
         @input="handleInput"
         @change="handleChange"
@@ -181,7 +184,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'border-slider-thumb-border pointer-events-none absolute rounded-full border-2',
           thumbSize[resolvedSize],
-          disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+          isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"
         :style="{
           left: `calc(${fillPercent}% - ${thumbHalf[resolvedSize]})`,

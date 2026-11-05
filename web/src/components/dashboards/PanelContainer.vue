@@ -481,7 +481,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("panel.downloadAsJSON") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
+              "
+              disabled
+              focusable-unavailable
+              icon-left="lock"
+              :description="goToLogsLockedReason"
+              data-test="dashboard-move-to-logs-module"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               :disabled="props.data.queryType != 'sql'"
               data-test="dashboard-move-to-logs-module"
               @select="onLogPanel"
@@ -720,6 +732,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { supportsResultSchema } from "@/utils/crossLinking";
+import { buildPanelLogsQuery } from "@/utils/dashboard/panelLogsQuery";
 import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
@@ -752,6 +766,8 @@ import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -1155,6 +1171,7 @@ export default defineComponent({
       queryDetails: any,
       currentUrl: string,
       vrlFunctionQueryEncoded: string,
+      showHistogram: boolean,
     ) => {
       const logsUrl = new URL(currentUrl + "/logs");
       logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
@@ -1177,9 +1194,34 @@ export default defineComponent({
       } else {
         logsUrl.searchParams.set("quick_mode", "false");
       }
-      logsUrl.searchParams.set("show_histogram", "false");
+      logsUrl.searchParams.set("show_histogram", showHistogram ? "true" : "false");
       return logsUrl;
     };
+
+    // null = keep the executed query, since the WHERE could not be read or rebuilt safely.
+    const buildLogsRowsQuery = async (
+      queryDetails: any,
+      query: string,
+      streamName: string,
+    ): Promise<string | null> => {
+      const renderer = PanleSchemaRendererRef.value;
+      // The panel's VRL was written for its result columns, which raw log rows don't have.
+      if (queryDetails.queries[0]?.vrlFunctionQuery?.trim()) return null;
+      if (!supportsResultSchema(queryDetails.queries[0]?.fields?.stream_type) || !renderer) {
+        return null;
+      }
+      await renderer.ensureDrilldownSchema(0, true);
+      return buildPanelLogsQuery(query, streamName, renderer.panelBaseWhere ?? "");
+    };
+
+    const licenseLocks = useLicenseLocks();
+    const goToLogsFeature = computed(() =>
+      streamTypeFeature(props.data?.queries?.[0]?.fields?.stream_type),
+    );
+    const goToLogsLocked = computed(() => licenseLocks.isLocked(goToLogsFeature.value));
+    const goToLogsLockedReason = computed(() =>
+      goToLogsFeature.value ? licenseLocks.lockedReason(goToLogsFeature.value) : raw(""),
+    );
 
     const onLogPanel = async () => {
       const showNotification = showPositiveNotification(
@@ -1194,11 +1236,10 @@ export default defineComponent({
       const { originalQuery, streamName } = getOriginalQueryAndStream(queryDetails, metaData) || {};
       if (!originalQuery || !streamName) return;
 
-      let modifiedQuery = originalQuery;
+      const executedQuery = originalQuery.replace(/`/g, '"');
+      const rowsQuery = await buildLogsRowsQuery(queryDetails, executedQuery, streamName);
 
-      modifiedQuery = modifiedQuery.replace(/`/g, '"');
-
-      const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+      const encodedQuery: any = b64EncodeUnicode((rowsQuery ?? executedQuery).replace(/`/g, '"'));
 
       const vrlFunctionQuery = queryDetails.queries[0]?.vrlFunctionQuery;
       const vrlFunctionQueryEncoded: any = b64EncodeUnicode(vrlFunctionQuery);
@@ -1215,6 +1256,7 @@ export default defineComponent({
         queryDetails,
         currentUrl,
         vrlFunctionQueryEncoded,
+        rowsQuery !== null,
       );
 
       // Use short_url service to shorten the URL and redirect
@@ -1548,6 +1590,8 @@ export default defineComponent({
 
     return {
       props,
+      goToLogsLocked,
+      goToLogsLockedReason,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,

@@ -73,6 +73,8 @@ pub struct Model {
     /// Data-time of the delivered alert still owed a recovery message, in microseconds.
     /// NULL means none is owed — this is pending state, not a log of the last recovery sent.
     pub last_recovery_notified_at: Option<i64>,
+    /// The template override by name; NULL uses the destination's template.
+    pub template: Option<String>,
     /// Start of this region's in-flight detection run; NULL or expired means free.
     #[serde(skip)]
     pub detection_lease_us: Option<i64>,
@@ -149,6 +151,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1000,

@@ -15,7 +15,9 @@
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
 import { toZonedTime } from "date-fns-tz";
-import type { TranslateFn } from "@/types/i18n";
+import type { I18nText, TranslateFn } from "@/types/i18n";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
@@ -26,7 +28,7 @@ import {
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
-import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { isCrossLinkingEnabledForStream, supportsResultSchema } from "@/utils/crossLinking";
 import useStreams from "@/composables/useStreams";
 import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
@@ -112,6 +114,21 @@ export function usePanelDrilldown({
   const panelWhereByStream = ref<Record<string, string>>({});
 
   const drilldownArray: any = ref([]);
+
+  const licenseLocks = useLicenseLocks();
+
+  /** Why a drilldown item cannot open: its in-app logs, metrics or traces target is not licensed. */
+  const drilldownLockedReason = (item: any): I18nText | null => {
+    let feature: string | null = null;
+    if (item?._isCrossLink) {
+      feature = inAppSignalFeature(item?.data?._rawUrl);
+    } else if (item?.type === "logs") {
+      feature = streamTypeFeature(panelSchema.value?.queries?.[0]?.fields?.stream_type);
+    } else if (item?.type === "byUrl") {
+      feature = inAppSignalFeature(item?.data?.url);
+    }
+    return feature && licenseLocks.isLocked(feature) ? licenseLocks.lockedReason(feature) : null;
+  };
 
   // need to save click event params, to open drilldown
   let drilldownParams: any = [];
@@ -743,6 +760,7 @@ export function usePanelDrilldown({
 
     // Handle cross-link items (they exist in drilldownArray but not in panelSchema.config.drilldown)
     const drilldownItem = drilldownArray.value[index];
+    if (drilldownLockedReason(drilldownItem)) return;
     if (drilldownItem?._isCrossLink) {
       try {
         const rawUrl = drilldownItem.data._rawUrl;
@@ -1289,28 +1307,32 @@ export function usePanelDrilldown({
   // Fetch cross-links + WHERE for the clicked query, once, on demand, and apply them to the
   // shared refs. Concurrent callers of the same query share the in-flight promise; a repeat
   // click on a query already fetched hits the cache. `queryIndex` selects the multi-query cell.
-  const ensureDrilldownSchema = async (queryIndex = 0): Promise<void> => {
+  // `needWhere` fetches the panel WHERE even with cross-linking off; chart clicks need only links.
+  const ensureDrilldownSchema = async (queryIndex = 0, needWhere = false): Promise<void> => {
     const query =
       metadata.value?.queries?.[queryIndex]?.query ||
       panelSchema.value?.queries?.[queryIndex]?.query ||
       "";
-    // Cross-linking is only supported for logs streams; skip the result_schema call for panels
-    // backed by other stream types (metrics, traces, enrichment_tables) to avoid failing requests.
-    const crossLinkStreamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    // result_schema errors for non-logs streams (metrics, traces, enrichment_tables).
+    const streamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    const crossLinking = isCrossLinkingEnabledForStream(store.state.zoConfig, streamType);
     if (
-      !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
+      !supportsResultSchema(streamType) ||
+      !(crossLinking || needWhere) ||
       !query ||
       panelSchema.value?.queryType === "promql"
     ) {
       applyDrilldownSchema(EMPTY_SCHEMA);
       return;
     }
-    const cached = schemaCache.get(query);
+    // Keyed by the cross-linking flag too, so a WHERE-only result never hides links later.
+    const cacheKey = `${crossLinking}:${query}`;
+    const cached = schemaCache.get(cacheKey);
     if (cached) {
       applyDrilldownSchema(cached);
       return;
     }
-    const inFlight = schemaInFlight.get(query);
+    const inFlight = schemaInFlight.get(cacheKey);
     if (inFlight) return inFlight;
     const fetchPromise = (async () => {
       try {
@@ -1331,24 +1353,27 @@ export function usePanelDrilldown({
             },
             page_type: "dashboards",
             is_streaming: false,
-            cross_linking: true,
+            cross_linking: crossLinking,
           },
           "dashboards",
         );
         const schema: DrilldownSchema = {
-          crossLinks: response.data?.cross_links || { stream_links: [], org_links: [] },
+          crossLinks: (crossLinking && response.data?.cross_links) || {
+            stream_links: [],
+            org_links: [],
+          },
           baseWhere: response.data?.where_clause ?? "",
           whereByStream: response.data?.where_by_stream ?? {},
         };
-        schemaCache.set(query, schema);
+        schemaCache.set(cacheKey, schema);
         applyDrilldownSchema(schema);
       } catch {
         applyDrilldownSchema(EMPTY_SCHEMA);
       } finally {
-        schemaInFlight.delete(query);
+        schemaInFlight.delete(cacheKey);
       }
     })();
-    schemaInFlight.set(query, fetchPromise);
+    schemaInFlight.set(cacheKey, fetchPromise);
     return fetchPromise;
   };
 
@@ -1367,6 +1392,7 @@ export function usePanelDrilldown({
     crossLinksData,
     onChartClick,
     openDrilldown,
+    drilldownLockedReason,
     hidePopupsAndOverlays,
     parser,
     interval,
@@ -1381,4 +1407,21 @@ export function usePanelDrilldown({
     panelWhereByStream,
     ensureDrilldownSchema,
   };
+}
+
+const SIGNAL_PAGES = new Set(["logs", "metrics", "traces"]);
+
+/** License key of a drilldown URL that opens this app's logs, metrics or traces page; null for any other URL. */
+function inAppSignalFeature(url: unknown): string | null {
+  if (typeof url !== "string" || !url) return null;
+  let target: URL;
+  try {
+    target = new URL(url, window.location.origin);
+  } catch {
+    return null;
+  }
+  if (target.origin !== window.location.origin) return null;
+  const page = target.pathname.split("/").find((segment) => SIGNAL_PAGES.has(segment));
+  if (!page) return null;
+  return streamTypeFeature(page === "logs" ? target.searchParams.get("stream_type") : page);
 }

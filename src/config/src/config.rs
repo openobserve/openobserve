@@ -133,8 +133,17 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 133: add status page run streaks to synthetics.
 // 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
 // 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
-// 136: add alerts.incident_title_template.
-pub const DB_SCHEMA_VERSION: u64 = 136;
+// 136: add applies_to to templates.
+// 137: rename user templates under the reserved o2_default_ prefix.
+// 138: add template to anomaly_detection_config.
+// 139: add template to synthetics.
+// 140: add template to oncall_policies.
+// 141: add templates to downtime_notifications.
+// 142: add templates to oncall_response_events.
+// 143: fold the retired compiled default templates into prebuilt_default.
+// 144: turn a json templates column from an earlier 141 or 142 into text.
+// 145: add alerts.incident_title_template.
+pub const DB_SCHEMA_VERSION: u64 = 145;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2864,6 +2873,12 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    #[env_config(
+        name = "ZO_OVERVIEW_CACHE_TTL",
+        default = 30,
+        help = "Seconds the org overview response is cached per caller; 0 disables the cache."
+    )]
+    pub overview_cache_ttl: u64,
     // How long an o2-ai session->owner claim survives. Must exceed the longest
     // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
     #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds

@@ -27,14 +27,14 @@ const micros = (iso: string) => Date.parse(iso) * 1000;
 const HISTORY_KEY = timeRangeHistoryKey("default", "example@gmail.com");
 
 const CALENDAR_IDS = [
-  "yesterday",
   "today",
-  "last-week",
+  "yesterday",
   "this-week",
-  "last-month",
+  "last-week",
   "this-month",
-  "last-quarter",
+  "last-month",
   "this-quarter",
+  "last-quarter",
 ];
 
 const SELECTED_CLASS = "bg-button-primary!";
@@ -97,19 +97,105 @@ describe("DateTime rail", () => {
   });
 
   describe("layout", () => {
-    it("shows Recent and the eight calendar ranges beside the unchanged picker", async () => {
+    it("hides the Recent section when empty and shows the eight calendar ranges beside the picker", async () => {
       createWrapper();
       await openMenu();
 
       expect(el("date-time-rail")).not.toBeNull();
-      expect(el("date-time-rail-recent-empty")?.textContent?.trim()).toBe(
-        "Ranges you apply will show up here.",
-      );
+      expect(el("date-time-rail-recent-group")).toBeNull();
+      expect(el("date-time-rail-recent-header")).toBeNull();
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).not.toBeNull();
-      expect(calendarItem("today")?.textContent?.trim()).toBe("Today");
-      expect(calendarItem("last-month")?.textContent?.trim()).toBe("Last month");
+      expect(calendarItem("today")?.textContent).toContain("Today");
+      expect(calendarItem("last-month")?.textContent).toContain("Last month");
+      expect(el("date-time-rail-calendar-today-hint")?.textContent).toBe("Oct 8");
+      expect(el("date-time-rail-calendar-yesterday-hint")?.textContent).toBe("Oct 7");
+      expect(el("date-time-rail-calendar-this-month-hint")?.textContent).toBe("Oct");
+      expect(el("date-time-rail-calendar-last-quarter-hint")?.textContent).toBe("Q3");
+      expect(
+        Array.from(document.querySelectorAll("[data-date-time-rail-calendar]")).map((node) =>
+          node.getAttribute("data-test"),
+        ),
+      ).toEqual(CALENDAR_IDS.map((id) => `date-time-rail-calendar-${id}`));
       expect(el("date-time-relative-15-m-btn")).not.toBeNull();
       expect(el("date-time-relative-tab")).not.toBeNull();
+    });
+
+    it("labels the section headers in one muted style", async () => {
+      seedHistory([hourRange(1)]);
+      createWrapper();
+      await openMenu();
+
+      const recent = el("date-time-rail-recent-header")!;
+      const calendar = el("date-time-rail-calendar-header")!;
+      for (const header of [recent, calendar]) {
+        expect(header.className).toContain("text-input-label-text");
+        expect(header.className).toContain("tracking-wide");
+      }
+    });
+
+    it("has no separate rail header cell and gives the rail its own surface", async () => {
+      createWrapper();
+      await openMenu();
+
+      expect(el("date-time-rail-header")).toBeNull();
+      expect(el("date-time-rail-frame")?.className).toContain("bg-surface-panel");
+    });
+
+    it("keeps the remove button always visible", async () => {
+      seedHistory([hourRange(1)]);
+      createWrapper();
+      await openMenu();
+
+      expect(el("date-time-rail-recent-0-remove")?.className).not.toContain("opacity-0");
+      expect(el("date-time-rail-recent-0-remove")?.className).toContain("text-text-secondary!");
+    });
+
+    it("switches Relative and Absolute from the segmented control", async () => {
+      createWrapper();
+      await openMenu();
+
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+      expect(el("date-time-absolute-tab")?.getAttribute("data-state")).toBe("on");
+
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+
+      el("date-time-relative-tab")!.click();
+      await flushPromises();
+      expect(wrapper!.vm.selectedType).toBe("relative");
+    });
+
+    it("gives every timezone option a UTC offset suffix and the zone name as its list label", async () => {
+      createWrapper({ autoApply: false });
+      await openMenu();
+
+      const options = wrapper!.vm.timezoneSelectOptions as {
+        label: string;
+        listLabel?: string;
+        suffix?: string;
+        value: string;
+      }[];
+      const kolkata = options.find((o) => o.value === "Asia/Calcutta")!;
+      expect(kolkata.suffix).toBe("UTC+05:30");
+      expect(kolkata.listLabel).toBe("Asia/Calcutta");
+      expect(kolkata.label).toBe("Asia/Calcutta (UTC+05:30)");
+      expect(options.find((o) => o.value === "UTC")?.suffix).toBe("UTC+00:00");
+      expect(options.every((o) => o.suffix?.startsWith("UTC"))).toBe(true);
+    });
+
+    it("has no Cancel button and shows the timezone offset", async () => {
+      createWrapper({ autoApply: false });
+      await openMenu();
+
+      wrapper!.vm.timezone = IST;
+      await flushPromises();
+      expect(el("datetime-timezone-select-trigger")?.textContent).toContain(
+        "Asia/Calcutta (UTC+05:30)",
+      );
+      expect(el("date-time-apply-btn")).not.toBeNull();
     });
 
     it("keeps Recent but drops the calendar section without calendarPresets", async () => {
@@ -119,6 +205,16 @@ describe("DateTime rail", () => {
       expect(el("date-time-rail")).not.toBeNull();
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).toBeNull();
       expect(wrapper!.vm.calendarRailItems).toBeNull();
+    });
+
+    it("explains the empty Recent list when there is no calendar to fill the rail", async () => {
+      createWrapper({ calendarPresets: false });
+      await openMenu();
+
+      expect(el("date-time-rail-recent-empty")?.textContent?.trim()).toBe(
+        "Ranges you apply will show up here.",
+      );
+      expect(el("date-time-rail-keys-hint")).toBeNull();
     });
 
     it("has no rail on a date-only picker", async () => {
@@ -182,7 +278,7 @@ describe("DateTime rail", () => {
       expect(calendarItem("last-quarter")?.disabled).toBe(true);
     });
 
-    it("moves between rail items with the arrow keys, pairing calendar rows two at a time", async () => {
+    it("moves between rail items with Up and Down, one calendar row at a time", async () => {
       seedHistory([hourRange(1)]);
       createWrapper();
       await openMenu();
@@ -194,19 +290,17 @@ describe("DateTime rail", () => {
         return document.activeElement?.getAttribute("data-test");
       };
 
-      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe(
+      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe("date-time-rail-calendar-today");
+      expect(press("date-time-rail-calendar-today", "ArrowDown")).toBe(
         "date-time-rail-calendar-yesterday",
       );
-      expect(press("date-time-rail-calendar-yesterday", "ArrowRight")).toBe(
-        "date-time-rail-calendar-today",
-      );
-      expect(press("date-time-rail-calendar-today", "ArrowDown")).toBe(
+      expect(press("date-time-rail-calendar-yesterday", "ArrowDown")).toBe(
         "date-time-rail-calendar-this-week",
       );
-      expect(press("date-time-rail-calendar-this-week", "ArrowLeft")).toBe(
-        "date-time-rail-calendar-last-week",
+      expect(press("date-time-rail-calendar-this-week", "ArrowUp")).toBe(
+        "date-time-rail-calendar-yesterday",
       );
-      expect(press("date-time-rail-calendar-yesterday", "ArrowUp")).toBe("date-time-rail-recent-0");
+      expect(press("date-time-rail-calendar-today", "ArrowUp")).toBe("date-time-rail-recent-0");
       expect(press("date-time-rail-calendar-last-quarter", "ArrowDown")).toBe(
         "date-time-rail-calendar-last-quarter",
       );
@@ -740,12 +834,15 @@ describe("DateTime rail", () => {
       await flushPromises();
       await openMenu();
 
-      expect(el("date-time-rail-recent-0")?.textContent?.trim()).toBe(
-        "2026/10/08 04:30:00 - 2026/10/08 05:00:00",
+      expect(el("date-time-rail-recent-0")?.getAttribute("aria-label")).toBe(
+        "Oct 8 · 04:30–05:00 (2026/10/08 04:30:00 - 2026/10/08 05:00:00)",
       );
-      expect(el("date-time-rail-recent-1")?.textContent?.trim()).toBe(
-        "2026/10/06 23:30:00 - 2026/10/06 23:59:59",
+      expect(el("date-time-rail-recent-0")?.textContent).toContain("Oct 8");
+      expect(el("date-time-rail-recent-0-duration")?.textContent).toBe("30m");
+      expect(el("date-time-rail-recent-1")?.getAttribute("aria-label")).toBe(
+        "Oct 6 · 23:30–23:59 (2026/10/06 23:30:00 - 2026/10/06 23:59:59)",
       );
+      expect(el("date-time-rail-recent-1")?.textContent).toContain("Oct 6");
 
       el("date-time-rail-recent-1")!.click();
       await flushPromises();
@@ -798,7 +895,7 @@ describe("DateTime rail", () => {
       const remove = el("date-time-rail-recent-1-remove")!;
       expect(document.activeElement).toBe(remove);
       expect(remove.getAttribute("aria-label")).toBe(
-        `Remove ${row.textContent?.trim()} from recent ranges`,
+        `Remove ${row.getAttribute("aria-label")} from recent ranges`,
       );
 
       key(remove, "ArrowLeft");
@@ -833,7 +930,7 @@ describe("DateTime rail", () => {
 
       expect(storedHistory()).toEqual([]);
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-yesterday",
+        "date-time-rail-calendar-today",
       );
     });
 
@@ -880,10 +977,10 @@ describe("DateTime rail", () => {
       press("ArrowDown");
       await flushPromises();
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-yesterday",
+        "date-time-rail-calendar-today",
       );
-      expect(tabbable()).toEqual(["date-time-rail-calendar-yesterday"]);
-      expect(el("date-time-relative-tab")?.getAttribute("tabindex")).not.toBe("-1");
+      expect(tabbable()).toEqual(["date-time-rail-calendar-today"]);
+      expect(el("date-time-type-toggle")?.getAttribute("tabindex")).toBe("0");
     });
 
     it("opens on the first calendar item when there is no recent range", async () => {
@@ -891,7 +988,7 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-yesterday",
+        "date-time-rail-calendar-today",
       );
     });
 

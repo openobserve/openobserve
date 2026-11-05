@@ -454,6 +454,22 @@ describe("ImportTemplate", () => {
       expect(wrapper.vm.tempalteCreators[0].success).toBe(true);
     });
 
+    it("keeps the kind and applies_to of an exported content template", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
+
+      await wrapper.vm.createTemplate(
+        { name: "card", type: "http", body: "{}", kind: "content", applies_to: ["anomaly"] },
+        1,
+      );
+
+      expect(templateService.default.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ kind: "content", applies_to: ["anomaly"] }),
+        }),
+      );
+    });
+
     it("trims the name when calling the service", async () => {
       const templateService = await import("@/services/alert_templates");
       vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);

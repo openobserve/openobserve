@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h, nextTick } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 import OButton from "./OButton.vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 import type { ButtonVariant } from "./OButton.types";
 
 describe("OButton", () => {
@@ -41,6 +42,58 @@ describe("OButton", () => {
     }).classes();
     expect(classes).toContain("opacity-60");
   });
+
+  it("row variant lays out start name and end value on an auto-height compact row", () => {
+    const classes = mount(OButton, { props: { variant: "row", block: true } }).classes();
+    for (const c of ["h-auto!", "justify-between!", "gap-3!", "px-0!", "py-1.5!", "text-start"]) {
+      expect(classes).toContain(c);
+    }
+    expect(classes).toContain("focus-visible:ring-3");
+  });
+
+  it("locked-body variant starts and wraps its message on an outlined body", () => {
+    const classes = mount(OButton, { props: { variant: "locked-body", block: true } }).classes();
+    for (const c of [
+      "h-auto!",
+      "justify-start!",
+      "whitespace-normal!",
+      "px-3!",
+      "py-3!",
+      "border",
+    ]) {
+      expect(classes).toContain(c);
+    }
+  });
+
+  it("row and locked-body dim when unavailable but focusable", () => {
+    const row = mount(OButton, {
+      props: { variant: "row", disabled: true, focusableUnavailable: true },
+    }).classes();
+    expect(row).toContain("text-text-disabled");
+    const locked = mount(OButton, {
+      props: { variant: "locked-body", disabled: true, focusableUnavailable: true },
+    }).classes();
+    expect(locked).toContain("opacity-50");
+  });
+
+  it.each(["row", "locked-body"] satisfies ButtonVariant[])(
+    "%s keeps start alignment, focus and aria-disabled when unavailable",
+    async (variant) => {
+      const wrapper = mount(OButton, {
+        props: { variant, disabled: true, focusableUnavailable: true },
+        attachTo: document.body,
+      });
+      expect(wrapper.classes()).toContain("text-start");
+      expect(wrapper.classes()).toContain("focus-visible:ring-3");
+      expect(wrapper.attributes("disabled")).toBeUndefined();
+      expect(wrapper.attributes("aria-disabled")).toBe("true");
+      (wrapper.element as HTMLElement).focus();
+      expect(document.activeElement).toBe(wrapper.element);
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("click")).toBeUndefined();
+      wrapper.unmount();
+    },
+  );
 
   it('defaults to type="button"', () => {
     const wrapper = mount(OButton);
@@ -459,6 +512,8 @@ describe("OButton", () => {
     "tint-purple",
     "tint-blue",
     "tint-orange",
+    "row",
+    "locked-body",
   ] satisfies ButtonVariant[])(
     "preserves native disabled styling for %s when unavailable",
     (variant) => {
@@ -479,7 +534,7 @@ describe("OButton", () => {
           .filter(
             (value) =>
               groups.includes(value.split("-")[0]) &&
-              !/^text-(xs|sm|base|lg|compact|inherit)$/.test(value),
+              !/^text-(xs|sm|base|lg|compact|inherit|start)$/.test(value),
           )
           .sort(),
       ).toEqual(disabledClasses.sort());
@@ -651,6 +706,57 @@ describe("OButton", () => {
       mountIconOnly().unmount();
       vi.advanceTimersByTime(1000);
       expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("lock icon", () => {
+    it.each(["iconLeft", "iconRight"])("paints a %s lock with the locked-icon token", (prop) => {
+      const wrapper = mount(OButton, { props: { [prop]: "lock" }, slots: { default: "Run" } });
+      expect(wrapper.find(".lock-chip").exists()).toBe(true);
+    });
+
+    it("leaves other icons uncoloured", () => {
+      const wrapper = mount(OButton, { props: { iconLeft: "add" }, slots: { default: "Run" } });
+      expect(wrapper.find(".lock-chip").exists()).toBe(false);
+    });
+  });
+
+  describe("inside a license-locked page", () => {
+    const mountLocked = (props: Record<string, unknown> = {}) => {
+      const Locked = defineComponent({
+        setup(_, { slots }) {
+          provideFeatureLock(ref("workflows"));
+          return () => slots.default?.();
+        },
+      });
+      return mount(Locked, {
+        slots: { default: () => h(OButton, { ...props, "data-test": "btn" }, () => "Save") },
+      });
+    };
+
+    it("renders disabled and emits no click", async () => {
+      const wrapper = mountLocked();
+      const button = wrapper.findComponent(OButton);
+      expect(button.attributes("disabled")).toBeDefined();
+      expect(button.attributes("aria-disabled")).toBe("true");
+      await button.trigger("click");
+      expect(button.emitted("click")).toBeUndefined();
+    });
+
+    it("blocks an anchor button, which has no native disabled", async () => {
+      const wrapper = mountLocked({ as: "a", href: "#target" });
+      const button = wrapper.findComponent(OButton);
+      expect(button.classes()).toContain("cursor-not-allowed!");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      button.element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(button.emitted("click")).toBeUndefined();
+    });
+
+    it("stays enabled outside any provider", async () => {
+      const wrapper = mount(OButton, { slots: { default: "Save" } });
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("click")).toHaveLength(1);
     });
   });
 });

@@ -15,10 +15,27 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { gt } from "@/types/i18n";
-import { nextTick } from "vue";
+import { defineComponent, nextTick } from "vue";
+import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import { usePanelDrilldown } from "./usePanelDrilldown";
 
 const resultSchemaMock = vi.fn();
+
+// The license lock reads the injected store, so the composable runs inside a mounted component.
+const withLicense = <T>(features: Record<string, string>, run: () => T): T => {
+  let result!: T;
+  mount(
+    defineComponent({
+      setup() {
+        result = run();
+        return () => null;
+      },
+    }),
+    { global: { plugins: [createStore({ state: { zoConfig: { features } } })] } },
+  );
+  return result;
+};
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -342,6 +359,113 @@ describe("usePanelDrilldown", () => {
         }),
       ),
     );
+  });
+
+  describe("license lock of the logs drilldown target", () => {
+    const logsDrilldownDeps = (streamType: string) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].fields.stream_type = streamType;
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } } as any,
+        { name: "Url", type: "byUrl", data: { url: "https://example.com" } } as any,
+      ];
+      return deps;
+    };
+
+    it.each(["logs", "metrics", "traces"])(
+      "%s locked: that panel's logs drilldown is locked and opens nothing",
+      async (streamType) => {
+        const deps = logsDrilldownDeps(streamType);
+        const api = withLicense({ [streamType]: "locked" }, () => usePanelDrilldown(deps as any));
+        const [logsItem, urlItem] = deps.panelSchema.value.config.drilldown;
+
+        expect(api.drilldownLockedReason(logsItem)).toBeTruthy();
+        expect(api.drilldownLockedReason(urlItem)).toBeNull();
+        api.drilldownArray.value = deps.panelSchema.value.config.drilldown;
+        await api.openDrilldown(0);
+        await nextTick();
+        expect(deps.router.push).not.toHaveBeenCalled();
+        expect(deps.store.dispatch).not.toHaveBeenCalled();
+      },
+    );
+
+    it("another signal locked or a free stream type: the logs drilldown stays live", () => {
+      const logsItem = logsDrilldownDeps("logs").panelSchema.value.config.drilldown[0];
+      const live = (features: Record<string, string>, streamType: string) =>
+        withLicense(features, () =>
+          usePanelDrilldown(logsDrilldownDeps(streamType) as any),
+        ).drilldownLockedReason(logsItem);
+      expect(live({ traces: "locked" }, "logs")).toBeNull();
+      expect(live({ logs: "locked" }, "enrichment_tables")).toBeNull();
+    });
+
+    const byUrl = (url: string) => ({ name: "Go", type: "byUrl", data: { url } });
+    const urlReason = (features: Record<string, string>, url: string) =>
+      withLicense(features, () => usePanelDrilldown(makeDeps() as any)).drilldownLockedReason(
+        byUrl(url),
+      );
+
+    it.each([
+      ["metrics", "/metrics?query_type=promql&stream_name=cpu"],
+      ["traces", "/web/traces?stream=default"],
+      ["logs", "/logs?stream=app"],
+      ["logs", `${window.location.origin}/web/logs?stream_type=logs`],
+      ["metrics", "/logs?stream_type=metrics"],
+    ])("%s locked: a by-URL drilldown to %s is locked and opens nothing", async (key, url) => {
+      expect(urlReason({ [key]: "locked" }, url)).toBeTruthy();
+      const deps = makeDeps();
+      deps.panelSchema.value.config.drilldown = [byUrl(url) as any];
+      const api = withLicense({ [key]: "locked" }, () => usePanelDrilldown(deps as any));
+      api.drilldownArray.value = deps.panelSchema.value.config.drilldown;
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      try {
+        await api.openDrilldown(0);
+        expect(open).not.toHaveBeenCalled();
+      } finally {
+        open.mockRestore();
+      }
+    });
+
+    it("a same-origin cross-link to a locked signal page is locked; external and other cross-links stay live", async () => {
+      const crossLink = (url: string) => ({
+        name: "X",
+        type: "byUrl",
+        _isCrossLink: true,
+        data: { url, _rawUrl: url, _fields: [] },
+      });
+      const reason = (features: Record<string, string>, url: string) =>
+        withLicense(features, () => usePanelDrilldown(makeDeps() as any)).drilldownLockedReason(
+          crossLink(url),
+        );
+      expect(
+        reason({ traces: "locked" }, "/web/traces/trace-details?trace_id=${field.__value}"),
+      ).toBeTruthy();
+      expect(reason({ logs: "locked" }, "/logs?stream=app")).toBeTruthy();
+      expect(reason({}, "/web/traces?trace_id=1")).toBeNull();
+      expect(
+        reason({ traces: "locked" }, "https://traces.example.com/${field.__value}"),
+      ).toBeNull();
+      expect(reason({ traces: "locked" }, "/dashboards/view")).toBeNull();
+
+      const deps = makeDeps();
+      const api = withLicense({ traces: "locked" }, () => usePanelDrilldown(deps as any));
+      api.drilldownArray.value = [crossLink("/web/traces?trace_id=1")];
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      try {
+        await api.openDrilldown(0);
+        expect(open).not.toHaveBeenCalled();
+      } finally {
+        open.mockRestore();
+      }
+    });
+
+    it("by-URL drilldowns stay live when enabled, for a free logs type, or to an external URL", () => {
+      expect(urlReason({}, "/metrics?q=1")).toBeNull();
+      expect(urlReason({ traces: "locked" }, "/metrics?q=1")).toBeNull();
+      expect(urlReason({ logs: "locked" }, "/logs?stream_type=enrichment_tables")).toBeNull();
+      expect(urlReason({ metrics: "locked" }, "https://example.com/metrics")).toBeNull();
+      expect(urlReason({ logs: "locked" }, "/dashboards/view?dashboard=1")).toBeNull();
+    });
   });
 
   it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
@@ -867,6 +991,106 @@ describe("usePanelDrilldown", () => {
 
     expect(resultSchemaMock).not.toHaveBeenCalled();
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
+  });
+
+  describe("panel WHERE lookup vs cross-linking", () => {
+    const schemaWithLinksAndWhere = () =>
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          where_clause: "rev = 1793591100",
+          where_by_stream: { slo_slices: "rev = 1793591100" },
+          cross_links: {
+            stream_links: [{ name: "L", url: "https://x", fields: [{ name: "f", alias: "f" }] }],
+            org_links: [],
+          },
+        },
+      });
+
+    const chartClick = {
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      dataIndex: 0,
+      seriesName: "s",
+      value: ["x", 1],
+    };
+
+    it("fetches the panel WHERE with cross-linking off, without asking for cross-links", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock).toHaveBeenCalledTimes(1);
+      expect(resultSchemaMock.mock.calls[0][0].cross_linking).toBe(false);
+      expect(api.panelBaseWhere.value).toBe("rev = 1793591100");
+      expect(api.panelWhereByStream.value).toEqual({ slo_slices: "rev = 1793591100" });
+      expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
+    });
+
+    it("makes no result_schema call on a chart click with cross-linking off", async () => {
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(chartClick);
+
+      expect(resultSchemaMock).not.toHaveBeenCalled();
+    });
+
+    it("asks for cross-links and gets the WHERE with cross-linking on", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock.mock.calls[0][0].cross_linking).toBe(true);
+      expect(api.panelBaseWhere.value).toBe("rev = 1793591100");
+      expect(api.crossLinksData.value.stream_links).toHaveLength(1);
+    });
+
+    it.each([
+      [
+        "a non-logs stream",
+        (d: any) => (d.panelSchema.value.queries[0].fields.stream_type = "metrics"),
+      ],
+      ["a PromQL panel", (d: any) => (d.panelSchema.value.queryType = "promql")],
+      [
+        "an empty query",
+        (d: any) => {
+          d.panelSchema.value.queries[0].query = "";
+          d.metadata.value.queries[0].query = "";
+        },
+      ],
+    ])("never calls result_schema for %s, even when the WHERE is needed", async (_, setup) => {
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      setup(deps);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock).not.toHaveBeenCalled();
+      expect(api.panelBaseWhere.value).toBe("");
+    });
+
+    it("does not let a WHERE-only cached result hide cross-links once cross-linking is on", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+      await api.ensureDrilldownSchema(0, true);
+      expect(api.crossLinksData.value.stream_links).toHaveLength(0);
+
+      deps.store.state.zoConfig.enable_cross_linking = true;
+      await api.ensureDrilldownSchema();
+
+      expect(resultSchemaMock).toHaveBeenCalledTimes(2);
+      expect(resultSchemaMock.mock.calls[1][0].cross_linking).toBe(true);
+      expect(api.crossLinksData.value.stream_links).toHaveLength(1);
+    });
   });
 
   describe("cross-link drilldown", () => {

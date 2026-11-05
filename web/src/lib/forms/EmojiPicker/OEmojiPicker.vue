@@ -6,6 +6,7 @@
 // fixed catalog instead of a continuous space.
 
 import { computed, inject, ref, watch, nextTick } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -24,6 +25,7 @@ const props = withDefaults(defineProps<EmojiPickerProps>(), {
 });
 
 const emit = defineEmits<EmojiPickerEmits>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 /** Grid width in cells — Up/Down step by this many. */
 const COLUMNS = 7;
@@ -153,7 +155,7 @@ watch(flatEmojis, (list) => {
       <template #trigger>
         <button
           type="button"
-          :disabled="disabled"
+          :disabled="isDisabled"
           :aria-label="ariaLabel ?? t('components.emojiPicker.chooseIcon')"
           data-test="emoji-picker-trigger"
           :class="[
@@ -163,7 +165,7 @@ watch(flatEmojis, (list) => {
             modelValue
               ? 'border-border-default bg-surface-base hover:bg-surface-subtle-hover'
               : 'border-border-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading border-dashed',
-            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+            isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           ]"
         >
           <OGlyph v-if="modelValue" :token="modelValue" :size="size === 'sm' ? 'md' : 'lg'" />
@@ -225,7 +227,7 @@ watch(flatEmojis, (list) => {
     </OPopover>
 
     <button
-      v-if="modelValue && !disabled"
+      v-if="modelValue && !isDisabled"
       type="button"
       :aria-label="t('components.emojiPicker.removeIcon')"
       :title="t('components.emojiPicker.removeIcon')"

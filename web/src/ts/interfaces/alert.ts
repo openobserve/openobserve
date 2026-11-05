@@ -87,6 +87,8 @@ export interface Template {
   // "custom" raw-payload template (body is an arbitrary user string). Absent
   // on templates created before this field existed — treat as "custom".
   kind?: "content" | "custom";
+  // Notification kinds the template is meant for; [] or absent means every kind.
+  applies_to?: string[];
 }
 
 // Template object which is modified in frontend to display in table and form

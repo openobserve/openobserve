@@ -14,6 +14,7 @@ module.exports = {
   OO_PASS: need('OO_PASS'),
   RN_ENV: process.env.RN_ENV || 'production',
   RUM_STREAM: '_rumdata',
+  RUM_LOG_STREAM: '_rumlog',
 
   // Per-platform app ids + service names (the RN app is one service across both platforms;
   // distinguish RN-iOS vs RN-Android by `source`/`os`, natives have their own service).

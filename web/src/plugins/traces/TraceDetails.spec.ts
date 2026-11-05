@@ -24,6 +24,8 @@ import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
+import searchService from "@/services/search";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -444,6 +446,21 @@ describe("TraceDetails", () => {
           }),
         );
         routerPushSpy.mockRestore();
+      }
+    });
+
+    it("should disable View Logs with a lock while logs is locked", async () => {
+      expect(wrapper.vm.logsLocked).toBe(false);
+      store.state.zoConfig.features = { logs: "locked" };
+      try {
+        await wrapper.vm.$nextTick();
+        const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
+        expect(wrapper.vm.logsLocked).toBe(true);
+        expect(wrapper.vm.isViewLogsDisabled).toBe(true);
+        expect(viewLogsBtn.attributes("disabled")).toBeDefined();
+        expect(viewLogsBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
       }
     });
   });
@@ -2107,6 +2124,25 @@ describe("TraceDetails", () => {
       expect(replayBtn.exists()).toBe(true);
     });
 
+    it("should render the session replay button disabled with a lock when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      try {
+        wrapper.vm.searchObj.data.traceDetails.spanList = [
+          {
+            ...tracesMockData.tracesDetails.traceSpans.hits[0],
+            rum_session_id: "session-123",
+            rum_session_has_replay: true,
+          },
+        ];
+        await wrapper.vm.$nextTick();
+        const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+        expect(replayBtn.attributes("disabled")).toBeDefined();
+        expect(replayBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+
     it("should not show session replay button when no RUM session exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
@@ -2667,6 +2703,52 @@ describe("TraceDetails", () => {
       localWrapper.unmount();
     });
 
+    it("stays on the page without a not-found redirect when the details call is a license denial", async () => {
+      // The unit-test http mock flattens error bodies, so reject with the shape production http rethrows.
+      vi.spyOn(searchService, "get_trace_details").mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "traces" } },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      const localWrapper = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "traces" }));
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
+      localWrapper.unmount();
+    });
+
+    it("skips the details call while traces is locked and makes it while licensed", async () => {
+      let detailCalls = 0;
+      globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => {
+            detailCalls++;
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+      store.state.zoConfig.features = { traces: "locked" };
+      try {
+        const locked = mountWithSpanQuery("any-span");
+        await flushPromises();
+        expect(detailCalls).toBe(0);
+        const lockedView = locked.find('[data-test="trace-details-license-locked"]');
+        expect(lockedView.exists()).toBe(true);
+        const denied = lockedView.findComponent({ name: "LicenseDeniedState" });
+        expect(denied.props("features")).toEqual(["traces"]);
+        const exempt = lockedView.find("[data-feature-lock-exempt]");
+        expect(exempt.find('[data-test="trace-details-back-btn"]').exists()).toBe(true);
+        locked.unmount();
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+      const licensed = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(detailCalls).toBeGreaterThan(0);
+      expect(licensed.find('[data-test="trace-details-license-locked"]').exists()).toBe(false);
+      licensed.unmount();
+    });
+
     it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
       const response = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans));
       response.hits[0].gen_ai_system = "openai";
@@ -3108,6 +3190,138 @@ describe("TraceDetails", () => {
     });
   });
 
+  // o2-enterprise#1578 (same-field conditions stacked) and #3126 B4 (always landed on Spans).
+  describe("Apply & Search from a span", () => {
+    let routerPushSpy: ReturnType<typeof vi.spyOn>;
+    const pushed = () => routerPushSpy.mock.calls.at(-1)?.[0] as any;
+    const pushedQueryText = () => b64DecodeUnicode(pushed().query.query);
+    const apply = (field: string, value: string, operator: "=" | "!=" = "=") =>
+      wrapper.vm.applyFilterImmediately({ field, value, operator });
+
+    beforeEach(() => {
+      routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper.vm.searchObj.data.editorValue = "";
+      wrapper.vm.searchObj.meta.searchMode = "traces";
+    });
+
+    afterEach(() => {
+      routerPushSpy.mockRestore();
+    });
+
+    it("replaces the earlier condition when the same field is applied twice", () => {
+      apply("service_name", "order-service");
+      expect(pushedQueryText()).toBe("service_name = 'order-service'");
+
+      apply("service_name", "frontend-app");
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("service_name = 'frontend-app'");
+      expect(pushedQueryText()).toBe("service_name = 'frontend-app'");
+    });
+
+    it("adds a second != on the same field, since excluding several values is valid", () => {
+      apply("service_name", "order-service", "!=");
+      apply("service_name", "inventory-service", "!=");
+      expect(pushedQueryText()).toBe(
+        "service_name != 'order-service' and service_name != 'inventory-service'",
+      );
+    });
+
+    it("does not repeat an identical != condition", () => {
+      apply("service_name", "order-service", "!=");
+      apply("service_name", "order-service", "!=");
+      expect(pushedQueryText()).toBe("service_name != 'order-service'");
+    });
+
+    it("wraps a query with a top-level or before adding the term", () => {
+      wrapper.vm.searchObj.data.editorValue = "service_name = 'a' or duration > 100";
+      apply("service_name", "b");
+      expect(pushedQueryText()).toBe(
+        "(service_name = 'a' or duration > 100) and service_name = 'b'",
+      );
+    });
+
+    it("keeps conditions on other fields and replaces only the repeated field", () => {
+      wrapper.vm.searchObj.data.editorValue = "duration > 100 and service_name = 'order-service'";
+      apply("operation_name", "create order");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and service_name = 'order-service' and operation_name = 'create order'",
+      );
+
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and service_name = 'frontend-app' and operation_name = 'create order'",
+      );
+    });
+
+    it("carries a pending sidebar filter into the query instead of dropping it", () => {
+      wrapper.vm.searchObj.data.editorValue = "duration > 100";
+      wrapper.vm.addFilterFromSidebar({ field: "http_method", value: "GET", operator: "=" });
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and http_method = 'GET' and service_name = 'frontend-app'",
+      );
+      expect(wrapper.vm.localEditorValue).toBe("");
+    });
+
+    it("lets the applied term replace a pending = on the same field", () => {
+      wrapper.vm.searchObj.data.editorValue = "service_name = 'order-service'";
+      wrapper.vm.addFilterFromSidebar({ field: "service_name", value: "cart", operator: "=" });
+      wrapper.vm.addFilterFromSidebar({ field: "http_method", value: "GET", operator: "!=" });
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe("service_name = 'frontend-app' and http_method != 'GET'");
+    });
+
+    it("returns to the Traces tab when the user came from it", () => {
+      apply("service_name", "order-service");
+      expect(pushed()).toMatchObject({
+        name: "traces",
+        query: { tab: "traces", "run-query": "true", stream: "test-stream" },
+      });
+      expect(pushed().query.trace_id).toBeUndefined();
+    });
+
+    it("returns to the Spans tab when the user came from it", () => {
+      wrapper.vm.searchObj.meta.searchMode = "spans";
+      apply("service_name", "order-service");
+      expect(pushed().query.tab).toBe("spans");
+    });
+
+    it("falls back to the Spans tab from a tab that does not search", () => {
+      wrapper.vm.searchObj.meta.searchMode = "services-catalog";
+      apply("service_name", "order-service");
+      expect(pushed().query.tab).toBe("spans");
+    });
+
+    it("carries the originating tab into the full-view URL", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const resolveSpy = vi.spyOn(router, "resolve").mockReturnValue({ href: "/full" } as any);
+
+      wrapper.vm.handleExpandToFullView();
+
+      expect(resolveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({ tab: "traces" }),
+        }),
+      );
+      windowOpenSpy.mockRestore();
+      resolveSpy.mockRestore();
+    });
+
+    it("returns to the Traces tab from a full view whose fresh search state says Spans", () => {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: { trace_id: "test-trace-id", stream: "test-stream", tab: "traces" },
+          name: "traceDetails",
+        },
+      } as any);
+      wrapper.vm.searchObj.meta.searchMode = "spans";
+
+      apply("service_name", "order-service");
+
+      expect(pushed()).toMatchObject({ name: "traces", query: { tab: "traces" } });
+    });
+  });
+
   describe("Tab order and active-tab persistence", () => {
     const ORDER_KEY = "o2_trace_tab_order";
     const ACTIVE_KEY = "o2_trace_active_tab";
@@ -3246,6 +3460,20 @@ describe("TraceDetails", () => {
       await pending;
 
       expect(viewSpanLogs).not.toHaveBeenCalled();
+    });
+
+    it("opens a plain logs search without a warning when correlation is license-locked", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      try {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+        const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+        await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+        await flushPromises();
+        expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
+      } finally {
+        delete store.state.zoConfig.features;
+      }
     });
   });
 

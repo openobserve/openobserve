@@ -39,6 +39,8 @@ pub struct Request {
     /// request because the query is planned again in spawned tasks, where
     /// that task-local is gone. Never derived from client input.
     pub chat_history_reader: bool,
+    /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
+    pub analyze_profile: bool,
 }
 
 impl Default for Request {
@@ -59,6 +61,7 @@ impl Default for Request {
             overwrite_cache: false,
             histogram_interval: 0,
             chat_history_reader: false,
+            analyze_profile: false,
         }
     }
 }
@@ -92,6 +95,7 @@ impl Request {
             overwrite_cache,
             histogram_interval,
             chat_history_reader: false,
+            analyze_profile: false,
         }
     }
 
@@ -110,6 +114,10 @@ impl Request {
 
     pub fn set_use_cache(&mut self, use_cache: bool) {
         self.use_cache = use_cache;
+    }
+
+    pub fn set_analyze_profile(&mut self, analyze_profile: bool) {
+        self.analyze_profile = analyze_profile;
     }
 
     /// Mark the request as the AI Chat API's history reader when — and only
@@ -138,6 +146,7 @@ impl From<FlightSearchRequest> for Request {
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
             chat_history_reader: false,
+            analyze_profile: false,
         }
     }
 }

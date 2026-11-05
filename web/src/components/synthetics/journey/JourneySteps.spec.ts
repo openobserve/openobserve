@@ -610,6 +610,35 @@ describe("JourneySteps", () => {
       expect(wrapper.findComponent(OProgressBarStub).props("value")).toBe(0);
     });
 
+    // A step with no dot state (an unknown result) must stay readable, never borrowing the pass colour.
+    it("draws a no-state step dot as a readable neutral outline", async () => {
+      const states: Record<number, string | undefined> = { 1: "pass", 2: "skip", 3: undefined };
+      wrapper = mount(JourneySteps, {
+        props: {
+          mode: "results",
+          data: [
+            { id: 1, name: "a", status: "pass" },
+            { id: 2, name: "b", status: "skipped" },
+            { id: 3, name: "c", status: "unknown" },
+          ],
+          dotStateFn: (row: { id: number }) => states[row.id],
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const dot = wrapper.find(
+        '[data-test="o2-table-row-2"] [data-test="o2-table-cell-step"] span',
+      );
+      expect(dot.exists()).toBe(true);
+      expect(dot.text()).toBe("3");
+      expect(dot.classes()).toEqual(
+        expect.arrayContaining(["border-text-secondary", "text-text-secondary"]),
+      );
+      expect(dot.classes()).not.toContain("text-text-muted");
+      expect(dot.classes().some((c) => c.includes("success"))).toBe(false);
+    });
+
     // Editor mode is a form; results mode is a table an engineer reads down.
     it("shows column headers in results mode but not in editor mode", async () => {
       const data = makeSteps(1);
