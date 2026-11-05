@@ -2,11 +2,14 @@
 
 histogram() counts from 2001-01-01 UTC. Partition edges, the index fast path, and the
 result cache counted from 1970-01-01 UTC. The two grids differ for any interval that
-does not divide 978,307,200 seconds, such as 7 hours. The 30-day dashboard bug has the
-same cause, but a 7-hour bucket fits inside the backfill window of this suite.
+does not divide 978,307,200 seconds, such as 2, 3, 5, 7, and 30 days.
 
 The expected rows come from the fixture. Another query cannot give them, because a
 filter does not always stop the fast path.
+
+An interval runs only if ZO_INGEST_ALLOWED_UPTO lets its whole bucket in. CI uses 48
+hours, which is enough for 1 day. For all intervals, run the server and this test with
+ZO_INGEST_ALLOWED_UPTO=2400.
 """
 
 import datetime as dt
@@ -16,20 +19,27 @@ import time
 import uuid
 
 import pytest
+import requests
+
+from support.sse import read_sse_response
 
 logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
-ORIGIN_SECS = 978_307_200
+ORIGIN_MICROS = 978_307_200 * 1_000_000
 HOUR = 3_600_000_000
-# 7 hours and 5 hours do not divide the origin. 1 hour does, so it is the control.
-INTERVALS_HOURS = [7, 5, 1]
-EVENTS_PER_HOUR = 4
-FIXTURE_HOURS = 42
+DAY = 24 * HOUR
+WINDOW_HOURS = int(os.environ.get("ZO_INGEST_ALLOWED_UPTO", "5"))
+FIXTURE_HOURS = min(WINDOW_HOURS - 1, 100 * 24)
+EVENT_STEP = 6 * HOUR if FIXTURE_HOURS > 96 else HOUR // 4
+# Lets a local server flush files first, so the same rows also run through the index.
+SETTLE_SECS = int(os.environ.get("HISTOGRAM_ORIGIN_SETTLE_SECS", "0"))
+# 1 day divides the origin, so it is the control. The others do not.
+INTERVAL_DAYS = [1, 2, 3, 5, 7, 30]
 
 
 def _bucket_edge(ts, interval, offset=0):
-    return ts - (ts + offset - ORIGIN_SECS * 1_000_000) % interval
+    return ts - (ts + offset - ORIGIN_MICROS) % interval
 
 
 def _label(ts):
@@ -51,18 +61,17 @@ class Fixture:
         self.session = session
         self.base_url = base_url
         self.stream = f"e2e_hist_origin_{uuid.uuid4().hex[:8]}"
-        # Stay inside the ZO_INGEST_ALLOWED_UPTO window of 48 hours, and on a whole hour.
-        self.start = (int(time.time()) // 3600 - FIXTURE_HOURS - 1) * 1_000_000 * 3600
-        self.end = self.start + FIXTURE_HOURS * HOUR
-        step = HOUR // EVENTS_PER_HOUR
-        self.events = list(range(self.start + step // 2, self.end, step))
+        self.end = (int(time.time()) // 3600 - 1) * HOUR
+        self.start = self.end - FIXTURE_HOURS * HOUR
+        self.events = list(range(self.start + EVENT_STEP // 2, self.end, EVENT_STEP))
 
     def ingest(self):
-        rows = [{"_timestamp": ts, "kind": "origin"} for ts in self.events]
+        rows = [{"_timestamp": ts, "kind": "origin", "log": "origin"} for ts in self.events]
         resp = self.session.post(
             f"{self.base_url}api/{ORG_ID}/{self.stream}/_json", json=rows
         )
         assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text[:300]}"
+        assert resp.json()["status"][0]["failed"] == 0, f"ingest dropped rows: {resp.text[:300]}"
 
     def search(self, sql, start, end, use_cache=False, **query):
         resp = self.session.post(
@@ -74,6 +83,17 @@ class Fixture:
         )
         assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:300]}"
         return resp.json()
+
+    def search_stream(self, sql, start, end, use_cache=False, **query):
+        resp: requests.Response = self.session.post(
+            f"{self.base_url}api/{ORG_ID}/_search_stream?type=logs&use_cache={str(use_cache).lower()}",
+            json={
+                "query": {"sql": sql, "start_time": start, "end_time": end,
+                          "from": 0, "size": -1, **query},
+            },
+        )
+        assert resp.status_code == 200, f"stream failed: {resp.status_code} {resp.text[:300]}"
+        return read_sse_response(resp)["results"]
 
     def wait_until_searchable(self):
         sql = f'SELECT count(*) AS cnt FROM "{self.stream}"'
@@ -87,21 +107,30 @@ class Fixture:
     def drop(self):
         self.session.delete(f"{self.base_url}api/{ORG_ID}/streams/{self.stream}?type=logs")
 
+    def whole_buckets(self, interval):
+        """The range of whole buckets inside the fixture, or a skip when there are none."""
+        first_edge = _bucket_edge(self.start - 1, interval) + interval
+        last_edge = _bucket_edge(self.end, interval)
+        if last_edge <= first_edge:
+            pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds no whole bucket")
+        return first_edge, last_edge
+
 
 @pytest.fixture(scope="module")
 def fixture(create_session, base_url):
     data = Fixture(create_session, base_url)
     data.ingest()
     data.wait_until_searchable()
+    time.sleep(SETTLE_SECS)
     yield data
     data.drop()
 
 
-def _sql(stream, hours, filtered, timezone=None):
+def _sql(stream, days, filtered, timezone=None):
     tz_arg = f", '{timezone}'" if timezone else ""
     where = " WHERE kind = 'origin'" if filtered else ""
     return (
-        f"SELECT histogram(_timestamp, '{hours} hours'{tz_arg}) AS ts, count(*) AS cnt "
+        f"SELECT histogram(_timestamp, '{days} days'{tz_arg}) AS ts, count(*) AS cnt "
         f'FROM "{stream}"{where} GROUP BY ts ORDER BY ts'
     )
 
@@ -113,7 +142,7 @@ def _rows(body):
 
 
 def _warm_cache(fixture, sql, start, end, expected, **query):
-    """Reports the cache ratio, because a test that never hits the cache proves nothing."""
+    """Reads back the cache ratio, because a test that never hits the cache proves nothing."""
     assert _rows(fixture.search(sql, start, end, use_cache=True, **query)) == expected
     for _ in range(30):
         body = fixture.search(sql, start, end, use_cache=True, **query)
@@ -125,21 +154,21 @@ def _warm_cache(fixture, sql, start, end, expected, **query):
 
 
 @pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
-@pytest.mark.parametrize("hours", INTERVALS_HOURS)
-def test_cache_off_rows_match_the_fixture(fixture, hours, filtered):
-    interval = hours * HOUR
-    sql = _sql(fixture.stream, hours, filtered)
+@pytest.mark.parametrize("days", INTERVAL_DAYS)
+def test_cache_off_rows_match_the_fixture(fixture, days, filtered):
+    interval = days * DAY
+    sql = _sql(fixture.stream, days, filtered)
     expected = _expected_rows(fixture.events, fixture.start, fixture.end, interval)
     assert _rows(fixture.search(sql, fixture.start, fixture.end)) == expected
+    assert _rows(fixture.search_stream(sql, fixture.start, fixture.end)) == expected
 
 
 @pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
-@pytest.mark.parametrize("hours", INTERVALS_HOURS)
-def test_a_request_inside_the_last_cached_bucket_counts_only_its_range(fixture, hours, filtered):
-    interval = hours * HOUR
-    sql = _sql(fixture.stream, hours, filtered)
-    first_edge = _bucket_edge(fixture.start, interval) + interval
-    last_edge = _bucket_edge(fixture.end, interval)
+@pytest.mark.parametrize("days", INTERVAL_DAYS)
+def test_a_request_inside_a_cached_bucket_counts_only_its_range(fixture, days, filtered):
+    interval = days * DAY
+    sql = _sql(fixture.stream, days, filtered)
+    first_edge, last_edge = fixture.whole_buckets(interval)
     expected = _expected_rows(fixture.events, first_edge, last_edge, interval)
     _warm_cache(fixture, sql, first_edge, last_edge, expected)
 
@@ -147,22 +176,23 @@ def test_a_request_inside_the_last_cached_bucket_counts_only_its_range(fixture, 
     expected = _expected_rows(fixture.events, first_edge, shorter_end, interval)
     assert _rows(fixture.search(sql, first_edge, shorter_end)) == expected
     assert _rows(fixture.search(sql, first_edge, shorter_end, use_cache=True)) == expected
+    assert _rows(fixture.search_stream(sql, first_edge, shorter_end, use_cache=True)) == expected
 
-    # A later start inside a cached bucket must also leave that bucket partial.
     later_start = first_edge + interval // 2
     expected = _expected_rows(fixture.events, later_start, last_edge, interval)
     assert _rows(fixture.search(sql, later_start, last_edge, use_cache=True)) == expected
+    assert _rows(fixture.search_stream(sql, later_start, last_edge, use_cache=True)) == expected
 
 
 @pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
 def test_date_bin_with_its_own_origin_keeps_its_labels(fixture, filtered):
     where = " WHERE kind = 'origin'" if filtered else ""
     sql = (
-        "SELECT date_bin(interval '7 hours', to_timestamp_micros(_timestamp), "
-        f"to_timestamp_micros('1970-01-01T00:00:00')) AS ts, count(*) AS cnt FROM \"{fixture.stream}\"{where} "
+        "SELECT date_bin(interval '30 days', to_timestamp_micros(_timestamp), "
+        f"'1970-01-01T00:00:00') AS ts, count(*) AS cnt FROM \"{fixture.stream}\"{where} "
         "GROUP BY ts ORDER BY ts"
     )
-    interval = 7 * HOUR
+    interval = 30 * DAY
     expected = {}
     for ts in fixture.events:
         label = _label(ts - ts % interval)
