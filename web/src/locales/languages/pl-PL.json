@@ -1504,7 +1504,6 @@
       "peakMemory": "Szczyt pamięci",
       "peakMemoryNode": "Maks. węzeł {node}",
       "nodes": "Węzły",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Lider {node}",
       "scanned": "Przeskanowano",
       "scannedFiles": "{count} plik | {count} plików",

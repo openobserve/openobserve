@@ -1504,7 +1504,6 @@
       "peakMemory": "Tepe bellek",
       "peakMemoryNode": "Maks. düğüm {node}",
       "nodes": "Düğümler",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Lider {node}",
       "scanned": "Taranan",
       "scannedFiles": "{count} dosya | {count} dosya",

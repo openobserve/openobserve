@@ -63,7 +63,9 @@ describe("QueryProfileView", () => {
 
   it("shows the summary tiles, phases and the straggler note", () => {
     wrapper = mountView();
-    expect(wrapper.find('[data-test="query-profile-tile-nodes"]').text()).toContain("4Q · 2I");
+    expect(wrapper.find('[data-test="query-profile-tile-nodes"]').text()).toContain(
+      "4 queriers · 2 ingesters",
+    );
     expect(wrapper.find('[data-test="query-profile-phases"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="query-profile-straggler-note"]').text()).toContain("q-2");
   });
@@ -204,17 +206,17 @@ describe("QueryProfileView", () => {
 
     it("shows one cluster from its table row and goes back from the notice", async () => {
       wrapper = mountView(superClusterJoinProfile());
-      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      expect(find("query-profile-tile-nodes").text()).toContain("9 queriers · 6 ingesters");
       const row = find("query-profile-clusters")
         .findAll("tr")
         .find((r) => r.text().includes("sc-b"))!;
       await row.trigger("click");
-      expect(find("query-profile-tile-nodes").text()).toContain("3Q · 2I");
+      expect(find("query-profile-tile-nodes").text()).toContain("3 queriers · 2 ingesters");
       expect(find("query-profile-fold-notice").text()).toContain(
         "Showing only sc-b: 5 of 15 nodes",
       );
       await find("query-profile-fold-notice-action").trigger("click");
-      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      expect(find("query-profile-tile-nodes").text()).toContain("9 queriers · 6 ingesters");
       expect(find("query-profile-fold-notice").exists()).toBe(false);
     });
 
@@ -225,9 +227,9 @@ describe("QueryProfileView", () => {
           .findAll("tr")
           .find((r) => r.text().includes("sc-b"))!;
       await row().trigger("click");
-      expect(find("query-profile-tile-nodes").text()).toContain("3Q · 2I");
+      expect(find("query-profile-tile-nodes").text()).toContain("3 queriers · 2 ingesters");
       await row().trigger("click");
-      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      expect(find("query-profile-tile-nodes").text()).toContain("9 queriers · 6 ingesters");
       expect(find("query-profile-fold-notice").exists()).toBe(false);
     });
 

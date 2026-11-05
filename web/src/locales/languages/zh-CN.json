@@ -1504,7 +1504,6 @@
       "peakMemory": "峰值内存",
       "peakMemoryNode": "最大节点 {node}",
       "nodes": "节点",
-      "nodesByRole": "{queriers} 查询 · {ingesters} 摄取",
       "leaderNode": "主节点 {node}",
       "scanned": "已扫描",
       "scannedFiles": "{count} 个文件 | {count} 个文件",

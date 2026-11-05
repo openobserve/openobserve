@@ -1504,7 +1504,6 @@
       "peakMemory": "記憶體峰值",
       "peakMemoryNode": "最大節點 {node}",
       "nodes": "節點",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "主節點 {node}",
       "scanned": "已掃描",
       "scannedFiles": "{count} 個檔案 | {count} 個檔案",

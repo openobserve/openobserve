@@ -1504,7 +1504,6 @@
       "peakMemory": "Memória máxima",
       "peakMemoryNode": "Nó máximo {node}",
       "nodes": "Nós",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Líder {node}",
       "scanned": "Analisados",
       "scannedFiles": "{count} ficheiro | {count} ficheiros",

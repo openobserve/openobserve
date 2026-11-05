@@ -1504,7 +1504,6 @@
       "peakMemory": "Pic de mémoire",
       "peakMemoryNode": "Nœud max {node}",
       "nodes": "Nœuds",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Leader {node}",
       "scanned": "Scanné",
       "scannedFiles": "{count} fichier | {count} fichiers",

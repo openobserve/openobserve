@@ -1504,7 +1504,6 @@
       "peakMemory": "Spitzenspeicher",
       "peakMemoryNode": "Max. Knoten {node}",
       "nodes": "Knoten",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Leader {node}",
       "scanned": "Gescannt",
       "scannedFiles": "{count} Datei | {count} Dateien",

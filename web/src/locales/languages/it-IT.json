@@ -1504,7 +1504,6 @@
       "peakMemory": "Memoria di picco",
       "peakMemoryNode": "Nodo max {node}",
       "nodes": "Nodi",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Leader {node}",
       "scanned": "Scansionato",
       "scannedFiles": "{count} file | {count} file",

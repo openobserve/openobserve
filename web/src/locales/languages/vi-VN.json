@@ -1504,7 +1504,6 @@
       "peakMemory": "Bộ nhớ đỉnh",
       "peakMemoryNode": "Node cao nhất {node}",
       "nodes": "Các node",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Leader {node}",
       "scanned": "Đã quét",
       "scannedFiles": "{count} tệp | {count} tệp",

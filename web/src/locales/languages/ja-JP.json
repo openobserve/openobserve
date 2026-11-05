@@ -1504,7 +1504,6 @@
       "peakMemory": "ピークメモリ",
       "peakMemoryNode": "最大ノード {node}",
       "nodes": "ノード",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "リーダー {node}",
       "scanned": "スキャン済み",
       "scannedFiles": "{count} ファイル | {count} ファイル",

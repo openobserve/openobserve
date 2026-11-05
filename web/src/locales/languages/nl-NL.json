@@ -1504,7 +1504,6 @@
       "peakMemory": "Piekgeheugen",
       "peakMemoryNode": "Max. node {node}",
       "nodes": "Nodes",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Leader {node}",
       "scanned": "Gescand",
       "scannedFiles": "{count} bestand | {count} bestanden",

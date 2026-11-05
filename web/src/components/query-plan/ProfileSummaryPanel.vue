@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <ProfileStatTile
         :label="t('search.queryProfile.nodes')"
-        :value="nodesValue"
-        :sub="t('search.queryProfile.leaderNode', { node: summary.leaderName })"
+        :value="summary.nodeCounts.total"
+        :sub="[nodeRoles, t('search.queryProfile.leaderNode', { node: summary.leaderName })]"
         data-test="query-profile-tile-nodes"
       />
       <ProfileStatTile
@@ -315,13 +315,16 @@ const clusterColumns = computed<OTableColumnDef<ClusterSummaryRow>[]>(() => [
   },
 ]);
 
-const nodesValue = computed(() => {
+const nodeRoles = computed(() => {
   const c = props.summary.nodeCounts;
   // all-in-one nodes hold both roles, so a role split would double count them
-  if (c.queriers + c.ingesters !== c.total) {
-    return t("search.queryProfile.nodesCount", { count: c.total }, c.total);
-  }
-  return t("search.queryProfile.nodesByRole", { queriers: c.queriers, ingesters: c.ingesters });
+  if (c.queriers + c.ingesters !== c.total) return null;
+  return raw(
+    [
+      t("search.queryProfile.queriersCount", { count: c.queriers }, c.queriers),
+      t("search.queryProfile.ingestersCount", { count: c.ingesters }, c.ingesters),
+    ].join(" · "),
+  );
 });
 
 const hotspots = computed(() =>

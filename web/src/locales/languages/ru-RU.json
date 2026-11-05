@@ -1504,7 +1504,6 @@
       "peakMemory": "Пиковая память",
       "peakMemoryNode": "Макс. узел {node}",
       "nodes": "Узлы",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "Лидер {node}",
       "scanned": "Просканировано",
       "scannedFiles": "{count} файл | {count} файлов",

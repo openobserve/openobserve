@@ -1504,7 +1504,6 @@
       "peakMemory": "최대 메모리",
       "peakMemoryNode": "최대 노드 {node}",
       "nodes": "노드",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "리더 {node}",
       "scanned": "스캔됨",
       "scannedFiles": "{count}개 파일 | {count}개 파일",

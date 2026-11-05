@@ -1504,7 +1504,6 @@
       "peakMemory": "ذروة الذاكرة",
       "peakMemoryNode": "أقصى عقدة {node}",
       "nodes": "العُقد",
-      "nodesByRole": "{queriers}Q · {ingesters}I",
       "leaderNode": "القائد {node}",
       "scanned": "المفحوص",
       "scannedFiles": "{count} ملف | {count} ملفات",

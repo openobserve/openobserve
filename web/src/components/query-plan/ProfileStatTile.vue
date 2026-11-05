@@ -22,20 +22,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
       >{{ value }}</OTruncatedText
     >
-    <OTruncatedText v-if="sub" as="div" class="text-text-secondary text-2xs">{{
-      sub
-    }}</OTruncatedText>
+    <OTruncatedText
+      v-for="(line, i) in lines"
+      :key="i"
+      as="div"
+      class="text-text-secondary text-2xs"
+      >{{ line }}</OTruncatedText
+    >
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { I18nText } from "@/types/i18n";
 
-defineProps<{
+const props = defineProps<{
   label: I18nText;
   value: string | number;
-  sub?: I18nText;
+  sub?: I18nText | (I18nText | null)[];
   dataTest?: string;
 }>();
+
+const lines = computed(() => [props.sub ?? []].flat().filter((l): l is I18nText => !!l));
 </script>
