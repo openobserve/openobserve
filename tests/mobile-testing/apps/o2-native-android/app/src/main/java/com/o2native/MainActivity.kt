@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.openobserve.android.log.Logger
 import com.openobserve.android.okhttp.OpenObserveInterceptor
 import com.openobserve.android.rum.GlobalRumMonitor
 import com.openobserve.android.rum.RumActionType
@@ -28,6 +29,8 @@ class MainActivity : AppCompatActivity() {
             OpenObserveInterceptor.Builder(listOf("jsonplaceholder.typicode.com")).build(),
         )
         .build()
+
+    private val logger by lazy { Logger.Builder().setName("o2-e2e").build() }
 
     private fun fetch(url: String) {
         http.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
@@ -81,6 +84,13 @@ class MainActivity : AppCompatActivity() {
         }
         button("Fetch resource 404") {
             fetch("https://jsonplaceholder.typicode.com/this-path-does-not-exist-404")
+        }
+        // Several logs per tap so the SDK uploads a multi-event batch (#16229).
+        button("Send logs") {
+            val burst = mapOf("log_burst" to System.currentTimeMillis().toString())
+            logger.i("O2 log burst info", attributes = burst)
+            logger.w("O2 log burst warn", attributes = burst)
+            logger.e("O2 log burst error", attributes = burst)
         }
         button("Trigger native crash") {
             throw RuntimeException("O2 Native — intentional uncaught crash")

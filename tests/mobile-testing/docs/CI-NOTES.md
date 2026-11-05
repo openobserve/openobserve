@@ -113,7 +113,7 @@ cleartext-HTTP handling are recorded below / in the git history.
 
 ## Validated locally
 
-- Suite parses (`playwright --list`): 42 tests, 4 platforms (+ sdk-drift project).
+- Suite parses (`playwright --list`): 46 tests, 4 platforms (+ sdk-drift project).
 - `gen-config.js` / `gen-config.sh` keep the committed **placeholders** when no env is set, and
   substitute `O2_RUM_*` when set.
 - Android/iOS native config wiring is in place (`BuildConfig.OO_*`, `GeneratedConfig`).
