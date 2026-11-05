@@ -67,10 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex gap-1" aria-hidden="true">
         <span
-          v-for="(step, i) in SAMPLE_TOUR_STEPS"
+          v-for="step in openSteps"
           :key="step.id"
           class="h-1 flex-1 rounded-full transition-colors"
-          :class="i <= index ? 'bg-accent' : 'bg-border-default'"
+          :class="SAMPLE_TOUR_STEPS.indexOf(step) <= index ? 'bg-accent' : 'bg-border-default'"
           :data-test="`sample-tour-dot-${step.id}`"
         />
       </div>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center gap-2">
           <OButton
-            v-if="index > 0"
+            v-if="previousIndex !== undefined"
             variant="outline"
             size="sm"
             icon-left="arrow-back"
@@ -165,6 +165,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 import {
   SAMPLE_TOUR_STEPS,
@@ -201,7 +202,25 @@ const visible = computed(
 );
 const index = computed(() => tour.value?.index ?? 0);
 const current = computed<SampleTourStep | undefined>(() => SAMPLE_TOUR_STEPS[index.value]);
-const capabilities = computed(() => [...new Set(SAMPLE_TOUR_STEPS.map((s) => s.capability))]);
+// a chapter whose page the license locks would land on the lock page, so it is skipped
+const { isLocked } = useLicenseLocks();
+const stepLocked = (step: SampleTourStep) => {
+  try {
+    return isLocked(router.resolve({ name: step.routes[0] }).meta.licenseFeature);
+  } catch {
+    return false;
+  }
+};
+const openSteps = computed(() => SAMPLE_TOUR_STEPS.filter((s) => !stepLocked(s)));
+const nextIndex = computed(() => {
+  const i = SAMPLE_TOUR_STEPS.findIndex((s, at) => at > index.value && !stepLocked(s));
+  return i === -1 ? SAMPLE_TOUR_STEPS.length : i;
+});
+const previousIndex = computed<number | undefined>(() => {
+  const i = SAMPLE_TOUR_STEPS.findLastIndex((s, at) => at < index.value && !stepLocked(s));
+  return i === -1 ? undefined : i;
+});
+const capabilities = computed(() => [...new Set(openSteps.value.map((s) => s.capability))]);
 
 // a keyboard user lands in the tour, and the finale drops focus on its way out
 watch(panel, (el) => el?.focus());
@@ -217,15 +236,15 @@ watch(
 const positionLabel = computed(() =>
   current.value
     ? t("sampleData.tour.position", {
-        current: raw(String(index.value + 1)),
-        total: raw(String(SAMPLE_TOUR_STEPS.length)),
+        current: raw(String(openSteps.value.indexOf(current.value) + 1)),
+        total: raw(String(openSteps.value.length)),
       })
     : t("sampleData.tour.done"),
 );
 const pillLabel = computed(() =>
   t("sampleData.tour.pill", {
-    current: raw(String(index.value + 1)),
-    total: raw(String(SAMPLE_TOUR_STEPS.length)),
+    current: raw(String(current.value ? openSteps.value.indexOf(current.value) + 1 : 0)),
+    total: raw(String(openSteps.value.length)),
   }),
 );
 
@@ -267,13 +286,13 @@ const showStep = async () => {
 };
 
 const next = async () => {
-  session.setTourIndex(index.value + 1);
+  session.setTourIndex(nextIndex.value);
   if (current.value) await showStep();
   else cancelPendingStep();
 };
 
 const back = async () => {
-  session.setTourIndex(index.value - 1);
+  session.setTourIndex(previousIndex.value ?? index.value);
   if (current.value) await showStep();
 };
 

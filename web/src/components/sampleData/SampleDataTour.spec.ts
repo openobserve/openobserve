@@ -39,18 +39,28 @@ const ORG = "test-org";
 const session = useSampleDataSession();
 
 const mounted: { unmount: () => void }[] = [];
-const mountTour = async (start = "/", attachTo?: HTMLElement) => {
+const mountTour = async (
+  start = "/",
+  attachTo?: HTMLElement,
+  features: Record<string, string> = {},
+) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: "/", name: "home", component: { template: "<div />" } },
       { path: "/p/:id", name: "page", component: { template: "<div />" } },
       { path: "/logs", name: "logs", component: { template: "<div />" } },
+      {
+        path: "/alerts",
+        name: "alertList",
+        meta: { licenseFeature: "alerts" },
+        component: { template: "<div />" },
+      },
     ],
   });
   await router.push(start);
   const store = createStore({
-    state: { selectedOrganization: { identifier: ORG }, kioskMode: false },
+    state: { selectedOrganization: { identifier: ORG }, kioskMode: false, zoConfig: { features } },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale } });
   const wrapper = mount(SampleDataTour, { attachTo, global: { plugins: [store, router, i18n] } });
@@ -177,5 +187,25 @@ describe("SampleDataTour", () => {
     } finally {
       host.remove();
     }
+  });
+
+  it("skips a chapter whose license feature is locked, without breaking numbering or Back", async () => {
+    session.startTour(ORG, 0);
+    const { wrapper } = await mountTour("/", undefined, { alerts: "locked" });
+    const alertIndex = SAMPLE_TOUR_STEPS.findIndex((s) => s.id === "alert");
+    const total = SAMPLE_TOUR_STEPS.length - 1;
+    expect(wrapper.get('[data-test="sample-tour-position"]').text()).toBe(
+      `Guided tour · step 1 of ${total}`,
+    );
+    expect(wrapper.find('[data-test="sample-tour-dot-alert"]').exists()).toBe(false);
+    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+    await flushPromises();
+    expect(session.tour.value?.index).toBe(alertIndex + 1);
+    expect(wrapper.get('[data-test="sample-tour-position"]').text()).toBe(
+      `Guided tour · step 2 of ${total}`,
+    );
+    await wrapper.get('[data-test="sample-tour-back"]').trigger("click");
+    await flushPromises();
+    expect(session.tour.value?.index).toBe(0);
   });
 });
