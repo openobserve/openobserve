@@ -65,8 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.rotationOpenMembers") }}
       </OButton>
+      <!-- Only with exactly one rotation: none has no first to back up, and a second off-hours now is still a secondary. -->
       <OButton
-        v-else-if="!secondary"
+        v-else-if="!secondary && rotationCount === 1"
         variant="outline"
         size="sm"
         icon-left="add"
@@ -102,8 +103,10 @@ const props = withDefaults(
      * the actions of a team that is staffed.
      */
     hasMembers?: boolean;
+    /** How many rotations the team has; the secondary is offered only to a team with one. */
+    rotationCount?: number;
   }>(),
-  { positions: () => [], hasMembers: true },
+  { positions: () => [], hasMembers: true, rotationCount: 1 },
 );
 
 const emit = defineEmits<{

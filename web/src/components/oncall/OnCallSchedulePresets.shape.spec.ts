@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import type { PresetDescriptor } from "@/ts/interfaces/oncall";
 
-import { coverageOf, layersOf } from "./OnCallSchedulePresets.shape";
+import "@/locales";
+
+import { coverageOf, describeWhen, layersOf, splitDay } from "./OnCallSchedulePresets.shape";
 
 /// Only `id` and the field labels are read here, so the fixtures carry those
 /// and nothing else — a full catalogue copy would drift from the server's.
@@ -121,5 +123,45 @@ describe("coverageOf", () => {
     // 09:00–10:00 is one unstaffed hour inside Monday's 08:00–16:00 cell.
     expect(coverage.cells[MON]?.[1]).toBe("unstaffed");
     expect(coverage.unstaffedHours).toBe(1);
+  });
+});
+
+describe("splitDay", () => {
+  it.each([
+    {
+      count: 2,
+      want: [
+        [0, 720],
+        [720, 1440],
+      ],
+    },
+    {
+      count: 3,
+      want: [
+        [0, 480],
+        [480, 960],
+        [960, 1440],
+      ],
+    },
+    {
+      count: 4,
+      want: [
+        [0, 360],
+        [360, 720],
+        [720, 1080],
+        [1080, 1440],
+      ],
+    },
+  ])("$count regions share the day evenly", ({ count, want }) => {
+    expect(splitDay(count)).toEqual(want);
+  });
+});
+
+describe("describeWhen", () => {
+  // The same separator the catalogue and the rest of the schedule use.
+  it("puts a comma between the days and all day", () => {
+    expect(String(describeWhen({ kind: "window", days: [0, 1, 2, 3, 4], from: 0, to: 1440 }))).toBe(
+      "Mon–Fri, all day",
+    );
   });
 });

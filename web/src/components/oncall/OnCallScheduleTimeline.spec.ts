@@ -198,9 +198,10 @@ describe("OnCallScheduleTimeline", () => {
 
     const staffed = render();
     const template = staffed.find('[data-test="oncall-timeline-add-template"]');
-    expect(template.text()).toBe("Start from a template");
+    expect(template.text()).toBe("From a template");
     await template.trigger("click");
-    expect(staffed.emitted("presets")).toHaveLength(1);
+    // No rotation id: from Add rotation the template builds a new rotation.
+    expect(staffed.emitted("presets")).toEqual([[]]);
     await staffed.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
     expect(staffed.emitted("add")).toHaveLength(1);
     expect(staffed.find('[data-test^="oncall-lane-presets-"]').exists()).toBe(true);
@@ -248,7 +249,7 @@ describe("OnCallScheduleTimeline", () => {
     const tip = wrapper
       .findAllComponents({ name: "OTooltip" })
       .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
-    expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · .+ – .+ \(UTC\)$/);
+    expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · Primary · .+ – .+ \(UTC\)$/);
   });
 
   it("draws one lane per rotation", () => {
@@ -287,6 +288,136 @@ describe("OnCallScheduleTimeline", () => {
   /// Hue is the ROTATION, not the person. Two people taking turns on one layer
   /// are the same lane doing its job, and painting them differently answered a
   /// question nobody asks of this chart while making two lanes look alike.
+  describe("gap or off (D3)", () => {
+    const rot = (id: string) => ({ kind: "rotation" as const, rotation_id: id });
+    const policy = (...steps: ReturnType<typeof rot>[][]) => ({
+      id: "p",
+      org_id: "default",
+      team_id: "t",
+      rungs: [
+        {
+          priority: 1 as const,
+          channels: [],
+          steps: steps.map((targets, i) => ({ after_micros: i, targets })),
+        },
+      ],
+    });
+    const twoLanes = (over: Partial<TimelineProps> = {}) =>
+      render({
+        rotations: [
+          rotation("Primary"),
+          rotation("Secondary", [
+            {
+              name: "Working hours",
+              members: ["bob@o2.ai"],
+              shift_micros: MICROS_PER_WEEK,
+              anchor_micros: start,
+              restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }],
+            },
+          ]),
+        ],
+        segments: [seg(), seg({ rotation_id: rid("Secondary"), rotation: null, user_email: null })],
+        ...over,
+      });
+
+    it("draws an empty stretch as Off when no level pages that rotation alone", () => {
+      const wrapper = twoLanes({ policy: policy([rot(rid("Primary")), rot(rid("Secondary"))]) });
+      const [band] = tracksOf(wrapper)[1].bands;
+      expect(band.tone).toBe("off");
+      expect(String(band.label)).toBe("Off");
+      expect(wrapper.find('[data-test="oncall-timeline-gap"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-timeline-fill-gap"]').exists()).toBe(false);
+    });
+
+    it("tips an Off band with the hours its rules hold", () => {
+      const wrapper = mount(OnCallScheduleTimeline, {
+        props: {
+          rotations: [
+            rotation("Secondary", [
+              {
+                name: "Working hours",
+                members: ["bob@o2.ai"],
+                shift_micros: MICROS_PER_WEEK,
+                anchor_micros: start,
+                restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }],
+              },
+            ]),
+          ],
+          segments: [seg({ rotation_id: rid("Secondary"), rotation: null, user_email: null })],
+          policy: policy([rot(rid("Secondary")), rot("rot_other")]),
+          timezone: "UTC",
+          window: { from: 0, to: 0 },
+          "onUpdate:window": () => {},
+        },
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            OTooltip: { name: "OTooltip", props: ["content"], template: "<i />" },
+          },
+        },
+      });
+      const band = tracksOf(wrapper)[0].bands[0];
+      const tip = wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
+      expect(String(tip!.props("content"))).toBe("Off · outside Mon–Fri, 09:00–17:00");
+    });
+
+    // An empty stretch inside a rule's hours (its only person away) is a real hole, whatever the policy.
+    it("keeps an empty stretch inside a rule's hours red", () => {
+      const wrapper = twoLanes({
+        policy: policy([rot(rid("Primary")), rot(rid("Secondary"))]),
+        segments: [
+          seg(),
+          seg({ rotation_id: rid("Secondary"), rotation: "Working hours", user_email: null }),
+        ],
+      });
+      expect(tracksOf(wrapper)[1].bands[0].tone).toBe("gap");
+      expect(wrapper.find('[data-test="oncall-timeline-gap"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-timeline-legend-off"]').exists()).toBe(false);
+    });
+
+    it("offers no cover on an Off band, and keys Off in the legend", () => {
+      const wrapper = twoLanes({ policy: policy([rot(rid("Primary")), rot(rid("Secondary"))]) });
+      // Only the Primary shift offers a cover; the Off stretch offers nothing.
+      expect(wrapper.findAll('[data-test="oncall-shift-menu-cover"]')).toHaveLength(1);
+      expect(wrapper.find('[data-test="oncall-timeline-legend-off"]').text()).toBe("Off");
+    });
+
+    it("keeps the gap red when a level pages that rotation alone", () => {
+      const wrapper = twoLanes({ policy: policy([rot(rid("Primary"))], [rot(rid("Secondary"))]) });
+      expect(tracksOf(wrapper)[1].bands[0].tone).toBe("gap");
+      expect(wrapper.find('[data-test="oncall-timeline-gap"]').exists()).toBe(true);
+    });
+
+    // B2: a rotation no step names pages nobody, however healthy its bars look.
+    it("warns on a lane no escalation step pages, only once a policy is loaded", () => {
+      const wrapper = twoLanes({ policy: policy([rot(rid("Primary"))]) });
+      expect(wrapper.find('[data-test="oncall-lane-no-escalation-rot_secondary"]').text()).toBe(
+        "Not paged by any escalation step",
+      );
+      expect(wrapper.find('[data-test="oncall-lane-no-escalation-rot_primary"]').exists()).toBe(
+        false,
+      );
+      expect(twoLanes().find('[data-test^="oncall-lane-no-escalation-"]').exists()).toBe(false);
+    });
+
+    it("says a later lane is paged alongside the first, only when a level pages both", () => {
+      const together = twoLanes({ policy: policy([rot(rid("Primary")), rot(rid("Secondary"))]) });
+      expect(together.find('[data-test="oncall-lane-alongside-rot_secondary"]').text()).toBe(
+        "paged alongside Primary",
+      );
+      expect(together.find('[data-test="oncall-lane-alongside-rot_primary"]').exists()).toBe(false);
+
+      const apart = twoLanes({ policy: policy([rot(rid("Primary"))], [rot(rid("Secondary"))]) });
+      expect(apart.find('[data-test="oncall-lane-alongside-rot_secondary"]').exists()).toBe(false);
+      expect(twoLanes().find('[data-test="oncall-lane-alongside-rot_secondary"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
   it("paints one rotation in one colour, whoever is on it", () => {
     const wrapper = render({
       segments: [
@@ -442,28 +573,87 @@ describe("OnCallScheduleTimeline", () => {
   });
 
   // A4: a segment running past the fetched window was cut there, so its end is not a handover.
-  it("says nothing about a handover the window cut off", () => {
+  it("says no end on a band the window cut off", () => {
     const wrapper = render({ segments: [seg({ from: start - DAY, to: start + 30 * DAY })] });
-    expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).not.toContain(
-      "hands over",
-    );
     const [band] = tracksOf(wrapper)[0].bands;
     expect(String(band.label)).toContain("on now");
     expect(String(band.label)).not.toContain("until");
   });
 
-  it("names the handover from the whole shift when the window cut it, as the Day view does", async () => {
-    const cut = seg({ from: start, to: start + DAY });
+  // U13: a cover or an absence ends the bar early, and the header still names the rule's handover.
+  it("takes the handover from the shift rules, never from the bar", () => {
+    const weekday = new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      timeZone: "UTC",
+    }).format(new Date(start / 1000));
     const wrapper = render({
-      segments: [cut],
-      shiftSpans: {
-        [`${cut.rotation_id}:${cut.from}:${cut.to}`]: { from: start - DAY, to: start + 6 * DAY },
-      },
+      segments: [
+        seg({ from: start, to: start + DAY }),
+        seg({ from: start + DAY, to: start + 2 * DAY, user_email: "bob@o2.ai", override_id: "o1" }),
+      ],
+      absences: [
+        {
+          id: "u1",
+          org_id: "default",
+          user_email: "ana@o2.ai",
+          start_at: start + 2 * DAY,
+          end_at: start + 3 * DAY,
+          created_by: "ana@o2.ai",
+          created_at: start,
+        },
+      ],
     });
-    wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "day");
-    await nextTick();
     expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).toContain(
-      "hands over",
+      `hands over weekly, ${weekday} 00:00`,
+    );
+  });
+
+  // Unnamed rules keep their place in the full list, as the editor numbers them, even past a stopped one.
+  it("numbers an unnamed rule by its place among all the rotation's rules", () => {
+    const unnamed = (over: Partial<Rotation["shift_rules"][number]> = {}) => ({
+      name: "",
+      members: ["ana@o2.ai"],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: start,
+      ...over,
+    });
+    const wrapper = render({
+      rotations: [
+        rotation("Primary", [
+          unnamed({ ends_at: start - DAY }),
+          unnamed({ priority: 1 }),
+          unnamed({ priority: 2 }),
+        ]),
+      ],
+    });
+    expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).toMatch(
+      /^Rule 2 · Rule 3 · /,
+    );
+  });
+
+  it("names a rotation's shift rules, its handover and its size on the lane header", () => {
+    const wrapper = render({
+      rotations: [
+        rotation("Primary", [
+          {
+            name: "Weekdays",
+            members: ["ana@o2.ai", "bob@o2.ai"],
+            shift_micros: MICROS_PER_WEEK,
+            anchor_micros: start,
+            priority: 1,
+            restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1440 }],
+          },
+          {
+            name: "Weekend",
+            members: ["cy@o2.ai", "di@o2.ai"],
+            shift_micros: MICROS_PER_WEEK,
+            anchor_micros: start,
+          },
+        ]),
+      ],
+    });
+    expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).toMatch(
+      /^Weekdays · Weekend · hands over .+ · 4 people$/,
     );
   });
 
@@ -489,7 +679,7 @@ describe("OnCallScheduleTimeline", () => {
       .findAllComponents({ name: "OTooltip" })
       .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
     const day = (micros: number) => String(new Date(micros / 1000).getUTCDate());
-    const [from, to] = String(tip!.props("content")).split(" · ")[1].split(" – ");
+    const [from, to] = String(tip!.props("content")).split(" · ")[2].split(" – ");
     expect(from).toContain(day(whole.from));
     expect(to).toContain(day(whole.to));
   });
@@ -547,7 +737,7 @@ describe("OnCallScheduleTimeline", () => {
       segments: [seg({ rotation_id: rid("Weekend"), rotation: "Weekend" })],
     });
     const header = wrapper.find('[data-test="oncall-lane-cadence-rot_weekend"]').text();
-    expect(header).toContain("All day");
+    expect(header).toContain("Sat–Sun · all day");
     expect(header).not.toContain("00:00 / 00:00");
   });
 
@@ -597,7 +787,7 @@ describe("OnCallScheduleTimeline", () => {
       segments: [seg({ rotation_id: rid("AMER"), rotation: "AMER" })],
     });
     const header = wrapper.find('[data-test="oncall-lane-cadence-rot_amer"]').text();
-    expect(header).toContain("16:00 / 24:00");
+    expect(header).toContain("16:00–24:00");
   });
 
   /// The loudest answer on the chart was a blank strip. It has to name the
@@ -724,21 +914,19 @@ describe("OnCallScheduleTimeline", () => {
       expect(wrapper.emitted("add")).toHaveLength(1);
     });
 
-    /// A template rewrites the first rotation only, so only that lane offers it.
-    it("offers starting over from a template on the first lane only", async () => {
+    /// U2: any lane's rules can be replaced from a template, and the drawer opens on that lane.
+    it("offers replacing its rules with a template on every lane", async () => {
       const wrapper = render({
         rotations: [rotation("Primary"), rotation("Secondary")],
         segments: [seg(), seg({ rotation_id: rid("Secondary") })],
       });
-      const item = wrapper.find(`[data-test="oncall-lane-presets-${rid("Primary")}"]`);
-
-      expect(item.text()).toBe("Start over from a template");
-      expect(item.attributes("data-icon")).toBe("restart-alt");
-      expect(wrapper.find(`[data-test="oncall-lane-presets-${rid("Secondary")}"]`).exists()).toBe(
-        false,
-      );
-      await item.trigger("click");
-      expect(wrapper.emitted("presets")).toHaveLength(1);
+      for (const name of ["Primary", "Secondary"]) {
+        const item = wrapper.find(`[data-test="oncall-lane-presets-${rid(name)}"]`);
+        expect(item.text()).toBe("Replace its rules with a template");
+        expect(item.attributes("data-icon")).toBe("restart-alt");
+        await item.trigger("click");
+      }
+      expect(wrapper.emitted("presets")).toEqual([[rid("Primary")], [rid("Secondary")]]);
     });
 
     it("gives every lane menu item a leading icon", () => {
@@ -914,6 +1102,21 @@ describe("OnCallScheduleTimeline", () => {
 
       expect(wrapper.find('[data-test="oncall-timeline-empty"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-timeline-chart"]').exists()).toBe(false);
+    });
+
+    // U15: an absence is undone where it is drawn, by whoever could have marked it.
+    it("clears an absence from its band, for those who may mark it", async () => {
+      const wrapper = render({ absences: [absence({ start_at: start + 2 * DAY })] });
+      const items = wrapper.findAll('[data-test="oncall-shift-menu-clear-away"]');
+      expect(items.map((item) => item.text())).toEqual(["Clear away"]);
+
+      await items[0].trigger("click");
+      expect(wrapper.emitted("clear-away")).toEqual([["u1"]]);
+
+      const own = render({ absences: [absence()], canMarkAway: false, selfEmail: "ana@o2.ai" });
+      expect(own.find('[data-test="oncall-shift-menu-clear-away"]').exists()).toBe(true);
+      const other = render({ absences: [absence()], canMarkAway: false, selfEmail: "bo@o2.ai" });
+      expect(other.find('[data-test="oncall-shift-menu-clear-away"]').exists()).toBe(false);
     });
 
     it("draws no away lane when nobody is away in the window", () => {

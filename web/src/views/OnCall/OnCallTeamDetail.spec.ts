@@ -69,6 +69,7 @@ vi.mock("@/services/oncall", () => ({
     testPage: vi.fn(),
     listUnavailability: vi.fn(),
     createUnavailability: vi.fn(),
+    deleteUnavailability: vi.fn(),
     getRoutingConfig: vi.fn(),
     setRoutingConfig: vi.fn(),
     coverageGaps: vi.fn(),
@@ -779,6 +780,24 @@ describe("OnCallTeamDetail", () => {
       queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
     });
 
+    // B4: the toast says what the dialog's summary said, in the page's own day format.
+    it("names whom the cover relieves and on which rotation in the toast", async () => {
+      service.getSchedule.mockResolvedValue(
+        ok({ rotations: [rotation("rot_primary", "Primary")] }),
+      );
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
+      const wrapper = render();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallCoverForm" })
+        .vm.$emit("save", { ...COVER, covering_for: "ana@corp.com" });
+      await flushPromises();
+
+      const message = String(toasted.mock.calls.at(-1)?.[0]?.message ?? "");
+      expect(message).toMatch(/^bo@corp\.com covers ana@corp\.com on Primary, .+\.$/);
+      expect(message).not.toMatch(/GMT|\d{2}:\d{2}/);
+    });
+
     it("passes covering_for through to the write", async () => {
       service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
@@ -1017,6 +1036,88 @@ describe("OnCallTeamDetail", () => {
     /// The editor rides along drawer-only: the resolved view is never swapped
     /// out for a page-sized editing mode. "Add rotation" opening a page whose
     /// own button is also "Add rotation" was the bug.
+    // U16: with no rotation there is no first to back up, so the answer bar offers no secondary.
+    it("offers Assign secondary only once a rotation exists", async () => {
+      const empty = await openSchedule();
+      expect(empty.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
+
+      queryClient.clear();
+      service.getSchedule.mockResolvedValue(ok({ rotations: [rotation("rot_p", "Primary")] }));
+      const staffed = await openSchedule();
+      expect(staffed.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(true);
+
+      // B9: a second rotation off-hours right now is still a secondary; nothing to assign.
+      queryClient.clear();
+      service.getSchedule.mockResolvedValue(
+        ok({ rotations: [rotation("rot_p", "Primary"), rotation("rot_s", "Secondary")] }),
+      );
+      const two = await openSchedule();
+      expect(two.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
+    });
+
+    // D3: the timeline reads the policy to tell a gap a level needs covered from an Off stretch.
+    it("hands the timeline the team's policy", async () => {
+      const policy = { id: "p", team_id: "team_1", rungs: [] };
+      service.getPolicy.mockResolvedValue(ok(policy));
+      const wrapper = await openSchedule();
+
+      expect(
+        wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("policy"),
+      ).toMatchObject(policy);
+    });
+
+    // U15: the away lane's Clear away is the Members tab's delete, then both lanes re-read.
+    // B7: an absence holds on every team, so clearing it asks first, naming whose and when.
+    it("clears an absence from the timeline after a confirm, and re-reads the lanes", async () => {
+      const DAY = 86_400_000_000;
+      const away = {
+        id: "u1",
+        org_id: "default",
+        user_email: "ana@corp.com",
+        start_at: Date.UTC(2026, 10, 9) * 1000,
+        end_at: Date.UTC(2026, 10, 9) * 1000 + 2 * DAY,
+        created_by: "ana@corp.com",
+        created_at: 0,
+      };
+      service.listUnavailability.mockResolvedValue(ok([away]));
+      service.deleteUnavailability.mockResolvedValue(ok(null));
+      service.getSchedule.mockResolvedValue(ok({ rotations: [rotation("rot_p", "Primary")] }));
+      const wrapper = await openSchedule();
+      const timeline = wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+      timeline.vm.$emit("update:window", { from: 1_000, to: away.end_at });
+      await flushPromises();
+      const absences = service.listUnavailability.mock.calls.length;
+      const segments = service.resolvedSchedule.mock.calls.length;
+
+      timeline.vm.$emit("clear-away", "u1");
+      await flushPromises();
+      expect(service.deleteUnavailability).not.toHaveBeenCalled();
+      const confirm = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((c) => c.props("title") === "Clear away")!;
+      expect(confirm.props("open")).toBe(true);
+      expect(confirm.props("primaryButtonLabel")).toBe("Clear");
+      // The dialog body is teleported to the document.
+      const message = [...document.querySelectorAll('[data-test="oncall-away-clear-message"]')].at(
+        -1,
+      );
+      expect(message?.textContent?.trim()).toMatch(
+        /^Clear ana@corp\.com's away, .+\? It applies on every team\.$/,
+      );
+
+      confirm.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(service.deleteUnavailability).toHaveBeenCalledWith(
+        expect.objectContaining({ unavailability_id: "u1" }),
+      );
+      expect(toasted).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Absence removed" }),
+      );
+      expect(service.listUnavailability.mock.calls.length).toBeGreaterThan(absences);
+      expect(service.resolvedSchedule.mock.calls.length).toBeGreaterThan(segments);
+    });
+
     it("keeps the resolved schedule mounted, with the editor as a drawer beside it", async () => {
       const wrapper = await openSchedule();
 
@@ -1054,6 +1155,30 @@ describe("OnCallTeamDetail", () => {
         mode: "edit",
         id: "Primary",
       });
+    });
+
+    /// U1: the template drawer opens on the lane it was asked from, or on a new rotation from Add rotation.
+    it.each([
+      { from: "rot_second", startOn: "rot_second" },
+      { from: undefined, startOn: "" },
+    ])("opens the template drawer on $startOn", async ({ from, startOn }) => {
+      service.getSchedule.mockResolvedValue(
+        ok({
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_second", "Secondary")],
+        }),
+      );
+      const wrapper = await openSchedule();
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("presets", from);
+      await flushPromises();
+
+      const drawer = wrapper.findComponent({ name: "OnCallSchedulePresets" });
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("startOn")).toBe(startOn);
+      expect(drawer.props("rotations").map((r: { id: string }) => r.id)).toEqual([
+        "rot_primary",
+        "rot_second",
+      ]);
     });
 
     it("deletes from the schedule the server has now, not the cached copy", async () => {

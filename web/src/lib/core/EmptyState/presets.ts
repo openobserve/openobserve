@@ -595,11 +595,13 @@ export const emptyStatePresets = {
         id: "presets",
         icon: "rocket-launch",
         titleKey: "emptyState.noOncallSchedule.presetsAction",
+        descriptionKey: "emptyState.noOncallSchedule.presetsActionDesc",
       },
       {
         id: "add",
         icon: "add",
         titleKey: "emptyState.noOncallSchedule.action",
+        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
       },
     ],
   },

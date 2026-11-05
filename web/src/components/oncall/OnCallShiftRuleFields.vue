@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- One shift rule as labelled rows; its name, stop date and removal live in its tab menu. -->
 <template>
-  <div class="grid grid-cols-[auto_1fr] items-start gap-x-6 gap-y-5">
+  <!-- A fixed label column, so switching rule tabs never moves the controls. -->
+  <div class="grid grid-cols-[10rem_1fr] items-start gap-x-6 gap-y-5">
     <!-- An empty team has nobody to pick, so the reader is sent to the roster instead. -->
     <div
       v-if="!hasTeamMembers"
@@ -214,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :data-test="`oncall-schedule-overlap-${ruleIndex}-loses`"
           >
-            {{ t("oncall.ruleOverlapOthersWin", { names: raw(overlapNames) }, overlapCount) }}
+            {{ t("oncall.ruleOverlapOthersWin", { names: raw(overlapNames) }) }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -275,6 +276,8 @@ const props = defineProps<{
   overlapCount: number;
   /** Unset when this rule wins against some overlaps and loses to others. */
   overlapChoice: "wins" | "loses" | undefined;
+  /** No window of its own, and higher rules take some of its hours. */
+  allOtherHours?: boolean;
   setMembers: (rule: ShiftRule, members: string[]) => void;
   awayClashesFor: (rule: ShiftRule) => Unavailability[];
   shortDate: (micros: number) => string;
@@ -316,7 +319,7 @@ function moveHandover(weekday: number, minute: number) {
 }
 
 const coversOptions = computed(() => [
-  { label: t("oncall.coversAll"), value: "all" },
+  { label: t(props.allOtherHours ? "oncall.coversAllOther" : "oncall.coversAll"), value: "all" },
   { label: t("oncall.coversBusinessHours"), value: "businessHours" },
   { label: t("oncall.coversWeekdays"), value: "weekdays" },
   { label: t("oncall.coversWeekends"), value: "weekends" },
