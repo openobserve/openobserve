@@ -343,6 +343,54 @@ describe("Profiles page", () => {
     });
   });
 
+  it.each([
+    [true, "CPU samples (count)"],
+    [false, "samples (count)"],
+    [undefined, "samples (count)"],
+  ])("labels samples only with CPU confirmation %s", async (confirmed, label) => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "samples", unit: "count", is_cpu_samples: confirmed }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        profile_type: "samples",
+        unit: "count",
+        series: [{ timestamp: 60_000_000, value: 7, rate: 1000 }],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, profile_type: "samples", unit: "count" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.findAll("option").map((option) => option.text())).toEqual([label]);
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
+    expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+      profile_type: "samples",
+      profile_unit: "count",
+    });
+    expect(route.query).toMatchObject({ profile_type: "samples", profile_unit: "count" });
+    expect(
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].data,
+    ).toEqual([[60_000, 7]]);
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).not.toContain("CPU usage");
+  });
+
+  it("labels a seeded CPU time option while metadata is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "cpu", profile_unit: "nanoseconds" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+  });
+
   it("switches to another stream from the selector", async () => {
     const wrapper = mountPage();
 
@@ -597,6 +645,8 @@ describe("Profiles page", () => {
     await settle();
 
     const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe("CPU time");
+    expect(wrapper.get('[data-test="profiles-series-card"]').text()).toContain("CPU usage (cores)");
     expect(options.backgroundColor).toBe("transparent");
     expect(options.series[0].smooth).toBe(false);
     expect(options.series[0].data).toEqual([
