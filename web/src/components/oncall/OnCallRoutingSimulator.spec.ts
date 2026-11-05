@@ -352,6 +352,77 @@ describe("OnCallRoutingSimulator", () => {
     expect(tip.props("content")).toBe("P4 pages nobody, so there is nothing to test");
   });
 
+  it("disables Send a test page, with the reason, when the first step reaches nobody", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [{ after_micros: 0, targets: [], recipients: [], resolves_to_nobody: true }],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBe("true");
+    const reasonId = button.attributes("aria-describedby");
+    expect(wrapper.find(`[id="${reasonId}"]`).text()).toBe(
+      "Nobody is on call now, so there is nothing to test",
+    );
+    await button.trigger("click");
+    expect(wrapper.emitted("send-test")).toBeUndefined();
+    const tip = wrapper
+      .find('[data-test="oncall-simulator-send-test-wrap"]')
+      .findComponent({ name: "OTooltip" });
+    expect(tip.props("content")).toBe("Nobody is on call now, so there is nothing to test");
+  });
+
+  it("keeps Send a test page enabled when the first step's people cannot receive a page", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [
+              {
+                user_email: "ana@o2.ai",
+                reason: "",
+                would_a_page_land: false,
+                why_not: "no verified channel",
+                deliverable_channels: [],
+              },
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    await button.trigger("click");
+    expect(wrapper.emitted("send-test")?.at(-1)).toEqual([{ team_id: "team_1", priority: "P1" }]);
+  });
+
+  it("keeps Send a test page enabled while the escalation preview has not loaded", async () => {
+    escalationPreview.mockReturnValue(new Promise(() => {}));
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await wrapper.vm.$nextTick();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    expect(
+      wrapper
+        .find('[data-test="oncall-simulator-send-test-wrap"]')
+        .findComponent(OTooltip)
+        .exists(),
+    ).toBe(false);
+  });
+
   it("says the winning rule inline and counts the less specific ones, with no expander", () => {
     const wrapper = render({
       seed: { service: "payments-api" },

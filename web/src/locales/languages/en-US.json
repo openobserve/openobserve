@@ -27411,6 +27411,7 @@
     "simulatorSendsNothing": "This priority sends nothing they can receive",
     "simulatorSendTest": "Send a test page",
     "simulatorSendTestNobody": "{priority} pages nobody, so there is nothing to test",
+    "simulatorSendTestNobodyOnCall": "Nobody is on call now, so there is nothing to test",
     "unroutedFires": "{count} trigger, last 30 days | {count} triggers, last 30 days",
     "unroutedClaimFor": "Claim for {team}",
     "unroutedAbsorbedBy": "sent to {team}",
