@@ -1261,16 +1261,16 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
   if (isCpuTime(profileType, unit)) return "cores";
-  if (isNanosecondsUnit(unit)) return "nanoseconds";
+  if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
 };
 
 const profileTypeLabel = (profileType: ProfileTypeMeta) => {
-  const { type, unit, is_cpu_samples } = profileType;
+  const { type, unit } = profileType;
   if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
-  if (type === "samples" && unit === "count" && is_cpu_samples === true)
+  if (type === "samples" && unit === "count")
     return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
   return raw(`${type} (${seriesUnitLabel(type, unit)})`);
 };
@@ -1318,7 +1318,7 @@ const formatDurationNanos = (value: number) => {
 const formatTableValue = (value: number) => {
   if (isCpuMetric.value) return formatDurationNanos(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
-  if (isNanosecondsUnit(currentUnit.value)) return formatDurationNanos(value);
+  if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
   return formatEventCount(Number(value || 0));
 };
 
@@ -1387,7 +1387,7 @@ const byteAxisInterval = (points: SeriesDatum[]) => {
 const formatSeriesAxisLabel = (value: number) => {
   if (isBytesUnit.value) return formatBytes(value);
   let unit = "numbers";
-  if (!isCpuMetric.value && isNanosecondsUnit(currentUnit.value)) unit = "nanoseconds";
+  if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
@@ -1396,7 +1396,7 @@ const formatSeriesValue = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "—";
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
-  if (isNanosecondsUnit(currentUnit.value)) return formatDurationNanos(value);
+  if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
   return Number(value).toLocaleString();
 };
 

@@ -28,7 +28,7 @@ use tracing::Span;
 use utoipa::ToSchema;
 
 use super::{
-    ProfilesSqlParams, check_stream_permission, hit_i64, hit_string, load_schema_field_names,
+    ProfilesSqlParams, check_stream_permission, hit_string, load_schema_field_names,
     parse_time_range_from_params, resolve_timeout, run_profiles_sql,
 };
 use crate::common::utils::http::get_or_create_trace_id;
@@ -38,8 +38,6 @@ pub struct ProfileTypeMeta {
     #[serde(rename = "type")]
     pub profile_type: String,
     pub unit: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_cpu_samples: Option<bool>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -139,14 +137,7 @@ pub async fn get_profiles_meta(
         service_name.is_some() && !schema_fields.iter().any(|f| f == "service_name");
     let profile_types_fut = async {
         if schema_fields.iter().any(|f| f == "profile_type") && !no_rows_for_service {
-            load_profile_types(
-                &types_params,
-                &stream,
-                service_name,
-                &schema_fields,
-                http_span.clone(),
-            )
-            .await
+            load_profile_types(&types_params, &stream, service_name, http_span.clone()).await
         } else {
             Ok(Vec::new())
         }
@@ -206,10 +197,9 @@ async fn load_profile_types(
     params: &ProfilesSqlParams<'_>,
     stream: &str,
     service_name: Option<&str>,
-    schema_fields: &[String],
     http_span: Span,
 ) -> Result<Vec<ProfileTypeMeta>, Response> {
-    let sql = profile_types_sql(stream, service_name, schema_fields);
+    let sql = profile_types_sql(stream, service_name);
     let response = run_profiles_sql(params, sql, 10_000, http_span).await?;
     let mut out = Vec::new();
     let mut seen = hashbrown::HashSet::new();
@@ -221,30 +211,15 @@ async fn load_profile_types(
         let unit = hit_string(hit, "profile_unit").unwrap_or_default();
         let key = format!("{profile_type}\0{unit}");
         if seen.insert(key) {
-            let is_cpu_samples = (hit_i64(hit, "is_cpu_samples") == Some(1)).then_some(true);
-            out.push(ProfileTypeMeta {
-                profile_type,
-                unit,
-                is_cpu_samples,
-            });
+            out.push(ProfileTypeMeta { profile_type, unit });
         }
     }
     Ok(out)
 }
 
-fn profile_types_sql(stream: &str, service_name: Option<&str>, schema_fields: &[String]) -> String {
+fn profile_types_sql(stream: &str, service_name: Option<&str>) -> String {
     let type_q = quote_identifier("profile_type");
     let unit_q = quote_identifier("profile_unit");
-    let cpu_samples = if ["period_type", "period_unit", "period_nanos"]
-        .iter()
-        .all(|column| schema_fields.iter().any(|field| field == column))
-    {
-        "MIN(CASE WHEN profile_type = 'samples' AND profile_unit = 'count' \
-         AND period_type = 'cpu' AND lower(period_unit) IN ('nanoseconds', 'nanosecond', 'ns', 'nanos') \
-         AND period_nanos > 0 THEN 1 ELSE 0 END)"
-    } else {
-        "0"
-    };
     let service_filter = service_name
         .map(|svc| {
             format!(
@@ -255,8 +230,7 @@ fn profile_types_sql(stream: &str, service_name: Option<&str>, schema_fields: &[
         })
         .unwrap_or_default();
     format!(
-        "SELECT {type_q} AS profile_type, {unit_q} AS profile_unit, \
-         {cpu_samples} AS is_cpu_samples \
+        "SELECT {type_q} AS profile_type, {unit_q} AS profile_unit \
          FROM {stream} WHERE {type_q} IS NOT NULL{service_filter} \
          GROUP BY profile_type, profile_unit ORDER BY profile_type"
     )
@@ -275,25 +249,10 @@ mod tests {
     }
 
     #[test]
-    fn legacy_profile_types_do_not_reference_missing_period_columns() {
-        let columns = ["period_type", "period_unit", "period_nanos"];
-        for missing in columns {
-            let fields = columns
-                .iter()
-                .filter(|column| **column != missing)
-                .map(|column| column.to_string())
-                .collect::<Vec<_>>();
-            let sql = profile_types_sql("profiles", None, &fields);
-            assert!(sql.contains("0 AS is_cpu_samples"), "{sql}");
-            assert!(!sql.contains("CASE"), "{sql}");
-        }
-    }
-
-    #[test]
     fn profile_types_sql_filters_by_service_only_when_given() {
-        let all = profile_types_sql(r#""default""#, None, &[]);
+        let all = profile_types_sql(r#""default""#, None);
         assert!(!all.contains("service_name"), "{all}");
-        let one = profile_types_sql(r#""default""#, Some("check'out"), &[]);
+        let one = profile_types_sql(r#""default""#, Some("check'out"));
         assert!(
             one.contains(r#"AND "service_name" = 'check''out'"#),
             "{one}"

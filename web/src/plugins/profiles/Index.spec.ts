@@ -343,16 +343,15 @@ describe("Profiles page", () => {
     });
   });
 
-  it.each([
-    [true, "CPU samples (count)"],
-    [false, "samples (count)"],
-    [undefined, "samples (count)"],
-  ])("labels samples only with CPU confirmation %s", async (confirmed, label) => {
+  it("labels sample counts as CPU samples without runtime metadata", async () => {
     route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
     mocks.meta.mockResolvedValue({
       data: {
         ...profileMetaResponse.data,
-        profile_types: [{ type: "samples", unit: "count", is_cpu_samples: confirmed }],
+        profile_types: [
+          { type: "samples", unit: "count" },
+          { type: "alloc_space", unit: "bytes" },
+        ],
       },
     });
     mocks.series.mockResolvedValue({
@@ -370,7 +369,10 @@ describe("Profiles page", () => {
     await settle();
 
     const select = wrapper.get('[data-test="profiles-type-select"] select');
-    expect(select.findAll("option").map((option) => option.text())).toEqual([label]);
+    expect(select.findAll("option").map((option) => option.text())).toEqual([
+      "CPU samples (count)",
+      "alloc_space (bytes)",
+    ]);
     expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
     expect(mocks.merge.mock.calls[0][2]).toMatchObject({
       profile_type: "samples",
@@ -381,6 +383,16 @@ describe("Profiles page", () => {
       wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].data,
     ).toEqual([[60_000, 7]]);
     expect(wrapper.get('[data-test="profiles-series-card"]').text()).not.toContain("CPU usage");
+  });
+
+  it("labels seeded sample counts as CPU samples while metadata is loading", async () => {
+    route.query = { stream: "profiles-a", profile_type: "samples", profile_unit: "count" };
+    mocks.meta.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountPage();
+    await flushPromises();
+    const select = wrapper.get('[data-test="profiles-type-select"] select');
+    expect(select.text()).toBe("CPU samples (count)");
+    expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
   });
 
   it.each(["nanoseconds", "ns", "NS"])(

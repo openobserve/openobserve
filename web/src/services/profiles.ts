@@ -24,7 +24,6 @@ export interface ProfileFilter {
 export interface ProfileTypeMeta {
   type: string;
   unit: string;
-  is_cpu_samples?: boolean;
 }
 
 export interface ProfilesMetaResponse {
