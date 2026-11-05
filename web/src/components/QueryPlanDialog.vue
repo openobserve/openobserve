@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   :physical-plan="physicalPlan"
                   :logical-plan="logicalPlan"
-                  :analyze-plan="analyzeText"
+                  :analyze-rows="analyzeRows"
                   initial-tab="analyze"
                   data-test="query-plan-analyze-fallback"
                 />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="mode === 'text'"
           :physical-plan="physicalPlan"
           :logical-plan="logicalPlan"
-          :analyze-plan="analyzeText"
+          :analyze-rows="analyzeRows"
         />
 
         <div
@@ -216,6 +216,7 @@ import {
   parseSearchStream,
   physicalPlanToProfile,
   summarizePlan,
+  type AnalyzeRow,
   type PlanHit,
   type QueryProfile,
   type SearchStreamResult,
@@ -299,7 +300,7 @@ const planModel = computed(() =>
 );
 // a join reads streams the logs page did not select, so prefer the ones the plan scans
 const planStreams = computed(() => (planModel.value ? summarizePlan(planModel.value).streams : []));
-const hasResults = computed(() => !!profile.value || !!analyzeText.value);
+const hasResults = computed(() => !!profile.value || !!analyzeRows.value);
 const analyzeBusy = computed(
   () => analyzeState.value === "running" || analyzeState.value === "rerunning",
 );
@@ -310,14 +311,18 @@ const resultNodes = computed(() =>
   resultModel.value ? clusterNodes(resultModel.value).filter((n) => !n.clusterEntry).length : 0,
 );
 
-const analyzeText = computed<string | null>(() => {
-  if (!streamResult.value) return null;
-  const text = [...streamResult.value.hits]
-    .sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0))
-    .map((h) => (h.plan ?? "").replace(/\s+$/, ""))
-    .filter((plan) => plan.trim())
-    .join("\n");
-  return text || null;
+// hit order keeps each remote node's rows under the stage that called it
+const analyzeRows = computed<AnalyzeRow[] | null>(() => {
+  const rows = (streamResult.value?.hits ?? [])
+    .map((h, id) => ({
+      id,
+      phase: h.phase ?? null,
+      node: h.node_name ?? "",
+      address: h.node_address ?? "",
+      plan: (h.plan ?? "").replace(/\s+$/, ""),
+    }))
+    .filter((r) => r.plan.trim());
+  return rows.length ? rows : null;
 });
 
 const lastSearchTook = computed(() => {

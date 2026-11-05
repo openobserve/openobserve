@@ -182,7 +182,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         QueryPlanText: stub("QueryPlanText", "query-plan-text", [
           "physicalPlan",
           "logicalPlan",
-          "analyzePlan",
+          "analyzeRows",
           "initialTab",
         ]),
       },
@@ -472,7 +472,7 @@ describe("QueryPlanDialog", () => {
       expect(find(wrapper, "query-plan-analyze-fallback").exists()).toBe(true);
       const text = wrapper.findComponent({ name: "QueryPlanText" });
       expect(text.props("initialTab")).toBe("analyze");
-      expect(text.props("analyzePlan")).toContain("RemoteScanExec");
+      expect(text.props("analyzeRows")[1].plan).toContain("RemoteScanExec");
       expect(find(wrapper, "query-profile-view").exists()).toBe(false);
     });
 
@@ -542,21 +542,22 @@ describe("QueryPlanDialog", () => {
   });
 
   describe("text mode", () => {
-    it("adds the analyze output only after a run is done, in phase order", async () => {
+    it("adds the analyze output only after a run is done, in the order the server sent it", async () => {
       wrapper = await openDialog();
       await selectMode(wrapper, "text");
       const text = () => wrapper.findComponent({ name: "QueryPlanText" });
       expect(text().props("physicalPlan")).toBe(AGG_PHYSICAL_PLAN);
       expect(text().props("logicalPlan")).toBe(AGG_LOGICAL_PLAN);
-      expect(text().props("analyzePlan")).toBeNull();
+      expect(text().props("analyzeRows")).toBeNull();
 
       await selectMode(wrapper, "analyze");
       mockStreamingSearch.mockResolvedValue({ data: OLD_ANALYZE_SSE });
       await click(wrapper, "query-plan-analyze-run");
       await selectMode(wrapper, "text");
-      expect(text().props("analyzePlan")).toBe(
-        "RemoteScanExec: metrics=[output_rows=5]\nDataSourceExec: metrics=[output_rows=5]",
-      );
+      expect(text().props("analyzeRows")).toEqual([
+        { id: 0, phase: 1, node: "", address: "", plan: "DataSourceExec: metrics=[output_rows=5]" },
+        { id: 1, phase: 0, node: "", address: "", plan: "RemoteScanExec: metrics=[output_rows=5]" },
+      ]);
     });
   });
 });

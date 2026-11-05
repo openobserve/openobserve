@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { AGG_LOGICAL_PLAN, AGG_PHYSICAL_PLAN } from "@/utils/__fixtures__/queryProfile.fixture";
+import type { AnalyzeRow } from "@/utils/queryProfile";
 import QueryPlanText from "./QueryPlanText.vue";
 
 const copyToClipboard = vi.fn(() => Promise.resolve(true));
@@ -26,9 +27,20 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (...args: unknown[]) => copyToClipboard(...(args as [])),
 }));
 
-function mountText(analyzePlan: string | null = null) {
+const ROWS: AnalyzeRow[] = [
+  {
+    id: 0,
+    phase: 0,
+    node: "querier-0",
+    address: "http://q0:5081",
+    plan: "ProjectionExec: expr=[a], metrics=[output_rows=1]\n  RemoteScanExec: x",
+  },
+  { id: 1, phase: 1, node: "ingester-1", address: "http://i1:5081", plan: "EmptyExec, metrics=[]" },
+];
+
+function mountText(analyzeRows: AnalyzeRow[] | null = null) {
   return mount(QueryPlanText, {
-    props: { physicalPlan: AGG_PHYSICAL_PLAN, logicalPlan: AGG_LOGICAL_PLAN, analyzePlan },
+    props: { physicalPlan: AGG_PHYSICAL_PLAN, logicalPlan: AGG_LOGICAL_PLAN, analyzeRows },
     global: { plugins: [store, i18n] },
   });
 }
@@ -71,12 +83,21 @@ describe("QueryPlanText", () => {
     expect(wrapper.find('[data-test="query-plan-text-op-5"]').text()).toBe("TableScan");
   });
 
-  it("shows the analyze output when one exists", async () => {
-    wrapper = mountText("ProjectionExec: expr=[a], metrics=[output_rows=1]\n  DataSourceExec: x");
+  it("lists the analyze output one row per node, with its phase and address", async () => {
+    wrapper = mountText(ROWS);
     expect(wrapper.find('[data-test="query-plan-text-tab-analyze"]').exists()).toBe(true);
     await selectTab(wrapper, "analyze");
-    expect(wrapper.findAll('[data-test^="query-plan-text-line-"]')).toHaveLength(2);
-    await wrapper.setProps({ analyzePlan: null });
+    const table = wrapper.find('[data-test="query-plan-text-analyze-table"]');
+    const headers = table.findAll("th").map((th) => th.text());
+    expect(headers).toEqual(["Phase", "Node", "Address", "Plan"]);
+    const rows = table.findAll("tbody tr");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain("querier-0");
+    expect(rows[0].text()).toContain("http://q0:5081");
+    expect(rows[0].findAll('[data-test^="query-plan-text-line-"]')).toHaveLength(2);
+    expect(rows[0].find('[data-test="query-plan-text-op-2"]').text()).toBe("RemoteScanExec");
+    expect(rows[1].text()).toContain("ingester-1");
+    await wrapper.setProps({ analyzeRows: null });
     expect(wrapper.find('[data-test="query-plan-text-line-1"]').text()).toContain(
       "SortPreservingMergeExec",
     );
@@ -99,9 +120,21 @@ describe("QueryPlanText", () => {
     expect((copyToClipboard.mock.calls[0] as unknown[])[0]).toBe(AGG_LOGICAL_PLAN);
   });
 
+  it("copies the analyze output as the JSON rows the logs page shows", async () => {
+    wrapper = mountText(ROWS);
+    await selectTab(wrapper, "analyze");
+    await wrapper.find('[data-test="query-plan-text-copy"]').trigger("click");
+    const copied = JSON.parse((copyToClipboard.mock.calls[0] as unknown[])[0] as string);
+    expect(copied).toEqual([
+      { phase: 0, node_address: "http://q0:5081", node_name: "querier-0", plan: ROWS[0].plan },
+      { phase: 1, node_address: "http://i1:5081", node_name: "ingester-1", plan: ROWS[1].plan },
+    ]);
+    expect(Object.keys(copied[0])).toEqual(["phase", "node_address", "node_name", "plan"]);
+  });
+
   it("shows an empty state when a plan is missing", () => {
     wrapper = mount(QueryPlanText, {
-      props: { physicalPlan: "", logicalPlan: "", analyzePlan: null },
+      props: { physicalPlan: "", logicalPlan: "", analyzeRows: null },
       global: { plugins: [store, i18n] },
     });
     expect(wrapper.find('[data-test="query-plan-text-empty"]').text()).toBe(

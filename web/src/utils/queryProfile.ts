@@ -104,6 +104,15 @@ interface TookDetail {
   search_took: number;
 }
 
+/** One row of EXPLAIN ANALYZE output: the plan one node ran for one phase. */
+export interface AnalyzeRow {
+  id: number;
+  phase: number | null;
+  node: string;
+  address: string;
+  plan: string;
+}
+
 export interface PlanHit {
   phase?: number;
   node_address?: string;
