@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :nodes-connectable="false"
       :elements-selectable="false"
       :delete-key-code="null"
-      :min-zoom="0.3"
+      :min-zoom="MIN_FLOW_ZOOM"
       :pan-on-scroll="true"
       :max-zoom="1.5"
       class="h-full w-full"
@@ -127,6 +127,7 @@ import FleetEditorGroupNode, {
   type GroupIssue,
 } from "./FleetEditorGroupNode.vue";
 import FleetEditorEdge from "./FleetEditorEdge.vue";
+import { MIN_FLOW_ZOOM } from "../flowTypes";
 import {
   catalogFor,
   compKey,
