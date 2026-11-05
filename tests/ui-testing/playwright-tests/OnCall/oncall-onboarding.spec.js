@@ -145,10 +145,13 @@ test.describe('On-call onboarding', {
     }
 
     await pm.oncallTeamDetailPage.applyQuickStart();
-    await expect(pm.oncallTeamDetailPage.getConfirmDialog(),
+    await expect(pm.oncallTeamDetailPage.getQuickStartReplaceConfirm(),
       'rewriting a stored rotation is confirmed first, naming it').toContainText(primary.name, { timeout: 20000 });
     const write = await pm.oncallTeamDetailPage.confirmQuickStartReplace();
     expect(write.status(), `the preset write must be accepted: ${await write.text().catch(() => '')}`).toBe(200);
+    const sent = write.request().postDataJSON();
+    expect(sent.rotation_id, 'a replace names the rotation it rewrites').toBe(primary.id);
+    expect(sent.new_rotation_name, 'a replace adds no rotation').toBeUndefined();
 
     await expect.poll(
       async () => (await getTeamSchedule(page, team.id)).rotations.find((r) => r.id === primary.id)?.source ?? 'gone',

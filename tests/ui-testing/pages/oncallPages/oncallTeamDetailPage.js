@@ -21,7 +21,7 @@
  *
  * Two editors, both drawers, both reached from the schedule tab:
  *   - the rotation editor  `oncall-schedule-editor` / `oncall-rotation-drawer`
- *   - Start from a template `oncall-presets-drawer`  (locale: "Start from a template")
+ *   - the template drawer   `oncall-presets-drawer`  (locale: "Template for …")
  */
 
 import { expect } from '@playwright/test';
@@ -82,11 +82,13 @@ export class OnCallTeamDetailPage {
       timeline: '[data-test="oncall-schedule-timeline"]',
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
+      timelineEmptyTemplate: '[data-test="oncall-timeline-empty"] [data-test="o2-empty-state-action-presets"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
       // Add rotation is a menu: a template or from scratch, with or without rotations.
       timelineAddScratch: '[data-test="oncall-timeline-add-scratch"]',
       timelineAddTemplate: '[data-test="oncall-timeline-add-template"]',
       laneMenus: '[data-test^="oncall-lane-menu-"]',
+      // Every lane's ⋮ offers "Replace its rules with a template"; the drawer opens on that lane's rotation.
       laneStartOver: '[data-test^="oncall-lane-presets-"]',
       timelineGap: '[data-test="oncall-timeline-gap"]',
       timelineFillGap: '[data-test="oncall-timeline-fill-gap"]',
@@ -123,6 +125,9 @@ export class OnCallTeamDetailPage {
       presetsApply: '[data-test="oncall-presets-apply"]',
       presetsError: '[data-test="oncall-presets-error"]',
       presetsBlocked: '[data-test="oncall-presets-blocked"]',
+      presetsTarget: '[data-test="oncall-presets-target"]',
+      presetsNewName: '[data-test="oncall-presets-new-name"]',
+      presetsReplaceNote: '[data-test="oncall-presets-replace-note"]',
       presetDefaults: '[data-test="oncall-preset-defaults"]',
       presetDefaultsToggle: '[data-test="oncall-preset-defaults-toggle"]',
 
@@ -282,10 +287,21 @@ export class OnCallTeamDetailPage {
   getPresetsTabs() { return this.page.locator(this.locators.presetsTabs); }
   /** The catalogue lands on a shape rather than an empty pane; this is that shape. */
   getActivePresetTab() {
-    return this.page.locator(`${this.locators.presetsTabs} [data-state="checked"]`);
+    // The radio's inner indicator carries data-state too, so only the radio itself is counted.
+    return this.page.locator(`${this.locators.presetsTabs} [role="radio"][data-state="checked"]`);
   }
   getPresetTab(presetId) { return this.page.locator(this.presetTab(presetId)); }
   getPresetRow(rowKey) { return this.page.locator(this.presetRow(rowKey)); }
+  /** A region's name as its inline edit shows it at rest. */
+  getPresetRowNameTrigger(rowKey) {
+    return this.page.locator(part(this.presetRowName(rowKey), 'trigger')).first();
+  }
+  getPresetsDrawer() { return this.page.locator(this.locators.presetsDrawer); }
+  getPresetsReplaceNote() { return this.page.locator(this.locators.presetsReplaceNote); }
+
+  getQuickStartReplaceConfirm() {
+    return this.page.locator('[data-test="oncall-presets-replace-confirm"]');
+  }
 
   /** Every L0 hold band on the ladder. Count, not visibility — there may be none. */
   getLadderL0Bands() { return this.page.locator(this.anyLadderL0()); }
@@ -480,18 +496,17 @@ export class OnCallTeamDetailPage {
   /**
    * Open Quick start.
    *
-   * The locale calls it "Start from a template" (`oncall.presetsTitle`); the component is
-   * OnCallSchedulePresets and everything inside it is keyed `oncall-preset*`.
-   * Applying one is a FULL REPLACE of the team's rotations, so on a team that
-   * already has a schedule a confirmation stands between Save and the request.
+   * The component is OnCallSchedulePresets and everything inside it is keyed `oncall-preset*`.
+   * From a lane's ⋮ it opens on that lane's rotation, and applying replaces only
+   * that rotation's shift rules, behind a "Replace" confirmation.
    */
   async openQuickStart() {
     const empty = this.page.locator(this.locators.timelineEmpty);
     const laneMenu = this.page.locator(this.locators.laneMenus).first();
     await expect(empty.or(laneMenu)).toBeVisible({ timeout: 20000 });
-    // An empty schedule offers the template as its main road; once one exists it is the first lane's "Start over".
+    // An empty schedule offers the template as its main road; once one exists it is the first lane's "Replace its rules".
     if (await empty.isVisible()) {
-      await empty.getByRole('button', { name: /Start from a template/ }).click();
+      await this.page.locator(this.locators.timelineEmptyTemplate).click();
     } else {
       await laneMenu.click();
       await this.page.locator(this.locators.laneStartOver).first().click();
@@ -551,13 +566,13 @@ export class OnCallTeamDetailPage {
     await this.getQuickStartApply().click();
   }
 
-  /** Accept the "replace the shift rules of …" confirm and return the preset write it issues. */
+  /** Accept the "Replace …'s shift rules?" confirm and return the preset write it issues. */
   async confirmQuickStartReplace() {
     const write = this.page.waitForResponse(
       (res) => /\/oncall\/teams\/[^/]+\/schedule\/from-preset/.test(res.url()) && res.request().method() === 'POST',
       { timeout: 30000 },
     );
-    await this.page.locator(this.locators.confirmOk).click();
+    await this.getQuickStartReplaceConfirm().getByRole('button', { name: 'Replace', exact: true }).click();
     return await write;
   }
 
