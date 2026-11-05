@@ -41,39 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pick"
         @fold="act"
         @notice-action="onCanvasNotice"
-      >
-        <template v-if="clusters" #toolbar>
-          <div
-            class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
-            data-test="query-profile-cluster-toolbar"
-          >
-            <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
-              t("search.queryProfile.clusters")
-            }}</span>
-            <OToggleGroup
-              type="single"
-              :model-value="clusterView"
-              :aria-label="t('search.queryProfile.clusters')"
-              @update:model-value="onClusterView"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="query-profile-cluster-all">{{
-                t("search.queryProfile.allClusters")
-              }}</OToggleGroupItem>
-              <OToggleGroupItem value="split" size="sm" data-test="query-profile-cluster-split">{{
-                t("search.queryProfile.byCluster")
-              }}</OToggleGroupItem>
-              <OToggleGroupItem
-                v-for="c in clusters.rows"
-                :key="c.name"
-                :value="clusterViewOf(c.name)"
-                size="sm"
-                :data-test="`query-profile-cluster-${c.name}`"
-                >{{ c.name }}</OToggleGroupItem
-              >
-            </OToggleGroup>
-          </div>
-        </template>
-      </ProfileCanvas>
+      />
     </template>
     <template #detail>
       <ProfileDetailPanel
@@ -89,12 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   clusterSummary,
-  clusterViewOf,
   modelForClusterView,
   scopeNodeKey,
   summarizeProfile,
@@ -133,8 +98,6 @@ const { selectedId, fold, layout, notice, act, onNoticeAction, pick } = useProfi
 const clusterNotice = computed<FoldNotice | null>(() => {
   if (clusterView.value === "all" || !clusters.value) return null;
   const action = t("search.queryProfile.showAllClusters");
-  if (clusterView.value === "split")
-    return { text: t("search.queryProfile.byClusterNote"), action };
   const cluster = clusterView.value.slice("cluster:".length);
   const row = clusters.value.rows.find((r) => r.name === cluster);
   const total = clusters.value.rows.reduce((a, r) => a + r.queriers + r.ingesters, 0);
@@ -157,10 +120,6 @@ function onCanvasNotice() {
   if (nodeNotice.value) scope.value = "sum";
   else if (clusterNotice.value) clusterView.value = "all";
   else onNoticeAction();
-}
-
-function onClusterView(value: unknown) {
-  if (typeof value === "string" && value) clusterView.value = value as ClusterView;
 }
 
 watch(

@@ -134,18 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      ref="toolbarEl"
-      class="absolute top-3 z-10 flex flex-wrap items-center gap-2"
-      :style="{ left: `${toolbarX}px`, maxWidth: `calc(100% - ${toolbarX + noticeRightGap}px)` }"
-      data-canvas-overlay
-    >
-      <slot name="toolbar" />
-    </div>
-
-    <div
       v-if="notice"
       class="bg-surface-base border-border-default rounded-default absolute bottom-3 z-10 flex items-center gap-2 border py-1 ps-2.5 pe-1 text-xs shadow-sm"
-      :style="{ left: `${toolbarX}px`, maxWidth: `calc(100% - ${toolbarX + noticeRightGap}px)` }"
+      :style="{ left: `${leftInset}px`, maxWidth: `calc(100% - ${leftInset + noticeRightGap}px)` }"
       data-canvas-overlay
       data-test="query-profile-fold-notice"
     >
@@ -248,8 +239,6 @@ import { operatorTitle, variantLabel } from "./profileText";
 const ZOOM_STEP = 1.2;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
-const FIT_TOP = 56;
-const TOOLBAR_GAP = 8;
 const FIT_MARGIN = 24;
 const FIT_OVERLAY_W = 56;
 // Below this a fitted card is unreadable; the graph is top-aligned instead and the rest is panned to.
@@ -277,7 +266,6 @@ const { t } = useI18nTyped();
 const { isDesktop } = useBreakpoint();
 
 const canvasEl = ref<HTMLElement | null>(null);
-const toolbarEl = ref<HTMLElement | null>(null);
 const view = reactive({ x: 0, y: 0, k: 1 });
 const size = reactive({ w: 0, h: 0 });
 const drag = ref<{ x: number; y: number; vx: number; vy: number; id: number } | null>(null);
@@ -286,7 +274,6 @@ let lastModel = props.model;
 // what the next layout change should do to the view: keep a card where it was, or refit
 let pending: { ids: string[]; sx: number; sy: number } | "fit" | null = null;
 
-const toolbarX = computed(() => props.leftInset);
 const noticeRightGap = computed(() => (isDesktop.value ? FIT_OVERLAY_W + 12 : 12));
 
 const stageBoxes = computed(() =>
@@ -317,7 +304,7 @@ const variantLabels = computed(() =>
   (props.model.planOnly ? [] : props.layout.variantLabels).map((v) => {
     const variant = props.model.variantById[v.variantId];
     const label = variantLabel(t, variant);
-    return { ...v, text: variant.cluster ? label : `${label} · ${variant.nodeKeys.length}` };
+    return { ...v, text: `${label} · ${variant.nodeKeys.length}` };
   }),
 );
 
@@ -442,8 +429,7 @@ function zoomBy(factor: number) {
 function fit() {
   const right = isDesktop.value ? FIT_OVERLAY_W : FIT_MARGIN;
   const availW = Math.max(1, size.w - props.leftInset - right);
-  const top = fitTop();
-  const availH = Math.max(1, size.h - top - FIT_MARGIN);
+  const availH = Math.max(1, size.h - 2 * FIT_MARGIN);
   // the width fits so the overlays never hide cards; only the height, or a very wide plan, scrolls
   const k = clampZoom(
     Math.max(
@@ -464,13 +450,7 @@ function fit() {
       ? Math.max(0, spare / 2)
       : Math.min(0, Math.max(spare, availW / 2 - (root.x + CARD_W / 2) * k));
   view.x = props.leftInset + x;
-  view.y = top;
-}
-
-// a wrapped toolbar takes two rows, and fitted cards must start below it
-function fitTop() {
-  const bar = toolbarEl.value;
-  return Math.max(FIT_TOP, bar ? bar.offsetTop + bar.offsetHeight + TOOLBAR_GAP : 0);
+  view.y = FIT_MARGIN;
 }
 
 function isOverlay(target: EventTarget | null) {

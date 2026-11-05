@@ -132,8 +132,8 @@ export type OperatorCategory =
 /** "sum" | "node:<key>" — rescopes the numbers of operators that run on many nodes. */
 export type StageScope = string;
 
-/** Which clusters the canvas shows: all merged, one leader per cluster, or a single cluster. */
-export type ClusterView = "all" | "split" | `cluster:${string}`;
+/** Which clusters the canvas shows: all merged, or a single cluster. */
+export type ClusterView = "all" | `cluster:${string}`;
 
 interface OperatorSample {
   nodeKey: string;
@@ -181,8 +181,6 @@ export interface StageVariant {
   role: VariantRole;
   nodeNames: string[];
   rootOpId: string;
-  /** The cluster this variant's one leader stands for, when clusters are split. */
-  cluster: string;
 }
 
 interface ProfileStage {
@@ -215,8 +213,6 @@ export interface ProfileModel {
 interface BuildProfileOptions {
   /** The profile came from a plain EXPLAIN, so it carries no runtime numbers. */
   planOnly?: boolean;
-  /** Give each super-cluster leader its own variant instead of merging leaders by plan shape. */
-  splitClusters?: boolean;
 }
 
 export interface ClusterSummaryRow {
@@ -407,7 +403,6 @@ interface BuildContext {
   order: string[];
   stages: ProfileStage[];
   multiCluster: boolean;
-  splitClusters: boolean;
 }
 
 interface Box {
@@ -848,7 +843,7 @@ function buildStage(
   };
   ctx.stages.push(stage);
   const used = new Set<string>();
-  const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[]; cluster: string }>();
+  const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[] }>();
   for (const remote of entries) {
     const plan = remote.plan;
     const name = nodeNameOf(remote) || `#${remote.partition}`;
@@ -868,9 +863,8 @@ function buildStage(
     };
     stage.nodes.push(node);
     if (!plan) continue;
-    const split = ctx.splitClusters && clusterEntry;
-    const fp = split ? `${planFingerprint(plan)}@${name}` : planFingerprint(plan);
-    const group = groups.get(fp) ?? { nodes: [], parts: [], cluster: split ? name : "" };
+    const fp = planFingerprint(plan);
+    const group = groups.get(fp) ?? { nodes: [], parts: [] };
     group.nodes.push(node);
     group.parts.push({ nodeKey: node.key, plan, remote: plan.remote ?? [] });
     groups.set(fp, group);
@@ -888,7 +882,6 @@ function buildStage(
       role: variantRole(group.nodes),
       nodeNames: group.nodes.map(nodeLabel),
       rootOpId: addOperator(variantId, group.parts, remoteOpId, stage.id, variantId, ctx),
-      cluster: group.cluster,
     });
   });
   return stage;
@@ -950,7 +943,6 @@ export function buildProfileModel(
     order: [],
     stages: [],
     multiCluster: collectClusters(profile.plan, new Set()).size > 1,
-    splitClusters: !!options.splitClusters,
   };
   const leaderKey = nodeNameOf(profile) || "leader";
   const rootId = addOperator(
@@ -994,12 +986,9 @@ export function clusterViewOf(cluster: string): ClusterView {
 
 export function modelForClusterView(model: ProfileModel, view: ClusterView): ProfileModel {
   if (view === "all") return model;
-  if (view === "split") {
-    return buildProfileModel(model.profile, { ...model.options, splitClusters: true });
-  }
   const cluster = view.slice("cluster:".length);
   const profile = { ...model.profile, plan: onlyCluster(model.profile.plan, cluster) };
-  return buildProfileModel(profile, { ...model.options, splitClusters: false });
+  return buildProfileModel(profile, model.options);
 }
 
 /** Every node any stage dispatched to, once each, in stage order. */

@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { buildProfileModel, modelForClusterView } from "@/utils/queryProfile";
+import { buildProfileModel } from "@/utils/queryProfile";
 import { joinProfile, superClusterJoinProfile } from "@/utils/__fixtures__/queryProfile.fixture";
 import QueryProfileView from "./QueryProfileView.vue";
 
@@ -193,15 +193,12 @@ describe("QueryProfileView", () => {
 
   describe("super-cluster views", () => {
     const find = (test: string) => wrapper.find(`[data-test="${test}"]`);
-    const stageBoxes = () => wrapper.findAll('[data-test^="query-profile-stage-"]');
 
-    it("offers the cluster switch and the clusters table only for a super cluster", () => {
+    it("lists the clusters only for a super cluster", () => {
       wrapper = mountView();
-      expect(find("query-profile-cluster-toolbar").exists()).toBe(false);
       expect(find("query-profile-clusters").exists()).toBe(false);
       wrapper.unmount();
       wrapper = mountView(superClusterJoinProfile());
-      expect(find("query-profile-cluster-toolbar").exists()).toBe(true);
       expect(find("query-profile-clusters").text()).toContain("sc-c");
     });
 
@@ -229,29 +226,6 @@ describe("QueryProfileView", () => {
       await row.trigger("click");
       expect(find("query-profile-fold-notice").text()).toContain("Showing only sc-b");
       expect(wrapper.find(".opacity-40").exists()).toBe(false);
-    });
-
-    it("draws a branch per cluster leader when split by cluster", async () => {
-      wrapper = mountView(superClusterJoinProfile());
-      await find("query-profile-fold-plumbing").trigger("click");
-      expect(stageBoxes()).toHaveLength(4);
-      await find("query-profile-cluster-split").trigger("click");
-      expect(stageBoxes()).toHaveLength(8);
-      expect(wrapper.text()).toContain("sc-c leader");
-    });
-
-    it("names the cluster of every node in one cluster's own stage", async () => {
-      wrapper = mountView(superClusterJoinProfile());
-      await find("query-profile-cluster-split").trigger("click");
-      const split = modelForClusterView(buildProfileModel(superClusterJoinProfile()), "split");
-      const stage = split.stages.find((s) => s.cluster === "sc-b")!;
-      await find(`query-profile-card-${stage.remoteOpId}`).trigger("click");
-      await flushPromises();
-      const labels = find("query-profile-remote-nodes").findAll(
-        '[data-test^="query-profile-node-cluster-"]',
-      );
-      expect(labels).toHaveLength(5);
-      expect(labels.every((l) => l.text().startsWith("sc-b"))).toBe(true);
     });
 
     it("lists each cluster with its own nodes under it in one table", async () => {

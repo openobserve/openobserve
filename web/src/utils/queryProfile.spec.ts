@@ -845,23 +845,6 @@ describe("cluster views of a super-cluster profile", () => {
     expect(nested.every((s) => s.nodes.length === 15 && s.cluster === "")).toBe(true);
   });
 
-  it("gives each cluster leader its own branch when split", () => {
-    const split = modelForClusterView(model, "split");
-    for (const top of topStages(split)) {
-      expect(top.variants.map((v) => v.cluster)).toEqual(["sc-a", "sc-b", "sc-c"]);
-    }
-    const nested = split.stages.filter((s) => s.parentStageId);
-    expect(nested).toHaveLength(6);
-    expect(nested.map((s) => [s.cluster, s.nodes.length])).toEqual(
-      expect.arrayContaining([
-        ["sc-a", 5],
-        ["sc-b", 5],
-        ["sc-c", 5],
-      ]),
-    );
-    expect(summarizeProfile(split).nodeCounts.total).toBe(15);
-  });
-
   it("keeps only one cluster's nodes and numbers when one is chosen", () => {
     const one = modelForClusterView(model, clusterViewOf("sc-c"));
     expect(topStages(one).every((s) => s.nodes.map((n) => n.name).join() === "sc-c")).toBe(true);
