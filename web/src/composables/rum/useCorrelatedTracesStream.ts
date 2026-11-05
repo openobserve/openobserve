@@ -25,6 +25,17 @@ import {
 import { generateTraceContext } from "@/utils/zincutils";
 import { normalizeTraceId, RUM_CORRELATION_TRACES_STREAM } from "@/utils/rum/fields";
 
+/**
+ * How a bulk resolve ended, for callers that must tell "the resolver failed" from "resolved,
+ * but the trace is indexed nowhere" (an absent id means either).
+ */
+export interface TraceLocationsOutcome {
+  /** True when a failure left some ids unanswered: the stream list, a probe (an error, a partial answer or a function error) or the whole resolve. */
+  failed: boolean;
+  /** The org's traces streams, as listed; empty when the list could not be read. */
+  streams: string[];
+}
+
 /** Where a trace lives, and when it ran when the index could tell us. */
 export interface TraceLocation {
   stream: string;
@@ -184,6 +195,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     traceIds: string[],
     startTimeUs: number,
     endTimeUs: number,
+    outcome?: TraceLocationsOutcome,
   ): Promise<Record<string, string>> => {
     if (!streams.length || !traceIds.length) return {};
     const idList = traceIds.map((id) => `'${id}'`).join(",");
@@ -238,6 +250,10 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
               };
               return (_payload: any, response: any) => {
                 const results = response?.content?.results;
+                // A partial answer or a function error keeps the hits it has, but a miss from it is not clean.
+                if (outcome && (results?.is_partial || results?.function_error?.length)) {
+                  outcome.failed = true;
+                }
                 const ownIndex =
                   typeof results?.query_index === "number" ? results.query_index : null;
                 if (response?.type === "search_response_metadata") {
@@ -248,13 +264,21 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
                 }
               };
             })(),
-            error: () => resolve(), // a failed sub-query is a miss, not an error
+            error: () => {
+              // a failed sub-query is a miss, not an error; the outcome tells a caller it was not a clean miss
+              if (outcome) outcome.failed = true;
+              resolve();
+            },
             complete: () => resolve(),
             reset: () => {},
           },
-        )?.catch?.(() => resolve());
+        )?.catch?.(() => {
+          if (outcome) outcome.failed = true;
+          resolve();
+        });
       });
     } catch {
+      if (outcome) outcome.failed = true;
       return {};
     } finally {
       if (probeTraceId) activeProbeTraceIds.delete(probeTraceId);
@@ -280,12 +304,20 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
    * carries the trace's real range; only ids it could not cover fall through
    * to the probe, which escalates `knownStreams` → the remaining streams and
    * yields a stream but no range. Never rejects.
+   *
+   * The optional `outcome` is filled in for callers that need to know why an id is absent
+   * (see TraceLocationsOutcome); callers that pass none behave as before.
    */
   const resolveTraceLocationsBulk = async (
     traceIds: string[],
     startTimeUs: number,
     endTimeUs: number,
+    outcome?: TraceLocationsOutcome,
   ): Promise<Record<string, TraceLocation>> => {
+    if (outcome) {
+      outcome.failed = false;
+      outcome.streams = [];
+    }
     try {
       const result: Record<string, TraceLocation> = {};
       const toResolve: string[] = [];
@@ -299,7 +331,12 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       if (!toResolve.length) return result;
 
       const allStreams = await listTracesStreams();
-      if (!allStreams.length) return result;
+      if (outcome) outcome.streams = allStreams;
+      if (!allStreams.length) {
+        // No list means a failed read as often as an org without traces; either way nothing was resolved.
+        if (outcome) outcome.failed = true;
+        return result;
+      }
       if (allStreams.length === 1) {
         // The stream is already known; the lookup is for the range alone, so
         // an unanswered id still resolves to that stream.
@@ -328,7 +365,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
 
       const known: string[] = cache().knownStreams.filter((s: string) => allStreams.includes(s));
       const step1Streams = known.length ? known : allStreams;
-      const step1 = await probeBatch(step1Streams, pending, startTimeUs, endTimeUs);
+      const step1 = await probeBatch(step1Streams, pending, startTimeUs, endTimeUs, outcome);
       for (const [id, stream] of Object.entries(step1)) {
         result[id] = { stream };
         record(id, stream);
@@ -338,7 +375,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       const unresolved = pending.filter((id) => !(id in result));
       const unprobed = allStreams.filter((s) => !step1Streams.includes(s));
       if (unresolved.length && unprobed.length) {
-        const step2 = await probeBatch(unprobed, unresolved, startTimeUs, endTimeUs);
+        const step2 = await probeBatch(unprobed, unresolved, startTimeUs, endTimeUs, outcome);
         for (const [id, stream] of Object.entries(step2)) {
           result[id] = { stream };
           record(id, stream);
@@ -347,6 +384,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       return result;
     } catch (err: unknown) {
       console.error("Failed to resolve traces streams", err);
+      if (outcome) outcome.failed = true;
       return {};
     }
   };

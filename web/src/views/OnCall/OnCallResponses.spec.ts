@@ -148,13 +148,19 @@ const stubs = {
         const rank = (k: string) => (order.indexOf(k) === -1 ? order.length : order.indexOf(k));
         return seen.sort((a, b) => rank(a) - rank(b));
       },
+      // One page, like the real client-paged table: drawing all 200+ rows of real cells timed tests out on loaded CI.
+      pageRows(): unknown[] {
+        const size = this.pageSize || 20;
+        const start = ((this.currentPage || 1) - 1) * size;
+        return (this.data || []).slice(start, start + size);
+      },
     },
     template: `<div>
       <slot name='toolbar' /><slot name='toolbar-trailing' /><slot name='subheader' />
       <div v-for="key in sectionKeys" :key="key" :data-test="'section-' + key">
         <slot name='group-header' :section-key="key" :rows="[]" />
       </div>
-      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+      <div v-for="(row, i) in pageRows" :key="i" data-test="row">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
       </div>
       <slot name='empty' />
@@ -718,7 +724,6 @@ describe("OnCallResponses", () => {
 
     /// Past the route's cap the list says so rather than leaving a blank cell that reads as "nothing has fired".
     it("caps how many ladders it loads, and says that it did", async () => {
-      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
       const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
       );
@@ -729,7 +734,7 @@ describe("OnCallResponses", () => {
       expect(asked).toHaveLength(200);
       expect(asked).not.toContain("resp_200");
       expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
-    }, 20000);
+    });
 
     /// Rows the server left out have no progress: the record's own step, or no claim, never "Not paged yet".
     it("says what it can for rows without an answer, without claiming they were not paged", async () => {
@@ -1228,9 +1233,7 @@ describe("OnCallResponses", () => {
     /// H6: this is the one test in the suite that mounts the table with 600
     /// rows, because a "full page" is only full at the component's own limit of
     /// 200 and the cap is three of them — shrinking the fixture would stop
-    /// pinning the claim. It passes in about a second alone and times out at
-    /// the 5s default under a 39-file parallel run, so it gets its own budget
-    /// rather than a re-run every time somebody sees it red.
+    /// pinning the claim.
     it("walks on while pages come back full, and says so when it stops early", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
       service.listTeams.mockResolvedValue({ data: [team] } as any);
@@ -1252,7 +1255,7 @@ describe("OnCallResponses", () => {
 
       expect(pagingCalls()).toHaveLength(3);
       expect(again.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
-    }, 20_000);
+    });
 
     /// The truncation line never claims a total. `/responses/count` was
     /// invented by the client — no build has ever served it — so it 404'd on
@@ -1268,7 +1271,7 @@ describe("OnCallResponses", () => {
       const line = wrapper.find('[data-test="oncall-responses-truncated"]').text();
       expect(line).toContain("600");
       expect(line).not.toContain(" of ");
-    }, 20_000);
+    });
   });
 
   /// The team column is the answer to "who owns this page", and the question
@@ -1680,7 +1683,6 @@ describe("OnCallResponses", () => {
     });
 
     it("splits row teams past the route's cap across context reads, asking for the viewer's once", async () => {
-      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
       answerTeams((id) => ({ ...emptyTeam, on_call: [position(`${id}@o2.ai`)] }));
       const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, team_id: `team_${i}` }, `al_${i}`),
@@ -1692,8 +1694,11 @@ describe("OnCallResponses", () => {
         [200, true],
         [5, false],
       ]);
+      // The last row sits on the table's last page of 20.
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:currentPage", 11);
+      await flushPromises();
       expect(shownOnCall(wrapper)).toContain("team_204@o2.ai");
-    }, 20000);
+    });
 
     it("shows the on-call cell from the context answer", async () => {
       answerTeams(() => ({ ...emptyTeam, on_call: [position("ana@o2.ai")] }));

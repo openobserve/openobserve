@@ -961,7 +961,7 @@ pub struct StreamSettings {
     pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
-    #[serde(default)]
+    #[serde(default = "StreamSettings::default_approx_partition")]
     pub approx_partition: bool,
     /// Per-stream override of `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; unset follows the type.
     #[serde(default)]
@@ -998,7 +998,7 @@ impl Default for StreamSettings {
             defined_schema_fields: Vec::new(),
             max_query_range: 0,
             store_original_data: false,
-            approx_partition: false,
+            approx_partition: Self::default_approx_partition(),
             dynamic_merge: None,
             distinct_value_fields: Vec::new(),
             index_updated_at: 0,
@@ -1034,6 +1034,13 @@ impl StreamSettings {
             columns.push(crate::ALL_VALUES_COL_NAME.to_string());
         }
         columns
+    }
+
+    // One source for an unset value, so a first save cannot pin a stream to false.
+    fn default_approx_partition() -> bool {
+        get_config()
+            .common
+            .use_stream_settings_for_partitions_enabled
     }
 }
 
@@ -1186,11 +1193,7 @@ impl From<&str> for StreamSettings {
         let approx_partition = settings
             .get("approx_partition")
             .and_then(Value::as_bool)
-            .unwrap_or(
-                get_config()
-                    .common
-                    .use_stream_settings_for_partitions_enabled,
-            );
+            .unwrap_or_else(Self::default_approx_partition);
 
         let dynamic_merge = settings.get("dynamic_merge").and_then(Value::as_bool);
 
@@ -2445,5 +2448,21 @@ mod tests {
         assert_eq!(null.dynamic_merge, None);
         let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
         assert_eq!(set.dynamic_merge, Some(false));
+    }
+
+    #[test]
+    fn test_stream_settings_unset_approx_partition_follows_env() {
+        let saved = crate::CONFIG.load_full();
+        let mut cfg = crate::Config::init().unwrap();
+        cfg.common.use_stream_settings_for_partitions_enabled = true;
+        crate::CONFIG.store(Arc::new(cfg));
+
+        let first_save = json::to_string(&StreamSettings::default()).unwrap();
+        let reloaded = StreamSettings::from(first_save.as_str());
+        let created: StreamSettings = json::from_str("{}").unwrap();
+
+        crate::CONFIG.store(saved);
+        assert!(reloaded.approx_partition);
+        assert!(created.approx_partition);
     }
 }

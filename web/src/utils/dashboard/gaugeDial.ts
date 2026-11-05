@@ -18,6 +18,9 @@ import { applyAggregation } from "./promql/shared/dataProcessor";
 import type { SeriesUnitArgs } from "./seriesOverrides";
 import type { DisplayedValueMapping } from "./tableConfigUtils";
 
+/** The name of a dial whose label value is blank, as series names elsewhere use for an empty group. */
+export const GAUGE_EMPTY_GROUP_NAME = "(empty)";
+
 const NO_VALUE_TEXT = "-";
 const MIN_DETAIL_FONT = 12;
 const MAX_DETAIL_FONT = 72;

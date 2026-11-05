@@ -228,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #actions>
             <OButton
+              v-if="pa.canWidenRange.value"
               variant="outline"
               size="md"
               data-test="rum-analytics-paths-no-anchor-widen-range-btn"
@@ -270,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("rum.analytics.pathsView.backToFunnel") }}</OButton
               >
               <OButton
+                v-if="pa.canWidenRange.value"
                 variant="outline"
                 size="md"
                 data-test="rum-analytics-paths-widen-range-btn"

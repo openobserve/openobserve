@@ -542,4 +542,119 @@ describe("useCorrelatedTracesStream", () => {
       expect(mockGetTraceTimeRanges).not.toHaveBeenCalled();
     });
   });
+  // The optional outcome tells "the resolver failed" from "resolved, indexed nowhere".
+  describe("resolveTraceLocationsBulk outcome", () => {
+    it("is clean and lists the streams when the ids are simply indexed nowhere", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([{ trace_id: T1, status: "not_found" }]),
+      );
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      const outcome = { failed: true, streams: [] as string[] };
+
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, outcome)).toEqual({});
+      expect(outcome.failed).toBe(false);
+      expect(outcome.streams).toEqual(["default", "payments_traces", "checkout_traces"]);
+    });
+
+    it("is clean when a probe answered and found nothing", async () => {
+      mockBatch({});
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      const outcome = { failed: true, streams: [] as string[] };
+
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, outcome)).toEqual({});
+      expect(outcome.failed).toBe(false);
+    });
+
+    it("fails when the stream list cannot be read", async () => {
+      mockGetStreams.mockRejectedValue(new Error("boom"));
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      const outcome = { failed: false, streams: ["stale"] };
+
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, outcome)).toEqual({});
+      expect(outcome).toEqual({ failed: true, streams: [] });
+    });
+
+    it("fails when the probe errors, whether it throws or reports an error", async () => {
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => {
+        throw new Error("boom");
+      });
+      const thrown = { failed: false, streams: [] as string[] };
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, thrown)).toEqual({});
+      expect(thrown.failed).toBe(true);
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_args: any, handlers: any) => {
+        handlers.error(new Error("stream"));
+        return Promise.resolve();
+      });
+      const reported = { failed: false, streams: [] as string[] };
+      expect(await resolveTraceLocationsBulk([T2], 1_000, 2_000, reported)).toEqual({});
+      expect(reported.failed).toBe(true);
+    });
+
+    // A probe answers with its hits (and no more than that), the metadata event carrying the extra fields.
+    const mockProbeAnswer = (hitIds: string[], extra: Record<string, unknown>) => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((args: any, handlers: any) => {
+        handlers.data(null, {
+          type: "search_response_metadata",
+          content: { results: { hits: [], total: hitIds.length, query_index: 0, ...extra } },
+        });
+        handlers.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: hitIds.map((id) => ({ trace_id: id })) } },
+        });
+        handlers.complete();
+        return Promise.resolve();
+      });
+    };
+
+    it.each([
+      ["is_partial", { is_partial: true }],
+      ["a function_error list", { function_error: ["a function failed"] }],
+    ])(
+      "fails when a probe answers with %s, and a miss from it is not clean",
+      async (_name, extra) => {
+        mockProbeAnswer([], extra);
+        const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+        const outcome = { failed: false, streams: [] as string[] };
+
+        expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, outcome)).toEqual({});
+        // The probe did run, so the failure is the partial answer's, not a lookup that never happened.
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+        expect(outcome.failed).toBe(true);
+      },
+    );
+
+    it("keeps the hits of a partial probe and still reports the failure", async () => {
+      mockProbeAnswer([T1], { is_partial: true });
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      const outcome = { failed: false, streams: [] as string[] };
+
+      const found = await resolveTraceLocationsBulk([T1, T2], 1_000, 2_000, outcome);
+
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(found).toEqual({ [T1]: { stream: "default" } });
+      expect(outcome.failed).toBe(true);
+    });
+
+    it("is clean when a probe answers with an empty function_error and no partial flag", async () => {
+      mockProbeAnswer([], { is_partial: false, function_error: [] });
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      const outcome = { failed: false, streams: [] as string[] };
+
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000, outcome)).toEqual({});
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(outcome.failed).toBe(false);
+    });
+
+    it("changes nothing for a caller that passes no outcome", async () => {
+      mockBatch({ payments_traces: [T1] });
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTraceLocationsBulk([T1], 1_000, 2_000)).toEqual({
+        [T1]: { stream: "payments_traces" },
+      });
+    });
+  });
 });
