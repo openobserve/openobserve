@@ -795,6 +795,14 @@ export class AlertsPage {
         return this.management.openCloneDialog(alertName);
     }
 
+    rowLastOutcome(alertName) {
+        return this.management.rowLastOutcome(alertName);
+    }
+
+    async clickRowEdit(alertName) {
+        return this.management.clickRowEdit(alertName);
+    }
+
     cloneSaveButton() {
         return this.management.cloneSaveButton();
     }

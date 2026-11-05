@@ -264,6 +264,10 @@ export class AlertSaveQueryModePage {
     await expect(this.page.locator(this.locators.streamTrigger)).toHaveText(streamName, { timeout: 20000 });
   }
 
+  alertNameValue() {
+    return this.page.locator('[data-test="add-alert-name-input-value"]');
+  }
+
   async expectThreshold(value) {
     // The field repaints from the fetched alert, so allow for the round trip.
     await expect(this.page.locator(this.locators.threshold)).toHaveValue(value, { timeout: 20000 });
