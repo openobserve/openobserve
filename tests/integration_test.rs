@@ -7760,6 +7760,10 @@ mod tests {
                 Box::pin(e2e_stale_cache_deletes_nothing(window)),
             ),
             (
+                "retry_repairs_missing_trigger",
+                Box::pin(e2e_retry_repairs_a_missing_trigger()),
+            ),
+            (
                 "stale_unreadable",
                 Box::pin(e2e_stale_row_that_cannot_be_checked_writes_nothing(window)),
             ),
@@ -8229,6 +8233,23 @@ mod tests {
             Some(window + E2E_PIPELINE_PERIOD_MICROS)
         );
         assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_retry_repairs_a_missing_trigger() {
+        let id = "retry_repair_pl";
+        let (_, row) = e2e_create_scheduled(id, "retry_repair", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+
+        // The body equals the stored pipeline, as a retry after a failed trigger write does.
+        let stored = e2e_stored_pipeline(id).await;
+        assert_eq!(e2e_update_pipeline(&stored).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, row.module_key);
         e2e_delete_scheduled(id).await;
     }
 

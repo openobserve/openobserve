@@ -234,6 +234,23 @@ async fn write_trigger(
     Ok(())
 }
 
+/// A trigger write can fail after the pipeline write, and a retry of the same body lands here.
+async fn repair_missing_trigger(pipeline: &mut Pipeline) -> Result<(), PipelineError> {
+    let (Some(source), Some(key)) = (
+        pipeline.get_derived_stream(),
+        pipeline.scheduler_module_key(),
+    ) else {
+        return Ok(());
+    };
+    if !pipeline.enabled
+        || scheduler::exists(&source.org_id, TriggerModule::DerivedStream, &key).await
+    {
+        return Ok(());
+    }
+    let validated_source = validated_scheduled_source(pipeline).await?;
+    write_trigger(None, pipeline, validated_source).await
+}
+
 async fn run_check(
     check: Option<&dyn WriteCheck<Pipeline>>,
     pipeline: &Pipeline,
@@ -371,7 +388,7 @@ pub async fn update_pipeline_checked(
     default_node_orgs(&mut existing_pipeline);
 
     if existing_pipeline == pipeline {
-        return Ok(());
+        return repair_missing_trigger(&mut pipeline).await;
     }
 
     // check version
