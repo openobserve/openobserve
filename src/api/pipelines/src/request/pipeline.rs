@@ -719,6 +719,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_run_in_progress_is_conflict() {
+        assert_eq!(
+            status(PipelineError::RunInProgress("abc".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
     // 400 Bad Request
     #[test]
     fn test_stream_in_use_is_bad_request() {

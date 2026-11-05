@@ -123,6 +123,30 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
     infra_scheduler::get(org, module, key).await
 }
 
+/// Moves a Waiting job to `new_key`, keeping its data and next run; false when no such job.
+#[inline]
+pub async fn rename_key(
+    org: &str,
+    module: TriggerModule,
+    key: &str,
+    new_key: &str,
+) -> Result<bool> {
+    let renamed = infra_scheduler::rename_key(org, module.clone(), key, new_key).await?;
+
+    // super cluster: the queue has no rename message
+    #[cfg(feature = "enterprise")]
+    if renamed && get_o2_config().super_cluster.enabled {
+        super_cluster::queue::scheduler_delete(org, module.clone(), key)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        super_cluster::queue::scheduler_push(infra_scheduler::get(org, module, new_key).await?)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+    }
+
+    Ok(renamed)
+}
+
 /// Returns the scheduled job associated with the given id in read-only fashion
 #[inline]
 pub async fn exists(org: &str, module: TriggerModule, key: &str) -> bool {

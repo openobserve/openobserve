@@ -273,7 +273,9 @@ impl From<PipelineError> for Response {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
+                MetaHttpResponse::conflict(value)
+            }
             PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }
