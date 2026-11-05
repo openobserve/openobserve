@@ -26,6 +26,7 @@ import { streamKeys } from "@/services/stream.querykeys";
 import store from "@/test/unit/helpers/store";
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
 import OnboardingView from "./OnboardingView.vue";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -116,6 +117,8 @@ async function mountAt(path: string, { inRouterView = false } = {}) {
 describe("OnboardingView", () => {
   // A first login sets the marker; only then does leaving onboarding record the start.
   beforeEach(() => {
+    // the page exists on cloud only
+    config.isCloud = "true";
     markStartPending(store.state.userInfo.email);
     // An org with no streams, so the page stays open.
     global.server.use(
@@ -126,12 +129,40 @@ describe("OnboardingView", () => {
   });
 
   afterEach(() => {
+    config.isCloud = "false";
     queryClient.clear();
     store.state.organizationData.isDataIngested = false;
     vi.mocked(analytics.track).mockClear();
     vi.mocked(billings.submit_new_user_info).mockClear();
     localStorage.clear();
     sessionStorage.clear();
+  });
+
+  // both switches off means no first-run flow, so a bookmark or typed URL must not open it
+  it("sends the user Home when the deployment turns onboarding off", async () => {
+    store.commit("setConfig", { ...store.state.zoConfig, onboarding_flow_enabled: false });
+    try {
+      const { router, wrapper } = await mountAt("/onboarding/logs", { inRouterView: true });
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(wrapper.find('[data-test="onboarding-view"]').exists()).toBe(false);
+    } finally {
+      delete store.state.zoConfig.onboarding_flow_enabled;
+    }
+  });
+
+  it("stays while the full config is unknown, and goes Home once it lands with onboarding off", async () => {
+    const full = { ...store.state.zoConfig };
+    const { version: _version, ...bootstrap } = full;
+    store.commit("setConfig", bootstrap);
+    try {
+      const { router } = await mountAt("/onboarding", { inRouterView: true });
+      expect(router.currentRoute.value.name).toBe("onboarding");
+      store.commit("setConfig", { ...full, onboarding_flow_enabled: false });
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("home");
+    } finally {
+      store.commit("setConfig", full);
+    }
   });
 
   it("keeps an org whose only streams are synthetic checks on onboarding", async () => {

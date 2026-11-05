@@ -16,7 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Cloud onboarding: a focus-mode page (route meta `focusMode`), so the app header shows with no side menu. -->
 <template>
-  <div class="bg-surface-base flex h-full min-h-0 flex-col" data-test="onboarding-view">
+  <div
+    v-if="!flowOff"
+    class="bg-surface-base flex h-full min-h-0 flex-col"
+    data-test="onboarding-view"
+  >
     <!-- The page never scrolls sideways; a step that needs to scrolls inside itself. -->
     <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <OnboardingStepChoose
@@ -107,6 +111,7 @@ import {
 } from "@/components/onboarding/onboardingFlow";
 import type { FirstSourceId } from "@/components/login/firstSourceOptions";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
+import { flowsKnown, onboardingFlowOn } from "@/utils/firstRunFlow";
 import analytics from "@/services/product_analytics";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -121,6 +126,14 @@ onBeforeRouteLeave((to) => {
 });
 
 const orgQuery = computed(() => ({ org_identifier: store.state.selectedOrganization?.identifier }));
+
+// A deployment that turns onboarding off has no such page, so a bookmark goes Home once the full config says so.
+const flowOff = computed(
+  () => flowsKnown(store.state.zoConfig) && !onboardingFlowOn(store.state.zoConfig),
+);
+watch(flowOff, (off) => off && router.replace({ name: "home", query: orgQuery.value }), {
+  immediate: true,
+});
 
 // Read before any step records the start: a user who came back from inside the app is not skipping sign-up.
 const fromFirstLogin = startPending(store.state.userInfo?.email);
@@ -144,6 +157,7 @@ provide(SETUP_CARD_ONBOARDING, tracePresets);
 watch(
   resolved,
   (step) => {
+    if (flowOff.value) return;
     if (step.step === "redirect") {
       router.replace({ name: "onboarding", params: { path: step.path }, query: orgQuery.value });
       return;
