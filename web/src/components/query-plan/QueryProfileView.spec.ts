@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import store from "@/test/unit/helpers/store";
 import { buildProfileModel, modelForClusterView } from "@/utils/queryProfile";
 import { joinProfile, superClusterJoinProfile } from "@/utils/__fixtures__/queryProfile.fixture";
@@ -208,6 +209,27 @@ describe("QueryProfileView", () => {
       await find("query-profile-fold-notice-action").trigger("click");
       expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
       expect(find("query-profile-fold-notice").exists()).toBe(false);
+    });
+
+    it("offers only pods in the node picker, never a cluster's own entry", () => {
+      wrapper = mountView(superClusterJoinProfile());
+      const labels = wrapper
+        .findComponent(OSelect)
+        .props("options")
+        .map((o: { label: string }) => String(o.label));
+      expect(labels).toHaveLength(15);
+      expect(labels.some((l: string) => /^sc-[abc]$/.test(l))).toBe(false);
+      expect(labels).toContain("querier-0 · sc-b · Querier");
+    });
+
+    it("opens a cluster from its timeline row instead of scoping to it", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      const row = wrapper
+        .findAll('[data-test^="query-profile-timeline-"]')
+        .find((r) => r.text().startsWith("sc-b"))!;
+      await row.trigger("click");
+      expect(find("query-profile-fold-notice").text()).toContain("Showing only sc-b");
+      expect(wrapper.find(".opacity-40").exists()).toBe(false);
     });
 
     it("draws a branch per cluster leader when split by cluster", async () => {

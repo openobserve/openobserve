@@ -181,10 +181,12 @@ const clusterNotice = computed<FoldNotice | null>(() => {
 });
 
 const nodeOptions = computed(() =>
-  clusterNodes(viewModel.value).map((n) => {
-    const role = n.clusterEntry ? null : roleLabel(t, n.role);
-    return { label: raw([n.name, n.cluster, role].filter(Boolean).join(" · ")), value: n.key };
-  }),
+  clusterNodes(viewModel.value)
+    .filter((n) => !n.clusterEntry)
+    .map((n) => ({
+      label: raw([n.name, n.cluster, roleLabel(t, n.role)].filter(Boolean).join(" · ")),
+      value: n.key,
+    })),
 );
 
 const selectedNode = computed(() => scopeNodeKey(scope.value));

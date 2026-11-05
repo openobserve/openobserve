@@ -173,10 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="cell"
         :aria-pressed="row.active"
         :data-test="`query-profile-timeline-${row.nodeKey}`"
-        @click="toggleNode(row.nodeKey)"
+        @click="onTimelineRow(row)"
       >
         <div
-          class="rounded-default grid grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] items-center gap-1.5 px-1 py-0.5 text-xs"
+          class="rounded-default grid grid-cols-[6.5rem_minmax(0,1fr)_4rem] items-center gap-1.5 px-1 py-0.5 text-xs"
           :class="row.active ? 'bg-surface-accent-active' : ''"
         >
           <OTruncatedText class="text-text-body">{{ row.name }}</OTruncatedText>
@@ -352,6 +352,7 @@ const timelineRows = computed(() => {
   const span = props.summary.timeline.spanUs || 1;
   return props.summary.timeline.rows.map((row) => ({
     nodeKey: row.nodeKey,
+    cluster: row.clusterEntry ? row.name : "",
     name: raw(row.name),
     active: activeNode.value === row.nodeKey,
     duration: formatNs(row.durationUs * 1000),
@@ -364,7 +365,9 @@ const timelineRows = computed(() => {
   }));
 });
 
-function toggleNode(nodeKey: string) {
-  emit("scope", activeNode.value === nodeKey ? "sum" : nodeScope(nodeKey));
+// a cluster's own row has no samples on its pods' operators, so it opens that cluster instead of scoping
+function onTimelineRow(row: { nodeKey: string; cluster: string }) {
+  if (row.cluster) return emit("cluster", clusterViewOf(row.cluster));
+  emit("scope", activeNode.value === row.nodeKey ? "sum" : nodeScope(row.nodeKey));
 }
 </script>

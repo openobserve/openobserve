@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="e in chipEdges"
         :key="`chip-${e.key}`"
-        class="absolute -translate-x-1/2 -translate-y-1/2"
+        class="bg-surface-base rounded-default absolute -translate-x-1/2 -translate-y-1/2"
         :style="{ left: `${e.labelX}px`, top: `${e.labelY}px` }"
         data-profile-card
       >
@@ -456,7 +456,14 @@ function fit() {
     ),
   );
   view.k = k;
-  view.x = props.leftInset + Math.max(0, (availW - props.layout.width * k) / 2);
+  const spare = availW - props.layout.width * k;
+  const root = cardAt(props.model.rootId);
+  // a plan wider than the canvas keeps its root, where reading starts, in the middle
+  const x =
+    spare >= 0 || !root
+      ? Math.max(0, spare / 2)
+      : Math.min(0, Math.max(spare, availW / 2 - (root.x + CARD_W / 2) * k));
+  view.x = props.leftInset + x;
   view.y = top;
 }
 

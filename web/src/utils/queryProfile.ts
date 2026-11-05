@@ -274,6 +274,7 @@ export interface TimelineSegment {
 interface TimelineRow {
   nodeKey: string;
   name: string;
+  clusterEntry: boolean;
   role: string;
   segments: TimelineSegment[];
   durationUs: number;
@@ -1248,6 +1249,7 @@ function timeline(model: ProfileModel): ProfileSummary["timeline"] {
       const row = rows.get(n.key) ?? {
         nodeKey: n.key,
         name: nodeLabel(n),
+        clusterEntry: n.clusterEntry,
         role: n.role,
         segments: [],
         durationUs: 0,
