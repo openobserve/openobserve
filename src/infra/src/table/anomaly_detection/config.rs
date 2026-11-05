@@ -22,7 +22,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JsonValue as Json, QueryFilter, QueryOrder, Set, TransactionTrait,
+    JsonValue as Json, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::{
@@ -56,6 +56,28 @@ pub async fn list_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<V
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
     Ok(models)
+}
+
+/// `(org, name)` of each config whose template override is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>> {
+    let mut query = anomaly_detection_config::Entity::find()
+        .select_only()
+        .column(anomaly_detection_config::Column::OrgId)
+        .column(anomaly_detection_config::Column::Name)
+        .filter(anomaly_detection_config::Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(anomaly_detection_config::Column::OrgId.eq(org));
+    }
+    query
+        .order_by_asc(anomaly_detection_config::Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
 }
 
 /// Lists all enabled configs across all organisations.
@@ -295,6 +317,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.rcf_shingle_size = Set(src.rcf_shingle_size);
     active.alert_enabled = Set(src.alert_enabled);
     active.alert_destinations = Set(src.alert_destinations);
+    active.template = Set(src.template);
     active.folder_id = Set(src.folder_id);
     active.owner = Set(src.owner);
     active.status = Set(src.status);
@@ -427,6 +450,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,
@@ -656,6 +680,7 @@ mod tests {
             last_failed_at,
             last_alert_fired_at,
             last_recovery_notified_at,
+            template,
             detection_lease_us,
             last_updated,
             created_at,
@@ -720,6 +745,8 @@ mod tests {
             // Pending state for an alert this region delivered; a peer's mark would recover
             // an alert local destinations never received, or cancel one they did.
             ("last_recovery_notified_at", Scope::RegionLocal),
+            // User-authored delivery config like `alert_destinations`.
+            ("template", Scope::Replicated),
             // A peer's in-flight run must neither block nor release this region's detection.
             ("detection_lease_us", Scope::RegionLocal),
             ("last_updated", Scope::Replicated),
@@ -778,6 +805,7 @@ mod tests {
             last_failed_at: Some(1_700_000_000_000_001),
             last_alert_fired_at: Some(1_700_000_000_000_002),
             last_recovery_notified_at: Some(1_700_000_000_000_003),
+            template: Some("peer-template".to_string()),
             detection_lease_us: Some(1_700_000_000_000_004),
             last_updated: 21,
             created_at: 9_999_999,

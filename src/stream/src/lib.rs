@@ -196,11 +196,6 @@ pub fn stream_res(
     };
 
     let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    if settings == StreamSettings::default() {
-        settings.approx_partition = get_config()
-            .common
-            .use_stream_settings_for_partitions_enabled;
-    }
     // what the UI needs is the switch in effect, a stream without its own value follows the env
     if stream_type.support_dynamic_partition() {
         settings.partition_time_level.dynamic = Some(get_stream_setting_dynamic_partition(

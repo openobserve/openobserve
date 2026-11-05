@@ -106,6 +106,14 @@ pub fn context_object(ctx: &NotificationContext) -> Value {
         out.insert(name.to_string(), str_or_null(value));
     }
 
+    // Alerts keep their envelope byte identical; every other kind names itself.
+    if ctx.kind != config::meta::alerts::notification_kind::NotificationKind::Alert {
+        out.insert("kind".to_string(), json!(ctx.kind.as_str()));
+        for (name, value) in crate::alerts::notifications::resolve::extra_scalar_vars(ctx) {
+            out.insert(name.to_string(), str_or_null(&value));
+        }
+    }
+
     // Row columns: the multi-value form, as arrays (the scalar `", "`-joined
     // form is a template convenience; a machine consumer wants the list).
     for (key, values) in &ctx.row_columns {

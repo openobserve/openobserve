@@ -15,8 +15,8 @@
 
 import type { DowntimeDetail, DowntimeWindow, TargetModule } from "@/services/downtimes";
 
-export const DOWNTIME_TEMPLATE = "prebuilt_downtime";
-export const DOWNTIME_EMAIL_TEMPLATE = "prebuilt_downtime_email";
+// The one built-in default every kind and channel falls back to, email included.
+export const DOWNTIME_TEMPLATE = "prebuilt_default";
 
 const DOWNTIME_VARIABLE_PREFIX = "{downtime_";
 
@@ -110,7 +110,7 @@ export const isEmailDestination = (dest: TestDestination): boolean => dest.type 
 
 export function templateNameFor(dest: TestDestination, ownBody?: string): string {
   if (dest.template && ownBody?.includes(DOWNTIME_VARIABLE_PREFIX)) return dest.template;
-  return isEmailDestination(dest) ? DOWNTIME_EMAIL_TEMPLATE : DOWNTIME_TEMPLATE;
+  return DOWNTIME_TEMPLATE;
 }
 
 export function testRequestFor(dest: TestDestination, body: string): DestinationTestRequest | null {

@@ -117,7 +117,14 @@ def test_preview_renders_slack_payload_from_draft(client: OpenObserveClient):
 
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert "attachments" in body["payload"]
+    payload = body["payload"]
+    # The status dot carries severity, so the blocks sit at the top level with no color stripe.
+    assert "attachments" not in payload, payload
+    blocks = payload["blocks"]
+    assert blocks[0]["type"] in ("section", "header"), blocks[0]
+    assert "Sample CPU alert fired" in blocks[0]["text"]["text"], blocks[0]
+    actions = next(b for b in blocks if b["type"] == "actions")
+    assert any(e["text"]["text"] == "View in OpenObserve" for e in actions["elements"]), actions
     assert "hello" in body["preview_model"]["body_html"]
     assert "{alert_name}" not in resp.text, "placeholders must be resolved against the sample"
 

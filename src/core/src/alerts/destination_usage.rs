@@ -885,6 +885,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,

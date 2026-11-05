@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -26,7 +26,14 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
+vi.mock("@/services/alert_templates", () => ({
+  default: {
+    list: vi.fn().mockResolvedValue({ data: [{ name: "ops-card", kind: "content" }] }),
+  },
+}));
+
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
+import templateService from "@/services/alert_templates";
 
 const makeConfig = (overrides: Record<string, any> = {}) => ({
   alert_enabled: true,
@@ -194,5 +201,25 @@ describe("AnomalyAlerting - direction and window share", () => {
       .map((id) => w.find(`#${id}`).text())
       .join(" ");
     expect(name).toBe("Notifications Enabled");
+  });
+});
+
+describe("AnomalyAlerting - template override", () => {
+  it("lists anomaly templates and writes the pick to the config", async () => {
+    const config = makeConfig({ template: null, template_error: "old" });
+    const w = await mountComp({ config });
+    await flushPromises();
+    expect(templateService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ applies_to: "anomaly" }),
+    );
+    const picker = w.findComponent({ name: "TemplateOverridePicker" });
+    await picker.vm.$emit("update:modelValue", "ops-card");
+    expect(config.template).toBe("ops-card");
+    expect(config.template_error).toBeNull();
+  });
+
+  it("hides the picker while notifications are off", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: false }) });
+    expect(w.findComponent({ name: "TemplateOverridePicker" }).exists()).toBe(false);
   });
 });

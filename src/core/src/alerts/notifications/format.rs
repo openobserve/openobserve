@@ -36,6 +36,22 @@ pub enum ChannelFormat {
 }
 
 impl ChannelFormat {
+    /// The channel name the send log line carries and the preview API accepts.
+    pub fn wire_name(&self) -> &'static str {
+        match self {
+            Self::Slack => "slack",
+            Self::TeamsAdaptiveCard => "teams_adaptivecard",
+            Self::TeamsMessageCard => "teams_messagecard",
+            Self::Discord => "discord",
+            Self::PagerDuty => "pagerduty",
+            Self::Opsgenie => "opsgenie",
+            Self::ServiceNow => "servicenow",
+            Self::Email => "email",
+            Self::Sns => "sns",
+            Self::Webhook => "webhook",
+        }
+    }
+
     /// The `*_overrides` key this format resolves against
     /// ([`resolve_content`](super::resolve::resolve_content)).
     ///

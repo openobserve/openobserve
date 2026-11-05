@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{Json, extract::Path, http::StatusCode, response::Response};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::StatusCode,
+    response::Response,
+};
 use config::meta::destinations::TemplateKind;
 use db::user::is_root_user;
 use openobserve_api_common::extractors::Headers;
@@ -30,7 +35,7 @@ use openobserve_core::{
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::destinations::Template,
+    models::destinations::{Template, TemplateWithUsage},
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
@@ -77,11 +82,17 @@ pub async fn save_template(
             ));
         }
     };
+    let applies_to = match tmpl.applies_to.as_deref().map(templates::parse_applies_to) {
+        None => None,
+        Some(Ok(kinds)) => Some(kinds),
+        Some(Err(e)) => return template_error_response(e),
+    };
     let tmpl = tmpl.into(&org_id);
     match templates::save(
         "",
         tmpl,
         requested_kind,
+        applies_to,
         true,
         is_root_user(&user_email.user_id),
     )
@@ -140,11 +151,17 @@ pub async fn update_template(
             ));
         }
     };
+    let applies_to = match tmpl.applies_to.as_deref().map(templates::parse_applies_to) {
+        None => None,
+        Some(Ok(kinds)) => Some(kinds),
+        Some(Err(e)) => return template_error_response(e),
+    };
     let tmpl = tmpl.into(&org_id);
     match templates::save(
         &name,
         tmpl,
         requested_kind,
+        applies_to,
         false,
         is_root_user(&user_email.user_id),
     )
@@ -175,7 +192,7 @@ pub async fn update_template(
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = inline(Template)),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(TemplateWithUsage)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -184,9 +201,52 @@ pub async fn update_template(
     )
 )]
 pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match templates::get(&org_id, &name).await {
-        Ok(data) => MetaHttpResponse::json(Template::from(data)),
+    let data = match templates::get(&org_id, &name).await {
+        Ok(data) => data,
+        Err(e) => return template_error_response(e),
+    };
+    match templates::used_by(&data.org_id, &data.name).await {
+        Ok(used_by) => MetaHttpResponse::json(TemplateWithUsage {
+            template: Template::from(data),
+            used_by,
+        }),
         Err(e) => template_error_response(e),
+    }
+}
+
+/// Query of `GET templates`: `applies_to` keeps user templates of one kind, `type` one transport.
+#[derive(Debug, Default, serde::Deserialize, utoipa::IntoParams)]
+pub struct ListTemplatesQuery {
+    pub applies_to: Option<String>,
+    #[serde(rename = "type")]
+    pub template_type: Option<String>,
+}
+
+impl ListTemplatesQuery {
+    fn filter(&self) -> Result<templates::ListFilter, String> {
+        let applies_to = match self.applies_to.as_deref().filter(|k| !k.is_empty()) {
+            None => None,
+            Some(k) => Some(
+                config::meta::alerts::notification_kind::NotificationKind::parse(k).ok_or_else(
+                    || {
+                        format!(
+                            "applies_to: unknown kind '{k}'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+                        )
+                    },
+                )?,
+            ),
+        };
+        let template_type = match self.template_type.as_deref().filter(|t| !t.is_empty()) {
+            None => None,
+            Some(t) => Some(
+                templates::TemplateTypeFilter::parse(t)
+                    .ok_or_else(|| format!("type: unknown '{t}'; allowed: http, email, sns"))?,
+            ),
+        };
+        Ok(templates::ListFilter {
+            applies_to,
+            template_type,
+        })
     }
 }
 
@@ -207,6 +267,7 @@ pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Respo
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ListTemplatesQuery,
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
@@ -223,8 +284,13 @@ pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Respo
 )]
 pub async fn list_templates(
     Path(org_id): Path<String>,
+    Query(query): Query<ListTemplatesQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    let filter = match query.filter() {
+        Ok(filter) => filter,
+        Err(e) => return MetaHttpResponse::bad_request(e.as_str()),
+    };
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -245,7 +311,7 @@ pub async fn list_templates(
         // Get List of allowed objects ends
     }
 
-    match templates::list(&org_id, _permitted).await {
+    match templates::list(&org_id, _permitted, filter).await {
         Ok(data) => {
             MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>())
         }

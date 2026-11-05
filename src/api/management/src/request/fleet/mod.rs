@@ -590,7 +590,7 @@ pub async fn rename_fleet(
         (status = 204, description = "Deleted"),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Still referenced, the default fleet, or changing", content_type = "application/json", body = Object),
+        (status = 409, description = "Still referenced, with the counts in `references`; the default fleet; or changing", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn delete_fleet(
@@ -2113,6 +2113,7 @@ fn folder_response(e: db::folders::FolderError) -> Response {
         FolderError::DeleteFleet(message) | FolderError::FleetChanged(message) => {
             MetaHttpResponse::conflict(message)
         }
+        FolderError::FleetInUse(message, references) => in_use_response(message, &references),
         FolderError::PermittedFoldersMissingUser | FolderError::PermittedFoldersValidator(_) => {
             MetaHttpResponse::forbidden("Forbidden")
         }
@@ -2121,6 +2122,16 @@ fn folder_response(e: db::folders::FolderError) -> Response {
             MetaHttpResponse::internal_error("internal error")
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn in_use_response(message: String, references: &config::meta::fleet::References) -> Response {
+    let body = serde_json::json!({
+        "code": StatusCode::CONFLICT.as_u16(),
+        "message": message,
+        "references": references,
+    });
+    (StatusCode::CONFLICT, axum::Json(body)).into_response()
 }
 
 /// The `sea-orm` text carries SQL fragments, so a server fault is logged, not returned.
@@ -2137,14 +2148,7 @@ fn to_response(e: anyhow::Error) -> Response {
             };
             (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(body)).into_response()
         }
-        Some(FleetError::ConfigInUse(_, references)) => {
-            let body = serde_json::json!({
-                "code": StatusCode::CONFLICT.as_u16(),
-                "message": e.to_string(),
-                "references": references,
-            });
-            (StatusCode::CONFLICT, axum::Json(body)).into_response()
-        }
+        Some(FleetError::ConfigInUse(_, references)) => in_use_response(e.to_string(), references),
         Some(err) => MetaHttpResponse::error(err.status_code(), e.to_string()).into_response(),
         None => {
             log::error!("[fleet] {e}");
@@ -2373,6 +2377,21 @@ mod tests {
         let res = to_response(FleetError::ConfigInUse("edge".into(), references).into());
         assert_eq!(res.status(), StatusCode::CONFLICT);
         assert!(body_text(res).await.contains(r#""fleets":2"#));
+        let references = config::meta::fleet::References {
+            collectors: 2,
+            tokens: 1,
+            ..Default::default()
+        };
+        let res = folder_response(db::folders::FolderError::FleetInUse(
+            "fleet in use".to_string(),
+            references,
+        ));
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        let text = body_text(res).await;
+        assert!(
+            text.contains(r#""collectors":2"#) && text.contains(r#""tokens":1"#),
+            "{text}"
+        );
         let other = to_response(anyhow::anyhow!("SELECT secret FROM x"));
         assert_eq!(other.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(!body_text(other).await.contains("SELECT secret"));

@@ -95,7 +95,7 @@ describe("TemplatePreviewPanel", () => {
     expect(previewSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("maps single_level severity to a null severity in the request", async () => {
+  it("starts on Critical so the sample Level is never blank", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")
       .mockResolvedValue(makePreviewResponse() as any);
@@ -106,10 +106,10 @@ describe("TemplatePreviewPanel", () => {
 
     expect(previewSpy).toHaveBeenCalled();
     const call = previewSpy.mock.calls[0][0] as any;
-    expect(call.data.severity).toBeNull();
+    expect(call.data.severity).toBe("critical");
   });
 
-  it("sends the selected non-single-level severity verbatim", async () => {
+  it("sends Single-level by name, because a missing severity means Critical", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")
       .mockResolvedValue(makePreviewResponse() as any);
@@ -121,14 +121,14 @@ describe("TemplatePreviewPanel", () => {
 
     // Drive the internal severity ref directly via defineExpose (OSelect
     // interaction is exercised elsewhere; this isolates the mapping logic).
-    (w.vm as any).severity = "critical";
+    (w.vm as any).severity = "single_level";
     await flushPromises();
     await vi.advanceTimersByTimeAsync(300);
     await flushPromises();
 
     expect(previewSpy).toHaveBeenCalled();
     const call = previewSpy.mock.calls[0][0] as any;
-    expect(call.data.severity).toBe("critical");
+    expect(call.data.severity).toBe("single_level");
   });
 
   it("renders the raw payload tab as pretty-printed JSON", async () => {
@@ -158,6 +158,19 @@ describe("TemplatePreviewPanel", () => {
     const chip = w.find('[data-test="template-preview-panel-unknown-variables-chip"]');
     expect(chip.exists()).toBe(true);
     expect(chip.text()).toContain("foo_bar");
+  });
+
+  it("names the variables that render empty for the previewed kind", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({ empty_variables: ["alert_operator", "alert_threshold"] }) as any,
+    );
+
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const chip = w.find('[data-test="template-preview-panel-empty-variables-chip"]');
+    expect(chip.text()).toBe("Empty for Alert: alert_operator, alert_threshold");
   });
 
   it("names the previewed channel on the card, so switching Channel is visibly acknowledged", async () => {
@@ -255,5 +268,153 @@ describe("TemplatePreviewPanel", () => {
     const button = w.find('[data-test="template-preview-panel-default-link"]');
     expect(button.exists()).toBe(true);
     expect(button.text()).toBe("View in OpenObserve");
+  });
+
+  it("puts Channel first, Severity next and Kind last in the preview row", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["alert", "synthetics"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const selects = w
+      .find('[data-test="template-preview-panel-channel-select"]')
+      .element.parentElement!.querySelectorAll(":scope > [data-test]");
+    expect(Array.from(selects).map((el) => el.getAttribute("data-test"))).toEqual([
+      "template-preview-panel-channel-select",
+      "template-preview-panel-severity-select",
+      "template-preview-panel-kind-select",
+    ]);
+    const labels = w
+      .findAllComponents({ name: "OSelect" })
+      .slice(0, 3)
+      .map((c) => c.props("label"));
+    expect(labels).toEqual(["Channel", "Severity", "Kind"]);
+    expect(
+      (
+        w
+          .find('[data-test="template-preview-panel-channel-select"]')
+          .findComponent({ name: "OSelect" })
+          .props("options") as any[]
+      ).length,
+    ).toBe(10);
+  });
+
+  it("previews as the first selected kind and sends kind on each request", async () => {
+    const previewSpy = vi
+      .spyOn(templateService, "preview")
+      .mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["incident", "anomaly"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const kindSelect = w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((kindSelect.props("options") as any[]).map((o) => o.value)).toEqual([
+      "incident",
+      "anomaly",
+    ]);
+    expect(previewSpy.mock.calls.at(-1)?.[0].data.kind).toBe("incident");
+
+    await kindSelect.vm.$emit("update:modelValue", "anomaly");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(previewSpy.mock.calls.at(-1)?.[0].data.kind).toBe("anomaly");
+  });
+
+  it("heads the section Playground, says nothing is sent, and keeps Send test in it", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+
+    expect(w.find('[data-test="template-preview-panel-playground-heading"]').text()).toBe(
+      "Playground",
+    );
+    expect(w.find('[data-test="template-preview-panel-playground-help"]').text()).toBe(
+      "Nothing here is sent.",
+    );
+    expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(true);
+  });
+
+  it("opens on Alert when the template applies to every kind and reports each Kind change", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+    expect(w.emitted("kind-change")).toEqual([["alert"]]);
+
+    const kindSelect = w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((kindSelect.props("options") as any[]).length).toBe(6);
+    await kindSelect.vm.$emit("update:modelValue", "downtime");
+    expect(w.emitted("kind-change")?.at(-1)).toEqual(["downtime"]);
+  });
+
+  it("opens on the first kind of Applies to", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["synthetics", "downtime"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await flushPromises();
+    expect((w.vm as any).previewKind).toBe("synthetics");
+    expect(w.emitted("kind-change")).toEqual([["synthetics"]]);
+  });
+
+  it("names the blank variables of the kind picked in the playground", async () => {
+    vi.spyOn(templateService, "preview").mockImplementation(
+      async (args: any) =>
+        makePreviewResponse({
+          empty_variables: args.data.kind === "anomaly" ? ["alert_threshold"] : [],
+        }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-empty-variables-chip"]').exists()).toBe(
+      false,
+    );
+
+    await w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" })
+      .vm.$emit("update:modelValue", "anomaly");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-empty-variables-chip"]').text()).toBe(
+      "Empty for Anomaly: alert_threshold",
+    );
+  });
+
+  it("keeps the last good preview and shows a banner when a request fails", async () => {
+    const previewSpy = vi
+      .spyOn(templateService, "preview")
+      .mockResolvedValueOnce(makePreviewResponse() as any)
+      .mockRejectedValueOnce({ response: { status: 500, data: { message: "boom" } } });
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-body"]').exists()).toBe(true);
+
+    await w.setProps({ spec: { ...emptyContentSpec(), title: "changed" } });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(previewSpy).toHaveBeenCalledTimes(2);
+    expect(w.find('[data-test="template-preview-panel-error"]').text()).toContain("boom");
+    expect(w.find('[data-test="template-preview-panel-body"]').exists()).toBe(true);
+  });
+
+  it("shows the permission text and hides test send on 403", async () => {
+    vi.spyOn(templateService, "preview").mockRejectedValue({ response: { status: 403 } });
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-forbidden"]').exists()).toBe(true);
+    expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(false);
   });
 });

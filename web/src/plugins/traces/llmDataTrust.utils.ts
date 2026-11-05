@@ -24,6 +24,7 @@ import type {
   DataHealthModelUsage,
   DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
+import type { FeatureKey } from "@/utils/enterpriseFeatures";
 
 /** How a row's cost reads: exact, a lower bound, or unknown. */
 export type CostKind = "exact" | "partial" | "unknown";
@@ -107,10 +108,16 @@ export function sortChecks(checks: DataHealthCheck[]): DataHealthCheck[] {
   return [...checks].sort((a, b) => rank[a.status] - rank[b.status]);
 }
 
+/** With model pricing off nothing is priced, so the unpriced check is hidden. */
+export function shownChecks(checks: DataHealthCheck[], pricingEnabled: boolean): DataHealthCheck[] {
+  return sortChecks(checks.filter((c) => c.id !== "unpriced_models" || pricingEnabled));
+}
+
 export const AI_INSTRUMENTATION_DOCS_URL = "https://openobserve.ai/docs/integration/ai/";
 
 export type FixTarget =
-  | { kind: "route"; to: { name: string; query: Record<string, string> } }
+  /** `feature` gates the setting; an edition that locks it (OSS) offers no fix. */
+  | { kind: "route"; to: { name: string; query: Record<string, string> }; feature: FeatureKey }
   | { kind: "url"; href: string };
 
 /** A time window in epoch microseconds. */
@@ -131,9 +138,14 @@ export function fixTarget(
       return {
         kind: "route",
         to: pricingGapsRoute(stream, orgId, window),
+        feature: "modelPricing",
       };
     case "missing_agent_identity":
-      return { kind: "route", to: { name: "genAiAgentMapping", query: { org_identifier: orgId } } };
+      return {
+        kind: "route",
+        to: { name: "genAiAgentMapping", query: { org_identifier: orgId } },
+        feature: "genAiAgentMapping",
+      };
     case "zero_duration_spans":
     case "missing_session_id":
       return { kind: "url", href: AI_INSTRUMENTATION_DOCS_URL };
