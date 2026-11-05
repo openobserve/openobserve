@@ -975,9 +975,10 @@ const currentUnit = computed(
 const currentType = computed(
   () => currentProfileType.value?.type || seriesResponse.value?.profile_type || "",
 );
-const isCpuMetric = computed(
-  () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
-);
+const isNanosecondsUnit = (unit: string) => /^(nanoseconds?|ns|nanos)$/i.test(unit);
+const isCpuTime = (profileType: string, unit: string) =>
+  profileType.toLowerCase() === "cpu" && isNanosecondsUnit(unit);
+const isCpuMetric = computed(() => isCpuTime(currentType.value, currentUnit.value));
 
 // Token values change with the theme, so they are re-read whenever it switches.
 const seriesColors = computed(() => {
@@ -1259,8 +1260,8 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
-  if (profileType.toLowerCase() === "cpu" && /nano/i.test(unit)) return "cores";
-  if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
+  if (isCpuTime(profileType, unit)) return "cores";
+  if (isNanosecondsUnit(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
@@ -1268,8 +1269,7 @@ const seriesUnitLabel = (profileType: string, unit: string) => {
 
 const profileTypeLabel = (profileType: ProfileTypeMeta) => {
   const { type, unit, is_cpu_samples } = profileType;
-  if (type.toLowerCase() === "cpu" && /nano/i.test(unit))
-    return t("profiles.cpuTime", { cpu: raw("CPU") });
+  if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
   if (type === "samples" && unit === "count" && is_cpu_samples === true)
     return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
   return raw(`${type} (${seriesUnitLabel(type, unit)})`);
@@ -1318,7 +1318,7 @@ const formatDurationNanos = (value: number) => {
 const formatTableValue = (value: number) => {
   if (isCpuMetric.value) return formatDurationNanos(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
-  if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
+  if (isNanosecondsUnit(currentUnit.value)) return formatDurationNanos(value);
   return formatEventCount(Number(value || 0));
 };
 
@@ -1387,7 +1387,7 @@ const byteAxisInterval = (points: SeriesDatum[]) => {
 const formatSeriesAxisLabel = (value: number) => {
   if (isBytesUnit.value) return formatBytes(value);
   let unit = "numbers";
-  if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
+  if (!isCpuMetric.value && isNanosecondsUnit(currentUnit.value)) unit = "nanoseconds";
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
@@ -1396,7 +1396,7 @@ const formatSeriesValue = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "—";
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
-  if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
+  if (isNanosecondsUnit(currentUnit.value)) return formatDurationNanos(value);
   return Number(value).toLocaleString();
 };
 
