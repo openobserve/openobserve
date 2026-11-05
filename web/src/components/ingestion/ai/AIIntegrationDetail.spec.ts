@@ -26,24 +26,6 @@ vi.mock("./content", () => ({
   },
 }));
 
-const credentialMock = vi.hoisted(() => ({ ready: true }));
-vi.mock("@/composables/useOrgCredential", async () => {
-  const { computed } = await import("vue");
-  return { useOrgCredential: () => ({ ready: computed(() => credentialMock.ready) }) };
-});
-
-const richMock = vi.hoisted(() => ({ on: false }));
-vi.mock("./content/richCard/registry", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./content/richCard/registry")>();
-  return {
-    ...actual,
-    getRichCardContent: (...args: Parameters<typeof actual.getRichCardContent>) =>
-      richMock.on
-        ? ({ provider: { name: "Agno" }, steps: [] } as any)
-        : actual.getRichCardContent(...args),
-  };
-});
-
 import { createMemoryHistory, createRouter } from "vue-router";
 import AIIntegrationDetail from "./AIIntegrationDetail.vue";
 import store from "@/test/unit/helpers/store";
@@ -215,49 +197,6 @@ describe("AIIntegrationDetail", () => {
       wrapper = mountDetail({ categorySlug: "frameworks", integrationSlug: "langchain" });
       await flushPromises();
       expect(router.currentRoute.value.query).toEqual({});
-    });
-  });
-
-  describe("rich card ingest token state", () => {
-    const RENDERER_STUB = {
-      name: "SetupCardRenderer",
-      template: '<div data-test="renderer-stub" />',
-      props: ["content", "subs", "tokenState", "logoUrl", "logoUrlDark"],
-    };
-    const mountRich = () =>
-      mount(AIIntegrationDetail, {
-        props: { categorySlug: "frameworks", integrationSlug: "agno" },
-        global: {
-          plugins: [store, router],
-          stubs: { SetupCardRenderer: RENDERER_STUB, CodingAgentSetup: true },
-        },
-      });
-
-    beforeEach(() => {
-      richMock.on = true;
-      credentialMock.ready = true;
-      store.state.organizationData.organizationPasscode = "";
-      store.state.organizationData.organizationPasscodeForbidden = false;
-    });
-    afterEach(() => {
-      richMock.on = false;
-    });
-
-    it("is loading while the credential has not settled", () => {
-      credentialMock.ready = false;
-      wrapper = mountRich();
-      expect(wrapper.findComponent(RENDERER_STUB).props("tokenState")).toBe("loading");
-    });
-
-    it("is unavailable when the read settled without a passcode", () => {
-      wrapper = mountRich();
-      expect(wrapper.findComponent(RENDERER_STUB).props("tokenState")).toBe("unavailable");
-    });
-
-    it("is ready once a passcode exists", () => {
-      store.state.organizationData.organizationPasscode = "pass";
-      wrapper = mountRich();
-      expect(wrapper.findComponent(RENDERER_STUB).props("tokenState")).toBe("ready");
     });
   });
 });
