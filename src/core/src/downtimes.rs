@@ -355,6 +355,29 @@ pub async fn extend_quick_mute(
     Ok(after)
 }
 
+/// Sends the started message through the live path, so a test reads what a real start sends.
+pub async fn send_test(
+    org: &str,
+    user_id: &str,
+    id: &str,
+    req: &config::meta::downtimes::DowntimeTestRequest,
+) -> Result<Vec<config::meta::downtimes::DowntimeTestResult>, DowntimeError> {
+    ensure_enabled()?;
+    let row = load(org, id).await?;
+    // Posting into the row's channels is a change a reader may not make.
+    access::authorize_row(org, user_id, &row, "PUT").await?;
+    let now = now_micros();
+    let item = list_item(&row, &MatchCounts::default(), now);
+    let window = item
+        .current_window
+        .or(item.next_window)
+        .unwrap_or(DowntimeWindow {
+            start: row.schedule.starts_at,
+            end: row.schedule.ends_at.unwrap_or(row.schedule.starts_at),
+        });
+    Ok(notify::send_test(&row, window, &req.destinations, now).await)
+}
+
 /// Lengthens the active window; a recurring row gets a one-time follow-up instead.
 pub async fn extend(
     org: &str,

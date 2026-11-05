@@ -21,7 +21,9 @@
 //! [`render`] functions Task 9's `send_notification` calls, never a
 //! reimplementation. See `preview_uses_production_renderer` below.
 
-use config::meta::alerts::{content_spec::ContentSpec, level::AlertLevel};
+use config::meta::alerts::{
+    content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -29,7 +31,7 @@ use super::{
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
-    resolve::resolve_content,
+    resolve::{empty_variables, resolve_content},
 };
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -44,6 +46,9 @@ pub struct PreviewRequest {
     /// Reserved for the Phase-1b alert-driven sample source; ignored in 1a.
     #[serde(default)]
     pub sample: Option<serde_json::Value>,
+    /// Which producer's sample to render with; absent means alert.
+    #[serde(default)]
+    pub kind: NotificationKind,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -53,6 +58,12 @@ pub struct PreviewResponse {
     /// FE card rendering schema.
     pub preview_model: PreviewModel,
     pub unknown_variables: Vec<String>,
+    /// Variables the draft uses that render blank in the previewed kind's sample.
+    pub empty_variables: Vec<String>,
+    /// Every variable a template of the requested kind can use.
+    pub variables: Vec<String>,
+    /// `common` and one group per kind whose producer renders templates in this release.
+    pub variable_groups: Vec<super::examples::VariableGroup>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -128,8 +139,9 @@ fn parse_channel(channel: &str) -> Result<ChannelFormat, PreviewError> {
 /// `"single_level"` all mean "no severity axis" (`None`) — design §4.2.1.
 fn parse_severity(severity: &Option<String>) -> Result<Option<AlertLevel>, PreviewError> {
     match severity.as_deref() {
-        None | Some("single_level") | Some("") => Ok(None),
-        Some("critical") => Ok(Some(AlertLevel::Critical)),
+        // The editor starts on Critical so the sample Level is never blank.
+        None | Some("") | Some("critical") => Ok(Some(AlertLevel::Critical)),
+        Some("single_level") => Ok(None),
         Some("warning") => Ok(Some(AlertLevel::Warning)),
         Some("ok") => Ok(Some(AlertLevel::Ok)),
         Some("no_data") => Ok(Some(AlertLevel::NoData)),
@@ -178,7 +190,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_start_time_millis: "1785578400000".into(),
         alert_end_time_millis: "1785579000000".into(),
         alert_url: "https://example.openobserve.ai/alerts/sample".into(),
-        alert_trigger_time: 1_754_000_000_000_000,
+        alert_trigger_time: 1_785_579_000_000_000,
         alert_trigger_time_str: "2026-08-01T10:10:00".into(),
         alert_description: "cpu > 80 for 10m".into(),
         promql_operator: None,
@@ -203,6 +215,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         chart_png: None,
         alert_id: String::new(),
         incident_id: String::new(),
+        ..Default::default()
     }
 }
 
@@ -220,9 +233,14 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         .validate()
         .map_err(PreviewError::InvalidContent)?;
 
-    let ctx = synthetic_context(level);
+    let ctx = match req.kind {
+        NotificationKind::Alert => synthetic_context(level),
+        // The selection only picks the sample; its level is the one a live send carries.
+        kind => super::examples::example_context_at(kind, level),
+    };
 
     let content = resolve_content(&req.definition, &ctx, format.channel_family());
+    let empty_variables = draft_empty_variables(&req.definition, &ctx, format.channel_family());
     let rendered =
         render(format, &content, &ctx).map_err(|e| PreviewError::RenderFailed(e.to_string()))?;
 
@@ -277,7 +295,30 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         payload,
         preview_model,
         unknown_variables: content.unknown_variables,
+        empty_variables,
+        variables: super::examples::variables_for(req.kind),
+        variable_groups: super::examples::variable_groups(),
     })
+}
+
+/// Every authored surface of the draft that the channel renders, checked for blank variables.
+fn draft_empty_variables(
+    spec: &ContentSpec,
+    ctx: &NotificationContext,
+    channel_family: &str,
+) -> Vec<String> {
+    let title = spec
+        .title_overrides
+        .get(channel_family)
+        .unwrap_or(&spec.title);
+    let mut text = vec![title.as_str(), spec.body.as_str()];
+    for f in &spec.fields {
+        text.extend([f.label.as_str(), f.value.as_str()]);
+    }
+    for l in &spec.links {
+        text.extend([l.label.as_str(), l.url.as_str()]);
+    }
+    empty_variables(&text.join("\n"), ctx)
 }
 
 #[cfg(test)]
@@ -311,6 +352,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         };
         let err = preview(&req).expect_err("hostile link previewed cleanly");
         assert!(
@@ -326,6 +368,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         };
         let resp = preview(&req).unwrap();
         // Same payload the send path would produce for the same spec +
@@ -357,6 +400,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert!(
@@ -365,13 +409,13 @@ mod tests {
                 .iter()
                 .any(|f| f.label == "runbook")
         );
-        // "single_level" (default) → level None → show_when field vanishes
-        // (§4.2.1).
+        // "single_level" → level None → show_when field vanishes (§4.2.1).
         let single = preview(&PreviewRequest {
             definition: spec,
             channel: "slack".into(),
-            severity: None,
+            severity: Some("single_level".into()),
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert!(
@@ -384,6 +428,87 @@ mod tests {
     }
 
     #[test]
+    fn an_incident_preview_renders_the_incident_sample_and_lists_the_incident_group() {
+        let mut spec = sample_spec();
+        spec.body = "{incident_title} on {incident_service}".into();
+        let resp = preview(&PreviewRequest {
+            definition: spec,
+            channel: "slack".into(),
+            severity: None,
+            sample: None,
+            kind: NotificationKind::Incident,
+        })
+        .unwrap();
+        assert!(
+            resp.unknown_variables.is_empty(),
+            "{:?}",
+            resp.unknown_variables
+        );
+        assert!(resp.variables.iter().any(|v| v == "incident_id"));
+        assert!(resp.preview_model.body_html.contains("checkout"));
+        let groups: Vec<&str> = resp
+            .variable_groups
+            .iter()
+            .map(|g| g.name.as_str())
+            .collect();
+        assert_eq!(
+            groups,
+            [
+                "common",
+                "alert",
+                "incident",
+                "anomaly",
+                "synthetics",
+                "downtime",
+                "on_call"
+            ]
+        );
+        let incident = &resp.variable_groups[2];
+        assert!(incident.variables.iter().any(|v| v == "incident_severity"));
+        assert!(
+            !resp.variable_groups[0]
+                .variables
+                .iter()
+                .any(|v| v == "incident_id")
+        );
+    }
+
+    #[test]
+    fn an_alert_variable_is_named_empty_in_a_synthetics_preview_only() {
+        let mut spec = sample_spec();
+        spec.body = "{alert_name} observed **{alert_agg_value}** over {alert_threshold}".into();
+        let request = |kind| PreviewRequest {
+            definition: spec.clone(),
+            channel: "slack".into(),
+            severity: None,
+            sample: None,
+            kind,
+        };
+        let synthetics = preview(&request(NotificationKind::Synthetics)).unwrap();
+        assert!(
+            synthetics
+                .empty_variables
+                .contains(&"alert_agg_value".to_string())
+        );
+        assert!(
+            synthetics
+                .empty_variables
+                .contains(&"alert_threshold".to_string())
+        );
+        assert!(
+            !synthetics
+                .empty_variables
+                .contains(&"alert_name".to_string())
+        );
+        let alert = preview(&request(NotificationKind::Alert)).unwrap();
+        assert!(
+            alert.empty_variables.is_empty(),
+            "{:?}",
+            alert.empty_variables
+        );
+    }
+
+    #[test]
     fn unknown_variables_reported() {
         let mut spec = sample_spec();
         spec.body = "{alert_name} {alert_time_zzz}".into();
@@ -392,6 +517,7 @@ mod tests {
             channel: "webhook".into(),
             severity: None,
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert_eq!(resp.unknown_variables, vec!["alert_time_zzz"]);
@@ -406,6 +532,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("criticall".into()),
             sample: None,
+            kind: Default::default(),
         })
         .unwrap_err();
         assert!(matches!(err, PreviewError::UnknownSeverity(ref s) if s == "criticall"));
@@ -415,17 +542,162 @@ mod tests {
         // note `preview_model.severity` echoes the request string verbatim, so
         // compare the rendered payload rather than that field.
         let mut payloads = vec![];
-        for ok in [None, Some("single_level".to_string()), Some(String::new())] {
+        for ok in [
+            None,
+            Some(String::new()),
+            Some("critical".to_string()),
+            Some("single_level".to_string()),
+        ] {
             let resp = preview(&PreviewRequest {
                 definition: sample_spec(),
                 channel: "slack".into(),
                 severity: ok,
                 sample: None,
+                kind: Default::default(),
             })
             .expect("documented severity values must be accepted");
             payloads.push(resp.payload);
         }
+        // A missing or empty severity previews as Critical, so the sample Level is never blank.
         assert_eq!(payloads[0], payloads[1]);
         assert_eq!(payloads[1], payloads[2]);
+    }
+
+    #[test]
+    fn severity_picker_drives_example_level_fields() {
+        let spec = ContentSpec {
+            title: "L:{alert_level} {alert_level_label}".into(),
+            ..sample_spec()
+        };
+        for (kind, expected) in [
+            (NotificationKind::Anomaly, "L:warning Warning"),
+            (NotificationKind::OnCall, "L:P2 P2"),
+            (NotificationKind::Synthetics, "L:"),
+        ] {
+            let req = PreviewRequest {
+                definition: spec.clone(),
+                channel: "slack".into(),
+                severity: Some("warning".into()),
+                sample: None,
+                kind,
+            };
+            let resp = preview(&req).unwrap();
+            assert_eq!(resp.preview_model.title.trim(), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn a_critical_page_and_incident_read_p1_in_their_text() {
+        let spec = ContentSpec {
+            title: "{alert_name}|{oncall_priority}{incident_severity}|{alert_level_label}".into(),
+            ..sample_spec()
+        };
+        for (kind, expected) in [
+            (
+                NotificationKind::OnCall,
+                "[P1] High error rate on web-logs — checkout|P1|P1",
+            ),
+            (NotificationKind::Incident, "High error rate|P1|P1"),
+        ] {
+            let req = PreviewRequest {
+                definition: spec.clone(),
+                channel: "slack".into(),
+                severity: Some("critical".into()),
+                sample: None,
+                kind,
+            };
+            let resp = preview(&req).unwrap();
+            assert_eq!(resp.preview_model.title, expected, "{kind:?}");
+        }
+    }
+
+    fn sample_title(kind: NotificationKind, severity: &str, title: &str) -> String {
+        let req = PreviewRequest {
+            definition: ContentSpec {
+                title: title.into(),
+                ..sample_spec()
+            },
+            channel: "slack".into(),
+            severity: Some(severity.into()),
+            sample: None,
+            kind,
+        };
+        preview(&req).unwrap().preview_model.title
+    }
+
+    #[test]
+    fn each_playground_priority_reads_its_own_number() {
+        // The panel sends P1 to P4 as these four severities, in this order.
+        for (severity, priority) in [
+            ("critical", "P1"),
+            ("warning", "P2"),
+            ("single_level", "P3"),
+            ("no_data", "P4"),
+        ] {
+            assert_eq!(
+                sample_title(NotificationKind::Incident, severity, "{incident_severity}"),
+                priority,
+                "incident {severity}"
+            );
+            assert_eq!(
+                sample_title(NotificationKind::OnCall, severity, "{oncall_priority}"),
+                priority,
+                "on-call {severity}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_degraded_or_flaky_check_gets_its_own_sample() {
+        let read = |severity: &str| {
+            sample_title(
+                NotificationKind::Synthetics,
+                severity,
+                "{status_dot} {alert_name} {alert_status}|{check_status_label}|{check_degraded}|{check_flaky}",
+            )
+        };
+        assert_eq!(
+            read("warning"),
+            "🟠 checkout API degraded|Degraded|true|false"
+        );
+        assert_eq!(read("no_data"), "🟠 checkout API flaky|Flaky|false|true");
+        assert_eq!(
+            read("critical"),
+            "🔴 checkout API failing|Failing|false|false"
+        );
+        assert_eq!(
+            read("ok"),
+            "🟢 checkout API recovered|Recovered|false|false"
+        );
+    }
+
+    #[test]
+    fn a_playground_sample_carries_the_level_and_event_a_live_send_has() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        use super::super::examples::example_context_at;
+        let at = |kind, level| {
+            let ctx = example_context_at(kind, level);
+            (ctx.level, ctx.event)
+        };
+        let firing = NotificationEvent::Firing;
+        let notice = NotificationEvent::Informational;
+        assert_eq!(
+            at(NotificationKind::Incident, Some(AlertLevel::Warning)),
+            (Some(AlertLevel::Critical), firing)
+        );
+        assert_eq!(
+            at(NotificationKind::Incident, None),
+            (Some(AlertLevel::Warning), firing)
+        );
+        assert_eq!(at(NotificationKind::OnCall, None), (None, firing));
+        assert_eq!(
+            at(NotificationKind::Synthetics, Some(AlertLevel::NoData)),
+            (Some(AlertLevel::Warning), notice)
+        );
+        assert_eq!(
+            at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
+            (Some(AlertLevel::Warning), notice)
+        );
     }
 }

@@ -29,7 +29,6 @@ use config::{
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
-            TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -70,23 +69,24 @@ use search::{
 };
 use svix_ksuid::Ksuid;
 
+#[cfg(test)]
+use crate::alerts::notifications::{apply_custom_template, render, resolve_content};
 #[cfg(feature = "enterprise")]
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
         QueryConditionExt, build_sql,
-        destinations::{self, note_skipped, org_member_split},
+        destinations::{self, note_skipped},
         notifications::{
-            NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
+            NotificationContext, RenderedMessage, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
             jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
-            render,
             render::slack as slack_render,
-            resolve_content,
+            send::{self, org_member_email},
         },
     },
     auth::is_ofga_unsupported,
@@ -239,6 +239,9 @@ pub enum AlertError {
 
     #[error("Alert template {template} not found")]
     AlertTemplateNotFound { template: String },
+
+    #[error("validation error: template '{template}' does not apply to alert")]
+    AlertTemplateNotForAlert { template: String },
 
     #[error(
         "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
@@ -689,6 +692,57 @@ impl SloSourceEffect {
 }
 
 /// Validates the alert and prepares it before it is written to the database.
+/// Reserved templates stay allowed so existing alerts keep saving; a user template must apply.
+fn check_alert_template(name: &str, template: &Template) -> Result<(), AlertError> {
+    if crate::alerts::notifications::default_template::is_reserved_template_name(&template.name)
+        || template
+            .applies_to_kind(config::meta::alerts::notification_kind::NotificationKind::Alert)
+    {
+        return Ok(());
+    }
+    Err(AlertError::AlertTemplateNotForAlert {
+        template: name.to_string(),
+    })
+}
+
+#[cfg(test)]
+mod check_alert_template_tests {
+    use config::meta::{alerts::notification_kind::NotificationKind, destinations::Template};
+
+    use super::{AlertError, check_alert_template};
+
+    fn tpl(name: &str, applies_to: Vec<NotificationKind>) -> Template {
+        Template {
+            name: name.to_string(),
+            applies_to,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_user_template_that_excludes_alert_is_refused() {
+        let t = tpl("ops-card", vec![NotificationKind::Anomaly]);
+        let err = check_alert_template("ops-card", &t).unwrap_err();
+        assert!(matches!(err, AlertError::AlertTemplateNotForAlert { .. }));
+        assert_eq!(
+            err.to_string(),
+            "validation error: template 'ops-card' does not apply to alert"
+        );
+    }
+
+    #[test]
+    fn a_user_template_for_alert_or_every_kind_is_allowed() {
+        assert!(check_alert_template("a", &tpl("a", vec![NotificationKind::Alert])).is_ok());
+        assert!(check_alert_template("b", &tpl("b", vec![])).is_ok());
+    }
+
+    #[test]
+    fn a_reserved_template_is_allowed_whatever_its_applies_to() {
+        let t = tpl("prebuilt_default", vec![NotificationKind::Anomaly]);
+        assert!(check_alert_template("prebuilt_default", &t).is_ok());
+    }
+}
+
 fn prepared_alert_name(route_name: &str, body_name: &str) -> String {
     let name = if body_name.trim().is_empty() {
         route_name
@@ -817,13 +871,13 @@ async fn prepare_alert(
     // Validate alert-level template if specified
     if let Some(ref template_name) = alert.template
         && !template_name.is_empty()
-        && db::alerts::templates::get(org_id, template_name)
-            .await
-            .is_err()
     {
-        return Err(AlertError::AlertTemplateNotFound {
-            template: template_name.clone(),
-        });
+        let template = db::alerts::templates::get(org_id, template_name)
+            .await
+            .map_err(|_| AlertError::AlertTemplateNotFound {
+                template: template_name.clone(),
+            })?;
+        check_alert_template(template_name, &template)?;
     }
 
     for dest in alert.destinations.iter() {
@@ -2826,8 +2880,7 @@ impl AlertExt for Alert {
             let effective = crate::alerts::notifications::org_default::resolve_effective_template(
                 &self.org_id,
                 explicit,
-            )
-            .await;
+            );
             let template = effective.template();
 
             if ctx.is_none() {
@@ -3200,8 +3253,7 @@ pub async fn send_recovery_notification(
         let effective = crate::alerts::notifications::org_default::resolve_effective_template(
             &alert.org_id,
             explicit,
-        )
-        .await;
+        );
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
         match send_to_destination(
@@ -3275,39 +3327,6 @@ async fn build_chart_asset(
     Some((url, payload))
 }
 
-/// Carry the episode id into a platform's own correlation field, so the resolve
-/// this module sends later can find what the firing opened.
-///
-/// A body we cannot parse is left alone and logged: saving the alert already
-/// refused this combination, so reaching here means the template changed after
-/// the fact, and dropping the firing would be the worse failure.
-fn stamp_platform_key(
-    dest_type: &DestinationType,
-    ctx: &NotificationContext,
-    msg: String,
-) -> String {
-    let (Some(platform), Some(episode_id)) = (platform_of(dest_type), ctx.episode_id.as_deref())
-    else {
-        return msg;
-    };
-    let empty = hashbrown::HashMap::new();
-    let metadata = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty,
-    };
-    match platform::stamp_key(platform, &msg, episode_id, metadata) {
-        Ok(stamped) => stamped,
-        Err(e) => {
-            log::warn!(
-                "[ALERT] {} payload has no place for {}: {e} — it will not be resolvable",
-                ctx.alert_name,
-                platform.key_field()
-            );
-            msg
-        }
-    }
-}
-
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
@@ -3334,191 +3353,14 @@ async fn send_to_destination(
         )
         .await;
     }
-    send_to_destination_type(&alert.org_id, &alert.name, dest_type, template, ctx).await
-}
-
-/// Transport for every destination type except the Slack app, which needs the alert itself.
-async fn send_to_destination_type(
-    org_id: &str,
-    sns_subject: &str,
-    dest_type: &DestinationType,
-    template: &Template,
-    ctx: &mut NotificationContext,
-) -> Result<String, anyhow::Error> {
-    // Jira builds its own text and keeps one issue per alert, so no template is rendered for it.
-    if let DestinationType::Http(endpoint) = dest_type
-        && jira::is_jira(endpoint)
-    {
-        return jira::send(endpoint, ctx).await;
-    }
-    let is_email = matches!(dest_type, DestinationType::Email(_));
-    let empty_meta = hashbrown::HashMap::new();
-    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty_meta,
-    };
-    ctx.metadata = metadata
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-
-    match template.kind {
-        TemplateKind::Custom => {
-            // Unchanged legacy path — byte-identical output.
-            let msg = apply_custom_template(&template.body, ctx, is_email);
-            let msg = stamp_platform_key(dest_type, ctx, msg);
-            let email_subject = if let TemplateType::Email { title } = &template.template_type {
-                apply_custom_template(title, ctx, is_email)
-            } else {
-                template.name.clone()
-            };
-            match dest_type {
-                DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-                DestinationType::Email(email) => {
-                    let (email, skipped) = org_member_email(org_id, email).await?;
-                    send_email_notification(&email_subject, &email, None, msg)
-                        .await
-                        .map(|resp| note_skipped(resp, &skipped))
-                }
-                DestinationType::Sns(aws_sns) => {
-                    send_sns_notification(sns_subject, aws_sns, msg).await
-                }
-                DestinationType::SlackApp(_) => Err(anyhow::anyhow!(
-                    "a Slack app destination is sent through slack_publish"
-                )),
-            }
-        }
-        TemplateKind::Content => {
-            let spec = db::alerts::templates::get_parsed_content(template)
-                .map_err(|e| anyhow::anyhow!("Invalid content template {}: {e}", template.name))?;
-            let format = derive_channel_format(dest_type);
-            let content = resolve_content(&spec, ctx, format.channel_family());
-            let rendered = render(format, &content, ctx)
-                .map_err(|e| anyhow::anyhow!("Renderer failed: {e}"))?;
-
-            match (rendered, dest_type) {
-                (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
-                    // Discord with a rendered chart: upload the PNG in the
-                    // same webhook POST (the embed references it as
-                    // `attachment://`).
-                    if matches!(format, ChannelFormat::Discord)
-                        && let Some(png) = ctx.chart_png.clone()
-                    {
-                        send_discord_with_attachment(endpoint, body, png).await
-                    } else {
-                        let body = stamp_platform_key(dest_type, ctx, body);
-                        send_http_notification(endpoint, body).await
-                    }
-                }
-                (
-                    RenderedMessage::Email {
-                        subject,
-                        html,
-                        text,
-                    },
-                    DestinationType::Email(email),
-                ) => {
-                    let (email, skipped) = org_member_email(org_id, email).await?;
-                    send_email_notification_with_inline_png(
-                        &subject,
-                        &email,
-                        Some(text),
-                        html,
-                        ctx.chart_png.clone(),
-                    )
-                    .await
-                    .map(|resp| note_skipped(resp, &skipped))
-                }
-                (
-                    RenderedMessage::Sns {
-                        subject: _,
-                        message,
-                    },
-                    DestinationType::Sns(aws_sns),
-                ) => send_sns_notification(sns_subject, aws_sns, message).await,
-                (rendered, dest_type) => Err(anyhow::anyhow!(
-                    "Rendered message {rendered:?} does not match destination type {dest_type:?}"
-                )),
-            }
-        }
-    }
-}
-
-/// Render `ctx` with the alert's template, else the destination's, else the org default, and send
-/// it.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn send_templated_to_destination(
-    org_id: &str,
-    sns_subject: &str,
-    dest_name: &str,
-    alert_template: Option<&Template>,
-    ctx: &mut NotificationContext,
-) -> Result<String, anyhow::Error> {
-    let (dest, dest_template) = destinations::get_with_template(org_id, dest_name).await?;
-    let Module::Alert {
-        destination_type, ..
-    } = dest.module
-    else {
-        anyhow::bail!("not an alert destination");
-    };
-    let explicit = choose_template(alert_template, dest_template.as_ref()).cloned();
-    let effective =
-        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
-            .await;
-    if let DestinationType::SlackApp(target) = &destination_type {
-        return crate::alerts::slack_publish::send_templated_post(
-            &crate::alerts::slack_publish::QueueSink,
-            org_id,
-            target,
-            effective.template(),
-            ctx,
-        )
-        .await;
-    }
-    send_to_destination_type(
-        org_id,
-        sns_subject,
-        &destination_type,
-        effective.template(),
+    send::send_to_destination(
+        &alert.org_id,
+        send::Subject::Alert(&alert.name),
+        dest_type,
+        template,
         ctx,
     )
     .await
-}
-
-/// Send a pre-built message string to a single destination type.
-///
-/// Used by synthetics and downtime notifications, which build their own
-/// payload rather than going through the alert template system.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn dispatch_notification(
-    org_id: &str,
-    dest_type: &DestinationType,
-    subject: &str,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    match dest_type {
-        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        // Callers build one payload with no HTML/plaintext split, so both
-        // parts carry the same string — byte-identical to the MIME this path
-        // emitted before the signature took two bodies.
-        DestinationType::Email(email) => {
-            let (email, skipped) = org_member_email(org_id, email).await?;
-            send_email_notification(subject, &email, Some(msg.clone()), msg)
-                .await
-                .map(|resp| note_skipped(resp, &skipped))
-        }
-        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-        DestinationType::SlackApp(target) => {
-            crate::alerts::slack_publish::send_post(
-                &crate::alerts::slack_publish::QueueSink,
-                org_id,
-                target,
-                subject,
-                &msg,
-            )
-            .await
-        }
-    }
 }
 
 /// Dispatch a rendered test-send message to one destination.
@@ -3531,14 +3373,6 @@ pub(crate) async fn dispatch_notification(
 /// of re-deriving it from `rendered`, or hardcoding a literal) keeps this
 /// function agnostic to the rendered payload's shape and guarantees the SNS
 /// subject is never anything other than the actual marked title.
-///
-/// Unlike [`dispatch_notification`], this is NOT enterprise-gated: test-send
-/// (Task 15) is an OSS-visible feature, and it needs the same private
-/// `send_http_notification` / `send_email_notification` / `send_sns_notification`
-/// transports this module already owns. Kept as a distinct, narrowly-scoped
-/// function rather than removing the `#[cfg]` from `dispatch_notification`
-/// itself, so the enterprise-only synthetics and downtime call sites are
-/// untouched.
 pub(crate) async fn dispatch_test_message(
     org_id: &str,
     dest_type: &DestinationType,
@@ -3577,38 +3411,22 @@ pub(crate) async fn dispatch_test_message(
     }
 }
 
-/// Narrows an email destination to org members and returns the skipped ones. [strong]
-async fn org_member_email(
-    org_id: &str,
-    email: &Email,
-) -> Result<(Email, Vec<String>), anyhow::Error> {
-    let (kept, skipped) = org_member_split(org_id, &email.recipients).await?;
-    Ok((members_to_send(kept, &skipped)?, skipped))
-}
-
-/// Email to the kept members, or an error naming the skipped when none is left. [pure]
-fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyhow::Error> {
-    if kept.is_empty() && !skipped.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Email not sent: no recipient is part of this org (skipped: {})",
-            skipped.join(", ")
-        ));
-    }
-    Ok(Email { recipients: kept })
-}
-
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+pub(crate) async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
     // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
     if jira::is_jira(endpoint) {
-        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+        return Err(send::SendError::Blocked(jira::UNSUPPORTED_SENDER.to_string()).into());
     }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
 
     let builder = if endpoint.skip_tls_verify {
@@ -3824,15 +3642,16 @@ fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
 /// image as `attachment://` ([`render::discord::CHART_ATTACHMENT_NAME`]), so
 /// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
 /// guard discipline as `send_http_notification`.
-async fn send_discord_with_attachment(
+pub(crate) async fn send_discord_with_attachment(
     endpoint: &Endpoint,
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
     let builder = if endpoint.skip_tls_verify {
         reqwest::Client::builder().danger_accept_invalid_certs(true)
@@ -3868,33 +3687,6 @@ async fn send_discord_with_attachment(
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
-/// A destination's non-2xx reply; `body` is `None` when the peer may not show it.
-#[derive(Debug)]
-pub(crate) struct DestinationStatusError {
-    pub(crate) status: reqwest::StatusCode,
-    body: Option<String>,
-}
-
-impl std::fmt::Display for DestinationStatusError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.body {
-            Some(body) => write!(f, "sent error status: {}, err: {body}", self.status),
-            None => write!(f, "sent error status: {}", self.status),
-        }
-    }
-}
-
-impl std::error::Error for DestinationStatusError {}
-
-#[cfg(all(test, feature = "enterprise"))]
-pub(crate) fn send_outcome_for_test(
-    status: reqwest::StatusCode,
-    body: &str,
-    hide_body: bool,
-) -> Result<String, anyhow::Error> {
-    send_outcome(status, body, hide_body)
-}
-
 /// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
 fn send_outcome(
     status: reqwest::StatusCode,
@@ -3904,14 +3696,15 @@ fn send_outcome(
     match (status.is_success(), hide_body) {
         (true, false) => Ok(format!("sent status: {status}, body: {body}")),
         (true, true) => Ok(format!("sent status: {status}")),
-        (false, hide_body) => Err(anyhow::Error::new(DestinationStatusError {
+        (false, hide) => Err(send::SendError::Rejected {
             status,
-            body: (!hide_body).then(|| body.to_string()),
-        })),
+            body: (!hide).then(|| body.to_string()),
+        }
+        .into()),
     }
 }
 
-async fn send_sns_notification(
+pub(crate) async fn send_sns_notification(
     alert_name: &str,
     aws_sns: &AwsSns,
     msg: String,
@@ -4508,6 +4301,11 @@ async fn build_notification_context(
             crate::alerts::notifications::STATUS_FIRING
         }
         .to_string(),
+        event: if resolved {
+            config::meta::alerts::notification_kind::NotificationEvent::Resolved
+        } else {
+            config::meta::alerts::notification_kind::NotificationEvent::Firing
+        },
         episode_id,
         recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
@@ -4556,6 +4354,8 @@ async fn build_notification_context(
         level,
         chart_url: None,
         chart_png: None,
+        cluster_name: config::get_cluster_name(),
+        ..Default::default()
     }
 }
 
@@ -5574,9 +5374,13 @@ mod tests {
             hidden.to_string(),
             "sent error status: 500 Internal Server Error"
         );
-        let typed = hidden.downcast_ref::<DestinationStatusError>().unwrap();
-        assert_eq!(typed.status, status);
-        assert!(typed.body.is_none());
+        let Some(send::SendError::Rejected { status: got, body }) =
+            hidden.downcast_ref::<send::SendError>()
+        else {
+            panic!("a rejected send keeps its status");
+        };
+        assert_eq!(*got, status);
+        assert!(body.is_none());
     }
 
     #[tokio::test]
@@ -5608,28 +5412,6 @@ mod tests {
         assert!(both.contains("multipart/alternative"));
         assert!(both.contains("text/plain"));
         assert!(both.contains("text/html"));
-    }
-
-    #[test]
-    fn test_members_to_send() {
-        let to = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        type Expected = Result<Vec<String>, String>;
-        let cases: Vec<(Vec<String>, Vec<String>, Expected)> = vec![
-            (to(&["a@x.com"]), vec![], Ok(to(&["a@x.com"]))),
-            (to(&["a@x.com"]), to(&["gone@x.com"]), Ok(to(&["a@x.com"]))),
-            (vec![], vec![], Ok(vec![])),
-            (
-                vec![],
-                to(&["gone@x.com", "left@x.com"]),
-                Err("Email not sent: no recipient is part of this org (skipped: gone@x.com, left@x.com)".to_string()),
-            ),
-        ];
-        for (kept, skipped, expected) in cases {
-            let got = members_to_send(kept, &skipped)
-                .map(|email| email.recipients)
-                .map_err(|e| e.to_string());
-            assert_eq!(got, expected, "skipped {skipped:?}");
-        }
     }
 
     #[test]
@@ -9687,6 +9469,32 @@ mod rule_notification_tests {
         assert!(!url.contains("/web/logs"));
         assert!(!url.contains("sql_mode"));
         assert!(!url.contains("query="));
+    }
+
+    #[tokio::test]
+    async fn recovered_alert_context_carries_the_resolved_event() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_name = "default".into();
+        for (resolved, want) in [
+            (false, NotificationEvent::Firing),
+            (true, NotificationEvent::Resolved),
+        ] {
+            let options = ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+                episode_id: None,
+                resolved,
+            };
+            let ctx = build_notification_context("org", &alert, &[], &[], options, None).await;
+            assert_eq!(ctx.event, want);
+        }
     }
 
     #[tokio::test]

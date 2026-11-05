@@ -248,29 +248,6 @@ pub async fn send_alert(
     publish_unchecked(sink, &event).await
 }
 
-/// A one-off message with no lifecycle: downtime notices, synthetics, incident notifications.
-pub async fn send_post(
-    sink: &dyn OutboundSink,
-    org_id: &str,
-    target: &SlackAppTarget,
-    subject: &str,
-    msg: &str,
-) -> anyhow::Result<String> {
-    if let Some(reason) = unavailable_reason(org_id) {
-        return Err(anyhow::anyhow!(reason));
-    }
-    let destination_id = destination_id_for(org_id, target).await?;
-    let ctx = NotificationContext {
-        alert_name: subject.to_string(),
-        ..Default::default()
-    };
-    let rendered = wire_from_custom(msg, &ctx);
-    let now = config::utils::time::now_micros();
-    let target = post_target(org_id, &destination_id, "", now.max(0) as u64);
-    let event = build_event(&target, AlertLevel::Warning, rendered, None, now);
-    publish_unchecked(sink, &event).await
-}
-
 /// An incident notification to a Slack app destination: its template rendered as a one-off Post.
 pub async fn send_templated_post(
     sink: &dyn OutboundSink,
@@ -393,8 +370,7 @@ pub async fn send_form_test(
         None => None,
     };
     let effective =
-        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
-            .await;
+        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit);
     let ctx = crate::alerts::notifications::preview::synthetic_context(None);
     let mut wire = render_wire(effective.template(), &ctx)?;
     wire.title = format!(

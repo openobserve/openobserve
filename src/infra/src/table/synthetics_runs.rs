@@ -657,6 +657,7 @@ mod tests {
             owner: None,
             created_at: 0,
             updated_at: 0,
+            template: None,
         };
         let am: checks::ActiveModel = check.into();
         am.reset_all().insert(&db).await.unwrap();

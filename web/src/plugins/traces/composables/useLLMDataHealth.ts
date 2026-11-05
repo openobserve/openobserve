@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { isAxiosError } from "axios";
 import {
   getDataHealth,
   type DataHealthCheckId,
@@ -38,19 +39,20 @@ function scopeKey(orgId: string, p: DataHealthParams): string {
   ]);
 }
 
-/**
- * AI data health for LLM Insights: one request per scope + window, shared by
- * the health strip and the Total Cost tile (which reads the unpriced check).
- * Sample trace ids cost an extra query per failing check, so they are
- * fetched only on demand (the data health drawer) for the last scope + window.
- * A response that lands after a newer request started is dropped.
- */
+/** Sample trace ids per check, as the server returned them. */
+function samplesOf(res: DataHealthResponse): DataHealthSamples {
+  return Object.fromEntries(res.checks.map((c) => [c.id, c.samples ?? []]));
+}
+
+/** Samples cost a query per failing check, so they load on demand unless a load sets `include_samples`. */
 export function useLLMDataHealth() {
   const health = ref<DataHealthResponse | null>(null);
   /** The window `health` was checked over, so links can open the same window. */
   const checkedWindow = ref<TimeWindow | null>(null);
   const loading = ref(false);
   const error = ref(false);
+  /** The last load failed with 404: the server predates the data health endpoint. */
+  const unsupported = ref(false);
   /** Samples per check for the last fetched scope + window; null until requested. */
   const samples = ref<DataHealthSamples | null>(null);
   const samplesLoading = ref(false);
@@ -78,21 +80,25 @@ export function useLLMDataHealth() {
       lastKey = key;
     }
     const mine = ++seq;
+    const withSamples = !!params.include_samples;
     last = { orgId, params: { ...params, include_samples: false } };
     clearSamples();
     loading.value = true;
     error.value = false;
+    unsupported.value = false;
     try {
-      const res = await getDataHealth(orgId, last.params);
+      const res = await getDataHealth(orgId, { ...last.params, include_samples: withSamples });
       if (mine !== seq) return;
       health.value = res.data;
       checkedWindow.value = { start: params.start_time, end: params.end_time };
+      if (withSamples) samples.value = samplesOf(res.data);
     } catch (e) {
       if (mine !== seq) return;
       console.error("LLM data health fetch error:", e);
       health.value = null;
       checkedWindow.value = null;
       error.value = true;
+      unsupported.value = isAxiosError(e) && e.response?.status === 404;
     } finally {
       if (mine === seq) loading.value = false;
     }
@@ -107,7 +113,7 @@ export function useLLMDataHealth() {
     try {
       const res = await getDataHealth(orgId, { ...params, include_samples: true });
       if (mine !== samplesSeq) return;
-      samples.value = Object.fromEntries(res.data.checks.map((c) => [c.id, c.samples ?? []]));
+      samples.value = samplesOf(res.data);
     } catch (e) {
       if (mine !== samplesSeq) return;
       console.error("LLM data health samples fetch error:", e);
@@ -126,6 +132,7 @@ export function useLLMDataHealth() {
     checkedWindow.value = null;
     loading.value = false;
     error.value = false;
+    unsupported.value = false;
   }
 
   return {
@@ -133,6 +140,7 @@ export function useLLMDataHealth() {
     checkedWindow,
     loading,
     error,
+    unsupported,
     samples,
     samplesLoading,
     fetchHealth,

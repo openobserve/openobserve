@@ -28,7 +28,7 @@ import {
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
-import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { isCrossLinkingEnabledForStream, supportsResultSchema } from "@/utils/crossLinking";
 import useStreams from "@/composables/useStreams";
 import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
@@ -1307,28 +1307,32 @@ export function usePanelDrilldown({
   // Fetch cross-links + WHERE for the clicked query, once, on demand, and apply them to the
   // shared refs. Concurrent callers of the same query share the in-flight promise; a repeat
   // click on a query already fetched hits the cache. `queryIndex` selects the multi-query cell.
-  const ensureDrilldownSchema = async (queryIndex = 0): Promise<void> => {
+  // `needWhere` fetches the panel WHERE even with cross-linking off; chart clicks need only links.
+  const ensureDrilldownSchema = async (queryIndex = 0, needWhere = false): Promise<void> => {
     const query =
       metadata.value?.queries?.[queryIndex]?.query ||
       panelSchema.value?.queries?.[queryIndex]?.query ||
       "";
-    // Cross-linking is only supported for logs streams; skip the result_schema call for panels
-    // backed by other stream types (metrics, traces, enrichment_tables) to avoid failing requests.
-    const crossLinkStreamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    // result_schema errors for non-logs streams (metrics, traces, enrichment_tables).
+    const streamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    const crossLinking = isCrossLinkingEnabledForStream(store.state.zoConfig, streamType);
     if (
-      !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
+      !supportsResultSchema(streamType) ||
+      !(crossLinking || needWhere) ||
       !query ||
       panelSchema.value?.queryType === "promql"
     ) {
       applyDrilldownSchema(EMPTY_SCHEMA);
       return;
     }
-    const cached = schemaCache.get(query);
+    // Keyed by the cross-linking flag too, so a WHERE-only result never hides links later.
+    const cacheKey = `${crossLinking}:${query}`;
+    const cached = schemaCache.get(cacheKey);
     if (cached) {
       applyDrilldownSchema(cached);
       return;
     }
-    const inFlight = schemaInFlight.get(query);
+    const inFlight = schemaInFlight.get(cacheKey);
     if (inFlight) return inFlight;
     const fetchPromise = (async () => {
       try {
@@ -1349,24 +1353,27 @@ export function usePanelDrilldown({
             },
             page_type: "dashboards",
             is_streaming: false,
-            cross_linking: true,
+            cross_linking: crossLinking,
           },
           "dashboards",
         );
         const schema: DrilldownSchema = {
-          crossLinks: response.data?.cross_links || { stream_links: [], org_links: [] },
+          crossLinks: (crossLinking && response.data?.cross_links) || {
+            stream_links: [],
+            org_links: [],
+          },
           baseWhere: response.data?.where_clause ?? "",
           whereByStream: response.data?.where_by_stream ?? {},
         };
-        schemaCache.set(query, schema);
+        schemaCache.set(cacheKey, schema);
         applyDrilldownSchema(schema);
       } catch {
         applyDrilldownSchema(EMPTY_SCHEMA);
       } finally {
-        schemaInFlight.delete(query);
+        schemaInFlight.delete(cacheKey);
       }
     })();
-    schemaInFlight.set(query, fetchPromise);
+    schemaInFlight.set(cacheKey, fetchPromise);
     return fetchPromise;
   };
 

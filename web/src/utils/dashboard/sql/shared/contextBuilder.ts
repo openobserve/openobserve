@@ -31,7 +31,12 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
-import { chartAxisLine, chartColor, chartTextColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import {
+  chartAxisLine,
+  chartAxisTextColor,
+  chartColor,
+  dataZoomBrushStyle,
+} from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
@@ -658,11 +663,12 @@ export function buildSQLContext(
         nameLocation: "middle",
         nameGap: dynamicXAxisNameGap,
         nameTextStyle: {
+          color: chartAxisTextColor(),
           fontWeight: "bold",
           fontSize: 14,
         },
         axisLabel: {
-          color: chartTextColor(),
+          color: chartAxisTextColor(),
           fontSize: 12,
           interval:
             panelSchema.type == "h-stacked"
@@ -712,6 +718,7 @@ export function buildSQLContext(
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap: (isHorizontalChart ? horizontalCategoryLabelWidth : widestYAxisTickLabel) + 10,
       nameTextStyle: {
+        color: chartAxisTextColor(),
         fontWeight: "bold",
         fontSize: 14,
       },
@@ -722,7 +729,7 @@ export function buildSQLContext(
         ellipsis: "..",
       },
       axisLabel: {
-        color: chartTextColor(),
+        color: chartAxisTextColor(),
         fontSize: 12,
         hideOverlap: true,
         formatter: function (value: any) {

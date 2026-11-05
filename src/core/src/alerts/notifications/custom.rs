@@ -22,17 +22,22 @@
 //! substitute last, which is the only thing stopping a pod named
 //! `{alert_name}` from being expanded by a later pass.
 
-use config::utils::json::Value;
+use config::{meta::alerts::notification_kind::NotificationKind, utils::json::Value};
 
 use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    // Another kind's names and text are free (a downtime "deploy" <db>), so a JSON body escapes
+    // them as it escapes attributes; plain text such as an SNS message gets them as written.
+    let json_body = ctx.kind != NotificationKind::Alert && !is_email && looks_like_json(tpl);
     let prepared = super::modifiers::prepare_modifiers(
         tpl,
         |field| {
             let placeholder = format!("{{{field}}}");
-            let value = apply_custom_template_plain(&placeholder, ctx, is_email);
+            // A modifier escapes its own output for a non-email body, so it starts from the raw
+            // value.
+            let value = apply_custom_template_plain(&placeholder, ctx, is_email, false);
             (value != placeholder).then_some(value)
         },
         |field| {
@@ -51,60 +56,117 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
         &prepared.template,
         ctx,
         is_email,
+        json_body,
     ))
+}
+
+/// A JSON object or array body; a placeholder such as `{alert_name}` also opens with a brace.
+fn looks_like_json(tpl: &str) -> bool {
+    let mut chars = tpl.trim_start().chars();
+    match chars.next() {
+        // `[prod] {alert_name}` is text; an array opens with a value.
+        Some('[') => {
+            let rest = chars.as_str().trim_start();
+            let literal = ["null", "true", "false"].iter().any(|word| {
+                rest.strip_prefix(word).is_some_and(|after| {
+                    !after.starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                })
+            });
+            literal
+                || matches!(
+                    rest.chars().next(),
+                    Some('{' | '"' | '[' | ']' | '-' | '0'..='9')
+                )
+        }
+        Some('{') => matches!(chars.find(|c| !c.is_whitespace()), Some('"' | '}')),
+        _ => false,
+    }
 }
 
 pub(crate) fn apply_custom_template_plain(
     tpl: &str,
     ctx: &NotificationContext,
     is_email: bool,
+    escape: bool,
 ) -> String {
     let evaluation_timestamp = ctx.alert_trigger_time;
     let evaluation_timestamp_millis = evaluation_timestamp / 1000;
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let rows_tpl_val: &[Value] = &ctx.rows_tpl_val;
 
+    // Alerts never set the email hint, so their email bodies keep the raw insert.
+    let html = is_email && ctx.render_hints.escape_email_attributes;
+    let esc = |v: &str| -> String {
+        if escape {
+            json_string_contents(v)
+        } else if html {
+            html_escape(v)
+        } else {
+            v.to_string()
+        }
+    };
     let mut resp = tpl
-        .replace("{org_name}", &ctx.org_name)
-        .replace("{stream_type}", &ctx.stream_type)
-        .replace("{stream_name}", &ctx.stream_name)
-        .replace("{alert_name}", &ctx.alert_name)
-        .replace("{alert_type}", &ctx.alert_type)
-        .replace("{alert_period}", &ctx.alert_period)
-        .replace("{alert_operator}", &ctx.alert_operator)
-        .replace("{alert_threshold}", &ctx.alert_threshold)
-        .replace("{alert_count}", &ctx.alert_count)
-        .replace("{alert_agg_value}", &ctx.alert_agg_value)
+        // Newer tokens run first so a value inserted below is never re-scanned for them.
+        .replace("{notification_kind}", ctx.kind.as_str())
+        .replace("{notification_event}", ctx.event.as_str())
+        .replace("{notification_kind_label}", ctx.kind.label())
+        .replace(
+            "{notification_event_label}",
+            ctx.kind.event_label(ctx.event),
+        )
+        .replace("{status_dot}", super::resolve::status_dot(ctx))
+        .replace(
+            "{alert_level_label}",
+            &super::resolve::level_label(&ctx.alert_level),
+        )
+        .replace(
+            "{alert_trigger_time_utc}",
+            &super::resolve::utc_stamp(ctx.alert_trigger_time),
+        )
+        .replace("{cluster_name}", &esc(&ctx.cluster_name))
+        .replace("{org_name}", &esc(&ctx.org_name))
+        .replace("{stream_type}", &esc(&ctx.stream_type))
+        .replace("{stream_name}", &esc(&ctx.stream_name))
+        .replace("{alert_name}", &esc(&ctx.alert_name))
+        .replace("{alert_type}", &esc(&ctx.alert_type))
+        .replace("{alert_period}", &esc(&ctx.alert_period))
+        .replace("{alert_operator}", &esc(&ctx.alert_operator))
+        .replace("{alert_threshold}", &esc(&ctx.alert_threshold))
+        .replace("{alert_count}", &esc(&ctx.alert_count))
+        .replace("{alert_agg_value}", &esc(&ctx.alert_agg_value))
         // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
         // what lets a template branch warning vs critical wording — per-level
         // DESTINATIONS are Phase 4; v1 routing is template-side.
-        .replace("{alert_level}", &ctx.alert_level)
+        .replace("{alert_level}", &esc(&ctx.alert_level))
         // `firing` / `resolved` (openobserve#6751). One template, both states.
-        .replace("{alert_status}", &ctx.alert_status)
+        .replace("{alert_status}", &esc(&ctx.alert_status))
         // The key that pairs a resolve with its trigger. Empty when the alert
         // does not notify on recovery, which is when nothing will resolve.
         .replace(
             "{episode_id}",
-            ctx.episode_id.as_deref().unwrap_or_default(),
+            &esc(ctx.episode_id.as_deref().unwrap_or_default()),
         )
-        .replace("{recovery_reason}", &ctx.recovery_reason)
+        .replace("{recovery_reason}", &esc(&ctx.recovery_reason))
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
         // empty tags render as "" rather than "P0"/"null", so a template that
         // interpolates them unconditionally still produces clean output.
-        .replace("{alert_priority}", &ctx.alert_priority)
-        .replace("{alert_tags}", &ctx.alert_tags)
-        .replace("{alert_threshold_crit}", &ctx.alert_threshold_crit)
-        .replace("{alert_threshold_warn}", &ctx.alert_threshold_warn)
+        .replace("{alert_priority}", &esc(&ctx.alert_priority))
+        .replace("{alert_tags}", &esc(&ctx.alert_tags))
+        .replace("{alert_threshold_crit}", &esc(&ctx.alert_threshold_crit))
+        .replace("{alert_threshold_warn}", &esc(&ctx.alert_threshold_warn))
         // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
         // previously it always read the count-family warning.
-        .replace("{alert_warning_threshold}", &ctx.alert_threshold_warn)
-        .replace("{alert_start_time}", &ctx.alert_start_time)
-        .replace("{alert_end_time}", &ctx.alert_end_time)
-        .replace("{alert_start_time_millis}", &ctx.alert_start_time_millis)
-        .replace("{alert_end_time_millis}", &ctx.alert_end_time_millis)
-        .replace("{alert_url}", &ctx.alert_url)
+        .replace("{alert_warning_threshold}", &esc(&ctx.alert_threshold_warn))
+        .replace("{alert_start_time}", &esc(&ctx.alert_start_time))
+        .replace("{alert_end_time}", &esc(&ctx.alert_end_time))
+        .replace(
+            "{alert_start_time_millis}",
+            &esc(&ctx.alert_start_time_millis),
+        )
+        .replace("{alert_end_time_millis}", &esc(&ctx.alert_end_time_millis))
+        .replace("{alert_url}", &esc(&ctx.alert_url))
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
         .replace(
             "{alert_trigger_time_millis}",
@@ -114,11 +176,14 @@ pub(crate) fn apply_custom_template_plain(
             "{alert_trigger_time_seconds}",
             &evaluation_timestamp_seconds.to_string(),
         )
-        .replace("{alert_trigger_time_str}", &ctx.alert_trigger_time_str)
+        .replace(
+            "{alert_trigger_time_str}",
+            &esc(&ctx.alert_trigger_time_str),
+        )
         // Back-compat alias: shipped prebuilt bodies historically used {alert_time},
         // which was never substituted. Alias it to the trigger-time string.
-        .replace("{alert_time}", &ctx.alert_trigger_time_str)
-        .replace("{alert_description}", &ctx.alert_description);
+        .replace("{alert_time}", &esc(&ctx.alert_trigger_time_str))
+        .replace("{alert_description}", &esc(&ctx.alert_description));
 
     if let (Some(operator), Some(value)) = (&ctx.promql_operator, &ctx.promql_value) {
         resp = resp
@@ -229,7 +294,23 @@ pub(crate) fn apply_custom_template_plain(
         }
     }
     for (key, value) in ctx.context_attributes.iter() {
-        process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
+        if is_email && ctx.render_hints.escape_email_attributes {
+            let escaped = html_escape(value);
+            process_variable_replace(&mut resp, key, &VarValue::Str(&escaped), is_email);
+        } else if escape {
+            // Another kind's JSON body: real JSON string escaping, as for its scalars.
+            scan_and_replace_var(&mut resp, key, |len| {
+                json_string_contents(&VarValue::Str(value).to_string_with_length(len, true))
+            });
+        } else if ctx.kind != NotificationKind::Alert && !is_email {
+            // Another kind's plain text body, such as an SNS message, gets its attributes as
+            // written.
+            scan_and_replace_var(&mut resp, key, |len| {
+                VarValue::Str(value).to_string_with_length(len, true)
+            });
+        } else {
+            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
+        }
     }
 
     // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
@@ -491,6 +572,25 @@ impl VarValue<'_> {
     }
 }
 
+/// format_variable_value leaves some control characters raw, which breaks a JSON body.
+fn json_string_contents(value: &str) -> String {
+    let quoted = serde_json::to_string(value).unwrap_or_default();
+    quoted
+        .strip_prefix('"')
+        .and_then(|q| q.strip_suffix('"'))
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 #[cfg(test)]
 mod golden {
     //! Byte-identity corpus for the custom-kind renderer.
@@ -503,6 +603,93 @@ mod golden {
     use config::meta::alerts::level::AlertLevel;
 
     use super::*;
+
+    #[test]
+    fn another_kinds_quoted_name_keeps_a_custom_json_body_valid() {
+        let ctx = NotificationContext {
+            kind: NotificationKind::Downtime,
+            alert_name: "Nightly \"deploy\" <db>".into(),
+            alert_description: "line one\nline two".into(),
+            ..Default::default()
+        };
+        let body = apply_custom_template(
+            r#"{"text":"{alert_name}","detail":"{alert_description}"}"#,
+            &ctx,
+            false,
+        );
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["text"], "Nightly \"deploy\" <db>");
+        assert_eq!(json["detail"], "line one\nline two");
+        let ctl = NotificationContext {
+            alert_name: "esc \u{1b}[31m red".into(),
+            alert_description: "col\tcol \u{1} \u{7f}".into(),
+            ..ctx.clone()
+        };
+        let body = apply_custom_template(
+            r#"{"text":"{alert_name}","detail":"{alert_description}"}"#,
+            &ctl,
+            false,
+        );
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["text"], "esc \u{1b}[31m red");
+        assert_eq!(json["detail"], "col\tcol \u{1} \u{7f}");
+        let attrs = NotificationContext {
+            context_attributes: vec![("check_error".into(), "timed \"out\"\n\u{1b}x".into())],
+            ..ctx.clone()
+        };
+        let body = apply_custom_template(r#"{"error":"{check_error}"}"#, &attrs, false);
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["error"], "timed \"out\"\n\u{1b}x");
+        assert_eq!(
+            apply_custom_template("[prod] {alert_name}", &ctx, false),
+            "[prod] Nightly \"deploy\" <db>"
+        );
+        assert!(looks_like_json("[true, \"{alert_name}\"]"));
+        assert!(looks_like_json("[ null ]"));
+        assert!(!looks_like_json("[test] {alert_name}"));
+        let sns = NotificationContext {
+            context_attributes: vec![("check_error".into(), "timed \"out\"\nnow".into())],
+            ..ctx.clone()
+        };
+        assert_eq!(
+            apply_custom_template("error: {check_error}", &sns, false),
+            "error: timed \"out\"\nnow"
+        );
+        // A plain text body, such as an SNS message, gets the values as written.
+        assert_eq!(
+            apply_custom_template("{alert_name}: {alert_description}", &ctx, false),
+            "Nightly \"deploy\" <db>: line one\nline two"
+        );
+        // An alert keeps the raw insert it always had.
+        let alert = NotificationContext {
+            alert_name: "cpu high".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(r#"{"text":"{alert_name}"}"#, &alert, false),
+            r#"{"text":"cpu high"}"#
+        );
+    }
+
+    #[test]
+    fn a_synthetics_email_body_html_escapes_the_scalars() {
+        let mut ctx = NotificationContext {
+            kind: NotificationKind::Synthetics,
+            alert_name: "API <prod>".into(),
+            ..Default::default()
+        };
+        ctx.render_hints.escape_email_attributes = true;
+        assert_eq!(
+            apply_custom_template("<h2>{alert_name}</h2>", &ctx, true),
+            "<h2>API &lt;prod&gt;</h2>"
+        );
+        // Without the hint, as for every alert, the insert stays raw.
+        ctx.render_hints.escape_email_attributes = false;
+        assert_eq!(
+            apply_custom_template("<h2>{alert_name}</h2>", &ctx, true),
+            "<h2>API <prod></h2>"
+        );
+    }
 
     fn fixture_ctx() -> NotificationContext {
         NotificationContext {
@@ -564,6 +751,7 @@ mod golden {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 
@@ -936,5 +1124,15 @@ mod golden {
                 "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
             })
         );
+    }
+
+    #[test]
+    fn custom_inserted_values_are_not_rescanned_for_newer_tokens() {
+        let ctx = NotificationContext {
+            alert_name: "cpu-{notification_kind}".into(),
+            ..Default::default()
+        };
+        let rendered = apply_custom_template(r#"{"text":"{alert_name}"}"#, &ctx, false);
+        assert_eq!(rendered, r#"{"text":"cpu-{notification_kind}"}"#);
     }
 }

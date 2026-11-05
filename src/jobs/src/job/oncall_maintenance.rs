@@ -265,7 +265,14 @@ async fn warn_about(
         }
     };
 
-    let rendered = notify::render_coverage_gap_ahead(&gap.team.name, gap.at, gap.hours_away(now));
+    let schedule_url =
+        notify::team_schedule_url(&config::get_config().common.web_url, org_id, &gap.team.id);
+    let rendered = notify::render_coverage_gap_ahead(
+        &gap.team.name,
+        gap.at,
+        gap.hours_away(now),
+        &schedule_url,
+    );
     for recipient in audience {
         let addressed = notify::Addressed {
             page: notify::Page {
@@ -275,10 +282,11 @@ async fn warn_about(
                 title: "coverage gap".to_string(),
                 priority: config::meta::alerts::priority::AlertPriority::P3,
                 reason: "you are on this team, or an admin of this org".to_string(),
-                detail_url: String::new(),
+                detail_url: schedule_url.clone(),
                 // No alert behind this one, so no runbook to follow.
                 runbook_url: None,
                 investigation: vec![],
+                stage: o2_enterprise::enterprise::oncall::sender::OnCallStage::CoverageGap,
             },
             recipient: recipient.clone(),
             channel: config::meta::oncall::Channel::Email,

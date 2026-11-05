@@ -1,4 +1,4 @@
-[CRITICAL] CPU "high" & <fire> on web-1
+CPU "high" & <fire> on web-1
 
 Value 92.5 exceeded 80 — see runbook
 
