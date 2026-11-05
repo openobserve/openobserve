@@ -2745,6 +2745,14 @@ mod tests {
                 "{key}"
             );
         }
+        for feature in Feature::all() {
+            let key: &str = feature.into();
+            assert_eq!(
+                runtime_definition().features[key].display_name.as_deref(),
+                Some(feature.display_name()),
+                "{key}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]
