@@ -97,11 +97,26 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
     >
       <ChartRenderer ref="chartRendererRef" :data="chartData" :key="chartKey" />
     </div>
+    <ul
+      v-if="assistantV2 && !loading && dependencies.length > 0"
+      class="border-border-default mt-2 flex max-h-32 shrink-0 flex-col gap-1 overflow-y-auto border-t pt-2"
+      :aria-label="t('assistant.entry.dependencies')"
+      data-test="incident-service-graph-dependencies"
+    >
+      <li
+        v-for="dep in dependencies"
+        :key="dep.key"
+        class="text-text-body flex items-center gap-2 text-sm"
+      >
+        <OTruncatedText class="min-w-0 flex-1">{{ dep.name }}</OTruncatedText>
+        <AiEntryButton v-bind="dependencyDoor(dep)" appearance="toolbar-icon" />
+      </li>
+    </ul>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
@@ -109,14 +124,22 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     ChartRenderer,
     OButton,
     OSpinner,
+    OTruncatedText,
     OIcon,
   },
   props: {
@@ -138,6 +161,54 @@ export default defineComponent({
 
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
+
+    // The canvas is not keyboard-selectable, so each dependency is also a list item with its door.
+    const assistantV2 = isAssistantV2();
+    const store = useStore();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => graphData.value,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const dependencies = computed(() => {
+      const nodes = graphData.value?.nodes ?? [];
+      const seen = new Map<string, { key: string; name: string; source: string; target: string }>();
+      for (const e of graphData.value?.edges ?? []) {
+        const source = nodes[e.from_node_index]?.service_name;
+        const target = nodes[e.to_node_index]?.service_name;
+        if (!source || !target || source === target) continue;
+        const key = `${source}->${target}`;
+        if (!seen.has(key)) seen.set(key, { key, name: `${source} → ${target}`, source, target });
+      }
+      return [...seen.values()];
+    });
+    const dependencyDoor = (dep: { name: string; source: string; target: string }) => ({
+      verb: "explain" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg?.value,
+      objectKind: "service_edge" as const,
+      label: t("assistant.entry.explainDependencyNamed", { name: dep.name }),
+      tooltip: t("assistant.entry.tooltip.explainEdge"),
+      dataTest: "ai-entry-service-edge-explain" as const,
+      build: async () => {
+        const nodes = graphData.value?.nodes ?? [];
+        const ms = (us: number) => (us > 1e14 ? Math.round(us / 1000) : us);
+        const firsts = nodes.map((n) => ms(n.first_fired_at)).filter((n) => n > 0);
+        const lasts = nodes.map((n) => ms(n.last_fired_at)).filter((n) => n > 0);
+        const now = Date.now();
+        return (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          source: dep.source,
+          target: dep.target,
+          range: {
+            from: firsts.length ? Math.min(...firsts) : now - 60 * 60_000,
+            to: lasts.length ? Math.max(...lasts) : now,
+          },
+          timeZone: store.state.timezone || "UTC",
+        });
+      },
+    });
 
     // D3-Force simulation to compute stable node positions with left-to-right layout
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
@@ -688,6 +759,9 @@ export default defineComponent({
 
     return {
       t,
+      assistantV2,
+      dependencies,
+      dependencyDoor,
       loading,
       graphData,
       chartRendererRef,

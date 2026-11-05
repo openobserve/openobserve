@@ -228,6 +228,8 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
 
   it("over a guard-blocked URL load the drawer still opens, and Run anyway keeps the init origin (CROSS-SPEC row 10)", async () => {
     localStorage.setItem("oo_toggle_auto_run", "false");
+    // The drawer's detail view is a lazy chunk; its first cold transform alone can outlast a waitFor.
+    await import("@/plugins/logs/DetailTable.vue");
     vi.spyOn(searchService, "search").mockResolvedValue({
       status: 200,
       data: { hits: [line], is_partial: false },

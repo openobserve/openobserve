@@ -44,6 +44,13 @@
 @utility bg-chat-bubble-user {
   background-image: var(--color-chat-bubble-user);
 }
+/* The trace thread view's own fills; LLM observability never reads the assistant's tokens (constraint 51). */
+@utility bg-trace-thread-user {
+  background-image: var(--color-trace-thread-user-bg);
+}
+@utility bg-trace-thread-user-avatar {
+  background-image: var(--color-trace-thread-user-avatar-bg);
+}
 
 /* Diagonal hatch marking a span that exists but cannot be shown. Consumer: components/rum/ReplayLoadBand.vue. */
 @utility bg-hatch-unavailable {

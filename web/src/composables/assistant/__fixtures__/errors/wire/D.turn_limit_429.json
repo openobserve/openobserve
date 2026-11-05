@@ -1,0 +1,11 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs:1141-1152 turn_limit_response",
+  "shape": "D",
+  "status": 429,
+  "body": {
+    "code": 429,
+    "error_code": "turn_limit",
+    "scope": "user",
+    "message": "Too many AI responses are running at once; please wait for one to finish"
+  }
+}

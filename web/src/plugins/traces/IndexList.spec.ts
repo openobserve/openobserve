@@ -464,6 +464,35 @@ describe("IndexList Component", () => {
     });
   });
 
+  describe("Set by assistant", () => {
+    const tag = () => wrapper.find('[data-test="traces-assistant-set-stream"]');
+
+    it("labels the stream the assistant set", async () => {
+      expect(tag().exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["stream"]) });
+      await flushPromises();
+      expect(tag().text()).toContain("Set by assistant");
+      expect(tag().attributes("aria-label")).toBe("Stream was set by the assistant");
+    });
+
+    it("reports the label cleared when the user picks another stream", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["stream", "time"]) });
+      await flushPromises();
+      wrapper.vm.onStreamChange("other");
+      expect(wrapper.emitted("assistant-set-cleared")).toEqual([["stream"]]);
+    });
+
+    it("reports nothing when the stream was not the assistant's", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["time"]) });
+      await flushPromises();
+      wrapper.vm.onStreamChange("other");
+      expect(wrapper.emitted("assistant-set-cleared")).toBeUndefined();
+    });
+  });
+
   describe("Field Search", () => {
     it("should update filterField in searchObj when GroupedFieldList emits update:search", async () => {
       // The search is now managed by GroupedFieldList internally and exposed via

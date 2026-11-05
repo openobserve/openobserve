@@ -1,0 +1,16 @@
+{
+  "comment": "Model ids scrubbed from viewer transcripts; must match MODEL_NAME in web/src/composables/assistant/record.ts (drift test in projection.rs).",
+  "replacement": "the model",
+  "patterns": [
+    "gpt-[\\w.-]+",
+    "chatgpt[\\w.-]*",
+    "claude(?:-[\\w.]+)*",
+    "gemini(?:-[\\w.]+)*",
+    "llama[\\w.-]*",
+    "mistral[\\w.-]*",
+    "mixtral[\\w.-]*",
+    "deepseek[\\w.-]*",
+    "qwen[\\w.-]*",
+    "o[134]-(?:mini|preview|pro)[\\w.-]*"
+  ]
+}

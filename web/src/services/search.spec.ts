@@ -88,6 +88,37 @@ describe("Search Service", () => {
       );
     });
 
+    it("encodes the page type, so a value cannot add search parameters", async () => {
+      const params = {
+        org_identifier: "test-org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs&search_type=dashboards#",
+      };
+      await search.search(params);
+      expect(mockHttp.post).toHaveBeenLastCalledWith(
+        "/api/test-org/_search?type=logs%26search_type%3Ddashboards%23&search_type=ui&use_cache=true",
+        params.query,
+        { transformResponse: [expect.any(Function)] },
+      );
+    });
+
+    it("keeps the grouped access toast out when the caller renders its own 403", async () => {
+      const params = {
+        org_identifier: "test-org",
+        query: { query: { sql: "SELECT * FROM logs" } },
+        page_type: "logs",
+        silentForbidden: true,
+      };
+
+      await search.search(params);
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
+        params.query,
+        { transformResponse: [expect.any(Function)], silentForbidden: true },
+      );
+    });
+
     it("should add dashboard parameters to URL", async () => {
       const params = {
         org_identifier: "test-org",

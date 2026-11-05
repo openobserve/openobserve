@@ -85,6 +85,19 @@ describe("expireSession", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the assistant drafts when it clears sessionStorage", () => {
+    vi.stubGlobal("location", { ...window.location, reload: vi.fn() });
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "draft");
+    sessionStorage.setItem("searchState", "x");
+    const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+    expireSession(store, { clearLocalStorage: true });
+
+    expect(sessionStorage.getItem("o2.assistant.draft:k1:s1")).toBe("draft");
+    expect(sessionStorage.getItem("searchState")).toBeNull();
+    sessionStorage.clear();
+  });
+
   it("goes to the login page instead of reloading when asked, keeping the drafts", () => {
     const reload = vi.fn();
     const assign = vi.fn();

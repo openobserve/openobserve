@@ -55,6 +55,8 @@ export interface SparklineProps {
    * other, since independently-scaled shapes cannot be compared by eye.
    */
   max?: number;
+  /** A reference value (such as the previous period's level) drawn as a dashed line behind the trend. */
+  baseline?: number;
   /** Height step. Cells use `xs`; a card's `#chart` slot uses `sm`. */
   size?: "xs" | "sm";
   /** Accessible description of the trend, e.g. "calls over the last 6 windows". */

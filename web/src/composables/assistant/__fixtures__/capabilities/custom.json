@@ -1,0 +1,25 @@
+{
+  "health": {
+    "status": "ok",
+    "checked_at": "2026-10-15T10:00:00Z"
+  },
+  "model": "default",
+  "agent_version": "1.42.0",
+  "model_provider": "openai",
+  "redaction_applied": false,
+  "can_chat": true,
+  "can_write": true,
+  "can_share": false,
+  "can_read_shares": true,
+  "persistence": true,
+  "public_links": false,
+  "retention_days": 90,
+  "agents": ["o2-ai", "sre"],
+  "toolsets": [],
+  "toolset_secret_merge": true,
+  "policy_enforced": false,
+  "attachments": true,
+  "context_used": true,
+  "answer_locale": true,
+  "rca_chat_mode": true
+}

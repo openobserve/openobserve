@@ -43,6 +43,7 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
+      silentForbidden,
     }: {
       org_identifier: string;
       query: any;
@@ -68,6 +69,8 @@ const search = {
        * unaffected.
        */
       signal?: AbortSignal;
+      /** The caller renders a 403 itself (the assistant's Run inline), so the grouped access toast stays out. */
+      silentForbidden?: boolean;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
@@ -77,7 +80,7 @@ const search = {
     const use_cache: boolean =
       useCache ?? ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
-    let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    let url = `/api/${org_identifier}/_search?type=${encodeURIComponent(page_type)}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
@@ -105,9 +108,13 @@ const search = {
         },
       ],
     };
-    const axiosConfig = signal ? { ...baseAxiosConfig, signal } : baseAxiosConfig;
+    const axiosConfig = {
+      ...baseAxiosConfig,
+      ...(signal && { signal }),
+      ...(silentForbidden && { silentForbidden }),
+    };
     if (typeof query.query.sql != "string") {
-      url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      url = `/api/${org_identifier}/_search_multi?type=${encodeURIComponent(page_type)}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
       if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
       if (folder_id) url += `&folder_id=${folder_id}`;

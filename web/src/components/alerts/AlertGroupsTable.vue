@@ -151,6 +151,10 @@
 
     <template #cell-actions="{ row }">
       <div class="flex items-center">
+        <template v-if="assistantV2 && alert && row.level">
+          <AiEntryButton v-bind="firingDoor(row, 'troubleshoot')" appearance="toolbar-icon" />
+          <AiEntryButton v-bind="firingDoor(row, 'add_to_chat')" appearance="toolbar-icon" />
+        </template>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -267,7 +271,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { alertFiringBuild } from "@/components/alerts/alertDoors";
+import type { AlertRecord } from "@/utils/assistant/prompts";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
@@ -304,6 +312,8 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    /** The alert these groups belong to; firing rows get Troubleshoot and Add to chat with it. */
+    alert?: AlertRecord;
     alertId?: string;
     alertName?: string;
     folderId?: string;
@@ -313,6 +323,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    alert: undefined,
     alertId: "",
     alertName: "",
     folderId: undefined,
@@ -426,6 +437,43 @@ const openMuteDialog = (row: AlertGroup) => {
   muteDialogOpen.value = true;
 };
 
+const assistantV2 = isAssistantV2();
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => props.groups,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const firingDoor = (row: AlertGroup, verb: "troubleshoot" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg?.value,
+  objectKind: "alert_firing" as const,
+  label: t(
+    verb === "troubleshoot" ? "assistant.entry.troubleshootAlert" : "assistant.entry.addFiring",
+  ),
+  tooltip: t(
+    verb === "troubleshoot"
+      ? "assistant.entry.tooltip.troubleshootAlert"
+      : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "troubleshoot"
+      ? ("ai-entry-alert-firing-troubleshoot" as const)
+      : ("ai-entry-alert-firing-add" as const),
+  objectKey: `${String(props.alert?.id ?? "")}:${row.group_key}:${String(row.level_since ?? "")}`,
+  build: alertFiringBuild(
+    () => ({
+      alert: props.alert ?? {},
+      firedAt: Math.round(Number(row.level_since ?? row.last_seen ?? Date.now() * 1000) / 1000),
+    }),
+    store.state,
+  ),
+});
+
 // Filtering is client-side because the whole group set is already bounded by
 // the M-6 cap — there is no page to fetch beyond it.
 const rows = computed<AlertGroup[]>(() => {
@@ -517,7 +565,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: raw(""),
     cell: " ",
     isAction: true,
-    size: 88,
+    size: assistantV2 ? 158 : 88,
     meta: { align: "center" },
   },
 ]);

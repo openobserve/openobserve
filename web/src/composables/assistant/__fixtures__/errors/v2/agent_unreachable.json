@@ -1,0 +1,13 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs agent_unreachable_error (W-23)",
+  "shape": "B-01",
+  "status": 503,
+  "body": {
+    "code": "agent_unreachable",
+    "message": "The chosen agent cannot take this chat right now",
+    "retryable": true,
+    "error": "The chosen agent cannot take this chat right now",
+    "error_code": "agent_unreachable",
+    "recoverable": true
+  }
+}

@@ -69,8 +69,43 @@ vi.mock("@/services/service_graph", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: { getCurrentTopology: vi.fn() },
+    servicesTrend: vi.fn(),
   });
 });
+// The agent-first block reads only the gate and the dock from the assistant runtime.
+const assistantGate = vi.hoisted(() => ({ value: "available" }));
+vi.mock("@/composables/assistant", async () => {
+  const { reactive, ref } = await import("vue");
+  const gate = ref(assistantGate.value);
+  return {
+    useAssistantCapability: () => ({ gate }),
+    assistantStore: { state: reactive({ shell: { placement: { kind: "hidden" } } }) },
+    __gate: gate,
+  };
+});
+vi.mock("./overview/OverviewNowList.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "OverviewNowList",
+    props: [
+      "snapshot",
+      "org",
+      "timezone",
+      "trend",
+      "pending",
+      "failedSources",
+      "sources",
+      "moreDegraded",
+      "returnState",
+      "dataAsOf",
+      "trendCapped",
+      "tracesLocked",
+      "deniedSources",
+    ],
+    emits: ["select", "open", "service", "fallback", "viewAll", "retry"],
+    template: '<div data-test="overview-now-stub" />',
+  },
+}));
 
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL
@@ -132,7 +167,11 @@ import OverviewTab from "./OverviewTab.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import { servicesTrend } from "@/services/service_graph";
 
 // OverviewTab renders only O2 `lib` components.
 
@@ -259,6 +298,9 @@ describe("OverviewTab", () => {
   };
 
   beforeEach(() => {
+    // The local .env may turn v2 on for the build, and these tests pin the v2-off Overview.
+    window.__O2_ASSISTANT_V2__ = false;
+    resetAssistantV2ForTests();
     originalZoConfig = { ...store.state.zoConfig };
 
     // Pin the build flags to OSS. `config` is built from import.meta.env, and
@@ -293,6 +335,8 @@ describe("OverviewTab", () => {
     store.commit("setConfig", originalZoConfig);
     config.isEnterprise = originalFlags.isEnterprise;
     config.isCloud = originalFlags.isCloud;
+    delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
     vi.clearAllMocks();
   });
 
@@ -2608,6 +2652,402 @@ describe("OverviewTab", () => {
       expect(drawer().props("open")).toBe(false);
       expect(drawer().props("alertDetails")).toBeNull();
       expect(drawer().props("alertId")).toBe("");
+    });
+  });
+
+  describe("the agent-first Overview (v2)", () => {
+    const START = 1_762_296_400_000_000;
+    const END = 1_762_300_000_000_000;
+    const nowList = () => wrapper.findComponent({ name: "OverviewNowList" });
+    const gate = async () =>
+      ((await import("@/composables/assistant")) as unknown as { __gate: { value: string } })
+        .__gate;
+    const trendResponse = (services: unknown[] = []) => ({
+      window: { start_time: START, end_time: END - 60_000_000 },
+      baseline_window: { start_time: START - 86_400_000_000, end_time: START },
+      data_until: END - 60_000_000,
+      source: "v4",
+      step_micros: 360_000_000,
+      partial: false,
+      warnings: [],
+      services,
+      total_services: services.length,
+      degraded_total: services.length,
+    });
+    const errorsService = {
+      service: "checkout-api",
+      current: { requests: 1000, failed: 61, error_rate: 6.1, p99_latency_ns: 900_000_000 },
+      baseline: {
+        error_rate: 0.4,
+        p99_latency_ns: 800_000_000,
+        requests_per_min: 20,
+        covered_hours: 24,
+      },
+      p99_ratio: 1.1,
+      error_rate_delta: 5.7,
+      signal: "errors",
+      included: false,
+      series: [],
+    };
+
+    beforeEach(async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      (await gate()).value = "available";
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+      vi.mocked(servicesTrend).mockResolvedValue(trendResponse([errorsService]) as never);
+      await router.replace({ name: "home", query: {} }).catch(() => undefined);
+    });
+
+    afterEach(() => contextRegistry.cleanup());
+
+    it("keeps today's sections when the assistant cannot chat", async () => {
+      (await gate()).value = "off_for_org";
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-agent-first"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-alerts-health-grid"]').exists()).toBe(true);
+      expect(servicesTrend).not.toHaveBeenCalled();
+    });
+
+    it("shows Now, the data health grid and the go-to column instead of today's cards", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-agent-first"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-alerts-health-grid"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-health-limit-grid"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-aside"]').exists()).toBe(true);
+      expect(nowList().exists()).toBe(true);
+    });
+
+    it("registers the Home provider while mounted and drops it on unmount", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect((await contextRegistry.getActiveContext())?.page).toBe("home_overview");
+      wrapper.unmount();
+      expect((await contextRegistry.getActiveContext())?.page).not.toBe("home_overview");
+    });
+
+    it("reads three incident statuses of 20", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const statuses = vi
+        .mocked(incidentsService.list)
+        .mock.calls.map(([, status, limit]) => `${status}:${limit}`);
+      expect(statuses).toEqual(
+        expect.arrayContaining(["open:20", "acknowledged:20", "resolved:20"]),
+      );
+    });
+
+    it("ranks a trend service and stamps Services data to from data_until", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const snapshot = nowList().props("snapshot");
+      expect(snapshot.rows.map((row: { key: string }) => row.key)).toContain(
+        "service:checkout-api",
+      );
+      expect(snapshot.services).toMatchObject({ available: true, dataUntil: END - 60_000_000 });
+      expect(nowList().props("trend")).not.toBeNull();
+    });
+
+    it("falls back to the topology figures when the trend answers null", async () => {
+      vi.mocked(servicesTrend).mockResolvedValue(null as never);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [{ id: "api", label: "api", requests: 100, error_rate: 9 }],
+          edges: [],
+        },
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const snapshot = nowList().props("snapshot");
+      expect(snapshot.services.available).toBe(false);
+      expect(snapshot.rows).toEqual([
+        expect.objectContaining({ key: "service:api", baselineErrorRate: null }),
+      ]);
+    });
+
+    it("sends no trend call over 7 days and shows the cap note", async () => {
+      await router.replace({ name: "home", query: { period: "8d" } });
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(servicesTrend).not.toHaveBeenCalled();
+      expect(nowList().props("trendCapped")).toBe(true);
+    });
+
+    it("restores the row and range from the URL over the saved range", async () => {
+      localStorage.setItem(
+        "o2_overview_time",
+        JSON.stringify({
+          type: "relative",
+          relative: "15m",
+          timeRange: { startTime: 1, endTime: 2 },
+        }),
+      );
+      await router.replace({ name: "home", query: { period: "1h", row: "service:checkout-api" } });
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const vm = wrapper.vm as unknown as { relativeTime: string; dateTimeType: string };
+      expect(vm.dateTimeType).toBe("relative");
+      expect(vm.relativeTime).toBe("1h");
+      expect(nowList().props("snapshot").selectedKey).toBe("service:checkout-api");
+    });
+
+    it("writes the selected row to the URL with replace, never push", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const replace = vi.spyOn(router, "replace");
+      const push = vi.spyOn(router, "push");
+      const row = nowList().props("snapshot").rows[0];
+      nowList().vm.$emit("select", row);
+      await flushPromises();
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ row: row.key }) }),
+      );
+      expect(push).not.toHaveBeenCalled();
+      replace.mockRestore();
+      push.mockRestore();
+    });
+
+    it("opens a service row in Traces with the way back to this row", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as never);
+      const row = nowList().props("snapshot").rows[0];
+      nowList().vm.$emit("open", row);
+      await flushPromises();
+      const target = push.mock.calls[0][0] as { name: string; query: Record<string, string> };
+      expect(target.name).toBe("traces");
+      expect(target.query.home_return).toContain("row=service%3Acheckout-api");
+      expect(Object.keys(target.query).at(-1)).toBe("org_identifier");
+      push.mockRestore();
+    });
+
+    it("opens the RED panel for today's Investigate on a service row", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      nowList().vm.$emit("fallback", nowList().props("snapshot").rows[0]);
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ServiceGraphNodeSidePanel" }).props("visible")).toBe(
+        true,
+      );
+    });
+
+    it("drops range A's topology when range B's topology read fails", async () => {
+      vi.mocked(servicesTrend).mockResolvedValue(null as never);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [{ id: "api", label: "api", requests: 100, error_rate: 9 }], edges: [] },
+      } as never);
+      let setRange: ((range: { from: number; to: number; period?: string }) => void) | null = null;
+      wrapper = mount(OverviewTab, {
+        global: { plugins: [i18n, store, router] },
+        slots: {
+          top: (props: { setPageRange: typeof setRange }) => {
+            setRange = props.setPageRange;
+            return null;
+          },
+        },
+      });
+      await flushPromises();
+      expect(
+        nowList()
+          .props("snapshot")
+          .rows.map((row: { key: string }) => row.key),
+      ).toEqual(["service:api"]);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(new Error("boom"));
+      setRange!({ from: 0, to: 1, period: "1h" });
+      await flushPromises();
+      const snapshot = nowList().props("snapshot");
+      expect(snapshot.rows.map((row: { key: string }) => row.key)).not.toContain("service:api");
+      expect(nowList().props("failedSources")).toEqual([
+        expect.objectContaining({ key: "services" }),
+      ]);
+    });
+
+    it("updates a committed row's coverage when the shared alert list is invalidated", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const row = () =>
+        nowList()
+          .props("snapshot")
+          .rows.find((r: { key: string }) => r.key === "service:checkout-api");
+      expect(row()).toMatchObject({ coverage: "none" });
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+        data: {
+          list: [
+            {
+              alert_id: "a1",
+              name: "checkout errors",
+              enabled: true,
+              stream_type: "traces",
+              condition: {
+                type: "custom",
+                conditions: [{ column: "service_name", operator: "=", value: "checkout-api" }],
+              },
+            },
+          ],
+        },
+      } as never);
+      await queryClient.invalidateQueries({ queryKey: alertKeys.all(org) });
+      await flushPromises();
+      expect(row()).toMatchObject({ coverage: "covered" });
+    });
+
+    it("hands the page range to the launcher slot and moves it from the launcher", async () => {
+      let setRange: ((range: { from: number; to: number; period?: string }) => void) | null = null;
+      let range: { period?: string } | null = null;
+      wrapper = mount(OverviewTab, {
+        global: { plugins: [i18n, store, router] },
+        slots: {
+          top: (props: { pageRange: { period?: string }; setPageRange: typeof setRange }) => {
+            range = props.pageRange;
+            setRange = props.setPageRange;
+            return null;
+          },
+        },
+      });
+      await flushPromises();
+      expect(range).toMatchObject({ period: "15m" });
+      setRange!({ from: 0, to: 1, period: "1h" });
+      await flushPromises();
+      expect(range).toMatchObject({ period: "1h" });
+      expect(JSON.parse(localStorage.getItem("o2_overview_time") ?? "{}").relative).toBe("1h");
+    });
+
+    const mountWithRange = () => {
+      let setRange: ((range: { from: number; to: number; period?: string }) => void) | null = null;
+      wrapper = mount(OverviewTab, {
+        global: { plugins: [i18n, store, router] },
+        slots: {
+          top: (props: { setPageRange: typeof setRange }) => {
+            setRange = props.setPageRange;
+            return null;
+          },
+        },
+      });
+      return (period: string) => setRange!({ from: 0, to: 1, period });
+    };
+    const windowSpan = () => {
+      const { start, end } = nowList().props("snapshot").window;
+      return Math.round((end - start) / 3_600_000_000);
+    };
+
+    it("never commits a superseded range's load under the newer range", async () => {
+      const setPeriod = mountWithRange();
+      await flushPromises();
+      const a = deferred<unknown>();
+      const b = deferred<unknown>();
+      vi.mocked(serviceGraphService.getCurrentTopology)
+        .mockReturnValueOnce(a.promise as never)
+        .mockReturnValueOnce(b.promise as never);
+      setPeriod("1h");
+      await flushPromises();
+      setPeriod("6h");
+      await flushPromises();
+      a.resolve({ data: mockOverview.emptyServiceGraphTopology });
+      await flushPromises();
+      expect(internals(wrapper).isLoading).toBe(true);
+      expect(windowSpan()).toBe(0);
+      b.resolve({ data: mockOverview.emptyServiceGraphTopology });
+      await flushPromises();
+      expect(internals(wrapper).isLoading).toBe(false);
+      expect(windowSpan()).toBe(6);
+    });
+
+    it("lets a late incidents read commit only when no load is in flight", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: false });
+      const setPeriod = mountWithRange();
+      await flushPromises();
+      const topology = deferred<unknown>();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockReturnValueOnce(
+        topology.promise as never,
+      );
+      setPeriod("6h");
+      await flushPromises();
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+      await flushPromises();
+      expect(incidentsService.list).toHaveBeenCalled();
+      expect(windowSpan()).toBe(0);
+      topology.resolve({ data: mockOverview.emptyServiceGraphTopology });
+      await flushPromises();
+      expect(windowSpan()).toBe(6);
+    });
+
+    it("never marks a newer trend failed from a superseded trend read", async () => {
+      const setPeriod = mountWithRange();
+      await flushPromises();
+      let failStale!: (err: Error) => void;
+      const stale = new Promise((_, reject) => (failStale = reject));
+      vi.mocked(servicesTrend)
+        .mockReturnValueOnce(stale as never)
+        .mockResolvedValueOnce(trendResponse([errorsService]) as never);
+      setPeriod("1h");
+      await flushPromises();
+      setPeriod("6h");
+      await flushPromises();
+      failStale(new Error("boom"));
+      await flushPromises();
+      expect(nowList().props("failedSources")).toEqual([]);
+    });
+
+    it("waits for the gate to settle, so a fallback org never reads the agent-first sources", async () => {
+      const g = await gate();
+      g.value = "loading";
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(servicesTrend).not.toHaveBeenCalled();
+      expect(alertsService.listByFolderId).not.toHaveBeenCalled();
+      g.value = "off_for_org";
+      await flushPromises();
+      expect(servicesTrend).not.toHaveBeenCalled();
+      expect(alertsService.listByFolderId).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="overview-alerts-health-grid"]').exists()).toBe(true);
+    });
+
+    it("loads the agent-first sources once the gate settles available", async () => {
+      const g = await gate();
+      g.value = "loading";
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      g.value = "available";
+      await flushPromises();
+      expect(servicesTrend).toHaveBeenCalledTimes(1);
+    });
+
+    it("names a denied source on Now instead of saying nothing needs attention", async () => {
+      const denied = Object.assign(new Error("forbidden"), { response: { status: 403 } });
+      vi.mocked(incidentsService.list).mockRejectedValue(denied);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(nowList().props("deniedSources")).toEqual([
+        expect.objectContaining({ key: "incidents" }),
+      ]);
+      expect(nowList().props("failedSources")).toEqual([]);
+    });
+
+    it("drops a deleted anomaly config's row on refresh", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, anomaly_detection_enabled: true });
+      vi.mocked(anomalyService.list).mockResolvedValue({
+        data: mockOverview.anomalyConfigs,
+      } as never);
+      vi.mocked(anomalyService.getAllHistory).mockResolvedValue({
+        data: mockOverview.buildAnomalyHistory(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const anomalyKeys = () =>
+        nowList()
+          .props("snapshot")
+          .rows.filter((row: { kind: string }) => row.kind === "anomaly")
+          .map((row: { key: string }) => row.key);
+      expect(anomalyKeys()).toHaveLength(1);
+      vi.mocked(anomalyService.list).mockResolvedValue({ data: [] } as never);
+      await wrapper.get(REFRESH_BTN).trigger("click");
+      await flushPromises();
+      expect(anomalyKeys()).toEqual([]);
     });
   });
 });

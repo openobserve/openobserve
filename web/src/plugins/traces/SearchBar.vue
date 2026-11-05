@@ -298,6 +298,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
+          <OTag
+            v-if="assistantSet.has('time')"
+            variant="primary-soft"
+            size="sm"
+            :icon="assistantGlyph.assistant"
+            :label="t('traces.assistantSet.label')"
+            role="note"
+            :aria-label="
+              t('traces.assistantSet.name', { field: t('traces.assistantSet.field.time') })
+            "
+            class="shrink-0"
+            data-test="traces-assistant-set-time"
+          />
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -642,6 +655,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
       </div>
+      <div v-if="assistantSet.has('query')" class="flex shrink-0 items-start p-1">
+        <OTag
+          v-if="assistantSet.has('query')"
+          variant="primary-soft"
+          size="sm"
+          :icon="assistantGlyph.assistant"
+          :label="t('traces.assistantSet.label')"
+          role="note"
+          :aria-label="
+            t('traces.assistantSet.name', { field: t('traces.assistantSet.field.query') })
+          "
+          class="shrink-0"
+          data-test="traces-assistant-set-query"
+        />
+      </div>
     </div>
     <RecentSearchesDrawer
       ref="recentDrawerRef"
@@ -698,6 +726,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -770,6 +800,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     OPageHeaderStatus,
+    OTag,
     OSeparator,
     DateTime,
     ShareButton,
@@ -808,6 +839,7 @@ export default defineComponent({
     "apply-saved-view",
     "drill-down",
     "recent-restore",
+    "assistant-set-cleared",
   ],
   props: {
     fieldValues: {
@@ -820,6 +852,11 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    /** Filters the assistant set when it opened the page; each shows a label until the user changes it. */
+    assistantSet: {
+      type: Set,
+      default: () => new Set(),
     },
   },
   methods: {
@@ -891,7 +928,12 @@ export default defineComponent({
       focusEditor();
     };
 
+    const clearAssistantSet = (field: "query" | "time") => {
+      if (props.assistantSet.has(field)) emit("assistant-set-cleared", field);
+    };
+
     const onRecentEditorEdit = (isBlank = false, wasBlank = false) => {
+      clearAssistantSet("query");
       recentFocusDismissed = false;
       recentFocusOpen.value = recentsOpenAfterEdit(
         recentFocusOpen.value,
@@ -1073,6 +1115,8 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
+      // Mount replays and programmatic sets emit too; only a user's pick takes the label away.
+      if (value.userChangedValue === true) clearAssistantSet("time");
       if (
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
@@ -1182,6 +1226,7 @@ export default defineComponent({
       }
       searchObj.data.editorValue = current;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(current);
+      clearAssistantSet("query");
       // Only trigger search if not explicitly skipped
       if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
@@ -1201,6 +1246,7 @@ export default defineComponent({
         .trim();
       searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
+      clearAssistantSet("query");
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
@@ -1271,6 +1317,8 @@ export default defineComponent({
     const resetFilters = () => {
       appliedSavedView.value = null;
       searchObj.data.editorValue = "";
+      // A programmatic editor write raises no user-edit, so the label is cleared here.
+      clearAssistantSet("query");
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
@@ -1615,6 +1663,7 @@ export default defineComponent({
       recentQueries,
       recentExamples,
       onRecentEditorEdit,
+      assistantGlyph,
       dismissRecentFocus,
       onRecentEditorKeydown,
       openRecentSearches,

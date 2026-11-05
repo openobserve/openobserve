@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { DIALOG_DEPTH_KEY } from "./dialogStacking";
+import { useOverlayScope } from "@/lib/overlay/overlayScope";
 // Copyright 2026 OpenObserve Inc.
 
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
@@ -395,6 +396,9 @@ watch(shown, (open) => {
     detachShadow();
   }
 });
+
+// A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
+const overlayScope = useOverlayScope();
 </script>
 
 <template>
@@ -421,6 +425,7 @@ watch(shown, (open) => {
       <!-- Dialog panel -->
       <DialogContent
         data-o2-dialog
+        v-bind="overlayScope"
         :data-test="parentDataTest || 'o-dialog-panel'"
         :style="[contentStyle, { zIndex: contentZIndex }]"
         :class="[

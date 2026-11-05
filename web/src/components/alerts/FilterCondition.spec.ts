@@ -171,7 +171,8 @@ describe("FilterCondition.vue Branch Coverage", () => {
 
       // Just test that the conditional rendering logic paths are covered by component creation
       expect(wrapper.vm).toBeDefined();
-      expect((wrapper.vm as any).store.state.isAiChatEnabled).toBe(true);
+      // With the revamp off the panel width follows the legacy chat flag, so the flag still squeezes.
+      expect((wrapper.vm as any).squeezed).toBe(true);
       expect((wrapper.vm as any).condition.column).toBe("test_column");
       expect((wrapper.vm as any).condition.operator).toBe("=");
       expect((wrapper.vm as any).condition.value).toBe("test_value");

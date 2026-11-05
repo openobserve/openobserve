@@ -131,6 +131,8 @@ export interface BadgeProps {
   removable?: boolean;
   /** Accessible name for the remove button. Defaults to `common.remove`. */
   removeLabel?: I18nText;
+  /** `data-test` for the remove button. Defaults to `o2-badge-remove`. */
+  removeDataTest?: string;
 }
 
 export interface BadgeEmits {

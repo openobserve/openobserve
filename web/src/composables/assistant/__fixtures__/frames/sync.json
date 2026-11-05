@@ -1,0 +1,9 @@
+{
+  "_source": "opencode durable sync event forwarded for OpenObserve persistence; dropped by the UI",
+  "_item": "today",
+  "frame": {
+    "type": "sync",
+    "seq": 12,
+    "event": {}
+  }
+}

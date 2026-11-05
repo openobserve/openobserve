@@ -15,11 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import {
   forkSharedChatMutation,
   mySharesQuery,
@@ -55,14 +56,21 @@ const props = defineProps<{
 const store = useStore();
 const { t } = useI18nTyped();
 const orgId = useOrgId();
+const assistantV2 = isAssistantV2();
+// Flag-off readers never download the new page.
+const SharedChatPage = defineAsyncComponent(
+  () => import("@/components/ai-assistant/shared/SharedChatPage.vue"),
+);
 
 // Polls while a turn runs, and slowly for a live share, so the page follows the owner's chat.
 const chatQuery = useQuery(() =>
   Object.assign(
     props.isPublic
-      ? Object.assign(publicSharedChatQuery(props.token), { enabled: !!props.token })
+      ? Object.assign(publicSharedChatQuery(props.token), {
+          enabled: !assistantV2 && !!props.token,
+        })
       : Object.assign(sharedChatQuery(orgId.value, props.token), {
-          enabled: !!props.token && !!orgId.value,
+          enabled: !assistantV2 && !!props.token && !!orgId.value,
         }),
     {
       refetchInterval: (query: { state: { data?: SharedChat } }) =>
@@ -94,7 +102,9 @@ const reload = () => chatQuery.refetch();
 
 // The owner's own links are in their share list, which holds the source chat to open instead of forking a copy.
 const mySharesRead = useQuery(() =>
-  Object.assign(mySharesQuery(orgId.value), { enabled: !props.isPublic && !!orgId.value }),
+  Object.assign(mySharesQuery(orgId.value), {
+    enabled: !assistantV2 && !props.isPublic && !!orgId.value,
+  }),
 );
 const ownShare = computed(() =>
   props.isPublic
@@ -137,7 +147,9 @@ const fork = async () => {
 </script>
 
 <template>
+  <SharedChatPage v-if="assistantV2" :token="token" :is-public="isPublic" />
   <div
+    v-else
     class="flex min-h-0 flex-col"
     :class="isPublic ? 'bg-surface-base h-screen' : 'h-full'"
     data-test="shared-chat-view"

@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="index-menu bg-surface-panel! flex w-full flex-col py-1.5!">
     <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
-    <div class="px-page-edge">
+    <div class="px-page-edge flex items-center gap-1.5">
       <OSelect
+        class="min-w-0 flex-1"
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
         :label="searchObj.data.stream.selectedStream?.label ? raw('') : t('search.selectIndex')"
@@ -31,6 +32,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
       </OSelect>
+      <OTag
+        v-if="assistantSet.has('stream')"
+        variant="primary-soft"
+        size="sm"
+        :icon="assistantGlyph.assistant"
+        :label="t('traces.assistantSet.label')"
+        role="note"
+        :aria-label="
+          t('traces.assistantSet.name', { field: t('traces.assistantSet.field.stream') })
+        "
+        class="shrink-0"
+        data-test="traces-assistant-set-stream"
+      />
     </div>
     <div
       class="index-table h-[calc(100%-2rem)]! w-full"
@@ -185,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -200,6 +214,9 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import type { AssistantSetField } from "@/composables/assistant/pure";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
@@ -216,6 +233,7 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
+    OTag,
     OSpinner,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
@@ -226,7 +244,7 @@ export default defineComponent({
     ),
     FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
   },
-  emits: ["update:changeStream", "update:selectedFields"],
+  emits: ["update:changeStream", "update:selectedFields", "assistant-set-cleared"],
   props: {
     fieldList: {
       type: Array,
@@ -239,6 +257,11 @@ export default defineComponent({
     activeExcludeFieldValues: {
       type: Object as () => Record<string, string[]>,
       default: () => ({}),
+    },
+    /** Filters the assistant set when it opened the page; the stream shows a label until the user changes it. */
+    assistantSet: {
+      type: Object as PropType<Set<AssistantSetField>>,
+      default: () => new Set(),
     },
   },
   setup(props, { emit }) {
@@ -323,6 +346,7 @@ export default defineComponent({
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;
+      if (props.assistantSet.has("stream")) emit("assistant-set-cleared", "stream");
       emit("update:changeStream");
     };
 
@@ -605,6 +629,7 @@ export default defineComponent({
       fnMarkerLabel,
       duration,
       onStreamChange,
+      assistantGlyph,
       showFtsFieldValues,
       normalizedFieldList,
       isFieldEditable,

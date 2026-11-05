@@ -32,6 +32,79 @@ export interface EdgeTrendParams {
   stream_name?: string;
 }
 
+export interface ServicesTrendParams {
+  /** Microseconds; the server fills a missing bound from the other one. */
+  start?: number;
+  end?: number;
+  baselineHours?: number;
+  stream?: string;
+  limit?: number;
+  /** Services the client already shows, returned even when they no longer rank (at most 12). */
+  include?: string[];
+}
+
+/** Microseconds. */
+export interface ServicesTrendWindow {
+  start_time: number;
+  end_time: number;
+}
+
+export type TrendSource = "v4" | "collector";
+
+export type ServiceTrendSignal = "errors" | "latency" | "normal" | "low_traffic";
+
+export interface RedFigures {
+  requests: number;
+  failed: number;
+  /** Percent. */
+  error_rate: number;
+  p99_latency_ns: number | null;
+}
+
+export interface RedBaseline {
+  error_rate: number;
+  p99_latency_ns: number | null;
+  requests_per_min: number;
+  covered_hours: number;
+}
+
+export interface ServiceTrendPoint {
+  timestamp: number;
+  requests: number;
+  failed: number;
+  p99_latency_ns: number | null;
+}
+
+export interface ServiceTrend {
+  service: string;
+  current: RedFigures;
+  baseline: RedBaseline | null;
+  p99_ratio: number | null;
+  /** Percentage points against the baseline. */
+  error_rate_delta: number | null;
+  signal: ServiceTrendSignal;
+  /** Returned because the request named it in `include`, not because it ranked. */
+  included: boolean;
+  /** Empty steps are omitted, so a missing timestamp is a gap, never a zero. */
+  series: ServiceTrendPoint[];
+}
+
+/** `GET /api/{org}/traces/service_graph/services/trend`; `window` is the effective window, ending at `data_until`. */
+export interface ServicesTrendResponse {
+  window: ServicesTrendWindow;
+  baseline_window: ServicesTrendWindow;
+  data_until: number;
+  source: TrendSource;
+  step_micros: number;
+  /** First series timestamp; every point sits at `series_start + k * step_micros`. */
+  series_start?: number;
+  partial: boolean;
+  warnings: string[];
+  services: ServiceTrend[];
+  total_services: number;
+  degraded_total: number;
+}
+
 const serviceGraphService = {
   /**
    * Get current service graph topology in JSON format
@@ -100,3 +173,32 @@ export interface TopologyRange {
  * mount. The request still carries the exact range; only the key is rounded.
  */
 export const OVERVIEW_BUCKET_MS = 5 * 60_000;
+
+/** Null on any 403 or 404 (OSS build, missing license or RBAC row), so the caller falls back to topology figures. */
+export async function servicesTrend(
+  orgId: string,
+  options: ServicesTrendParams = {},
+): Promise<ServicesTrendResponse | null> {
+  try {
+    const response = await http().get(`/api/${orgId}/traces/service_graph/services/trend`, {
+      params: servicesTrendQueryParams(options),
+      silentForbidden: true,
+    });
+    return response.data as ServicesTrendResponse;
+  } catch (e: unknown) {
+    const status = (e as { response?: { status?: number } } | null)?.response?.status;
+    if (status === 403 || status === 404) return null;
+    throw e;
+  }
+}
+
+function servicesTrendQueryParams(options: ServicesTrendParams): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+  if (options.start !== undefined) params.start_time = options.start;
+  if (options.end !== undefined) params.end_time = options.end;
+  if (options.baselineHours !== undefined) params.baseline_hours = options.baselineHours;
+  if (options.stream && options.stream !== "all") params.stream_name = options.stream;
+  if (options.limit !== undefined) params.limit = options.limit;
+  if (options.include?.length) params.include = [...options.include].sort().join(",");
+  return params;
+}

@@ -1,0 +1,9 @@
+{
+  "_source": "B-02 lifecycle frame (00 §18), A-01 policy",
+  "_item": "B-02",
+  "frame": {
+    "type": "permission_denied",
+    "tool": "o2_UpdateAlert",
+    "policy": "permission_tier"
+  }
+}

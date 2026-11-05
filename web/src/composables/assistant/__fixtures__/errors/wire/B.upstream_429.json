@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:296-303 ai_upstream_error_response",
+  "shape": "B",
+  "status": 429,
+  "body": {
+    "code": 429,
+    "error": "upstream returned 429 Too Many Requests"
+  }
+}

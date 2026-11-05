@@ -166,6 +166,9 @@ export interface DrawerProps {
   /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
   modal?: boolean;
 
+  /** Stops at a column pinned at the viewport end (the assistant panel), which stays usable beside the drawer. Default: false. */
+  insetBeside?: boolean;
+
   returnFocusTo?: () => HTMLElement | null;
 }
 

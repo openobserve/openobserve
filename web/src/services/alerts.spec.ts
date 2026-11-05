@@ -527,6 +527,12 @@ describe("alerts service", () => {
         `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`,
       );
     });
+
+    it("encodes the id, so a path-shaped id stays one segment (S4)", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+      await alerts.get_by_alert_id("org123", "../../users");
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/v2/org123/alerts/..%2F..%2Fusers");
+    });
   });
 
   describe("composite alert contracts", () => {

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openobserve.ai/schemas/ai-assistant/findings.schema.json",
+  "title": "findings frame (EB-A2)",
+  "description": "The typed findings of an incident-style answer. o2-ai sends a findings frame only when it validates against this schema; the web client validates the same file.",
+  "type": "object",
+  "required": ["type", "likely_cause", "confidence", "evidence", "ruled_out", "unknowns", "next_steps"],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "findings" },
+    "likely_cause": { "type": "string", "maxLength": 500 },
+    "confidence": { "enum": ["high", "medium", "low", "inconclusive"] },
+    "evidence": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["text", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "call_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "kind": { "enum": ["verified", "inferred"] }
+        }
+      }
+    },
+    "ruled_out": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "unknowns": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "next_steps": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "changed_since": {
+      "description": "What a build-on-previous analysis found that the previous report did not; absent on a fresh analysis.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    }
+  }
+}

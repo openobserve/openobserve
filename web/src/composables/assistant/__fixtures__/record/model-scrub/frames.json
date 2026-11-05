@@ -1,0 +1,37 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-model-1",
+      "created": 1772418240000000,
+      "user": {
+        "text": "Which model are you?"
+      },
+      "frames": [
+        {
+          "type": "status",
+          "message": "Calling gpt-4o-mini"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "tokens_in": 10,
+            "tokens_out": 5
+          },
+          "model": "gpt-4o-mini"
+        },
+        {
+          "type": "message_delta",
+          "content": "I run on claude-3-5-sonnet and sometimes gemini-1.5-pro."
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 5
+    }
+  ]
+}

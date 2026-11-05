@@ -68,9 +68,7 @@
         :options="triggerOperators"
         :aria-label="t('common.operator')"
         :dropdownStyle="{ textTransform: 'capitalize' }"
-        :class="[
-          inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-17.5' : computedInputWidth,
-        ]"
+        :class="[inputWidth ? inputWidth : squeezed ? 'w-17.5' : computedInputWidth]"
         :searchable="false"
         data-test="alert-conditions-operator-select"
         @update:model-value="onOperatorChange"
@@ -85,9 +83,7 @@
         :placeholder="t('common.value')"
         :aria-label="t('common.value')"
         :help-text="valueSuggestions.hint.value"
-        :class="[
-          inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
-        ]"
+        :class="[inputWidth ? inputWidth : squeezed ? 'w-27.5' : computedValueWidth]"
         data-test="alert-conditions-value-combobox"
         @update:model-value="() => emits('input:update', 'conditions', condition)"
       />
@@ -96,9 +92,7 @@
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
         :aria-label="t('common.value')"
-        :class="[
-          inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
-        ]"
+        :class="[inputWidth ? inputWidth : squeezed ? 'w-27.5' : computedValueWidth]"
         data-test="alert-conditions-value-input"
         @update:model-value="() => emits('input:update', 'conditions', condition)"
       />
@@ -182,7 +176,7 @@ const props = defineProps({
 
 import { ref, computed, watch, inject, type PropType } from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
+import { useAssistantPanelWidth } from "@/composables/assistant/pure";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
@@ -209,7 +203,9 @@ watch(
   },
 );
 
-const store = useStore();
+// The assistant panel squeezes these inputs only while pinned beside them; floating never does.
+const { panelWidthRem } = useAssistantPanelWidth();
+const squeezed = computed(() => panelWidthRem.value > 0);
 
 const { t } = useI18nTyped();
 
@@ -282,16 +278,11 @@ const columnDisplay = computed(() => {
 });
 
 const computedInputWidth = computed(() => {
-  return (
-    props.inputWidth || (store.state.isAiChatEnabled ? "" : "xl:min-w-50 lg:min-w-22.5 lg:w-fit")
-  );
+  return props.inputWidth || (squeezed.value ? "" : "xl:min-w-50 lg:min-w-22.5 lg:w-fit");
 });
 
 const computedValueWidth = computed(() => {
-  return (
-    props.inputWidth ||
-    (store.state.isAiChatEnabled ? "w-27.5" : "xl:min-w-50 lg:w-fit lg:min-w-20")
-  );
+  return props.inputWidth || (squeezed.value ? "w-27.5" : "xl:min-w-50 lg:w-fit lg:min-w-20");
 });
 
 const filterColumns = (val: string) => {

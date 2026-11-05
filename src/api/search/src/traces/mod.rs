@@ -40,7 +40,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::ingestion::check_ingestion_allowed;
 pub use openobserve_core::traces::{
     agent_signals::{compare_agent_versions, get_agent_signals},
-    service_graph::{self, get_current_topology, get_edge_history},
+    service_graph::{self, get_current_topology, get_edge_history, get_services_trend},
 };
 use openobserve_core::{auth::UserEmail, traces};
 use tracing::{Instrument, Span};

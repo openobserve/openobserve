@@ -1,0 +1,15 @@
+{
+  "_source": "B-01 error envelope (WP-17: code, error_code, retryable, recoverable, action, retry_after?, turn_id); action is the closed wire set",
+  "shape": "B-01",
+  "status": 429,
+  "body": {
+    "code": "turn_limit",
+    "message": "B-01 envelope for turn_limit",
+    "retryable": true,
+    "action": "retry",
+    "error": "B-01 envelope for turn_limit",
+    "error_code": "turn_limit",
+    "recoverable": true,
+    "turn_id": "0199e7b2-7000-7a3e-a1b2-c3d4e5f60718"
+  }
+}

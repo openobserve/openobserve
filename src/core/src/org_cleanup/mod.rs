@@ -1214,6 +1214,75 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_ai_assistant_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    use infra::table::{ai_chat_sessions, ai_chat_shares, ai_chat_turns};
+
+    // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
+    #[cfg(feature = "enterprise")]
+    crate::ai_chat::purge_org_replicas(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
+    infra::table::ai_access_requests::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_access_requests: {e}"))?;
+    infra::table::ai_actions::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_actions: {e}"))?;
+    infra::table::ai_grants::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_grants: {e}"))?;
+    infra::table::ai_turn_marks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_turn_marks: {e}"))?;
+    infra::table::ai_chat_feedback::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_feedback: {e}"))?;
+    infra::table::ai_chat_imports::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_imports: {e}"))?;
+    infra::table::ai_approvals::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_approvals: {e}"))?;
+    // Turns and shares before their chat rows, so none is left without the chat it belongs to.
+    ai_chat_turns::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_turns: {e}"))?;
+    ai_chat_shares::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_shares: {e}"))?;
+    // Chats the retention sweep still re-purges stay until the tombstone sweep, as for any delete.
+    let repurge_since =
+        config::utils::time::now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
+    ai_chat_sessions::delete_by_org_except_repurging(org_id, repurge_since)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_sessions: {e}"))?;
+    Ok(())
+}
+
+async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
+    // The service layer also tears down triggers, jobs, ownership and caches cluster-wide.
+    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    for p in pipelines {
+        let id = p.id.clone();
+        crate::pipeline::delete_listed_pipeline(p)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
+    }
+    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
+    for id in infra::pipeline::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
+    {
+        crate::db::authz::remove_ownership(
+            org_id,
+            "pipelines",
+            common::meta::authz::Authz::new(&id),
+        )
+        .await;
+    }
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -1224,11 +1293,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
-        alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
-        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
-        llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
-        providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
+        alert_acks, alert_calibration, alert_incidents, anomaly_detection, compactor_manual_jobs,
+        distinct_values, external_alerts, gen_ai_agents, incident_events, incident_integrations,
+        llm_eval, llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets,
+        org_telephony, providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
         re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
         slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
         synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
@@ -1346,24 +1414,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ai_toolsets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
-    // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
-    #[cfg(feature = "enterprise")]
-    crate::ai_chat::purge_org_replicas(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
-    // Turns and shares before their chat rows, so none is left without the chat it belongs to.
-    ai_chat_turns::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_turns: {e}"))?;
-    ai_chat_shares::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_shares: {e}"))?;
-    // Chats the retention sweep still re-purges stay until the tombstone sweep, as for any delete.
-    let repurge_since =
-        config::utils::time::now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
-    ai_chat_sessions::delete_by_org_except_repurging(org_id, repurge_since)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_sessions: {e}"))?;
+    delete_org_ai_assistant_resources(org_id).await?;
     // A queued write would re-insert the rows; other nodes' flushes refuse an inactive org.
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::llm_evaluations::agent_registry::evict_org(org_id).await;
@@ -1490,6 +1541,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
+    #[cfg(feature = "cloud")]
+    infra::table::paid_overage_attribution::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/paid_overage_attribution: {e}"))?;
     // Through the db layer, not the table layer: it also evicts the token caches cluster-wide.
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
@@ -1519,29 +1574,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/functions: {e}"))?;
 
-    // Delete pipelines through the service layer so derived-stream triggers,
-    // backfill jobs, OFGA ownership, and the executable-pipeline caches are all
-    // torn down and evicted cluster-wide — a raw infra::pipeline::delete would
-    // leave those side effects (and stale cache entries) behind.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
-    for p in pipelines {
-        let id = p.id.clone();
-        crate::pipeline::delete_listed_pipeline(p)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
-    }
-    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
-    for id in infra::pipeline::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
-    {
-        crate::db::authz::remove_ownership(
-            org_id,
-            "pipelines",
-            common::meta::authz::Authz::new(&id),
-        )
-        .await;
-    }
+    delete_org_pipelines(org_id).await?;
     crate::db::pipeline_errors::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
@@ -4729,11 +4762,17 @@ mod tests {
 
     #[test]
     fn test_ai_chat_replicas_then_children_go_before_their_chats() {
-        let sessions = position_of("ai_chat_sessions::delete_by_org_except_repurging(org_id");
-        let turns = position_of("ai_chat_turns::delete_by_org(org_id)");
-        let shares = position_of("ai_chat_shares::delete_by_org(org_id)");
+        position_of("delete_org_ai_assistant_resources(org_id)");
+        let body = fn_body(SOURCE, "delete_org_ai_assistant_resources");
+        let at = |call: &str| {
+            body.find(call)
+                .unwrap_or_else(|| panic!("delete_org_ai_assistant_resources never calls {call}"))
+        };
+        let sessions = at("ai_chat_sessions::delete_by_org_except_repurging(org_id");
+        let turns = at("ai_chat_turns::delete_by_org(org_id)");
+        let shares = at("ai_chat_shares::delete_by_org(org_id)");
         assert!(turns < sessions && shares < sessions);
-        assert!(position_of("crate::ai_chat::purge_org_replicas(org_id)") < turns.min(shares));
+        assert!(at("crate::ai_chat::purge_org_replicas(org_id)") < turns.min(shares));
     }
 
     #[test]
@@ -4786,8 +4825,10 @@ mod tests {
 
     #[test]
     fn test_pipeline_teardown_deletes_the_listed_pipeline_without_a_re_read() {
+        position_of("delete_org_pipelines(org_id)");
         assert!(
-            db_resources_step().contains("crate::pipeline::delete_listed_pipeline(p)"),
+            fn_body(SOURCE, "delete_org_pipelines")
+                .contains("crate::pipeline::delete_listed_pipeline(p)"),
             "the pipeline teardown must delete the pipeline it listed"
         );
         let body = fn_body(include_str!("../pipeline/mod.rs"), "delete_listed_pipeline");

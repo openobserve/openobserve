@@ -167,7 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <!-- Beside the fix sentence, because that sentence is exactly what the
            user wants elaborated: the band says WHAT to do, this asks HOW. -->
+      <AiEntryButton v-if="assistantV2 && aiDoor" v-bind="aiDoor" />
       <DbmSuggestFixButton
+        v-else
         :label="t('dbm.ai.deadlockFix')"
         :tooltip="t('dbm.ai.deadlockFixHint')"
         :data-test="`${dataTest}-ask-ai`"
@@ -199,7 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, useId } from "vue";
+import { computed, defineAsyncComponent, useId } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import type { dbmFixDoor } from "@/components/dbm/dbmDoors";
 
 import DbmDeadlockSide from "@/components/dbm/DbmDeadlockSide.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
@@ -216,8 +220,10 @@ const props = withDefaults(
     /** The pair's statements touch one object's rows in opposite order. */
     oppositeRowOrder?: boolean;
     dataTest?: string;
+    /** With the assistant on: the page's `ai-entry-dbm-finding-fix` door for this pair. */
+    aiDoor?: ReturnType<typeof dbmFixDoor>;
   }>(),
-  { oppositeRowOrder: false, dataTest: "dbm-deadlock-cycle" },
+  { oppositeRowOrder: false, dataTest: "dbm-deadlock-cycle", aiDoor: undefined },
 );
 
 const emit = defineEmits<{
@@ -227,6 +233,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 // SVG marker ids must be unique per instance: two expanded cycles on one page
 // would otherwise share a marker and the second would inherit the first's.

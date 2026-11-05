@@ -253,7 +253,7 @@ const alerts = {
     // A teardown-time watcher can reach here with no id; that must not become
     // a GET /alerts/undefined on the wire.
     if (!alert_id) return Promise.reject(new Error("alert_id is required"));
-    let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
+    let url = `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
