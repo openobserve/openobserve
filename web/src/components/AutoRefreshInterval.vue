@@ -37,13 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="t('search.autoRefreshWithValue', { value: selectedLabel })" />
+          <OTooltip :content="t('search.autoRefreshWithValue', { value: triggerLabel })" />
         </OButton>
         <OButton
           v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
           :variant="isOn ? 'outline-primary' : variant"
           size="sm-toolbar"
+          :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
             <OIcon :name="isOn ? 'update' : 'sync-disabled'" size="sm" class="me-1" />
@@ -68,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OSwitch
             data-test="logs-search-off-refresh-interval"
-            :key="switchKey"
             :model-value="isOn"
+            :disabled="switchDisabled"
             :aria-label="t('search.autoRefreshTitle')"
             @update:model-value="onSwitch"
           />
@@ -89,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :block="true"
                 :disabled="item.disabled"
+                :aria-pressed="Number(modelValue) === item.value"
+                :aria-label="item.label"
                 @click="onPick(item)"
               >
                 <OTooltip
@@ -245,9 +248,7 @@ export default defineComponent({
     const isOn = computed(() => selectedValue.value > 0);
 
     const triggerLabel = computed(() =>
-      isOn.value
-        ? autoRefreshShortLabel(selectedValue.value, t) || selectedLabel.value
-        : t("common.off"),
+      isOn.value ? autoRefreshShortLabel(selectedValue.value, t) : t("common.off"),
     );
 
     const triggerAriaLabel = computed(() =>
@@ -257,21 +258,13 @@ export default defineComponent({
     );
 
     let lastSelectedInterval = 0;
-    // Remounts OSwitch to reset its internal state when the model cannot change.
-    const switchKey = ref(0);
     const DEFAULT_INTERVAL = 30;
 
     // The remembered interval may fall below a minimum raised since it was picked.
     const resumeInterval = () => {
       if (lastSelectedInterval && !isDisabled(lastSelectedInterval)) return lastSelectedInterval;
       if (!isDisabled(DEFAULT_INTERVAL)) return DEFAULT_INTERVAL;
-      return (
-        refreshTimes.value
-          .flat()
-          .filter((it) => !it.disabled)
-          .map((it) => it.value)
-          .sort((a, b) => a - b)[0] ?? 0
-      );
+      return refreshTimes.value.flat().find((it) => !it.disabled)?.value ?? 0;
     };
 
     const onSwitch = (on: unknown) => {
@@ -280,13 +273,11 @@ export default defineComponent({
         selectedValue.value = 0;
         return;
       }
-      const next = resumeInterval();
-      if (!next) {
-        switchKey.value++;
-        return;
-      }
-      selectedValue.value = next;
+      selectedValue.value = resumeInterval();
     };
+
+    // Switching on is impossible when no interval satisfies the minimum.
+    const switchDisabled = computed(() => !isOn.value && resumeInterval() === 0);
 
     const onItemClick = (item: { value: number }) => {
       selectedValue.value = item.value;
@@ -345,7 +336,7 @@ export default defineComponent({
       selectedLabel,
       triggerLabel,
       isOn,
-      switchKey,
+      switchDisabled,
       triggerAriaLabel,
       refreshTimes,
       refreshSections,
@@ -361,11 +352,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(keyframes): the spinning refresh icon is used only by this component. The
-   `animation` is declared here rather than as a template `[animation:…]` utility
-   so Vue's scoped compiler renames the keyframe and this reference together.
-   The class lands on an OIcon root, which carries this component's scope id too.
-   `!important` is retained from the original `!`-prefixed utilities. */
+/* keep(keyframes): scoped compiler renames the keyframe and this reference together, which a template utility cannot. */
 .auto-refresh-icon--spinning {
   display: inline-block !important;
   transform-origin: center center !important;

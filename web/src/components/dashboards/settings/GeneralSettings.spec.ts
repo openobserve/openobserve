@@ -702,6 +702,16 @@ describe("GeneralSettings", () => {
       expect(refreshSelect().props("modelValue")).toBe(0);
     });
 
+    it("hides the relative-time note in the settings control", async () => {
+      wrapper = await createWrapper();
+
+      refreshSelect().vm.btnRefreshInterval = true;
+      await flushPromises();
+
+      expect(document.body.querySelector('[data-test="auto-refresh-panel"]')).not.toBeNull();
+      expect(document.body.querySelector('[data-test="auto-refresh-footer"]')).toBeNull();
+    });
+
     it("writes the interval picked in the control into the form", async () => {
       wrapper = await createWrapper();
       refreshSelect().vm.$emit("update:modelValue", 900);
