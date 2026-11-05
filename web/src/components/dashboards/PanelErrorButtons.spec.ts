@@ -497,7 +497,9 @@ describe("PanelErrorButtons", () => {
         sharedBucketRows: 4,
         seriesLimit: { shown: 100, total: 1000, cap: 100 },
       });
-      expect(wrapper.find('[data-test="panel-notice-chip-shared-bucket-rows"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-notice-chip-shared-bucket-rows"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(true);
       wrapper.unmount();
     });
