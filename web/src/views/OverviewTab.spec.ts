@@ -1424,10 +1424,10 @@ describe("OverviewTab", () => {
     const serverError = () => Object.assign(new Error("boom"), { response: { status: 500 } });
     const internalOnly = {
       logs: [
-        { name: "usage", stream_type: "logs" },
-        { name: "_o2_ingest_rejections", stream_type: "logs" },
+        { name: "usage", stream_type: "logs", is_internal: true },
+        { name: "_o2_ingest_rejections", stream_type: "logs", is_internal: true },
       ],
-      metrics: [{ name: "audit", stream_type: "metrics" }],
+      metrics: [{ name: "audit", stream_type: "metrics", is_internal: true }],
     };
     const refreshLastRun = () =>
       wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt") as number | null;

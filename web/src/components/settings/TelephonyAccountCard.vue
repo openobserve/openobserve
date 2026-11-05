@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
+          icon-left="edit"
           :disabled="readOnly"
           data-test="telephony-card-problem-update"
           @click="emit('update')"
@@ -85,6 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <slot />
+
+    <div class="flex flex-wrap justify-end gap-2">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="fact-check"
+        :loading="status.isFetching.value"
+        data-test="telephony-card-check"
+        @click="checkAccount"
+      >
+        {{ t("telephony.checkAccount") }}
+      </OButton>
+      <slot name="actions" />
+    </div>
   </OCard>
 </template>
 
@@ -99,6 +114,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { telephonyStatusQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
@@ -148,6 +164,15 @@ const tagLabel = computed<I18nText>(() => {
   };
   return labels[health.value];
 });
+
+async function checkAccount() {
+  const result = await status.refetch();
+  if (result.data?.state === "ok" && !result.error) {
+    toast({ variant: "success", message: t("telephony.checkOk", { provider: PROVIDER }) });
+  } else {
+    toast({ variant: "warning", message: t("telephony.checkFailed") });
+  }
+}
 
 const problem = computed<I18nText | null>(() => {
   const state = live.value?.state;

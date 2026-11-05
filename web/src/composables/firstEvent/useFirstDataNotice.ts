@@ -52,6 +52,7 @@ export interface FirstDataStream {
 export interface ListedStream {
   name?: string;
   stream_type?: string;
+  is_internal?: boolean;
   stats?: { created_at?: number; doc_time_min?: number };
 }
 
@@ -138,9 +139,7 @@ const userStreamsOfType = async (
       )
       .catch(() => null);
     if (!res || !Array.isArray(res.list)) return null;
-    const users = (res.list as ListedStream[]).filter((s) =>
-      isUserDataStream(s?.name ?? "", s?.stream_type ?? type),
-    );
+    const users = (res.list as ListedStream[]).filter((s) => isUserDataStream(s, type));
     if (users.length) return users;
   }
   return [];
@@ -223,7 +222,7 @@ export function useFirstDataNotice(
       const listed = layoutStreams.value;
       if (listed?.org !== orgId) return;
       const users = listed.list
-        .filter((s: ListedStream) => isUserDataStream(s?.name ?? "", s?.stream_type ?? ""))
+        .filter((s: ListedStream) => isUserDataStream(s))
         .map(toFirstDataStream);
       await evaluate(orgId, users);
       return;

@@ -470,7 +470,7 @@ const useStreams = (t: TranslateFn) => {
     // only user data flips the flag: internal streams such as usage exist before any ingest
     if (
       !store.state.organizationData.isDataIngested &&
-      streamList.some((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? streamName))
+      streamList.some((s) => isUserDataStream(s, streamName))
     )
       store.dispatch("setIsDataIngested", true);
 

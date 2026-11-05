@@ -85,6 +85,7 @@ const stream = {
     search_type = "ui",
     traceId,
     clear_cache = false,
+    signal,
   }: {
     org_identifier: string;
     query: any;
@@ -92,6 +93,7 @@ const stream = {
     search_type?: string;
     traceId?: string;
     clear_cache?: boolean;
+    signal?: AbortSignal;
   }) => {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
@@ -101,7 +103,7 @@ const stream = {
       (window as any).use_cache !== undefined ? (window as any).use_cache : true;
 
     const url = `/api/${org_identifier}/_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}&clear_cache=${clear_cache}`;
-    return http().post(url, query);
+    return signal ? http().post(url, query, { signal }) : http().post(url, query);
   },
 
   // Start a streaming multi-stream search request

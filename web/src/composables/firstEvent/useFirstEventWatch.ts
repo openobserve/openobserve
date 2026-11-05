@@ -85,6 +85,7 @@ export interface FirstEventWatchOptions {
 interface StreamRow {
   name: string;
   stream_type?: string;
+  is_internal?: boolean;
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 
@@ -414,7 +415,7 @@ export function useFirstEventWatch(
       total = res.total;
       rows.push(
         ...(res.list as StreamRow[]).filter(
-          (s) => s?.name?.includes(keyword) && isUserDataStream(s.name, s.stream_type ?? ctx.type),
+          (s) => s?.name?.includes(keyword) && isUserDataStream(s, ctx.type),
         ),
       );
       if (offset + STREAM_PROBE_PAGE >= res.total) break;
@@ -647,7 +648,7 @@ export function useFirstEventWatch(
       if (!list || stale(ctx)) return;
       known.total = res.total;
       for (const s of list) {
-        if (!known.names.has(s.name) && isUserDataStream(s.name, s.stream_type ?? type)) {
+        if (!known.names.has(s.name) && isUserDataStream(s, type)) {
           pending.set(s.name, s);
         }
       }

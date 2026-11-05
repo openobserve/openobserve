@@ -76,8 +76,9 @@ use crate::{
         context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
         eliminate_aggregate::EliminateAggregateRule,
         logical_optimizer::{
-            add_sort_and_limit::AddSortAndLimitRule, limit_join_right_side::LimitJoinRightSide,
-            rewrite_histogram::RewriteHistogram, shared_subplan::StripDivergedSharedSubplanRule,
+            add_sort_and_limit::AddSortAndLimitRule, like_to_str_match::RewriteLikeToStrMatch,
+            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+            shared_subplan::StripDivergedSharedSubplanRule,
         },
         physical_optimizer::{
             aggregate_topk::AggregateTopkRule, distribute_analyze::optimize_distribute_analyze,
@@ -112,7 +113,10 @@ pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + S
     rules
 }
 
-pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+pub fn generate_optimizer_rules(
+    req: &Request,
+    sql: &Sql,
+) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let cfg = config::get_config();
     let limit = if sql.limit > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
@@ -189,15 +193,24 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(OptimizeProjections::new()));
 
     // *********** custom rules ***********
+    // should after PushDownFilter, which moves a filter below aliases so its columns name the table
+    if req.use_index
+        && cfg.search.inverted_index_enabled
+        && cfg.search.inverted_index_like_optimizer_enabled
+    {
+        let index_fields = stream_index_fields(sql);
+        rules.push(Arc::new(RewriteLikeToStrMatch::new(index_fields)));
+    }
+
     // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
     // require the join's on columns, and if filter have join keys, it should be pushed down
-    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows > 0
-    {
-        rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.search.feature_join_right_side_max_rows,
-            sql.stream_type,
-        )));
+    if cfg.search.feature_join_match_one_enabled {
+        let max_rows = cfg.search.feature_join_right_side_max_rows;
+        if max_rows > 0 {
+            rules.push(Arc::new(LimitJoinRightSide::new(max_rows, sql.stream_type)));
+        }
     }
+
     // Must be last so it sees the copies after every pushdown of this pass.
     if cfg.search.feature_shared_cte_enabled {
         rules.push(Arc::new(StripDivergedSharedSubplanRule::new()));
@@ -262,23 +275,10 @@ pub fn generate_physical_optimizer_rules(
     }
 
     // should after remote scan
-    let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
-    for (stream_name, schema) in sql.schemas.iter() {
-        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let idx_fields = get_stream_setting_index_fields(&stream_settings, sql.stream_type);
-        let idx_fields = idx_fields
-            .into_iter()
-            .filter_map(|index_field| {
-                if schema.contains_field(&index_field) {
-                    Some(index_field)
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<_>>();
-        index_fields.insert(stream_name.clone(), idx_fields);
+    if req.use_index {
+        let index_fields = stream_index_fields(sql);
+        rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
     }
-    rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
 
     rules.push(Arc::new(LimitPushdown::new()));
 
@@ -310,6 +310,19 @@ pub async fn create_physical_plan(
     optimize_distribute_analyze(physical_plan, analyze_profile)
 }
 
+fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
+    let mut index_fields = HashMap::new();
+    for (stream_name, schema) in sql.schemas.iter() {
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let idx_fields = get_stream_setting_index_fields(&stream_settings, sql.stream_type)
+            .into_iter()
+            .filter(|index_field| schema.contains_field(index_field))
+            .collect::<HashSet<_>>();
+        index_fields.insert(stream_name.clone(), idx_fields);
+    }
+    index_fields
+}
+
 #[cfg(test)]
 mod tests {
     use arrow::{
@@ -337,7 +350,7 @@ mod tests {
             physical_optimizer::remote_scan::RemoteScanRule,
         },
         table_provider::empty_table::NewEmptyTable,
-        udf::histogram_udf,
+        udf::time::histogram,
     };
 
     const MINUTE_MICROS: i64 = 60_000_000;
@@ -440,7 +453,7 @@ mod tests {
         let t2 = MemTable::try_new(t2_schema, vec![vec![t2]]).unwrap();
         ctx.register_table("t", Arc::new(t)).unwrap();
         ctx.register_table("t2", Arc::new(t2)).unwrap();
-        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
     }
 
     fn histogram_rule(sql: &Sql) -> Arc<RewriteHistogram> {
@@ -461,7 +474,7 @@ mod tests {
     async fn assert_same_rows_as_datafusion(sql: &Sql, cases: &[(&str, &str)]) {
         let state = SessionStateBuilder::new()
             .with_default_features()
-            .with_optimizer_rules(generate_optimizer_rules(sql))
+            .with_optimizer_rules(generate_optimizer_rules(&Request::default(), sql))
             .build();
         let oo = SessionContext::new_with_state(state);
         register_tables(&oo);
@@ -477,7 +490,7 @@ mod tests {
     async fn optimized_plan(sql: &Sql, query: &str) -> String {
         let state = SessionStateBuilder::new()
             .with_default_features()
-            .with_optimizer_rules(generate_optimizer_rules(sql))
+            .with_optimizer_rules(generate_optimizer_rules(&Request::default(), sql))
             .build();
         let ctx = SessionContext::new_with_state(state);
         register_tables(&ctx);
@@ -501,7 +514,7 @@ mod tests {
             "DataFusion's default logical rules changed; review generate_optimizer_rules, then update this list"
         );
 
-        let ours = generate_optimizer_rules(&test_sql())
+        let ours = generate_optimizer_rules(&Request::default(), &test_sql())
             .iter()
             .map(|rule| rule.name().to_string())
             .collect::<std::collections::HashSet<_>>();
@@ -613,7 +626,7 @@ mod tests {
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(4))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
-            .with_optimizer_rules(generate_optimizer_rules(&sql))
+            .with_optimizer_rules(generate_optimizer_rules(&Request::default(), &sql))
             .with_physical_optimizer_rule(Arc::new(RemoteScanRule::new_test(file_id_lists, false)))
             .with_default_features()
             .build();
@@ -672,6 +685,78 @@ mod tests {
             "DataFusion's default physical rules changed; review the order in generate_physical_optimizer_rules"
         );
         assert_eq!(rules[upstream.len()].name(), "JoinReorderRule");
+    }
+
+    #[tokio::test]
+    async fn test_like_on_index_field_uses_str_match_only_with_use_index() {
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8View, true),
+        ])
+        .with_metadata(std::collections::HashMap::from([(
+            "settings".to_string(),
+            r#"{"index_fields":["name"]}"#.to_string(),
+        )]));
+        let mut sql = test_sql();
+        sql.schemas.insert(
+            TableReference::from("logs"),
+            Arc::new(infra::schema::SchemaCache::new(schema.clone())),
+        );
+        let batch = RecordBatch::try_new(
+            Arc::new(schema),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3])) as ArrayRef,
+                Arc::new(arrow::array::StringViewArray::from_iter([
+                    Some("auth-gw"),
+                    Some("billing"),
+                    None,
+                ])),
+            ],
+        )
+        .unwrap();
+        let table = Arc::new(MemTable::try_new(batch.schema(), vec![vec![batch]]).unwrap());
+        for (use_index, expected) in [(true, "str_match"), (false, "LIKE")] {
+            let req = Request {
+                use_index,
+                ..Default::default()
+            };
+            let state = SessionStateBuilder::new()
+                .with_default_features()
+                .with_optimizer_rules(generate_optimizer_rules(&req, &sql))
+                .build();
+            let ctx = SessionContext::new_with_state(state);
+            ctx.register_table("logs", table.clone()).unwrap();
+            let query = "SELECT name FROM logs WHERE name LIKE '%auth%'";
+            let df = ctx.sql(query).await.unwrap();
+            let plan = df.clone().into_optimized_plan().unwrap();
+            assert!(
+                plan.display_indent().to_string().contains(expected),
+                "{plan}"
+            );
+            let rows: usize = df
+                .collect()
+                .await
+                .unwrap()
+                .iter()
+                .map(|b| b.num_rows())
+                .sum();
+            assert_eq!(rows, 1, "use_index={use_index}");
+        }
+    }
+
+    #[test]
+    fn test_leader_index_rule_follows_use_index() {
+        let has_leader_index_rule = |req: &Request| {
+            generate_physical_optimizer_rules(req, &test_sql(), vec![])
+                .iter()
+                .any(|rule| rule.name() == "LeaderIndexOptimizerRule")
+        };
+        let no_index_req = Request {
+            use_index: false,
+            ..Default::default()
+        };
+        assert!(has_leader_index_rule(&Request::default()));
+        assert!(!has_leader_index_rule(&no_index_req));
     }
 
     #[tokio::test]

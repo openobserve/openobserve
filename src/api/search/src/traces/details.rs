@@ -170,6 +170,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

@@ -192,6 +192,13 @@
   );
 }
 
+/* On a card wrapping an OTable: the card's edge is the table's last line, so the last row draws none. */
+@utility table-last-row-flush {
+  & tbody > tr:last-child > td {
+    border-bottom-width: 0;
+  }
+}
+
 /* Thin ring cut around a glyph so it stays legible when it overlaps another icon. */
 @utility lock-halo {
   filter: drop-shadow(0.09375rem 0 0 var(--color-surface-chrome-deeper))
@@ -203,4 +210,10 @@
 /* Bare amber lock glyph, no container: the one look for every lock icon. */
 @utility lock-chip {
   @apply text-icon-locked;
+}
+
+/* Dotted canvas behind a pannable node graph. Consumer: components/query-plan/ProfileCanvas.vue. */
+@utility bg-dot-grid {
+  background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
+  background-size: 1.125rem 1.125rem;
 }

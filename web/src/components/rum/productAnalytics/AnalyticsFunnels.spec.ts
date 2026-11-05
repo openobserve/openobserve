@@ -603,6 +603,23 @@ describe("AnalyticsFunnels", () => {
     expect(useProductAnalytics().state.datetime.relativeTimePeriod).toBe("30d");
   });
 
+  it("an empty step 1 offers no widen action once the range is already 30 days (#3268)", async () => {
+    routes = [[/FROM ps LIMIT 1/, [{ c1: 0, c2: 0, seen1: 0, seen2: 0 }]], ...baseRoutes()];
+    respond();
+    await mountFunnels();
+    useProductAnalytics().setScope({
+      datetime: { valueType: "relative", relativeTimePeriod: "30d", startTime: 0, endTime: 0 },
+    });
+    await setSteps([
+      ["p", "/nowhere"],
+      ["c", "b"],
+    ]);
+    expect(text("rum-analytics-funnel-step1-empty")).toContain("/nowhere");
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-widen-range-btn"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("tags a step never seen in range while the funnel still computes (AC-21)", async () => {
     routes = [[/FROM ps LIMIT 1/, [{ c1: 100, c2: 0, seen1: 150, seen2: 0 }]], ...baseRoutes()];
     respond();

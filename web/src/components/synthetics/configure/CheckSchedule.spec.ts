@@ -629,6 +629,25 @@ describe("CheckSchedule", () => {
       ).toBe(true);
     });
 
+    it.each([
+      { intervalValue: 1, intervalUnit: "days" },
+      { intervalValue: 5, intervalUnit: "weeks" },
+      { intervalValue: 1, intervalUnit: "months" },
+    ] as const)(
+      "should treat $intervalValue $intervalUnit as custom, not a minute preset",
+      ({ intervalValue, intervalUnit }) => {
+        const check = makeCheck({
+          schedule: { type: "interval", intervalValue, intervalUnit },
+        });
+        wrapper = mountSchedule(check);
+        expect(
+          wrapper
+            .find('[data-test="synthetics-check-schedule-custom-interval-value-input"]')
+            .exists(),
+        ).toBe(true);
+      },
+    );
+
     it("should treat non-standard interval as custom frequency", () => {
       const check = makeCheck({
         schedule: { type: "interval", intervalValue: 7, intervalUnit: "minutes" },
