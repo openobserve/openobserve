@@ -51,6 +51,40 @@ describe("AlertSettingsHelpDrawer", () => {
     vi.clearAllMocks();
   });
 
+  it("uses kind-neutral copy for an object override and names the destinations it does not fit", async () => {
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "hook",
+      templates: [{ name: "hook", body: "hello" }],
+      unfitDestinations: ["play_email"],
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+
+    const text = w.text();
+    expect(text).not.toContain("for this alert only");
+    expect(text).not.toContain("All destinations use this template");
+    expect(text).toContain("Destinations that fit use this template:");
+    expect(w.find('[data-test="help-current-unfit"]').text()).toContain("play_email");
+    expect(w.find('[data-test="help-apply-template-btn"]').text()).toBe("Use this template");
+  });
+
+  it("lists the resolved template per destination when an object has no override", async () => {
+    w = mountDrawer({
+      subject: "object",
+      currentTemplate: "",
+      selectedDestinations: ["hook"],
+      resolvedDestinations: [{ destination: "hook", label: "card (destination template)" }],
+    });
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+
+    const rows = w.findAll('[data-test="help-resolved-row"]');
+    expect(rows.map((r) => r.findAll("span").map((x) => x.text()))).toEqual([
+      ["hook", "card (destination template)"],
+    ]);
+  });
+
   it("renders the current section for topic=template", () => {
     w = mountDrawer({ topic: "template" });
     expect(w.find('[data-test="help-current-section"]').exists()).toBe(true);

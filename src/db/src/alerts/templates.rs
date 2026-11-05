@@ -32,7 +32,10 @@ use config::{
 use infra::table;
 use itertools::Itertools;
 
-use crate::{self as db, authz::remove_ownership};
+use crate::{
+    self as db,
+    authz::{remove_ownership, set_ownership},
+};
 
 // db cache watcher prefix
 const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
@@ -73,9 +76,51 @@ pub enum TemplateError {
     InvalidKind(String),
     #[error("content template body is not a valid content spec: {0}")]
     InvalidContentSpec(String),
+    #[error(
+        "applies_to: unknown kind '{0}'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+    )]
+    UnknownKind(String),
+    #[error("template is used for {kind} by: {by}; remove the binding first")]
+    InUseForKind { kind: String, by: String },
+    #[error("Template is in use by {0}")]
+    DeleteWithBinding(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
+    if !follows_alias(name) {
+        return get_shared(org_id, name).await;
+    }
+    // A node whose destination or alert cache predates a rename still asks for the old name: the
+    // org's own rename wins over the shared default row of that name.
+    if org_id != DEFAULT_ORG {
+        if let Some(template) = own_row(org_id, name).await? {
+            return Ok(template);
+        }
+        if let Some(to) = alias(org_id, name).await?
+            && let Ok(template) = get_shared(org_id, &to).await
+        {
+            return Ok(template);
+        }
+    }
+    match get_shared(org_id, name).await {
+        Err(TemplateError::NotFound) => match alias(DEFAULT_ORG, name).await? {
+            Some(to) => get_shared(org_id, &to).await,
+            None => Err(TemplateError::NotFound),
+        },
+        found => found,
+    }
+}
+
+/// Only reserved and retired names are ever renamed, so other lookups skip the alias reads; the
+/// system owns prebuilt_default now, so a new binding to it reads the system row.
+fn follows_alias(name: &str) -> bool {
+    (table::templates::is_reserved_default_name(name)
+        || table::templates::RETIRED_DEFAULT_NAMES.contains(&name))
+        && name != table::templates::DEFAULT_TEMPLATE_NAME
+}
+
+/// The org's row, else the shared default org's row of that name.
+async fn get_shared(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     let map_key = format!("{org_id}/{name}");
     if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
         return Ok(v.value().clone());
@@ -84,13 +129,27 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     if let Some(v) = ALERTS_TEMPLATES.get(&default_org_key) {
         return Ok(v.value().clone());
     }
-
     if let Some(template) = table::templates::get(org_id, name).await? {
         return Ok(template);
     }
     table::templates::get(DEFAULT_ORG, name)
         .await?
         .ok_or(TemplateError::NotFound)
+}
+
+async fn own_row(org_id: &str, name: &str) -> Result<Option<Template>, TemplateError> {
+    if let Some(v) = ALERTS_TEMPLATES.get(&format!("{org_id}/{name}")) {
+        return Ok(Some(v.value().clone()));
+    }
+    Ok(table::templates::get_own(org_id, name).await?)
+}
+
+/// The name `name` was renamed to in exactly `org_id`.
+async fn alias(org_id: &str, name: &str) -> Result<Option<String>, TemplateError> {
+    Ok(table::templates::renamed_in(org_id, name)
+        .await
+        .map_err(infra::errors::Error::from)?
+        .filter(|to| to != name))
 }
 
 pub async fn set(template: Template) -> Result<Template, TemplateError> {
@@ -365,6 +424,117 @@ async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError>
     Ok(())
 }
 
+/// Cached destinations and alerts that name the template, scoped like the delete guard.
+pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<String>) {
+    let destinations = DESTINATIONS
+        .iter()
+        .filter(|dest| {
+            references_from(org_id, dest.key())
+                && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
+        })
+        .map(|dest| dest.name.clone())
+        .collect();
+    let alerts = ALERTS
+        .read()
+        .await
+        .iter()
+        .filter(|(key, (_, alert))| {
+            references_from(org_id, key) && alert.template.as_deref() == Some(name)
+        })
+        .map(|(_, (_, alert))| alert.name.clone())
+        .collect();
+    (destinations, alerts)
+}
+
+/// Moves user rows out of the reserved prefix and tells every node's cache.
+pub async fn rename_reserved_collisions()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let db = infra::db::get_orm_client_rw().await;
+    let renames =
+        table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS, true)
+            .await
+            .map_err(infra::errors::Error::from)?;
+    // Tuples are keyed by name; one that did not move stays queued, so a later boot retries it.
+    // Queued before the emits, because the rows are already renamed and a failed emit returns.
+    table::templates::record_pending_renames(db, &renames)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    for r in &renames {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    let pending = table::templates::pending_renames(db)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    let mut left = Vec::new();
+    for r in pending {
+        if let Err(e) = move_tuples(&r).await {
+            log::warn!(
+                "[TEMPLATES] tuples of '{}' in org {} not moved to '{}' yet: {e}",
+                r.from,
+                r.org,
+                r.to
+            );
+            left.push(r);
+        }
+    }
+    table::templates::set_pending_renames(db, &left)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    Ok(renames)
+}
+
+/// Folds the retired default rows into `prebuilt_default` and tells every node's cache.
+pub async fn retire_default_templates()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let moved = table::templates::retire_default_templates(infra::db::get_orm_client_rw().await)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    // System rows: the seeder writes no tuple for prebuilt_default, so none is set here. The old
+    // tuples go first, because the rows are already folded and a failed emit returns.
+    for r in &moved {
+        disown_old_name(r).await?;
+    }
+    for r in &moved {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    Ok(moved)
+}
+
+/// Moves every tuple on the old name, ownership and role grants, to the new one.
+async fn move_tuples(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let mut orgs = tuple_owners(&r.org, std::slice::from_ref(&r.from))
+        .await?
+        .remove(&r.from)
+        .unwrap_or_default();
+    let unowned = !orgs.contains(&r.org);
+    if unowned {
+        orgs.push(r.org.clone());
+    }
+    db::authz::rename_object(&orgs, "templates", &r.from, &r.to, r.org == DEFAULT_ORG)
+        .await
+        .map_err(|e| TemplateError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    // A row with no tuple on its old name still needs an owner on the new one.
+    if unowned && db::authz::tracks_ownership() {
+        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
+    }
+    Ok(())
+}
+
+/// Removes the tuples of the name a row was moved off.
+async fn disown_old_name(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let owners = tuple_owners(&r.org, std::slice::from_ref(&r.from)).await?;
+    for owner in owners.get(&r.from).into_iter().flatten() {
+        remove_ownership(owner, "templates", Authz::new(&r.from)).await;
+    }
+    Ok(())
+}
+
 // A `default` template is shared by every org, so its references are checked across all orgs.
 fn references_from(org_id: &str, cache_key: &str) -> bool {
     org_id == DEFAULT_ORG
@@ -418,6 +588,16 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn only_a_retired_or_reserved_user_name_follows_its_rename() {
+        assert!(!follows_alias("prebuilt_default"));
+        assert!(!follows_alias("prebuilt_slack"));
+        assert!(!follows_alias("ops-card"));
+        assert!(follows_alias("o2_default_content"));
+        assert!(follows_alias("o2_default_mine"));
+        assert!(follows_alias("prebuilt_downtime"));
+    }
 
     fn seed_destination(org_id: &str, name: &str, template: &str) {
         DESTINATIONS.insert(
@@ -729,6 +909,7 @@ mod tests {
             template_type: config::meta::destinations::TemplateType::Http,
             body: r#"{"text":"{alert_name}"}"#.to_string(),
             kind: TemplateKind::Custom,
+            applies_to: Vec::new(),
         })
         .await
         .unwrap();

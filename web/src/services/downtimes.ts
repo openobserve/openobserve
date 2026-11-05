@@ -15,6 +15,7 @@
 
 import type { AxiosRequestConfig } from "axios";
 import http from "./http";
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
 export type DowntimeStatus = "scheduled" | "active" | "ended" | "cancelled" | "ended_early";
@@ -85,6 +86,8 @@ export interface DowntimeNotificationLogEntry {
   sent_at: number;
   destinations: string[];
   result?: string;
+  /** The template each destination that sent used; absent on rows sent before it was recorded. */
+  templates?: SentTemplate[];
 }
 
 export interface Downtime {
@@ -292,6 +295,12 @@ const downtimes = {
     http().post(`${one(org, id)}/cancel`, undefined, inFolder(folder)),
   extend: (org: string, id: string, body: ExtendDowntimeRequest, folder?: string) =>
     http().post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder)),
+  test: (org: string, id: string, destinations: string[], folder?: string) =>
+    http().post<{ destination: string; ok: boolean; unsupported?: boolean; error?: string }[]>(
+      `${one(org, id)}/test`,
+      { destinations },
+      inFolder(folder),
+    ),
   remove: (org: string, id: string, folder?: string) =>
     http().delete(one(org, id), inFolder(folder)),
   move: (org: string, downtimeIds: string[], dstFolderId: string, folder?: string) =>

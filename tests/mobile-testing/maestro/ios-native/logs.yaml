@@ -1,0 +1,9 @@
+appId: com.o2native.ios
+---
+# One tap writes an info/warn/error burst through the Logs SDK; the spec asserts all three reach _rumlog.
+- launchApp:
+    clearState: false
+- assertVisible: "O2 Native iOS"
+- tapOn: "Send logs"
+- waitForAnimationToEnd:
+    timeout: 3000

@@ -245,6 +245,8 @@ const oncall = {
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
       l0?: L0Policy;
+      /** Template override; null clears it. */
+      template?: string | null;
     };
   }) =>
     http()

@@ -363,7 +363,7 @@ function startBackgroundIngest(page, stream, { services, hosts = ['h1'], extra =
   return { stop: () => { stopped = true; clearInterval(timer); } };
 }
 
-/** Self-ingest destination like seedNotificationDestination; the template renders {rows} to filter per group and the incident fields to count incident notifications. */
+/** Self-ingest destination; the template leaves out anomaly and downtime so those sends keep their default bodies (anomaly_id, downtime_name). */
 async function seedSinkDestination(page, baseName) {
   const template = `${baseName}_tmpl`;
   const destination = `${baseName}_dest`;
@@ -373,6 +373,7 @@ async function seedSinkDestination(page, baseName) {
     body: '{"text":"{alert_name} {alert_level} {rows}","incident_id":"{incident_id}","incident_event":"{incident_event}"}',
     type: 'http',
     title: '',
+    applies_to: ['alert', 'incident', 'synthetics'],
   });
   if (!tmplRes.ok() && tmplRes.status() !== 409) await must(tmplRes, `Create template ${template}`);
   const destRes = await api(page, 'post', `${v1()}/alerts/destinations`, {
@@ -438,7 +439,7 @@ async function anomalySinkCount(page, sink, anomalyId, sinceUs) {
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
 }
 
-/** Lifecycle notifications use the prebuilt downtime template, which flattens to downtime_name / downtime_event. */
+/** Lifecycle notifications render the built-in prebuilt_default template (the sink destination template leaves out downtime); counts match on downtime_name / downtime_event. */
 async function downtimeEventCount(page, sink, downtimeName, event, sinceUs) {
   const byEvent = event ? ` AND downtime_event = '${sqlStr(event)}'` : '';
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE downtime_name = '${sqlStr(downtimeName)}'${byEvent} AND _timestamp > ${Math.floor(sinceUs)}`;

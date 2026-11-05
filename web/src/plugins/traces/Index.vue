@@ -216,6 +216,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
+                    <div v-else-if="searchCancelled && !searchObj.loading">
+                      <OEmptyState
+                        preset="search-cancelled"
+                        size="hero"
+                        data-test="traces-search-cancelled-state"
+                        @action="() => searchData()"
+                      />
+                    </div>
                     <div v-else data-test="logs-search-search-result" class="h-full!">
                       <SearchResult
                         ref="searchResultRef"
@@ -519,6 +527,7 @@ let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
+const searchCancelled = ref(false);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -901,6 +910,7 @@ async function getQueryData(
     searchObj.loading = true;
 
     if (!isPagination) {
+      searchCancelled.value = false;
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -1224,11 +1234,32 @@ const rebuildColumns = () => {
   );
 };
 
+// Rows a cancelled search streamed are a partial answer, so none of them stay on screen.
+const showSearchCancelled = () => {
+  searchObj.data.queryResults = {
+    hits: [],
+    total: 0,
+    countPending: false,
+    from: 0,
+    size: searchObj.meta.resultGrid.rowsPerPage,
+    took: 0,
+  };
+  searchObj.data.sortedQueryResults = [];
+  searchObj.meta.resultGrid.showPagination = false;
+  searchObj.data.resultGrid.currentPage = 0;
+  isLLMSpanPresent.value = false;
+  searchCancelled.value = true;
+};
+
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
-  if (currentSearchTraceId) dropKeptCount(searchObj.data.queryResults);
+  if (!currentSearchTraceId) return;
+  dropKeptCount(searchObj.data.queryResults);
+  const isPageLoad = searchObj.data.resultGrid.pageRequest?.requestId === currentSearchTraceId;
   cancelMainSearch();
+  // Only the user's cancel shows the cancelled state; a page left mid-search re-runs it on return.
+  if (!isPageLoad) showSearchCancelled();
 };
 
 function cancelMainSearch() {
