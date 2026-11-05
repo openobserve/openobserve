@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #actions>
         <OButton
+          v-if="pa.canWidenRange.value"
           variant="primary"
           size="sm"
           data-test="rum-analytics-overview-widen-range-btn"
