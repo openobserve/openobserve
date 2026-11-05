@@ -24,12 +24,12 @@ CTX = ssl.create_default_context()
 if os.environ.get("O2_REPORTING_INSECURE", "") == "true":
     CTX.check_hostname = False; CTX.verify_mode = ssl.CERT_NONE
 
-# (workflow file, stream, suite, is_regression)
+# (workflow file, stream, suite, is_regression, shard job-name prefix)
 TARGETS = [
-    ("playwright.yml", "ci_test_runs", "ui", False),
-    ("api-testing.yml", "ci_test_runs", "api", False),
-    ("playwright_bugfix_regression.yml", "ci_regression", "regression", True),
-    ("api_bugfix_regression.yml", "ci_test_runs", "api", True),
+    ("playwright.yml", "ci_test_runs", "ui", False, None),
+    ("api-testing.yml", "ci_test_runs", "api", False, None),
+    ("playwright_bugfix_regression.yml", "ci_regression", "regression", True, "e2e /"),
+    ("api_bugfix_regression.yml", "ci_test_runs", "api", True, "api_regression /"),
 ]
 
 def gh(path):
@@ -57,7 +57,7 @@ def jdur(j):
     if a is None or b is None: return None
     d = round(b - a); return d if d >= 0 else None
 
-def reconstruct(run, suite, is_reg):
+def reconstruct(run, suite, is_reg, prefix):
     rid, att = run["id"], run.get("run_attempt", 1)
     jobs = gh(f"repos/{REPO}/actions/runs/{rid}/attempts/{att}/jobs?per_page=100").get("jobs", [])
     final = wall(jobs)
@@ -84,7 +84,7 @@ def reconstruct(run, suite, is_reg):
         "retry_wasted_sec": total - final,
     }
     if is_reg:
-        sh = [j for j in jobs if j.get("name", "").startswith("e2e /")]
+        sh = [j for j in jobs if j.get("name", "").startswith(prefix)]
         bj = [j for j in jobs if j.get("name") == "build_binary"]
         doc.update({
             "build_duration_sec": (jdur(bj[0]) if bj else None),
@@ -120,10 +120,10 @@ def main():
         print("::notice::missing env (repo/token/O2_REPORTING_*) — skipping re-sync"); return
     since = (datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y-%m-%d")
     grand = 0
-    for wf, stream, suite, is_reg in TARGETS:
+    for wf, stream, suite, is_reg, prefix in TARGETS:
         runs = gh(f"repos/{REPO}/actions/workflows/{wf}/runs?created=%3E%3D{since}&per_page=100").get("workflow_runs", [])
         runs = [r for r in runs if r.get("status") == "completed"]
-        docs = [reconstruct(r, suite, is_reg) for r in runs]
+        docs = [reconstruct(r, suite, is_reg, prefix) for r in runs]
         n = post(stream, docs); grand += n
         print(f"{wf:<26} -> {stream} ({suite}): {len(docs)} runs, ingested {n}")
     print(f"TOTAL re-synced: {grand}")
