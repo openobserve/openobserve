@@ -373,3 +373,33 @@ def test_a_raw_query_excludes_a_row_at_exactly_the_end_time(fixture):
     last_row = inside[-1]
     body = fixture.search(sql, start, last_row, use_cache=True, size=2000)
     assert sorted(hit["_timestamp"] for hit in body["hits"]) == inside[:-1]
+
+
+def test_a_space_before_the_bracket_gets_the_same_timezone_rows(fixture):
+    if WINDOW_HOURS < 96:
+        pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds too few whole days")
+    offset = 19_800_000_000
+    first_edge = _bucket_edge(fixture.start - 1, DAY, offset) + DAY
+    last_edge = _bucket_edge(fixture.end, DAY, offset)
+    sql = (
+        "SELECT histogram (_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt "
+        f'FROM "{fixture.stream}" GROUP BY ts ORDER BY ts'
+    )
+    expected = _expected_rows(fixture.events, first_edge, last_edge, DAY, offset)
+    _warm_cache(fixture, sql, first_edge, last_edge, expected)
+    shorter_end = last_edge - 2 * DAY
+    expected = _expected_rows(fixture.events, first_edge, shorter_end, DAY, offset)
+    assert _rows(fixture.search(sql, first_edge, shorter_end, use_cache=True)) == expected
+
+
+@pytest.mark.parametrize("call", ["histogram (_timestamp,", "histogram((_timestamp),"], ids=["space", "parens"])
+def test_other_valid_spellings_of_a_month_bucket_skip_the_cache(fixture, call):
+    sql = f"SELECT {call} '1 month') AS ts, count(*) AS cnt FROM \"{fixture.stream}\" GROUP BY ts ORDER BY ts"
+    shorter_end = fixture.end - (fixture.end - fixture.start) // 3
+    expected = {}
+    for ts in fixture.events:
+        if ts < shorter_end:
+            label = _month_label(ts)
+            expected[label] = expected.get(label, 0) + 1
+    fixture.search(sql, fixture.start, fixture.end, use_cache=True)
+    assert _rows(fixture.search(sql, fixture.start, shorter_end, use_cache=True)) == expected

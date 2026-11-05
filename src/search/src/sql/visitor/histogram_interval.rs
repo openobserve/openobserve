@@ -24,6 +24,7 @@ pub struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: (i64, i64),
     pub error: Option<String>,
+    pub timezone: Option<String>,
 }
 
 impl HistogramIntervalVisitor {
@@ -33,6 +34,7 @@ impl HistogramIntervalVisitor {
             interval: None,
             time_range,
             error: None,
+            timezone: None,
         }
     }
 }
@@ -70,6 +72,13 @@ impl VisitorMut for HistogramIntervalVisitor {
                         .map(|seconds| {
                             validate_and_adjust_histogram_interval(seconds, self.time_range)
                         });
+                // third is the timezone
+                self.timezone = args.next().map(|timezone| {
+                    timezone
+                        .to_string()
+                        .trim_matches(|v| v == '\'' || v == '"')
+                        .to_string()
+                });
             }
             return ControlFlow::Break(());
         }

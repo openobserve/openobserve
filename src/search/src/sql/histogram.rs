@@ -22,6 +22,7 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes};
+use regex::Regex;
 use sqlparser::{
     ast::{SetExpr, Statement, VisitMut},
     dialect::PostgreSqlDialect,
@@ -73,27 +74,27 @@ pub fn handle_histogram(
     );
 }
 
-/// Whether the first `histogram()` uses an interval without a fixed width, such as a month.
-pub fn has_calendar_histogram_interval(sql: &str) -> bool {
-    if !RE_HISTOGRAM.is_match(sql) {
-        return false;
+/// Reads the first `histogram()` from the parsed SQL, because a regex misses valid spellings.
+fn first_histogram_call(sql: &str) -> Option<HistogramIntervalVisitor> {
+    if !sql.to_ascii_lowercase().contains("histogram") {
+        return None;
     }
-    // parsed, because the regex stops at the first `)` of `histogram((_timestamp), '1 month')`
-    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
-        return false;
-    };
+    let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
     let mut visitor = HistogramIntervalVisitor::new((0, 0));
     for mut statement in statements {
         let _ = statement.visit(&mut visitor);
     }
-    visitor.is_histogram && visitor.error.is_none() && visitor.interval.is_none()
+    visitor.is_histogram.then_some(visitor)
+}
+
+/// Whether the first `histogram()` uses an interval without a fixed width, such as a month.
+pub fn has_calendar_histogram_interval(sql: &str) -> bool {
+    first_histogram_call(sql).is_some_and(|call| call.error.is_none() && call.interval.is_none())
 }
 
 /// The timezone argument of the first `histogram()` in the SQL.
 pub fn histogram_timezone_arg(sql: &str) -> Option<String> {
-    let args = RE_HISTOGRAM.captures(sql)?.get(1)?.as_str();
-    let tz = args.split(',').nth(2)?;
-    Some(tz.trim().trim_matches(['\'', '"']).to_string())
+    first_histogram_call(sql)?.timezone
 }
 
 /// The offset east of UTC that `histogram()` buckets use; the SQL argument beats the request.
@@ -111,9 +112,18 @@ pub fn pin_histogram_timezone(sql: &mut String, timezone: &mut Option<String>, e
     if let Some(tz) = histogram_timezone_arg(sql)
         && let Some(fixed) = fixed_offset_of_named_zone(&tz, end_time)
     {
-        *sql = RE_HISTOGRAM
-            .replace_all(sql, |caps: &regex::Captures| caps[0].replace(&tz, &fixed))
-            .into_owned();
+        // the literal after two commas of the call, not an equal string elsewhere in the SQL
+        let pattern = format!(
+            r#"(?is)(\bhistogram\s*\(.*?,.*?,\s*['"]){}(['"])"#,
+            regex::escape(&tz)
+        );
+        if let Ok(re) = Regex::new(&pattern) {
+            *sql = re
+                .replace_all(sql, |caps: &regex::Captures| {
+                    format!("{}{fixed}{}", &caps[1], &caps[2])
+                })
+                .into_owned();
+        }
     }
     if let Some(tz) = timezone.as_deref()
         && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
@@ -313,6 +323,8 @@ mod tests {
             assert!(has_calendar_histogram_interval(&sql), "{interval}");
             let sql = format!("SELECT histogram((_timestamp), '{interval}') FROM t");
             assert!(has_calendar_histogram_interval(&sql), "{interval}");
+            let sql = format!("SELECT histogram (_timestamp, '{interval}') FROM t");
+            assert!(has_calendar_histogram_interval(&sql), "{interval}");
         }
         for sql in [
             "SELECT histogram(_timestamp, '30 days') FROM t",
@@ -376,6 +388,48 @@ mod tests {
             "SELECT histogram(_timestamp, '1 day', '-07:00') FROM t"
         );
         assert_eq!(timezone.as_deref(), Some("+05:30"));
+    }
+
+    #[test]
+    fn test_timezone_comes_from_any_valid_spelling() {
+        for sql in [
+            "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t",
+            "SELECT histogram (_timestamp, '1 day', '+05:30') FROM t",
+            "SELECT histogram((_timestamp), '1 day', '+05:30') FROM t",
+            "SELECT HISTOGRAM ( (_timestamp) , '1 day' , '+05:30' ) FROM t",
+        ] {
+            assert_eq!(
+                histogram_timezone_arg(sql).as_deref(),
+                Some("+05:30"),
+                "{sql}"
+            );
+        }
+        assert_eq!(
+            histogram_timezone_arg("SELECT histogram(_timestamp) FROM t"),
+            None
+        );
+        assert_eq!(
+            histogram_timezone_arg("SELECT a FROM histogram_stream"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_pin_histogram_timezone_changes_only_the_argument() {
+        let mut timezone = None;
+        let mut sql = "SELECT histogram (_timestamp, '1 day', 'Asia/Kolkata') FROM t WHERE tz = 'Asia/Kolkata'"
+            .to_string();
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram (_timestamp, '1 day', '+05:30') FROM t WHERE tz = 'Asia/Kolkata'"
+        );
+        let mut sql = "SELECT histogram((_timestamp), '1 day', 'Asia/Kolkata') FROM t".to_string();
+        pin_histogram_timezone(&mut sql, &mut timezone, JUL_2026);
+        assert_eq!(
+            sql,
+            "SELECT histogram((_timestamp), '1 day', '+05:30') FROM t"
+        );
     }
 
     #[test]
