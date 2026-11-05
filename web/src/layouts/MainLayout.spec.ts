@@ -30,6 +30,7 @@ import config from "@/aws-exports";
 import stream from "@/services/stream";
 import billings from "@/services/billings";
 import configService from "@/services/config";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
@@ -2085,6 +2086,38 @@ describe("MainLayout — first-time cloud login", () => {
     } finally {
       store.state.zoConfig.version = version;
     }
+  });
+
+  // the header Try marks the welcome seen, so the welcome never ends this first login
+  it("ends a first login when sample data starts loading outside the welcome, as a sample start", async () => {
+    store.state.zoConfig.onboarding_flow_enabled = false;
+    const session = useSampleDataSession();
+    const { wrapper } = await mountAtHome();
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    try {
+      session.loadingOrg.value = "org1";
+      session.status.value = "loading";
+      await flushPromises();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+      expect(startCalls()).toEqual([
+        ["org1", expect.objectContaining({ first_source: "sample", skipped: false })],
+      ]);
+    } finally {
+      session.status.value = "idle";
+      session.loadingOrg.value = "";
+      wrapper.unmount();
+    }
+  });
+
+  it("holds Home for a first login only while the onboarding flow is on", async () => {
+    store.state.zoConfig.onboarding_flow_enabled = false;
+    const { wrapper, router } = await mountAtHome();
+    const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    expect(hold()).toBe(false);
+    wrapper.unmount();
   });
 
   it("with both first-run flows off, sends no one to onboarding and ends the first login", async () => {

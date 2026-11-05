@@ -334,6 +334,8 @@ import {
   redirectPending,
 } from "@/components/onboarding/onboardingFlow";
 import { orgHasUserData } from "@/composables/useOrgHasUserData";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import type { FirstSourceId } from "@/components/login/firstSourceOptions";
 import { flowsKnown, onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
@@ -785,12 +787,17 @@ export default defineComponent({
       document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
 
-    // a sign-up that never reaches onboarding still sends its one attribution event, as skipped
-    const recordSkippedStart = () => {
+    // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
+    const recordFirstStart = (firstSource?: FirstSourceId) => {
       if (config.isCloud !== "true") return;
       const email = store.state.userInfo?.email;
       markStartPending(email);
-      void recordStart(store.state.selectedOrganization?.identifier, email, undefined, true);
+      void recordStart(
+        store.state.selectedOrganization?.identifier,
+        email,
+        firstSource,
+        !firstSource,
+      );
     };
 
     // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
@@ -805,7 +812,7 @@ export default defineComponent({
         // the sample data welcome ends the first login itself; with neither flow it ends here
         if (!sampleDataFlowOn(store.state.zoConfig)) {
           localStorage.removeItem("isFirstTimeLogin");
-          recordSkippedStart();
+          recordFirstStart();
         }
         return;
       }
@@ -827,7 +834,7 @@ export default defineComponent({
       // a failed list, or streams with no stats yet, decide nothing; the next Home visit asks again
       if (hasData === undefined) return;
       localStorage.removeItem("isFirstTimeLogin");
-      if (hasData) return recordSkippedStart();
+      if (hasData) return recordFirstStart();
       markStartPending(store.state.userInfo?.email);
       await router.replace({
         name: "onboarding",
@@ -851,11 +858,19 @@ export default defineComponent({
       [() => router.currentRoute.value.name, () => flowsKnown(store.state.zoConfig)],
       ([name]) => {
         const firstLogin = name === "home" && isFirstLoginOf(store.state.userInfo?.email);
-        // Only Home waits on the decision: a page the user moved to while the lists load shows at once.
-        holdForOnboarding.value = firstLogin && config.isCloud === "true";
+        // Only Home waits on the decision, and only when it may onboard: a page the user moved to while the lists load shows at once.
+        holdForOnboarding.value = firstLogin && onboardingFlowOn(store.state.zoConfig);
         if (firstLogin && !deciding) void onboardFirstLogin();
       },
     );
+
+    // A load started outside the welcome (the header Try, Home's callout) marks the welcome seen, so the first login ends here.
+    const sampleSession = useSampleDataSession();
+    watch(sampleSession.status, (now) => {
+      if (now !== "loading" || !isFirstLoginOf(store.state.userInfo?.email)) return;
+      localStorage.removeItem("isFirstTimeLogin");
+      recordFirstStart("sample");
+    });
 
     onMounted(() => {
       setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
