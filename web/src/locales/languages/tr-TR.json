@@ -12466,6 +12466,7 @@
       "incidentTitleTemplateTooltip": "Bu uyarının oluşturduğu vakalar için isteğe bağlı başlık. Tetikleyen satırdaki veya gruplama anahtarlarındaki değerler için {'{'}field{'}'}, ayrıca {'{'}alert_name{'}'}, {'{'}stream_name{'}'}, {'{'}stream_type{'}'}, {'{'}org_name{'}'}, {'{'}alert_time{'}'}, {'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'} ve bağlam öznitelikleri kullanılabilir. Eksik değişkenler – olarak gösterilir; hiçbiri çözümlenemezse varsayılan başlık kullanılır.",
       "incidentTitleTemplatePlaceholder": "örn. {'{'}host{'}'} üzerinde {'{'}service_name{'}'} hataları",
       "incidentTitlePreview": "Önizleme",
+      "incidentTitlePreviewHint": "{'{'}name{'}'} olarak bırakılan yer tutucular, uyarı tetiklendiğinde tetikleyici satırdaki değerlerle doldurulur. Bulunamayanlar – olarak gösterilir ve hiçbiri bulunamazsa varsayılan başlık kullanılır.",
       "helpTemplateTitle": "Şablon Geçersiz Kılma",
       "helpVariablesTitle": "Ek Değişkenler",
       "helpRowTemplateTitle": "Satır Şablonu",

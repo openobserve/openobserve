@@ -12466,6 +12466,7 @@
       "incidentTitleTemplateTooltip": "Titre facultatif des incidents créés par cette alerte. Utilisez {'{'}field{'}'} pour les valeurs de la ligne déclencheuse ou de ses clés de regroupement, ainsi que {'{'}alert_name{'}'}, {'{'}stream_name{'}'}, {'{'}stream_type{'}'}, {'{'}org_name{'}'}, {'{'}alert_time{'}'}, {'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'} et les attributs de contexte. Les variables absentes s'affichent comme – ; si aucune n'est résolue, le titre par défaut est utilisé.",
       "incidentTitleTemplatePlaceholder": "p. ex. erreurs {'{'}service_name{'}'} sur {'{'}host{'}'}",
       "incidentTitlePreview": "Aperçu",
+      "incidentTitlePreviewHint": "Les espaces réservés laissés sous la forme {'{'}name{'}'} sont remplis à partir de la ligne déclencheuse lorsque l'alerte se déclenche. Ceux qui sont introuvables affichent –, et si aucun ne l'est, le titre par défaut est utilisé.",
       "helpTemplateTitle": "Remplacer le modèle",
       "helpVariablesTitle": "Variables supplémentaires",
       "helpRowTemplateTitle": "Modèle de ligne",

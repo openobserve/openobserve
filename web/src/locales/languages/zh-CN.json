@@ -12466,6 +12466,7 @@
       "incidentTitleTemplateTooltip": "此告警所创建事件的可选标题。使用 {'{'}field{'}'} 引用触发行或其分组键中的值，另可使用 {'{'}alert_name{'}'}、{'{'}stream_name{'}'}、{'{'}stream_type{'}'}、{'{'}org_name{'}'}、{'{'}alert_time{'}'}、{'{'}alert_start_time{'}'}、{'{'}alert_end_time{'}'} 和上下文属性。缺少的变量显示为 –；如果都无法解析，则使用默认标题。",
       "incidentTitleTemplatePlaceholder": "例如：{'{'}host{'}'} 上的 {'{'}service_name{'}'} 错误",
       "incidentTitlePreview": "预览",
+      "incidentTitlePreviewHint": "保留为 {'{'}name{'}'} 的占位符会在告警触发时从触发行中填充。无法找到的占位符显示为 –，若全部无法找到，则使用默认标题。",
       "helpTemplateTitle": "模板覆盖",
       "helpVariablesTitle": "其他变量",
       "helpRowTemplateTitle": "行模板",

@@ -12466,6 +12466,7 @@
       "incidentTitleTemplateTooltip": "عنوان اختياري للحوادث التي ينشئها هذا التنبيه. استخدم {'{'}field{'}'} لقيم السجل المُشغِّل أو مفاتيح التجميع الخاصة به، بالإضافة إلى {'{'}alert_name{'}'}، {'{'}stream_name{'}'}، {'{'}stream_type{'}'}، {'{'}org_name{'}'}، {'{'}alert_time{'}'}، {'{'}alert_start_time{'}'}، {'{'}alert_end_time{'}'} وسمات السياق. تظهر المتغيرات المفقودة كـ –؛ وإذا لم يُحل أي منها، يُستخدم العنوان الافتراضي.",
       "incidentTitleTemplatePlaceholder": "مثال: أخطاء {'{'}service_name{'}'} على {'{'}host{'}'}",
       "incidentTitlePreview": "معاينة",
+      "incidentTitlePreviewHint": "العناصر النائبة المتروكة بصيغة {'{'}name{'}'} تُملأ من الصف المُشغِّل عند إطلاق التنبيه. وأي منها يتعذر العثور عليه يظهر –، وإذا تعذر العثور على أي منها، يُستخدم العنوان الافتراضي.",
       "helpTemplateTitle": "تجاوز القالب",
       "helpVariablesTitle": "متغيرات إضافية",
       "helpRowTemplateTitle": "قالب الصف",
