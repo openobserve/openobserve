@@ -29871,7 +29871,7 @@
       "action": "Hành động",
       "target": "Đối tượng",
       "auditDisabled": "Nhật ký kiểm toán cần O2_AUDIT_ENABLED=true trên máy chủ",
-      "auditDelayHint": "Chưa có bản ghi. Máy chủ phát hành bản ghi kiểm toán theo lô, mặc định mỗi 10 phút (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "Không có bản ghi nào trong 24 giờ qua. Hãy chọn khoảng thời gian dài hơn hoặc quay lại sau: máy chủ công bố bản ghi audit theo lô, mặc định 10 phút một lần (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Mặc định của fleet",
       "fleetDefaultsDesc": "Mọi fleet dùng các giá trị này trừ khi nó đặt giá trị riêng trong cài đặt của mình",
       "gateObserve": "Quan sát cổng kiểm tra (giây)",

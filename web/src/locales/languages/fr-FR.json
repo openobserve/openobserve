@@ -29871,7 +29871,7 @@
       "action": "Action",
       "target": "Cible",
       "auditDisabled": "Le journal d'audit nécessite O2_AUDIT_ENABLED=true sur le serveur",
-      "auditDelayHint": "Aucune entrée pour l'instant. Le serveur publie les enregistrements d'audit par lots, toutes les 10 minutes par défaut (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "Aucune entrée au cours des dernières 24 heures. Choisissez une période plus longue ou revenez plus tard : le serveur publie les enregistrements d'audit par lots, toutes les 10 minutes par défaut (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Valeurs par défaut des flottes",
       "fleetDefaultsDesc": "Chaque flotte utilise ces valeurs, sauf si elle définit les siennes dans ses paramètres",
       "gateObserve": "Observation du contrôle (secondes)",

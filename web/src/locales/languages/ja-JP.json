@@ -29871,7 +29871,7 @@
       "action": "アクション",
       "target": "対象",
       "auditDisabled": "監査証跡を利用するには、サーバーで O2_AUDIT_ENABLED=true を設定する必要があります",
-      "auditDelayHint": "まだ記録はありません。サーバーは監査記録をまとめて発行します。既定では 10 分ごとです(O2_AUDIT_PUBLISH_INTERVAL)。",
+      "auditDelayHint": "過去 24 時間のエントリはありません。より長い期間を選択するか、しばらくしてから確認してください。サーバーは監査レコードをバッチ単位で公開します（デフォルトでは 10 分ごと、O2_AUDIT_PUBLISH_INTERVAL）。",
       "fleetDefaults": "フリートのデフォルト",
       "fleetDefaultsDesc": "各フリートの設定で個別に指定しない限り、すべてのフリートがこれらの値を使用します",
       "gateObserve": "ゲート観察時間（秒）",

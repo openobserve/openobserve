@@ -29865,7 +29865,7 @@
       "action": "Action",
       "target": "Target",
       "auditDisabled": "The audit trail needs O2_AUDIT_ENABLED=true on the server",
-      "auditDelayHint": "No entries yet. The server publishes audit records in batches, every 10 minutes by default (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "ไม่มีรายการในช่วง 24 ชั่วโมงที่ผ่านมา เลือกช่วงเวลาที่ยาวขึ้น หรือกลับมาตรวจสอบใหม่ในเร็วๆ นี้: เซิร์ฟเวอร์เผยแพร่บันทึกการตรวจสอบเป็นชุด โดยค่าเริ่มต้นทุก 10 นาที (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Fleet defaults",
       "fleetDefaultsDesc": "Every fleet uses these values unless it sets its own in its settings",
       "gateObserve": "Gate observation (seconds)",
