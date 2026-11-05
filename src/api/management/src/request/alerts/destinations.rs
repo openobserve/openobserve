@@ -414,6 +414,9 @@ pub async fn save_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not Supported");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -468,6 +471,9 @@ pub async fn update_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not Supported");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -1270,5 +1276,40 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn pipeline_destinations_are_refused_without_enterprise() {
+        use std::collections::HashMap;
+
+        use axum::extract::Query;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        use super::{save_destination, update_destination};
+
+        let args = |module: &str| {
+            let query = HashMap::from([("module".to_string(), module.to_string())]);
+            let user = UserEmail {
+                user_id: "root@example.com".to_string(),
+            };
+            let dest =
+                serde_json::from_value(serde_json::json!({"name": "d", "type": "sns"})).unwrap();
+            (Query(query), Headers(user), Json(dest))
+        };
+        let path = || Path("default".to_string());
+        let named = || Path(("default".to_string(), "d".to_string()));
+        for (module, expected) in [
+            ("pipeline", StatusCode::FORBIDDEN),
+            ("alert", StatusCode::BAD_REQUEST),
+        ] {
+            let (query, user, dest) = args(module);
+            let saved = save_destination(path(), query, user, dest).await;
+            assert_eq!(saved.status(), expected, "save module={module}");
+            let (query, user, dest) = args(module);
+            let updated = update_destination(named(), query, user, dest).await;
+            assert_eq!(updated.status(), expected, "update module={module}");
+        }
     }
 }
