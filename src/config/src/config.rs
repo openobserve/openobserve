@@ -1948,6 +1948,12 @@ pub struct Search {
     )]
     pub inverted_index_count_optimizer_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_LIKE_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle using the inverted index for `col LIKE '%x%'` and `col ILIKE '%x%'`. When off, these predicates are answered by scanning files."
+    )]
+    pub inverted_index_like_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
         help = "Toggle tantivy result cache."

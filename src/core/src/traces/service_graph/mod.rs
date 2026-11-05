@@ -59,6 +59,7 @@ pub(crate) async fn run_graph_search(
         search_type: Some(config::meta::search::SearchEventType::Other),
         search_event_context: None,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
