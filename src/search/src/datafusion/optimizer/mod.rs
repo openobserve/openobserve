@@ -64,9 +64,9 @@ use datafusion::{
         limit_pushdown::LimitPushdown, limit_pushdown_past_window::LimitPushPastWindows,
         limited_distinct_aggregation::LimitedDistinctAggregation,
         output_requirements::OutputRequirements, projection_pushdown::ProjectionPushdown,
-        pushdown_sort::PushdownSort, sanity_checker::SanityCheckPlan,
-        topk_aggregation::TopKAggregation, topk_repartition::TopKRepartition,
-        update_aggr_exprs::OptimizeAggregateOrder, window_topn::WindowTopN,
+        pushdown_sort::PushdownSort, topk_aggregation::TopKAggregation,
+        topk_repartition::TopKRepartition, update_aggr_exprs::OptimizeAggregateOrder,
+        window_topn::WindowTopN,
     },
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
@@ -256,8 +256,6 @@ pub fn generate_physical_optimizer_rules(
     rules.push(Arc::new(EnsureCooperative::new()));
     // Must be near the end: later plan changes break the dynamic filters' source references
     rules.push(Arc::new(FilterPushdown::new_post_optimization()));
-    // Only validates the plan as left by the rules above it, not the custom rules below
-    rules.push(Arc::new(SanityCheckPlan::new()));
 
     // *********** custom rules ***********
     rules.push(Arc::new(JoinReorderRule::new()));
@@ -803,7 +801,6 @@ mod tests {
             "PushdownSort",
             "EnsureCooperative",
             "FilterPushdown(Post)",
-            "SanityCheckPlan",
             "JoinReorderRule",
             "RemoteScanRule",
             "AggregateTopkRule",

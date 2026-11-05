@@ -65,8 +65,9 @@ pub async fn update_setting(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    metadata: std::collections::HashMap<String, String>,
+    metadata: impl Into<arrow_schema::Metadata>,
 ) -> Result<(), anyhow::Error> {
+    let metadata: arrow_schema::Metadata = metadata.into();
     infra::schema::update_setting(org_id, stream_name, stream_type, metadata.clone()).await?;
 
     // super cluster

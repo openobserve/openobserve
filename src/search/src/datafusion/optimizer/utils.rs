@@ -81,7 +81,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             // skip projection,subqueryalias, analyze, that we can add limit/sort after them
             LogicalPlan::Projection(_)
             | LogicalPlan::SubqueryAlias(_)
-            | LogicalPlan::DescribeTable(_)
+            | LogicalPlan::Show(_)
             | LogicalPlan::Analyze(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
@@ -266,7 +266,7 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
                     .with_projection(projection)
                     .with_filters(scan.filters)
                     .with_fetch(scan.fetch)
-                    .with_statistics_requests(scan.statistics_requests)
+                    .with_statistics_requests(*scan.statistics_requests)
                     .build()?;
                 if !is_metrics {
                     // non-metrics files are timestamp-descending.

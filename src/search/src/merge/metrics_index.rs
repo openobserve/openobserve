@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "vortex")]
 use anyhow::Context;
 use arrow::array::RecordBatch;
 use arrow_schema::Schema;
@@ -23,14 +24,17 @@ use datafusion::error::{DataFusionError, Result};
 use metrics_index::block::{BlockWriter, ParentMetadata};
 use parquet::file::metadata::ParquetMetaData;
 use tokio::task::JoinHandle;
+#[cfg(feature = "vortex")]
 use vortex::{arrow::ArrowSessionExt, file::OpenOptionsSessionExt, session::VortexSession};
 
 use super::MergedFile;
 
+#[cfg(feature = "vortex")]
 pub(super) const VORTEX_SOURCE_SCHEMA_KEY: &str = "o2_metrics_source_schema";
 
 pub(super) enum SourceMetadata {
     Parquet(ParquetMetaData),
+    #[cfg_attr(not(feature = "vortex"), allow(dead_code))]
     Vortex(Arc<Schema>),
 }
 
@@ -141,6 +145,7 @@ impl<T> Drop for EncodingJob<T> {
     }
 }
 
+#[cfg(feature = "vortex")]
 pub(super) async fn verify_vortex_source(
     data_path: &std::path::Path,
     meta: &FileMeta,

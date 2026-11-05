@@ -138,7 +138,7 @@ impl TableProvider for NewMemTable {
     async fn scan(
         &self,
         state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -172,8 +172,8 @@ impl TableProvider for NewMemTable {
             });
             (Some(filter_projection), projection)
         };
-        let mem_projection = mem_projection.as_ref();
-        let filter_projection = filter_projection.as_ref();
+        let mem_projection = mem_projection.as_deref();
+        let filter_projection = filter_projection.as_deref();
 
         let memory_exec = self
             .mem_table

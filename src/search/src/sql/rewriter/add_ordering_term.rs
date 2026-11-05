@@ -58,7 +58,11 @@ impl VisitorMut for AddOrderingTermVisitor {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
                     with_fill: None,
                     options: sqlparser::ast::OrderByOptions {
-                        asc: Some(self.is_asc),
+                        sort: Some(if self.is_asc {
+                            sqlparser::ast::OrderBySort::Asc
+                        } else {
+                            sqlparser::ast::OrderBySort::Desc
+                        }),
                         nulls_first: None,
                     },
                 }]),

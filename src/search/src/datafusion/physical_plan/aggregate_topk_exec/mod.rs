@@ -203,7 +203,7 @@ impl ExecutionPlan for AggregateTopkExec {
         vec![false; self.children().len()]
     }
 
-    fn supports_limit_pushdown(&self) -> bool {
-        true
+    fn limit_behavior(&self) -> datafusion::physical_plan::LimitBehavior {
+        datafusion::physical_plan::LimitBehavior::CopyToChildren
     }
 }

@@ -319,7 +319,7 @@ pub(crate) async fn create_context(
         trace_id,
         org_id,
         stream_name,
-        schema: Arc::new(schema.with_metadata(Default::default())),
+        schema: Arc::new(schema.with_metadata(arrow::datatypes::Metadata::default())),
         files,
         scan_stats,
         sort_order,
