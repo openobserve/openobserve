@@ -6965,6 +6965,8 @@
     "splunkTokenCreateLabel": "Also create a Splunk HEC token",
     "splunkTokenCreateHint": "Lets Splunk forwarders and HEC clients send data to this organization.",
     "splunkTokenNone": "Not enabled",
+    "systemTokenTag": "System",
+    "systemTokenHint": "Used by an OpenObserve feature. Disable it to stop that feature's writes.",
     "splunkTokenGenerate": "Generate Splunk token",
     "splunkTokenRevoke": "Revoke Splunk token",
     "splunkTokenGenerated": "Splunk HEC token generated.",
