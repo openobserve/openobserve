@@ -192,7 +192,7 @@ describe("buildSandboxDocument", () => {
   });
 
   it("tags every script with the nonce", () => {
-    const tags = [...doc.matchAll(/<script[^>]*>/g)].map((match) => match[0]);
+    const tags = [...doc.matchAll(/<script[^>]*>/gi)].map((match) => match[0]);
     expect(tags.length).toBeGreaterThanOrEqual(4);
     for (const tag of tags) expect(tag).toContain('nonce="abc123"');
   });
