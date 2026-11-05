@@ -190,6 +190,11 @@ pub async fn get_latest_users(
 
     // Get paginated user list with trace_ids per user
     let query_sql = build_latest_users_page_sql(&stream_name, user_id_col, &filter);
+    if let Some(response) =
+        super::check_sql_permissions(&org_id, user_id, &query_sql, &trace_id).await
+    {
+        return response;
+    }
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -760,6 +765,16 @@ mod tests {
         assert_eq!(user.total_events, 5);
         assert_eq!(user.first_event, 0);
         assert_eq!(user.last_event, 0);
+    }
+
+    #[test]
+    fn user_page_sql_names_every_stream_a_filter_reaches() {
+        let filter = "1=1) UNION SELECT user_id FROM \"other\" WHERE (1=1";
+        assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
+        let sql = build_latest_users_page_sql("default", "user_id", filter);
+        let tables = openobserve_core::authz::resolve_sql_tables(&sql).unwrap();
+        let names: Vec<_> = tables.iter().map(|t| t.table()).collect();
+        assert!(names.contains(&"default") && names.contains(&"other"));
     }
 
     #[test]
