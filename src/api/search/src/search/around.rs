@@ -128,7 +128,7 @@ pub(crate) async fn around(
     let fw_sql =
         config::utils::query_select_utils::replace_o2_custom_patterns(&fw_sql).unwrap_or(fw_sql);
 
-    let req = config::meta::search::Request {
+    let fw_req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: fw_sql,
             size: fw_size,
@@ -149,9 +149,10 @@ pub(crate) async fn around(
         local_mode: None,
         agent_options: None,
     };
-    let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span.clone())
-        .await?;
+    let resp_forward =
+        SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &fw_req)
+            .instrument(http_span.clone())
+            .await?;
 
     // search backward
     let bw_sql = check_or_add_order_by_timestamp(&around_sql, true)
@@ -196,6 +197,19 @@ pub(crate) async fn around(
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
+
+    // The bare planner never redacts; search-time SDR lives in the wrappers that call it.
+    #[cfg(feature = "vectorscan")]
+    SearchService::cache::apply_regex_to_response(
+        &fw_req,
+        org_id,
+        stream_name,
+        stream_type,
+        &mut resp,
+        trace_id,
+        "around",
+    )
+    .await?;
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_around", "", "");
@@ -306,6 +320,19 @@ mod tests {
             around_subquery_sizes(i64::MAX).unwrap(),
             (i64::MAX / 2 + 1, i64::MAX / 2)
         );
+    }
+
+    #[test]
+    fn test_around_redacts_after_both_searches() {
+        let text = include_str!("around.rs");
+        let body = &text[text.find("pub(crate) async fn around(").expect("handler")..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        let last_search = body.rfind("SearchService::search(").expect("search");
+        let redact = body
+            .find("SearchService::cache::apply_regex_to_response(")
+            .expect("around hits must pass search-time redaction");
+        assert!(last_search < redact);
+        assert!(body[redact..].contains("&mut resp,"));
     }
 
     #[test]

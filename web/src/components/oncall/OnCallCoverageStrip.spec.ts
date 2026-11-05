@@ -85,6 +85,20 @@ describe("OnCallCoverageStrip", () => {
     mockViewport.lgUp = true;
   });
 
+  // The axis dates are team days, so the strip says which zone they are on.
+  it("names the team's zone under the strip", () => {
+    const wrapper = mount(OnCallCoverageStrip, {
+      props: {
+        rotations: [rotation(["ana@o2.ai"])],
+        timezone: "Asia/Kolkata",
+        days: 14,
+        fromMicros: FROM,
+      },
+      global: { plugins: [i18n], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-coverage-zone"]').text()).toBe("Times in Asia/Kolkata");
+  });
+
   /// A covered fortnight is ONE band, not 336 hourly slivers the browser has to
   /// lay out.
   it("merges an unbroken stretch of cover into a single band", () => {

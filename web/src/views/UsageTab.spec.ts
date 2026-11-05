@@ -241,6 +241,34 @@ describe("UsageTab", () => {
       expect(panel.text()).toContain("No data ingested yet");
       expect(panel.text()).toContain("This organization hasn't received any data");
     });
+
+    it("should show the no-data panel when the org's only streams are ones O2 writes itself", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 1, num_user_streams: 0 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(true);
+    });
+
+    it("should show the summary once the org has a user data stream", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 2, num_user_streams: 1 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
+    });
   });
 
   // ── data with summary ───────────────────────────────────────────────────

@@ -29,7 +29,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::{
-    datafusion::udf::str_match_udf::{STR_MATCH_IGNORE_CASE_UDF, STR_MATCH_UDF},
+    datafusion::udf::fulltext::str_match::{STR_MATCH_IGNORE_CASE_UDF, STR_MATCH_UDF},
     index::like_substring,
 };
 

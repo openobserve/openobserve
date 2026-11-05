@@ -1,18 +1,31 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import type { DeliveryRecord } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
+  OnCallPersonName: {
+    name: "OnCallPersonName",
+    props: ["email"],
+    template: "<span>{{ email }}</span>",
+  },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
 };
+
+vi.mock("@/services/users", () => ({
+  default: {
+    orgUsers: vi.fn().mockResolvedValue({
+      data: { data: [{ email: "ana@o2.ai", first_name: "Ana", last_name: "Ruiz" }] },
+    }),
+  },
+}));
 
 function row(over: Partial<DeliveryRecord> = {}): DeliveryRecord {
   return {
@@ -36,6 +49,19 @@ function render(records: DeliveryRecord[], total = records.length) {
 }
 
 describe("OnCallDeliveryLedger", () => {
+  /// Names, not addresses: the real name component, with the email in its tooltip.
+  it("names each recipient, with the email one hover away", async () => {
+    const wrapper = mount(OnCallDeliveryLedger, {
+      props: { records: [row()], total: 1 },
+      global: { plugins: [i18n, store], stubs: { ...stubs, OnCallPersonName: false } },
+    });
+    await flushPromises();
+    const person = wrapper.find('[data-test="oncall-delivery-recipient-1-0"]');
+    expect(person.text()).toBe("Ana Ruiz");
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(person.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+  });
+
   it("shows the receipt per send: who, channel, landed or failed", () => {
     const text = render([row(), row({ recipient: "bo@o2.ai", delivered: false })]).text();
     expect(text).toContain("ana@o2.ai");
