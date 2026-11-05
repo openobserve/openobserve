@@ -25,6 +25,23 @@ pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyho
     Ok(())
 }
 
+pub async fn compare_and_set(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    val: bytes::Bytes,
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_set(org_id, key, expected, val).await
+}
+
+pub async fn compare_and_delete_in_region(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    kv::compare_and_delete_in_region(org_id, key, expected).await
+}
+
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     kv::delete(org_id, key).await?;
     Ok(())

@@ -17,6 +17,7 @@
 
 pub mod config;
 pub mod digests;
+pub mod dismissals;
 mod suggestions;
 mod visibility;
 

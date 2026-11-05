@@ -83,6 +83,7 @@ all DeleteSyntheticsEnvironmentVariable
 all DeleteSyntheticsVariable
 ent DetectAnomalies
 ent DiscardRemoteTaskDraft
+ent DismissAlertCalibrationFinding
 all DowntimeResources
 all DowntimeValues
 all DuplicateSyntheticsEnvironment
@@ -197,6 +198,7 @@ all GetUserGroups
 all GetUserRoles
 all JiraDestinationSetup
 all ListAlertAcks
+ent ListAlertCalibrationDismissals
 ent ListAlertCalibrationRuns
 ent ListAlertCalibrationRunsForAlert
 all ListAlertTags
@@ -287,6 +289,7 @@ oss RemoveUserFromOrg
 all RenameFleet
 all RenameFleetCollector
 all RenameOrganization
+ent ReopenAlertCalibrationDismissal
 ent ReplaceRemoteTaskAuthSecret
 ent ReplaceRemoteTaskHeaderSecret
 all RestartFleetCollector

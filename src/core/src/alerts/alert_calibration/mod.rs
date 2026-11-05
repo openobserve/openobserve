@@ -15,6 +15,7 @@
 
 //! The OSS half of alert calibration: the search the collector cannot reach, and the digest sink.
 
+pub mod dismissals;
 pub mod sink;
 
 use std::{

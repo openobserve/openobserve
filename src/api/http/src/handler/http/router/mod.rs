@@ -1292,6 +1292,9 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/records", get(alert_calibration::digests::get_run_records))
         .route("/v2/{org_id}/alert_calibration/digests/rules", get(alert_calibration::digests::count_findings_by_rule))
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
+        .route("/v2/{org_id}/alert_calibration/dismissals", get(alert_calibration::dismissals::list_dismissals))
+        .route("/v2/{org_id}/alert_calibration/findings/{finding_id}/dismiss", post(alert_calibration::dismissals::dismiss_finding))
+        .route("/v2/{org_id}/alert_calibration/dismissals/{id}/reopen", post(alert_calibration::dismissals::reopen_dismissal))
 }
 
 #[cfg(feature = "enterprise")]

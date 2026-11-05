@@ -31,8 +31,9 @@ use crate::request::alert_grants::{AlertVisibility, Probe};
 /// A full probe is judged on the whole org's alerts, so the set is never cut (P3-D3).
 pub(super) const PROBE_CAP: usize = 10_000;
 /// Counted over the whole org, so a scoped reader gets null for each (P3-D5).
-const ORG_TOTALS: [&str; 7] = [
+const ORG_TOTALS: [&str; 8] = [
     "alerts_in_scope",
+    "dismissed_count",
     "omitted_routine_skip_count",
     "coverage_unreadable_definitions",
     "coverage_facts_without_definition",
@@ -764,6 +765,32 @@ mod tests {
                  AND window_start = 1 AND window_end = 2"
             )
         );
+    }
+
+    #[tokio::test]
+    async fn a_scoped_reader_gets_no_org_dismissed_count() {
+        let mut counted = finding(5, "a0", "noise");
+        counted["dismissed_count"] = json!(3);
+        let digest = Digest::new(vec![counted.clone()]);
+        let rows = records(&digest, &window(None, Some("noise")), &only(&["a0"])).await;
+        let [scoped] = rows.as_slice() else {
+            panic!("one visible finding: {rows:?}");
+        };
+        assert_eq!(scoped["alert_id"], "a0");
+        assert_eq!(scoped["dismissed_count"], Value::Null);
+        let org_wide = visible_search(
+            |_| "SELECT *".to_string(),
+            &AlertVisibility::Org,
+            |_| {
+                ready(Ok(SearchResponse {
+                    hits: vec![counted.clone()],
+                    ..Default::default()
+                }))
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(org_wide[0]["dismissed_count"], 3);
     }
 
     #[tokio::test]
