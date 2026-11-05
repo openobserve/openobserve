@@ -96,7 +96,7 @@ describe("FleetAudit", () => {
     await settle();
   };
 
-  it("reads the first page of the last 30 days from the API", async () => {
+  it("reads the first page of the last 24 hours from the API", async () => {
     const before = Date.now();
     await mountAudit();
     const after = Date.now();
@@ -104,8 +104,8 @@ describe("FleetAudit", () => {
     const [orgId, params] = vi.mocked(fleet.listAudit).mock.calls[0] as any;
     expect(orgId).toBe(org());
     expect(params).toMatchObject({ offset: 0, limit: 50 });
-    expect(params.from).toBeGreaterThanOrEqual(before - 30 * DAY_MS);
-    expect(params.from).toBeLessThanOrEqual(after - 30 * DAY_MS);
+    expect(params.from).toBeGreaterThanOrEqual(before - DAY_MS);
+    expect(params.from).toBeLessThanOrEqual(after - DAY_MS);
     expect(params.to).toBeUndefined();
     expect(params).not.toHaveProperty("fleet");
     expect(params).not.toHaveProperty("module");
@@ -167,11 +167,12 @@ describe("FleetAudit", () => {
     expect(trailing.find('[data-test="fleet-audit-refresh"]').exists()).toBe(true);
   });
 
-  it("narrows the period to a shorter preset", async () => {
+  it("widens the period to a longer preset", async () => {
     await mountAudit();
     const before = Date.now();
-    await pick("fleet-audit-range", "24h");
-    expect(lastParams().from).toBeGreaterThanOrEqual(before - DAY_MS);
+    await pick("fleet-audit-range", "7d");
+    expect(lastParams().from).toBeGreaterThanOrEqual(before - 7 * DAY_MS);
+    expect(lastParams().from).toBeLessThan(before - DAY_MS);
     expect(lastParams().offset).toBe(0);
   });
 

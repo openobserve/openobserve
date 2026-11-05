@@ -184,8 +184,8 @@ const AUDIT_RANGES = [
 
 type AuditRange = (typeof AUDIT_RANGES)[number]["value"] | "custom";
 
-// The server's default period, so only a different one counts as a filter.
-const DEFAULT_RANGE: AuditRange = "30d";
+// Only a period other than this one counts as a filter.
+const DEFAULT_RANGE: AuditRange = "24h";
 
 const DEFAULT_FILTERS: AuditFilters = {
   q: "",
