@@ -2188,6 +2188,7 @@
       "pageLabel": "Sayfa",
       "noDeviceData": "Bu sayfada bu cihaz türünde tıklama kaydedilmedi.",
       "noReplay": "Bu sayfa için oturum tekrarı kaydedilmedi, bu yüzden üzerine çizim yapılacak ekran görüntüsü yok. Uygulama için oturum tekrarını açın.",
+      "noReplayLegacySdk": "Sayfa anlık görüntüleri daha yeni bir RUM SDK gerektirir. Burada kaydedilen oturum tekrarı daha eski bir SDK'dan geldiği için üzerine çizilecek ekran görüntüsü yok.",
       "loadFailed": "Tıklama verileri yüklenemedi.",
       "snapshotFailed": "Sayfa anlık görüntüsü yüklenemedi.",
       "noPosition": "Bu sayfada bu dönemde tıklama yok.",

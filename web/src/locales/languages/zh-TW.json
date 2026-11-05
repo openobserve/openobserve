@@ -2188,6 +2188,7 @@
       "pageLabel": "頁面",
       "noDeviceData": "此頁面在此裝置類型上未記錄任何點擊。",
       "noReplay": "此頁面未記錄工作階段重播，因此沒有可繪製的螢幕擷取畫面。請為應用程式開啟工作階段重播。",
+      "noReplayLegacySdk": "頁面快照需要較新的 RUM SDK。此處錄製的工作階段重播來自較舊的 SDK，因此沒有可繪製的螢幕截圖。",
       "loadFailed": "無法載入點擊資料。",
       "snapshotFailed": "無法載入頁面快照。",
       "noPosition": "此頁面在此期間沒有點擊。",

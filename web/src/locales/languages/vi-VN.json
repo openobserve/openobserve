@@ -2188,6 +2188,7 @@
       "pageLabel": "Trang",
       "noDeviceData": "Không có lượt nhấp nào được ghi nhận trên loại thiết bị này cho trang này.",
       "noReplay": "Không có bản phát lại phiên nào được ghi cho trang này, nên không có ảnh chụp màn hình để vẽ lên. Hãy bật tính năng phát lại phiên cho ứng dụng.",
+      "noReplayLegacySdk": "Ảnh chụp trang cần RUM SDK mới hơn. Bản phát lại phiên được ghi ở đây đến từ SDK cũ hơn, nên không có ảnh chụp màn hình để vẽ lên.",
       "loadFailed": "Không thể tải dữ liệu lượt nhấp.",
       "snapshotFailed": "Không thể tải ảnh chụp nhanh trang.",
       "noPosition": "Không có lượt nhấp nào trong khoảng thời gian này cho trang này.",

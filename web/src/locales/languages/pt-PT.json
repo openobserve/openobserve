@@ -2188,6 +2188,7 @@
       "pageLabel": "Página",
       "noDeviceData": "Não foram registados cliques neste tipo de dispositivo nesta página.",
       "noReplay": "Não existe nenhuma reprodução de sessão gravada para esta página, pelo que não há captura de ecrã onde desenhar. Ative a reprodução de sessões para a aplicação.",
+      "noReplayLegacySdk": "Os instantâneos de página requerem um SDK RUM mais recente. A reprodução de sessão gravada aqui provém de um SDK mais antigo, pelo que não há captura de ecrã para mostrar.",
       "loadFailed": "Não foi possível carregar os dados de cliques.",
       "snapshotFailed": "Não foi possível carregar o instantâneo da página.",
       "noPosition": "Sem cliques neste período para esta página.",

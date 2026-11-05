@@ -2188,6 +2188,7 @@
       "pageLabel": "Strona",
       "noDeviceData": "Nie zarejestrowano kliknięć na tym typie urządzenia dla tej strony.",
       "noReplay": "Dla tej strony nie zarejestrowano żadnego odtwarzania sesji, więc nie ma zrzutu ekranu do naniesienia danych. Włącz odtwarzanie sesji dla aplikacji.",
+      "noReplayLegacySdk": "Migawki stron wymagają nowszego RUM SDK. Zarejestrowane tutaj odtwarzanie sesji pochodzi ze starszego SDK, więc nie ma zrzutu ekranu, na którym można rysować.",
       "loadFailed": "Nie udało się wczytać danych o kliknięciach.",
       "snapshotFailed": "Nie udało się wczytać zrzutu strony.",
       "noPosition": "Brak kliknięć w tym okresie dla tej strony.",

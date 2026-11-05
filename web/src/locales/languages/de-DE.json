@@ -2188,6 +2188,7 @@
       "pageLabel": "Seite",
       "noDeviceData": "Für diese Seite wurden auf diesem Gerätetyp keine Klicks aufgezeichnet.",
       "noReplay": "Für diese Seite wurde kein Session-Replay aufgezeichnet, daher gibt es keinen Screenshot zum Daraufzeichnen. Aktivieren Sie Session-Replay für die App.",
+      "noReplayLegacySdk": "Seiten-Snapshots benötigen ein neueres RUM-SDK. Das hier aufgezeichnete Session-Replay stammt von einem älteren SDK, daher gibt es keinen Screenshot, auf dem gezeichnet werden kann.",
       "loadFailed": "Die Klickdaten konnten nicht geladen werden.",
       "snapshotFailed": "Der Seiten-Snapshot konnte nicht geladen werden.",
       "noPosition": "Keine Klicks in diesem Zeitraum für diese Seite.",

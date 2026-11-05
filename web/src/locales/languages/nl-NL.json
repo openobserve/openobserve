@@ -2188,6 +2188,7 @@
       "pageLabel": "Pagina",
       "noDeviceData": "Geen klikken geregistreerd op dit apparaattype voor deze pagina.",
       "noReplay": "Er is geen sessie-replay vastgelegd voor deze pagina, dus er is geen schermafbeelding om op te tekenen. Schakel sessie-replay in voor de app.",
+      "noReplayLegacySdk": "Paginasnapshots vereisen een nieuwere RUM SDK. De sessie-replay die hier is opgenomen, is afkomstig van een oudere SDK, dus er is geen schermafbeelding om op te tekenen.",
       "loadFailed": "Kan de klikgegevens niet laden.",
       "snapshotFailed": "Kan de paginamomentopname niet laden.",
       "noPosition": "Geen klikken in deze periode voor deze pagina.",

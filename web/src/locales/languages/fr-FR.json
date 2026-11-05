@@ -2188,6 +2188,7 @@
       "pageLabel": "Page",
       "noDeviceData": "Aucun clic enregistré sur ce type d'appareil pour cette page.",
       "noReplay": "Aucun rejeu de session n'a été enregistré pour cette page, il n'y a donc pas de capture d'écran à utiliser. Activez le rejeu de session pour l'application.",
+      "noReplayLegacySdk": "Les instantanés de page nécessitent un SDK RUM plus récent. La relecture de session enregistrée ici provient d'un SDK plus ancien, il n'y a donc pas de capture d'écran sur laquelle dessiner.",
       "loadFailed": "Impossible de charger les données de clics.",
       "snapshotFailed": "Impossible de charger l'instantané de la page.",
       "noPosition": "Aucun clic sur cette période pour cette page.",

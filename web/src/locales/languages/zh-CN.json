@@ -2188,6 +2188,7 @@
       "pageLabel": "页面",
       "noDeviceData": "该页面在此设备类型上未记录到点击。",
       "noReplay": "该页面未记录到会话回放，因此没有可绘制的截图。请为应用开启会话回放。",
+      "noReplayLegacySdk": "页面快照需要较新版本的 RUM SDK。此处记录的会话回放来自较旧版本的 SDK，因此没有可用于绘制的截图。",
       "loadFailed": "无法加载点击数据。",
       "snapshotFailed": "无法加载页面快照。",
       "noPosition": "该页面在该时间段内没有点击。",

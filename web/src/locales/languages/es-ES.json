@@ -2188,6 +2188,7 @@
       "pageLabel": "Página",
       "noDeviceData": "No se han registrado clics en este tipo de dispositivo para esta página.",
       "noReplay": "No se grabó ninguna repetición de sesión para esta página, por lo que no hay ninguna captura de pantalla sobre la que dibujar. Activa la repetición de sesiones para la aplicación.",
+      "noReplayLegacySdk": "Las instantáneas de página necesitan un SDK de RUM más reciente. La reproducción de sesión registrada aquí proviene de un SDK anterior, por lo que no hay ninguna captura de pantalla sobre la que dibujar.",
       "loadFailed": "No se pudieron cargar los datos de clics.",
       "snapshotFailed": "No se pudo cargar la instantánea de la página.",
       "noPosition": "No hay clics en este período para esta página.",
