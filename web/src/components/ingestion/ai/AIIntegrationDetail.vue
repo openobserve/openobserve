@@ -21,11 +21,13 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
+import { useOrgCredential } from "@/composables/useOrgCredential";
 import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
 import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
+import type { IngestTokenState } from "@/components/ingestion/setupCard/types";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
@@ -72,6 +74,14 @@ const subs = computed<CardSubstitutions>(() => {
     org: store.state.selectedOrganization?.identifier ?? "",
     token: basicIngestToken(email, passcode),
   };
+});
+
+const credential = useOrgCredential();
+
+// a settled read can still carry no token, so readiness alone does not make the commands usable
+const tokenState = computed<IngestTokenState>(() => {
+  if (!credential.ready.value) return "loading";
+  return store.state.organizationData?.organizationPasscode ? "ready" : "unavailable";
 });
 
 const passcodeForbidden = computed(
@@ -149,7 +159,7 @@ const agentGuideName = computed(
       :key="integrationSlug"
       :content="richContent"
       :subs="subs"
-      :key-pending="!store.state.organizationData?.organizationPasscode"
+      :token-state="tokenState"
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
