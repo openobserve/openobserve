@@ -52,7 +52,7 @@ use crate::{
             match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
         },
     },
-    index::{Condition, IndexCondition, like_contains_term, like_substring},
+    index::{Condition, IndexCondition, like_contains_term},
 };
 
 #[derive(Default, Debug)]
@@ -193,11 +193,14 @@ impl TreeNodeRewriter for IndexOptimizer {
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
             for expr in split_conjunction(filter.predicate()) {
-                if is_expr_valid_for_index(expr, &self.index_fields, &self.fts_fields) {
-                    let condition = Condition::from_physical_expr(expr, &self.index_fields);
-                    if condition.requires_filter() {
-                        other_conditions.push(expr.clone());
-                    }
+                if is_expr_valid_for_index(expr, &self.index_fields) {
+                    let condition = Condition::from_physical_expr(expr);
+                    index_conditions.add_condition(condition);
+                } else if let Some(condition) =
+                    fts_like_condition(expr, &self.index_fields, &self.fts_fields)
+                {
+                    // `_all` only narrows the candidates, so the LIKE has to stay in the plan
+                    other_conditions.push(expr.clone());
                     index_conditions.add_condition(condition);
                 } else {
                     other_conditions.push(expr.clone());
@@ -267,11 +270,7 @@ fn construct_filter_exec(
 }
 
 // Check if the expression is valid for the index.
-fn is_expr_valid_for_index(
-    expr: &Arc<dyn PhysicalExpr>,
-    index_fields: &HashSet<String>,
-    fts_fields: &HashSet<String>,
-) -> bool {
+fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<String>) -> bool {
     if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Eq | Operator::NotEq => {
@@ -288,8 +287,8 @@ fn is_expr_valid_for_index(
                 }
             }
             Operator::And | Operator::Or => {
-                return is_expr_valid_for_index(expr.left(), index_fields, fts_fields)
-                    && is_expr_valid_for_index(expr.right(), index_fields, fts_fields);
+                return is_expr_valid_for_index(expr.left(), index_fields)
+                    && is_expr_valid_for_index(expr.right(), index_fields);
             }
             _ => return false,
         }
@@ -321,12 +320,8 @@ fn is_expr_valid_for_index(
             }
             _ => false,
         };
-    } else if let Some(expr) = expr.downcast_ref::<LikeExpr>() {
-        return is_like_valid_for_index(expr, index_fields, fts_fields);
     } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
-        // a superset from `_all` turns into a subset under NOT
-        return is_expr_valid_for_index(expr.arg(), index_fields, fts_fields)
-            && !Condition::from_physical_expr(expr.arg(), index_fields).requires_filter();
+        return is_expr_valid_for_index(expr.arg(), index_fields);
     } else {
         return false;
     }
@@ -334,32 +329,30 @@ fn is_expr_valid_for_index(
 }
 
 // only `col [I]LIKE '%x%'` on a plain column, since the index stores the uncast value
-fn is_like_valid_for_index(
-    expr: &LikeExpr,
+fn fts_like_condition(
+    expr: &Arc<dyn PhysicalExpr>,
     index_fields: &HashSet<String>,
     fts_fields: &HashSet<String>,
-) -> bool {
-    if !config::get_config()
-        .search
-        .inverted_index_like_optimizer_enabled
+) -> Option<Condition> {
+    let like = expr.downcast_ref::<LikeExpr>()?;
+    if like.negated()
+        || !config::get_config()
+            .search
+            .inverted_index_like_optimizer_enabled
     {
-        return false;
+        return None;
     }
-    let Some(column) = expr.expr().downcast_ref::<Column>() else {
-        return false;
-    };
-    let Ok(pattern) = extract_string_literal(expr.pattern()) else {
-        return false;
-    };
-    if expr.negated() {
-        return false;
+    let field = like.expr().downcast_ref::<Column>()?.name();
+    // a field that is also a secondary index keeps its terms out of `_all`
+    if index_fields.contains(field) || !fts_fields.contains(field) {
+        return None;
     }
-    if index_fields.contains(column.name()) {
-        // exact like `str_match`, but the index folds ASCII case only
-        like_substring(&pattern).is_some_and(|x| !expr.case_insensitive() || x.is_ascii())
-    } else {
-        fts_fields.contains(column.name()) && like_contains_term(&pattern).is_some()
-    }
+    let pattern = extract_string_literal(like.pattern()).ok()?;
+    let value = like_contains_term(&pattern)?.to_string();
+    Some(Condition::Like {
+        field: field.to_string(),
+        value,
+    })
 }
 
 #[cfg(test)]
@@ -492,7 +485,6 @@ mod tests {
     #[test]
     fn test_is_expr_valid_for_index() {
         let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
-        let fts_fields = HashSet::new();
         // PhysicalExpr, is_valid, Condition
         let case = vec![
             // name = 'test'
@@ -573,29 +565,23 @@ mod tests {
 
         for (expr, is_valid, condition) in case {
             if is_valid {
-                assert!(is_expr_valid_for_index(&expr, &index_fields, &fts_fields));
+                assert!(is_expr_valid_for_index(&expr, &index_fields));
             } else {
-                assert!(!is_expr_valid_for_index(&expr, &index_fields, &fts_fields));
+                assert!(!is_expr_valid_for_index(&expr, &index_fields));
             }
             if let Some(condition) = condition {
-                assert_eq!(
-                    Condition::from_physical_expr(&expr, &index_fields),
-                    condition
-                );
+                assert_eq!(Condition::from_physical_expr(&expr), condition);
             }
         }
     }
 
     #[test]
-    fn test_is_expr_valid_for_index_like() {
+    fn test_fts_like_condition() {
         let index_fields = HashSet::from(["name".to_string(), "both".to_string()]);
         let fts_fields = HashSet::from(["message".to_string(), "both".to_string()]);
-        let like_condition = |field: &str, value: &str| Condition::Like {
-            field: field.to_string(),
+        let fts_like = |value: &str| Condition::Like {
+            field: "message".to_string(),
             value: value.to_string(),
-        };
-        let str_match = |field: &str, value: &str, case_sensitive| {
-            Condition::StrMatch(field.to_string(), value.to_string(), case_sensitive)
         };
         let long_term = format!("%{}%", "a".repeat(64));
         let max_term = format!("%{}%", "a".repeat(63));
@@ -605,87 +591,68 @@ mod tests {
             column("message"),
             column("name"),
         ));
-        // PhysicalExpr, is_valid, Condition
         let cases = vec![
             (
-                like("name", "%open%", false, false),
-                true,
-                Some(str_match("name", "open", true)),
-            ),
-            (
-                like("name", "%auth-gw%", false, true),
-                true,
-                Some(str_match("name", "auth-gw", false)),
-            ),
-            (
-                like("name", "%é%", false, false),
-                true,
-                Some(str_match("name", "é", true)),
-            ),
-            (
-                like("both", "%open%", false, false),
-                true,
-                Some(str_match("both", "open", true)),
-            ),
-            (
-                not(like("name", "%err%", false, false)),
-                true,
-                Some(Condition::Not(Box::new(str_match("name", "err", true)))),
-            ),
-            (
                 like("message", "%Err42%", false, true),
-                true,
-                Some(like_condition("message", "Err42")),
+                Some(fts_like("Err42")),
             ),
             (
                 like("message", &max_term, false, false),
-                true,
-                Some(like_condition("message", &"a".repeat(63))),
+                Some(fts_like(&"a".repeat(63))),
             ),
+            (like("name", "%open%", false, false), None),
+            (like("both", "%open%", false, false), None),
+            (like("message", &long_term, false, false), None),
+            (like("message", "%e%", false, false), None),
+            (like("message", "%auth-gw%", false, false), None),
+            (like("message", "err%", false, false), None),
+            (like("message", "%err%", true, false), None),
+            (like("message", "%err%", true, true), None),
+            (like("status", "%err%", false, false), None),
+            (column_pattern, None),
+            (not(like("message", "%err%", false, false)), None),
             (
                 or(
                     eq(column("name"), literal("a")),
                     like("message", "%err%", false, false),
                 ),
-                true,
-                Some(Condition::Or(vec![
-                    Condition::Equal("name".to_string(), "a".to_string()),
-                    like_condition("message", "err"),
-                ])),
-            ),
-            (like("name", "%é%", false, true), false, None),
-            (like("name", "%a_b%", false, false), false, None),
-            (like("name", "open%", false, false), false, None),
-            (like("name", "%err%", true, false), false, None),
-            (like("message", &long_term, false, false), false, None),
-            (like("message", "%e%", false, false), false, None),
-            (like("message", "%auth-gw%", false, false), false, None),
-            (like("message", "err%", false, false), false, None),
-            (like("message", "%err%", true, false), false, None),
-            (like("message", "%err%", true, true), false, None),
-            (not(like("message", "%err%", false, false)), false, None),
-            (
-                not(or(
-                    eq(column("name"), literal("a")),
-                    like("message", "%err%", false, false),
-                )),
-                false,
                 None,
             ),
-            (like("status", "%err%", false, false), false, None),
-            (column_pattern, false, None),
         ];
 
-        for (expr, is_valid, condition) in cases {
+        for (expr, condition) in cases {
             assert_eq!(
-                is_expr_valid_for_index(&expr, &index_fields, &fts_fields),
-                is_valid,
+                fts_like_condition(&expr, &index_fields, &fts_fields),
+                condition,
                 "{expr}"
             );
-            if let Some(condition) = condition {
+            assert!(!is_expr_valid_for_index(&expr, &index_fields), "{expr}");
+        }
+    }
+
+    #[test]
+    fn test_fts_like_condition_accepts_every_string_literal_type() {
+        let index_fields = HashSet::new();
+        let fts_fields = HashSet::from(["message".to_string()]);
+        let scalars: [fn(Option<String>) -> ScalarValue; 3] = [
+            ScalarValue::Utf8,
+            ScalarValue::LargeUtf8,
+            ScalarValue::Utf8View,
+        ];
+        for scalar in scalars {
+            for ilike in [false, true] {
+                let expr: Arc<dyn PhysicalExpr> = Arc::new(LikeExpr::new(
+                    false,
+                    ilike,
+                    column("message"),
+                    Arc::new(Literal::new(scalar(Some("%Err42%".to_string())))),
+                ));
                 assert_eq!(
-                    Condition::from_physical_expr(&expr, &index_fields),
-                    condition
+                    fts_like_condition(&expr, &index_fields, &fts_fields),
+                    Some(Condition::Like {
+                        field: "message".to_string(),
+                        value: "Err42".to_string(),
+                    })
                 );
             }
         }
@@ -711,7 +678,6 @@ mod tests {
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        let name_like = Condition::StrMatch("name".to_string(), "open".to_string(), false);
         let message_like = Condition::Like {
             field: "message".to_string(),
             value: "error".to_string(),
@@ -726,13 +692,13 @@ mod tests {
             ),
             (
                 "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND _timestamp > 1",
-                Some(vec![name_like.clone()]),
-                true,
                 None,
+                false,
+                Some("ILIKE %open%"),
             ),
             (
                 "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND message LIKE '%error%'",
-                Some(vec![name_like, message_like]),
+                Some(vec![message_like]),
                 false,
                 Some("LIKE %error%"),
             ),
@@ -741,6 +707,18 @@ mod tests {
                 None,
                 false,
                 Some("NOT LIKE %error%"),
+            ),
+            (
+                "SELECT count(*) FROM t WHERE message LIKE '%error%' OR name = 'a'",
+                None,
+                false,
+                Some("LIKE %error%"),
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name LIKE '%open%' OR name LIKE '%obs%'",
+                None,
+                false,
+                Some("LIKE %open%"),
             ),
         ];
 

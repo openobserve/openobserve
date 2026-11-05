@@ -26,7 +26,7 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, Literal, NotExpr},
     },
     scalar::ScalarValue,
 };
@@ -43,7 +43,7 @@ use tantivy::{
 use super::physical::{
     conjunction, create_like_expr_with_not_null, create_str_match_expr, disjunction,
     get_physical_column_name, get_physical_value, get_scalar_value, is_alphanumeric,
-    is_physical_column, is_physical_value, like_contains_term, like_substring,
+    is_physical_column, is_physical_value,
 };
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
@@ -121,7 +121,7 @@ impl Condition {
     }
 
     // walks the same-operator chain iteratively so depth stays O(1) for `a OR b OR c ...`
-    fn flatten_physical_chain(root: &BinaryExpr, index_fields: &HashSet<String>) -> Vec<Condition> {
+    fn flatten_physical_chain(root: &BinaryExpr) -> Vec<Condition> {
         let op = *root.op();
         let mut items = Vec::new();
         let mut stack = vec![root.right(), root.left()];
@@ -131,17 +131,13 @@ impl Condition {
                     stack.push(bin.right());
                     stack.push(bin.left());
                 }
-                _ => items.push(Condition::from_physical_expr(expr, index_fields)),
+                _ => items.push(Condition::from_physical_expr(expr)),
             }
         }
         items
     }
 
-    /// `index_fields` decides whether a LIKE column is searched as its own field or through `_all`.
-    pub fn from_physical_expr(
-        expr: &Arc<dyn PhysicalExpr>,
-        index_fields: &HashSet<String>,
-    ) -> Self {
+    pub fn from_physical_expr(expr: &Arc<dyn PhysicalExpr>) -> Self {
         if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
             match expr.op() {
                 Operator::Eq | Operator::NotEq => {
@@ -167,8 +163,8 @@ impl Condition {
                         Condition::NotEqual(field, value)
                     }
                 }
-                Operator::And => Condition::And(Self::flatten_physical_chain(expr, index_fields)),
-                Operator::Or => Condition::Or(Self::flatten_physical_chain(expr, index_fields)),
+                Operator::And => Condition::And(Self::flatten_physical_chain(expr)),
+                Operator::Or => Condition::Or(Self::flatten_physical_chain(expr)),
                 _ => unreachable!(),
             }
         } else if let Some(expr) = expr.downcast_ref::<InListExpr>() {
@@ -196,24 +192,8 @@ impl Condition {
                 }
                 _ => unreachable!(),
             }
-        } else if let Some(expr) = expr.downcast_ref::<LikeExpr>() {
-            let field = get_physical_column_name(expr.expr()).to_string();
-            let pattern = get_physical_value(expr.pattern());
-            if index_fields.contains(&field) {
-                let value =
-                    like_substring(&pattern).expect("LIKE pattern is validated before conversion");
-                Condition::StrMatch(field, value.to_string(), !expr.case_insensitive())
-            } else {
-                let value = like_contains_term(&pattern)
-                    .expect("LIKE pattern is validated before conversion")
-                    .to_string();
-                Condition::Like { field, value }
-            }
         } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
-            Condition::Not(Box::new(Condition::from_physical_expr(
-                expr.arg(),
-                index_fields,
-            )))
+            Condition::Not(Box::new(Condition::from_physical_expr(expr.arg())))
         } else {
             unreachable!()
         }
@@ -572,24 +552,6 @@ impl Condition {
             Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
-
-    /// The index only narrows candidates, so the predicate must stay even if filters get removed.
-    pub fn requires_filter(&self) -> bool {
-        match self {
-            Condition::Like { .. } => true,
-            Condition::Or(items) | Condition::And(items) => {
-                items.iter().any(|c| c.requires_filter())
-            }
-            Condition::Not(condition) => condition.requires_filter(),
-            Condition::Equal(..)
-            | Condition::NotEqual(..)
-            | Condition::StrMatch(..)
-            | Condition::In(..)
-            | Condition::MatchAll(..)
-            | Condition::FuzzyMatchAll(..)
-            | Condition::All() => false,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -895,7 +857,7 @@ mod tests {
 
     #[test]
     fn test_from_physical_expr_flattens_or_chain() {
-        let condition = Condition::from_physical_expr(&deep_or_chain(4), &HashSet::new());
+        let condition = Condition::from_physical_expr(&deep_or_chain(4));
         let Condition::Or(items) = &condition else {
             panic!("expected Or, got {condition:?}");
         };
@@ -924,7 +886,7 @@ mod tests {
             Operator::And,
             eq("c"),
         ));
-        let condition = Condition::from_physical_expr(&expr, &HashSet::new());
+        let condition = Condition::from_physical_expr(&expr);
         assert_eq!(
             condition,
             Condition::And(vec![
@@ -940,7 +902,7 @@ mod tests {
     #[test]
     fn test_deep_or_chain_does_not_recurse_per_term() {
         let expr = deep_or_chain(5_000);
-        let condition = Condition::from_physical_expr(&expr, &HashSet::new());
+        let condition = Condition::from_physical_expr(&expr);
         assert!(condition.can_remove_filter());
         let mut builder = tantivy::schema::SchemaBuilder::new();
         builder.add_text_field("field1", tantivy::schema::STRING);
@@ -1013,7 +975,6 @@ mod tests {
     fn test_condition_like_searches_all_field() {
         let condition = like("message", "Error");
         assert!(!condition.can_remove_filter());
-        assert!(condition.requires_filter());
         // `_all` is lowercased, so LIKE and ILIKE share one case-insensitive superset
         assert_eq!(count_like(&condition), 2);
         assert_eq!(count_like(&like("message", "refused")), 1);
@@ -1047,18 +1008,6 @@ mod tests {
     }
 
     #[test]
-    fn test_condition_requires_filter_propagates() {
-        let fts = like("message", "error");
-        let exact = Condition::Equal("service".to_string(), "a".to_string());
-        let str_match = Condition::StrMatch("service".to_string(), "ab".to_string(), true);
-        assert!(Condition::Or(vec![exact.clone(), fts.clone()]).requires_filter());
-        assert!(Condition::And(vec![exact.clone(), fts.clone()]).requires_filter());
-        assert!(Condition::Not(Box::new(fts)).requires_filter());
-        assert!(!Condition::Or(vec![exact, str_match]).requires_filter());
-        assert!(!Condition::MatchAll("error".to_string()).requires_filter());
-    }
-
-    #[test]
     fn test_condition_like_physical_expr_leaves_rows_to_plan_filter() {
         let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
             "service",
@@ -1072,38 +1021,5 @@ mod tests {
             expr.downcast_ref::<Literal>().unwrap().value(),
             &ScalarValue::Boolean(Some(true))
         );
-    }
-
-    #[test]
-    fn test_condition_like_from_physical_expr() {
-        let index_fields = HashSet::from(["service".to_string()]);
-        for data_type in [
-            arrow_schema::DataType::Utf8,
-            arrow_schema::DataType::LargeUtf8,
-            arrow_schema::DataType::Utf8View,
-        ] {
-            for (ilike, case_sensitive) in [(false, true), (true, false)] {
-                let like_on = |field: &str, pattern: &str| -> Arc<dyn PhysicalExpr> {
-                    Arc::new(LikeExpr::new(
-                        false,
-                        ilike,
-                        Arc::new(Column::new(field, 0)),
-                        get_scalar_value(pattern, &data_type).unwrap(),
-                    ))
-                };
-                assert_eq!(
-                    Condition::from_physical_expr(&like_on("message", "%Err42%"), &index_fields),
-                    like("message", "Err42")
-                );
-                assert_eq!(
-                    Condition::from_physical_expr(&like_on("service", "%auth-gw%"), &index_fields),
-                    Condition::StrMatch(
-                        "service".to_string(),
-                        "auth-gw".to_string(),
-                        case_sensitive
-                    )
-                );
-            }
-        }
     }
 }

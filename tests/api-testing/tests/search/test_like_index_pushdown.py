@@ -1,9 +1,9 @@
 """`col LIKE '%x%'` uses the inverted index only to narrow candidates.
 
 A LIKE on a full-text-search field is answered by the `_all` field as a superset
-and re-checked by the original predicate; on a secondary index field it is the
-same exact substring lookup as `str_match()`. Either way the rows must equal a plain scan, which
-the `use_index=false` request field forces.
+and re-checked by the original predicate; on a secondary index field it is rewritten
+to `str_match()`. Either way the rows must equal a plain scan, which the `use_index=false`
+request field forces.
 """
 from __future__ import annotations
 
@@ -103,6 +103,26 @@ def test_like_matches_scan_with_and_without_index(
 
     assert _count(client, sql, start=start) == expected
     assert _count(client, sql, start=start, use_index=False) == expected
+
+
+def test_like_distinct_on_index_field_matches_scan(
+    client: OpenObserveClient, seeded_stream: tuple[str, int]
+):
+    stream, start = seeded_stream
+    sql = (
+        f'SELECT service FROM "{stream}" WHERE service LIKE \'%Auth%\' '
+        "GROUP BY service ORDER BY service LIMIT 10"
+    )
+
+    def services(use_index: bool) -> list[str]:
+        _, end = time_window(minutes=60)
+        body = search_payload(sql, start_time=start, end_time=end, size=10)
+        body["use_index"] = use_index
+        resp = client.post("_search?type=logs", json=body, raise_for_status=True)
+        return [hit["service"] for hit in resp.json().get("hits", [])]
+
+    assert services(True) == ["AuthService", "billingAuth"]
+    assert services(False) == ["AuthService", "billingAuth"]
 
 
 def test_like_finds_rows_written_before_field_joined_fts(
