@@ -23,8 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • block  inside a card or panel — medium illustration, tighter copy
     • slim    one text line inside a card section — no icon, no illustration
     • inline  inside a table body / dropdown — tiny: just icon + one line
-  Plus `intro`: a page's product intro — hero copy over a smaller illustration,
-  centred in its pane and growing past it, so the pane scrolls rather than clips.
 
   Driven by a PRESET (the common path) or by props/slots (the escape hatch):
     <OEmptyState preset="no-search-results" @action="clearFilters" />
@@ -85,9 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
-        <p v-if="$slots.eyebrow" class="text-text-secondary text-sm font-semibold">
-          <slot name="eyebrow" />
-        </p>
         <component
           :is="isInlineCopy ? 'p' : 'h2'"
           :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
@@ -184,7 +179,7 @@ import {
   type EmptyStateVariant,
 } from "./presets";
 
-type Size = "hero" | "intro" | "block" | "compact" | "inline" | "slim";
+type Size = "hero" | "block" | "compact" | "inline" | "slim";
 
 const props = withDefaults(
   defineProps<{
@@ -367,18 +362,6 @@ const SIZE_MAP: Record<
     illustrationWidth: 300,
     // CSS width beats the SVG width attribute; h-auto keeps the viewBox ratio.
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-36",
-    iconWrap: "",
-  },
-  intro: {
-    root: "w-full min-h-full px-6 py-8 max-md:px-4 max-md:py-5",
-    stack: "gap-4 max-md:gap-3",
-    copy: "gap-2 max-md:gap-1.5",
-    actions: "gap-3 max-md:gap-2",
-    extra: "w-full flex flex-col items-center gap-3 pt-1 max-md:gap-2 max-md:pt-0",
-    title: raw("text-2xl! max-md:text-lg!"),
-    description: raw("text-base max-md:text-sm"),
-    illustrationWidth: 136,
-    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
     iconWrap: "",
   },
   block: {

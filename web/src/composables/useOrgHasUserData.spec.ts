@@ -241,26 +241,17 @@ describe("useOrgHasUserData", () => {
   });
 
   it.each([
-    [
-      "only O2's own and synthetics streams",
-      { logs: ["usage"], metrics: ["synthetics_x"] },
-      true,
-      true,
-    ],
-    ["only metrics", { metrics: ["up"] }, true, false],
-    ["no stream", {}, false, false],
-  ])(
-    "with %s, tells whether the org has any stream and any logs stream",
-    async (_, byType, any, logs) => {
-      listsFor({ org1: byType as Lists });
-      const { result, wrapper } = setup("org1");
-      expect(result.hasAnyStream.value).toBeUndefined();
-      await flushPromises();
-      expect(result.hasAnyStream.value).toBe(any);
-      expect(result.hasLogsStream.value).toBe(logs);
-      wrapper.unmount();
-    },
-  );
+    ["only O2's own and synthetics streams", { logs: ["usage"], metrics: ["synthetics_x"] }, true],
+    ["only metrics", { metrics: ["up"] }, true],
+    ["no stream", {}, false],
+  ])("with %s, tells whether the org has any stream", async (_, byType, any) => {
+    listsFor({ org1: byType as Lists });
+    const { result, wrapper } = setup("org1");
+    expect(result.hasAnyStream.value).toBeUndefined();
+    await flushPromises();
+    expect(result.hasAnyStream.value).toBe(any);
+    wrapper.unmount();
+  });
 
   it("reads the same answer once, outside a component, for a first login", async () => {
     listsFor({ org1: { logs: ["default"] }, org2: { logs: ["usage"] } });
@@ -339,13 +330,13 @@ describe("useOrgHasUserData", () => {
     const spy = listsFor({ org1: lists });
     const { result, wrapper } = setup("org1");
     await flushPromises();
-    expect(result.hasLogsStream.value).toBe(false);
+    expect(result.hasAnyStream.value).toBe(false);
     expect(queryClient.getQueryData(streamNameListQuery("org1", "logs").queryKey)).toBeUndefined();
 
     lists.logs = ["default"];
     await queryClient.fetchQuery({ ...streamNameListQuery("org1", "logs"), staleTime: 0 });
     await flushPromises();
-    expect(result.hasLogsStream.value).toBe(true);
+    expect(result.hasAnyStream.value).toBe(true);
     expect(result.hasUserData.value).toBe(true);
     expect(spy).toHaveBeenCalledTimes(TYPES + 1);
     wrapper.unmount();

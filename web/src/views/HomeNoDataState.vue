@@ -192,7 +192,7 @@ import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
 import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { getImageURL } from "@/utils/zincutils";
-import { useSetupTarget } from "@/composables/useNoDataIntro";
+import { useSetupTarget } from "@/composables/useSetupTarget";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import DOMPurify from "dompurify";
@@ -258,7 +258,7 @@ const description = computed(() => DOMPurify.sanitize(t("home.noDataState.descri
 const go = (routeName: string) => {
   router.push({ name: routeName, query: orgQuery.value });
 };
-// the three main cards start onboarding on cloud for an org with no data, as the data pages' intros do
+// the three main cards start onboarding on cloud for an org with no data
 const { target } = useSetupTarget();
 const setUp = (choice: OnboardingChoiceId, routeName: string) => {
   void router.push(target(choice, routeName));

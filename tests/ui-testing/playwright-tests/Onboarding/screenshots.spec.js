@@ -282,7 +282,7 @@ const SCREENS = [
             const ep = new EmptyPagesPage(page);
             await ep.open('logs', orgId);
             await expect(ep.panelFor('logs')).toHaveAttribute('data-pick', 'none', { timeout: 20000 });
-            await expect(ep.logsSetupBtn).toBeVisible();
+            await expect(ep.logsCurlCard).toBeVisible();
         },
     },
     {

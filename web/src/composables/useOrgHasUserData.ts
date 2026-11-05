@@ -106,19 +106,13 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
     ),
   );
   // Any stream at all, O2's own and synthetics included: an org with one has something to search.
-  const hasStreams = (picked: typeof queries) =>
-    computed<boolean | undefined>(() => {
-      if (picked.some((q) => (q.data.value ?? []).length > 0)) return true;
-      return picked.every((q) => q.isSuccess.value) ? false : undefined;
-    });
+  const hasAnyStream = computed<boolean | undefined>(() => {
+    if (queries.some((q) => (q.data.value ?? []).length > 0)) return true;
+    return queries.every((q) => q.isSuccess.value) ? false : undefined;
+  });
   // a stale cached answer shows while it refetches; callers that decide once wait for this to clear
   const isFetching = computed(() => queries.some((q) => q.isFetching.value));
-  return {
-    hasUserData,
-    isFetching,
-    hasAnyStream: hasStreams(queries),
-    hasLogsStream: hasStreams([queries[USER_DATA_STREAM_TYPES.indexOf("logs")]]),
-  };
+  return { hasUserData, isFetching, hasAnyStream };
 }
 
 /** `useOrgHasUserData`'s answer, read once outside a component; undefined when a list fails. */
