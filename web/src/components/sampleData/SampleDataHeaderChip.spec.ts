@@ -119,12 +119,20 @@ describe("SampleDataHeaderChip", () => {
   let wrapper: VueWrapper;
 
   let store: ReturnType<typeof createStore<any>>;
-  const mountChip = (sampleDataFlow = true, version = "v0.0.0", realMenu = false) => {
+  const mountChip = (
+    sampleDataFlow = true,
+    version: string | null = "v0.0.0",
+    realMenu = false,
+  ) => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: ORG },
         kioskMode: false,
-        zoConfig: { version, sample_data_onboarding_enabled: sampleDataFlow },
+        zoConfig: {
+          // null leaves the version absent, as before /config has loaded
+          ...(version === null ? {} : { version }),
+          sample_data_onboarding_enabled: sampleDataFlow,
+        },
       },
     });
     wrapper = mount(SampleDataHeaderChip, {
@@ -176,10 +184,17 @@ describe("SampleDataHeaderChip", () => {
 
     it("offers no Try Sample Data until the full config has loaded, then offers it", async () => {
       Object.assign(data, { sample: false, own: false });
-      mountChip(true, "");
+      mountChip(true, null);
       expect(tryBtn().exists()).toBe(false);
-      store.state.zoConfig.version = "v0.0.0";
+      // the app swaps in the full config as a whole
+      store.state.zoConfig = { ...store.state.zoConfig, version: "v0.0.0" };
       await nextTick();
+      expect(tryBtn().exists()).toBe(true);
+    });
+
+    it("offers Try Sample Data on an untagged build whose version is empty", () => {
+      Object.assign(data, { sample: false, own: false });
+      mountChip(true, "");
       expect(tryBtn().exists()).toBe(true);
     });
 
