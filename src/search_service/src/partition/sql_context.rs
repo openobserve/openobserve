@@ -128,10 +128,13 @@ impl PartitionSqlContext {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::meta::{histogram_origin::histogram_bucket_offset, stream::StreamType};
 
     use super::*;
-    use crate::sql::Sql;
+    use crate::{
+        partition::{generate_partitions, settings::calculate_partition_settings},
+        sql::Sql,
+    };
 
     fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
         (col.to_string(), dir)
@@ -171,6 +174,39 @@ mod tests {
             use_single_partition: false,
             is_histogram_eligible: false,
             sql_order_by: OrderBy::Desc,
+        }
+    }
+
+    #[test]
+    fn test_settings_to_partitions_never_cut_inside_a_histogram_bucket() {
+        const SECS: i64 = 1_000_000;
+        const DAY: i64 = 86_400;
+        let may_2026 = 1_778_302_800 * SECS;
+        for interval in [3_600, DAY, 2 * DAY, 3 * DAY, 5 * DAY, 7 * DAY, 30 * DAY] {
+            let interval_micros = interval * SECS;
+            for start_shift in [0, 1, 17 * 3_600 * SECS, interval_micros / 2] {
+                for buckets in [2, 3, 7, 30, 61] {
+                    let start = may_2026 + start_shift;
+                    let end = start + buckets * interval_micros + 3 * SECS;
+                    let mut ctx = mk(vec![], true, Some(interval), Some("_timestamp"));
+                    ctx.sql.time_range = (start, end);
+                    let total_secs = ((end - start) / SECS) as usize;
+                    let settings = calculate_partition_settings("t", total_secs, &ctx, true, 0);
+                    let mut partitions = generate_partitions(&ctx, &settings);
+                    partitions.sort();
+                    assert_eq!(partitions.first().unwrap()[0], start);
+                    assert_eq!(partitions.last().unwrap()[1], end);
+                    for pair in partitions.windows(2) {
+                        assert_eq!(pair[0][1], pair[1][0], "gap or overlap: {partitions:?}");
+                        assert_eq!(
+                            histogram_bucket_offset(pair[0][1], interval_micros),
+                            0,
+                            "interval {interval}s: edge {} is inside a bucket",
+                            pair[0][1]
+                        );
+                    }
+                }
+            }
         }
     }
 

@@ -15,7 +15,13 @@
 
 use std::sync::Arc;
 
-use config::{TIMESTAMP_COL_NAME, meta::inverted_index::IndexOptimizeMode};
+use config::{
+    TIMESTAMP_COL_NAME,
+    meta::{
+        histogram_origin::{DATE_BIN_ORIGIN_SECS, histogram_bucket_offset},
+        inverted_index::IndexOptimizeMode,
+    },
+};
 use datafusion::{
     common::{
         Result,
@@ -97,24 +103,17 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
                     && let Some(func) = get_data_bin(group_expr)
-                    && func.args().len() == 3
-                    // check second argument is _timestamp (with an optional timezone shift)
-                    && let Some(ts_offset) = get_timestamp_offset(&func.args()[1])
+                    && let Some((histogram_interval, ts_offset)) = get_fast_path_buckets(func)
                 {
-                    let args = func.args();
-                    if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
-                        let (start_time, end_time) = self.time_range;
-                        // round the bucket edges to even start
-                        let rounding_by = histogram_interval as i64;
-                        let min_value = start_time - start_time % rounding_by;
-                        let max_value = end_time;
-                        let num_buckets = ((max_value - min_value) as f64
-                            / histogram_interval as f64)
-                            .ceil() as usize;
-                        self.simple_histogram =
-                            Some((min_value, histogram_interval, num_buckets, ts_offset));
-                        return Ok(TreeNodeRecursion::Continue);
-                    }
+                    let (start_time, end_time) = self.time_range;
+                    let min_value =
+                        start_time - histogram_bucket_offset(start_time, histogram_interval as i64);
+                    let max_value = end_time;
+                    let num_buckets = ((max_value - min_value) as f64 / histogram_interval as f64)
+                        .ceil() as usize;
+                    self.simple_histogram =
+                        Some((min_value, histogram_interval, num_buckets, ts_offset));
+                    return Ok(TreeNodeRecursion::Continue);
                 }
             }
             // If AggregateExec doesn't match SimpleHistogram pattern, stop visiting
@@ -148,6 +147,39 @@ fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
     } else {
         None
     }
+}
+
+/// The bucket width and timezone offset, when the index can reproduce this `date_bin` exactly.
+fn get_fast_path_buckets(func: &ScalarFunctionExpr) -> Option<(u64, i64)> {
+    let [interval, source, origin] = func.args() else {
+        return None;
+    };
+    let ts_offset = get_timestamp_offset(source)?;
+    let interval = get_histogram_interval(interval).filter(|width| *width > 0)?;
+    let width = interval as i64;
+    if !is_on_histogram_origin_grid(origin, width) {
+        return None;
+    }
+    // shifted bounds are not supported yet, and only the grids that match UTC stay correct
+    if ts_offset != 0 && histogram_bucket_offset(0, width) != 0 {
+        return None;
+    }
+    Some((interval, ts_offset))
+}
+
+/// The index always counts from the `histogram()` origin, so any other grid needs a real scan.
+fn is_on_histogram_origin_grid(origin: &Arc<dyn PhysicalExpr>, width_micros: i64) -> bool {
+    let Some(literal) = origin.downcast_ref::<Literal>() else {
+        return false;
+    };
+    let origin_micros = match literal.value() {
+        ScalarValue::TimestampSecond(Some(v), _) => *v * 1_000_000,
+        ScalarValue::TimestampMillisecond(Some(v), _) => *v * 1_000,
+        ScalarValue::TimestampMicrosecond(Some(v), _) => *v,
+        ScalarValue::TimestampNanosecond(Some(v), _) => *v / 1_000,
+        _ => return false,
+    };
+    (origin_micros - DATE_BIN_ORIGIN_SECS * 1_000_000).rem_euclid(width_micros) == 0
 }
 
 // unit: microseconds
@@ -262,24 +294,18 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                     if self.index_fields.contains(column_name) {
                         // Extract histogram parameters from the date_bin expression
                         let func = get_data_bin(&groups[db_idx].0).unwrap();
-                        if func.args().len() == 3
-                            && let Some(ts_offset) = get_timestamp_offset(&func.args()[1])
-                        {
-                            let args = func.args();
-                            if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
-                                let (start_time, end_time) = self.time_range;
-                                let rounding_by = histogram_interval as i64;
-                                let min_value = start_time - start_time % rounding_by;
-                                let max_value = end_time;
-                                self.simple_multi_histogram = Some((
-                                    min_value,
-                                    max_value,
-                                    histogram_interval,
-                                    ts_offset,
-                                    column_name.to_string(),
-                                ));
-                                return Ok(TreeNodeRecursion::Continue);
-                            }
+                        if let Some((histogram_interval, ts_offset)) = get_fast_path_buckets(func) {
+                            let (start_time, end_time) = self.time_range;
+                            let min_value = start_time
+                                - histogram_bucket_offset(start_time, histogram_interval as i64);
+                            self.simple_multi_histogram = Some((
+                                min_value,
+                                end_time,
+                                histogram_interval,
+                                ts_offset,
+                                column_name.to_string(),
+                            ));
+                            return Ok(TreeNodeRecursion::Continue);
                         }
                     }
                 }
@@ -323,6 +349,29 @@ mod tests {
         table_provider::empty_table::NewEmptyTable,
         udf::histogram_udf,
     };
+
+    #[test]
+    fn test_only_an_origin_on_the_histogram_grid_can_use_the_index() {
+        const DAY: i64 = 86_400_000_000;
+        let nanos = |secs: i64| -> Arc<dyn PhysicalExpr> {
+            Arc::new(Literal::new(ScalarValue::TimestampNanosecond(
+                Some(secs * 1_000_000_000),
+                None,
+            )))
+        };
+        let (y1970, y2001, y2020) = (0, DATE_BIN_ORIGIN_SECS, 1_577_836_800);
+        assert!(is_on_histogram_origin_grid(&nanos(y2001), 30 * DAY));
+        assert!(!is_on_histogram_origin_grid(&nanos(y1970), 30 * DAY));
+        assert!(!is_on_histogram_origin_grid(&nanos(y2020), 30 * DAY));
+        // 1 day divides the distance from 1970 to 2001, so both origins give one grid
+        assert!(is_on_histogram_origin_grid(&nanos(y1970), DAY));
+        let micros: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(
+            ScalarValue::TimestampMicrosecond(Some(y2001 * 1_000_000), None),
+        ));
+        assert!(is_on_histogram_origin_grid(&micros, 30 * DAY));
+        let text: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::from("2001")));
+        assert!(!is_on_histogram_origin_grid(&text, 30 * DAY));
+    }
 
     #[tokio::test]
     async fn test_is_simple_histogram() -> Result<()> {
@@ -370,6 +419,40 @@ mod tests {
                     16,
                     28800000000,
                 )),
+            ),
+            // 2025-08-23 is the 30-day edge of the 2001 grid; the 1970 grid has 2025-08-10
+            (
+                "SELECT histogram(_timestamp, '30 days') as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1755907200000000,
+                    2592000000000,
+                    1,
+                    0,
+                )),
+            ),
+            // the first bucket stays on the 2001 grid, because 2 days do not divide the origin
+            (
+                "SELECT histogram(_timestamp, '2 days') as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757289600000000,
+                    172800000000,
+                    1,
+                    0,
+                )),
+            ),
+            // a 30-day bucket with a timezone must scan until the bounds carry the offset
+            (
+                "SELECT histogram(_timestamp, '30 days', '-08:00') as ts, count(*) as cnt from t group by ts",
+                None,
+            ),
+            // any origin off the 2001 grid must scan, because the index would relabel its rows
+            (
+                "SELECT date_bin(interval '30 days', to_timestamp_micros(_timestamp), to_timestamp_micros('1970-01-01T00:00:00')) as ts, count(*) as cnt from t group by ts",
+                None,
+            ),
+            (
+                "SELECT date_bin(interval '30 days', to_timestamp_micros(_timestamp), to_timestamp_micros('2020-01-01T00:00:00')) as ts, count(*) as cnt from t group by ts",
+                None,
             ),
             (
                 "SELECT histogram(_timestamp) as ts, count(_timestamp) as cnt from t group by ts",
@@ -465,6 +548,24 @@ mod tests {
                     -19800000000,
                     "level".to_string(),
                 )),
+            ),
+            (
+                "SELECT histogram(_timestamp, '30 days') as ts, level, count(*) as cnt from t group by ts, level",
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1755907200000000,
+                    1757402594060000,
+                    2592000000000,
+                    0,
+                    "level".to_string(),
+                )),
+            ),
+            (
+                "SELECT histogram(_timestamp, '30 days', '-08:00') as ts, level, count(*) as cnt from t group by ts, level",
+                None,
+            ),
+            (
+                "SELECT date_bin(interval '30 days', to_timestamp_micros(_timestamp), to_timestamp_micros('1970-01-01T00:00:00')) as ts, level, count(*) as cnt from t group by ts, level",
+                None,
             ),
             (
                 "SELECT histogram(_timestamp) as ts, level, count(_timestamp) as cnt from t group by ts, level",

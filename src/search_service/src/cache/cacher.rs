@@ -20,7 +20,10 @@ use ::search::{
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{search::Response, sql::OrderBy, stream::StreamType},
+    meta::{
+        histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
+        stream::StreamType,
+    },
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -431,8 +434,8 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (m.start_time % cache_req.histogram_interval != 0
-                    || m.end_time % cache_req.histogram_interval != 0)
+                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
+                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
             {
                 return false;
             }
@@ -478,30 +481,9 @@ pub async fn get_cached_results(
         }
     };
 
-    // filter data based on request time range
-    let (hits_allowed_start_time, hits_allowed_end_time) =
-        (cache_req.q_start_time, cache_req.q_end_time);
-    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-    let data_start_time = std::cmp::min(first_ts, last_ts);
-    let data_end_time = std::cmp::max(first_ts, last_ts);
-    // convert histogram interval to microseconds
-    let histogram_interval = cached_response.histogram_interval.unwrap_or_default() * 1_000_000;
-    // check if need to filter the data
-    if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
-        cached_response.hits.retain(|hit| {
-            let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-            hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
-        });
-        // if the data is empty after filtering, return None
-        if cached_response.hits.is_empty() {
-            return None;
-        }
-        // reset the start and end time
-        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-        matching_meta.start_time = std::cmp::min(first_ts, last_ts);
-        matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
+    // if the data is empty after filtering, return None
+    if !trim_cached_response(&mut cached_response, &mut matching_meta, &cache_req) {
+        return None;
     }
     cached_response.total = cached_response.hits.len();
 
@@ -522,6 +504,55 @@ pub async fn get_cached_results(
         is_descending: cache_req.is_descending,
         limit: -1,
     })
+}
+
+/// Keeps the hits the request fully covers and shrinks the meta to them; false when none remain.
+fn trim_cached_response(
+    response: &mut Response,
+    meta: &mut ResultCacheMeta,
+    cache_req: &CacheQueryRequest,
+) -> bool {
+    let (q_start, q_end) = (cache_req.q_start_time, cache_req.q_end_time);
+    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
+    // convert histogram interval to microseconds
+    let interval = response.histogram_interval.unwrap_or_default() * 1_000_000;
+    // a bucket that ends after the request holds counts from outside it, even if its label fits
+    if data_start >= q_start && data_end + interval <= q_end {
+        return true;
+    }
+    response.hits.retain(|hit| {
+        let hit_ts = get_ts_value(&cache_req.ts_column, hit);
+        let fits_end = if interval > 0 {
+            hit_ts + interval <= q_end
+        } else {
+            hit_ts < q_end
+        };
+        fits_end && hit_ts >= q_start
+    });
+    if response.hits.is_empty() {
+        return false;
+    }
+    let (data_start, data_end) = cached_hits_time_range(response, cache_req);
+    meta.start_time = data_start;
+    meta.end_time = data_end + interval;
+    true
+}
+
+/// Hits sorted by another column need a full scan, since the ends of the list are not the ends.
+fn cached_hits_time_range(response: &Response, cache_req: &CacheQueryRequest) -> (i64, i64) {
+    let ts_of = |hit| get_ts_value(&cache_req.ts_column, hit);
+    if cache_req.is_histogram_non_ts_order {
+        return response
+            .hits
+            .iter()
+            .map(ts_of)
+            .fold((i64::MAX, i64::MIN), |(min, max), ts| {
+                (min.min(ts), max.max(ts))
+            });
+    }
+    let first_ts = ts_of(response.hits.first().unwrap());
+    let last_ts = ts_of(response.hits.last().unwrap());
+    (first_ts.min(last_ts), first_ts.max(last_ts))
 }
 
 pub fn calculate_deltas(
@@ -1392,6 +1423,203 @@ mod tests {
         assert!(res.is_none());
         // the meta pointing at the missing file was removed on the miss
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    const DAY: i64 = 86_400_000_000;
+    // 2026-08-18 is a 30-day edge of the 2001 grid
+    const EDGE_30D: i64 = 1_787_011_200_000_000;
+
+    fn cached_buckets(interval_secs: i64, labels: &[(i64, i64)]) -> Response {
+        let mut response = Response {
+            histogram_interval: Some(interval_secs),
+            ..Default::default()
+        };
+        response.hits = labels
+            .iter()
+            .map(|(label, count)| {
+                let label = chrono::DateTime::from_timestamp_micros(*label)
+                    .unwrap()
+                    .format("%Y-%m-%dT%H:%M:%S")
+                    .to_string();
+                json::json!({"ts": label, "cnt": count})
+            })
+            .collect();
+        response
+    }
+
+    fn histogram_cache_req(q_start_time: i64, q_end_time: i64) -> CacheQueryRequest {
+        CacheQueryRequest {
+            q_start_time,
+            q_end_time,
+            is_aggregate: true,
+            ts_column: "ts".to_string(),
+            histogram_interval: DAY,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        }
+    }
+
+    fn agg_meta(start_time: i64, end_time: i64) -> ResultCacheMeta {
+        ResultCacheMeta {
+            start_time,
+            end_time,
+            is_aggregate: true,
+            is_descending: false,
+        }
+    }
+
+    fn trim(
+        response: &mut Response,
+        meta: &mut ResultCacheMeta,
+        q_start: i64,
+        q_end: i64,
+    ) -> Vec<QueryDelta> {
+        assert!(trim_cached_response(
+            response,
+            meta,
+            &histogram_cache_req(q_start, q_end)
+        ));
+        let mut deltas = vec![];
+        calculate_deltas(meta, q_start, q_end, DAY, &mut deltas);
+        deltas
+    }
+
+    #[test]
+    fn test_trim_drops_a_bucket_that_ends_after_the_request() {
+        let d0 = EDGE_30D;
+        let mut response = cached_buckets(86_400, &[(d0, 2_995), (d0 + DAY, 5_979)]);
+        let mut meta = agg_meta(d0, d0 + 2 * DAY);
+        let q_end = d0 + DAY + DAY / 2;
+        let deltas = trim(&mut response, &mut meta, d0, q_end);
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!(response.hits[0]["cnt"], 2_995);
+        assert_eq!((meta.start_time, meta.end_time), (d0, d0 + DAY));
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(
+            (deltas[0].delta_start_time, deltas[0].delta_end_time),
+            (d0 + DAY, q_end)
+        );
+    }
+
+    #[test]
+    fn test_trim_misses_when_the_only_bucket_ends_after_the_request() {
+        let mut response = cached_buckets(2_592_000, &[(EDGE_30D, 2)]);
+        let mut meta = agg_meta(EDGE_30D, EDGE_30D + 30 * DAY);
+        let req = histogram_cache_req(EDGE_30D, EDGE_30D + 15 * DAY);
+        assert!(!trim_cached_response(&mut response, &mut meta, &req));
+    }
+
+    #[test]
+    fn test_trim_keeps_a_bucket_that_ends_exactly_at_the_request_end() {
+        let d0 = EDGE_30D;
+        let mut response = cached_buckets(86_400, &[(d0, 1), (d0 + DAY, 2), (d0 + 2 * DAY, 3)]);
+        let mut meta = agg_meta(d0, d0 + 3 * DAY);
+        let deltas = trim(&mut response, &mut meta, d0, d0 + 2 * DAY);
+        assert_eq!(response.hits.len(), 2);
+        assert_eq!(meta.end_time, d0 + 2 * DAY);
+        assert!(deltas.is_empty());
+    }
+
+    #[test]
+    fn test_trim_drops_a_bucket_that_starts_before_the_request() {
+        let d0 = EDGE_30D;
+        let mut response = cached_buckets(86_400, &[(d0, 1), (d0 + DAY, 2)]);
+        let mut meta = agg_meta(d0, d0 + 2 * DAY);
+        let q_start = d0 + DAY / 2;
+        let deltas = trim(&mut response, &mut meta, q_start, d0 + 2 * DAY);
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!(response.hits[0]["cnt"], 2);
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(
+            (deltas[0].delta_start_time, deltas[0].delta_end_time),
+            (q_start, d0 + DAY)
+        );
+    }
+
+    #[test]
+    fn test_trim_leaves_a_response_the_request_fully_covers() {
+        let d0 = EDGE_30D;
+        let mut response = cached_buckets(86_400, &[(d0, 1), (d0 + DAY, 2)]);
+        let mut meta = agg_meta(d0, d0 + 2 * DAY);
+        let deltas = trim(&mut response, &mut meta, d0, d0 + 2 * DAY);
+        assert_eq!(response.hits.len(), 2);
+        assert_eq!((meta.start_time, meta.end_time), (d0, d0 + 2 * DAY));
+        assert!(deltas.is_empty());
+    }
+
+    #[test]
+    fn test_trim_scans_all_hits_when_sorted_by_count() {
+        let d0 = EDGE_30D;
+        // the newest bucket sits in the middle, so the list ends alone would pass the check
+        let mut response = cached_buckets(86_400, &[(d0, 9), (d0 + 2 * DAY, 5), (d0 + DAY, 1)]);
+        let mut meta = agg_meta(d0, d0 + 3 * DAY);
+        let mut req = histogram_cache_req(d0, d0 + 2 * DAY + DAY / 2);
+        req.is_histogram_non_ts_order = true;
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 2);
+        assert_eq!(meta.end_time, d0 + 2 * DAY);
+    }
+
+    #[test]
+    fn test_trim_keeps_the_half_open_end_for_non_histogram_hits() {
+        let mut response = Response {
+            hits: vec![json::json!({"ts": 100}), json::json!({"ts": 200})],
+            ..Default::default()
+        };
+        let mut meta = agg_meta(100, 300);
+        let mut req = histogram_cache_req(100, 200);
+        req.histogram_interval = 0;
+        // the last hit sits on the end, which a half-open query range does not include
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 2);
+        let mut req = histogram_cache_req(100, 150);
+        req.histogram_interval = 0;
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!((meta.start_time, meta.end_time), (100, 100));
+    }
+
+    #[test]
+    fn test_calculate_deltas_multi_queries_the_partial_bucket() {
+        let d0 = EDGE_30D;
+        let mut response = cached_buckets(86_400, &[(d0, 1), (d0 + DAY, 2)]);
+        let mut meta = agg_meta(d0, d0 + 2 * DAY);
+        let q_end = d0 + DAY + DAY / 2;
+        trim(&mut response, &mut meta, d0, q_end);
+        let cached = CachedQueryResponse {
+            response_start_time: meta.start_time,
+            response_end_time: meta.end_time,
+            ..Default::default()
+        };
+        let (deltas, ..) = calculate_deltas_multi(&[cached], d0, q_end, true, false, DAY);
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(
+            (deltas[0].delta_start_time, deltas[0].delta_end_time),
+            (d0 + DAY, q_end)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_picks_only_histogram_grid_entries() {
+        let file_path = "grid_org/logs/grid_stream/grid_hash";
+        let query_key = file_path.replace('/', "_");
+        // the 1970 grid has an edge on 2026-08-05, which is off the 2001 grid at 30 days
+        let on_grid = agg_meta(EDGE_30D, EDGE_30D + 30 * DAY);
+        let epoch_grid = agg_meta(EDGE_30D - 13 * DAY, EDGE_30D + 17 * DAY);
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![on_grid, epoch_grid.clone()]);
+        let mut req = histogram_cache_req(EDGE_30D - 20 * DAY, EDGE_30D + 40 * DAY);
+        req.histogram_interval = 30 * DAY;
+        assert!(
+            get_cached_results("grid_trace", file_path, req, None)
+                .await
+                .is_none()
+        );
+        // only the on-grid entry was selected, then healed away because it has no file
+        let remaining = QUERY_RESULT_CACHE.read().await.get(&query_key).cloned();
+        assert_eq!(remaining, Some(vec![epoch_grid]));
     }
 
     #[tokio::test]
