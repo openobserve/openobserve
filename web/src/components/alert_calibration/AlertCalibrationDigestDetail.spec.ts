@@ -373,10 +373,26 @@ describe("AlertCalibrationDigestDetail dismissed tile", () => {
       (item) => item.key === "dismissed",
     );
 
+  it("strip counts read in the reader's locale", async () => {
+    const wrapper = await mountDetail([
+      { ...finding(12_345, 1), alerts_in_scope: 12_345, dismissed_count: 1_000 },
+    ]);
+    await flushPromises();
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    const value = (key: string) => items.find((item) => item.key === key)?.value;
+    expect([value("findings"), value("scope"), value("dismissed")]).toEqual([
+      "12,345",
+      "12,345",
+      "1,000",
+    ]);
+    expect(wrapper.findComponent(OStatStrip).text()).toContain("12,345");
+    wrapper.unmount();
+  });
+
   it("the_detail_tile_shows_the_runs_dismissed_count_only_when_written", async () => {
     const written = await mountDetail([{ ...finding(1, 1), dismissed_count: 2 }]);
     await flushPromises();
-    expect(tile(written)?.value).toBe(2);
+    expect(tile(written)?.value).toBe("2");
     expect(tile(written)?.sub).toBe("Hidden from this run");
     expect(tile(written)?.label).toBe("Dismissed");
     written.unmount();

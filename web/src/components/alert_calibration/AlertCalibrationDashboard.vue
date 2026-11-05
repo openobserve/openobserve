@@ -506,7 +506,7 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "findings",
       label: t("alertCalibration.dashboard.openFindings"),
-      value: countsPending.value ? raw("—") : countOrDash(openTotal.value),
+      value: countsPending.value ? raw("—") : countOrDash(openTotal.value, locale.value),
       icon: "fact-check",
       tone: countsPending.value
         ? "neutral"
@@ -519,7 +519,7 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "scope",
       label: t("alertCalibration.dashboard.alertsInScope"),
-      value: scope.value,
+      value: countOrDash(scope.count, locale.value),
       sub: scope.sub,
       subIcon: scope.subIcon,
       icon: "notifications",

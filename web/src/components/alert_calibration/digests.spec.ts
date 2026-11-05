@@ -19,6 +19,7 @@ import {
   adviceOf,
   coverageNoteRows,
   coverageNotes,
+  countOrDash,
   coverageVerdict,
   findingsByRule,
   insightActionsOf,
@@ -572,7 +573,7 @@ describe("a scoped run", () => {
       nothingDescription:
         "Alert calibration found nothing on the alerts you can access in this run.",
       alertsInScope: {
-        value: "—",
+        count: null,
         sub: "Shown only with access to every alert",
         subIcon: "info-outline",
       },
@@ -587,7 +588,7 @@ describe("a scoped run", () => {
       allClear: "The latest run found nothing to fix.",
       nothingDescription:
         "No coverage gap and nothing declined: across 4 alerts in scope, alert calibration found nothing.",
-      alertsInScope: { value: 4 },
+      alertsInScope: { count: 4 },
       pending: {
         banner: "Counts on the alerts you can access are not ready yet. Refresh shortly.",
         badge: "Pending",
@@ -608,5 +609,17 @@ describe("a scoped run", () => {
     expect(recordHits([runRow, finding])).toBe(1);
     expect(latestEmission([runRow, finding]).run?.visibility).toBe("scoped");
     expect(recordHits([record({ kind: "run" }), record({ kind: "run" })])).toBe(2);
+  });
+});
+
+describe("countOrDash", () => {
+  it.each([
+    [12345, "en-US", "12,345"],
+    [12345, "de-DE", "12.345"],
+    [0, "en-US", "0"],
+    [null, "en-US", "—"],
+    [undefined, "en-US", "—"],
+  ])("%s in %s reads %s", (count, locale, shown) => {
+    expect(countOrDash(count, locale)).toBe(shown);
   });
 });

@@ -430,7 +430,7 @@ describe("AlertCalibrationDashboard", () => {
       expect(banner.text()).toBe("No findings on the alerts you can access in the latest run.");
       expect(banner.props("variant")).toBe("info");
       const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
-      expect(items[0]).toMatchObject({ value: 0, tone: "neutral" });
+      expect(items[0]).toMatchObject({ value: "0", tone: "neutral" });
       expect(items[1]).toMatchObject({
         value: "—",
         sub: "Shown only with access to every alert",
@@ -453,8 +453,8 @@ describe("AlertCalibrationDashboard", () => {
     expect(banner.text()).toBe("The latest run found nothing to fix.");
     expect(banner.props("variant")).toBe("success");
     const items = root.findComponent(OStatStrip).props("items") as StatItem[];
-    expect(items[0]).toMatchObject({ value: 0, tone: "success" });
-    expect(items[1]).toMatchObject({ value: 4 });
+    expect(items[0]).toMatchObject({ value: "0", tone: "success" });
+    expect(items[1]).toMatchObject({ value: "4" });
     expect(items[1].sub).toBeUndefined();
     root.unmount();
   });
@@ -700,7 +700,7 @@ describe("AlertCalibrationDashboard dismissals", () => {
     await group.find("button").trigger("click");
     await settle();
     expect(openStat(wrapper)?.label).toBe("Open findings");
-    expect(openStat(wrapper)?.value).toBe(2);
+    expect(openStat(wrapper)?.value).toBe("2");
     expect(filterText()).toContain("Dismissed (0)");
 
     await wrapper
@@ -729,14 +729,14 @@ describe("AlertCalibrationDashboard dismissals", () => {
 
     expect(alertCalibration.dismissFinding).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a1"]').exists()).toBe(true);
-    expect(openStat(wrapper)?.value).toBe(2);
+    expect(openStat(wrapper)?.value).toBe("2");
     expect(filterText()).toContain("Dismissed (0)");
 
     land(dismissalPage([fid(1)]));
     await settle();
     expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]').exists()).toBe(true);
-    expect(openStat(wrapper)?.value).toBe(1);
+    expect(openStat(wrapper)?.value).toBe("1");
     expect(filterText()).toContain("Dismissed (1)");
     wrapper.unmount();
   });
@@ -746,7 +746,7 @@ describe("AlertCalibrationDashboard dismissals", () => {
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(1), fid(9)]));
     const wrapper = await mountPage();
     await settle();
-    expect(openStat(wrapper)?.value).toBe(2);
+    expect(openStat(wrapper)?.value).toBe("2");
     expect(filterText()).toContain("Dismissed (2)");
     const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
     expect(group.text()).toContain("2 alerts");
@@ -859,7 +859,7 @@ describe("AlertCalibrationDashboard dismissals", () => {
       "Nothing open. 2 dismissed findings are hidden; see Dismissed.",
     );
     expect(wrapper.text()).not.toContain("The latest run found nothing to fix.");
-    expect(openStat(wrapper)).toMatchObject({ value: 0, tone: "neutral" });
+    expect(openStat(wrapper)).toMatchObject({ value: "0", tone: "neutral" });
     wrapper.unmount();
 
     // A scoped reader gets no org total, so its own dismissals from before the run stand in.
@@ -943,7 +943,7 @@ describe("AlertCalibrationDashboard dismissals", () => {
     answer(dismissalPage([]));
     await settle();
     expect(board(wrapper)).toBe(true);
-    expect(openStat(wrapper)?.value).toBe(1);
+    expect(openStat(wrapper)?.value).toBe("1");
     expect(filterText()).toContain("Dismissed (0)");
     wrapper.unmount();
 
