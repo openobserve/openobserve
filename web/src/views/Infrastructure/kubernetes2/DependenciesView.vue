@@ -26,6 +26,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { k8sInstantQuery } from "@/services/kubernetes.queries";
@@ -37,6 +39,13 @@ import type { Series } from "./kubernetesModel";
 import { VIEW_ICON } from "./k8sTree";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import type { K8sTime } from "./useKubernetesInventory";
+import {
+  COLLAPSE_THRESHOLD,
+  collapseNamespaces,
+  isBoundary,
+  namespaceId,
+  type CollapseMode,
+} from "./dependencyCollapse";
 import {
   FLOW_STREAM,
   buildGraph,
@@ -82,6 +91,9 @@ const forbidden = ref(false);
 const loaded = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const collapseMode = ref<CollapseMode>("auto");
+const expandedNamespaces = ref<Set<string>>(new Set());
+const COLLAPSE_MODES: CollapseMode[] = ["auto", "expanded", "collapsed"];
 
 const hasFlows = computed(() => props.hasStream(FLOW_STREAM));
 
@@ -170,9 +182,44 @@ const edges = computed(() =>
   ),
 );
 
-const graph = computed(() => buildGraph(edges.value));
+const collapsedEdges = computed(() =>
+  collapseNamespaces(edges.value, {
+    mode: collapseMode.value,
+    expanded: expandedNamespaces.value,
+    threshold: COLLAPSE_THRESHOLD,
+  }),
+);
 
-const capped = computed(() => graph.value.edges.length < edges.value.length);
+const graph = computed(() => buildGraph(collapsedEdges.value));
+
+const capped = computed(() => graph.value.edges.length < collapsedEdges.value.length);
+
+const hasGroups = computed(() => graph.value.nodes.some((n) => isBoundary(n.end)));
+
+const expandedList = computed(() =>
+  [...expandedNamespaces.value].sort((a, b) => a.localeCompare(b)),
+);
+
+function toggleNamespace(id: string) {
+  const next = new Set(expandedNamespaces.value);
+  if (!next.delete(id)) next.add(id);
+  expandedNamespaces.value = next;
+}
+
+const setCollapseMode = (mode: unknown) => {
+  if (COLLAPSE_MODES.includes(mode as CollapseMode)) collapseMode.value = mode as CollapseMode;
+};
+
+const collapseLabel = (mode: CollapseMode) =>
+  mode === "auto"
+    ? t("infra.k8s2.depsCollapseAuto")
+    : mode === "expanded"
+      ? t("infra.k8s2.depsCollapseExpanded")
+      : t("infra.k8s2.depsCollapseCollapsed");
+
+const boundaryKey = (end: FlowEnd) => namespaceId(end.cluster, end.namespace);
+
+const namespaceOfId = (id: string) => id.slice(id.lastIndexOf("/") + 1);
 
 const selectedEdge = computed(
   () => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null,
@@ -196,6 +243,8 @@ function endLabel(end: FlowEnd): string {
 }
 
 function endDetail(end: FlowEnd): I18nText {
+  if (isBoundary(end))
+    return t("infra.k8s2.depsGroupDetail", { count: end.members ?? 0 }, end.members ?? 0);
   if (end.kind === "external") return t("infra.k8s2.depsOutsideCluster");
   if (end.kind === "node") return t("infra.k8s2.depsHostTraffic");
   return t("infra.k8s2.depsTypeIn", { type: end.ownerType, namespace: end.namespace });
@@ -212,7 +261,7 @@ const arrowOf = (edge: FlowEdge) => (edge.directed ? "→" : "↔");
 
 // Workloads by namespace too, so two namespaces' web → api read apart.
 const fullLabel = (end: FlowEnd) =>
-  end.kind === "workload" ? `${end.namespace}/${end.name}` : endLabel(end);
+  end.kind === "workload" && !isBoundary(end) ? `${end.namespace}/${end.name}` : endLabel(end);
 
 const edgeText = (edge: FlowEdge) =>
   `${fullLabel(edge.source)} ${arrowOf(edge)} ${fullLabel(edge.target)}`;
@@ -253,6 +302,7 @@ const colorOf = (end: FlowEnd) =>
 
 // A workload by its owner's kind, as the resource tree shows it.
 function iconOf(end: FlowEnd): IconName {
+  if (isBoundary(end)) return "widgets";
   if (end.kind === "external") return "public";
   if (end.kind === "node") return VIEW_ICON.nodes;
   return (VIEW_ICON as Record<string, IconName>)[`${end.ownerType.toLowerCase()}s`] ?? "widgets";
@@ -316,9 +366,11 @@ watch(graph, (next) => {
 // Outside addresses, and owner types without a drawer, have nothing to open.
 const kindOf = (end: FlowEnd) => (end.kind === "external" ? null : detailKindOf(end.ownerType));
 
-const canOpen = (end: FlowEnd) => kindOf(end) != null;
+// A namespace boundary expands in place instead of opening a drawer.
+const canOpen = (end: FlowEnd) => isBoundary(end) || kindOf(end) != null;
 
 function openEnd(end: FlowEnd) {
+  if (isBoundary(end)) return toggleNamespace(boundaryKey(end));
   const kind = kindOf(end);
   if (!kind) return;
   emit("open", {
@@ -470,6 +522,26 @@ function clearFilters() {
         data-test="k8s2-deps-show-low-traffic"
         @update:model-value="(lowTraffic: unknown) => emit('update', { lowTraffic: !!lowTraffic })"
       />
+      <div class="flex items-center gap-2" data-test="k8s2-deps-collapse">
+        <OText tag="span" class="text-text-secondary text-xs">
+          {{ t("infra.k8s2.depsCollapseMode") }}
+        </OText>
+        <OToggleGroup
+          :model-value="collapseMode"
+          data-test="k8s2-deps-collapse-mode"
+          @update:model-value="setCollapseMode"
+        >
+          <OToggleGroupItem
+            v-for="m in COLLAPSE_MODES"
+            :key="m"
+            :value="m"
+            size="xs"
+            :data-test="`k8s2-deps-collapse-${m}`"
+          >
+            {{ collapseLabel(m) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
       <div class="flex items-center gap-1">
         <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
           {{ t("infra.k8s2.depsCaption", { window: windowText }) }}
@@ -548,8 +620,35 @@ function clearFilters() {
         class="text-text-secondary text-xs"
         data-test="k8s2-deps-capped"
       >
-        {{ t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
+        {{
+          t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: collapsedEdges.length })
+        }}
       </OText>
+      <div
+        v-if="hasGroups || expandedList.length"
+        class="flex flex-wrap items-center gap-2"
+        data-test="k8s2-deps-groups"
+      >
+        <OText
+          v-if="hasGroups"
+          tag="span"
+          class="text-text-secondary text-xs"
+          data-test="k8s2-deps-group-hint"
+        >
+          {{ t("infra.k8s2.depsGroupHint") }}
+        </OText>
+        <OButton
+          v-for="id in expandedList"
+          :key="id"
+          variant="outline"
+          size="xs"
+          icon-left="close"
+          data-test="k8s2-deps-group-collapse"
+          @click="toggleNamespace(id)"
+        >
+          {{ t("infra.k8s2.depsGroupCollapse", { namespace: namespaceOfId(id) }) }}
+        </OButton>
+      </div>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="k8s2-deps-area">
         <!-- Before the map, so keyboard users reach the edge list without tabbing through every card. not-sr-only
              resets position to static, so this wrapper does the overlay positioning. -->
