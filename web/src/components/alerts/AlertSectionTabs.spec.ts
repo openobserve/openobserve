@@ -22,6 +22,9 @@ import AlertSectionTabs from "./AlertSectionTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
+import { queryClient } from "@/composables/query/queryClient";
+import alerts from "@/services/alerts";
+import { firingAlertsQuery, firingCountsQuery } from "@/services/alerts.queries";
 
 // A router with just the sibling routes: the app router pulls in every view and
 // runs the real auth guard, neither of which this component depends on.
@@ -38,22 +41,121 @@ const mountTabs = () =>
 describe("AlertSectionTabs", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    localStorage.removeItem("o2_alert_section_tab_order");
+    queryClient.clear();
     store.state.zoConfig.custom_hide_menus = "";
     await router.push({ name: "alertList" });
     await router.isReady();
   });
 
-  it("renders the four sibling sections in workflow order", () => {
+  it("renders the sibling sections in workflow order with Firing first", () => {
     // Library last: it is where you go once to fetch an alert, not where you
-    // work. The rail's Reliability flyout lists the same four in this order.
+    // work.
     const wrapper = mountTabs();
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
     expect(labels).toEqual([
+      "Firing",
       "All Alerts",
       "Notification Destinations",
       "Destination Templates",
       "Alert Library",
     ]);
+  });
+
+  it("badges Firing with the unacked firing count, Muted excluded", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(firingCountsQuery(org).queryKey, {
+      list: [],
+      counts: { firing: 7, acked: 1, muted: 3, failed: 1, recovered: 0 },
+      total: 0,
+    });
+    const wrapper = mountTabs();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("7");
+  });
+
+  it("asks for counts alone away from the Firing page", async () => {
+    const read = vi.spyOn(alerts, "listByState").mockResolvedValue({
+      data: { list: [], counts: { firing: 2 }, total: 2 },
+    } as any);
+    mountTabs();
+    await flushPromises();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read.mock.calls[0][3]).toBe(0);
+  });
+
+  it("reads the Firing page's own entry on that page", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(firingAlertsQuery(org, "firing").queryKey, {
+      list: [],
+      counts: { firing: 9, acked: 0, muted: 0, failed: 0, recovered: 0 },
+      total: 0,
+    });
+    await router.push({ name: "alertFiring" });
+    const wrapper = mountTabs();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("9");
+  });
+
+  it("keeps a hidden section's saved place when another tab is dragged", async () => {
+    store.state.zoConfig.custom_hide_menus = "alertLibrary";
+    localStorage.setItem(
+      "o2_alert_section_tab_order",
+      JSON.stringify(["alertLibrary", "alertList", "alertFiring"]),
+    );
+    const wrapper = mountTabs();
+    wrapper
+      .findComponent({ name: "OTabs" })
+      .vm.$emit("reorder", { from: "alertFiring", to: "alertList", before: true });
+    await flushPromises();
+    const saved = JSON.parse(localStorage.getItem("o2_alert_section_tab_order") ?? "[]");
+    expect(saved.slice(0, 3)).toEqual(["alertLibrary", "alertFiring", "alertList"]);
+  });
+
+  it("restores a saved order and appends a section the save never knew", () => {
+    localStorage.setItem(
+      "o2_alert_section_tab_order",
+      JSON.stringify(["alertLibrary", "gone", "alertFiring"]),
+    );
+    const wrapper = mountTabs();
+    const keys = wrapper
+      .findAll('[role="tab"]')
+      .map((tab) => tab.attributes("data-test")?.replace("alert-section-tab-", ""));
+    expect(keys).toEqual([
+      "alertLibrary",
+      "alertFiring",
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+    ]);
+  });
+
+  it("saves a dragged order", async () => {
+    const wrapper = mountTabs();
+    wrapper
+      .findComponent({ name: "OTabs" })
+      .vm.$emit("reorder", { from: "alertLibrary", to: "alertFiring", before: true });
+    await flushPromises();
+    expect(JSON.parse(localStorage.getItem("o2_alert_section_tab_order") ?? "[]")[0]).toBe(
+      "alertLibrary",
+    );
+    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert Library");
+  });
+
+  it("survives storage that throws", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    const wrapper = mountTabs();
+    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Firing");
+    wrapper
+      .findComponent({ name: "OTabs" })
+      .vm.$emit("reorder", { from: "alertLibrary", to: "alertFiring", before: true });
+    await flushPromises();
+    expect(wrapper.findAll('[role="tab"]')[0].text()).toContain("Alert Library");
   });
 
   it("marks the tab for the current route active", async () => {
@@ -93,6 +195,7 @@ describe("AlertSectionTabs", () => {
     store.state.zoConfig.custom_hide_menus = "openapi,reports,alertLibrary";
     const wrapper = mountTabs();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
+      "Firing",
       "All Alerts",
       "Notification Destinations",
       "Destination Templates",

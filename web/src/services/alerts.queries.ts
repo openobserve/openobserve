@@ -30,7 +30,14 @@ import type {
   MuteAlertRequest,
   UnackAlertRequest,
 } from "@/ts/interfaces/alert";
+import type { FiringPage, FiringState } from "@/utils/alerts/firingAlerts";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
+
+type AlertSqlSource = { stream_name: string; stream_type: string; query_condition: unknown };
+
+const RECOVERED_WINDOW_MS = 86_400_000;
+const STATE_PAGE_SIZE = 1000;
+const BULK_ACK_CONCURRENCY = 10;
 
 export const alertsListQuery = (
   org: string,
@@ -84,16 +91,54 @@ export const alertDependenciesQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertDetailQuery = (org: string, id: string) =>
+const readFiringPage = async (
+  org: string,
+  state: FiringState,
+  pageSize: number,
+): Promise<FiringPage> =>
+  (await alerts.listByState(org, state, (Date.now() - RECOVERED_WINDOW_MS) * 1000, pageSize)).data;
+
+/** One read of a live view: filters, groups and paging run on these rows in the page. */
+export const firingAlertsQuery = (org: string, state: FiringState) =>
   queryOptions({
-    queryKey: alertKeys.detail(org, id),
-    queryFn: async () => (await alerts.get_by_alert_id(org, id)).data,
+    queryKey: alertKeys.state(org, state),
+    queryFn: () => readFiringPage(org, state, STATE_PAGE_SIZE),
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The view's counts alone: the server totals before it pages, so an empty page still counts. */
+export const firingCountsQuery = (org: string) =>
+  queryOptions({
+    queryKey: alertKeys.state(org, "counts"),
+    queryFn: () => readFiringPage(org, "firing", 0),
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const alertDetailQuery = (org: string, id: string, folderId?: string) =>
+  queryOptions({
+    queryKey: [...alertKeys.detail(org, id), ...(folderId ? [folderId] : [])],
+    queryFn: async () => (await alerts.get_by_alert_id(org, id, folderId)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The SQL a builder alert runs; an alert written as SQL already carries it. */
+export const alertSqlQuery = (org: string, id: string, alert: AlertSqlSource | null) =>
+  queryOptions({
+    queryKey: [...alertKeys.detail(org, id), "sql"],
+    queryFn: async (): Promise<string> => {
+      const { data } = await alerts.generate_sql(org, {
+        stream_name: alert?.stream_name,
+        stream_type: alert?.stream_type,
+        query_condition: alert?.query_condition,
+      });
+      return data?.sql || "";
+    },
     staleTime: LIVE_STALE_TIME,
   });
 
 export const alertAcksQuery = (org: string, id: string, folderId?: string) =>
   queryOptions({
-    queryKey: alertKeys.acks(org, id),
+    queryKey: [...alertKeys.acks(org, id), ...(folderId ? [folderId] : [])],
     queryFn: async (): Promise<AckView[]> =>
       (await alerts.listAlertAcks(org, id, folderId)).data?.acks ?? [],
     staleTime: LIVE_STALE_TIME,
@@ -195,6 +240,25 @@ export const ackAlertMutation = (org: string) =>
     mutationFn: async (vars: { alertId: string; body: AckAlertRequest; folderId?: string }) =>
       (await alerts.ackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
     // Callers render refusals and stale-firing answers themselves.
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+/** One invalidation for the whole batch; a refused or unchanged alert counts as skipped. */
+export const ackAlertsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (
+      targets: { alertId: string; body: AckAlertRequest; folderId?: string }[],
+    ): Promise<{ acked: number; skipped: number }> => {
+      let acked = 0;
+      for (let i = 0; i < targets.length; i += BULK_ACK_CONCURRENCY) {
+        const batch = targets.slice(i, i + BULK_ACK_CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map((t) => alerts.ackAlert(org, t.alertId, t.body, t.folderId)),
+        );
+        acked += results.filter((r) => r.status === "fulfilled" && r.value.data.changed).length;
+      }
+      return { acked, skipped: targets.length - acked };
+    },
     meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 

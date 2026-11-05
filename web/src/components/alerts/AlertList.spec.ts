@@ -1787,7 +1787,11 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     // A failed stream-list load must not skip fetching the alert being
     // cloned — otherwise Save would silently copy whatever alert was
     // cloned previously instead of this one.
-    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      undefined,
+    );
   });
 
   it("clone dialog emits click:primary -> invokes submitForm", async () => {

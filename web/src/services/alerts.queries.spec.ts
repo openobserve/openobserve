@@ -18,6 +18,7 @@ import {
   promRulePreviewQuery,
   alertHistoryQuery,
   alertAcksQuery,
+  alertDetailQuery,
   ackAlertMutation,
   unackAlertMutation,
   muteAlertMutation,
@@ -146,6 +147,16 @@ describe("ack and mute queries", () => {
     expect(options.queryKey.slice(0, alertKeys.all(ORG).length)).toEqual(alertKeys.all(ORG));
     expect(await (options.queryFn as () => Promise<unknown>)()).toEqual([ACK]);
     expect(alerts.listAlertAcks).toHaveBeenCalledWith(ORG, "a1", undefined);
+  });
+
+  it("re-reads an alert once its folder is known, since the folder decides the route check", () => {
+    expect(alertAcksQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertAcksQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertDetailQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1").queryKey).toEqual(alertKeys.detail(ORG, "a1"));
   });
 
   it("returns the server's ack answer and refreshes every alert read", async () => {
