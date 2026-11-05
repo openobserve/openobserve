@@ -7,9 +7,8 @@ does not divide 978,307,200 seconds, such as 2, 3, 5, 7, and 30 days.
 The expected rows come from the fixture. Another query cannot give them, because a
 filter does not always stop the fast path.
 
-An interval runs only if ZO_INGEST_ALLOWED_UPTO lets its whole bucket in. CI uses 48
-hours, which is enough for 1 day. For all intervals, run the server and this test with
-ZO_INGEST_ALLOWED_UPTO=2400.
+An interval runs only if ZO_INGEST_ALLOWED_UPTO lets its whole bucket in. CI uses 2400
+hours, which is enough for all intervals. Run a local server and this test with the same value.
 """
 
 import datetime as dt
@@ -207,6 +206,8 @@ def test_date_bin_with_its_own_origin_keeps_its_labels(fixture, filtered):
 
 
 TIMEZONES = [("+05:30", 19_800_000_000), ("-08:00", -28_800_000_000)]
+TIMEZONES_AND_UTC = [(None, 0), *TIMEZONES]
+TIMEZONE_IDS = ["utc", "ist", "pst"]
 
 
 @pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
@@ -343,19 +344,28 @@ def uneven_fixture(create_session, base_url):
     data.drop()
 
 
-def test_a_list_sorted_by_count_still_counts_only_the_request_range(uneven_fixture):
-    data = uneven_fixture
-    sql = (
-        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
-        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt DESC, ts DESC'
+def _ranked_sql(stream, timezone, order):
+    tz_arg = f", '{timezone}'" if timezone else ""
+    return (
+        f"SELECT histogram(_timestamp, '1 hour'{tz_arg}) AS ts, count(*) AS cnt "
+        f'FROM "{stream}" GROUP BY ts ORDER BY {order}'
     )
-    expected = _expected_rows(data.events, data.start, data.end, HOUR)
-    _warm_cache(data, sql, data.start, data.end, expected)
 
-    shorter_end = data.end - HOUR // 2 + 90_000_000
-    expected = _expected_rows(data.events, data.start, shorter_end, HOUR)
-    assert _rows(data.search(sql, data.start, shorter_end)) == expected
-    assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == expected
+
+@pytest.mark.parametrize("timezone,offset", TIMEZONES_AND_UTC, ids=TIMEZONE_IDS)
+def test_a_list_sorted_by_count_still_counts_only_the_request_range(uneven_fixture, timezone, offset):
+    data = uneven_fixture
+    sql = _ranked_sql(data.stream, timezone, "cnt DESC, ts DESC")
+    start = _bucket_edge(data.start, HOUR, offset)
+    end = _bucket_edge(data.end, HOUR, offset)
+    _warm_cache(data, sql, start, end, _expected_rows(data.events, start, end, HOUR, offset))
+
+    # 2 of the 10 newest events fall before this end, so a stale cached bucket shows 10.
+    shorter_end = data.end - HOUR + 150_000_000
+    expected = _expected_rows(data.events, start, shorter_end, HOUR, offset)
+    assert 2 in expected.values()
+    assert _rows(data.search(sql, start, shorter_end)) == expected
+    assert _rows(data.search(sql, start, shorter_end, use_cache=True)) == expected
 
 
 def test_a_raw_query_excludes_a_row_at_exactly_the_end_time(fixture):
@@ -380,14 +390,19 @@ def test_a_raw_query_excludes_a_row_at_exactly_the_end_time(fixture):
     assert sorted(hit["_timestamp"] for hit in body["hits"]) == inside[:-1]
 
 
-def test_a_space_before_the_bracket_gets_the_same_timezone_rows(fixture):
+@pytest.mark.parametrize(
+    "call",
+    ["histogram (_timestamp, '1 day', '+05:30')", "histogram(_timestamp, '1 day', ('+05:30'))"],
+    ids=["space", "bracketed_timezone"],
+)
+def test_other_valid_spellings_get_the_same_timezone_rows(fixture, call):
     if WINDOW_HOURS < 96:
         pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds too few whole days")
     offset = 19_800_000_000
     first_edge = _bucket_edge(fixture.start - 1, DAY, offset) + DAY
     last_edge = _bucket_edge(fixture.end, DAY, offset)
     sql = (
-        "SELECT histogram (_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt "
+        f"SELECT {call} AS ts, count(*) AS cnt "
         f'FROM "{fixture.stream}" GROUP BY ts ORDER BY ts'
     )
     expected = _expected_rows(fixture.events, first_edge, last_edge, DAY, offset)
@@ -410,42 +425,83 @@ def test_other_valid_spellings_of_a_month_bucket_skip_the_cache(fixture, call):
     assert _rows(fixture.search(sql, fixture.start, shorter_end, use_cache=True)) == expected
 
 
+@pytest.mark.parametrize("timezone,offset", TIMEZONES_AND_UTC, ids=TIMEZONE_IDS)
 @pytest.mark.parametrize("direction", ["ASC", "DESC"])
-def test_a_limit_with_a_non_time_order_recounts_a_narrower_range(uneven_fixture, direction):
+def test_a_limit_with_a_non_time_order_recounts_a_narrower_range(uneven_fixture, direction, timezone, offset):
     data = uneven_fixture
-    sql = (
-        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
-        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt {direction}, ts {direction} LIMIT 3'
-    )
+    sql = _ranked_sql(data.stream, timezone, f"cnt {direction}, ts {direction} LIMIT 3")
     sign = 1 if direction == "ASC" else -1
+    start = _bucket_edge(data.start, HOUR, offset)
+    end = _bucket_edge(data.end, HOUR, offset)
 
-    def top_rows(end):
-        rows = _expected_rows(data.events, data.start, end, HOUR)
+    def top_rows(request_end):
+        rows = _expected_rows(data.events, start, request_end, HOUR, offset)
         ranked = sorted(rows.items(), key=lambda row: (sign * row[1], sign * _micros(row[0])))
         return dict(ranked[:3])
 
-    _warm_cache(data, sql, data.start, data.end, top_rows(data.end))
+    _warm_cache(data, sql, start, end, top_rows(end))
     # 2 events of the newest bucket fall before this end, so it now ranks first for ASC.
     shorter_end = data.end - HOUR + 150_000_000
-    assert _rows(data.search(sql, data.start, shorter_end)) == top_rows(shorter_end)
-    assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == top_rows(shorter_end)
+    assert _rows(data.search(sql, start, shorter_end)) == top_rows(shorter_end)
+    assert _rows(data.search(sql, start, shorter_end, use_cache=True)) == top_rows(shorter_end)
 
 
-def test_a_filtered_write_does_not_hide_buckets_under_a_limit(uneven_fixture):
+@pytest.mark.parametrize("timezone,offset", TIMEZONES_AND_UTC, ids=TIMEZONE_IDS)
+def test_a_filtered_write_does_not_hide_buckets_under_a_limit(uneven_fixture, timezone, offset):
     data = uneven_fixture
-    sql = (
-        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
-        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt DESC, ts DESC LIMIT 2'
-    )
+    sql = _ranked_sql(data.stream, timezone, "cnt DESC, ts DESC LIMIT 2")
+    start = _bucket_edge(data.start, HOUR, offset)
 
-    def top_rows(end):
-        rows = _expected_rows(data.events, data.start, end, HOUR)
+    def top_rows(request_end):
+        rows = _expected_rows(data.events, start, request_end, HOUR, offset)
         ranked = sorted(rows.items(), key=lambda row: (-row[1], -_micros(row[0])))
         return dict(ranked[:2])
 
-    # The newest bucket is partial here, so a write would drop one of the 2 limited rows.
-    warm_end = data.end - HOUR // 2
-    assert _rows(data.search(sql, data.start, warm_end, use_cache=True)) == top_rows(warm_end)
+    # The newest bucket is partial here in each zone, so a write would drop one of the 2 limited rows.
+    warm_end = data.end - HOUR + 15 * 60_000_000
+    assert _rows(data.search(sql, start, warm_end, use_cache=True)) == top_rows(warm_end)
     time.sleep(2)
     narrower_end = data.end - 2 * HOUR + 150_000_000
-    assert _rows(data.search(sql, data.start, narrower_end, use_cache=True)) == top_rows(narrower_end)
+    assert _rows(data.search(sql, start, narrower_end, use_cache=True)) == top_rows(narrower_end)
+
+
+REPORT_DAILY_COUNTS = [100, 70, 90, 60, 80]
+
+
+@pytest.fixture(params=TIMEZONES_AND_UTC, ids=TIMEZONE_IDS)
+def report_fixture(request, create_session, base_url):
+    """The five days of the report, with the events of each day after noon in the zone."""
+    if WINDOW_HOURS < 7 * 24:
+        pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds no 5 days")
+    timezone, offset = request.param
+    data = Fixture(create_session, base_url)
+    data.end = _bucket_edge((int(time.time()) // 3600 - 1) * HOUR, DAY, offset)
+    data.start = data.end - len(REPORT_DAILY_COUNTS) * DAY
+    data.events = [
+        data.start + day * DAY + DAY // 2 + (n + 1) * 1_000_000
+        for day, count in enumerate(REPORT_DAILY_COUNTS)
+        for n in range(count)
+    ]
+    data.ingest()
+    data.wait_until_searchable()
+    yield data, timezone, offset
+    data.drop()
+
+
+def test_the_report_limit_example_ranks_the_narrower_range(report_fixture):
+    data, timezone, offset = report_fixture
+    tz_arg = f", '{timezone}'" if timezone else ""
+    sql = (
+        f"SELECT histogram(_timestamp, '1 day'{tz_arg}) AS ts, count(*) AS cnt "
+        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt DESC LIMIT 3'
+    )
+
+    def row(day, count):
+        return {_label(data.start + day * DAY + offset): count}
+
+    _warm_cache(data, sql, data.start, data.end, {**row(0, 100), **row(2, 90), **row(4, 80)})
+    # All events of the last day fall after this end, and a stale list would rank day 3 here.
+    shorter_end = data.end - DAY // 2
+    expected = {**row(0, 100), **row(2, 90), **row(1, 70)}
+    assert _rows(data.search(sql, data.start, shorter_end)) == expected
+    assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == expected

@@ -18,7 +18,7 @@ from opentelemetry.proto.metrics.v1 import metrics_pb2
 from opentelemetry.proto.resource.v1 import resource_pb2
 from opentelemetry.proto.trace.v1 import trace_pb2
 
-STALE_OFFSET_NANOS = 60 * 24 * 60 * 60 * 1_000_000_000
+STALE_OFFSET_NANOS = 400 * 24 * 60 * 60 * 1_000_000_000
 
 
 @dataclass

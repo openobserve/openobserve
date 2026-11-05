@@ -28,7 +28,7 @@ env:
   ZO_ALERT_SCHEDULE_INTERVAL: 3
   ZO_SMTP_ENABLED: true
   ZO_CREATE_ORG_THROUGH_INGESTION: true
-  ZO_INGEST_ALLOWED_UPTO: 48  # Allow backdated data ingestion for backfill tests
+  ZO_INGEST_ALLOWED_UPTO: 2400  # Allow backdated data for backfill tests and whole 30-day histogram buckets
   ZO_SSRF_ALLOW_LOOPBACK: true  # Allow localhost destinations in API tests
   ZO_ALERT_COMPOSITE_SWEEP_SECS: 30  # A firing composite repeats only per sweep; the 300 s default made the ack test ~12 min
 

@@ -15,7 +15,7 @@ Note: Tests use recent timestamps to ensure data is in the current partition,
     which both _search API and backfill scheduler can access.
 
 CI/CD Configuration:
-    Requires ZO_INGEST_ALLOWED_UPTO=48 (hours) in .github/workflows/api-testing.yml
+    Requires ZO_INGEST_ALLOWED_UPTO>=48 (hours) in .github/workflows/api-testing.yml
     to allow backdated data ingestion for testing.
 """
 

@@ -20,7 +20,7 @@ MIN_US = 60 * US
 PARTIAL_MSG = "Some profiles were rejected due to out-of-window timestamps, malformed samples, or empty samples"
 BAD_CT_BODY = {"code": 3, "message": "Bad Request: Content-Type must be application/json or application/x-protobuf"}
 GRPC_EXPORT = "/opentelemetry.proto.collector.profiles.v1development.ProfilesService/Export"
-# Older than any ZO_INGEST_ALLOWED_UPTO in use (CI 48 h, local up to 4000 h).
+# Older than any ZO_INGEST_ALLOWED_UPTO in use (CI 2400 h, local up to 4000 h).
 STALE_NS = 400 * 24 * 3600 * NS
 
 # A 1000-frame stack nests ~2000 JSON levels in merge/diff trees, past the default decoder limit.

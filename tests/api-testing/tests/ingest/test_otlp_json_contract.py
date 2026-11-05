@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Far enough outside any sane ZO_INGEST_ALLOWED_UPTO that the record is
 # certainly rejected, which is what makes the server produce a partial-success
 # body to encode in the first place.
-STALE_OFFSET_NANOS = 60 * 24 * 60 * 60 * 1_000_000_000
+STALE_OFFSET_NANOS = 400 * 24 * 60 * 60 * 1_000_000_000
 
 
 def _hex(length: int) -> str:
