@@ -9,17 +9,6 @@
  * Fix 3 (usePromqlSuggestions.ts): analyzeLabelFocus() handles unclosed braces
  *   (e.g. metricname{) correctly — label suggestions appear instead of stream names.
  *
- * QUERY EDITOR ELEMENTS (verified data-test attributes):
- *   [data-test="dashboard-panel-query-editor"]   — Monaco editor container
- *   [data-test="dashboard-promql-query-type"]    — PromQL mode button
- *   [data-test="dashboard-custom-query-type"]    — Custom mode button
- *   [data-test="dashboard-builder-query-type"]   — Builder mode button
- *
- * METRICS PAGE ELEMENTS (verified data-test attributes):
- *   [data-test="dashboard-promql-query-type"]    — PromQL mode button (same component)
- *   [data-test="dashboard-custom-query-type"]    — Custom mode button (same component)
- *   [data-test="metrics-explorer-run"]           — Run Query button
- *
  * Selectors / Monaco access live in the PO (pages/dashboardPages/dashboard-promql-editor.js);
  * this spec only calls PO methods so it complies with the data-test-only selector policy.
  */
