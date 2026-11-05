@@ -1123,6 +1123,26 @@ describe("IncidentList.vue", () => {
       };
     };
 
+    it("a finding's chips read what, name, type everywhere", async () => {
+      const { chips, more } = await mountWith({
+        env: "prod",
+        stream_type: "logs",
+        stream_name: "checkout",
+        autoobserve_finding: "stream_silence",
+      });
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
+      expect(more.text()).toContain("+2 more");
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
+        "StreamType=logsenv=prod",
+      );
+    });
+
+    it("another incident keeps the alphabetical chips", async () => {
+      const { chips, more } = await mountWith({ service: "api", env: "prod", cluster: "eu" });
+      expect(chips.map((c) => c.props("dimKey"))).toEqual(["cluster", "env"]);
+      expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe("service=api");
+    });
+
     it("the list shows a finding's chips in words", async () => {
       const { chips, more } = await mountWith({
         autoobserve_finding: "stream_silence",

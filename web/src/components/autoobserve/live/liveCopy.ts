@@ -42,6 +42,8 @@ export interface LiveStale {
   dataAt: number;
 }
 
+export type CheckedView = { kind: "loading" } | { kind: "text"; text: I18nText } | { kind: "none" };
+
 export const RAIL_CAP = 5;
 
 export const DRAWER_PAGE = 25;
@@ -217,6 +219,44 @@ export const agoText = (t: TranslateFn, locale: string, minutes: number): I18nTe
   minutes < 1
     ? t("autoobserveLive.time.justNow")
     : t("autoobserveLive.time.ago", { time: durationText(locale, minutes) });
+
+export const todayText = (locale: string, timeZone: string, nowMs: number): I18nText =>
+  raw(
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone,
+    }).format(new Date(nowMs)),
+  );
+
+// A failed or denied coverage read has no pass to report, and its own notice says why.
+export const checkedView = (
+  t: TranslateFn,
+  locale: string,
+  source: { status: "loading" | "error" | "ready"; passMinutes: number | null },
+): CheckedView => {
+  if (source.status === "loading") return { kind: "loading" };
+  if (source.status === "error") return { kind: "none" };
+  if (source.passMinutes === null)
+    return { kind: "text", text: t("autoobserveLive.topbar.firstCheck") };
+  return {
+    kind: "text",
+    text: t("autoobserveLive.topbar.checked", { ago: agoText(t, locale, source.passMinutes) }),
+  };
+};
+
+// A missing part is left out, never drawn as a dash; with neither part there is no location.
+export const whereText = (
+  t: TranslateFn,
+  cluster: string | null | undefined,
+  namespace: string | null | undefined,
+): I18nText | null => {
+  if (cluster && namespace)
+    return t("autoobserveLive.where", { cluster: raw(cluster), namespace: raw(namespace) });
+  const only = cluster || namespace;
+  return only ? raw(only) : null;
+};
 
 export type LiveCoverageState = "watched" | "gap";
 

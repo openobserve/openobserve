@@ -25,7 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
       :class="railShown ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
     >
-      <TopBar @open="openNamed" @search="searchIssues" />
+      <TopBar
+        :live="live"
+        :date="liveData.today.value"
+        :checked="liveData.checked.value"
+        @open="openNamed"
+        @search="searchIssues"
+      />
       <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
       <div
         class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
@@ -34,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
         >
+          <LivePaged v-if="live" :cap="MAIN_PAGED_CAP" class="order-1" />
           <ThisWeek
+            v-else
             v-model:range="range"
             v-model:priority="priority"
             v-model:shown="shown"
@@ -47,10 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <PageFooter
             class="order-3 pt-2"
+            :live="live"
             @open-coverage="openCoverage()"
             @open-activity="openActivity()"
           />
           <div
+            v-if="!live"
             class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
             data-test="autoobserve2-scenario"
           >
@@ -80,7 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-rail-scroll"
             @scroll="measureRail"
           >
-            <LivePaged v-if="live" class="order-2 shrink-0" />
             <LiveSuggestions
               v-if="live"
               class="order-2 shrink-0"
@@ -328,6 +337,7 @@ import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
 import { coverageSentence as liveSentence } from "@/components/autoobserve/live/liveCopy";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
+import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import {
@@ -653,8 +663,8 @@ onMounted(async () => {
   const problemId = typeof route.query.problem === "string" ? route.query.problem : "";
   const knownProblem = problemsIn(scenario.value, "quarter").some((p) => p.id === problemId);
   if (page.value) howOpen.value = false;
-  // Only a drawer the current scenario can show reopens; anything else is dropped from the URL.
-  if (drawer === "problem" && knownProblem) {
+  // Only a drawer the current scenario can show reopens; live mode has no fixture problems to open.
+  if (drawer === "problem" && knownProblem && !live.value) {
     howOpen.value = false;
     selectedId.value = problemId;
     // Focus the row first, so closing a deep-linked drawer lands on it rather than the page body.

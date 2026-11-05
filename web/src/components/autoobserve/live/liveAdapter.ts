@@ -35,7 +35,14 @@ import {
 } from "../fixtures";
 import type { Msg, Request, RequestCopy } from "../v2/fixtures";
 import type { ChangeKind } from "../v2/changes";
-import { agoText, coverageWord, formatDay, type LiveFailure, type LiveStale } from "./liveCopy";
+import {
+  agoText,
+  coverageWord,
+  formatDay,
+  whereText,
+  type LiveFailure,
+  type LiveStale,
+} from "./liveCopy";
 
 export type SourceStatus = "loading" | "error" | "ready";
 
@@ -337,10 +344,7 @@ const toRow = (
   return {
     service,
     stream: streamText(row),
-    where: t("autoobserveLive.where", {
-      cluster: raw(row.cluster || "—"),
-      namespace: raw(row.namespace || "—"),
-    }),
+    where: whereText(t, row.cluster, row.namespace) ?? raw("—"),
     scannedMinutes: minutes,
     lastScanned:
       minutes === null ? t("autoobserve.coverage.notScanned") : agoText(t, locale, minutes),
@@ -400,19 +404,15 @@ const serviceName = (s: AutoObserveSuggestion) =>
     str(s.evidence.service_name) || s.subject.key_dims.service_name || s.subject.key_dims.entity_id,
   );
 
-const serviceMeta = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+const serviceMeta = (t: TranslateFn, s: AutoObserveSuggestion): I18nText | null => {
   const dims = s.subject.key_dims;
-  const where = t("autoobserveLive.where", {
-    cluster: raw(dims.k8s_cluster_name || "—"),
-    namespace: raw(dims.k8s_namespace_name || "—"),
-  });
-  const traffic = num(s.evidence.traffic_per_hour);
-  return traffic === null
-    ? where
-    : t("autoobserveLive.suggestions.serviceMeta", {
-        where,
-        traffic: raw(formatLargeNumber(Math.round(traffic))),
-      });
+  const where = whereText(t, dims.k8s_cluster_name, dims.k8s_namespace_name);
+  const value = num(s.evidence.traffic_per_hour);
+  if (value === null) return where;
+  const traffic = raw(formatLargeNumber(Math.round(value)));
+  return where
+    ? t("autoobserveLive.suggestions.serviceMeta", { where, traffic })
+    : t("autoobserveLive.suggestions.trafficOnly", { traffic });
 };
 
 const cellsOf = (s: AutoObserveSuggestion) =>
@@ -615,14 +615,9 @@ export const toRequests = (
     };
   });
 
-const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
-  const dims = s.subject.key_dims;
-  if (!dims.k8s_cluster_name && !dims.k8s_namespace_name) return raw("—");
-  return t("autoobserveLive.where", {
-    cluster: raw(dims.k8s_cluster_name || "—"),
-    namespace: raw(dims.k8s_namespace_name || "—"),
-  });
-};
+const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText =>
+  whereText(t, s.subject.key_dims.k8s_cluster_name, s.subject.key_dims.k8s_namespace_name) ??
+  raw("—");
 
 export const toSuggestionRows = (
   t: TranslateFn,

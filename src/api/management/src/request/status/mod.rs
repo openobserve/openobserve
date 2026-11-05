@@ -259,6 +259,8 @@ struct ConfigResponse<'a> {
     query_history_enabled: bool,
     /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
     query_history_retention_days: i64,
+    /// Days alert level changes are kept; 0 or less keeps them all.
+    alert_transitions_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -781,6 +783,7 @@ pub async fn zo_config(
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         query_history_enabled: cfg.limit.query_history_enabled,
         query_history_retention_days: cfg.limit.query_history_retention_days,
+        alert_transitions_retention_days: cfg.limit.alert_transitions_retention_days,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -2756,6 +2759,15 @@ mod tests {
             assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
             assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_transitions_retention() {
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["alert_transitions_retention_days"],
+            get_config().limit.alert_transitions_retention_days
+        );
     }
 
     async fn zo_config_json() -> serde_json::Value {

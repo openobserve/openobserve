@@ -14,20 +14,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, mount, shallowMount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import autoobserve from "@/services/autoobserve";
-import { SCENARIOS } from "@/components/autoobserve/data/facts";
+import { SCENARIOS, problemsIn } from "@/components/autoobserve/data/facts";
 import { scenarioData } from "@/components/autoobserve/v2/fixtures";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
+import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
+import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
+import TopBar from "@/components/autoobserve/v2/TopBar.vue";
+import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
+import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
 const routeQuery: Record<string, string> = {};
+const replace = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace, push: vi.fn(), back: vi.fn() }),
   useRoute: () => ({ query: routeQuery }),
 }));
 
@@ -59,6 +65,8 @@ const mountView = () =>
 describe("AutoObserve2 rail column (OSS-9)", () => {
   beforeEach(() => {
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    replace.mockReset();
+    localStorage.setItem("autoobserve2.howItWorksSeen", "1");
     vi.mocked(autoobserve.coverage).mockReturnValue(pending());
     vi.mocked(autoobserve.suggestions).mockReturnValue(pending());
     vi.mocked(autoobserve.incidents).mockReset();
@@ -82,19 +90,72 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.find('[data-test="autoobserve2-rail"]').exists()).toBe(false);
   });
 
-  it("the paged card shows only in live mode, first in the rail", () => {
-    Object.assign(routeQuery, { live: "1", scenario: quiet ?? "" });
-    const wrapper = mountView();
-    const rail = wrapper.find('[data-test="autoobserve2-rail-scroll"]');
-    const order = Array.from(rail.element.children);
-    const paged = wrapper.findComponent(LivePaged);
-    expect(paged.exists()).toBe(true);
-    expect(order.indexOf(paged.element)).toBe(0);
-    expect(order.indexOf(wrapper.findComponent(LiveSuggestions).element)).toBe(1);
-    expect(paged.classes()).toEqual(expect.arrayContaining(["order-2", "shrink-0"]));
-    wrapper.unmount();
+  it("live mode shows the paged findings card in the main column, not the fixture", () => {
+    for (const scenario of SCENARIOS) {
+      Object.assign(routeQuery, { live: "1", scenario });
+      const wrapper = mountView();
+      const paged = wrapper.findComponent(LivePaged);
+      expect(paged.exists(), scenario).toBe(true);
+      expect(paged.props("cap")).toBe(MAIN_PAGED_CAP);
+      expect(MAIN_PAGED_CAP).toBe(10);
+      expect(paged.classes()).toContain("order-1");
+      expect(wrapper.findComponent(ThisWeek).exists()).toBe(false);
+      const rail = wrapper.find('[data-test="autoobserve2-rail-scroll"]');
+      expect(rail.element.contains(paged.element)).toBe(false);
+      expect(Array.from(rail.element.children)).toEqual([
+        wrapper.findComponent(LiveSuggestions).element,
+      ]);
+      wrapper.unmount();
+    }
+  });
 
+  it("fixture mode is unchanged", () => {
+    Object.assign(routeQuery, { scenario: SCENARIOS[0] });
+    const wrapper = mountView();
+    expect(wrapper.findComponent(ThisWeek).exists()).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(true);
+    expect(wrapper.findComponent(LivePaged).exists()).toBe(false);
+    expect(wrapper.findComponent(TopBar).props("live")).toBe(false);
+    expect(wrapper.findComponent(PageFooter).props("live")).toBe(false);
+  });
+
+  it("live mode hides the fixture-only controls", () => {
+    Object.assign(routeQuery, { live: "1", scenario: SCENARIOS[0] });
+    const wrapper = mountView();
+    expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
+    const bar = wrapper.findComponent(TopBar);
+    expect(bar.props("live")).toBe(true);
+    expect(bar.props("checked")).toEqual({ kind: "loading" });
+    expect(wrapper.findComponent(PageFooter).props("live")).toBe(true);
+    const footer = mount(PageFooter, { props: { live: true }, global: { plugins: [i18n] } });
+    expect(footer.find('[data-test="autoobserve2-footer-activity"]').exists()).toBe(false);
+    expect(footer.find('[data-test="autoobserve2-footer-coverage"]').exists()).toBe(true);
+  });
+
+  it("a fixture problem drawer in the URL is dropped in live mode", async () => {
+    const scenario = SCENARIOS.find((s) => problemsIn(s, "quarter").length) ?? SCENARIOS[0];
+    const problem = problemsIn(scenario, "quarter")[0].id;
+    Object.assign(routeQuery, { live: "1", scenario, drawer: "problem", problem });
+    const wrapper = mountView();
+    await flushPromises();
+    expect(replace).toHaveBeenCalledTimes(1);
+    const query = replace.mock.calls[0][0].query;
+    expect(query.drawer).toBeUndefined();
+    expect(query.problem).toBeUndefined();
+    expect(query.live).toBe("1");
+    expect(wrapper.findComponent(AutoObserveIssueDrawer).props("open")).toBe(false);
+
+    wrapper.unmount();
+    replace.mockReset();
     delete routeQuery.live;
+    const fixtureView = mountView();
+    await flushPromises();
+    expect(fixtureView.findComponent(AutoObserveIssueDrawer).props("open")).toBe(true);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("the fixture view never fetches paged findings", () => {
+    Object.assign(routeQuery, { scenario: quiet ?? "" });
     const fixtureView = mountView();
     expect(fixtureView.findComponent(LivePaged).exists()).toBe(false);
     expect(autoobserve.incidents).not.toHaveBeenCalled();

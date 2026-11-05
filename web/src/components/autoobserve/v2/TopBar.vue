@@ -29,15 +29,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoobserve2.topbar.brand") }}
       </h1>
       <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-      <span class="text-text-body">{{ today }}</span>
-      <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-      <span class="text-text-body">{{
-        t("autoobserve2.topbar.checked", { count: LAST_CHECKED }, LAST_CHECKED)
-      }}</span>
+      <span class="text-text-body">{{ live ? date : today }}</span>
+      <span
+        v-if="live"
+        class="text-text-body flex min-w-32 items-center gap-x-3"
+        :aria-hidden="checked.kind === 'none' ? 'true' : undefined"
+        data-test="autoobserve2-topbar-checked"
+      >
+        <template v-if="checked.kind !== 'none'">
+          <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
+          <OSkeleton v-if="checked.kind === 'loading'" animation="none" class="h-3 w-28" />
+          <span v-else>{{ checked.text }}</span>
+        </template>
+      </span>
+      <template v-else>
+        <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
+        <span class="text-text-body">{{
+          t("autoobserve2.topbar.checked", { count: LAST_CHECKED }, LAST_CHECKED)
+        }}</span>
+      </template>
     </div>
     <nav class="flex flex-wrap items-center gap-1" data-test="autoobserve2-nav">
       <ViewSwitch class="me-1" />
       <div
+        v-if="!live"
         class="items-center"
         :class="searchOpen ? 'flex' : 'hidden sm:flex'"
         data-test="autoobserve2-nav-search"
@@ -59,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OInput>
       </div>
       <OButton
-        v-if="!searchOpen"
+        v-if="!live && !searchOpen"
         variant="ghost-muted"
         size="icon-sm"
         class="sm:hidden"
@@ -70,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="search" size="sm" />
       </OButton>
       <OButton
+        v-if="!live"
         variant="ghost-muted"
         size="sm"
         icon-left="history"
@@ -79,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoobserve2.nav.history") }}
       </OButton>
       <OButton
+        v-if="!live"
         variant="ghost-muted"
         size="icon-sm"
         :aria-label="t('autoobserve2.nav.settings')"
@@ -104,14 +121,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ViewSwitch from "./ViewSwitch.vue";
 import { DEMO_DATE } from "../data/facts";
 import { LAST_CHECKED } from "./fixtures";
+import type { CheckedView } from "../live/liveCopy";
+
+withDefaults(defineProps<{ live?: boolean; date?: I18nText; checked?: CheckedView }>(), {
+  live: false,
+  date: () => raw(""),
+  checked: () => ({ kind: "none" }),
+});
 
 const emit = defineEmits<{
   open: [drawer: "history" | "settings" | "howItWorks"];

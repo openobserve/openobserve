@@ -857,7 +857,7 @@ import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/tr
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
-import { dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -1713,9 +1713,7 @@ const formatReqRate = (reqs: number) => {
 };
 
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
-  Object.keys(dims)
-    .sort()
-    .map((k) => [k, dims[k]]);
+  chipDimensionKeys(dims).map((k) => [k, dims[k]]);
 
 // Shorten verbose k8s-style keys for display: "k8s-namespace" → "namespace"
 const shortDimKey = (key: string): string =>

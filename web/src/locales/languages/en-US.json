@@ -13430,6 +13430,7 @@
       "rollupRow": "All groups (rollup)",
       "noHistoryTitle": "No transitions recorded",
       "noHistoryDescription": "Level changes appear here as groups start firing, escalate or recover.",
+      "noHistoryRetention": "Changes older than {count} day are not kept. | Changes older than {count} days are not kept.",
       "evaluationsView": "Evaluations",
       "levelChangesView": "Level changes",
       "noEvaluationsTitle": "No evaluations in this window",
@@ -28560,6 +28561,10 @@
   },
   "autoobserveLive": {
     "where": "{cluster} / {namespace}",
+    "topbar": {
+      "checked": "Checked {ago}",
+      "firstCheck": "First check in progress"
+    },
     "retry": "Retry",
     "classes": {
       "errors": "Errors",
@@ -28638,6 +28643,7 @@
     },
     "suggestions": {
       "serviceMeta": "{where}, about {traffic} events an hour",
+      "trafficOnly": "About {traffic} events an hour",
       "kinds": {
         "coverage_gap": "Coverage gap",
         "no_absence_check": "No absence check",
@@ -28710,7 +28716,7 @@
       },
       "coverage": {
         "deniedTitle": "You don't have permission to see coverage",
-        "deniedDesc": "Coverage lists the monitors that watch each service, so it needs permission to view alerts in this organization. Ask an organization admin for it.",
+        "deniedDesc": "Coverage counts the monitors in every folder, so it needs permission to view all alerts in this organization, not only some folders. Ask an organization admin for it.",
         "offDesc": "An administrator turns it on for this deployment. Coverage appears here after its first check.",
         "unavailableTitle": "Coverage is temporarily unavailable",
         "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",

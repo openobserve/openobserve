@@ -21,6 +21,7 @@ import {
   coverageSentence,
   coverageWord,
   agoText,
+  checkedView,
   durationText,
   emptyCoverageNotice,
   formatDay,
@@ -36,7 +37,9 @@ import {
   moreText,
   refreshFailedText,
   seeAllText,
+  todayText,
   userTimeZone,
+  whereText,
   type LiveFailure,
 } from "./liveCopy";
 import {
@@ -63,7 +66,14 @@ describe("liveFailureOf / liveNotice", () => {
     const notice = liveNotice(gt, "coverage", "denied");
     expect(notice).toMatchObject({ severity: "error", retry: false, details: false, icon: "lock" });
     expect(notice.title).toBe("You don't have permission to see coverage");
-    expect(notice.description).toContain("permission to view alerts in this organization");
+  });
+
+  it("the denial names the missing org-wide permission", () => {
+    const notice = liveNotice(gt, "coverage", "denied");
+    expect(notice).toMatchObject({ severity: "error", retry: false, details: false });
+    expect(notice.description).toContain("all alerts in this organization");
+    expect(notice.description).toContain("not only some folders");
+    expect(notice.description).toContain("Ask an organization admin for it.");
   });
 
   it("maps 404 to a neutral 'not turned on' state with no retry", () => {
@@ -438,5 +448,44 @@ describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
       "problem",
       "problem",
     ]);
+  });
+});
+
+describe("the live top bar", () => {
+  // 2026-11-05T23:30Z: still Thursday in UTC, already Friday in India.
+  const NOW_MS = Date.UTC(2026, 10, 5, 23, 30);
+  const ready = (passMinutes: number | null) => ({ status: "ready" as const, passMinutes });
+
+  it("today is the viewer's date in the viewer's zone", () => {
+    expect(todayText("en-US", "UTC", NOW_MS)).toBe("Thursday, November 5");
+    expect(todayText("en-US", "Asia/Kolkata", NOW_MS)).toBe("Friday, November 6");
+  });
+
+  it("the check slot follows the coverage pass", () => {
+    expect(checkedView(gt, "en-US", { status: "loading", passMinutes: null })).toEqual({
+      kind: "loading",
+    });
+    expect(checkedView(gt, "en-US", ready(0))).toEqual({ kind: "text", text: "Checked just now" });
+    expect(checkedView(gt, "en-US", ready(12))).toEqual({
+      kind: "text",
+      text: "Checked 12 minutes ago",
+    });
+    expect(checkedView(gt, "en-US", ready(null))).toEqual({
+      kind: "text",
+      text: "First check in progress",
+    });
+    expect(checkedView(gt, "en-US", { status: "error", passMinutes: 12 })).toEqual({
+      kind: "none",
+    });
+  });
+});
+
+describe("whereText (a service's Kubernetes location)", () => {
+  it("whereText reads every location shape", () => {
+    expect(whereText(gt, "prod", "payments")).toBe("prod / payments");
+    expect(whereText(gt, "prod", "")).toBe("prod");
+    expect(whereText(gt, "", "payments")).toBe("payments");
+    expect(whereText(gt, "", "")).toBeNull();
+    expect(whereText(gt, undefined, null)).toBeNull();
   });
 });

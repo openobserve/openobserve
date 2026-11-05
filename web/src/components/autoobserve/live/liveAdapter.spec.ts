@@ -115,6 +115,66 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
   });
 });
 
+describe("a service's location on cards and in tables", () => {
+  const outside = (evidence: Record<string, unknown>) =>
+    suggestion({
+      subject: { kind: "service", key_dims: { service_name: "checkout" } },
+      evidence: { service_name: "checkout", severity: "high", cells: {}, ...evidence },
+    });
+  const why = (s: AutoObserveSuggestion) => toRequests(gt, EAST, [s])[0].copy?.why;
+
+  it("a card outside Kubernetes never prints dashes", () => {
+    expect(why(outside({ traffic_per_hour: 4 }))).toBe("About 4 events an hour");
+    expect(why(outside({}))).toBeNull();
+    const located = (dims: Record<string, string>) =>
+      why(
+        suggestion({
+          subject: { kind: "service", key_dims: { service_name: "checkout", ...dims } },
+          evidence: { service_name: "checkout", traffic_per_hour: 4, cells: {} },
+        }),
+      );
+    expect(located({ k8s_cluster_name: "prod", k8s_namespace_name: "payments" })).toBe(
+      "prod / payments, about 4 events an hour",
+    );
+    expect(located({ k8s_cluster_name: "prod" })).toBe("prod, about 4 events an hour");
+    expect(located({ k8s_namespace_name: "payments" })).toBe("payments, about 4 events an hour");
+    const all = toRequests(gt, EAST, [outside({ traffic_per_hour: 4 }), outside({})]);
+    expect(JSON.stringify(all)).not.toContain("—");
+  });
+
+  it("table cells keep the no-value dash", () => {
+    const [row] = toSuggestionRows(gt, EAST, [outside({ traffic_per_hour: 4 })]);
+    expect(row.where).toBe("—");
+    const [one] = toSuggestionRows(gt, EAST, [
+      suggestion({
+        subject: {
+          kind: "service",
+          key_dims: { service_name: "checkout", k8s_cluster_name: "prod" },
+        },
+      }),
+    ]);
+    expect(one.where).toBe("prod");
+    const coverage = {
+      view: "strict",
+      pass_at: null,
+      refreshed_at: null,
+      quality: null,
+      classes: [],
+      rows: [
+        { service_name: "checkout", cluster: "", namespace: "", streams: [], cells: {} },
+        { service_name: "orders", cluster: "prod", namespace: "", streams: [], cells: {} },
+      ],
+    } as unknown as AutoObserveCoverage;
+    const source = toCoverageSource(
+      gt,
+      coverage,
+      { status: "ready", retry: () => undefined },
+      "en-US",
+    );
+    expect(source.rows.map((r) => r.where)).toEqual(["—", "prod"]);
+  });
+});
+
 describe("rail order (one rank for rail and drawer)", () => {
   const ranked = [
     suggestion({ id: "gap" }),

@@ -58,8 +58,9 @@ const originalOrg = store.state.selectedOrganization;
 const originalConfig = store.state.zoConfig;
 
 let wrappers: ReturnType<typeof mountCard>[] = [];
-const mountCard = () => {
+const mountCard = (props: { cap?: number } = {}) => {
   const wrapper = mount(LivePaged, {
+    props,
     attachTo: document.body,
     global: { plugins: [i18n, store] },
   });
@@ -342,6 +343,32 @@ describe("LivePaged (D9-web)", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(announce().text()).toBe("Paged findings loaded");
     expect(w.attributes("aria-busy")).toBe("false");
+  });
+
+  it("the main card reads ten and says so", async () => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    api.mockReturnValueOnce(later(900, page(pick(0, 1, 2, 3), { has_more: true })) as never);
+    const main = mountCard({ cap: 10 });
+    await vi.advanceTimersByTimeAsync(301);
+    expect(api).toHaveBeenCalledWith("demo-org", { limit: 10, offset: 0 });
+    expect(main.find(sel("skeleton")).findAll("li")).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(rows(main)).toHaveLength(4);
+    expect(main.find(sel("more")).text()).toBe("Showing the 10 newest");
+  });
+
+  it("the default cap stays three", async () => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    api.mockReturnValueOnce(later(900, page(FIXTURE.items, { has_more: true })) as never);
+    const rail = mountCard();
+    await vi.advanceTimersByTimeAsync(301);
+    expect(api).toHaveBeenCalledWith("demo-org", { limit: 3, offset: 0 });
+    expect(rail.find(sel("skeleton")).findAll("li")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(rows(rail)).toHaveLength(3);
+    expect(rail.find(sel("more")).text()).toBe("Showing the 3 newest");
   });
 
   it("fetches nothing outside live mode", async () => {

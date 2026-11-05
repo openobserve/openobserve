@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import {
   dimensionDisplay,
   findingFacts,
+  chipDimensionKeys,
   findingLabels,
   isFindingIncident,
   orderedDimensionKeys,
@@ -84,8 +85,8 @@ describe("findingDimensions", () => {
 
   it("a finding trigger's labels are the finding in words, in order", () => {
     const labels = findingLabels(gt, F);
-    expect(Object.keys(labels!)).toEqual(["Finding", "Stream Type", "Stream Name"]);
-    expect(Object.values(labels!)).toEqual(["Stopped sending data", "logs", "checkout"]);
+    expect(Object.keys(labels!)).toEqual(["Finding", "Stream Name", "Stream Type"]);
+    expect(Object.values(labels!)).toEqual(["Stopped sending data", "checkout", "logs"]);
     expect(findingLabels(gt, { service: "api" })).toBeNull();
   });
 
@@ -98,8 +99,8 @@ describe("findingDimensions", () => {
     };
     expect(orderedDimensionKeys(served)).toEqual([
       "autoobserve_finding",
-      "stream_type",
       "stream_name",
+      "stream_type",
       "env",
     ]);
     expect(orderedDimensionKeys({ stream_name: "checkout", service: "api" })).toEqual([
@@ -107,5 +108,24 @@ describe("findingDimensions", () => {
       "service",
     ]);
     expect(orderedDimensionKeys(null)).toEqual([]);
+  });
+
+  it("a finding's chips read what, name, type everywhere", () => {
+    const served = { env: "prod", stream_type: "logs", stream_name: "checkout", ...F };
+    expect(chipDimensionKeys(served)).toEqual([
+      "autoobserve_finding",
+      "stream_name",
+      "stream_type",
+      "env",
+    ]);
+  });
+
+  it("another incident keeps the alphabetical chips", () => {
+    expect(chipDimensionKeys({ service: "api", env: "prod", cluster: "eu" })).toEqual([
+      "cluster",
+      "env",
+      "service",
+    ]);
+    expect(chipDimensionKeys(null)).toEqual([]);
   });
 });
