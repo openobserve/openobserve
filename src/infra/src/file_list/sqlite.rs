@@ -428,7 +428,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let (time_start, time_end) = time_range;
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
                 time_end,
-                super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+                super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
             );
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
@@ -491,7 +491,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let pool = CLIENT_RO.clone();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
             time_end,
-            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
         );
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
@@ -608,11 +608,12 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
         };
         log::debug!("file_list day_partitions: {day_partitions:?}");
 
-        let max_ts_level = super::max_ts_bound_level(org_id, stream_type, stream_name).await;
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
+            let max_ts_level =
+                super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await;
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                     let max_ts_upper_bound =
@@ -699,7 +700,7 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
         let cfg = get_config();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
             time_end,
-            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
         );
         let sql = r#"
 SELECT date
