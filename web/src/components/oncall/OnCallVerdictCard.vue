@@ -56,10 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ raw(promotion.body) }}
       </p>
-
-      <!-- The verdict never edits the page that already went out — it rides as
-         one follow-up. Saying so heads off "why didn't my page update". -->
-      <span class="text-text-secondary text-xs">{{ t("oncall.verdictFollowUpNote") }}</span>
     </OCardSection>
   </OCard>
 </template>

@@ -41,6 +41,8 @@ export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
      * prevented.
      */
     create_secondary: z.boolean().optional(),
+    /** Edit only: make this team the org's default; turning it off is not offered. */
+    make_default: z.boolean().optional(),
   });
 
 export type OnCallTeamFormValues = z.infer<ReturnType<typeof makeOnCallTeamSchema>>;

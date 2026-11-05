@@ -165,18 +165,24 @@ pub struct SetScheduleRequest {
     pub rotations: Vec<Rotation>,
 }
 
-/// A full replace; which fields a preset takes is the catalogue's job to say, not this struct's.
+/// Replaces one rotation's shift rules or adds one; the catalogue says which fields apply.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct FromPresetRequest {
     /// Absent means the team's own zone; there is no per-user timezone to fall back on.
     #[serde(default)]
     pub timezone: Option<String>,
-    /// How long one shift lasts, on every layer the preset builds. Absent is a week.
+    /// How long one shift lasts, on every shift rule the preset builds. Absent is a week.
     #[serde(default)]
     pub handover_micros: Option<i64>,
     /// Absent is now, snapped to the last local Monday 00:00 so handovers land on a week boundary.
     #[serde(default)]
     pub anchor_micros: Option<i64>,
+    /// Replaces this rotation's shift rules; its id and name stay.
+    #[serde(default)]
+    pub rotation_id: Option<String>,
+    /// Adds a rotation with this name; setting both fields is a 400.
+    #[serde(default)]
+    pub new_rotation_name: Option<String>,
     #[serde(flatten)]
     pub spec: config::meta::oncall::PresetSpec,
 }
@@ -1277,7 +1283,7 @@ pub async fn list_schedule_presets(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "ApplyOnCallSchedulePreset",
-    summary = "Replace the shift rules of a team's primary rotation with ones built from a preset",
+    summary = "Build shift rules from a template, replacing a chosen rotation's or adding a rotation",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1301,7 +1307,7 @@ pub async fn apply_schedule_preset(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // It replaces the primary rotation's rules via `PUT /schedule`, so the same authority.
+        // It writes the schedule via `PUT /schedule`'s path, so the same authority.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1312,6 +1318,8 @@ pub async fn apply_schedule_preset(
             body.spec,
             body.handover_micros,
             body.anchor_micros,
+            body.rotation_id,
+            body.new_rotation_name,
             config::utils::time::now_micros(),
         )
         .await
@@ -6283,6 +6291,21 @@ mod tests {
         assert_eq!(body.anchor_micros, None);
         assert_eq!(body.spec.id(), config::meta::oncall::PresetId::FollowTheSun);
         assert_eq!(body.spec.members(), vec!["naoto@o2.ai", "lars@o2.ai"]);
+    }
+
+    /// The target fields are read beside the flattened preset, not swallowed by it.
+    #[test]
+    fn test_from_preset_body_reads_the_target_rotation() {
+        let body: FromPresetRequest = serde_json::from_str(
+            r#"{"preset":"weekday_weekend",
+                "rotation_id":"rot_b",
+                "new_rotation_name":"Tertiary",
+                "weekdays":{"members":["ana@o2.ai"]},
+                "weekend":{"members":["sam@o2.ai"]}}"#,
+        )
+        .unwrap();
+        assert_eq!(body.rotation_id.as_deref(), Some("rot_b"));
+        assert_eq!(body.new_rotation_name.as_deref(), Some("Tertiary"));
     }
 
     /// Everything but the preset and its groups is optional.
