@@ -1090,13 +1090,17 @@ describe("ClickHeatmap", () => {
         step(n);
       });
     const scale = (1200 - 32) / 1440;
+    let noCanvas: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       // jsdom has no CSS.escape; browsers do.
       vi.stubGlobal("CSS", { escape: (v: string) => v.replace(/[^\w-]/g, (c) => `\\${c}`) });
+      // A 1440x6000 page makes every redraw recolour 8.6M mock-canvas pixels; these tests check geometry, not paint.
+      noCanvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     });
 
     afterEach(() => {
+      noCanvas.mockRestore();
       if (origWidth) Object.defineProperty(Element.prototype, "clientWidth", origWidth);
       if (origHeight) Object.defineProperty(Element.prototype, "clientHeight", origHeight);
       h.pageWidth = 0;
@@ -1133,7 +1137,6 @@ describe("ClickHeatmap", () => {
       wrapper.unmount();
     });
 
-    // Takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
     it("refits and redraws after entering and leaving full screen", async () => {
       const { wrapper } = await mountGeo();
       const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
@@ -1160,7 +1163,7 @@ describe("ClickHeatmap", () => {
       expect(scroller.scrollTop).toBe(0);
       expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
       wrapper.unmount();
-    }, 20000);
+    });
 
     const hitMove = async (w: any, x: number, y: number) => {
       const layer = w.find('[data-test="rum-heatmap-hit-layer"]');

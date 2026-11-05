@@ -94,6 +94,7 @@ describe("SloList pagination persistence", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    resetListViewState();
     (router as any).currentRoute.value.query = {};
     vi.restoreAllMocks();
   });
@@ -123,7 +124,9 @@ describe("SloList pagination persistence", () => {
   });
 
   it("resets to page 1 and drops page from the URL on a folder switch", async () => {
-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
+    // One row per page: the switch's unawaited refetch re-renders page 1 inside this test's time, and 25 real rows took seconds.
+    Object.assign(useListViewState("slos", { pageSize: 25 }), { pageSize: 1 });
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(2) } } as any);
     (router as any).currentRoute.value.query = { page: "2", folder: "default" };
     wrapper = await mountList();
     expect((wrapper.vm as any).currentPage).toBe(2);
