@@ -364,6 +364,18 @@ describe("OnboardingStepGuide", () => {
       watch.result.value = undefined;
     });
 
+    it("shows the open and add-another buttons once, under Explore, not again in the card's status", async () => {
+      const w = await mountGuide(false, undefined, undefined, true);
+      watch.result.value = metrics;
+      watch.state.value = "received";
+      await flushPromises();
+      expect(w.find('[data-test="first-event-status"]').exists()).toBe(true);
+      expect(w.find('[data-test="onboarding-first-data-open"]').exists()).toBe(true);
+      expect(w.find('[data-test="first-event-status-open-btn"]').exists()).toBe(false);
+      expect(w.find('[data-test="first-event-status-setup-another-btn"]').exists()).toBe(false);
+      watch.result.value = undefined;
+    });
+
     it("leaves the tracing step open when the data check finds only the cluster's logs", async () => {
       cardSteps.value = [
         { id: "install", title: "Quick install", done: false, active: true },

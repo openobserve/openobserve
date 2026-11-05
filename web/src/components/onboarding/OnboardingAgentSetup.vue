@@ -259,6 +259,7 @@ import { otlpTracesDetect } from "@/components/ingestion/setupCard/content/otlpT
 import { rumDetect } from "@/components/ingestion/setupCard/content/rum";
 import type { RichCardDetect } from "@/components/ingestion/setupCard/types";
 import { FIRST_EVENT_SNIPPET_COPIED } from "@/composables/firstEvent/firstEventCopied";
+import { FIRST_EVENT_SUCCESS_BY_HOST } from "@/composables/firstEvent/firstEventReporter";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { useCredentialSnippet } from "@/composables/useCredentialSnippet";
 import useIngestion from "@/composables/useIngestion";
@@ -380,6 +381,8 @@ watch(focus, () => {
   promptCopied.value = false;
 });
 const restartWatch = () => status.value?.start("copy");
+// The success panel below holds the open and add-another buttons, so the status does not repeat them.
+provide(FIRST_EVENT_SUCCESS_BY_HOST, true);
 provide(FIRST_EVENT_SNIPPET_COPIED, () => {
   tokenCopied.value = true;
   restartWatch();

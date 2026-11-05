@@ -29,6 +29,7 @@ import { markHeardFromPending } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
 import {
   FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
   type FirstEventReporter,
 } from "@/composables/firstEvent/firstEventReporter";
 import analytics from "@/services/product_analytics";
@@ -98,6 +99,7 @@ const mountBar = (
     askAi?: (q: string) => void;
     zoConfig?: Record<string, unknown>;
     reporter?: FirstEventReporter;
+    successByHost?: boolean;
     org?: Record<string, unknown>;
     organizations?: unknown[];
   } = {},
@@ -110,6 +112,7 @@ const mountBar = (
       provide: {
         ...(opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {}),
         ...(opts.reporter ? { [FIRST_EVENT_REPORTER as symbol]: opts.reporter } : {}),
+        ...(opts.successByHost ? { [FIRST_EVENT_SUCCESS_BY_HOST as symbol]: true } : {}),
       },
     },
   });
@@ -265,6 +268,17 @@ describe("FirstEventStatus — received", () => {
     rangeStart: NOW * 1000 - 900_000_000,
     rangeEnd: NOW * 1000 + 900_000_000,
   };
+
+  it("leaves the open and add-another buttons to an onboarding page's own success panel", async () => {
+    mountBar({}, { successByHost: true });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-summary").exists()).toBe(true);
+    expect(q("first-event-status-open-btn").exists()).toBe(false);
+    expect(q("first-event-status-setup-another-btn").exists()).toBe(false);
+    expect(q("first-event-status-connect-source-btn").exists()).toBe(false);
+  });
 
   it("shows the count, stream, source and first record, and fires first_event_detected once", async () => {
     mountBar({ sourceLabel: "acme-prod-eks" });

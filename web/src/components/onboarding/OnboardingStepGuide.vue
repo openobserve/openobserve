@@ -254,6 +254,7 @@ import { SETUP_CARD_ONBOARDING } from "@/components/ingestion/setupCard/types";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { provideBarsCopied } from "@/composables/firstEvent/firstEventCopied";
+import { FIRST_EVENT_SUCCESS_BY_HOST } from "@/composables/firstEvent/firstEventReporter";
 import type {
   FirstEventResult,
   FirstEventState,
@@ -346,6 +347,8 @@ const onState = (next: FirstEventState) => {
 const successTitle = computed(() => t("onboarding.firstData.title"));
 // The question sits under Explore, so the card's or page's own status does not ask it too.
 provide(HEARD_FROM_ASKED_BY_HOST, true);
+// Explore Your Data holds the open and add-another buttons, so a status here does not repeat them.
+provide(FIRST_EVENT_SUCCESS_BY_HOST, true);
 
 // A setup card reports its steps; a Data sources page has none to report, so the nav uses a
 // generic pair for it. Either way "Explore Your Data" ends the list.

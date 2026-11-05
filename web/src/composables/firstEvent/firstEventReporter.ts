@@ -26,3 +26,6 @@ export interface FirstEventReporter {
 
 /** Provided by onboarding around a guide page it shows in place. */
 export const FIRST_EVENT_REPORTER: InjectionKey<FirstEventReporter> = Symbol("firstEventReporter");
+
+/** Provided by an onboarding page with its own success panel, whose buttons replace a status's received ones. */
+export const FIRST_EVENT_SUCCESS_BY_HOST: InjectionKey<boolean> = Symbol("firstEventSuccessByHost");

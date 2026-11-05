@@ -32,7 +32,10 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
 import { FIRST_EVENT_BARS } from "@/composables/firstEvent/firstEventCopied";
-import { FIRST_EVENT_REPORTER } from "@/composables/firstEvent/firstEventReporter";
+import {
+  FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
+} from "@/composables/firstEvent/firstEventReporter";
 import {
   useFirstEventWatch,
   type FirstEventResult,
@@ -99,6 +102,7 @@ const store = useStore();
 const router = useRouter();
 const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
 const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
+const hostShowsSuccess = inject(FIRST_EVENT_SUCCESS_BY_HOST, false);
 // Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
 const reporter = inject(FIRST_EVENT_REPORTER, null);
 const detach = reporter?.attach();
@@ -664,7 +668,10 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       </div>
       <template
         v-if="
-          state === 'waiting' || state === 'stopped' || state === 'idle' || state === 'received'
+          state === 'waiting' ||
+          state === 'stopped' ||
+          state === 'idle' ||
+          (state === 'received' && !hostShowsSuccess)
         "
         #actions
       >
