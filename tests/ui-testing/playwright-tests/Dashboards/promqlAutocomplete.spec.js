@@ -27,63 +27,8 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const generateUniqueDashboardName = () =>
   "Dashboard_PromQL_AC_" + Math.random().toString(36).slice(2, 9) + "_" + Date.now();
 
-/**
- * Trigger PromQL suggestions and poll the Monaco suggest controller until at
- * least one completion item appears (or the deadline elapses).
- *
- * The streamResults-driven autocomplete watcher (Fix 2) populates metric
- * keywords asynchronously after `selectStreamType("metrics")` resolves the
- * stream list. On a slow backend the first Ctrl+Space can fire before the
- * keywords land, so we re-trigger via dismiss + Ctrl+Space and re-check.
- *
- * @returns {Promise<number>} the final suggestion count (0 if none arrived)
- */
-const triggerAndWaitForSuggestions = async (promqlEditor, { totalTimeoutMs = 30000, perTryTimeoutMs = 5000 } = {}) => {
-  const deadline = Date.now() + totalTimeoutMs;
-  let lastCount = 0;
-  let lastError = null;
-  while (Date.now() < deadline) {
-    try {
-      // Programmatic trigger via Monaco's action — survives transient focus
-      // losses better than a raw Ctrl+Space, while still being deterministic.
-      await promqlEditor.page.evaluate(() => {
-        const m = window.monaco;
-        const editors = m?.editor?.getEditors?.() || [];
-        const editor = editors[editors.length - 1];
-        if (!editor) return;
-        editor.focus();
-        editor.trigger('e2e', 'editor.action.triggerSuggest', {});
-      });
-      await promqlEditor.waitForSuggestionsReady(perTryTimeoutMs);
-      lastCount = await promqlEditor.getSuggestionCount();
-      if (lastCount > 0) return lastCount;
-    } catch (err) {
-      lastError = err;
-      // No completion items yet — re-trigger after dismissing the popup.
-    }
-    await promqlEditor.dismissSuggestions();
-  }
-  if (lastError) {
-    testLogger.warn(`Suggestions widget not visible: ${lastError.message}`);
-  }
-  return lastCount;
-};
-
 // Host names metrics-ingestion.js writes as the node label; value suggestions arrive quoted.
 const SEEDED_HOSTS = ['server-01', 'server-02', 'server-03', 'node-01', 'node-02', 'instance-01', 'instance-02'];
-
-const isMetricEntry = (label) => /\([A-Za-z]+\)$/.test(label);
-
-// Re-trigger until the list has settled past "...Loading" and the stale pre-debounce list into one holding a seeded entry.
-const waitForSeededSuggestions = async (promqlEditor, matchesSeed, message) => {
-  let labels = [];
-  await expect.poll(async () => {
-    await triggerAndWaitForSuggestions(promqlEditor, { totalTimeoutMs: 5000, perTryTimeoutMs: 2000 });
-    labels = await promqlEditor.getSuggestionLabels(1000);
-    return !labels.includes('...Loading') && labels.some(matchesSeed);
-  }, { message, timeout: 30000, intervals: [500, 1000, 2000] }).toBe(true);
-  return labels;
-};
 
 /**
  * Navigate a dashboard add-panel flow into PromQL Custom mode.
@@ -197,8 +142,7 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
       // Trigger suggestions — the watcher (Fix 2) should have already fed metric names
       // into autoCompletePromqlKeywords via updateMetricKeywords
       try {
-        const labels = await waitForSeededSuggestions(
-          pm.dashboardPromQLEditor,
+        const labels = await pm.dashboardPromQLEditor.waitForSeededSuggestions(
           (l) => l.startsWith('cpu_usage'),
           'Expected the seeded cpu_usage metric among suggestions for "cpu"',
         );
@@ -247,8 +191,7 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
       // Cursor is now right after '{' — analyzeLabelFocus must detect unclosed brace
 
       try {
-        const labels = await waitForSeededSuggestions(
-          pm.dashboardPromQLEditor,
+        const labels = await pm.dashboardPromQLEditor.waitForSeededSuggestions(
           (l) => l === 'instance',
           'Expected the seeded instance label among suggestions for cpu_usage{',
         );
@@ -257,7 +200,7 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         // Before Fix 3, isFocused remained false so no suggestions were shown at all.
         expect(labels.length, 'Expected label suggestions to appear for unclosed brace but none were shown').toBeGreaterThan(0);
         expect(labels, 'Expected the seeded instance label').toContain('instance');
-        expect(labels.filter(isMetricEntry), 'Expected label names, got metric names').toEqual([]);
+        expect(labels.filter((l) => pm.dashboardPromQLEditor.isMetricEntry(l)), 'Expected label names, got metric names').toEqual([]);
         await pm.dashboardPromQLEditor.logSuggestions('Suggestions for cpu_usage{', 8);
         testLogger.info('Fix 3 verified: label suggestions shown for unclosed brace pattern');
       } finally {
@@ -299,8 +242,7 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
       await pm.dashboardPromQLEditor.typeInEditor('node=', { delay: 50 });
 
       try {
-        const labels = await waitForSeededSuggestions(
-          pm.dashboardPromQLEditor,
+        const labels = await pm.dashboardPromQLEditor.waitForSeededSuggestions(
           (l) => SEEDED_HOSTS.includes(l.replace(/^"|"$/g, '')),
           'Expected a seeded node value among suggestions for node=',
         );
@@ -361,8 +303,7 @@ test.describe("PromQL Autocomplete — Metrics Page", () => {
       await pm.dashboardPromQLEditor.typeInEditor('cpu', { delay: 50 });
 
       try {
-        const labels = await waitForSeededSuggestions(
-          pm.dashboardPromQLEditor,
+        const labels = await pm.dashboardPromQLEditor.waitForSeededSuggestions(
           (l) => l.startsWith('cpu_usage'),
           'Expected the seeded cpu_usage metric among suggestions for "cpu" on Metrics page',
         );
@@ -405,8 +346,7 @@ test.describe("PromQL Autocomplete — Metrics Page", () => {
       await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{', { delay: 50 });
 
       try {
-        const labels = await waitForSeededSuggestions(
-          pm.dashboardPromQLEditor,
+        const labels = await pm.dashboardPromQLEditor.waitForSeededSuggestions(
           (l) => l === 'instance',
           'Expected the seeded instance label among suggestions for cpu_usage{ on Metrics page',
         );
@@ -414,7 +354,7 @@ test.describe("PromQL Autocomplete — Metrics Page", () => {
 
         expect(labels.length, 'Expected label name suggestions on Metrics page but none appeared').toBeGreaterThan(0);
         expect(labels, 'Expected the seeded instance label').toContain('instance');
-        expect(labels.filter(isMetricEntry), 'Expected label names, got metric names').toEqual([]);
+        expect(labels.filter((l) => pm.dashboardPromQLEditor.isMetricEntry(l)), 'Expected label names, got metric names').toEqual([]);
         await pm.dashboardPromQLEditor.logSuggestions('Label name suggestions on Metrics page', 8);
       } finally {
         await pm.dashboardPromQLEditor.dismissSuggestions();
