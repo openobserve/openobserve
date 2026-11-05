@@ -20,7 +20,7 @@
 //! background; every color set explicitly on the element that needs it so a
 //! dark client's inversion cannot produce black-on-black).
 
-use super::{DEFAULT_LINK_LABEL, markdown, safe_url, severity_color, severity_label};
+use super::{DEFAULT_LINK_LABEL, markdown, safe_url};
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
 const TEXT_COLOR: &str = "#202124";
@@ -57,22 +57,9 @@ fn html_part(c: &RenderedContent, has_chart: bool) -> String {
         r#"<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:{TEXT_COLOR};"><tr><td style="padding:16px;">"#
     ));
 
-    // Severity stripe + badge + title. The stripe alone (a 4px color bar) is
-    // easy to miss — especially on mobile or in a client's preview pane, where
-    // it can be scrolled out of view or rendered too thin to register as a
-    // deliberate signal rather than a layout artifact. The badge is the
-    // primary severity cue; the stripe stays as a secondary accent.
-    let badge = severity_label(c.severity)
-        .map(|label| {
-            format!(
-                r#"<span style="display:inline-block;margin:0 0 8px 0;padding:2px 8px;border-radius:3px;background-color:{};color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:0.03em;">{label}</span><br/>"#,
-                severity_color(c.severity),
-            )
-        })
-        .unwrap_or_default();
+    // The title's status dot carries severity, as on every other channel.
     h.push_str(&format!(
-        r#"<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;"><tr><td width="4" style="width:4px;background-color:{};"></td><td style="padding:0 0 0 12px;">{badge}<h2 style="margin:0 0 8px 0;font-size:20px;line-height:1.3;color:{TEXT_COLOR};">{}</h2></td></tr></table>"#,
-        severity_color(c.severity),
+        r#"<h2 style="margin:0 0 8px 0;font-size:20px;line-height:1.3;color:{TEXT_COLOR};">{}</h2>"#,
         esc(&c.title),
     ));
 
@@ -185,13 +172,7 @@ fn html_part(c: &RenderedContent, has_chart: bool) -> String {
 }
 
 fn text_part(c: &RenderedContent) -> String {
-    // Plaintext has no color at all, so the severity label is the ONLY
-    // signal available here — not secondary to a stripe as in the HTML part.
-    let title = match severity_label(c.severity) {
-        Some(label) => format!("[{label}] {}", c.title),
-        None => c.title.clone(),
-    };
-    let mut parts: Vec<String> = vec![title];
+    let mut parts: Vec<String> = vec![c.title.clone()];
 
     if !c.body_markdown.is_empty() {
         let body = markdown::markdown_to_plaintext(&c.body_markdown);

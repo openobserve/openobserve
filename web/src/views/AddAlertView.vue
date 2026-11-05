@@ -21,9 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
+      :templates="templates"
       @update:list="handleUpdateList"
       @cancel:hideform="handleCancel"
       @refresh:destinations="refreshDestinations"
+      @refresh:templates="refreshTemplates"
     />
   </div>
 </template>
@@ -33,6 +35,8 @@ import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
@@ -58,6 +62,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const destinations = ref([]);
+    const templates = ref<any[]>([]);
     const isUpdated = ref(false);
 
     /**
@@ -145,6 +150,29 @@ export default defineComponent({
       await getDestinations();
     };
 
+    // The Advanced tab lists these as the template override options.
+    const getTemplates = async () => {
+      try {
+        templates.value = await queryClient.fetchQuery(
+          templatesQuery(store.state.selectedOrganization.identifier),
+        );
+      } catch (error: any) {
+        if (error?.response?.status === 403) return;
+        toast({
+          variant: "error",
+          message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
+        });
+      }
+    };
+
+    const refreshTemplates = async () => {
+      await queryClient.invalidateQueries({
+        queryKey: templateKeys.list(store.state.selectedOrganization.identifier),
+        exact: true,
+      });
+      await getTemplates();
+    };
+
     const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
@@ -186,10 +214,10 @@ export default defineComponent({
     };
 
     onBeforeMount(() => {
-      // In parallel: the form needs destinations either way, and edit mode
+      // In parallel: the form needs destinations and templates either way, and edit mode
       // needs the alert. Sequencing them would make editing feel slower than
       // the list-hosted editor it replaces.
-      void Promise.all([getDestinations(), loadAlertForEdit()]);
+      void Promise.all([getDestinations(), getTemplates(), loadAlertForEdit()]);
     });
 
     // Leaving without saving retires the prefill too — otherwise re-opening the
@@ -201,12 +229,14 @@ export default defineComponent({
 
     return {
       destinations,
+      templates,
       isUpdated,
       editedAlert,
       isLoadingAlert,
       loadFailed,
       getDestinations,
       refreshDestinations,
+      refreshTemplates,
       handleUpdateList,
       handleCancel,
     };

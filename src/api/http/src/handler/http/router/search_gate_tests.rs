@@ -155,6 +155,7 @@ const UNGATED_SIBLINGS: &[(&str, &str)] = &[
     ("downtimes::list_downtimes", "downtime bookkeeping, no search"),
     ("downtimes::move_downtimes", "downtime bookkeeping, no search"),
     ("downtimes::preview_downtime", "inventory match only"),
+    ("downtimes::test_downtime", "test notification send, no search"),
     ("downtimes::update_downtime", "downtime bookkeeping, no search"),
     ("eval_jobs::activate_eval_job", "job bookkeeping; scoring runs in the background executor"),
     ("eval_jobs::archive_eval_job", "job bookkeeping, no search"),

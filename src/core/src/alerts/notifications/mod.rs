@@ -23,17 +23,22 @@ pub mod chart;
 pub mod context;
 pub mod custom;
 pub mod default_template;
+pub mod examples;
 pub mod format;
 pub mod jira;
 pub(crate) mod modifiers;
+pub mod notify;
+#[cfg(feature = "enterprise")]
+pub mod oncall;
 pub mod org_default;
 pub mod platform;
 pub mod preview;
 pub mod render;
 pub mod resolve;
+pub mod send;
 pub mod test_send;
 
-pub use context::{NotificationContext, build_row_columns};
+pub use context::{LegacyPayload, NotificationContext, build_row_columns};
 pub use custom::apply_custom_template;
 pub use format::{ChannelFormat, derive_channel_format, teams_format_for_url};
 pub use preview::{PreviewError, PreviewRequest, PreviewResponse, preview};

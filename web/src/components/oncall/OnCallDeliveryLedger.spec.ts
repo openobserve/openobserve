@@ -62,6 +62,28 @@ describe("OnCallDeliveryLedger", () => {
     expect(wrapper.find('[data-test="oncall-delivery-row-1-1"]').exists()).toBe(false);
   });
 
+  it("names the template each destination of a room post rendered with", () => {
+    const wrapper = render([
+      row(),
+      row({
+        recipient: "Platform channel",
+        channel: "webhook",
+        templates: [
+          {
+            destination: "team_slack",
+            template_name: "play_oncall_card",
+            template_source: "org_default",
+          },
+        ],
+      }),
+    ]);
+    expect(wrapper.find('[data-test="oncall-delivery-post-template-1-0"]').text()).toBe(
+      "Template: team_slack: play_oncall_card (org default)",
+    );
+    // A row written before the column, or an email page, has no template line.
+    expect(wrapper.find('[data-test="oncall-delivery-row-template-1-0"]').exists()).toBe(false);
+  });
+
   it("draws no room-post section when nothing broadcast", () => {
     expect(render([row()]).find('[data-test="oncall-deliveries-posts-1"]').exists()).toBe(false);
   });

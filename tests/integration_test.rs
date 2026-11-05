@@ -1643,6 +1643,7 @@ mod tests {
             l0_json: Set("{}".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
+            template: Set(None),
         })
         .await;
         insert_active(oncall_ownership_rules::ActiveModel {
@@ -2487,6 +2488,7 @@ mod tests {
                 body: Set(r#"{"text":"{alert_name}"}"#.to_string()),
                 title: Set(None),
                 kind: Set("custom".to_string()),
+                applies_to: Set("[]".to_string()),
             }
             .insert(conn)
             .await

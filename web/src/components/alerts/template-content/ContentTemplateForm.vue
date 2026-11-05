@@ -402,6 +402,8 @@ const props = defineProps<{
    * quiet. Existing templates ignore this and open on their real content.
    */
   isSeeded?: boolean;
+  /** The preview's variables for the selected kinds; the alert list is used until they load. */
+  variables?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -645,7 +647,7 @@ const applyToolbarAction = (name: string) => {
 // executeEdits (Datadog's insert-at-cursor pattern, not PagerDuty's
 // copy-to-clipboard step). Falls back to appending at the end of the body
 // when the editor isn't mounted, mirroring applyToolbarAction above.
-const allVariables = [
+const ALERT_VARIABLES = [
   "alert_name",
   "alert_agg_value",
   "alert_operator",
@@ -661,14 +663,15 @@ const allVariables = [
   "alert_status",
   "episode_id",
 ];
-const mostUsedVariables = allVariables.slice(0, 5);
+const allVariables = computed(() => (props.variables?.length ? props.variables : ALERT_VARIABLES));
+const mostUsedVariables = computed(() => allVariables.value.slice(0, 5));
 const showAllVariables = ref(false);
 
 const visibleVariables = computed(() =>
-  showAllVariables.value ? allVariables : mostUsedVariables,
+  showAllVariables.value ? allVariables.value : mostUsedVariables.value,
 );
 const hiddenVariableCount = computed(() =>
-  showAllVariables.value ? 0 : allVariables.length - mostUsedVariables.length,
+  showAllVariables.value ? 0 : allVariables.value.length - mostUsedVariables.value.length,
 );
 
 const variableChipLabel = (name: string): string => `{${name}}`;

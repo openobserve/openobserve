@@ -45,6 +45,24 @@ fn is_reserved_key(key: &str) -> bool {
         .starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX)
 }
 
+/// Keys of the retired org default templates level; nothing reads them, so they read as absent.
+const RETIRED_KEYS: [&str; 2] = ["default_templates", "default_alert_template"];
+/// System rows the template renames keep for every org; no org may read or write them here.
+const INTERNAL_KEYS: [&str; 2] = [
+    infra::table::templates::RENAMED_ALIASES_KEY,
+    infra::table::templates::RENAMES_PENDING_KEY,
+];
+
+/// A key this API treats as absent: retired, or internal to the server.
+fn is_hidden_key(key: &str) -> bool {
+    let key = key.trim();
+    RETIRED_KEYS.contains(&key) || INTERNAL_KEYS.contains(&key)
+}
+
+fn hidden_key_response() -> Response {
+    MetaHttpResponse::not_found("Setting not found")
+}
+
 fn reserved_key_response() -> Response {
     MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
 }
@@ -133,6 +151,9 @@ pub async fn get_setting(
     {
         return foreign_user_response();
     }
+    if is_hidden_key(&key) {
+        return hidden_key_response();
+    }
 
     match system_settings::get_resolved(Some(&org_id), user_id, &key).await {
         Ok(setting) => (StatusCode::OK, Json(setting)).into_response(), // Returns setting or null
@@ -181,7 +202,13 @@ pub async fn list_settings(
     let category = query.category.as_deref();
 
     match system_settings::list_resolved(Some(&org_id), user_id, category).await {
-        Ok(settings) => (StatusCode::OK, Json(settings)).into_response(),
+        Ok(settings) => {
+            let settings: std::collections::HashMap<_, _> = settings
+                .into_iter()
+                .filter(|(key, _)| !is_hidden_key(key))
+                .collect();
+            (StatusCode::OK, Json(settings)).into_response()
+        }
         Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
@@ -221,6 +248,11 @@ pub async fn set_org_setting(
     }
     if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
         return response;
+    }
+    if is_hidden_key(&payload.setting_key) {
+        return MetaHttpResponse::bad_request(
+            "This setting is retired: a template applies through an override or its destination",
+        );
     }
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {
@@ -270,6 +302,9 @@ pub async fn set_user_setting(
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
         return reserved_key_response();
+    }
+    if is_hidden_key(&payload.setting_key) {
+        return MetaHttpResponse::bad_request("This setting is not writable here");
     }
     if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
         return response;
@@ -327,6 +362,9 @@ pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> 
     if is_reserved_key(&key) {
         return reserved_key_response();
     }
+    if is_hidden_key(&key) {
+        return hidden_key_response();
+    }
     match system_settings::delete(&SettingScope::Org, Some(&org_id), None, &key).await {
         Ok(true) => (StatusCode::OK, Json(serde_json::json!({"deleted": true}))).into_response(),
         Ok(false) => MetaHttpResponse::not_found("Setting not found"),
@@ -369,6 +407,9 @@ pub async fn delete_user_setting(
     if is_reserved_key(&key) {
         return reserved_key_response();
     }
+    if is_hidden_key(&key) {
+        return hidden_key_response();
+    }
     if !may_access_user_settings(&org_id, &user_email.user_id, &user_id).await {
         return foreign_user_response();
     }
@@ -389,6 +430,15 @@ mod tests {
         assert!(is_reserved_key(" PROMPT_SETTINGS/default"));
         assert!(!is_reserved_key("gen_ai_agent_mapping"));
         assert!(!is_reserved_key("my_prompt_settings/default"));
+    }
+
+    #[test]
+    fn the_org_default_template_keys_are_retired() {
+        assert!(is_hidden_key("default_templates"));
+        assert!(is_hidden_key(" default_alert_template"));
+        assert!(!is_hidden_key("default_templates_v2"));
+        assert!(is_hidden_key("templates_renamed"));
+        assert!(is_hidden_key("templates_renamed_pending"));
     }
 
     #[tokio::test]
@@ -419,6 +469,49 @@ mod tests {
             .await,
         ] {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_cannot_read_or_write_the_template_rename_lists() {
+        let org = "default".to_string();
+        for key in ["templates_renamed", "templates_renamed_pending"] {
+            let payload = || {
+                Json(SystemSettingPayload {
+                    setting_key: key.to_string(),
+                    setting_value: serde_json::json!([]),
+                    setting_category: None,
+                    description: None,
+                })
+            };
+            let read = get_setting(
+                Path((org.clone(), key.to_string())),
+                caller("u@x.com"),
+                Query(SystemSettingQuery::default()),
+            )
+            .await;
+            assert_eq!(read.status(), StatusCode::NOT_FOUND, "{key}");
+            for response in [
+                set_org_setting(Path(org.clone()), payload()).await,
+                set_user_setting(
+                    Path((org.clone(), "u@x.com".to_string())),
+                    caller("u@x.com"),
+                    payload(),
+                )
+                .await,
+            ] {
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{key}");
+            }
+            for response in [
+                delete_org_setting(Path((org.clone(), key.to_string()))).await,
+                delete_user_setting(
+                    Path((org.clone(), "u@x.com".to_string(), key.to_string())),
+                    caller("u@x.com"),
+                )
+                .await,
+            ] {
+                assert_eq!(response.status(), StatusCode::NOT_FOUND, "{key}");
+            }
         }
     }
 

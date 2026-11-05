@@ -61,6 +61,8 @@ export const makeAddDestinationSchema = (
       // email addresses rather than the comma-separated string this used to be.
       emails: z.array(z.string()).optional().default([]),
       skip_tls_verify: z.boolean().optional().default(false),
+      // A generic webhook's body choice, stored as metadata.payload_format; "auto" stores nothing.
+      payload_format: z.enum(["auto", "legacy", "rendered"]).optional().default("auto"),
       slack_setup_method: z.enum(["oauth", "manifest", "webhook"]).default("oauth"),
       slack_app_name: z.string().default(DEFAULT_SLACK_APP_NAME),
       slack_team_id: z.string().default(""),
@@ -267,6 +269,7 @@ export const addDestinationDefaults = (): AddDestinationForm => ({
   output_format: "json",
   emails: [] as string[],
   skip_tls_verify: false,
+  payload_format: "auto",
   slack_setup_method: "oauth",
   slack_app_name: DEFAULT_SLACK_APP_NAME,
   slack_team_id: "",

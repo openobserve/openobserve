@@ -14063,7 +14063,6 @@
     "previewFidelityEmail": "البريد الإلكتروني الحقيقي هو HTML مع بديل نصي عادي. انظر الحمولة لكلا النسختين.",
     "previewFidelityWebhook": "مستقبلات Webhook تحصل على JSON، وليس بطاقة. انظر الحمولة للجسم الدقيق.",
     "previewFidelityMachine": "تستهلك هذه القناة من قبل البرنامج، وليس من قبل الناس — البطاقة هي عرض طبيعي. تظهر الحمولة الجسم الدقيق الذي تم إرساله.",
-    "previewGroupLabel": "معاينة (لم ترسل إلى أي مكان)",
     "previewChannel": "القناة",
     "previewSeverity": "الخطورة",
     "previewSeveritySingle": "المستوى الواحد (بدون مستوى)",

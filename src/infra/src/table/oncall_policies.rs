@@ -22,10 +22,15 @@ use config::{
     meta::oncall::{EscalationPolicy, PriorityRung},
     utils::time::now_micros,
 };
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 
 use super::{entity::oncall_policies, ttl_cache::TtlCache};
-use crate::{db::get_orm_client_rw, errors};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
+};
 
 /// The team's escalation policy, for the paging path (`06` §3).
 ///
@@ -99,6 +104,7 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             rungs,
             destinations,
             l0,
+            template: m.template,
         },
         Err(e) => {
             log::error!(
@@ -190,6 +196,7 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         rungs: Set(serde_json::to_string(&policy.rungs)?),
         destinations: Set(serde_json::to_string(&policy.destinations)?),
         l0_json: Set(serde_json::to_string(&policy.l0)?),
+        template: Set(policy.template.clone()),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -217,6 +224,19 @@ pub async fn update_rungs(
     // `None` means **unchanged**, never reset: this column is the only copy of a team's L0 block.
     l0: Option<&config::meta::oncall::L0Policy>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
+    update_policy(org_id, team_id, rungs, destinations, l0, None).await
+}
+
+/// `update_rungs` that also sets (`Some(Some)`) or clears (`Some(None)`) the template override in
+/// the same write, so a concurrent save cannot pair one request's rungs with another's template.
+pub async fn update_policy(
+    org_id: &str,
+    team_id: &str,
+    rungs: &[PriorityRung],
+    destinations: Option<&[String]>,
+    l0: Option<&config::meta::oncall::L0Policy>,
+    template: Option<Option<&str>>,
+) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_policies::Entity::find()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
@@ -234,10 +254,65 @@ pub async fn update_rungs(
     if let Some(l0) = l0 {
         model.l0_json = Set(serde_json::to_string(l0)?);
     }
+    if let Some(template) = template {
+        model.template = Set(template.map(str::to_string));
+    }
     model.updated_at = Set(now_micros());
     let updated = to_policy(model.update(client).await?);
     invalidate_and_publish(org_id, team_id).await;
     Ok(Some(updated))
+}
+
+/// Sets or clears the team's template override; false when the team has no policy row.
+pub async fn set_template(
+    org_id: &str,
+    team_id: &str,
+    template: Option<String>,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let res = oncall_policies::Entity::update_many()
+        .col_expr(
+            oncall_policies::Column::Template,
+            sea_orm::sea_query::Expr::value(template),
+        )
+        .col_expr(
+            oncall_policies::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(now_micros()),
+        )
+        .filter(oncall_policies::Column::OrgId.eq(org_id))
+        .filter(oncall_policies::Column::TeamId.eq(team_id))
+        .exec(client)
+        .await?;
+    invalidate_and_publish(org_id, team_id).await;
+    Ok(res.rows_affected > 0)
+}
+
+/// `(org, team_id)` of each policy whose template override is `template`; `None` is every org.
+pub async fn teams_using_template(
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query = oncall_policies::Entity::find()
+        .select_only()
+        .column(oncall_policies::Column::OrgId)
+        .column(oncall_policies::Column::TeamId)
+        .filter(oncall_policies::Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(oncall_policies::Column::OrgId.eq(org));
+    }
+    Ok(query.into_tuple::<(String, String)>().all(client).await?)
+}
+
+/// Every policy of every org; read once at boot for the upgrade notice.
+pub async fn list_all() -> Result<Vec<EscalationPolicy>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Ok(oncall_policies::Entity::find()
+        .all(client)
+        .await?
+        .into_iter()
+        .map(to_policy)
+        .collect())
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<EscalationPolicy>, errors::Error> {
@@ -282,6 +357,7 @@ mod tests {
             // The column defaults, 04 §3's own: one pass, then record that nobody answered.
             created_at: 10,
             updated_at: 20,
+            template: None,
         }
     }
 

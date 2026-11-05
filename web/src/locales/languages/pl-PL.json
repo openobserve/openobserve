@@ -14063,7 +14063,6 @@
     "previewFidelityEmail": "Prawdziwy e-mail ma format HTML z wersją zwykłego tekstu. Zobacz Payload dla obu.",
     "previewFidelityWebhook": "Odbiorcy webhook otrzymują JSON, a nie kartę. Zobacz Payload, aby uzyskać dokładną treść.",
     "previewFidelityMachine": "Ten kanał jest używany przez oprogramowanie, a nie czytany przez ludzi — karta jest znormalizowanym odwzorowaniem. Payload pokazuje dokładną treść, która jest wysyłana.",
-    "previewGroupLabel": "Podgląd (nie jest nigdzie wysyłany)",
     "previewChannel": "Kanał",
     "previewSeverity": "Ważność",
     "previewSeveritySingle": "Pojedynczy poziom (bez poziomu)",

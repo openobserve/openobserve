@@ -14063,7 +14063,6 @@
     "previewFidelityEmail": "実際のメールはHTMLで、プレーンテキスト版も含まれます。両方ともペイロードを参照してください。",
     "previewFidelityWebhook": "WebhookレシーバーはカードではなくJSONを受け取ります。正確な本文はペイロードを参照してください。",
     "previewFidelityMachine": "このチャネルは人が読むものではなくソフトウェアが利用するものです。カードは正規化されたレンダリングです。送信される正確な本文はペイロードに表示されます。",
-    "previewGroupLabel": "プレビュー（どこにも送信されません）",
     "previewChannel": "チャネル",
     "previewSeverity": "重大度",
     "previewSeveritySingle": "単一レベル（レベルなし）",
