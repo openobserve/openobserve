@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { vi } from "vitest";
+import { AxiosHeaders, type AxiosResponse } from "axios";
 
 /**
  * Overlay stub methods onto a real service module for `vi.mock`.
@@ -73,4 +74,36 @@ export function automockService<T extends Record<string, any>>(actual: T): T {
     }
   }
   return merged as T;
+}
+
+/** An axios-shaped 200 for `mockResolvedValue`; typed `never` so one fixture fits whatever payload the endpoint declares. */
+export function axiosReply(data: unknown): AxiosResponse<never> {
+  return {
+    data,
+    status: 200,
+    statusText: "OK",
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  } as AxiosResponse<never>;
+}
+
+export type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+/** A mocked axios answer typed from the call it stands in for; the fixture holds only the fields under test. */
+export function ok<R extends { data: unknown }>(data: DeepPartial<R["data"]> | null): R {
+  return axiosReply(data) as unknown as R;
+}
+
+/** A reply the test sends later with `answer(data)`, for ordering a slow read against a newer one. */
+export function deferredReply(): {
+  promise: Promise<AxiosResponse<never>>;
+  answer: (data: unknown) => void;
+} {
+  let resolve: (reply: AxiosResponse<never>) => void = () => {};
+  const promise = new Promise<AxiosResponse<never>>((done) => (resolve = done));
+  return { promise, answer: (data) => resolve(axiosReply(data)) };
 }

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-team-attention"
       >
         <span class="flex min-w-0 items-center gap-x-3">
-          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase max-md:hidden">
+          <span class="text-text-secondary shrink-0 text-xs font-medium max-md:hidden">
             {{ t("oncall.attentionHeading") }}
           </span>
           <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText
               class="text-text-body text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
             >
-              {{ worst.message }}
+              <OnCallPeopleText :text="worst.message" />
             </OTruncatedText>
           </span>
         </span>
@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="worst.fix"
               variant="outline"
               size="xs"
+              icon-left="build"
               data-test="oncall-attention-fix-now"
               @click="emit('act', worst.fix, worst.rotation)"
             >
@@ -75,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="xs"
+              icon-left="unfold-more"
               data-test="oncall-attention-expand"
               @click="expanded = true"
             >
@@ -123,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-attention-group-${group.id}`"
       >
         <h3
-          class="text-text-secondary text-2xs bg-surface-subtle border-border-subtle flex items-center gap-2 border-b px-4 py-1.5 tracking-wide uppercase"
+          class="text-text-secondary bg-surface-subtle border-border-subtle flex items-center gap-2 border-b px-4 py-1.5 text-xs font-medium"
         >
           {{ t(group.headingKey) }}
           <span class="text-text-secondary">{{ group.rows.length }}</span>
@@ -142,8 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div class="flex min-w-0 flex-1 basis-80 flex-col gap-1">
-            <OText variant="body-strong">{{ row.headline }}</OText>
-            <p v-if="row.detail" class="text-text-secondary text-sm">{{ row.detail }}</p>
+            <OText variant="body-strong"><OnCallPeopleText :text="row.headline" /></OText>
+            <p v-if="row.detail" class="text-text-secondary text-sm">
+              <OnCallPeopleText :text="row.detail" />
+            </p>
 
             <!-- What the sentence cannot say: who it costs, and how often this
                  path has actually been used lately. -->
@@ -152,7 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs"
               :data-test="`oncall-attention-evidence-${row.kind}`"
             >
-              <span v-for="fact in row.evidence" :key="String(fact)">{{ fact }}</span>
+              <span v-for="fact in row.evidence" :key="String(fact)">
+                <OnCallPeopleText :text="fact" />
+              </span>
             </p>
           </div>
 
@@ -164,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variant="row.bucket === 'blocking' ? 'primary' : 'outline'"
             size="xs"
             class="shrink-0"
+            icon-left="arrow-forward"
             :data-test="`oncall-attention-cta-${row.kind}`"
             @click="emit('act', row.fix, row.rotation)"
           >
@@ -210,6 +217,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OnCallPeopleText from "./OnCallPeopleText.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type {
   ConfigRisk,

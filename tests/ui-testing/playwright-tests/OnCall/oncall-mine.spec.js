@@ -134,6 +134,7 @@ test.describe('On-call — my duty, my inbox, my history', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_duty`);
+    const STAFFED_ROTATION = 'Primary';
     const me = process.env.ZO_ROOT_USER_EMAIL;
     expect(me, 'the suite runs as a real identity and the duty list is keyed on it').toBeTruthy();
 
@@ -142,7 +143,7 @@ test.describe('On-call — my duty, my inbox, my history', {
     await addTeamMembers(page, staffed.id, [me]);
     await setTeamSchedule(page, staffed.id, {
       timezone: 'UTC',
-      rotations: [rotation({ id: 'Primary', members: [me] })],
+      rotations: [rotation({ id: STAFFED_ROTATION, members: [me] })],
     });
 
     // And one the caller is on that staffs nobody — genuinely off duty, which
@@ -197,8 +198,9 @@ test.describe('On-call — my duty, my inbox, my history', {
     ).toBe(1);
 
     const staffedDuty = await pm.oncallMinePage.readDutyText(staffed.id);
+    // An on-call seat is labelled with the rotation the caller holds, so the definite answer is its name.
     expect(staffedDuty.toLowerCase(), 'a resolvable team must give a definite answer')
-      .toMatch(/on call/);
+      .toBe(STAFFED_ROTATION.toLowerCase());
     expect(staffedDuty.toLowerCase(), 'and it must not be the unknown state')
       .not.toContain('could not');
 

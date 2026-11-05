@@ -356,6 +356,7 @@ const headingColspan = computed(
         </template>
       </OTableBodyRow>
     </template>
+    <slot name="body-end" />
   </tbody>
 
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
@@ -432,5 +433,13 @@ const headingColspan = computed(
         }"
       />
     </tr>
+    <slot name="body-end" />
+  </tbody>
+  <!-- Own tbody, after the v-if chain: inside the draggable body it would count as a model row. -->
+  <tbody
+    v-if="!isVirtual() && rowReorderEnabled && slots['body-end']"
+    data-test="o2-table-body-end"
+  >
+    <slot name="body-end" />
   </tbody>
 </template>

@@ -20,18 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   drifting apart edit by edit.
 -->
 <template>
-  <div class="flex flex-col gap-1">
-    <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
-    <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
-    <OSelect
-      :model-value="cause"
-      :options="causeOptions"
-      clearable
-      :placeholder="t('oncall.resolveCausePlaceholder')"
-      :data-test="`${dataTestPrefix}-cause`"
-      @update:model-value="(v) => emit('update:cause', (v as ResolutionCause) || '')"
-    />
-  </div>
+  <OSelect
+    :model-value="cause"
+    :options="causeOptions"
+    :label="t('oncall.resolveCause')"
+    clearable
+    :placeholder="t('oncall.resolveCausePlaceholder')"
+    :data-test="`${dataTestPrefix}-cause`"
+    @update:model-value="(v) => emit('update:cause', (v as ResolutionCause) || '')"
+  >
+    <template #tooltip>
+      <OTooltip :content="t('oncall.resolveCauseHint')" />
+    </template>
+  </OSelect>
 
   <OTextarea
     :model-value="note"
@@ -48,6 +49,7 @@ import { computed } from "vue";
 
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { ResolutionCause } from "@/ts/interfaces/oncall";
