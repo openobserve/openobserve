@@ -273,6 +273,15 @@ async function addTeamMembers(page, teamId, userEmails) {
   return body;
 }
 
+/** Take one person off the team; the server also drops them from every rotation, so a sole member leaves it staffing nobody. */
+async function removeTeamMember(page, teamId, userEmail) {
+  const res = await api(
+    page, 'delete',
+    `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/members?user_email=${encodeURIComponent(userEmail)}`,
+  );
+  return must(res, `Remove ${userEmail} from team ${teamId}`);
+}
+
 async function listTeamMembers(page, teamId) {
   const res = await page.request.get(
     `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/members`,
@@ -1086,6 +1095,7 @@ module.exports = {
   listTeams,
   getTeam,
   addTeamMembers,
+  removeTeamMember,
   listTeamMembers,
   rotation,
   allDayRestriction,

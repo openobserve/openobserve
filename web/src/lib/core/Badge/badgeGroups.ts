@@ -287,8 +287,32 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
-      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
-      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+      gap: { variant: "error-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "warning-soft", labelKey: "oncall.coverage_cantReach" },
+      allunreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // A routing rule's traffic verdict, from `ownership/stats`; never recomputed on the client.
+  oncallRuleHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      active: { variant: "success-soft", labelKey: "oncall.ruleActive" },
+      shadowed: { variant: "warning-soft", labelKey: "oncall.ruleShadowed" },
+      neverused: { variant: "default-soft", labelKey: "oncall.ruleNeverMatchedYet" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an unowned signal landed: the catch-all paged somebody, or nobody was paged at all.
+  oncallUnroutedOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      defaultteam: { variant: "warning-soft", labelKey: "oncall.unroutedFilterDefault" },
+      nobody: { variant: "error-soft", labelKey: "oncall.unroutedPagedNobody" },
     },
     fallback: { variant: "default-soft" },
   },

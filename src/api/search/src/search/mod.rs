@@ -905,6 +905,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        use_index: true,
         clear_cache: req.clear_cache,
         local_mode: None,
         agent_options: None,
@@ -1088,6 +1089,7 @@ async fn values_inner(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
         agent_options: None,
@@ -1305,7 +1307,7 @@ fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> O
 
 /// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
-async fn check_sql_stream_permissions(
+pub(crate) async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,

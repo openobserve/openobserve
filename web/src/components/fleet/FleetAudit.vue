@@ -184,8 +184,8 @@ const AUDIT_RANGES = [
 
 type AuditRange = (typeof AUDIT_RANGES)[number]["value"] | "custom";
 
-// The server's default period, so only a different one counts as a filter.
-const DEFAULT_RANGE: AuditRange = "30d";
+// Only a period other than this one counts as a filter.
+const DEFAULT_RANGE: AuditRange = "24h";
 
 const DEFAULT_FILTERS: AuditFilters = {
   q: "",
@@ -200,7 +200,7 @@ const page = ref(1);
 const pageSize = ref(PAGE_SIZE);
 const filters = ref<AuditFilters>({ ...DEFAULT_FILTERS });
 const anchor = ref(Date.now());
-const customRange = ref({ from: Date.now() - 30 * DAY_MS, to: Date.now() });
+const customRange = ref({ from: 0, to: 0 });
 
 const period = computed((): Pick<FleetAuditParams, "from" | "to"> => {
   if (filters.value.range === "custom") return { ...customRange.value };
@@ -254,6 +254,10 @@ function setFilters(patch: Partial<AuditFilters>) {
 
 function onRangeChange(range: AuditRange) {
   anchor.value = Date.now();
+  // Custom opens on the period it replaces, so switching to it keeps showing the same span.
+  if (range === "custom" && filters.value.range !== "custom") {
+    customRange.value = { from: period.value.from ?? anchor.value, to: anchor.value };
+  }
   setFilters({ range });
 }
 

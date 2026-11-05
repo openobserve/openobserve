@@ -877,7 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 me-1 max-md:me-auto">
+        <div class="order-1 max-md:me-auto">
           <DateTime
             ref="dateTimeRef"
             auto-apply

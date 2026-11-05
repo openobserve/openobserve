@@ -130,14 +130,16 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(w.find('[data-test="slack-workspace-name"]').text()).toBe("Acme Corp");
     expect(w.find('[data-test="slack-workspace-status"]').text()).toBe("Degraded");
     expect(w.find('[data-test="slack-workspace-meta"]').text()).toContain(
-      "Socket Mode · connected by ana@acme.example",
+      "Connected by ana@acme.example",
     );
   });
 
   it("shows socket health as of the local health record, and none in HTTP mode", () => {
-    expect(mountCard().find('[data-test="slack-workspace-sockets"]').text()).toContain(
-      "2 of 2 sockets · as of",
-    );
+    const w = mountCard();
+    expect(w.find('[data-test="slack-workspace-sockets"]').text()).toContain("Connected to Slack");
+    expect(w.find('[data-test="slack-workspace-sockets"]').text()).not.toContain("Socket Mode");
+    expect(w.find('[data-test="slack-workspace-meta"]').text()).not.toContain("Socket Mode");
+    expect(w.find('[data-test="slack-workspace-connection-info"]').exists()).toBe(true);
     expect(
       mountCard(installationView({ mode: "http" }))
         .find('[data-test="slack-workspace-sockets"]')
@@ -279,11 +281,65 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(orgs).toContain("3 other orgs");
   });
 
+  it("names this org by its name, not its identifier", () => {
+    const store = makeSlackStore();
+    store.state.selectedOrganization.label = "Acme Inc";
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false },
+      global: {
+        plugins: [i18n, store],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    expect(w.find('[data-test="slack-connected-orgs"]').text()).toContain("Acme Inc (this org)");
+    expect(w.text()).toContain("Stops Slack for Acme Inc only");
+    w.unmount();
+  });
+
+  it("renders the on-call slot right under the workspace card, above connected orgs", () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false },
+      slots: {
+        oncall: '<div data-test="oncall-slot" />',
+        default: '<div data-test="default-slot" />',
+      },
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    const html = w.html();
+    expect(html.indexOf("oncall-slot")).toBeLessThan(html.indexOf("slack-connected-orgs"));
+    expect(html.indexOf("slack-connected-orgs")).toBeLessThan(html.indexOf("default-slot"));
+    w.unmount();
+  });
+
+  it("gives every card action a leading icon", () => {
+    const w = mountCard();
+    for (const id of [
+      "slack-test-connection",
+      "slack-reinstall",
+      "slack-update-credentials",
+      "slack-disconnect-org",
+      "slack-uninstall",
+    ]) {
+      expect(w.find(`[data-test="${id}"] svg`).exists()).toBe(true);
+    }
+  });
+
   it("AC-7.6 Forget clears only OpenObserve's copy of the refresh token after a confirm", async () => {
     const w = mountCard();
-    expect(w.find('[data-test="slack-refresh-token"]').text()).toContain(
-      "Configuration refresh token kept",
-    );
+    expect(w.find('[data-test="slack-refresh-token"]').text()).toContain("Slack setup token kept");
     await w.find('[data-test="slack-forget-token"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("Acme Corp");
     const dialog = w.findComponent(NamedConfirmDialogStub);
@@ -399,7 +455,7 @@ describe("SlackWorkspaceCard (A3)", () => {
     );
     expect(banner.text()).toContain("Questions: #o2-platform");
     expect(w.find('[data-test="slack-workspace-meta"]').text()).toBe(
-      "Socket Mode · managed by your instance admin",
+      "Managed by your instance admin",
     );
     expect(mountCard().find('[data-test="slack-managed-banner"]').exists()).toBe(false);
   });

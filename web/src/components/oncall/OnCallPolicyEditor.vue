@@ -7,12 +7,21 @@
     :open="props.open"
     size="xxl"
     :title="t('oncall.escalationEditing')"
-    :sub-title="t('oncall.policyHint')"
     bleed
     data-test="oncall-policy-editor"
     :close-guard="guardClose"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
+    <template #header-left>
+      <OIcon
+        name="info-outline"
+        size="sm"
+        class="text-icon-color cursor-pointer"
+        data-test="oncall-policy-editor-info"
+      >
+        <OTooltip side="bottom" :content="t('oncall.policyHint')" />
+      </OIcon>
+    </template>
     <!-- `bleed` because the chip bar spans the full width and supplies its own
          inset; everything below keeps the drawer's standard one. -->
     <!-- Same chips as the read view, so editing feels like the ladder
@@ -20,24 +29,33 @@
          time: five stacked ladders was a page nobody could scan. Sticky,
          because a long ladder scrolls the only thing saying which priority
          you are editing off the top. -->
+    <!-- Hidden on AI triage, which lists every priority itself; there the chips would select nothing. -->
     <div
+      v-if="policyTab !== 'triage'"
       class="bg-dialog-bg border-dialog-header-border px-dialog-content-px py-dialog-content-py sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b"
       data-test="oncall-policy-priority-bar"
     >
       <OButton
         v-for="rung in draft"
         :key="rung.priority"
-        :variant="rung.priority === selected ? 'primary' : 'outline'"
+        :variant="rung.priority === selected ? 'outline-primary' : 'outline'"
         size="xs"
         :data-test="`oncall-policy-priority-${rung.priority}`"
         @click="selected = rung.priority"
       >
-        {{ priorityLabel(rung.priority) }}
-        {{
-          rung.steps.length
-            ? t("oncall.policyChipSteps", { count: rung.steps.length }, rung.steps.length)
-            : t("oncall.reachPagesNobody")
-        }}
+        <OTag
+          type="alertPriority"
+          :value="`p${rung.priority}`"
+          :label="raw(priorityLabel(rung.priority))"
+          size="xs"
+        />
+        <span class="text-2xs text-text-secondary ms-1.5">
+          {{
+            rung.steps.length
+              ? t("oncall.policyChipSteps", { count: rung.steps.length }, rung.steps.length)
+              : t("oncall.reachPagesNobody")
+          }}
+        </span>
       </OButton>
     </div>
 
@@ -57,6 +75,7 @@
           <OButton
             variant="outline"
             size="xs"
+            icon-left="build"
             data-test="oncall-policy-destinations-fix"
             @click="policyTab = 'delivery'"
           >
@@ -66,11 +85,7 @@
       </OBanner>
 
       <div class="flex flex-col">
-        <OTabs
-          v-model="policyTab"
-          class="border-border-default border-b px-2"
-          data-test="oncall-policy-tabs"
-        >
+        <OTabs v-model="policyTab" bordered data-test="oncall-policy-tabs">
           <OTab name="policy" data-test="oncall-policy-tab-policy">
             {{ t("oncall.policyMainTabPolicy") }}
           </OTab>
@@ -102,19 +117,6 @@
               class="flex flex-col gap-4 px-4 pt-3 pb-4"
               data-test="oncall-policy-rung"
             >
-              <!-- The whole ladder as one sentence, before any of the controls. The
-             editor is built out of target KINDS and absolute offsets; this is
-             the plain reading of what they add up to. -->
-              <OBanner
-                variant="info"
-                icon="bolt"
-                dense
-                inline-actions
-                data-test="oncall-policy-sentence"
-              >
-                {{ ladderSentence }}
-              </OBanner>
-
               <div class="flex flex-col gap-2">
                 <OText variant="section" as="div">{{ t("oncall.policyStepsSection") }}</OText>
 
@@ -252,16 +254,18 @@
                         :key="i"
                       >
                         <span v-if="line?.people.length" class="flex items-center gap-2">
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="email in line.people.slice(0, AVATARS_SHOWN)"
-                              :key="email"
-                              :value="email"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              line.people.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta">
-                            {{ t("oncall.policyTodayIs", { who: raw(line.people.join(", ")) }) }}
+                            {{
+                              t("oncall.policyTodayIs", {
+                                who: raw(line.people.map(nameOf).join(", ")),
+                              })
+                            }}
                           </OText>
                         </span>
 
@@ -272,14 +276,12 @@
                           :data-test="`oncall-policy-open-members-${current.priority}-${stepIndex}`"
                           @click="openMembers"
                         >
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="member in teamMembers.slice(0, AVATARS_SHOWN)"
-                              :key="member"
-                              :value="member"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              teamMembers.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta" class="hover:underline">
                             {{
                               t(
@@ -342,22 +344,17 @@
                   <div class="border-border-default flex flex-col gap-1 border-t px-3 py-2">
                     <div class="flex flex-wrap items-center gap-2">
                       <OText variant="label">{{ t("oncall.policyWhenStepsRunOut") }}</OText>
-                      <span class="w-64">
+                      <span class="w-80 max-md:w-full">
                         <OSelect
                           :model-value="ladderEnd"
                           :options="ladderEndOptions"
+                          :searchable="false"
                           size="sm"
                           data-test="oncall-policy-ladder-end-select"
                           @update:model-value="(v: unknown) => setLadderEnd(String(v))"
                         />
                       </span>
                     </div>
-                    <!-- The option label cannot name the org's catch-all team; this
-                   line can, and that is the difference between "hands off" and
-                   "hands off to Platform". -->
-                    <OText variant="meta" data-test="oncall-policy-ladder-end">
-                      {{ ladderEndLine }}
-                    </OText>
                     <!-- §G.9 #9: notify_default_team with nobody nominated is
                    indistinguishable from stop — the ladder ends silently while
                    the policy reads as having a safety net. Said HERE, where the
@@ -383,7 +380,7 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                   <OButton
-                    variant="ghost-primary"
+                    variant="outline"
                     size="sm-action"
                     icon-left="add"
                     :data-test="`oncall-policy-add-step-${current.priority}`"
@@ -398,8 +395,6 @@
 
           <OTabPanel name="delivery" data-test="oncall-policy-delivery">
             <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
-              <OText variant="meta">{{ t("oncall.policyDeliveryHint") }}</OText>
-
               <!-- Channels apply to everyone paged at this priority; the primary
                      and the secondary are not treated differently. -->
               <div v-if="current" class="flex flex-col gap-2">
@@ -418,13 +413,6 @@
                   />
                 </div>
                 <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
-                  <OText variant="meta" data-test="oncall-policy-channels-hint">
-                    {{
-                      t("oncall.policyChannelsHint", {
-                        priority: raw(priorityLabel(current.priority)),
-                      })
-                    }}
-                  </OText>
                   <OText v-if="emailLocked" variant="meta" data-test="oncall-policy-email-locked">
                     {{ t("oncall.policyEmailLockedBySlack") }}
                   </OText>
@@ -441,6 +429,7 @@
                     <OButton
                       variant="ghost-primary"
                       size="xs"
+                      icon-left="open-in-new"
                       data-test="oncall-policy-telephony-link"
                       @click="openTelephony"
                     >
@@ -475,7 +464,7 @@
                 >
                   {{ t("oncall.policyReachesNobody") }}
                 </OTag>
-                <OText v-else variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
+                <OText v-else variant="meta">{{ t("oncall.policyDestinationsHintShort") }}</OText>
               </div>
 
               <div
@@ -519,9 +508,18 @@
                      channel and pages still go to the old room" has to be answerable
                      here, not by paging somebody to find out. -->
               <div class="flex flex-wrap items-center gap-2" data-test="oncall-team-channel">
-                <OText variant="label" class="w-32 shrink-0">
-                  {{ t("oncall.teamChannelTitle") }}
-                </OText>
+                <span class="flex w-32 shrink-0 items-center gap-1">
+                  <OText variant="label">{{ t("oncall.teamChannelTitle") }}</OText>
+                  <!-- One post per firing, not a live room: the HTTP transport cannot edit what it already sent. -->
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="text-text-secondary cursor-help"
+                    data-test="oncall-team-channel-info"
+                  >
+                    <OTooltip side="right" :content="t('oncall.teamChannelHint')" />
+                  </OIcon>
+                </span>
                 <span class="w-72">
                   <OSelect
                     v-model="teamChannelDraft"
@@ -532,33 +530,27 @@
                     data-test="oncall-team-channel-select"
                   />
                 </span>
+                <!-- A team's own list says so through the button that reverts it; only the inherited one needs a label. -->
                 <OTag
-                  v-if="teamChannel"
-                  :variant="channelFromTeam ? 'primary-soft' : 'default-soft'"
+                  v-if="teamChannel && !channelFromTeam"
+                  variant="default-soft"
                   size="xs"
                   data-test="oncall-team-channel-source"
                 >
-                  {{
-                    channelFromTeam
-                      ? t("oncall.teamChannelFromTeam")
-                      : t("oncall.teamChannelFromPolicy")
-                  }}
+                  {{ t("oncall.teamChannelFromPolicy") }}
                 </OTag>
                 <!-- Clearing is its own verb because null and [] are different
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
                   v-if="channelFromTeam"
-                  variant="ghost"
+                  variant="outline"
                   size="sm-action"
+                  icon-left="close"
                   data-test="oncall-team-channel-clear"
                   @click="usePolicyChannel"
                 >
                   {{ t("oncall.teamChannelUsePolicy") }}
                 </OButton>
-                <!-- One post per firing, not a live room: the only transport is an
-                       HTTP destination, which cannot edit what it already sent. Said
-                       here so nobody designs an expectation the engine cannot meet. -->
-                <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
                 <!-- Only the team's own empty list is a choice; an empty list inherited from the policy is the policy's. -->
                 <span
                   v-if="channelFromTeam && !teamChannelDraft.length"
@@ -587,8 +579,6 @@
                  editing steps must never silently rewrite the gate. -->
           <OTabPanel name="triage" data-test="oncall-policy-triage">
             <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
-              <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
-
               <OnCallL0Editor
                 :l0="l0Draft ?? props.policy?.l0 ?? null"
                 @update:l0="onL0Update"
@@ -638,10 +628,13 @@ import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.v
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { stableStringify } from "@/utils/drafts/editorDraftStore";
-import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -693,6 +686,8 @@ import {
   priorityLabel,
   resolveLadder,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { serverMessageOf } from "@/utils/slackLink";
 
 const props = withDefaults(
   defineProps<{
@@ -720,7 +715,13 @@ const emit = defineEmits<{
   "policy-written": [];
   "update:open": [boolean];
   "open-members": [];
+  licenseDenied: [features: string[]];
 }>();
+
+function noteDenial(err: unknown) {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+}
 
 interface PolicyDraftData {
   rungs: PriorityRung[];
@@ -732,6 +733,7 @@ interface PolicyDraftData {
 }
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
@@ -822,6 +824,7 @@ const contactRead = useQuery(() =>
   }),
 );
 const noProvider = computed(() => contactRead.data.value?.phone_provider_available === false);
+watch(contactRead.error, noteDenial);
 
 const savePolicyWrite = useMutation(() => setTeamPolicyMutation(orgId.value, props.teamId));
 const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, props.teamId));
@@ -882,7 +885,8 @@ async function fetchTeamChannel() {
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     teamChannel.value = null;
   }
 }
@@ -899,7 +903,7 @@ async function saveChannelAfterPolicy(): Promise<boolean> {
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({ variant: "error", message: t("oncall.teamChannelNotSavedAfterPolicy") });
     return false;
@@ -929,11 +933,11 @@ async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
       ...slack,
     });
     teamChannel.value = res.data ?? null;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.slackChannelSaveFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.slackChannelSaveFailed"),
     });
   } finally {
     savingSlack.value = false;
@@ -949,7 +953,8 @@ async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
 /// Routing screen.
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 async function fetchRoutingConfig() {
-  await loadRoutingConfig(orgId.value);
+  const denied = await loadRoutingConfig(orgId.value);
+  if (denied) emit("licenseDenied", denied);
 }
 
 const defaultTeamMissing = computed(
@@ -958,54 +963,6 @@ const defaultTeamMissing = computed(
     routingConfig.value !== null &&
     !routingConfig.value.default_team_id,
 );
-
-/// What actually happens when the steps run out, from the policy itself —
-/// the static "decided by the repeat and final action" told the author to go
-/// find out. `repeat_count` 1 means the ladder runs once; there is no zero.
-const ladderEndLine = computed(() => {
-  const repeats = repeatCount.value;
-  const hands = finalAction.value === "notify_default_team";
-  if (hands) {
-    const team = routingConfig.value?.default_team_name;
-    return team
-      ? t("oncall.policyEndsHandsTo", { count: repeats, team: raw(team) }, repeats)
-      : t("oncall.policyEndsHandsToUnset", { count: repeats }, repeats);
-  }
-  return t("oncall.policyEndsStops", { count: repeats }, repeats);
-});
-
-/// The whole selected ladder as one sentence. The editor is built out of
-/// target kinds and absolute offsets; this is what they add up to, said the way
-/// somebody would say it out loud.
-const ladderSentence = computed<I18nText>(() => {
-  const rung = current.value;
-  const priority = raw(priorityLabel(rung?.priority ?? selected.value));
-  if (!rung?.steps.length) return t("oncall.policySentenceNobody", { priority });
-
-  const steps = rung.steps
-    .map((step) => {
-      const who = step.targets
-        .map((target) => describeTarget(target, t, rotationNameOf(target)))
-        .join(", ");
-      return step.after_micros === 0
-        ? t("oncall.policySentenceStepNow", { who: raw(who) })
-        : t("oncall.policySentenceStepAt", {
-            who: raw(who),
-            delay: raw(formatMicrosDuration(step.after_micros)),
-          });
-    })
-    .join(", ");
-
-  const team = routingConfig.value?.default_team_name;
-  const ending =
-    finalAction.value === "notify_default_team"
-      ? team
-        ? t("oncall.policySentenceEndHandOff", { team: raw(team) })
-        : t("oncall.policySentenceEndHandOffUnset")
-      : t("oncall.policySentenceEndStop");
-
-  return t("oncall.policySentence", { priority, steps: raw(steps), ending });
-});
 
 /// The two halves of the ladder's end as one value, because they are one
 /// decision: how many passes, and what happens after the last one.
@@ -1020,7 +977,13 @@ const ladderEndOptions = computed(() => [
     value: `${n}:stop`,
   })),
   ...[1, 2, 3, 4, 5].map((n) => ({
-    label: t("oncall.policyEndOptionHandOff", { count: n }, n),
+    label: routingConfig.value?.default_team_name
+      ? t(
+          "oncall.policyEndOptionHandOffTo",
+          { count: n, team: raw(routingConfig.value.default_team_name) },
+          n,
+        )
+      : t("oncall.policyEndOptionHandOff", { count: n }, n),
     value: `${n}:notify_default_team`,
   })),
 ]);
@@ -1287,9 +1250,8 @@ watch(
   (open) => {
     if (!open) return;
     reset();
-    // Every visit starts on Delivery — a re-open landing on whichever tab was
-    // last showing would carry a stale AI triage view into an unrelated edit.
-    policyTab.value = "delivery";
+    // Every visit starts on the ladder it was opened to edit, never on a stale tab.
+    policyTab.value = "policy";
     // A policy need not carry a rung for every priority, so an unrepresented
     // one falls back to a chip that exists rather than an empty body.
     const wanted = props.priority ?? selected.value;
@@ -1357,7 +1319,8 @@ async function fetchMembers() {
       label: raw(m.user_email),
       value: m.user_email,
     }));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     memberOptions.value = [];
   }
 }
@@ -1367,7 +1330,8 @@ async function fetchMembers() {
 async function fetchOnCallNow() {
   try {
     onCallNow.value = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     onCallNow.value = [];
   }
 }
@@ -1436,11 +1400,11 @@ async function save(): Promise<boolean> {
     policyDraft.markSaved();
     emit("saved");
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.savePolicyFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.savePolicyFailed"),
     });
     return false;
   } finally {

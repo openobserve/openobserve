@@ -77,13 +77,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             );
                         }
                         // release locked stream
-                        let key = format!(
-                            "{}/{}/{}",
-                            job.org_id,
-                            job.stream_type.as_str(),
-                            job.stream_name
-                        );
-                        db::compact::stream::clear_running(&key);
+                        if job.holds_stream {
+                            let key = format!(
+                                "{}/{}/{}",
+                                job.org_id,
+                                job.stream_type.as_str(),
+                                job.stream_name
+                            );
+                            db::compact::stream::clear_running(&key);
+                        }
                     }
                 }
             }

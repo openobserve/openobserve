@@ -19,10 +19,14 @@ use config::{
     cluster, get_config,
     meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
-    utils::time::hour_micros,
+    utils::{parquet::parse_file_key_columns, time::hour_micros},
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{cache::file_data, file_list as infra_file_list};
+use infra::{
+    cache::file_data,
+    file_list as infra_file_list,
+    schema::{get_partition_time_level_at, get_settings},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search::datafusion::merge::MergeMode;
@@ -33,10 +37,16 @@ use tokio::{
 };
 
 use super::{
-    job::{job_range_end, job_time_level},
+    job::{job_range_end, job_time_level, scheduling_level},
     plan::{BatchLimits, plan_batches},
 };
-use crate::worker::{MergeBatch, MergeSender};
+use crate::{
+    bloom::compact::OrphanBlooms,
+    worker::{MergeBatch, MergeSender},
+};
+
+/// Position of the hour directory in `files/{org}/{type}/{stream}/YYYY/MM/DD/HH/...`.
+const HOUR_SEGMENT: usize = 7;
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -73,18 +83,24 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    // A job whose offset hour has not yet settled (hour end + 3 * max_file_retention_time,
-    // see is_past_hour) is an incremental round on a hour that can still receive files
-    // (enqueued by the ingester, see service::compaction::incremental): only seal full-size
-    // groups and carry the remainder, so each file is merged into a sealed output exactly
-    // once. The scheduled hour-end pass seals whatever is left.
+    // an unsettled range can still receive files: seal full-size groups only
     let offset = offset - offset % hour_micros(1);
-    let is_incremental = !crate::is_past_hour(offset);
+    let settings = get_settings(org_id, stream_name, stream_type).await;
+    let settings = settings.as_deref();
+    let job_level = scheduling_level(stream_type, settings, offset);
+    let job_end = job_range_end(offset, job_level);
+    let is_incremental = !crate::is_past_hour(job_end);
+    // a daily day was written hourly: its files merge as one group, written to DD/00
+    let merges_by_day = job_level == PartitionTimeLevel::Daily;
 
     // check offset
-    let partition_time_level = job_time_level(stream_type, offset, !is_incremental, |max_ts| {
-        has_downsampling_rule(stream_name, max_ts)
-    });
+    let partition_time_level = job_time_level(
+        stream_type,
+        offset,
+        !is_incremental,
+        get_partition_time_level_at(stream_type, settings, offset),
+        |max_ts| has_downsampling_rule(stream_name, max_ts),
+    );
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
@@ -142,10 +158,16 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
-        let file_name = file.key.clone();
-        let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
-        let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(file.to_owned());
+        let prefix = &file.key[..file.key.rfind('/').unwrap()];
+        let prefix = if merges_by_day {
+            day_prefix(prefix)
+        } else {
+            prefix.to_string()
+        };
+        partition_files_with_size
+            .entry(prefix)
+            .or_default()
+            .push(file);
     }
 
     // use multiple threads to merge
@@ -157,7 +179,7 @@ pub async fn merge_by_stream(
         let mode = mode.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<anyhow::Result<OrphanBlooms>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -199,7 +221,7 @@ pub async fn merge_by_stream(
             })
             .collect();
             if batch_groups.is_empty() {
-                return Ok(vec![]); // no files need to merge
+                return Ok(OrphanBlooms::default()); // no files need to merge
             }
 
             // send to worker
@@ -219,7 +241,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
-            let mut orphan_blooms = Vec::new();
+            let mut orphan_blooms = OrphanBlooms::default();
             for ret in worker_results {
                 let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
@@ -258,9 +280,13 @@ pub async fn merge_by_stream(
                 }
 
                 // collect orphan blooms after writing file list successfully
-                for file in &retire_files {
-                    if file.meta.bloom_ver > 0 {
-                        orphan_blooms.push(file.meta.bloom_ver);
+                for file in retire_files.iter().filter(|f| f.meta.bloom_ver > 0) {
+                    // a `.bf` lives under the hour of the file it covers, not under the job's
+                    if let Ok((_, date, _)) = parse_file_key_columns(&file.key) {
+                        orphan_blooms
+                            .entry(date)
+                            .or_default()
+                            .push(file.meta.bloom_ver);
                     }
                 }
             }
@@ -274,9 +300,11 @@ pub async fn merge_by_stream(
     }
 
     // collect bloom files which need to be clean
-    let mut orphan_blooms = Vec::new();
+    let mut orphan_blooms = OrphanBlooms::default();
     for task in tasks {
-        orphan_blooms.extend(task.await??);
+        for (date, bloom_vers) in task.await?? {
+            orphan_blooms.entry(date).or_default().extend(bloom_vers);
+        }
     }
 
     // Build bloom filters for the current hour. Failures are non-fatal: files
@@ -306,13 +334,19 @@ pub async fn merge_by_stream(
         }
     }
 
-    // the hour settled mid-round: stay Running so check_running_jobs re-arms a whole-hour retry
-    if is_incremental && crate::is_past_hour(offset) {
+    // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
+    if is_incremental && crate::is_past_hour(job_end) {
         log::warn!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] hour {date_start} settled during the incremental round, job {job_id} is left for the hour-end retry"
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
         );
     } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
+    } else if is_incremental
+        && crate::is_past_hour(job_end)
+        // add_job does nothing on a Running row, so the scheduled pass may have just missed this one
+        && let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await
+    {
+        log::error!("[COMPACTOR] re-arm job {job_id} failed: {e}");
     }
 
     // metrics
@@ -405,6 +439,16 @@ async fn write_file_list(
     Ok(())
 }
 
+/// `prefix` with its hour directory replaced by `00`, where the files of a daily day are written.
+fn day_prefix(prefix: &str) -> String {
+    prefix
+        .split('/')
+        .enumerate()
+        .map(|(i, segment)| if i == HOUR_SEGMENT { "00" } else { segment })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 /// File-list events that add `new_files` and delete `retire_files`; delete-only is valid.
 fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<FileKey> {
     if retire_files.is_empty() {
@@ -478,6 +522,22 @@ mod tests {
             selection: None,
             row_group_size: None,
         }
+    }
+
+    #[test]
+    fn test_day_prefix_replaces_only_the_hour() {
+        assert_eq!(
+            day_prefix("files/o/logs/s/2026/09/30/17"),
+            "files/o/logs/s/2026/09/30/00"
+        );
+        assert_eq!(
+            day_prefix("files/o/logs/s/2026/09/30/17/k8s_namespace=prod/host=a"),
+            "files/o/logs/s/2026/09/30/00/k8s_namespace=prod/host=a"
+        );
+        assert_eq!(
+            day_prefix("files/o/logs/s/2026/09/30/00"),
+            "files/o/logs/s/2026/09/30/00"
+        );
     }
 
     #[test]

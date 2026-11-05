@@ -20,7 +20,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Utc};
 use config::{
     FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
@@ -31,7 +31,7 @@ use config::{
     },
     utils::{
         parquet::get_recordbatch_reader_from_bytes,
-        time::{BASE_TIME, HourFormat, get_ymdh_from_micros, hour_micros, now, now_micros},
+        time::{BASE_TIME, HourFormat, get_ymdh_from_micros, now, now_micros},
     },
 };
 use db;
@@ -40,14 +40,17 @@ use infra::{
     cluster::get_node_from_consistent_hash,
     errors, file_list as infra_file_list,
     file_list::FileRecord,
-    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_partition_time_level, get_settings},
+    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings},
 };
 use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
 
-use crate::bloom::compact::bloom_files_deleted;
+use crate::{
+    bloom::compact::bloom_files_deleted,
+    merge::{job_range, job_range_end, scheduling_level},
+};
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -56,6 +59,8 @@ pub struct DumpJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
+    /// A daily job holds the stream against merges until it ends.
+    pub holds_stream: bool,
 }
 
 // compactor dump run steps:
@@ -91,14 +96,14 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // we don't dump for file_list stream
             continue;
         }
-        if !super::is_past_hour(*offset) {
-            need_done_ids.push(*job_id); // the data is not past hour, need to wait
-            continue;
-        }
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(stream_type);
+        let level = scheduling_level(stream_type, Some(&stream_settings), *offset);
+        if !super::is_past_hour(job_range_end(*offset, level)) {
+            need_done_ids.push(*job_id); // the data is not past its range, need to wait
+            continue;
+        }
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()
@@ -114,7 +119,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
         }
-        if partition_time_level == PartitionTimeLevel::Daily {
+        if level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -126,12 +131,18 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
                 continue;
             }
 
+            // the dump removes live rows the sealing merge still reads
+            let (compact_offset, _) =
+                db::compact::files::get_offset(&org_id, stream_type, &stream_name).await;
+            if !is_day_sealed(*offset, compact_offset) {
+                need_release_ids.push(*job_id);
+                continue;
+            }
+
             // check if already running a job for this stream
-            if db::compact::stream::is_running(stream) {
+            if !db::compact::stream::set_running(stream) {
                 need_release_ids.push(*job_id); // another job is running
                 continue;
-            } else {
-                db::compact::stream::set_running(stream);
             }
         }
         // collect the dump jobs
@@ -141,6 +152,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             stream_name,
             job_id: *job_id,
             offset: *offset,
+            holds_stream: level == PartitionTimeLevel::Daily,
         });
     }
 
@@ -215,34 +227,9 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // check offset
-    let partition_time_level = get_partition_time_level(job.stream_type);
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(job.offset * 1000);
-    let offset_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
-            0,
-            0,
-        )
-        .unwrap();
-    let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
-        (
-            // start of the day
-            offset_hour.with_hour(0).unwrap().timestamp_micros(),
-            // start of next hour
-            offset_hour.timestamp_micros() + hour_micros(1) - 1,
-        )
-    } else {
-        (
-            // start of the hour
-            offset_hour.timestamp_micros(),
-            // start of next hour
-            offset_hour.timestamp_micros() + hour_micros(1) - 1,
-        )
-    };
+    let settings = get_settings(&job.org_id, &job.stream_name, job.stream_type).await;
+    let level = scheduling_level(job.stream_type, settings.as_deref(), job.offset);
+    let (start_time, end_time) = job_range(job.offset, level);
 
     let files = infra_file_list::query_for_dump(
         &job.org_id,
@@ -329,14 +316,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
     // generate the dump file
     let dumped_ids = dump_delete_pairs(&files);
-    let dump_file = match generate_dump(
-        &job.org_id,
-        job.stream_type,
-        &job.stream_name,
-        (start_time, end_time),
-        files,
-    )
-    .await
+    let dump_file = match generate_dump(&job.org_id, job.stream_type, &job.stream_name, files).await
     {
         Ok(v) => v,
         Err(e) => {
@@ -441,7 +421,7 @@ pub async fn delete_by_time_range(
         .map(|(date, files)| (date, files.collect::<Vec<_>>()))
         .collect::<Vec<_>>();
     for (date, files) in groupd_files_to_keep {
-        match generate_dump(org_id, stream_type, stream_name, range, files).await {
+        match generate_dump(org_id, stream_type, stream_name, files).await {
             Ok(Some(v)) => new_dump_files.push(v),
             Ok(None) => continue,
             Err(e) => {
@@ -549,6 +529,11 @@ pub async fn delete_by_time_range(
     Ok(())
 }
 
+/// The generator is past the day once it has enqueued the job that seals it.
+fn is_day_sealed(day_offset: i64, compact_offset: i64) -> bool {
+    compact_offset > job_range_end(day_offset, PartitionTimeLevel::Daily)
+}
+
 fn deleted_data_file(file: &FileRecord) -> FileListDeleted {
     FileListDeleted {
         id: 0,
@@ -565,7 +550,6 @@ async fn generate_dump(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    range: (i64, i64),
     files: Vec<FileRecord>,
 ) -> Result<Option<FileKey>, errors::Error> {
     // if there are no files to dump, no point in making a dump file
@@ -574,6 +558,9 @@ async fn generate_dump(
     }
 
     let records = files.len();
+    // from the rows: a delete rewrites what it keeps, which lies outside the range it deleted
+    let min_ts = files.iter().map(|f| f.min_ts).min().unwrap_or_default();
+    let max_ts = files.iter().map(|f| f.max_ts).max().unwrap_or_default();
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
@@ -592,7 +579,7 @@ async fn generate_dump(
     }
     writer.close().await?;
 
-    let ts = Utc.timestamp_nanos(range.0 * 1000);
+    let ts = Utc.timestamp_nanos(min_ts * 1000);
 
     let file_name = format!(
         "{:04}/{:02}/{:02}/{:02}/{}.parquet",
@@ -611,8 +598,8 @@ async fn generate_dump(
     );
 
     let meta = FileMeta {
-        min_ts: range.0,
-        max_ts: range.1 - 1, // because the end_time is the start of next hour
+        min_ts,
+        max_ts,
         records: records as i64,
         original_size: buf.len() as i64,
         compressed_size: buf.len() as i64,
@@ -855,6 +842,7 @@ mod tests {
             stream_name: "test_stream".to_string(),
             job_id: 123,
             offset: 1000000,
+            holds_stream: false,
         };
 
         assert_eq!(job.org_id, "test_org");
@@ -872,6 +860,7 @@ mod tests {
             stream_name: "metric_stream".to_string(),
             job_id: 456,
             offset: 2000000,
+            holds_stream: false,
         };
 
         let cloned = job.clone();
@@ -890,6 +879,7 @@ mod tests {
             stream_name: "trace_stream".to_string(),
             job_id: 1,
             offset: 100,
+            holds_stream: false,
         };
         assert_eq!(job.stream_type, StreamType::Traces);
     }
@@ -902,6 +892,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: 0,
             offset: 0,
+            holds_stream: false,
         };
         assert_eq!(job.job_id, 0);
         assert_eq!(job.offset, 0);
@@ -916,6 +907,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: 99,
             offset: -1,
+            holds_stream: false,
         };
         assert_eq!(job.offset, -1);
     }
@@ -928,6 +920,7 @@ mod tests {
             stream_name: "stream".to_string(),
             job_id: i64::MAX,
             offset: i64::MAX,
+            holds_stream: false,
         };
         assert_eq!(job.job_id, i64::MAX);
         assert_eq!(job.offset, i64::MAX);
@@ -942,6 +935,7 @@ mod tests {
             stream_name: "original_stream".to_string(),
             job_id: 1,
             offset: 100,
+            holds_stream: false,
         };
         let mut cloned = original.clone();
         cloned.job_id = 999;
@@ -1811,6 +1805,7 @@ mod tests {
                 stream_name: "stream".to_string(),
                 job_id: 1,
                 offset: 0,
+                holds_stream: false,
             };
             let formatted = format!("{}/{}/{}", job.org_id, job.stream_type, job.stream_name);
             assert!(
@@ -1863,5 +1858,39 @@ mod tests {
             "every pair must carry that record's own stored (id, date), in input order"
         );
         assert!(dump_delete_pairs(&[]).is_empty());
+    }
+
+    const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+
+    #[tokio::test]
+    async fn test_generate_dump_meta_covers_the_rows_it_holds() {
+        use config::utils::time::hour_micros;
+        let row = |hour, min_ts, max_ts| FileRecord {
+            min_ts,
+            max_ts,
+            ..delete_pairs_record(hour, "2026/09/29/00")
+        };
+        let rows = vec![
+            row(1, DAY + 5, DAY + hour_micros(1) - 5),
+            row(2, DAY + hour_micros(23) + 5, DAY + hour_micros(24) - 5),
+        ];
+        let name = format!("dump_meta_{}", config::ider::generate());
+        let dump = generate_dump("dump_meta", StreamType::Logs, &name, rows)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (dump.meta.min_ts, dump.meta.max_ts),
+            (DAY + 5, DAY + hour_micros(24) - 5)
+        );
+    }
+
+    #[test]
+    fn test_is_day_sealed_needs_the_generator_past_the_day() {
+        use config::utils::time::day_micros;
+        assert!(!is_day_sealed(DAY, DAY));
+        assert!(!is_day_sealed(DAY, DAY + day_micros(1) - 1));
+        assert!(is_day_sealed(DAY, DAY + day_micros(1)));
+        assert!(is_day_sealed(DAY, DAY + day_micros(3)));
     }
 }

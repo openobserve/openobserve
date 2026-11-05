@@ -87,13 +87,24 @@ const onDateChange = (field: any, dt: any) => {
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div v-if="props.label || props.description" class="mb-2">
-        <div v-if="props.label" class="text-input-label-text text-sm font-bold">
+        <div
+          v-if="props.label && $slots['label-append']"
+          class="text-input-label-text flex items-center gap-1 text-sm font-bold"
+        >
+          <span
+            >{{ props.label
+            }}<span v-if="props.required" class="text-input-error-text"> *</span></span
+          >
+          <slot name="label-append" />
+        </div>
+        <div v-else-if="props.label" class="text-input-label-text text-sm font-bold">
           {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">
           {{ props.description }}
         </div>
       </div>
+      <div v-if="$slots.above" class="mb-2"><slot name="above" /></div>
       <DateTime
         :key="renderKey"
         v-bind="$attrs"

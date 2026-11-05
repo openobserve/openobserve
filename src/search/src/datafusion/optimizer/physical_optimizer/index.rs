@@ -32,7 +32,7 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, NotExpr},
         filter::{FilterExec, FilterExecBuilder},
         limit::LocalLimitExec,
         projection::ProjectionExec,
@@ -49,15 +49,16 @@ use crate::{
         udf::{
             MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
             STR_MATCH_UDF_NAME,
-            match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+            fulltext::match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
         },
     },
-    index::{Condition, IndexCondition},
+    index::{Condition, IndexCondition, like_contains_term},
 };
 
 #[derive(Default, Debug)]
 pub struct IndexRule {
     index_fields: HashSet<String>,
+    fts_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // this set to true when all filter can be extract to
     // index condition(except _timestamp filter)
@@ -67,10 +68,12 @@ pub struct IndexRule {
 impl IndexRule {
     pub fn new(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: Arc::new(AtomicBool::new(false)),
         }
@@ -91,8 +94,11 @@ impl PhysicalOptimizerRule for IndexRule {
             return Ok(plan);
         }
 
-        let mut rewriter =
-            IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
+        let mut rewriter = IndexOptimizer::new(
+            self.index_fields.clone(),
+            self.fts_fields.clone(),
+            self.index_condition.clone(),
+        );
         let plan = plan.rewrite(&mut rewriter).data()?;
 
         // If no filter was found at all (e.g., SELECT count(*) FROM table),
@@ -127,6 +133,7 @@ impl PhysicalOptimizerRule for IndexRule {
 
 struct IndexOptimizer {
     index_fields: HashSet<String>,
+    fts_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // set to true when the filter only have _timestamp filter
     can_optimize: bool,
@@ -139,10 +146,12 @@ struct IndexOptimizer {
 impl IndexOptimizer {
     pub fn new(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: false,
             has_filter: false,
@@ -158,12 +167,14 @@ impl IndexOptimizer {
     #[cfg(test)]
     fn new_with_config(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
         is_remove_filter: bool,
         optimizer_enabled: bool,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: false,
             has_filter: false,
@@ -184,6 +195,10 @@ impl TreeNodeRewriter for IndexOptimizer {
             for expr in split_conjunction(filter.predicate()) {
                 if is_expr_valid_for_index(expr, &self.index_fields) {
                     let condition = Condition::from_physical_expr(expr);
+                    index_conditions.add_condition(condition);
+                } else if let Some(condition) = fts_like_condition(expr, &self.fts_fields) {
+                    // `_all` only narrows the candidates, so the LIKE has to stay in the plan
+                    other_conditions.push(expr.clone());
                     index_conditions.add_condition(condition);
                 } else {
                     other_conditions.push(expr.clone());
@@ -311,6 +326,31 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
     true
 }
 
+// only `col [I]LIKE '%x%'` on a plain column, since the index stores the uncast value
+fn fts_like_condition(
+    expr: &Arc<dyn PhysicalExpr>,
+    fts_fields: &HashSet<String>,
+) -> Option<Condition> {
+    let like = expr.downcast_ref::<LikeExpr>()?;
+    if like.negated()
+        || !config::get_config()
+            .search
+            .inverted_index_like_optimizer_enabled
+    {
+        return None;
+    }
+    let field = like.expr().downcast_ref::<Column>()?.name();
+    if !fts_fields.contains(field) {
+        return None;
+    }
+    let pattern = extract_string_literal(like.pattern()).ok()?;
+    let value = like_contains_term(&pattern)?.to_string();
+    Some(Condition::Like {
+        field: field.to_string(),
+        value,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -333,9 +373,9 @@ mod tests {
     use crate::{
         datafusion::{
             optimizer::physical_optimizer::utils::is_only_timestamp_filter,
-            udf::{
-                match_all_udf::{self, MATCH_ALL_UDF},
-                str_match_udf::{self, STR_MATCH_UDF},
+            udf::fulltext::{
+                match_all::{self, MATCH_ALL_UDF},
+                str_match::{self, STR_MATCH_UDF},
             },
         },
         index::Condition,
@@ -394,6 +434,15 @@ mod tests {
             vec![column(field), literal(lit)],
             FieldRef::new(Field::new(field, DataType::Utf8, true)),
             Arc::new(ConfigOptions::default()),
+        ))
+    }
+
+    fn like(field: &str, pattern: &str, negated: bool, ilike: bool) -> Arc<dyn PhysicalExpr> {
+        Arc::new(LikeExpr::new(
+            negated,
+            ilike,
+            column(field),
+            literal(pattern),
         ))
     }
 
@@ -523,20 +572,195 @@ mod tests {
     }
 
     #[test]
+    fn test_fts_like_condition() {
+        let index_fields = HashSet::from(["name".to_string()]);
+        let fts_fields = HashSet::from(["message".to_string()]);
+        let fts_like = |value: &str| Condition::Like {
+            field: "message".to_string(),
+            value: value.to_string(),
+        };
+        let long_term = format!("%{}%", "a".repeat(64));
+        let max_term = format!("%{}%", "a".repeat(63));
+        let column_pattern: Arc<dyn PhysicalExpr> = Arc::new(LikeExpr::new(
+            false,
+            false,
+            column("message"),
+            column("name"),
+        ));
+        let cases = vec![
+            (
+                like("message", "%Err42%", false, true),
+                Some(fts_like("Err42")),
+            ),
+            (
+                like("message", &max_term, false, false),
+                Some(fts_like(&"a".repeat(63))),
+            ),
+            (like("name", "%open%", false, false), None),
+            (like("message", &long_term, false, false), None),
+            (like("message", "%e%", false, false), None),
+            (like("message", "%auth-gw%", false, false), None),
+            (like("message", "err%", false, false), None),
+            (like("message", "%err%", true, false), None),
+            (like("message", "%err%", true, true), None),
+            (like("status", "%err%", false, false), None),
+            (column_pattern, None),
+            (not(like("message", "%err%", false, false)), None),
+            (
+                or(
+                    eq(column("name"), literal("a")),
+                    like("message", "%err%", false, false),
+                ),
+                None,
+            ),
+        ];
+
+        for (expr, condition) in cases {
+            assert_eq!(fts_like_condition(&expr, &fts_fields), condition, "{expr}");
+            assert!(!is_expr_valid_for_index(&expr, &index_fields), "{expr}");
+        }
+    }
+
+    #[test]
+    fn test_fts_like_condition_accepts_every_string_literal_type() {
+        let fts_fields = HashSet::from(["message".to_string()]);
+        let scalars: [fn(Option<String>) -> ScalarValue; 3] = [
+            ScalarValue::Utf8,
+            ScalarValue::LargeUtf8,
+            ScalarValue::Utf8View,
+        ];
+        for scalar in scalars {
+            for ilike in [false, true] {
+                let expr: Arc<dyn PhysicalExpr> = Arc::new(LikeExpr::new(
+                    false,
+                    ilike,
+                    column("message"),
+                    Arc::new(Literal::new(scalar(Some("%Err42%".to_string())))),
+                ));
+                assert_eq!(
+                    fts_like_condition(&expr, &fts_fields),
+                    Some(Condition::Like {
+                        field: "message".to_string(),
+                        value: "Err42".to_string(),
+                    })
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_optimizer_like_keeps_fts_filter() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("message", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["an error"])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let message_like = Condition::Like {
+            field: "message".to_string(),
+            value: "error".to_string(),
+        };
+        // sql, expected conditions, LIKE left in the plan
+        let cases = vec![
+            (
+                "SELECT count(*) FROM t WHERE message LIKE '%error%' AND _timestamp > 1",
+                Some(vec![message_like.clone()]),
+                "LIKE %error%",
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND _timestamp > 1",
+                None,
+                "ILIKE %open%",
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND message LIKE '%error%'",
+                Some(vec![message_like]),
+                "LIKE %error%",
+            ),
+            (
+                "SELECT count(*) FROM t WHERE message NOT LIKE '%error%'",
+                None,
+                "NOT LIKE %error%",
+            ),
+            (
+                "SELECT count(*) FROM t WHERE message LIKE '%error%' OR name = 'a'",
+                None,
+                "LIKE %error%",
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name LIKE '%open%' OR name LIKE '%obs%'",
+                None,
+                "LIKE %open%",
+            ),
+        ];
+
+        for is_remove_filter in [true, false] {
+            for (sql, conditions, kept_like) in cases.clone() {
+                let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+                let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+                let index_condition = Arc::new(Mutex::new(None));
+                let mut rewriter = IndexOptimizer::new_with_config(
+                    HashSet::from(["name".to_string()]),
+                    HashSet::from(["message".to_string()]),
+                    index_condition.clone(),
+                    is_remove_filter,
+                    true,
+                );
+                let plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+                let plan = datafusion::physical_plan::displayable(plan.as_ref())
+                    .indent(false)
+                    .to_string();
+
+                assert_eq!(
+                    index_condition.lock().clone().map(|c| c.conditions),
+                    conditions,
+                    "{sql}"
+                );
+                assert!(!rewriter.can_optimize, "{sql}");
+                assert!(plan.contains(kept_like), "{sql}\n{plan}");
+            }
+        }
+    }
+
+    #[test]
     fn test_index_rule_name_returns_expected() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert_eq!(rule.name(), "IndexConditionRule");
     }
 
     #[test]
     fn test_index_rule_schema_check_returns_true() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert!(rule.schema_check());
     }
 
     #[test]
     fn test_index_rule_can_optimize_initial_false() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert!(!rule.can_optimize());
     }
 
@@ -561,8 +785,8 @@ mod tests {
         .unwrap();
 
         let ctx = SessionContext::new();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match::STR_MATCH_UDF.clone());
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
@@ -604,6 +828,7 @@ mod tests {
             let optimizer_enabled = true;
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 is_remove_filter,
                 optimizer_enabled,
@@ -636,8 +861,8 @@ mod tests {
         .unwrap();
 
         let ctx = SessionContext::new();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(match_all::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match::STR_MATCH_UDF.clone());
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
@@ -686,6 +911,7 @@ mod tests {
             let optimizer_enabled = true;
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 is_remove_filter,
                 optimizer_enabled,
@@ -743,6 +969,7 @@ mod tests {
             let index_condition = Arc::new(Mutex::new(None));
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 false,
                 optimizer_enabled,

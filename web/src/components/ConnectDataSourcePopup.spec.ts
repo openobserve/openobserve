@@ -215,6 +215,19 @@ describe("ConnectDataSourcePopup", () => {
       expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBe("true");
     });
 
+    it("opens when the org's only streams are ones O2 writes itself", async () => {
+      global.server.use(
+        http.get(SUMMARY_URL, () =>
+          HttpResponse.json({ streams: { num_streams: 1, num_user_streams: 0 } }),
+        ),
+      );
+
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+    });
+
     it("stays closed when the org already has data", async () => {
       mockSummary(5);
 

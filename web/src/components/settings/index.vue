@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default shrink-0 border-b"
       />
       <ConstrainedPage
-        :size="['password_policy', 'license'].includes(activeSection) ? 'full' : 'lg'"
+        :size="FULL_WIDTH_SECTIONS.has(activeSection) ? 'full' : 'lg'"
         align="left"
         :padded="false"
         class="min-h-0 flex-1 px-4 py-3"
@@ -143,6 +143,7 @@ export default defineComponent({
       "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
+    const FULL_WIDTH_SECTIONS = new Set(["password_policy", "license", "slack"]);
     const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 
     const slackVisible = computed(() => {
@@ -396,7 +397,6 @@ export default defineComponent({
         {
           key: "slack",
           label: t("settings.slackApp"),
-          description: t("settings.slackAppDesc"),
           icon: `img:${slackIcon.value}`,
           to: { name: "slack", query: { org_identifier: org } },
           visible: slackVisible.value,
@@ -584,6 +584,7 @@ export default defineComponent({
       isMetaOrg,
       activeSection,
       isConstrainedSection,
+      FULL_WIDTH_SECTIONS,
       onlineEvalsRouteOff,
       activeSectionItem,
       sectionGroups,

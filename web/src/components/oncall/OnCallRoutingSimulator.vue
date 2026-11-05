@@ -14,218 +14,195 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Describe an alert and see the whole path it would take, without firing one.
-
-  The path is the point. "Which team owns this" is answerable from the rule
-  table, but "does that actually wake somebody" is not: it runs through the
-  winning rule, the team, that priority's ladder, and whoever holds the shift
-  this instant. Every one of those steps is the server's answer — a client that
-  recomputed precedence or resolved the roster would eventually disagree with
-  the engine that pages people, and disagree silently.
--->
+<!-- Test routing: describe an alert, read where the engine sends it. Every step is the server's answer. -->
 <template>
-  <div
-    :class="[
-      'flex flex-col gap-3',
-      embedded
-        ? ''
-        : 'card-container rounded-surface bg-surface-base border-border-default border px-4 py-3',
-    ]"
-    data-test="oncall-routing-simulator"
-  >
-    <span v-if="!embedded" class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-      <OText variant="panel-title">{{ t("oncall.simulatorTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.simulatorHint") }}</OText>
-    </span>
-
-    <!-- The query, as chips. A dimension is a fact about the alert; the
-         priority picks which ladder that team would run. -->
-    <span class="flex flex-wrap items-center gap-2">
-      <span
-        v-for="pair in pairs"
-        :key="pair.name"
-        class="border-border-default rounded-default flex items-center gap-1 border px-2 py-1"
-        :data-test="`oncall-simulator-chip-${pair.name}`"
-      >
-        <OText variant="meta">{{ displayOf(pair.name) }}</OText>
-        <span class="text-text-body text-compact font-medium">{{ raw(pair.value) }}</span>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="close"
-          :aria-label="t('oncall.removeDimension')"
-          @click="removePair(pair.name)"
+  <div class="flex flex-col gap-5" data-test="oncall-routing-simulator">
+    <OSelect
+      v-if="startOptions.length"
+      :model-value="startPick"
+      :label="t('oncall.simulatorStartFrom')"
+      :options="startOptions"
+      :placeholder="t('oncall.ruleEditorStartPlaceholder')"
+      size="sm"
+      searchable
+      icon-key="icon"
+      :dropdown-style="START_PICKER_DROPDOWN_STYLE"
+      data-test="oncall-simulator-start"
+      @update:model-value="startFrom"
+    >
+      <template #option="{ option }">
+        <OnCallStartOption
+          :option="option"
+          :aliases="aliases"
+          :data-test="`oncall-simulator-start-option-${String(option.value)}`"
         />
+      </template>
+    </OSelect>
+
+    <div class="flex flex-col gap-2">
+      <span class="flex items-center gap-1">
+        <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
+        <OTooltip side="right" :content="t('oncall.simulatorInfo')">
+          <OIcon
+            name="info-outline"
+            size="sm"
+            tabindex="0"
+            :label="t('oncall.simulatorInfo')"
+            class="text-text-secondary cursor-help"
+            data-test="oncall-simulator-conditions-info"
+          />
+        </OTooltip>
       </span>
-
-      <span
-        v-if="priority"
-        class="border-border-default rounded-default flex items-center gap-1 border px-2 py-1"
-        data-test="oncall-simulator-chip-priority"
-      >
-        <OText variant="meta">{{ t("oncall.priority") }}</OText>
-        <span class="text-text-body text-compact font-medium">{{ raw(priority) }}</span>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="close"
-          :aria-label="t('oncall.removeDimension')"
-          @click="priority = ''"
-        />
-      </span>
-
-      <OButton
-        v-if="!adding"
-        variant="outline"
-        size="xs"
-        data-test="oncall-simulator-add-dimension"
-        @click="adding = true"
-      >
-        {{ t("oncall.addDimension") }}
-      </OButton>
-
-      <!-- Priority is the one axis that is not a dimension: it picks which
-           ladder the winning team would run. Offered, never assumed — a
-           pre-filled P1 makes the tester answer a question nobody asked. -->
-      <OSelect
-        v-if="!priority"
-        :model-value="priority"
-        :options="priorityOptions"
-        :placeholder="t('oncall.priority')"
-        width="xs"
-        data-test="oncall-simulator-priority"
-        @update:model-value="(v: unknown) => (priority = String(v))"
+      <OnCallConditionRows
+        :key="seedKey"
+        v-model="dimensions"
+        :aliases="aliases"
+        :catalogue="catalogue"
+        :signals="signals"
+        :services="services"
+        :rules="rules"
+        :prefix="false"
+        test-prefix="oncall-simulator"
       />
+    </div>
 
-      <OButton
-        variant="primary"
-        size="xs"
-        class="ms-auto"
-        :disabled="!pairs.length"
-        :loading="loading"
-        data-test="oncall-simulator-run"
-        @click="emit('run', query)"
-      >
-        {{ t("oncall.simulatorTest") }}
-      </OButton>
-    </span>
-
-    <!-- Nothing tried yet — the title above already explains the CONCEPT,
-         this explains the FIRST ACTION, the same inline empty state
-         PriorCauses uses so "nothing here yet" reads the same way across
-         on-call. -->
-    <OEmptyState
-      v-if="!preview"
-      size="inline"
-      :title="t('oncall.simulatorEmptyTitle')"
-      :description="t('oncall.simulatorEmptyDescription')"
-      hide-action
-      data-test="oncall-simulator-empty"
+    <OSelect
+      :model-value="priority"
+      :label="t('oncall.priority')"
+      :options="priorityOptions"
+      size="sm"
+      width="xs"
+      data-test="oncall-simulator-priority"
+      @update:model-value="(v: unknown) => (priority = v === null ? 'P1' : String(v))"
     />
 
-    <!-- A closed vocabulary: a typo here would produce a confident "nothing
-         matches" for a dimension nothing ever emits. -->
-    <span v-if="adding" class="flex flex-wrap items-end gap-2" data-test="oncall-simulator-adder">
-      <OSelect
-        v-model="draftName"
-        :options="dimensionOptions"
-        :label="t('oncall.dimensionName')"
-        :placeholder="t('oncall.dimensionNamePlaceholder')"
-        width="sm"
-        searchable
-        data-test="oncall-simulator-dimension-name"
-      />
-      <OInput
-        v-model="draftValue"
-        :label="t('oncall.dimensionValue')"
-        :placeholder="t('oncall.dimensionValuePlaceholder')"
-        width="sm"
-        data-test="oncall-simulator-dimension-value"
-      />
-      <OButton
-        variant="outline"
-        size="sm-action"
-        :disabled="!canAdd"
-        data-test="oncall-simulator-dimension-confirm"
-        @click="addPair"
-      >
-        {{ t("oncall.add") }}
-      </OButton>
-      <OButton variant="ghost" size="sm-action" @click="adding = false">
-        {{ t("oncall.cancel") }}
-      </OButton>
-    </span>
+    <OText v-if="!hasConditions" variant="meta" data-test="oncall-simulator-empty">
+      {{ t("oncall.simulatorPickCondition") }}
+    </OText>
 
-    <!-- The resolved path: rule → team → ladder → person. -->
     <div
-      v-if="preview"
-      class="border-border-default rounded-default flex flex-wrap items-center gap-x-4 gap-y-3 border px-3 py-2.5"
+      v-else-if="preview"
+      class="border-border-default rounded-surface flex flex-col gap-3 border px-4 py-3"
+      :class="loading ? 'opacity-60' : ''"
+      :aria-busy="loading"
       data-test="oncall-simulator-result"
     >
-      <span class="flex flex-col">
-        <OText variant="meta">{{ matchedLabel }}</OText>
-        <code class="text-text-body text-compact">{{ matchedPath }}</code>
-      </span>
-
-      <OTag
-        v-if="specificityNote"
-        variant="primary-soft"
-        size="sm"
-        data-test="oncall-simulator-specificity"
-      >
-        {{ specificityNote }}
-      </OTag>
-
-      <OIcon name="arrow-right" size="xs" class="text-text-muted" aria-hidden="true" />
-
-      <span class="flex flex-col" data-test="oncall-simulator-team">
-        <span class="text-text-heading text-sm font-medium">{{ teamLabel }}</span>
-        <OText variant="meta">{{ teamNote }}</OText>
-      </span>
-
-      <template v-if="ladderEntry">
-        <OIcon name="arrow-right" size="xs" class="text-text-muted" aria-hidden="true" />
-        <span class="flex flex-col" data-test="oncall-simulator-ladder">
-          <span class="text-text-heading text-sm font-medium">
-            {{ t("oncall.simulatorLadder", { priority: raw(ladderEntry.priority) }) }}
-          </span>
-          <span
-            :class="ladderEntry.pages_anyone ? 'text-text-secondary' : 'text-status-error-text'"
-            class="text-xs"
-            >{{ ladderNote }}</span
+      <!-- Wraps rather than cuts: the names are the answer, and a tooltip would hide the one being asked for. -->
+      <p class="text-sm" data-test="oncall-simulator-answer">
+        <span class="text-text-heading font-semibold" data-test="oncall-simulator-team">
+          {{ t("oncall.simulatorAnswerTeam", { team: teamLabel }) }}
+        </span>
+        <span v-if="preview.team_id" class="text-text-body">
+          <span>{{ raw(" · ") }}</span>
+          <i18n-t
+            v-if="wakes"
+            keypath="oncall.simulatorWakesNow"
+            tag="span"
+            scope="global"
+            :class="responderTone"
+            data-test="oncall-simulator-responder"
           >
-        </span>
-      </template>
-
-      <template v-if="responder">
-        <OIcon name="arrow-right" size="xs" class="text-text-muted" aria-hidden="true" />
-        <span class="flex flex-col" data-test="oncall-simulator-responder">
-          <OUserCell :value="responder.user_email" />
-          <!-- Channels that would carry it, or the server's reason none can. -->
-          <span :class="responderTone" class="text-xs" data-test="oncall-simulator-responder-note">
+            <template #who>
+              <template v-for="(email, index) in wakes.emails" :key="email">
+                <span v-if="index">{{ raw(", ") }}</span>
+                <OnCallPersonName :email="email" data-test="oncall-simulator-responder-person" />
+              </template>
+            </template>
+            <template #channels>{{ wakes.channels }}</template>
+          </i18n-t>
+          <span
+            v-else
+            :class="responderTone"
+            :tabindex="responderWhy ? 0 : undefined"
+            data-test="oncall-simulator-responder"
+          >
             {{ responderNote }}
+            <OTooltip
+              v-if="responderWhy"
+              side="bottom"
+              :content="responderWhy"
+              data-test="oncall-simulator-responder-why"
+            />
           </span>
+          <template v-if="nextStep">
+            <span>{{ raw(" · ") }}</span>
+            <i18n-t
+              keypath="oncall.simulatorNextStep"
+              tag="span"
+              scope="global"
+              data-test="oncall-simulator-next"
+            >
+              <template #who>
+                <template v-for="(email, index) in nextStep.emails" :key="email">
+                  <span v-if="index">{{ raw(", ") }}</span>
+                  <OnCallPersonName :email="email" data-test="oncall-simulator-next-person" />
+                </template>
+              </template>
+              <template #after>{{ nextStep.after }}</template>
+            </i18n-t>
+          </template>
         </span>
-      </template>
+      </p>
 
-      <OButton
-        v-if="preview.team_id"
-        variant="outline"
-        size="xs"
-        class="ms-auto"
-        :loading="sending"
-        :disabled="!canConfigure"
-        data-test="oncall-simulator-send-test"
-        @click="sendTest(preview.team_id)"
-      >
-        {{ t("oncall.simulatorSendTest") }}
-      </OButton>
+      <span class="-mt-2 flex flex-col gap-0.5">
+        <OText
+          variant="meta"
+          :tabindex="matchedNotes.length ? 0 : undefined"
+          data-test="oncall-simulator-won"
+        >
+          {{ wonLine }}
+          <OTooltip v-if="matchedNotes.length" side="bottom">
+            <template #content>
+              <span class="flex flex-col" data-test="oncall-simulator-notes">
+                <span v-for="(note, index) in matchedNotes" :key="index">{{ raw(note) }}</span>
+              </span>
+            </template>
+          </OTooltip>
+        </OText>
+        <OText
+          v-if="alsoMatched.length"
+          variant="meta"
+          tabindex="0"
+          data-test="oncall-simulator-also"
+        >
+          {{
+            t("oncall.simulatorAlsoMatchedCount", { count: alsoMatched.length }, alsoMatched.length)
+          }}
+          <OTooltip side="bottom">
+            <template #content>
+              <span class="flex flex-col" data-test="oncall-simulator-also-list">
+                <span
+                  v-for="other in alsoMatched"
+                  :key="other.rule_id"
+                  :data-test="`oncall-simulator-also-${other.rule_id}`"
+                  >{{ alsoLine(other) }}</span
+                >
+              </span>
+            </template>
+          </OTooltip>
+        </OText>
+      </span>
 
-      <!-- Counted per attempt, not per person: one person on email and SMS is two attempts. -->
+      <span v-if="preview.team_id" class="flex" data-test="oncall-simulator-send-test-wrap">
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="notifications-active"
+          :loading="sending"
+          :disabled="!canConfigure || !!testUnavailable"
+          :focusable-unavailable="!!testUnavailable"
+          data-test="oncall-simulator-send-test"
+          @click="sendTest(preview.team_id)"
+        >
+          {{ t("oncall.simulatorSendTest") }}
+          <template v-if="testUnavailable" #unavailable-reason>{{ testUnavailable }}</template>
+        </OButton>
+        <OTooltip v-if="testUnavailable" side="bottom" :content="testUnavailable" />
+      </span>
+
       <div
         v-if="testResult && sentFor === inputsKey"
-        class="flex basis-full flex-col gap-1"
+        class="flex flex-col gap-1"
         data-test="oncall-simulator-test-result"
       >
         <template v-if="testResult.attempts.length">
@@ -250,54 +227,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </div>
     </div>
-
-    <!-- Rules that matched and lost, in the server's words. Somebody reading
-         this is usually asking why their rule did not win. -->
-    <p
-      v-for="other in preview?.also_matched ?? []"
-      :key="other.rule_id"
-      class="text-text-secondary text-xs"
-      :data-test="`oncall-simulator-also-${other.rule_id}`"
-    >
-      {{ t("oncall.simulatorAlsoMatched", { path: raw(readable(other.path)) }) }}
-      <span class="text-text-body">{{ alsoTarget(other) }}</span>
-      {{ raw(other.lost_because) }}
-    </p>
-
-    <p
-      v-for="(note, index) in preview?.notes ?? []"
-      :key="index"
-      class="text-text-secondary text-xs"
-      :data-test="`oncall-simulator-note-${index}`"
-    >
-      {{ raw(note) }}
-    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useStore } from "vuex";
 
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import OnCallStartOption from "@/components/oncall/OnCallStartOption.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { escalationPreviewQuery } from "@/services/oncall.queries";
 import type {
   AlsoMatchedRule,
   Channel,
+  DimensionCatalogue,
+  DiscoveredService,
+  OwnershipRuleStats,
+  PreviewRung,
   RoutingPreview,
   TeamRungSummary,
   TestPageAttempt,
   TestPageResult,
+  UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { normalizeDimensionValue } from "@/utils/oncall";
+import {
+  SERVICE_DIMENSION,
+  START_PICKER_DROPDOWN_STYLE,
+  claimableDimensions,
+  dimensionsOfPath,
+  fieldLabel,
+  literalDimensions,
+  ownershipPath,
+  readableConditions,
+} from "@/utils/oncall";
 
 export interface SimulatorQuery {
   dimensions: Record<string, string>;
@@ -307,156 +282,226 @@ export interface SimulatorQuery {
 const props = withDefaults(
   defineProps<{
     preview?: RoutingPreview | null;
-    /** The team whose screen this is, so the result can say "this team". */
-    teamId?: string;
-    teamName?: string;
-    /** Resolves the team a foreign rule routes to. */
     teams?: { id: string; name: string }[];
     aliases?: { id: string; display?: string }[];
+    catalogue?: DimensionCatalogue;
+    services?: DiscoveredService[];
+    /** Signals that need an owner, offered as starting points. */
+    signals?: UnroutedSignal[];
+    rules?: OwnershipRuleStats[];
+    /** Conditions to open with; a new object re-seeds the rows. */
+    seed?: Record<string, string> | null;
     loading?: boolean;
     sending?: boolean;
-    /** Hosted inside a surface that already frames and names it — a drawer, a
-     *  dialog — so it drops its own card and title. */
-    embedded?: boolean;
-    /** False once a configuration write was refused for this org (A10). */
+    /** False once a configuration write was refused for this org. */
     canConfigure?: boolean;
-    /** What the last real test page did, kept on screen until the next query. */
+    /** What the last real test page did, kept on screen until the inputs change. */
     testResult?: TestPageResult | null;
   }>(),
   {
     preview: null,
-    teamId: "",
-    teamName: "",
     teams: () => [],
     aliases: () => [],
+    catalogue: () => ({ present: [], values: {} }),
+    services: () => [],
+    signals: () => [],
+    rules: () => [],
+    seed: null,
     loading: false,
     sending: false,
-    embedded: false,
     canConfigure: true,
     testResult: null,
   },
 );
 
 const emit = defineEmits<{
+  /** Debounced: the conditions or priority settled on a new question. */
   (e: "run", query: SimulatorQuery): void;
   (e: "send-test", value: { team_id: string; priority: string }): void;
+  (e: "licenseDenied", features: string[]): void;
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+const { nameOf } = useOrgUserNames();
 
-const pairs = ref<{ name: string; value: string }[]>([]);
-const priority = ref("");
-const adding = ref(false);
-const draftName = ref("");
-const draftValue = ref("");
+const PRIORITIES = ["P1", "P2", "P3", "P4", "P5"];
+const STARTS_SHOWN = 10;
+
+const dimensions = ref<Record<string, string>>({});
+const seedKey = ref(0);
+const priority = ref("P1");
+const startPick = ref<string | null>(null);
+
+const hasConditions = computed(() => Object.keys(dimensions.value).length > 0);
+
+const priorityOptions = PRIORITIES.map((value) => ({ label: raw(value), value }));
+
+/// The conditions the picked start filled in; once the rows say something else, the start no longer describes them.
+let seededPath: string | null = null;
+
+function seedWith(next: Record<string, string>) {
+  const literal = literalDimensions(next);
+  dimensions.value = literal;
+  seededPath = ownershipPath(literal);
+  seedKey.value += 1;
+}
+
+watch(
+  dimensions,
+  (next) => {
+    if (startPick.value !== null && ownershipPath(next) !== seededPath) startPick.value = null;
+  },
+  { deep: true },
+);
+
+/// Three kinds of real starting point, each tagged by its source so one id space cannot collide with another.
+const startOptions = computed<SelectOption[]>(() => {
+  const signals = [...props.signals]
+    .sort((a, b) => b.occurrences - a.occurrences)
+    .slice(0, STARTS_SHOWN)
+    .map((signal) => ({
+      label: raw(readable(claimableDimensions(signal.dimensions)) || signal.path),
+      value: `signal:${signal.id}`,
+      icon: "notifications-active",
+      dimensions: claimableDimensions(signal.dimensions),
+      meta: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
+    }));
+  const rules = props.rules.slice(0, STARTS_SHOWN).map((rule) => ({
+    label: raw(readable(rule.dimensions)),
+    value: `rule:${rule.rule_id}`,
+    icon: "alt-route",
+    dimensions: rule.dimensions,
+    meta: raw(teamNameOf(rule.team_id) || rule.team_name || ""),
+  }));
+  const services = props.services.slice(0, STARTS_SHOWN).map((service) => ({
+    label: raw(service.name),
+    value: `service:${service.name}`,
+    icon: "group-work",
+  }));
+  const group = (label: I18nText, options: SelectOption[]): SelectOption[] =>
+    options.length ? [{ label, header: true }, ...options] : [];
+  return [
+    ...group(t("oncall.routingTabNeedsOwnerPlain"), signals),
+    ...group(t("oncall.routingTabRules"), rules),
+    ...group(t("oncall.simulatorStartServices"), services),
+  ];
+});
+
+/// Names the start a seed came from, so the picker never reads "Choose…" over rows it filled.
+function startOf(seed: Record<string, string>): string | null {
+  const path = ownershipPath(seed);
+  const rule = props.rules.find((one) => ownershipPath(one.dimensions) === path);
+  if (rule) return `rule:${rule.rule_id}`;
+  const signal = props.signals.find(
+    (one) => ownershipPath(claimableDimensions(one.dimensions)) === path,
+  );
+  return signal ? `signal:${signal.id}` : null;
+}
+
+watch(
+  () => props.seed,
+  (next) => {
+    if (!next) return;
+    const start = startOf(next);
+    startPick.value = startOptions.value.some((option) => option.value === start) ? start : null;
+    seedWith(next);
+  },
+  { immediate: true },
+);
+
+function startFrom(value: unknown) {
+  const pick = String(value ?? "");
+  const [kind, ...rest] = pick.split(":");
+  const id = rest.join(":");
+  let next: Record<string, string> | null = null;
+  if (kind === "signal") {
+    const signal = props.signals.find((one) => one.id === id);
+    next = signal ? claimableDimensions(signal.dimensions) : null;
+  } else if (kind === "rule") {
+    next = props.rules.find((one) => one.rule_id === id)?.dimensions ?? null;
+  } else if (kind === "service") {
+    next = { [SERVICE_DIMENSION]: id };
+  }
+  if (!next) return;
+  startPick.value = pick;
+  seedWith(next);
+}
 
 const query = computed<SimulatorQuery>(() => ({
-  dimensions: Object.fromEntries(pairs.value.map((pair) => [pair.name, pair.value])),
+  dimensions: dimensions.value,
   priority: priority.value,
 }));
 
-/// The five the ladder is defined over; `formatPriority` is the same vocabulary
-/// on the read side.
-const priorityOptions = ["P1", "P2", "P3", "P4", "P5"].map((value) => ({
-  label: raw(value),
-  value,
-}));
-
-const dimensionOptions = computed(() =>
-  props.aliases.map((alias) => ({ label: raw(alias.display || alias.id), value: alias.id })),
+let runTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  query,
+  (next) => {
+    clearTimeout(runTimer);
+    if (!Object.keys(next.dimensions).length) return;
+    runTimer = setTimeout(() => emit("run", { ...next, dimensions: { ...next.dimensions } }), 300);
+  },
+  { deep: true, immediate: true },
 );
 
-const canAdd = computed(
-  () =>
-    !!draftName.value.trim() &&
-    !!draftValue.value.trim() &&
-    !pairs.value.some((pair) => pair.name === draftName.value.trim()),
-);
+function teamNameOf(teamId: string | null | undefined): string {
+  if (!teamId) return "";
+  return props.teams.find((team) => team.id === teamId)?.name || teamId;
+}
 
-/// Normalised on the way in, because the server lowercases these before
-/// matching — showing the un-normalised form would mean testing one string and
-/// reading back another.
-function addPair() {
-  if (!canAdd.value) return;
-  pairs.value.push({
-    name: draftName.value.trim(),
-    value: normalizeDimensionValue(draftValue.value),
+function readable(dimensions: Record<string, string>): string {
+  return readableConditions(dimensions, props.aliases, {
+    and: String(t("oncall.ruleEditorAnd")),
+    startsWith: (field) => String(t("oncall.ruleChipStartsWith", { field: raw(field) })),
   });
-  draftName.value = "";
-  draftValue.value = "";
-  adding.value = false;
 }
 
-function removePair(name: string) {
-  pairs.value = pairs.value.filter((pair) => pair.name !== name);
-}
-
-function displayOf(name: string): I18nText {
-  return raw(props.aliases.find((alias) => alias.id === name)?.display || name);
-}
-
-/// `k8s-namespace=payments` as stored, spaced out for reading.
-function readable(path: string): string {
-  return path.split("/").join(" · ").split("=").join(" = ");
-}
-
-const matchedPath = computed<I18nText>(() => {
-  const path = props.preview?.decision?.path;
-  return raw(typeof path === "string" ? readable(path) : "");
-});
-
-const matchedLabel = computed<I18nText>(() =>
-  props.preview?.landed_on_default
-    ? t("oncall.simulatorDefaultTeam")
-    : t("oncall.simulatorMatchedRule"),
+const teamLabel = computed<I18nText>(() =>
+  props.preview?.team_id ? raw(teamNameOf(props.preview.team_id)) : t("oncall.wouldPageNobody"),
 );
 
-/// Only worth a badge when something else also matched — otherwise "most
-/// specific of 1" is noise dressed as a finding.
-const specificityNote = computed<I18nText | "">(() => {
-  const others = props.preview?.also_matched?.length ?? 0;
-  return others ? t("oncall.simulatorMostSpecific", { count: others + 1 }) : "";
+/// Plain words, never the engine's `k=v` notes: they restate this line in storage notation.
+const wonLine = computed<I18nText>(() => {
+  const path = props.preview?.decision?.path;
+  if (typeof path === "string" && !props.preview?.landed_on_default) {
+    return t("oncall.simulatorMatchedRuleLine", {
+      conditions: raw(listed(dimensionsOfPath(path))),
+    });
+  }
+  return props.preview?.team_id
+    ? t("oncall.simulatorNoRuleDefault", { team: teamLabel.value })
+    : t("oncall.simulatorNoRuleNobody");
 });
 
-const teamLabel = computed<I18nText>(() => {
-  const id = props.preview?.team_id;
-  if (!id) return t("oncall.wouldPageNobody");
-  const known = props.teams.find((team) => team.id === id)?.name;
-  return raw(known || (id === props.teamId ? props.teamName : id));
+/// Each condition as "Field = value", the way the owner reads a rule, joined on one line.
+function listed(dimensions: Record<string, string>): string {
+  return Object.keys(dimensions)
+    .sort()
+    .map((name) => {
+      const value = String(dimensions[name]);
+      const field = fieldLabel(name, props.aliases);
+      return value.endsWith("*")
+        ? `${String(t("oncall.ruleChipStartsWith", { field: raw(field) }))} ${value.slice(0, -1)}`
+        : `${field} = ${value}`;
+    })
+    .join(" · ");
+}
+
+const alsoMatched = computed<AlsoMatchedRule[]>(() => props.preview?.also_matched ?? []);
+
+/// The no-match note only restates `wonLine` in `k=v` form; a matched route's notes are real caveats.
+const matchedNotes = computed<string[]>(() => {
+  const kind = props.preview?.decision?.kind;
+  return kind === "ownership" || kind === "explicit" ? (props.preview?.notes ?? []) : [];
 });
 
-const teamNote = computed<I18nText>(() => {
-  const id = props.preview?.team_id;
-  if (!id) return t("oncall.simulatorNoOwner");
-  // Org-level host: there is no "this team" to compare against, and the team
-  // name above the note already answers the question.
-  if (!props.teamId) return raw("");
-  if (id === props.teamId) return t("oncall.thisTeam");
-  return t("oncall.simulatorOtherTeam");
-});
-
-const ladderEntry = computed<TeamRungSummary | null>(() => {
-  if (!priority.value) return null;
-  return props.preview?.ladder?.find((entry) => entry.priority === priority.value) ?? null;
-});
-
-/// "3 rungs, ends at 20m" — or the finding, when the priority wakes nobody.
-const ladderNote = computed<I18nText>(() => {
-  const entry = ladderEntry.value;
-  if (!entry) return raw("");
-  if (!entry.pages_anyone) return t("oncall.reachPagesNobody");
-  const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
-  return entry.nobody_after_micros
-    ? t("oncall.simulatorLadderEnds", {
-        rungs: raw(rungs),
-        at: raw(formatMicrosDuration(entry.nobody_after_micros)),
-      })
-    : raw(rungs);
-});
+const ladderEntry = computed<TeamRungSummary | null>(
+  () => props.preview?.ladder?.find((entry) => entry.priority === priority.value) ?? null,
+);
 
 const responder = computed(() => props.preview?.current_responder ?? null);
 
-/// What they can receive narrowed to what the chosen priority sends; with no priority there is nothing to narrow by.
+/// What they can receive narrowed to what the chosen priority sends.
 const sentChannels = computed<Channel[]>(() => {
   const person = responder.value;
   if (!person) return [];
@@ -465,25 +510,127 @@ const sentChannels = computed<Channel[]>(() => {
   return person.deliverable_channels.filter((channel) => entry.channels.includes(channel));
 });
 
-const responderNote = computed<I18nText>(() => {
+const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+const escalation = useQuery(() =>
+  Object.assign(
+    escalationPreviewQuery(
+      orgId.value,
+      props.preview?.team_id ?? "",
+      Number(priority.value.slice(1)) || 1,
+    ),
+    { enabled: !!props.preview?.team_id && !!orgId.value, retry: false },
+  ),
+);
+watch(escalation.error, (err) => {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+});
+
+/// The ladder's first step, which pages every target on it at once; null until the ladder has loaded.
+const firstStep = computed<PreviewRung | null>(() => {
+  if (escalation.isError.value) return null;
+  const rungs = [...(escalation.data.value?.rungs ?? [])].sort(
+    (a, b) => a.after_micros - b.after_micros,
+  );
+  return rungs[0] ?? null;
+});
+
+/// Everybody the first step reaches and what they are sent, so the names render with their email tooltips.
+const wakes = computed<{ emails: string[]; channels: string } | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
+  const step = firstStep.value;
+  if (!step) return wakesFromResponder();
+  const landing = step.recipients.filter((one) => one.would_a_page_land);
+  const ladderChannels = escalation.data.value?.channels ?? ladderEntry.value?.channels ?? [];
+  const sent = ladderChannels.filter((channel) =>
+    landing.some((one) => one.deliverable_channels.includes(channel)),
+  );
+  if (!landing.length || !sent.length) return null;
+  return {
+    emails: [...new Set(landing.map((one) => one.user_email))],
+    channels: sent.map((channel) => String(t(`oncall.channel_${channel}`))).join(", "),
+  };
+});
+
+/// Before the ladder loads, or when the reader may not see it, the engine's current responder is all there is.
+function wakesFromResponder(): { emails: string[]; channels: string } | null {
   const person = responder.value;
-  if (!person) return raw("");
-  if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
-  if (!sentChannels.value.length) return t("oncall.simulatorSendsNothing");
+  if (!person?.would_a_page_land || !sentChannels.value.length) return null;
   const channels = sentChannels.value
     .map((channel) => String(t(`oncall.channel_${channel}`)))
     .join(", ");
-  return t("oncall.simulatorReachableNow", { channels: raw(channels) });
+  return { emails: [person.user_email], channels };
+}
+
+/// A test page goes to the first step only, so one that reaches nobody would send nothing; unloaded data never disables.
+const testUnavailable = computed<I18nText | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) {
+    return t("oncall.simulatorSendTestNobody", { priority: raw(priority.value) });
+  }
+  return firstStep.value?.resolves_to_nobody ? t("oncall.simulatorSendTestNobodyOnCall") : null;
+});
+
+const responderNote = computed<I18nText>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");
+  const step = firstStep.value;
+  if (step) {
+    if (!step.recipients.length) return t("oncall.simulatorNobodyOnCall");
+    if (!step.recipients.some((one) => one.would_a_page_land)) return t("oncall.contactNoChannel");
+    return t("oncall.simulatorSendsNothing");
+  }
+  const person = responder.value;
+  if (!person) return t("oncall.simulatorNobodyOnCall");
+  if (!person.would_a_page_land) return t("oncall.contactNoChannel");
+  return t("oncall.simulatorSendsNothing");
+});
+
+/// The server's reason a page cannot land runs to a sentence, so it rides the tooltip and the answer stays one line.
+const responderWhy = computed<I18nText | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
+  const step = firstStep.value;
+  if (step) {
+    if (step.recipients.some((one) => one.would_a_page_land)) return null;
+    return raw(step.recipients.find((one) => !one.would_a_page_land)?.why_not) || null;
+  }
+  const person = responder.value;
+  return person && !person.would_a_page_land ? raw(person.why_not) || null : null;
 });
 
 const responderTone = computed(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return "text-text-secondary";
+  if (firstStep.value) {
+    if (wakes.value) return "text-text-body";
+    return firstStep.value.recipients.some((one) => one.would_a_page_land)
+      ? "text-status-warning-text"
+      : "text-status-error-text";
+  }
   if (!responder.value?.would_a_page_land) return "text-status-error-text";
-  return sentChannels.value.length ? "text-status-success-text" : "text-status-warning-text";
+  return sentChannels.value.length ? "text-text-body" : "text-status-warning-text";
 });
 
-/// The team, priority and dimensions on screen, so a result is shown only beside the inputs it was sent for.
+/// The next step that wakes somebody the first step did not; hidden when the reader may not see the ladder.
+const nextStep = computed<{ emails: string[]; after: string } | null>(() => {
+  if (escalation.isError.value) return null;
+  const rungs = [...(escalation.data.value?.rungs ?? [])].sort(
+    (a, b) => a.after_micros - b.after_micros,
+  );
+  const first = rungs[0];
+  if (!first) return null;
+  const woken = new Set(first.recipients.map((one) => one.user_email.toLowerCase()));
+  const fresh = (rung: PreviewRung) =>
+    rung.recipients.map((one) => one.user_email).filter((email) => !woken.has(email.toLowerCase()));
+  const step = rungs.slice(1).find((rung) => fresh(rung).length);
+  if (!step) return null;
+  return {
+    emails: [...new Set(fresh(step))],
+    after: formatMicrosDuration(step.after_micros),
+  };
+});
+
+/// A result is shown only beside the inputs it was sent for.
 const inputsKey = computed(() =>
-  JSON.stringify([props.preview?.team_id, priority.value, query.value.dimensions]),
+  JSON.stringify([props.preview?.team_id, priority.value, dimensions.value]),
 );
 const sentFor = ref<string | null>(null);
 
@@ -496,10 +643,9 @@ const sentAttempts = computed(
   () => props.testResult?.attempts.filter((attempt) => attempt.delivered).length ?? 0,
 );
 
-/// The transport's own error is the reason; without one the row says only that it was not sent.
 function attemptLine(attempt: TestPageAttempt): I18nText {
   const params = {
-    person: raw(attempt.recipient),
+    person: raw(nameOf(attempt.recipient)),
     channel: t(`oncall.channel_${attempt.channel}`),
   };
   if (attempt.delivered) return t("oncall.testPageAttemptSent", params);
@@ -508,12 +654,11 @@ function attemptLine(attempt: TestPageAttempt): I18nText {
     : t("oncall.testPageAttemptNotSentBare", params);
 }
 
-/// A losing rule that points at the same team changes nothing; one pointing
-/// elsewhere is the case worth naming, because that is a page going to another
-/// team's phone.
-function alsoTarget(other: AlsoMatchedRule): I18nText {
-  if (other.same_team) return t("oncall.simulatorSameTeam");
-  const name = other.team_name || props.teams.find((team) => team.id === other.team_id)?.name;
-  return t("oncall.simulatorOtherTeamNamed", { team: raw(name || other.team_id) });
+/// A loser pointing at the same team changes nothing; one pointing elsewhere is a page on another team's phone.
+function alsoLine(other: AlsoMatchedRule): I18nText {
+  const conditions = raw(listed(dimensionsOfPath(other.path)));
+  if (other.same_team) return t("oncall.simulatorAlsoRuleSameTeam", { conditions });
+  const team = raw(other.team_name || teamNameOf(other.team_id) || other.team_id);
+  return t("oncall.simulatorAlsoRuleOtherTeam", { conditions, team });
 }
 </script>
