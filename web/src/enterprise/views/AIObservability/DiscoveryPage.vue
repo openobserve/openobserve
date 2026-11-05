@@ -756,8 +756,8 @@ async function addToQueue(queue: LlmQueue, rows: LlmDiscoveryItem[]) {
   }
 }
 
-onMounted(() => {
-  mountResolve();
-  fetchItems();
-});
+// Resolved in setup, not onMounted: the date picker seeds from dateState in its own
+// onMounted, which runs first and would replay the stored window over a deep link.
+mountResolve();
+onMounted(fetchItems);
 </script>

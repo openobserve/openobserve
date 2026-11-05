@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, nextTick } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
@@ -116,8 +116,7 @@ async function onDateChange(value: any) {
   );
 }
 
-onMounted(() => {
-  // Precedence: URL > cross-page shared state > default relative.
-  mountResolve();
-});
+// Precedence: URL > shared state > default relative. Resolved in setup, not onMounted: the
+// date picker seeds from dateState in its own onMounted, which runs first.
+mountResolve();
 </script>
