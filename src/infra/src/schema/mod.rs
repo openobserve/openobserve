@@ -1295,6 +1295,23 @@ mod tests {
     }
 
     #[test]
+    fn test_first_settings_save_keeps_env_approx_partition() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.common.use_stream_settings_for_partitions_enabled = true;
+        config::CONFIG.store(Arc::new(cfg));
+
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+        let metadata =
+            HashMap::from([("settings".to_string(), json::to_string(&settings).unwrap())]);
+        let reloaded = unwrap_stream_settings(&schema.with_metadata(metadata)).unwrap();
+
+        config::CONFIG.store(saved);
+        assert!(reloaded.approx_partition);
+    }
+
+    #[test]
     fn test_unwrap_stream_created_at() {
         // Test with created_at in metadata
         let mut metadata = HashMap::new();
