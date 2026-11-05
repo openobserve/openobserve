@@ -174,6 +174,18 @@ describe("alert_templates service", () => {
     });
   });
 
+  describe("list with filters", () => {
+    it("sends applies_to and type as query params", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await template.list({ org_identifier: "org123", applies_to: "anomaly", type: "http" });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/org123/alerts/templates`, {
+        params: { applies_to: "anomaly", type: "http" },
+      });
+    });
+  });
+
   describe("get_by_name", () => {
     it("should make GET request with encoded template name", async () => {
       const params = {

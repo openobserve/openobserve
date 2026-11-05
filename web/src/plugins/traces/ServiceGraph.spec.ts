@@ -2228,4 +2228,50 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(panel.props("timeRange")).toEqual({ startTime: 1000, endTime: 2000 });
     });
   });
+
+  describe("node side panel after a reload", () => {
+    const topologyWith = (nodes: Record<string, unknown>[]) =>
+      ({ data: { nodes, edges: [] } }) as any;
+
+    it("gives the open panel the refreshed node instead of the click-time snapshot", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleNodeClick({
+        dataType: "node",
+        data: { id: "service-a", name: "service-a", value: 1000, errors: 10 },
+      });
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
+        topologyWith([
+          { id: "service-a", label: "service-a", requests: 1000, errors: 200, error_rate: 20 },
+        ]),
+      );
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("selectedNode")).toMatchObject({
+        id: "service-a",
+        errors: 200,
+        error_rate: 20,
+      });
+    });
+
+    it("closes the panel when the reload no longer returns the node", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      expect(wrapper.vm.showSidePanel).toBe(true);
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
+        topologyWith([{ id: "service-z", label: "service-z", requests: 5, errors: 0 }]),
+      );
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(false);
+    });
+  });
 });

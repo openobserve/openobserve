@@ -156,6 +156,29 @@ describe("DateTime paste", () => {
     expect(lastToast()).toMatchObject({ variant: "success" });
   });
 
+  it.each([
+    ["an empty", ""],
+    ["a whitespace-only", "  \n\t "],
+  ])("says the clipboard is empty when the paste button reads %s clipboard", async (_, text) => {
+    stubReadText(() => Promise.resolve(text));
+    createWrapper();
+    await openMenu();
+    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+
+    await wrapper!.vm.pasteRange();
+    await flushPromises();
+
+    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(lastToast()).toMatchObject({
+      variant: "info",
+      message: "Clipboard is empty. Copy a date range first.",
+    });
+    expect(toastMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Could not parse date range" }),
+    );
+    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+  });
+
   it("keeps the default focus inside the panel when the rail has nothing to focus", async () => {
     localStorage.clear();
     createWrapper({ calendarPresets: false });

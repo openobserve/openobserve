@@ -29,6 +29,7 @@ use utoipa::ToSchema;
 const PLAIN_METADATA_KEYS: &[&str] = &[
     "prebuilt_type",
     "render_format",
+    "payload_format",
     "setup_method",
     "slack_team_id",
     "slack_team_name",
@@ -192,8 +193,10 @@ impl From<meta_dest::Template> for Template {
 
         // Shared rule lives in `config::prebuilt_loader` so the HTTP DTO and
         // the service-layer guards can't drift apart.
-        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name)
-            || openobserve_core::alerts::templates::is_downtime_template_name(&value.name);
+        let is_prebuilt =
+            openobserve_core::alerts::notifications::default_template::is_reserved_template_name(
+                &value.name,
+            );
 
         Self {
             name: value.name,
@@ -203,6 +206,13 @@ impl From<meta_dest::Template> for Template {
             template_type,
             title,
             kind: Some(value.kind.to_string()),
+            applies_to: Some(
+                value
+                    .applies_to
+                    .iter()
+                    .map(|k| k.as_str().to_string())
+                    .collect(),
+            ),
         }
     }
 }
@@ -222,6 +232,7 @@ impl Template {
             template_type,
             body: self.body,
             kind: meta_dest::TemplateKind::default(),
+            applies_to: Vec::new(),
         }
     }
 }
@@ -467,6 +478,17 @@ pub struct Template {
     /// stored kind (sticky-kind rule, design §6.2).
     #[serde(default)]
     pub kind: Option<String>,
+    /// Kinds the template is meant for; [] is every kind. Absent on update keeps the stored list.
+    #[serde(default)]
+    pub applies_to: Option<Vec<String>>,
+}
+
+/// One template with where it is referenced.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct TemplateWithUsage {
+    #[serde(flatten)]
+    pub template: Template,
+    pub used_by: openobserve_core::alerts::templates::UsedBy,
 }
 
 /// Wire form of `DestinationConsumer`; no wildcard arm, so a new consumer must compile here too.
@@ -610,6 +632,7 @@ mod tests {
             },
             body: "body content".to_string(),
             kind: meta_dest::TemplateKind::default(),
+            applies_to: Vec::new(),
         };
         let t = Template::from(meta);
         assert_eq!(t.name, "my_template");
@@ -628,6 +651,7 @@ mod tests {
             template_type: meta_dest::TemplateType::Http,
             body: "{}".to_string(),
             kind: meta_dest::TemplateKind::default(),
+            applies_to: Vec::new(),
         };
         let t = Template::from(meta);
         assert_eq!(t.template_type, DestinationType::Http);
@@ -645,6 +669,7 @@ mod tests {
             template_type: meta_dest::TemplateType::Sns,
             body: "sns body".to_string(),
             kind: meta_dest::TemplateKind::default(),
+            applies_to: Vec::new(),
         };
         let t = Template::from(meta);
         assert_eq!(t.template_type, DestinationType::Sns);
@@ -662,6 +687,7 @@ mod tests {
             template_type: DestinationType::Http,
             title: String::new(),
             kind: None,
+            applies_to: None,
         };
         let meta = t.into("myorg");
         assert_eq!(meta.org_id, "myorg");
@@ -680,6 +706,7 @@ mod tests {
             template_type: DestinationType::Email,
             title: "My Alert".to_string(),
             kind: None,
+            applies_to: None,
         };
         let meta = t.into("org");
         assert!(meta.is_default);
@@ -699,6 +726,7 @@ mod tests {
             template_type: DestinationType::Sns,
             title: String::new(),
             kind: None,
+            applies_to: None,
         };
         let meta = t.into("org");
         assert!(matches!(meta.template_type, meta_dest::TemplateType::Sns));

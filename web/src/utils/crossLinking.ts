@@ -19,6 +19,10 @@
 // enrichment_tables), so the call must be skipped for them.
 export const CROSS_LINKING_SUPPORTED_STREAM_TYPES = ["logs"] as const;
 
+/** True when `result_schema` can be called for this stream type, whatever the cross-linking config. */
+export const supportsResultSchema = (streamType: string | undefined): boolean =>
+  (CROSS_LINKING_SUPPORTED_STREAM_TYPES as readonly string[]).includes(streamType ?? "");
+
 /**
  * Returns true when cross-linking should be active for the given stream type.
  * Requires the `enable_cross_linking` config flag to be on AND the stream type
@@ -27,6 +31,4 @@ export const CROSS_LINKING_SUPPORTED_STREAM_TYPES = ["logs"] as const;
 export const isCrossLinkingEnabledForStream = (
   zoConfig: any,
   streamType: string | undefined,
-): boolean =>
-  !!zoConfig?.enable_cross_linking &&
-  CROSS_LINKING_SUPPORTED_STREAM_TYPES.includes(streamType as any);
+): boolean => !!zoConfig?.enable_cross_linking && supportsResultSchema(streamType);

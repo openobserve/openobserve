@@ -376,6 +376,19 @@ pub struct DowntimeNotificationLogEntry {
     pub destinations: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<String>,
+    /// The template each destination that sent used; empty for rows sent before it was recorded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<DowntimeNotificationTemplate>,
+}
+
+/// One destination's template, as the send log line names it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DowntimeNotificationTemplate {
+    pub destination: String,
+    /// Empty when the send carried no rendered template (a platform resolve or a legacy body).
+    pub template_name: String,
+    /// `explicit`, `destination`, `org_default`, `compiled`, `platform_resolve` or `legacy`.
+    pub template_source: String,
 }
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -600,6 +613,24 @@ pub struct ExtendDowntimeRequest {
     /// The version the row was loaded at; a newer stored row makes the extension a 409.
     #[serde(default)]
     pub version: Option<i64>,
+}
+
+/// Which of the downtime's destinations a test send reaches; empty means all of them.
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct DowntimeTestRequest {
+    #[serde(default)]
+    pub destinations: Vec<String>,
+}
+
+/// One destination's test send; `unsupported` is a destination the shared path skips for downtimes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct DowntimeTestResult {
+    pub destination: String,
+    pub ok: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unsupported: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 /// The row that now ends later: the extended one-time row, or the follow-up of a recurring one.

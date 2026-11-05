@@ -353,6 +353,22 @@ describe("FleetConfigEditor", () => {
   });
 
   describe("publish", () => {
+    it("refuses to publish the latest version's text until it changes", async () => {
+      vi.mocked(fleet.getConfig).mockResolvedValue({
+        data: detail({ latest_version: 2, versions: [published(2), published(1)] }),
+      } as any);
+      wrapper = await mountEditor("edge");
+      const button = () => wrapper.find('[data-test="fleet-config-editor-publish"]');
+      const editor = wrapper.findComponent({ name: "FleetCodeEditor" });
+      expect(button().attributes("disabled")).toBeDefined();
+      editor.vm.$emit("update:code", LOSSY + "# fixed\n");
+      await flushPromises();
+      expect(button().attributes("disabled")).toBeUndefined();
+      editor.vm.$emit("update:code", LOSSY);
+      await flushPromises();
+      expect(button().attributes("disabled")).toBeDefined();
+    });
+
     it("toasts the new version and leaves draft mode", async () => {
       vi.mocked(fleet.publishConfigVersion).mockResolvedValue({
         data: { version: 1, warnings: {} },

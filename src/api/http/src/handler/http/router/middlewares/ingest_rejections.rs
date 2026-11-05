@@ -51,6 +51,7 @@ pub async fn ingest_rejections_middleware(request: Request, next: Next) -> Respo
 async fn record_rejections(request: Request, next: Next, sink: &impl RejectionSink) -> Response {
     let method = request.method().clone();
     let uri = request.uri().clone();
+    let route = crate::handler::http::router::matched_route(&request);
     let original_uri = request
         .extensions()
         .get::<OriginalUri>()
@@ -58,7 +59,14 @@ async fn record_rejections(request: Request, next: Next, sink: &impl RejectionSi
     let response = next.run(request).await;
     if response.status().is_client_error() {
         let original_path = original_uri.as_ref().map(|uri| uri.path());
-        record_if_rejected(sink, &method, uri.path(), original_path, &response);
+        record_if_rejected(
+            sink,
+            &method,
+            uri.path(),
+            route.as_deref(),
+            original_path,
+            &response,
+        );
     }
     response
 }
@@ -67,10 +75,11 @@ fn record_if_rejected(
     sink: &impl RejectionSink,
     method: &Method,
     path: &str,
+    route: Option<&str>,
     original_path: Option<&str>,
     response: &Response,
 ) {
-    let Some(org_id) = rejected_org(method, path, response) else {
+    let Some(org_id) = rejected_org(method, path, route, response) else {
         return;
     };
     let status = response.status().as_u16();
@@ -94,12 +103,17 @@ fn record_if_rejected(
 }
 
 /// The HEC collector names the org in a response extension; API writes carry it in the path.
-fn rejected_org(method: &Method, path: &str, response: &Response) -> Option<String> {
+fn rejected_org(
+    method: &Method,
+    path: &str,
+    route: Option<&str>,
+    response: &Response,
+) -> Option<String> {
     if let Some(org) = response.extensions().get::<RejectionOrg>() {
         return Some(org.0.clone());
     }
     let relative = path.trim_start_matches('/');
-    if !is_ingestion_write(method, relative) {
+    if !is_ingestion_write(method, relative, route) {
         return None;
     }
     relative.split('/').next().map(str::to_string)
@@ -443,9 +457,17 @@ mod tests {
     #[test]
     fn test_a_v2_path_is_recorded_only_for_an_org_named_v2() {
         let response = StatusCode::FORBIDDEN.into_response();
-        let org = |path| rejected_org(&Method::POST, path, &response);
-        assert_eq!(org("/v2/s/_json").as_deref(), Some("v2"));
-        assert_eq!(org("/v2/acme/folders/_json"), None);
-        assert_eq!(org("/acme/s/_json").as_deref(), Some("acme"));
+        let org = |path, route| rejected_org(&Method::POST, path, Some(route), &response);
+        let json = "/api/{org_id}/{stream_name}/_json";
+        assert_eq!(org("/v2/s/_json", json).as_deref(), Some("v2"));
+        assert_eq!(
+            org(
+                "/v2/acme/folders/_json",
+                "/api/v2/{org_id}/folders/{folder_type}"
+            ),
+            None
+        );
+        assert_eq!(org("/acme/s/_json", json).as_deref(), Some("acme"));
+        assert_eq!(org("/acme/kv/_json", "/api/{org_id}/kv/{key}"), None);
     }
 }

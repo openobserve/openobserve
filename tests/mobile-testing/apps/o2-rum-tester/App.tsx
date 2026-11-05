@@ -20,6 +20,7 @@ import {
   OpenObserveProvider,
   OpenObserveProviderConfiguration,
   TrackingConsent,
+  O2Logs,
   O2Rum,
   O2SdkReactNative,
   RumActionType,
@@ -145,6 +146,15 @@ function HomeScreen({go}: {go: (s: string) => void}) {
     }
   };
 
+  // Several logs per tap so the SDK uploads a multi-event batch (#16229).
+  const sendLogs = async () => {
+    const burst = {log_burst: String(Date.now())};
+    await O2Logs.info('O2 log burst info', burst);
+    await O2Logs.warn('O2 log burst warn', burst);
+    await O2Logs.error('O2 log burst error', burst);
+    setStatus('logs sent');
+  };
+
   const crash = () => {
     O2Rum.addAction(RumActionType.TAP, 'Trigger crash');
     // uncaught -> native crash report on next launch
@@ -161,6 +171,7 @@ function HomeScreen({go}: {go: (s: string) => void}) {
       <Btn label="Trigger native crash" onPress={crash} tone="danger" />
       <Btn label="Go to Details →" onPress={() => go('details')} />
       <Btn label="Go to Checkout form →" onPress={() => go('form')} />
+      <Btn label="Send logs" onPress={sendLogs} />
       <Text style={styles.status}>{status}</Text>
     </View>
   );

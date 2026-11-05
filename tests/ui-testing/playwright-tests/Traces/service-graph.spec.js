@@ -18,6 +18,14 @@ const {
 const EMPTY_TOPOLOGY_MESSAGE =
   'Service graph topology is still empty 4 minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).';
 
+// Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
+const expectedHealth = (errorRate) => {
+  if (errorRate > 10) return 'critical';
+  if (errorRate > 5) return 'warning';
+  if (errorRate >= 1) return 'degraded';
+  return 'healthy';
+};
+
 test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
 
@@ -220,7 +228,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P1: Verify user-service has degraded status and high error rate", {
+  test("P1: Verify user-service shows the Warning or Critical status its high error rate maps to", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Verifying user-service health status ===');
@@ -243,13 +251,12 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const status = await pm.serviceGraphPage.getHealthStatus();
     testLogger.info(`user-service health status: ${status}`);
-    // Should be degraded (>5% error rate) or critical (>10%)
-    expect(['degraded', 'critical']).toContain(status);
+    expect(status).toBe(expectedHealth(apiErrorRate));
 
     await pm.serviceGraphPage.closeSidePanel();
   });
 
-  test("P1: Verify search-service has healthy status and 0% error rate", {
+  test("P1: Verify search-service shows the Healthy or Degraded status its low error rate maps to", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Verifying search-service health status ===');
@@ -272,7 +279,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const status = await pm.serviceGraphPage.getHealthStatus();
     testLogger.info(`search-service health status: ${status}`);
-    expect(status).toBe('healthy');
+    expect(status).toBe(expectedHealth(apiErrorRate));
 
     await pm.serviceGraphPage.closeSidePanel();
   });

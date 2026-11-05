@@ -67,6 +67,9 @@ describe("FleetRemoveDialog", () => {
     expect(w.find('[data-test="fleet-remove-dialog-message"]').text()).toContain(
       "uninstall it on its host first",
     );
+    expect(w.find('[data-test="fleet-remove-dialog-message"]').text()).toContain(
+      "unless its enrollment token is used up",
+    );
     const cmd = w.findComponent({ name: "FleetUninstallCommand" });
     expect(cmd.props("platform")).toBe("macos");
     expect(cmd.props("showPlatforms")).toBe(true);

@@ -1,0 +1,197 @@
+{
+  "slack_firing": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🔴 [P2] High error rate on web-logs — checkout paged>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nP2"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nPaged"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Team*\ncheckout"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Reason*\npaged by policy checkout-escalation"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+            "style": "primary"
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🟢 [P2] High error rate on web-logs — checkout acknowledged>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "P2 · High error rate on web-logs\n\nthe incident was resolved for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\n\nAcknowledge from the incident page (no link available)."
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Level*\nP2"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Event*\nAcknowledged"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Team*\ncheckout"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Reason*\nthe incident was resolved"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+          }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+            "style": "primary"
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "🔴 [P2] High error rate on web-logs — checkout paged",
+    "body_markdown": "P2 · High error rate on web\\-logs\n\npaged by policy checkout\\-escalation for checkout\\.\n\nerror rate 12\\.4\\% over the 5\\% threshold on checkout\n\nRunbook\\: https\\:\\/\\/wiki\\.acme\\.com\\/runbooks\\/checkout\n\nDetails\\: https\\:\\/\\/o2\\.acme\\.com\\/web\\/oncall\\/responses\\/resp\\_31\\?org\\_identifier\\=acme\nAcknowledge\\: https\\:\\/\\/o2\\.acme\\.com\\/api\\/acme\\/oncall\\/ack\\/resp\\_31\n",
+    "fields": {
+      "Level": "P2",
+      "Event": "Paged",
+      "Team": "checkout",
+      "Reason": "paged by policy checkout-escalation",
+      "Time": "2026-11-02 10:05:00 UTC"
+    },
+    "rows": [],
+    "links": [
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": null,
+      "stream_name": null,
+      "alert_name": "[P2] High error rate on web-logs — checkout",
+      "alert_type": null,
+      "alert_period": null,
+      "alert_operator": null,
+      "alert_threshold": null,
+      "alert_count": null,
+      "alert_agg_value": null,
+      "alert_level": "P2",
+      "alert_status": "paged",
+      "episode_id": "resp_31",
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": "N/A",
+      "alert_end_time": "N/A",
+      "alert_url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+      "alert_trigger_time_str": "2026-11-02 10:05:00",
+      "alert_time": "2026-11-02 10:05:00",
+      "alert_description": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31\n",
+      "kind": "on_call",
+      "notification_kind": "on_call",
+      "notification_event": "firing",
+      "notification_kind_label": "On-call",
+      "notification_event_label": "Paged",
+      "status_dot": "🔴",
+      "alert_level_label": "P2",
+      "alert_trigger_time_utc": "2026-11-02 10:05:00 UTC",
+      "cluster_name": "o2-acme",
+      "alert_start_time_millis": "N/A",
+      "alert_end_time_millis": "N/A",
+      "alert_trigger_time": "1793613900000000",
+      "alert_trigger_time_millis": "1793613900000",
+      "alert_trigger_time_seconds": "1793613900",
+      "alert_promql_operator": null,
+      "alert_promql_value": null,
+      "oncall_team": "checkout",
+      "oncall_reason": "paged by policy checkout-escalation",
+      "oncall_stage": "1",
+      "oncall_priority": "P2",
+      "oncall_recipient": "maria@acme.com",
+      "oncall_response_id": "resp_31",
+      "oncall_ack_url": "https://o2.acme.com/api/acme/oncall/ack/resp_31",
+      "runbook_url": "https://wiki.acme.com/runbooks/checkout"
+    }
+  },
+  "email_firing": {
+    "subject": "🔴 [P2] High error rate on web-logs — checkout paged",
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 [P2] High error rate on web-logs — checkout paged</h2><div style=\"margin:16px 0;color:#202124;\"><p>P2 · High error rate on web-logs</p>\n<p>paged by policy checkout-escalation for checkout.</p>\n<p>error rate 12.4% over the 5% threshold on checkout</p>\n<p>Runbook: https://wiki.acme.com/runbooks/checkout</p>\n<p>Details: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme<br />\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Level</td><td style=\"padding:4px 0;color:#202124;\">P2</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Paged</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Team</td><td style=\"padding:4px 0;color:#202124;\">checkout</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Reason</td><td style=\"padding:4px 0;color:#202124;\">paged by policy checkout-escalation</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔴 [P2] High error rate on web-logs — checkout paged\n\nP2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31\n\nLevel: P2\nEvent: Paged\nTeam: checkout\nReason: paged by policy checkout-escalation\nTime: 2026-11-02 10:05:00 UTC\n\nView in OpenObserve: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\n\nSent by OpenObserve."
+  },
+  "sns_firing": {
+    "subject": "🔴 [P2] High error rate on web-logs — checkout paged",
+    "message": "🔴 [P2] High error rate on web-logs — checkout paged\n\nP2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31\n\nLevel: P2\nEvent: Paged\nTeam: checkout\nReason: paged by policy checkout-escalation\nTime: 2026-11-02 10:05:00 UTC\n\nhttps://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme"
+  }
+}

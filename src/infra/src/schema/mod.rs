@@ -241,6 +241,27 @@ pub async fn get_from_db(
     })
 }
 
+/// Sums the versions created at or after `since` across `streams`, excluding each stream's oldest
+/// (its creation), under one cache read lock.
+pub async fn count_cached_versions_since(
+    org_id: &str,
+    streams: &[(StreamType, &str)],
+    since: i64,
+) -> usize {
+    let r = STREAM_SCHEMAS.read().await;
+    streams
+        .iter()
+        .map(|(stream_type, stream_name)| {
+            let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+            r.get(&cache_key).map_or(0, |versions| {
+                let oldest = versions.iter().map(|(t, _)| *t).min();
+                let in_window = versions.iter().filter(|(t, _)| *t >= since).count();
+                in_window - usize::from(oldest.is_some_and(|t| t >= since))
+            })
+        })
+        .sum()
+}
+
 #[tracing::instrument(name = "infra:schema:get_versions", skip_all)]
 pub async fn get_versions(
     org_id: &str,
@@ -1151,6 +1172,48 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn test_count_cached_versions_since_skips_creation_and_includes_boundary() {
+        let schema = Schema::empty();
+        let versions = vec![
+            (100, schema.clone()),
+            (200, schema.clone()),
+            (300, schema.clone()),
+        ];
+        {
+            let mut w = STREAM_SCHEMAS.write().await;
+            w.insert("count_versions_org/logs/three".to_string(), versions);
+            w.insert(
+                "count_versions_org/logs/one".to_string(),
+                vec![(300, schema)],
+            );
+        }
+        let count = |name: &'static str, since: i64| async move {
+            count_cached_versions_since("count_versions_org", &[(StreamType::Logs, name)], since)
+                .await
+        };
+        assert_eq!(count("three", 200).await, 2);
+        assert_eq!(count("three", 201).await, 1);
+        assert_eq!(count("three", 0).await, 2);
+        assert_eq!(count("one", 0).await, 0);
+        assert_eq!(count("one", 300).await, 0);
+        assert_eq!(count("missing", 0).await, 0);
+
+        let all = [
+            (StreamType::Logs, "three"),
+            (StreamType::Logs, "one"),
+            (StreamType::Logs, "missing"),
+        ];
+        assert_eq!(
+            count_cached_versions_since("count_versions_org", &all, 0).await,
+            2
+        );
+        assert_eq!(
+            count_cached_versions_since("count_versions_org", &[], 0).await,
+            0
+        );
+    }
+
+    #[tokio::test]
     async fn test_stream_settings_mutation_api() {
         // unique org prefix so the shared global caches can host parallel tests
         let key1 = "settings_api_test_org/logs/s1".to_string();
@@ -1229,6 +1292,23 @@ mod tests {
             Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
         let settings = unwrap_stream_settings(&schema);
         assert!(settings.is_some());
+    }
+
+    #[test]
+    fn test_first_settings_save_keeps_env_approx_partition() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.common.use_stream_settings_for_partitions_enabled = true;
+        config::CONFIG.store(Arc::new(cfg));
+
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+        let metadata =
+            HashMap::from([("settings".to_string(), json::to_string(&settings).unwrap())]);
+        let reloaded = unwrap_stream_settings(&schema.with_metadata(metadata)).unwrap();
+
+        config::CONFIG.store(saved);
+        assert!(reloaded.approx_partition);
     }
 
     #[test]

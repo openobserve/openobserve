@@ -993,6 +993,106 @@ describe("usePanelDrilldown", () => {
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
   });
 
+  describe("panel WHERE lookup vs cross-linking", () => {
+    const schemaWithLinksAndWhere = () =>
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          where_clause: "rev = 1793591100",
+          where_by_stream: { slo_slices: "rev = 1793591100" },
+          cross_links: {
+            stream_links: [{ name: "L", url: "https://x", fields: [{ name: "f", alias: "f" }] }],
+            org_links: [],
+          },
+        },
+      });
+
+    const chartClick = {
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      dataIndex: 0,
+      seriesName: "s",
+      value: ["x", 1],
+    };
+
+    it("fetches the panel WHERE with cross-linking off, without asking for cross-links", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock).toHaveBeenCalledTimes(1);
+      expect(resultSchemaMock.mock.calls[0][0].cross_linking).toBe(false);
+      expect(api.panelBaseWhere.value).toBe("rev = 1793591100");
+      expect(api.panelWhereByStream.value).toEqual({ slo_slices: "rev = 1793591100" });
+      expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
+    });
+
+    it("makes no result_schema call on a chart click with cross-linking off", async () => {
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(chartClick);
+
+      expect(resultSchemaMock).not.toHaveBeenCalled();
+    });
+
+    it("asks for cross-links and gets the WHERE with cross-linking on", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock.mock.calls[0][0].cross_linking).toBe(true);
+      expect(api.panelBaseWhere.value).toBe("rev = 1793591100");
+      expect(api.crossLinksData.value.stream_links).toHaveLength(1);
+    });
+
+    it.each([
+      [
+        "a non-logs stream",
+        (d: any) => (d.panelSchema.value.queries[0].fields.stream_type = "metrics"),
+      ],
+      ["a PromQL panel", (d: any) => (d.panelSchema.value.queryType = "promql")],
+      [
+        "an empty query",
+        (d: any) => {
+          d.panelSchema.value.queries[0].query = "";
+          d.metadata.value.queries[0].query = "";
+        },
+      ],
+    ])("never calls result_schema for %s, even when the WHERE is needed", async (_, setup) => {
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      setup(deps);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.ensureDrilldownSchema(0, true);
+
+      expect(resultSchemaMock).not.toHaveBeenCalled();
+      expect(api.panelBaseWhere.value).toBe("");
+    });
+
+    it("does not let a WHERE-only cached result hide cross-links once cross-linking is on", async () => {
+      schemaWithLinksAndWhere();
+      const deps = makeDeps();
+      deps.store.state.zoConfig.enable_cross_linking = false;
+      const api = usePanelDrilldown(deps as any);
+      await api.ensureDrilldownSchema(0, true);
+      expect(api.crossLinksData.value.stream_links).toHaveLength(0);
+
+      deps.store.state.zoConfig.enable_cross_linking = true;
+      await api.ensureDrilldownSchema();
+
+      expect(resultSchemaMock).toHaveBeenCalledTimes(2);
+      expect(resultSchemaMock.mock.calls[1][0].cross_linking).toBe(true);
+      expect(api.crossLinksData.value.stream_links).toHaveLength(1);
+    });
+  });
+
   describe("cross-link drilldown", () => {
     const mockStreamLink = (url: string) =>
       resultSchemaMock.mockResolvedValue({

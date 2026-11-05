@@ -22,6 +22,7 @@ import {
   buildCategoryYAxis,
   buildValueAxis,
 } from "./axisBuilder";
+import { chartAxisTextColor } from "@/utils/chartTheme";
 
 // Mock the convertDataIntoUnitValue module
 vi.mock("../../convertDataIntoUnitValue", () => ({
@@ -532,6 +533,7 @@ describe("axisBuilder", () => {
       expect(result.name).toBe("Response Time (ms)");
       expect(result.nameLocation).toBe("middle");
       expect(result.nameGap).toBe(50);
+      expect(result.nameTextStyle.color).toBe(chartAxisTextColor());
       expect(result.nameTextStyle.fontWeight).toBe("bold");
       expect(result.nameTextStyle.fontSize).toBe(14);
     });

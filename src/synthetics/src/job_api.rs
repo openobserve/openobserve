@@ -1048,6 +1048,9 @@ pub struct AckResponse {
     /// `alert`. `None` when muted.
     #[serde(skip)]
     pub gap_notice: Option<crate::alerting::GapNotice>,
+    /// The check's template override; server-side only.
+    #[serde(skip)]
+    pub template: Option<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1662,6 +1665,7 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
         suppressed_by: None,
+        template: None,
         coverage: None,
         gap_notice: None,
     }
@@ -1721,16 +1725,24 @@ pub(crate) fn merged_alert_input(
     }
 }
 
+/// An up run with a warning and no confirm job keeps its flaky or degraded reason only on the ack,
+/// so the merged vote would read it as passed and close an open incident. Any other up run, such
+/// as one with a Not measured location, goes on: it can close a gap or an incident.
+fn swept_run_keeps_its_warning(
+    had_confirm: bool,
+    run_class: config::meta::synthetics::RunClass,
+    run_result: i32,
+) -> bool {
+    !had_confirm
+        && run_class == config::meta::synthetics::RunClass::Up
+        && run_result == config::meta::synthetics::SyntheticStatus::Warning.to_db()
+}
+
 /// Decides and sends the alert of a run that finalized outside an ack: a dead letter, a failed
 /// dispatch or the stuck-run sweep. No ack runs the alert for it, and a Not measured run must
 /// still count toward its gap notice.
 pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
-    // An up run with a warning and no confirm job keeps its flaky or degraded reason only on the
-    // ack, so the merged vote would read it as passed and close an open incident.
-    if !done.had_confirm
-        && done.run_class == config::meta::synthetics::RunClass::Up
-        && done.run_result != config::meta::synthetics::SyntheticStatus::Passed.to_db()
-    {
+    if swept_run_keeps_its_warning(done.had_confirm, done.run_class, done.run_result) {
         return;
     }
     let conn = get_orm_client_rw().await;
@@ -1799,6 +1811,7 @@ pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
         suppressed_by: None,
         coverage: resolved.coverage,
         gap_notice: resolved.gap_notice,
+        template: synthetic.template,
     })
     .await;
 }
@@ -1890,6 +1903,7 @@ async fn send_gap_notice(org_id: &str, synthetics_id: &str, notice: crate::alert
         suppressed_by: None,
         coverage: None,
         gap_notice: Some(notice),
+        template: None,
     })
     .await;
 }
@@ -2228,6 +2242,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         suppressed_by,
         coverage,
         gap_notice,
+        template: synthetic.template.clone(),
     })
 }
 
@@ -2654,6 +2669,27 @@ mod tests {
         ));
         assert_eq!(closed.gap_since, 100, "only a delivery closes the gap");
         assert_eq!(closed.gap_resumed_at, 300);
+    }
+
+    #[test]
+    fn a_swept_up_run_with_a_not_measured_location_still_resolves_its_alert() {
+        use config::meta::synthetics::{RunClass as C, SyntheticStatus as S};
+        assert!(!swept_run_keeps_its_warning(false, C::Up, S::Error.to_db()));
+        assert!(!swept_run_keeps_its_warning(
+            false,
+            C::Up,
+            S::Passed.to_db()
+        ));
+        assert!(swept_run_keeps_its_warning(
+            false,
+            C::Up,
+            S::Warning.to_db()
+        ));
+        assert!(!swept_run_keeps_its_warning(
+            true,
+            C::Up,
+            S::Warning.to_db()
+        ));
     }
 
     #[test]

@@ -678,13 +678,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View mode toggle toolbar -->
           <div class="flex h-fit! items-center justify-start pb-1.5!">
             <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
-              <OToggleGroupItem value="json" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="json"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-json"
+              >
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 {{ t("common.json") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="table"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-table"
+              >
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
@@ -2360,6 +2370,8 @@ export default defineComponent({
           from: convertTimeFromNsToUs(props.span.start_time) - 3600000000,
           to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
+          // Apply & Search in the linked trace returns to the search tab the user came from.
+          tab: router.currentRoute.value.query.tab,
         };
 
         if (query.trace_id === props.span.trace_id) {

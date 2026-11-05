@@ -16,6 +16,7 @@
 use std::{
     future::Future,
     pin::Pin,
+    sync::LazyLock,
     task::{Context, Poll},
     time::Instant,
 };
@@ -40,6 +41,12 @@ const REDACTED_REQUEST_HEADERS: [&str; 6] = [
 ];
 /// Workflow hook credentials; a URL value starting with one, in any case or encoding, is cut.
 const HOOK_CREDENTIAL_PREFIXES: [&str; 2] = ["o2wh_", "whsec_"];
+
+// Handle generic %{Header}i patterns for request headers
+static RE_REQ_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}i").unwrap());
+
+// Handle generic %{Header}o patterns for response headers
+static RE_RES_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}o").unwrap());
 
 /// The access log format: `common`, `json`, or a custom one (%a %t %r %s %b %U %T %D %{Header}i/o).
 pub fn get_http_access_log_format() -> String {
@@ -251,9 +258,7 @@ where
 
                 // Generic header patterns are parsed only when the format has one (regex work).
                 if this.format.contains("}i") {
-                    // Handle generic %{Header}i patterns for request headers
-                    let request_header_regex = Regex::new(r"%\{([^}]+)\}i").unwrap();
-                    for cap in request_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_REQ_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         // Skip already-handled headers to avoid redundant work
                         if header_name == "Content-Length"
@@ -281,9 +286,7 @@ where
                 }
 
                 if this.format.contains("}o") {
-                    // Handle generic %{Header}o patterns for response headers
-                    let response_header_regex = Regex::new(r"%\{([^}]+)\}o").unwrap();
-                    for cap in response_header_regex.captures_iter(&this.format.clone()) {
+                    for cap in RE_RES_HEADER.captures_iter(&this.format.clone()) {
                         let header_name = &cap[1];
                         let header_value = response_headers
                             .iter()
