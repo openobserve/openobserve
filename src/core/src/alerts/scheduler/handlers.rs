@@ -2215,18 +2215,29 @@ fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOut
     trigger.data = td.to_json_string();
 }
 
-/// Parse a detection interval string like "5m", "1h" into microseconds.
-/// Defaults to 5 minutes on parse failure.
+/// Parse a stored schedule into microseconds, at the floor or above; an unusable one keeps the
+/// 5 minute default.
 fn parse_detection_interval_to_micros(interval: &str) -> i64 {
+    const DEFAULT_MICROS: i64 = 5 * 60 * 1_000_000;
     let s = interval.trim();
-    let secs: i64 = if let Some(n) = s.strip_suffix('h') {
-        n.trim().parse::<i64>().unwrap_or(1) * 3600
-    } else if let Some(n) = s.strip_suffix('m') {
-        n.trim().parse::<i64>().unwrap_or(5) * 60
-    } else {
-        s.parse::<i64>().unwrap_or(5) * 60
+    // Old rows stored bare minutes; every other form is the grammar the validator accepted.
+    let secs = match s.parse::<i64>() {
+        Ok(minutes) => minutes.checked_mul(60),
+        Err(_) => config::utils::time::parse_interval(s).ok(),
     };
-    secs * 1_000_000
+    match secs
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs.max(config::utils::time::MIN_ANOMALY_SCHEDULE_SECONDS))
+        .and_then(|secs| secs.checked_mul(1_000_000))
+    {
+        Some(micros) => micros,
+        None => {
+            log::warn!(
+                "[anomaly_detection] unusable schedule_interval '{interval}', using the 5 minute default"
+            );
+            DEFAULT_MICROS
+        }
+    }
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
@@ -8778,31 +8789,31 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_detection_interval_invalid_suffix_defaults_to_five_minutes() {
-        // Unknown suffix falls through to the bare-number branch which tries parse().
-        // "abc" parse fails → unwrap_or(5) * 60 * 1_000_000
-        let result = parse_detection_interval_to_micros("abcm");
-        // "abcm".strip_suffix('m') = Some("abc"), parse::<i64>() fails → unwrap_or(5)
-        assert_eq!(result, 5 * 60 * 1_000_000);
+    fn test_parse_detection_interval_days_and_seconds_keep_what_the_user_saved() {
+        assert_eq!(parse_detection_interval_to_micros("1d"), 86_400 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("90s"), 90 * 1_000_000);
     }
 
     #[test]
-    fn test_parse_detection_interval_invalid_hour_defaults_to_one_hour() {
-        // "xh" → strip_suffix('h') = Some("x"), parse fails → unwrap_or(1) * 3600
-        let result = parse_detection_interval_to_micros("xh");
-        assert_eq!(result, 3600 * 1_000_000);
+    fn test_parse_detection_interval_below_the_floor_runs_at_the_floor() {
+        assert_eq!(parse_detection_interval_to_micros("30s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1m"), 60 * 1_000_000);
     }
 
     #[test]
-    fn test_parse_detection_interval_empty_string_defaults() {
-        // Empty string: no suffix matches, parse fails → unwrap_or(5) * 60
-        let result = parse_detection_interval_to_micros("");
-        assert_eq!(result, 5 * 60 * 1_000_000);
+    fn test_parse_detection_interval_unparsable_defaults_to_five_minutes() {
+        for interval in ["abcm", "xh", "", "1w", "9999999999999d", "999999999999999"] {
+            assert_eq!(
+                parse_detection_interval_to_micros(interval),
+                5 * 60 * 1_000_000,
+                "{interval}"
+            );
+        }
     }
 
     #[test]
     fn test_parse_detection_interval_whitespace_trimmed() {
-        // Surrounding whitespace is trimmed before parsing
         let result = parse_detection_interval_to_micros("  3m  ");
         assert_eq!(result, 3 * 60 * 1_000_000);
     }
@@ -8814,16 +8825,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_detection_interval_zero_minutes() {
-        // "0m" → 0 * 60 * 1_000_000 = 0
-        let result = parse_detection_interval_to_micros("0m");
-        assert_eq!(result, 0);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_zero_hours() {
-        let result = parse_detection_interval_to_micros("0h");
-        assert_eq!(result, 0);
+    fn test_parse_detection_interval_zero_or_negative_defaults_to_five_minutes() {
+        for interval in ["0m", "0h", "0", "-5m", "-1"] {
+            assert_eq!(
+                parse_detection_interval_to_micros(interval),
+                5 * 60 * 1_000_000,
+                "{interval}"
+            );
+        }
     }
 
     // ── get_pipeline_info_from_module_key additional edge cases ──────────────
