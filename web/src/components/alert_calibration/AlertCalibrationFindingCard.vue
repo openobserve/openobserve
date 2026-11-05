@@ -112,6 +112,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="advice" class="flex flex-col gap-0.5" data-test="alert-calibration-finding-advice">
         <OText variant="label" as="div">{{ t("alertCalibration.detail.advice") }}</OText>
         <OText variant="meta" as="div">{{ advice }}</OText>
+        <ul
+          v-if="options.length"
+          class="text-text-secondary flex list-disc flex-col gap-0.5 ps-4 text-xs"
+          data-test="alert-calibration-finding-options"
+        >
+          <li
+            v-for="option in options"
+            :key="option.key"
+            :data-test="`alert-calibration-finding-option-${option.key}`"
+          >
+            <i18n-t keypath="alertCalibration.resourceOption.line" tag="span">
+              <template #option>
+                <span class="text-text-body font-medium">{{ option.label }}</span>
+              </template>
+              <template #cost>{{ option.cost }}</template>
+            </i18n-t>
+          </li>
+        </ul>
       </div>
 
       <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
@@ -229,12 +247,14 @@ import {
 import {
   CONFIDENCE_LABEL,
   formatEvidence,
+  formatEvidenceField,
   isDegradedQuality,
   QUALITY_LABEL,
   SEVERITY_BADGE,
   SEVERITY_LABEL,
   SEVERITY_TILE,
   TIER_LABEL,
+  resourceOptions,
 } from "./format";
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
 import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
@@ -271,6 +291,7 @@ const quality = computed(() => {
 });
 const limitations = computed(() => limitationsOf(t, props.finding));
 const advice = computed(() => adviceOf(t, props.finding));
+const options = computed(() => resourceOptions(t, props.finding));
 /** Usable evidence has no badge, so its reasons would explain nothing on screen. */
 const qualityReasons = computed(() => {
   const reasons = quality.value ? qualityReasonsOf(t, props.finding) : [];
@@ -297,9 +318,10 @@ const evidence = computed(() =>
   evidenceFor(props.finding).map((field) => ({
     column: field.column,
     label: t(field.labelKey),
-    value: formatEvidence(t, props.finding[field.column], field.format),
-    // Free text runs long, so it takes its own line instead of squeezing the numbers beside it.
-    wide: field.format === "text",
+    value: formatEvidenceField(t, props.finding, field),
+    // Free text and the time sentences run long, so each takes its own line.
+    wide:
+      field.format === "text" || field.format === "evaluationTimes" || field.format === "nearLimit",
   })),
 );
 

@@ -18,7 +18,16 @@ import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { DigestRecord, InsightAction, ReviewFocus, RuleId } from "./digests";
 
 export type EvidenceFormat =
-  "count" | "ratio" | "seconds" | "text" | "boolean" | "time" | "errorClass";
+  | "count"
+  | "ratio"
+  | "seconds"
+  | "text"
+  | "boolean"
+  | "time"
+  | "errorClass"
+  | "durationMs"
+  | "evaluationTimes"
+  | "nearLimit";
 
 export interface EvidenceField {
   column: `evidence_${string}`;
@@ -326,6 +335,25 @@ const ERROR_BLOCK: EvidenceField[] = [
   },
 ];
 const ERROR_ROWS: EvidenceField[] = [...NOT_WORKING_ERRORS, ...ERROR_BLOCK];
+/** A resource card's times against the limit, written only when the times read answered (P7b §7). */
+const TIME_ROWS: EvidenceField[] = [
+  {
+    column: "evidence_notworking_query_limit_secs",
+    labelKey: "alertCalibration.evidence.queryTimeLimit",
+    format: "seconds",
+  },
+  {
+    column: "evidence_notworking_ok_p50_ms",
+    labelKey: "alertCalibration.evidence.successTimes",
+    format: "evaluationTimes",
+  },
+  {
+    column: "evidence_notworking_ok_near_limit",
+    labelKey: "alertCalibration.evidence.nearLimit",
+    format: "nearLimit",
+  },
+];
+const RESOURCE_ROWS: EvidenceField[] = [...ERROR_ROWS, ...TIME_ROWS];
 
 /** The rows each definition-check pattern shows, in the evidence grid the card already has (spec §4). */
 export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
@@ -341,8 +369,8 @@ export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
     ...ERROR_BLOCK,
   ],
   syntax: ERROR_ROWS,
-  resource_timeout: ERROR_ROWS,
-  resource_memory: ERROR_ROWS,
+  resource_timeout: RESOURCE_ROWS,
+  resource_memory: RESOURCE_ROWS,
   other: ERROR_ROWS,
   ignored_matcher: [
     {
@@ -370,7 +398,9 @@ const isNotWorkingPattern = (value: unknown): value is NotWorkingPattern =>
 /** A written column shows; an error class this build cannot name shows no row at all. */
 const isShown = (record: DigestRecord, field: EvidenceField): boolean =>
   record[field.column] != null &&
-  (field.format !== "errorClass" || isErrorClass(record[field.column]));
+  (field.format !== "errorClass" || isErrorClass(record[field.column])) &&
+  // "0 of 0 took longer" says nothing, so a read without successes shows no near row.
+  (field.format !== "nearLimit" || Number(record.evidence_notworking_ok_evaluations_timed) > 0);
 
 /** A version-2 `failure` record shows its pattern's rows, or the error rows when it has none it knows. */
 export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): EvidenceField[] => {
@@ -406,6 +436,8 @@ export const ADVICE_LABEL: Record<string, I18nKey> = {
   confirm_quiet_source: "alertCalibration.advice.confirmQuietSource",
   attach_folder_destination: "alertCalibration.advice.attachFolderDestination",
   add_destination: "alertCalibration.advice.addDestination",
+  reduce_query_time: "alertCalibration.advice.reduceQueryTime",
+  reduce_query_memory: "alertCalibration.advice.reduceQueryMemory",
 };
 
 /** Limitation codes (ENT not_working.rs `LIMIT_*`). */
@@ -415,6 +447,7 @@ export const LIMITATION_LABEL: Record<string, I18nKey> = {
   no_success_in_window: "alertCalibration.limitation.noSuccessInWindow",
   failure_may_predate_window: "alertCalibration.limitation.failureMayPredateWindow",
   edit_timing_only: "alertCalibration.limitation.editTimingOnly",
+  limit_may_differ: "alertCalibration.limitation.limitMayDiffer",
 };
 
 /** Quality-reason codes (ENT not_working.rs `QUALITY_*`). */
@@ -423,6 +456,7 @@ export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
   error_classes_capped: "alertCalibration.qualityReason.errorClassesCapped",
   error_classes_timed_out: "alertCalibration.qualityReason.errorClassesTimedOut",
   error_classes_failed: "alertCalibration.qualityReason.errorClassesFailed",
+  evaluation_times_unread: "alertCalibration.qualityReason.evaluationTimesUnread",
 };
 
 export type ProposedAction =
