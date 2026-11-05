@@ -159,7 +159,9 @@ test.describe('On-call dry runs', {
     const predictedResponder = predicted.current_responder?.user_email
       ?? predicted.ladder?.[0]?.recipients?.[0]?.user_email ?? null;
     expect(predictedResponder, 'a preview that does not name a person has predicted nothing').toBeTruthy();
-    expect(rendered.responder, 'the screen names the same person the engine does')
+    const renderedResponders = await pm.oncallRoutingPage.readSimulatorResponderEmails();
+    testLogger.info('TS-13.01 rendered responders', { renderedResponders });
+    expect(renderedResponders, 'the screen names the same person the engine does')
       .toContain(predictedResponder);
 
     // Simulating must cost nothing: no record, no unrouted entry, no page.

@@ -571,6 +571,23 @@ export class OnCallRoutingPage {
     };
   }
 
+  /** The emails of everyone the verdict says it wakes; each name carries its email only in a hover tooltip. */
+  async readSimulatorResponderEmails() {
+    const people = this.page.locator(`${this.locators.simulatorResponder} [data-test="oncall-simulator-responder-person"]`);
+    const tooltip = this.page.locator('[data-test="oncall-person-name-tooltip"]');
+    const emails = [];
+    for (let i = 0; i < (await people.count()); i++) {
+      await people.nth(i).hover();
+      await expect(tooltip.first()).toBeVisible({ timeout: 10000 });
+      const text = await tooltip.first().innerText();
+      const email = text.match(/\S+@\S+/)?.[0] ?? text.trim();
+      emails.push(email);
+      await this.page.mouse.move(0, 0);
+      await expect(tooltip).toHaveCount(0, { timeout: 10000 });
+    }
+    return emails;
+  }
+
   /** The simulator names the team it would page, by NAME rather than by id. */
   async expectSimulatorTeamNames(teamName) {
     await expect(this.page.locator(this.locators.simulatorTeam)).toContainText(teamName, { timeout: 30000 });

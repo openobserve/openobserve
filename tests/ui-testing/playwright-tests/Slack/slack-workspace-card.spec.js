@@ -55,7 +55,13 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     await slack.settings.goto(orgs.main);
     await slack.card.waitLoaded();
     await expect(slack.card.name).toHaveText(TEAM.teamName);
-    await expect(slack.card.meta).toContainText('root@example.com');
+    const rootEmail = process.env.ZO_ROOT_USER_EMAIL || 'root@example.com';
+    const rootName = await api.displayName(apiContext, orgs.main, rootEmail);
+    await expect(slack.card.meta).toContainText(`Connected by ${rootName} on `);
+    if (rootName !== rootEmail) {
+      await slack.card.meta.hover();
+      await expect(slack.card.tooltip.filter({ hasText: rootEmail })).toBeVisible();
+    }
     await expect(slack.card.status).toBeVisible();
     await expect(slack.card.refreshToken).toBeVisible();
     await expect(slack.card.sockets).toBeVisible();

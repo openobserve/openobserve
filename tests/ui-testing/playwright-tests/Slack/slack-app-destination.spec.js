@@ -391,7 +391,9 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     expect(me).toHaveProperty('next_shift_at');
     const card = byTest('slack-oncall-unlinked');
     await expect(card).toBeVisible();
-    await expect(card).toContainText(ROOT);
+    // The row names the person by display name; their email keys the row and rides in the tooltip.
+    await expect(card.locator(`[data-test="slack-oncall-unlinked-person-${ROOT}"]`)).toBeVisible();
+    await expect(card.locator(`[data-test="slack-oncall-unlinked-teams-${ROOT}"]`)).toContainText(`pw-payments-${u}`);
     await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).toContainText('Not sent');
     await shoot(page, 'c4-mk6b-settings');
 
