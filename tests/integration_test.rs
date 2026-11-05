@@ -7710,12 +7710,12 @@ mod tests {
         );
     }
 
-    fn e2e_pipeline_trigger_cases(
-        window: i64,
-    ) -> Vec<(
+    type PipelineTriggerCase = (
         &'static str,
         std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>,
-    )> {
+    );
+
+    fn e2e_pipeline_trigger_cases(window: i64) -> Vec<PipelineTriggerCase> {
         vec![
             ("rename_interval", Box::pin(e2e_rename_keeps_the_row(false))),
             ("rename_cron", Box::pin(e2e_rename_keeps_the_row(true))),

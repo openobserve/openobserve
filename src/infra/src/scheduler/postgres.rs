@@ -117,11 +117,12 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     armed_for    BIGINT
 );"#;
 
-/// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
-/// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
+/// Moves only a Waiting row: `$5` is Waiting, so a running job keeps its key until it ends.
 const RENAME_KEY_QUERY: &str = r#"UPDATE scheduled_jobs SET module_key = $1
     WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5;"#;
 
+/// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
+/// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
 const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
     (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, data)
 VALUES ($1, $2, $3, false, false, $4, 0, $5, '')
@@ -144,7 +145,7 @@ const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
     armed_for = NULL
 WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
 
-/// [`super::Scheduler::arm_slack_sync`] on `pool`.
+/// [`super::Scheduler::rename_key`] on `pool`.
 async fn rename_key_in(
     pool: &Pool<Postgres>,
     org: &str,
@@ -163,6 +164,7 @@ async fn rename_key_in(
     Ok(result.rows_affected() == 1)
 }
 
+/// [`super::Scheduler::arm_slack_sync`] on `pool`.
 async fn arm_slack_sync_in(
     pool: &Pool<Postgres>,
     org: &str,

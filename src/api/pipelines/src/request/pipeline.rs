@@ -55,6 +55,7 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The pipeline is running, retry after the run ends", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
@@ -475,6 +476,7 @@ pub async fn delete_pipeline_bulk(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The pipeline is running or changed, refresh and retry", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),

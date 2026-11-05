@@ -155,7 +155,12 @@ async fn delete_stored_trigger(
 ) -> Result<(), PipelineError> {
     super::alerts::derived_streams::delete(stored_source, &stored.name, &stored.id)
         .await
-        .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))
+        .map_err(trigger_write_error)
+}
+
+/// The request was valid, and the pipeline row may already be written, so this is a server error.
+fn trigger_write_error(error: anyhow::Error) -> PipelineError {
+    PipelineError::InfraError(infra::errors::Error::Message(error.to_string()))
 }
 
 /// Moves the stored pipeline's trigger to the new key; true when an upsert must still follow.
@@ -224,7 +229,7 @@ async fn write_trigger(
             &pipeline.id,
         )
         .await
-        .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+        .map_err(trigger_write_error)?;
     }
     Ok(())
 }
@@ -300,9 +305,22 @@ pub async fn save_pipeline_checked(
     validate_no_javascript_functions(&pipeline).await?;
     run_check(check, &pipeline).await?;
 
-    let validated_source = validated_scheduled_source(&mut pipeline).await?;
+    let mut validated_source = validated_scheduled_source(&mut pipeline).await?;
     let stored = pipeline::get_by_id(&pipeline.id).await.ok();
     refuse_rename_during_run(stored.as_ref(), &pipeline).await?;
+
+    // A new pipeline has no row to move, so its failed trigger write must leave no pipeline behind.
+    if stored.is_none()
+        && let Some(derived_stream) = validated_source.take()
+    {
+        super::alerts::derived_streams::upsert_trigger(
+            &derived_stream,
+            &pipeline.name,
+            &pipeline.id,
+        )
+        .await
+        .map_err(trigger_write_error)?;
+    }
 
     if let Err(e) = pipeline::set(&pipeline).await {
         log::error!("Failed to save pipeline: {e}");
