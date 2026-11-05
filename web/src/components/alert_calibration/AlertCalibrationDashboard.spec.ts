@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
+import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import alertCalibration from "@/services/alert_calibration";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -44,6 +45,8 @@ vi.mock("@/services/alert_calibration", async (importOriginal) => {
       getStatus: vi.fn(),
       readDigests: vi.fn(),
       requestRun: vi.fn(),
+      listDismissals: vi.fn(),
+      dismissFinding: vi.fn(),
     },
   };
 });
@@ -109,6 +112,53 @@ const findings = [
   }),
 ];
 
+const fid = (n: number) => n.toString(16).padStart(64, "0");
+
+const dismissalPage = (ids: string[], total = ids.length) =>
+  ({
+    data: {
+      items: ids.map((id) => ({
+        id,
+        rule_id: "no_destination",
+        pattern: null,
+        scope_kind: "alert",
+        scope_key: "a1",
+        state: "active",
+        revision: 1,
+        reason: "known_issue",
+        note: null,
+        has_note: false,
+        actor: "u-ops@example.com",
+        dismissed_at: NOW,
+        duration_days: 90,
+        expires_at: NOW + 90 * DAY_MICROS,
+        reopened_at: null,
+        reopened_by: null,
+        updated_at: NOW,
+        alert_name: "ops_cpu",
+      })),
+      next_cursor: null,
+      total,
+    },
+  }) as never;
+
+/** One v2 no-destination finding per alert, each with its own identity. */
+const nodest = (n: number, extra: Partial<DigestRecord> = {}) =>
+  record({
+    schema_version: 2,
+    kind: "finding",
+    rule_id: "no_destination",
+    severity: "Medium",
+    confidence: "High",
+    title: `ops_a${n} fired with no destination`,
+    alert_id: `a${n}`,
+    alert_name: `ops_a${n}`,
+    finding_id: fid(n),
+    scope_kind: "alert",
+    scope_key: `a${n}`,
+    ...extra,
+  });
+
 const config = (enabled: boolean) => ({
   data: {
     id: "c1",
@@ -121,7 +171,7 @@ const config = (enabled: boolean) => ({
   },
 });
 
-const mountPage = async () => {
+const mountPage = async (query: Record<string, string> = {}) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -149,7 +199,7 @@ const mountPage = async () => {
       { path: "/alerts", name: "alertList", component: { template: "<div />" } },
     ],
   });
-  await router.push({ name: "alertCalibration", query: { org_identifier: "default" } });
+  await router.push({ name: "alertCalibration", query: { org_identifier: "default", ...query } });
   await router.isReady();
   const wrapper = mount(AlertCalibrationDashboard, {
     global: { plugins: [store, router] },
@@ -172,6 +222,8 @@ describe("AlertCalibrationDashboard", () => {
     vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
       read === "" ? ([run] as never) : (findings as never),
     );
+    // The board waits for the dismissals read, so every test answers it.
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
   });
 
   it("lists the alerts each rule flagged in the latest run, worst rule first", async () => {
@@ -582,5 +634,321 @@ describe("AlertCalibrationDashboard", () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) expect(rule.text()).toContain("Pending");
     wrapper.unmount();
+  });
+});
+
+describe("AlertCalibrationDashboard dismissals", () => {
+  const settle = async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+    }
+  };
+  const serve = (records: DigestRecord[], count: number, extra: Partial<DigestRecord> = {}) =>
+    vi
+      .mocked(alertCalibration.readDigests)
+      .mockImplementation(async (_org, read) =>
+        read === ""
+          ? ([{ ...run, finding_count: count }] as never)
+          : (records.map((r) => ({ ...r, finding_count: count, ...extra })) as never),
+      );
+  const openStat = (wrapper: VueWrapper) =>
+    (wrapper.findComponent(OStatStrip).props("items") as StatItem[]).find(
+      (item) => item.key === "findings",
+    );
+  const filterText = () =>
+    document.body.querySelector('[data-test="alert-calibration-filter-dismissed"]')?.textContent ??
+    "";
+
+  beforeEach(() => {
+    queryClient.clear();
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+    };
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue(config(true) as never);
+    vi.mocked(alertCalibration.getStatus).mockResolvedValue({ data: { last_run: null } } as never);
+    vi.mocked(alertCalibration.listDismissals).mockReset();
+    vi.mocked(alertCalibration.dismissFinding).mockReset();
+  });
+
+  it("nothing_folds_before_the_server_and_the_list_confirm", async () => {
+    serve([nodest(1), nodest(2)], 2);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValueOnce(dismissalPage([]));
+    const wrapper = await mountPage();
+    await settle();
+    const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
+    await group.find("button").trigger("click");
+    await settle();
+    expect(openStat(wrapper)?.label).toBe("Open findings");
+    expect(openStat(wrapper)?.value).toBe(2);
+    expect(filterText()).toContain("Dismissed (0)");
+
+    await wrapper
+      .find(
+        '[data-test="alert-calibration-dashboard-alert-a1"] [data-test="alert-calibration-dashboard-dismiss"]',
+      )
+      .trigger("click");
+    await settle();
+    let land: (value: unknown) => void = () => {};
+    vi.mocked(alertCalibration.listDismissals).mockImplementationOnce(
+      () => new Promise((resolve) => (land = resolve)) as never,
+    );
+    vi.mocked(alertCalibration.dismissFinding).mockResolvedValue({
+      data: { id: fid(1), state: "active", expires_at: NOW },
+    } as never);
+    (
+      document.body.querySelector(
+        '[data-test="alert-calibration-dismiss-reason-known_issue"]',
+      ) as HTMLElement
+    ).click();
+    await settle();
+    (
+      document.body.querySelector('[data-test="alert-calibration-dismiss-submit"]') as HTMLElement
+    ).click();
+    await settle();
+
+    expect(alertCalibration.dismissFinding).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a1"]').exists()).toBe(true);
+    expect(openStat(wrapper)?.value).toBe(2);
+    expect(filterText()).toContain("Dismissed (0)");
+
+    land(dismissalPage([fid(1)]));
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]').exists()).toBe(true);
+    expect(openStat(wrapper)?.value).toBe(1);
+    expect(filterText()).toContain("Dismissed (1)");
+    wrapper.unmount();
+  });
+
+  it("open_and_dismissed_counts_stay_apart", async () => {
+    serve([nodest(1), nodest(2), nodest(3)], 3, { dismissed_count: 4 });
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(1), fid(9)]));
+    const wrapper = await mountPage();
+    await settle();
+    expect(openStat(wrapper)?.value).toBe(2);
+    expect(filterText()).toContain("Dismissed (2)");
+    const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
+    expect(group.text()).toContain("2 alerts");
+    wrapper.unmount();
+  });
+
+  it("all_open_dismissed_reads_as_hidden_not_clear", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(1)]));
+    const wrapper = await mountPage();
+    await settle();
+    const banner = wrapper.find('[data-test="alert-calibration-dashboard-all-dismissed"]');
+    expect(banner.text()).toBe("Nothing open. 1 dismissed finding is hidden; see Dismissed.");
+    const notice = wrapper
+      .findAllComponents(OBanner)
+      .find((b) => b.props("dataTest") === "alert-calibration-dashboard-all-dismissed");
+    expect(notice?.props("variant")).toBe("default");
+    expect(wrapper.text()).not.toContain("The latest run found nothing to fix.");
+    const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
+    await group.find("button").trigger("click");
+    await settle();
+    expect(
+      wrapper.find('[data-test="alert-calibration-dashboard-rule-all-dismissed"]').text(),
+    ).toBe("Nothing open: 1 alert's finding is dismissed.");
+    wrapper.unmount();
+  });
+
+  it("a_failed_state_read_renders_with_the_findings_in_one_paint", async () => {
+    queryClient.setQueryDefaults(["org"], { retry: false });
+    serve([nodest(1)], 1);
+    let fail: (reason: unknown) => void = () => {};
+    vi.mocked(alertCalibration.listDismissals).mockImplementationOnce(
+      () => new Promise((_resolve, reject) => (fail = reject)) as never,
+    );
+    const wrapper = await mountPage();
+    await settle();
+    // The records are in, the state read is not: the board must still be a skeleton.
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-attention"]').exists()).toBe(
+      false,
+    );
+
+    fail(Object.assign(new Error("HTTP 500"), { response: { status: 500 } }));
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-attention"]').exists()).toBe(true);
+    const unknown = wrapper.find('[data-test="alert-calibration-dashboard-states-unknown"]');
+    expect(unknown.text()).toContain(
+      "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
+    );
+    expect(filterText()).toContain("Dismissed (—)");
+
+    vi.mocked(alertCalibration.listDismissals).mockRejectedValue(
+      Object.assign(new Error("HTTP 500"), { response: { status: 500 } }),
+    );
+    await wrapper.find('[data-test="alert-calibration-dashboard-states-retry"]').trigger("click");
+    await settle();
+    expect(alertCalibration.listDismissals).toHaveBeenCalledTimes(2);
+
+    await wrapper.router.replace({ query: { org_identifier: "default", findings: "dismissed" } });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dismissed-error"]').exists()).toBe(true);
+    queryClient.setQueryDefaults(["org"], {});
+    wrapper.unmount();
+  });
+
+  it("the_filter_lives_in_the_url", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
+    const wrapper = await mountPage({ findings: "dismissed" });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dismissed"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]').exists(),
+    ).toBe(false);
+    const replace = vi.spyOn(wrapper.router, "replace");
+    (
+      document.body.querySelector('[data-test="alert-calibration-filter-open"]') as HTMLElement
+    ).click();
+    await settle();
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(wrapper.router.currentRoute.value.query.findings).toBeUndefined();
+    expect(wrapper.router.currentRoute.value.query.org_identifier).toBe("default");
+    expect(wrapper.find('[data-test="alert-calibration-dismissed"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]').exists(),
+    ).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("a_run_after_everything_was_dismissed_still_reads_hidden_not_clear", async () => {
+    // The next run leaves the dismissed findings out: no finding records, only the run's own.
+    const runOnly = (extra: Partial<DigestRecord>) =>
+      vi
+        .mocked(alertCalibration.readDigests)
+        .mockImplementation(async (_org, read) =>
+          read === ""
+            ? ([{ ...run, finding_count: 0 }] as never)
+            : ([record({ schema_version: 2, kind: "run", finding_count: 0, ...extra })] as never),
+        );
+    const before = (ids: string[]) => {
+      const page = dismissalPage(ids) as { data: { items: { dismissed_at: number }[] } };
+      for (const item of page.data.items) item.dismissed_at = NOW - 10_000;
+      return page as never;
+    };
+
+    runOnly({ dismissed_count: 2 });
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(before([fid(1), fid(2)]));
+    const wrapper = await mountPage();
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-all-dismissed"]').text()).toBe(
+      "Nothing open. 2 dismissed findings are hidden; see Dismissed.",
+    );
+    expect(wrapper.text()).not.toContain("The latest run found nothing to fix.");
+    expect(openStat(wrapper)).toMatchObject({ value: 0, tone: "neutral" });
+    wrapper.unmount();
+
+    // A scoped reader gets no org total, so its own dismissals from before the run stand in.
+    queryClient.clear();
+    runOnly({ dismissed_count: null, visibility: "scoped", alerts_in_scope: null });
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(before([fid(3)]));
+    const scoped = await mountPage();
+    await settle();
+    expect(scoped.find('[data-test="alert-calibration-dashboard-all-dismissed"]').text()).toBe(
+      "Nothing open. 1 dismissed finding is hidden; see Dismissed.",
+    );
+    scoped.unmount();
+  });
+
+  it("active_dismissals_stay_reachable_without_a_board", async () => {
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
+    const listed = async (wrapper: VueWrapper) =>
+      wrapper.findAll('[data-test="alert-calibration-dismissed-reopen"]').length;
+
+    // No run in the lookback.
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([] as never);
+    const noRun = await mountPage();
+    await settle();
+    expect(noRun.find('[data-test="alert-calibration-dashboard-empty"]').exists()).toBe(true);
+    expect(filterText()).toContain("Dismissed (1)");
+    noRun.unmount();
+    const noRunList = await mountPage({ findings: "dismissed" });
+    await settle();
+    expect(noRunList.find('[data-test="alert-calibration-dashboard-no-board"]').exists()).toBe(
+      true,
+    );
+    expect(await listed(noRunList)).toBe(1);
+    noRunList.unmount();
+
+    // The digest read failed.
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(new Error("HTTP 500"));
+    const failed = await mountPage({ findings: "dismissed" });
+    await settle();
+    expect(failed.find('[data-test="alert-calibration-dashboard-no-board"]').exists()).toBe(true);
+    expect(await listed(failed)).toBe(1);
+    failed.unmount();
+
+    // Calibration is switched off for the org.
+    queryClient.clear();
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue(config(false) as never);
+    const off = await mountPage({ findings: "dismissed" });
+    await settle();
+    expect(off.find('[data-test="alert-calibration-dashboard-no-board"]').exists()).toBe(true);
+    expect(await listed(off)).toBe(1);
+    off.unmount();
+
+    // With nothing dismissed, the empty states stay as they were.
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const clean = await mountPage();
+    await settle();
+    expect(clean.find('[data-test="alert-calibration-dashboard-not-enabled"]').exists()).toBe(true);
+    expect(filterText()).toBe("");
+    clean.unmount();
+  });
+
+  it("a_cached_state_read_waits_for_this_visits_answer", async () => {
+    serve([nodest(1)], 1);
+    const key = alertCalibrationKeys.dismissals("default");
+    const fresh = () => {
+      let land: (value: unknown) => void = () => {};
+      vi.mocked(alertCalibration.listDismissals).mockImplementationOnce(
+        () => new Promise((resolve) => (land = resolve)) as never,
+      );
+      return (value: unknown) => land(value);
+    };
+    const board = (wrapper: VueWrapper) =>
+      wrapper.find('[data-test="alert-calibration-dashboard-attention"]').exists();
+
+    // An earlier visit cached f1 as dismissed; it has since been reopened.
+    queryClient.setQueryData(key, {
+      items: (dismissalPage([fid(1)]) as { data: { items: unknown[] } }).data.items,
+      total: 1,
+      capped: false,
+    });
+    const answer = fresh();
+    const wrapper = await mountPage();
+    await settle();
+    expect(board(wrapper)).toBe(false);
+    answer(dismissalPage([]));
+    await settle();
+    expect(board(wrapper)).toBe(true);
+    expect(openStat(wrapper)?.value).toBe(1);
+    expect(filterText()).toContain("Dismissed (0)");
+    wrapper.unmount();
+
+    // An earlier visit cached a failed read; this visit's read succeeds.
+    queryClient.clear();
+    queryClient
+      .getQueryCache()
+      .build(queryClient, { queryKey: key })
+      .setState({ status: "error", error: new Error("HTTP 500"), errorUpdateCount: 1 });
+    const second = fresh();
+    const again = await mountPage();
+    await settle();
+    expect(board(again)).toBe(false);
+    second(dismissalPage([]));
+    await settle();
+    expect(board(again)).toBe(true);
+    expect(again.find('[data-test="alert-calibration-dashboard-states-unknown"]').exists()).toBe(
+      false,
+    );
+    again.unmount();
   });
 });

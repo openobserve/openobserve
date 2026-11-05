@@ -74,6 +74,8 @@ export interface RunRow extends Coverage {
   /** Version 2 splits `skip_count` into the skips written as records and the routine ones only counted. */
   written_skip_count?: number | null;
   omitted_routine_skip_count?: number | null;
+  /** Alert subjects the run left out as dismissed; absent before P4, null for a scoped reader. */
+  dismissed_count?: number | null;
   /** Null for a scoped reader: the org's count is not one it may see. */
   alerts_in_scope: number | null;
   coverage_gap: boolean;
@@ -234,6 +236,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     skip_count: record.skip_count,
     written_skip_count: record.written_skip_count,
     omitted_routine_skip_count: record.omitted_routine_skip_count,
+    dismissed_count: record.dismissed_count,
     alerts_in_scope: record.alerts_in_scope,
     coverage_gap: record.coverage_gap,
     coverage_unreadable_definitions: record.coverage_unreadable_definitions,
