@@ -15,8 +15,8 @@
 
 import { format as formatDate } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { Confidence, CoverageVerdict, Quality, Severity, Tier } from "./digests";
-import { ERROR_CLASS_LABEL, isErrorClass, type EvidenceFormat } from "./rules";
+import type { Confidence, CoverageVerdict, DigestRecord, Quality, Severity, Tier } from "./digests";
+import { ERROR_CLASS_LABEL, isErrorClass, type EvidenceField, type EvidenceFormat } from "./rules";
 
 const MINUTES_PER_DAY = 1440;
 const MINUTES_PER_YEAR = 365 * MINUTES_PER_DAY;
@@ -54,6 +54,24 @@ export function formatSeconds(t: TranslateFn, secs: number): I18nText {
   return formatMinutes(t, Math.round(rounded / 60));
 }
 
+/** Under a minute keeps one decimal, so 29.6 s is not rounded up to the 30 s limit it missed. */
+export function formatMillis(t: TranslateFn, ms: number): I18nText {
+  if (ms < 1000) {
+    const rounded = Math.round(ms);
+    return t(
+      "alertCalibration.duration.milliseconds",
+      { count: rounded.toLocaleString() },
+      rounded,
+    );
+  }
+  if (ms < 60_000) {
+    const secs = Math.round(ms / 100) / 10;
+    const shown = secs.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    return t("alertCalibration.duration.seconds", { count: shown }, secs);
+  }
+  return formatSeconds(t, ms / 1000);
+}
+
 /** Microseconds, in the card's existing hour format. */
 const formatTime = (micros: number) => formatDate(micros / 1000, "MMM d, HH:mm");
 
@@ -63,6 +81,7 @@ export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceF
   if (format === "seconds") return formatSeconds(t, Number(value));
   if (format === "count") return raw(Number(value).toLocaleString());
   if (format === "time") return raw(formatTime(Number(value)));
+  if (format === "durationMs") return formatMillis(t, Number(value));
   if (format === "errorClass") return isErrorClass(value) ? t(ERROR_CLASS_LABEL[value]) : raw("—");
   if (format === "boolean") {
     return value === true || value === "true"
@@ -70,6 +89,97 @@ export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceF
       : t("alertCalibration.evidence.no");
   }
   return raw(String(value));
+}
+
+const NOT_WORKING = "evidence_notworking_";
+/** ENT context.rs `NEAR_LIMIT_SHARE`: a success within 20 % of the limit is near it (P7b-D2). */
+const NEAR_LIMIT_SHARE = 0.8;
+
+/** One evidence row's value; the time rows read their sibling columns from the same record. */
+export function formatEvidenceField(
+  t: TranslateFn,
+  record: DigestRecord,
+  field: EvidenceField,
+): I18nText {
+  const column = (name: string) => record[`${NOT_WORKING}${name}`];
+  const millis = (name: string) => formatEvidence(t, column(name), "durationMs");
+  if (field.format === "evaluationTimes") {
+    return t("alertCalibration.evidence.successTimesValue", {
+      p50: millis("ok_p50_ms"),
+      p90: millis("ok_p90_ms"),
+      max: millis("ok_max_ms"),
+    });
+  }
+  if (field.format === "nearLimit") {
+    const total = Number(column("ok_evaluations_timed"));
+    const limitSecs = Number(column("query_limit_secs"));
+    return t(
+      "alertCalibration.evidence.nearLimitValue",
+      {
+        count: Number(record[field.column]).toLocaleString(),
+        total: total.toLocaleString(),
+        near: formatMillis(t, limitSecs * NEAR_LIMIT_SHARE * 1000),
+      },
+      total,
+    );
+  }
+  return formatEvidence(t, record[field.column], field.format);
+}
+
+export interface ResourceOption {
+  key: "window" | "filter" | "frequency";
+  label: I18nText;
+  cost: I18nText;
+}
+
+const positiveSecs = (value: unknown): number | null => {
+  const secs = Number(value);
+  return value != null && value !== "" && Number.isFinite(secs) && secs > 0 ? secs : null;
+};
+
+/** A resource card's three ways to make the query cheaper, each with what it costs in coverage. */
+export function resourceOptions(t: TranslateFn, record: DigestRecord): ResourceOption[] {
+  if (record.pattern !== "resource_timeout" && record.pattern !== "resource_memory") return [];
+  const period = positiveSecs(record[`${NOT_WORKING}period_secs`]);
+  const frequency = positiveSecs(record[`${NOT_WORKING}frequency_secs`]);
+  const span = (secs: number) => formatSeconds(t, secs);
+  let windowCost: I18nText;
+  if (period === null) {
+    windowCost = t("alertCalibration.resourceCost.windowRealTime");
+  } else if (frequency === null) {
+    windowCost = t("alertCalibration.resourceCost.windowCron");
+  } else if (period > frequency) {
+    windowCost = t("alertCalibration.resourceCost.windowOverlap", {
+      period: span(period),
+      overlap: span(period - frequency),
+      frequency: span(frequency),
+    });
+  } else {
+    windowCost = t("alertCalibration.resourceCost.windowGap", {
+      period: span(period),
+      frequency: span(frequency),
+    });
+  }
+  const options: ResourceOption[] = [
+    { key: "window", label: t("alertCalibration.resourceOption.window"), cost: windowCost },
+    {
+      key: "filter",
+      label: t("alertCalibration.resourceOption.filter"),
+      cost: t("alertCalibration.resourceCost.filter"),
+    },
+  ];
+  // A real-time alert has no schedule, so running it less often is not an option.
+  if (period !== null) {
+    options.push({
+      key: "frequency",
+      label: t("alertCalibration.resourceOption.frequency"),
+      cost:
+        frequency === null
+          ? t("alertCalibration.resourceCost.frequencyCron")
+          : t("alertCalibration.resourceCost.frequency", { frequency: span(frequency) }),
+    });
+  }
+  return options;
 }
 
 export const SEVERITY_BADGE: Record<

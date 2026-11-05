@@ -622,6 +622,190 @@ describe("AlertCalibrationFindingCard", () => {
     expect(unknown.text()).not.toContain("made_up");
   });
 
+  it("renders_resource_rows_options_and_costs_in_amber", () => {
+    const resource = (overrides: Partial<FindingRecord>) =>
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "failure",
+        severity: "Medium",
+        confidence: "High",
+        tier: "C",
+        alert_id: "a7",
+        alert_name: "app_timeout",
+        pattern: "resource_timeout",
+        advice: "reduce_query_time",
+        title: "app_timeout failed 96 of 315 evaluations: the query timed out",
+        actions: undefined,
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_schedulerhealth_affected_orgs: undefined,
+        evidence_schedulerhealth_skipped_windows: undefined,
+        evidence_schedulerhealth_late_ratio: undefined,
+        insight_actions: JSON.stringify([
+          { type: "review_alert", alert_id: "a7", focus: "query" },
+          { type: "review_alert", alert_id: "a7", focus: "settings" },
+        ]),
+        evidence_notworking_evaluation_errors: 96,
+        evidence_notworking_evaluations: 315,
+        evidence_notworking_error_class: "resource_timeout",
+        evidence_notworking_class_errors: 96,
+        evidence_notworking_query_limit_secs: 30,
+        evidence_notworking_ok_evaluations_timed: 219,
+        evidence_notworking_ok_p50_ms: 21_000,
+        evidence_notworking_ok_p90_ms: 28_000,
+        evidence_notworking_ok_max_ms: 29_600,
+        evidence_notworking_ok_near_limit: 64,
+        evidence_notworking_period_secs: 3_600,
+        evidence_notworking_frequency_secs: 300,
+        ...overrides,
+      });
+    const options = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper
+        .findAll('[data-test^="alert-calibration-finding-option-"]')
+        .map((option) => option.text());
+    const FILTER = "Narrower filter: Data the filter leaves out is no longer checked.";
+
+    const timeout = mountCard(resource({ limitations: JSON.stringify(["limit_may_differ"]) }));
+    const tile = timeout.find('[data-test="alert-calibration-finding-tile"]');
+    expect(tile.classes()).toContain("bg-badge-warning-soft-bg");
+    expect(timeout.html()).not.toMatch(/error-soft|badge-error/);
+    expect(timeout.find('[data-test="alert-calibration-finding-tier"]').text()).toBe(
+      "Owner decision",
+    );
+    expect(timeout.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "Error type",
+      "Errors of this type",
+      "Query time limit",
+      "Successful evaluation time",
+      "Near the time limit",
+    ]);
+    expect(
+      timeout
+        .findAll("dd")
+        .map((dd) => dd.text())
+        .slice(4),
+    ).toEqual([
+      "30 seconds",
+      "median 21 seconds · 90th percentile 28 seconds · longest 29.6 seconds",
+      "64 of 219 successful evaluations took 24 seconds or more",
+    ]);
+    const advice = timeout.find('[data-test="alert-calibration-finding-advice"]');
+    expect(advice.text()).toContain(
+      "The query keeps reaching its time limit. Each option makes it cheaper and costs some coverage:",
+    );
+    expect(options(timeout)).toEqual([
+      "Shorter query window: Each run checks 1 hour, which overlaps the next run by 55 minutes. Down to 5 minutes it still checks all data, but the threshold then applies to 5 minutes, not 1 hour.",
+      FILTER,
+      "Less frequent runs: A breach can wait up to the new interval before it is noticed (now 5 minutes). Keep the window at least as long as the interval, or part of each interval goes unchecked.",
+    ]);
+    expect(timeout.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
+      "These evaluations stopped before this node's query time limit, so another limit may have applied; the options still help.",
+    );
+    expect(
+      timeout
+        .findAll('[data-test="alert-calibration-finding-action-review_alert-button"]')
+        .map((button) => button.text()),
+    ).toEqual(["Review query", "Review settings"]);
+
+    const memory = mountCard(
+      resource({
+        pattern: "resource_memory",
+        advice: "reduce_query_memory",
+        evidence_notworking_error_class: "resource_memory",
+        evidence_notworking_ok_near_limit: 0,
+        evidence_notworking_ok_max_ms: 2_100,
+        evidence_notworking_ok_p90_ms: 900,
+        evidence_notworking_ok_p50_ms: 400,
+        evidence_notworking_period_secs: 300,
+        evidence_notworking_frequency_secs: 600,
+      }),
+    );
+    expect(memory.find('[data-test="alert-calibration-finding-advice"]').text()).toContain(
+      "The query keeps running out of memory. Each option makes it cheaper and costs some coverage:",
+    );
+    expect(
+      memory
+        .findAll("dd")
+        .map((dd) => dd.text())
+        .slice(5),
+    ).toEqual([
+      "median 400 ms · 90th percentile 900 ms · longest 2.1 seconds",
+      "0 of 219 successful evaluations took 24 seconds or more",
+    ]);
+    expect(options(memory)[0]).toBe(
+      "Shorter query window: Each run checks 5 minutes of every 10 minutes. A shorter window leaves more of each interval unchecked.",
+    );
+
+    const cron = mountCard(resource({ evidence_notworking_frequency_secs: undefined }));
+    expect(options(cron)).toEqual([
+      "Shorter query window: Each run checks less data, so data outside the shorter window is not checked.",
+      FILTER,
+      "Less frequent runs: A breach can wait longer before it is noticed. Keep the window at least as long as the gap between runs.",
+    ]);
+
+    const realTime = mountCard(
+      resource({
+        evidence_notworking_period_secs: undefined,
+        evidence_notworking_frequency_secs: undefined,
+      }),
+    );
+    expect(options(realTime)).toEqual([
+      "Shorter query window: Real-time alerts check each record as it arrives, so only a narrower filter applies.",
+      FILTER,
+    ]);
+
+    const unread = mountCard(
+      resource({
+        quality: "partial",
+        quality_reasons: JSON.stringify(["evaluation_times_unread"]),
+        evidence_notworking_query_limit_secs: undefined,
+        evidence_notworking_ok_evaluations_timed: undefined,
+        evidence_notworking_ok_p50_ms: undefined,
+        evidence_notworking_ok_p90_ms: undefined,
+        evidence_notworking_ok_max_ms: undefined,
+        evidence_notworking_ok_near_limit: undefined,
+      }),
+    );
+    expect(unread.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "Error type",
+      "Errors of this type",
+    ]);
+    expect(unread.find('[data-test="alert-calibration-finding-quality-reasons"]').text()).toBe(
+      "Reason: evaluation times were not read",
+    );
+    expect(options(unread)).toHaveLength(3);
+
+    const noSuccess = mountCard(
+      resource({
+        evidence_notworking_ok_evaluations_timed: 0,
+        evidence_notworking_ok_p50_ms: undefined,
+        evidence_notworking_ok_p90_ms: undefined,
+        evidence_notworking_ok_max_ms: undefined,
+        evidence_notworking_ok_near_limit: 0,
+      }),
+    );
+    expect(noSuccess.findAll("dt").map((dt) => dt.text())).toContain("Query time limit");
+    expect(noSuccess.findAll("dt").map((dt) => dt.text())).not.toContain("Near the time limit");
+
+    for (const wrapper of [timeout, memory, cron, realTime, unread]) {
+      for (const code of [
+        "reduce_query",
+        "limit_may_differ",
+        "evaluation_times_unread",
+        "resource_",
+      ]) {
+        expect(wrapper.text()).not.toContain(code);
+      }
+    }
+    expect(
+      mountCard(finding()).find('[data-test="alert-calibration-finding-options"]').exists(),
+    ).toBe(false);
+  });
+
   it("renders the no-destination advice and candidate rows, and nothing extra for a plain record", () => {
     const review = { type: "review_alert", alert_id: "a1", focus: "settings" };
     const noDestination = (overrides: Partial<FindingRecord>) =>

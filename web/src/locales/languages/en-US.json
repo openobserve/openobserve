@@ -11321,7 +11321,8 @@
       "minutes": "{count} minute | {count} minutes",
       "hours": "{count} hour | {count} hours",
       "days": "{count} day | {count} days",
-      "years": "{count} year | {count} years"
+      "years": "{count} year | {count} years",
+      "milliseconds": "{count} ms"
     },
     "unit": {
       "minutes": "minute | minutes",
@@ -11377,7 +11378,12 @@
       "lastFailure": "Last recorded failure",
       "lastSuccess": "Last recorded success",
       "lastEdit": "Latest alert edit",
-      "errorSample": "Error message"
+      "errorSample": "Error message",
+      "queryTimeLimit": "Query time limit",
+      "successTimes": "Successful evaluation time",
+      "nearLimit": "Near the time limit",
+      "successTimesValue": "median {p50} · 90th percentile {p90} · longest {max}",
+      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more"
     },
     "errorClass": {
       "streamMissing": "Stream not found",
@@ -11424,20 +11430,39 @@
       "addDestination": "Add a destination in Edit Alert, or confirm this alert is meant to notify no one.",
       "checkStreamNotFound": "Check the source the query reads: evaluations recorded it as not found.",
       "checkFieldNotFound": "Check the fields the query uses: evaluations recorded one as not found.",
-      "checkQuerySyntax": "Check the alert's query: the search engine rejected it as not valid. The error does not say which part is wrong."
+      "checkQuerySyntax": "Check the alert's query: the search engine rejected it as not valid. The error does not say which part is wrong.",
+      "reduceQueryTime": "The query keeps reaching its time limit. Each option makes it cheaper and costs some coverage:",
+      "reduceQueryMemory": "The query keeps running out of memory. Each option makes it cheaper and costs some coverage:"
+    },
+    "resourceOption": {
+      "window": "Shorter query window",
+      "filter": "Narrower filter",
+      "frequency": "Less frequent runs",
+      "line": "{option}: {cost}"
+    },
+    "resourceCost": {
+      "windowOverlap": "Each run checks {period}, which overlaps the next run by {overlap}. Down to {frequency} it still checks all data, but the threshold then applies to {frequency}, not {period}.",
+      "windowGap": "Each run checks {period} of every {frequency}. A shorter window leaves more of each interval unchecked.",
+      "windowCron": "Each run checks less data, so data outside the shorter window is not checked.",
+      "windowRealTime": "Real-time alerts check each record as it arrives, so only a narrower filter applies.",
+      "filter": "Data the filter leaves out is no longer checked.",
+      "frequency": "A breach can wait up to the new interval before it is noticed (now {frequency}). Keep the window at least as long as the interval, or part of each interval goes unchecked.",
+      "frequencyCron": "A breach can wait longer before it is noticed. Keep the window at least as long as the gap between runs."
     },
     "limitation": {
       "quietSource": "A quiet source can be a batch or cron job that is idle by design.",
       "scanTruncated": "Wider searches timed out, so the empty answer covers less than the full 7 days.",
       "noSuccessInWindow": "No successful evaluation is recorded in this window, so when it last worked is unknown.",
       "failureMayPredateWindow": "Failures were already happening when this window began, so the first failure may be earlier.",
-      "editTimingOnly": "The latest edit is shown for timing only; it is not a confirmed cause."
+      "editTimingOnly": "The latest edit is shown for timing only; it is not a confirmed cause.",
+      "limitMayDiffer": "These evaluations stopped before this node's query time limit, so another limit may have applied; the options still help."
     },
     "qualityReason": {
       "scanTruncated": "wider searches timed out",
       "errorClassesCapped": "error types were not read: too many failing alerts",
       "errorClassesTimedOut": "error types were not read in time",
-      "errorClassesFailed": "error types could not be read"
+      "errorClassesFailed": "error types could not be read",
+      "evaluationTimesUnread": "evaluation times were not read"
     },
     "severity": {
       "high": "High",
