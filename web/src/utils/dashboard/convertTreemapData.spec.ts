@@ -134,6 +134,33 @@ describe("treemap through convertPanelData", () => {
     expect(drilling.leafDepth).toBeUndefined();
   });
 
+  it("draws every level and does not zoom when a click opens the point menu", async () => {
+    const levels = { x: [field("x_axis_1", "Region"), field("x_axis_2", "Service")], y: [count] };
+    const deep = [{ x_axis_1: "eu", x_axis_2: "api", y_axis_1: 5 }];
+    const args = [
+      store,
+      { value: {} },
+      { value: null },
+      { value: [] },
+      { queries: [] },
+      {},
+      { value: [] },
+    ] as const;
+    const series = (
+      (await convertPanelData(
+        panel("treemap", levels),
+        [deep],
+        ...args,
+        false,
+        undefined,
+        undefined,
+        true,
+      )) as any
+    ).options.series[0];
+    expect(series.nodeClick).toBe(false);
+    expect(series.leafDepth).toBeUndefined();
+  });
+
   it("renders one treemap series with a breadcrumb that zooms on click", async () => {
     const { options, chartType } = await viaPanel(
       panel("treemap", { x: [serviceX], y: [count], breakdown: [regionB] }),
