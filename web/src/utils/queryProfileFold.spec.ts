@@ -213,19 +213,26 @@ describe("plumbing operators fold onto edges", () => {
     expect(layout.edges.find((e) => e.folded.length === 2)?.folded).toEqual([top, below]);
   });
 
-  it("keeps the root, hotspots and costly operators as cards", () => {
-    const model = unionModel([5, 5]);
-    const hot = hotspotSet(model);
-    const costly = {
-      ...model.operators[idOf(model, "ProjectionExec")],
-      totalComputeNs: model.totalComputeNs,
-    };
-    expect(isPlumbing(model, costly, hot)).toBe(false);
+  it("keeps the root as a card", () => {
     const root = buildProfileModel({
       ...joinProfile(),
       plan: timed("ProjectionExec", 0.01, [timed("DataSourceExec", 1)]),
     });
     expect(visibleIds(layoutProfile(root, initialFold())).has(root.rootId)).toBe(true);
+  });
+
+  it("folds an exchange whatever its cost, and opens it when picked", () => {
+    const model = buildProfileModel({
+      ...joinProfile(),
+      plan: timed("AggregateExec", 100, [
+        timed("RepartitionExec", 50, [timed("DataSourceExec", 1)]),
+      ]),
+    });
+    const repartition = idOf(model, "RepartitionExec");
+    expect(hotspotSet(model).has(repartition)).toBe(true);
+    expect(visibleIds(layoutProfile(model, initialFold())).has(repartition)).toBe(false);
+    const picked = revealOp(model, initialFold(), repartition);
+    expect(visibleIds(layoutProfile(model, picked)).has(repartition)).toBe(true);
   });
 
   it("opens a folded operator as a card and folds it back", () => {
@@ -243,9 +250,7 @@ describe("plumbing operators fold onto edges", () => {
 
   it("refolds everything opened by hand when the switch goes back on", () => {
     const model = joinModel();
-    const plumbing = model.order.filter((id) =>
-      isPlumbing(model, model.operators[id], hotspotSet(model)),
-    );
+    const plumbing = model.order.filter((id) => isPlumbing(model.operators[id]));
     const fold = run(
       model,
       { type: "show", opIds: plumbing },

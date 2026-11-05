@@ -99,7 +99,7 @@ export function revealOp(model: ProfileModel, fold: FoldState, opId: string): Fo
   const ancestors = ancestorIds(model, opId);
   const path = [opId, ...ancestors];
   const stageIds = path.map((id) => model.operators[id].stageId).filter((s): s is string => !!s);
-  const unfold = fold.plumbing && isPlumbing(model, op, hotspotSet(model)) && !fold.shown.has(opId);
+  const unfold = fold.plumbing && isPlumbing(op) && !fold.shown.has(opId);
   const changed =
     unfold ||
     ancestors.some((id) => fold.collapsed.has(id)) ||

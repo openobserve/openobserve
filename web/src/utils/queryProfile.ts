@@ -1311,7 +1311,6 @@ type VisNode =
 interface FoldContext {
   model: ProfileModel;
   fold: FoldState;
-  hot: Set<string>;
 }
 
 interface Link {
@@ -1337,7 +1336,6 @@ export const NO_FOLD: FoldState = {
 };
 
 const PLUMBING_RE = /^(Repartition|CoalescePartitions|CoalesceBatches|Projection|Cooperative)Exec/;
-const PLUMBING_SHARE = 0.01;
 
 export function subtreeIds(model: ProfileModel, opId: string): string[] {
   const out: string[] = [];
@@ -1356,15 +1354,9 @@ export function ancestorIds(model: ProfileModel, opId: string): string[] {
   return out;
 }
 
-/** A single-child exchange or projection too cheap to deserve its own card. */
-export function isPlumbing(model: ProfileModel, op: ProfileOperator, hot: Set<string>): boolean {
-  return (
-    PLUMBING_RE.test(op.name) &&
-    op.childIds.length === 1 &&
-    !op.remoteStageId &&
-    !hot.has(op.id) &&
-    (model.planOnly || shareOfTotal(model, op) < PLUMBING_SHARE)
-  );
+/** A single-child exchange or projection, drawn on its edge instead of as a card. */
+export function isPlumbing(op: ProfileOperator): boolean {
+  return PLUMBING_RE.test(op.name) && op.childIds.length === 1 && !op.remoteStageId;
 }
 
 export function hotspotSet(model: ProfileModel): Set<string> {
@@ -1372,7 +1364,7 @@ export function hotspotSet(model: ProfileModel): Set<string> {
 }
 
 function foldsAway(ctx: FoldContext, op: ProfileOperator): boolean {
-  return ctx.fold.plumbing && !ctx.fold.shown.has(op.id) && isPlumbing(ctx.model, op, ctx.hot);
+  return ctx.fold.plumbing && !ctx.fold.shown.has(op.id) && isPlumbing(op);
 }
 
 function hiddenWhole(ctx: FoldContext, opId: string): boolean {
@@ -1598,7 +1590,7 @@ function edgeFor(link: Link, x2: number, y2: number, parentId: string, slide: nu
 
 /** Tidy top-down layout: each subtree owns a disjoint x-range, stages box their variants side by side. */
 export function layoutProfile(model: ProfileModel, fold: FoldState = NO_FOLD): ProfileLayout {
-  const ctx: FoldContext = { model, fold, hot: hotspotSet(model) };
+  const ctx: FoldContext = { model, fold };
   // the root has no edge above it to carry folded operators, so it is never folded away
   const root = buildNode(ctx, model.rootId);
   const memo = new WeakMap<VisNode, Box>();
