@@ -56,6 +56,14 @@ class FleetConfigPage {
     await expect(this.page.locator(this.validateBtn)).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
   }
 
+  async expectOpenedFor(configId) {
+    await expect(this.page).toHaveURL(new RegExp(`/fleet/configurations/${encodeURIComponent(configId)}(\\?|$)`), {
+      timeout: PAGE_TIMEOUT_MS,
+    });
+    await expect(this.page.locator(this.editorPage)).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+    await expect(this.page.locator(this.validateBtn)).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
+  }
+
   async expectTitle(configId) {
     await expect(this.page.locator(this.editorPage).getByRole('heading', { name: configId })).toBeVisible();
   }

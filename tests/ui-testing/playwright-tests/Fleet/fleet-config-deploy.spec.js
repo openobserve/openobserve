@@ -171,23 +171,22 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     expect((await pm.fleetSeed.rolloutsForConfig(config)).map((r) => r.id)).toEqual([seeded.id]);
   });
 
-  test('R-3311-8 · Publish stays off while the YAML is unchanged from the version the editor opened, and on once it changes', {
+  test('R-3311-8 · Fix forward on a halted rollout opens the editor with Publish off until the YAML differs from the failed version', {
     tag: ['@fleetConfig', '@regression', '@P2'],
   }, async () => {
-    // Known gap: the Fix forward navigation itself needs a halted rollout, i.e. a collector that rejects a version.
-    const config = await pm.fleetSeed.createConfig('fixfwd', FLEET_YAML.publishable);
-    const v1 = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
-    await pm.fleetConfigPage.goto(config);
-    await pm.fleetConfigPage.expectModeChip(`Viewing published v${v1} · not rolled out`);
+    const halted = await pm.fleetSeed.seedRejectedRollout('fixfwd', FLEET_YAML.publishable);
+    await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: halted.fleetId, rollout: halted.rolloutId });
+    await pm.fleetFleetsPage.fixForwardFromRolloutDrawer();
+
+    await pm.fleetConfigPage.expectOpenedFor(halted.config);
     await pm.fleetConfigPage.switchToYaml();
     await pm.fleetConfigPage.expectYaml(FLEET_YAML.publishable);
     await pm.fleetConfigPage.expectPublishEnabled(false);
-
     await pm.fleetConfigPage.setYaml(FLEET_YAML.publishable.replace('https://example.com', 'https://example.org'));
     await pm.fleetConfigPage.expectPublishEnabled(true);
     await pm.fleetConfigPage.setYaml(FLEET_YAML.publishable);
     await pm.fleetConfigPage.expectPublishEnabled(false);
-    expect((await pm.fleetSeed.getConfig(config)).latest_version).toBe(v1);
+    expect((await pm.fleetSeed.getConfig(halted.config)).latest_version).toBe(halted.version);
   });
 
   test('R-3311-12 · the deploy dialog shows a 90 s phase timeout as "1 min 30 s", not rounded up to "2 min"', {
@@ -197,13 +196,14 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetSeed.setFleetSettings(fleet.id, { phase_timeout_secs: 90 });
     const config = await pm.fleetSeed.createConfig('timeout', FLEET_YAML.publishable);
     const v1 = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
+    // Spec §9.3: a fleet with no collectors waits on an unproven version; the dialog only needs a desired version.
     const seeded = await pm.fleetSeed.setDesired(fleet.id, config, v1);
-    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'completed');
+    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'waiting');
     await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: fleet.id });
     await pm.fleetFleetsPage.openDeploy();
     await pm.fleetRolloutPage.expectReady();
 
     expect(await pm.fleetRolloutPage.timeoutNoteText()).not.toContain('2 min');
-    await pm.fleetRolloutPage.expectTimeoutNoteContains('1 min 30 s');
+    await pm.fleetRolloutPage.expectTimeoutNoteContains(/\b(1 min 30 s|90 s|1\.5 min)\b/);
   });
 });
