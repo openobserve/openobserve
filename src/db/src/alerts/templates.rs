@@ -154,6 +154,8 @@ async fn alias(org_id: &str, name: &str) -> Result<Option<String>, TemplateError
 
 pub async fn set(template: Template) -> Result<Template, TemplateError> {
     let saved = table::templates::put(template).await?;
+    // The watch event lands later; without this a list right after the save can miss it.
+    apply_template_cache_event(&format!("{}/{}", saved.org_id, saved.name), Some(&saved));
 
     // trigger watch event to update in-memory cache
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
@@ -185,6 +187,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     if !table::templates::delete(org_id, name).await? {
         return Err(TemplateError::NotFound);
     }
+    apply_template_cache_event(&format!("{org_id}/{name}"), None);
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{org_id}/{name}");
 
     // trigger watch event to update in-memory cache
