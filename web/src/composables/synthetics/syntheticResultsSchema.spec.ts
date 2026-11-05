@@ -1883,8 +1883,8 @@ describe("confirm jobs in uptime", () => {
 
   it("should ask for confirm rows only when the stream has the field", () => {
     expect(buildHistogramSql("m", "1 minute")).not.toContain("confirm_runs");
-    expect(
-      buildHistogramSql("m", "1 minute", false, false, undefined, false, true),
-    ).toContain("trigger_type = 'confirm'");
+    expect(buildHistogramSql("m", "1 minute", false, false, undefined, false, true)).toContain(
+      "trigger_type = 'confirm'",
+    );
   });
 });
