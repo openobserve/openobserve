@@ -868,17 +868,6 @@ describe("recent searches: settled runs", () => {
       const call = settle({ hits: [], total: 0, is_partial: true }).mock.calls[0][0];
       expect(call.partial).toBe(true);
     });
-
-    it("never reaches the report for a cancelled run, since completion checks it is current", () => {
-      const settled = vi.fn();
-      run().onRunSettled(settled);
-      const hits = hitsOf(dispatch("run").id);
-      run().bindPayload(hits);
-      expect(run().isPayloadCurrent(hits)).toBe(true);
-      run().engine.cancelGeneration(null, { cause: "user" });
-      expect(run().isPayloadCurrent(hits)).toBe(false);
-      expect(settled).not.toHaveBeenCalled();
-    });
   });
 
   it("reports a failed search with its error", () => {

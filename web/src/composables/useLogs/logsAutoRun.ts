@@ -68,7 +68,7 @@ export interface LogsRunSettled {
   startUs: number;
   endUs: number;
   partial: boolean;
-  noResults?: boolean;
+  noResults: boolean;
   /** Null when the search finished. */
   error: RunError | null;
 }

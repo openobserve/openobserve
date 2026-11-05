@@ -599,9 +599,9 @@ describe("Starred chip", () => {
     );
   });
 
-  const mountWithRealChips = () =>
+  const mountWithRealChips = (source = "logs") =>
     mount(RecentSearchesDrawer, {
-      props: { source: "logs", open: true },
+      props: { source, open: true },
       global: {
         plugins: [store],
         stubs: {
@@ -620,6 +620,47 @@ describe("Starred chip", () => {
   const chip = (wrapper: ReturnType<typeof mountWithRealChips>, key: string) =>
     wrapper.find(`[data-test="recent-searches-status-${key}"]`);
 
+  it("hides the No results chip for metrics but keeps it for logs and the all-pages scope", async () => {
+    const metrics = mountWithRealChips("metrics");
+    await flushPromises();
+    expect(chip(metrics, "no_results").exists()).toBe(false);
+    await metrics.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    expect(chip(metrics, "no_results").exists()).toBe(true);
+    expect(
+      mountWithRealChips("logs").find('[data-test="recent-searches-status-no_results"]').exists(),
+    ).toBe(true);
+  });
+
+  it("treats a chosen No results as any once the scope narrows to metrics", async () => {
+    const wrapper = mountWithRealChips("metrics");
+    await flushPromises();
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    await chip(wrapper, "no_results").trigger("click");
+    await wrapper.find('[data-test="recent-searches-scope-page"]').trigger("click");
+    await flushPromises();
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    const metricsCalls = api.list.mock.calls.filter(([, p]) => p.source === "metrics");
+    expect(metricsCalls.every(([, p]) => p.status === undefined)).toBe(true);
+  });
+
+  it("shows no total in the footer until the count query resolves", async () => {
+    api.count.mockImplementation(() => new Promise(() => {}));
+    const wrapper = mountWithRealChips();
+    await flushPromises();
+    expect(wrapper.find('[data-test="recent-searches-showing"]').text()).toBe("Showing 3");
+  });
+
+  it("renders no footer text for the empty state or an error", async () => {
+    api.list.mockResolvedValue({ data: [] });
+    const empty = mountWithRealChips();
+    await flushPromises();
+    expect(empty.find('[data-test="recent-searches-showing"]').exists()).toBe(false);
+    api.list.mockRejectedValue(new Error("boom"));
+    const failed = mountWithRealChips();
+    await flushPromises();
+    expect(failed.find('[data-test="recent-searches-showing"]').exists()).toBe(false);
+  });
+
   it("selects Starred, shows only starred rows, also after the drawer is closed and reopened", async () => {
     const wrapper = mountWithRealChips();
     await flushPromises();
@@ -627,13 +668,13 @@ describe("Starred chip", () => {
     expect(chip(wrapper, "any").text()).toBe("Any status");
     expect(chip(wrapper, "starred").text()).toBe("Starred");
     expect(wrapper.find('[data-test="recent-searches-scope-page"]').text()).toBe("Logs");
-    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
 
     await chip(wrapper, "starred").trigger("click");
     await flushPromises();
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
-    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
     expect(api.list).toHaveBeenLastCalledWith(
       "default",
       expect.objectContaining({ starred: true }),
@@ -641,7 +682,7 @@ describe("Starred chip", () => {
     expect(shownRows(wrapper)).toBe(1);
 
     await wrapper.setProps({ open: false });
-    await wrapper.setProps({ open: true });
+    (wrapper.vm as unknown as { show: () => void }).show();
     await flushPromises();
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
     expect(shownRows(wrapper)).toBe(1);
@@ -649,6 +690,27 @@ describe("Starred chip", () => {
     await chip(wrapper, "starred").trigger("click");
     await flushPromises();
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
+    expect(shownRows(wrapper)).toBe(3);
+  });
+
+  it("hides Reset all with no filter and clears search, scope, status and Starred when clicked", async () => {
+    const wrapper = mountWithRealChips();
+    await flushPromises();
+    const reset = () => wrapper.find('[data-test="recent-searches-reset-filters"]');
+    expect(reset().exists()).toBe(false);
+    await chip(wrapper, "error").trigger("click");
+    await chip(wrapper, "starred").trigger("click");
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    await flushPromises();
+    expect(reset().exists()).toBe(true);
+    await reset().trigger("click");
+    await flushPromises();
+    expect(reset().exists()).toBe(false);
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
+    expect(
+      wrapper.find('[data-test="recent-searches-scope-page"]').attributes("aria-checked"),
+    ).toBe("true");
     expect(shownRows(wrapper)).toBe(3);
   });
 
@@ -662,10 +724,10 @@ describe("Starred chip", () => {
       "default",
       expect.objectContaining({ status: "error", starred: true }),
     );
-    expect(chip(wrapper, "error").attributes("aria-pressed")).toBe("true");
+    expect(chip(wrapper, "error").attributes("aria-checked")).toBe("true");
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
     const group = wrapper.find('[data-test="recent-searches-status"]');
-    expect(group.attributes("role")).toBe("group");
+    expect(group.attributes("role")).toBe("radiogroup");
     expect(group.attributes("aria-label")).toBe("Run status");
     expect(wrapper.find('[data-test="recent-searches-scope"]').attributes("aria-label")).toBe(
       "Search scope",
@@ -701,7 +763,7 @@ describe("Starred chip", () => {
       await flushPromises();
       await chip(wrapper, "ok").trigger("click");
       await flushPromises();
-      expect(api.list.mock.calls.length).toBeLessThanOrEqual(11);
+      expect(api.list).toHaveBeenCalledTimes(11);
       expect(wrapper.find('[data-test="recent-searches-drawer-empty"]').exists()).toBe(true);
     });
 

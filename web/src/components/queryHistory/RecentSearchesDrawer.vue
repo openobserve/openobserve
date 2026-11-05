@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-center gap-2">
           <span
             class="flex flex-wrap items-center gap-2"
-            role="group"
+            role="radiogroup"
             :aria-label="t('recentSearches.scopeGroup')"
             data-test="recent-searches-scope"
           >
@@ -65,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="option.value"
               clickable
               :variant="scope === option.value ? 'primary-soft' : 'default-outline'"
-              :aria-pressed="scope === option.value"
+              role="radio"
+              :aria-checked="scope === option.value"
               :data-test="`recent-searches-scope-${option.value}`"
               @click="scope = option.value"
             >
@@ -75,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="bg-border-default mx-1 h-5 w-px" aria-hidden="true" />
           <span
             class="flex flex-wrap items-center gap-2"
-            role="group"
+            role="radiogroup"
             :aria-label="t('recentSearches.statusGroup')"
             data-test="recent-searches-status"
           >
@@ -84,8 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="option.value"
               clickable
               :variant="status === option.value ? 'primary-soft' : 'default-outline'"
-              :icon="option.icon"
-              :aria-pressed="status === option.value"
+              role="radio"
+              :aria-checked="status === option.value"
               :data-test="`recent-searches-status-${option.value}`"
               @click="status = option.value"
             >
@@ -103,6 +104,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("recentSearches.statusStarred") }}
           </OBadge>
+          <OButton
+            v-if="differsFromDefault"
+            variant="ghost-primary"
+            size="xs"
+            icon-left="restart-alt"
+            class="ms-auto"
+            data-test="recent-searches-reset-filters"
+            @click="resetFilters"
+          >
+            {{ t("recentSearches.reset") }}
+            <OTooltip :content="t('recentSearches.resetFilters')" />
+          </OButton>
         </div>
       </div>
 
@@ -298,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </section>
-        <div v-if="history.hasNextPage.value" class="flex justify-center p-3">
+        <div v-if="history.hasNextPage.value && !scanning" class="flex justify-center p-3">
           <OButton
             variant="outline"
             size="sm"
@@ -314,10 +327,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
-        <span class="text-text-secondary text-xs italic" data-test="recent-searches-showing">
+        <span
+          v-if="showFooterText"
+          class="text-text-secondary text-xs italic"
+          data-test="recent-searches-showing"
+        >
           {{ footerText }}
         </span>
         <OButton
+          class="ms-auto"
           variant="ghost-destructive"
           size="sm"
           icon-left="delete"
@@ -451,7 +469,16 @@ const STATUS_DOT = {
 
 const search = ref("");
 const scope = ref<"page" | "all">("page");
-const status = ref<StatusFilter>("any");
+const chosenStatus = ref<StatusFilter>("any");
+// Metrics runs never set no_results, so that chip is hidden and a stale choice reads as any.
+const hideNoResults = computed(() => props.source === "metrics" && scope.value === "page");
+const status = computed<StatusFilter>({
+  get: () =>
+    hideNoResults.value && chosenStatus.value === "no_results" ? "any" : chosenStatus.value,
+  set: (value) => {
+    chosenStatus.value = value;
+  },
+});
 const starredOnly = ref(false);
 const clearOpen = ref(false);
 const includeStarred = ref(false);
@@ -461,22 +488,25 @@ const sourceParam = computed(() =>
   scope.value === "page" ? props.source : HISTORY_SOURCES.join(","),
 );
 
+// The backend stores only ok|error, so Success and No results are told apart on the loaded rows.
+const clientFiltered = computed(() => ["ok", "no_results"].includes(status.value));
+
 const filters = computed<QueryHistoryListParams>(() => ({
   source: sourceParam.value,
   ...(search.value.trim() ? { q: search.value.trim() } : {}),
   ...(status.value === "error" ? { status: "error" as const } : {}),
-  ...(["ok", "no_results"].includes(status.value) ? { status: "ok" as const } : {}),
+  ...(clientFiltered.value ? { status: "ok" as const } : {}),
   ...(starredOnly.value ? { starred: true } : {}),
 }));
 const filtered = computed(
   () => !!search.value.trim() || status.value !== "any" || starredOnly.value,
 );
-// The backend stores only ok|error, so Success and No results are told apart on the loaded rows.
-const clientFiltered = computed(() => ["ok", "no_results"].includes(status.value));
+const differsFromDefault = computed(() => filtered.value || scope.value !== "page");
 
 const resetFilters = () => {
   search.value = "";
-  status.value = "any";
+  scope.value = "page";
+  chosenStatus.value = "any";
   starredOnly.value = false;
 };
 
@@ -487,7 +517,6 @@ const history = useInfiniteQuery(() =>
 );
 const hiddenIds = ref<Set<string>>(new Set());
 const pendingDeletes = new Map<string, { org: string; ids: Set<string>; dismiss: () => void }>();
-// The backend stores only ok|error, so "No results" is told apart here from the recorded context.
 const entryStatus = (entry: QueryHistoryEntry): "ok" | "no_results" | "error" => {
   if (entry.status === "error") return "error";
   return entry.context.no_results ? "no_results" : "ok";
@@ -496,12 +525,13 @@ const rows = computed(() =>
   (history.data.value?.pages.flat() ?? []).filter(
     (entry) =>
       !hiddenIds.value.has(entry.id) &&
-      (!["ok", "no_results"].includes(status.value) || entryStatus(entry) === status.value),
+      (!clientFiltered.value || entryStatus(entry) === status.value),
   ),
 );
-// Keeps paging while a client-side chip hides every loaded row, so the empty state is never a false negative.
+// Keeps paging, up to a page cap, while a client-side chip hides every loaded row.
 const scanning = computed(
   () =>
+    open.value &&
     clientFiltered.value &&
     !history.isError.value &&
     !rows.value.length &&
@@ -536,25 +566,29 @@ const filteredCount = useQuery(() =>
     enabled: open.value && !!orgId.value && filtered.value && !clientFiltered.value,
   }),
 );
+const showFooterText = computed(
+  () =>
+    !history.isPending.value && !history.isError.value && !scanning.value && rows.value.length > 0,
+);
 const footerText = computed(() => {
   if (clientFiltered.value) return t("recentSearches.showingLoaded", { shown: rows.value.length });
   const total = filtered.value ? filteredCount.data.value : totalCount.value;
-  return t("recentSearches.showing", {
-    shown: rows.value.length,
-    total: total ?? rows.value.length,
-  });
+  if (total === undefined) return t("recentSearches.showingLoaded", { shown: rows.value.length });
+  return t("recentSearches.showing", { shown: rows.value.length, total });
 });
 
 const scopeOptions = computed(() => [
   { value: "page" as const, label: t(`recentSearches.page.${props.source}`) },
   { value: "all" as const, label: t("recentSearches.allPages") },
 ]);
-const statusOptions = computed(() => [
-  { value: "any" as const, label: t("recentSearches.statusAll"), icon: undefined },
-  { value: "ok" as const, label: t("recentSearches.statusOk"), icon: undefined },
-  { value: "no_results" as const, label: t("recentSearches.statusNoResults"), icon: undefined },
-  { value: "error" as const, label: t("recentSearches.statusError"), icon: undefined },
-]);
+const statusOptions = computed(() =>
+  [
+    { value: "any" as const, label: t("recentSearches.statusAll") },
+    { value: "ok" as const, label: t("recentSearches.statusOk") },
+    { value: "no_results" as const, label: t("recentSearches.statusNoResults") },
+    { value: "error" as const, label: t("recentSearches.statusError") },
+  ].filter((option) => !(hideNoResults.value && option.value === "no_results")),
+);
 
 const statusLabel = (entry: QueryHistoryEntry) =>
   t(
@@ -705,7 +739,6 @@ watch(clearOpen, (isOpen) => {
 
 const show = (initialStatus: HistoryStatus | null = null) => {
   status.value = initialStatus ?? "any";
-  starredOnly.value = false;
   open.value = true;
 };
 

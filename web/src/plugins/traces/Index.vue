@@ -1174,7 +1174,7 @@ async function getQueryData(
             recordRecent(
               buildTracesRecord({
                 ...historyRun,
-                result: noResults ? { status: "ok", noResults } : { status: "ok" },
+                result: { status: "ok", noResults },
               }),
             );
           }
