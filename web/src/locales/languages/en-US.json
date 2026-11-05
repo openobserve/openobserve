@@ -10284,7 +10284,7 @@
       "logs": "Send logs",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} & more",
       "traces": "Send traces",
-      "tracesOtlpDesc": "{otlp} from any {otel} SDK or collector",
+      "tracesDesc": "{product1} / {product2} / {product3} distributed tracing",
       "metrics": "Send metrics",
       "metricsDesc": "{product1}, {product2}, {product3} & more",
       "or": "Or:",
