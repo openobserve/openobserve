@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
     ingestMetrics: vi.fn(async (_org: string, rows: unknown[]) => accepted(rows)),
     ingestTraces: vi.fn(async () => ({ data: {} })),
     putState: vi.fn(),
+    keepWindow: vi.fn(),
     deleteState: vi.fn(),
   },
   dashboardCreate: vi.fn(),
@@ -579,5 +580,29 @@ describe("loadSampleData rollback", () => {
       warn.mockRestore();
       vi.mocked(jsTransformService.delete).mockReset();
     }
+  });
+});
+
+describe("loadSampleData window save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("retries a failed save once and does not keep the window locally when it works", async () => {
+    mocks.sampleData.putState.mockRejectedValueOnce(new Error("down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await loadSampleData("acme", 5, () => {});
+    warn.mockRestore();
+    expect(mocks.sampleData.putState).toHaveBeenCalledTimes(2);
+    expect(mocks.sampleData.keepWindow).not.toHaveBeenCalled();
+  });
+
+  it("keeps the window for this tab when the save fails twice", async () => {
+    mocks.sampleData.putState.mockRejectedValueOnce(new Error("down"));
+    mocks.sampleData.putState.mockRejectedValueOnce(new Error("down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await loadSampleData("acme", 5, () => {});
+    warn.mockRestore();
+    expect(mocks.sampleData.putState).toHaveBeenCalledTimes(2);
+    const [, startUs, endUs] = mocks.sampleData.putState.mock.calls[0];
+    expect(mocks.sampleData.keepWindow).toHaveBeenCalledWith("acme", startUs, endUs);
   });
 });

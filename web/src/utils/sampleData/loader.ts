@@ -405,13 +405,14 @@ export const loadSampleData = async (
   }
   counts = telemetry.counts;
   result.counts = counts;
+  const saveWindow = () =>
+    quiet(() => sampleDataService.putState(org, telemetry.window.startUs, telemetry.window.endUs));
   try {
-    await quiet(() =>
-      sampleDataService.putState(org, telemetry.window.startUs, telemetry.window.endUs),
-    );
+    await saveWindow().catch(saveWindow);
   } catch (e) {
-    // the data is already loaded; without the saved window the tour falls back to relative ranges
+    // the data is already loaded; this tab keeps the window so the tour is not left on relative ranges
     console.warn("Sample data window was not saved", e);
+    sampleDataService.keepWindow(org, telemetry.window.startUs, telemetry.window.endUs);
   }
 
   await run("dashboards", () => createDashboards(org, telemetry.window));

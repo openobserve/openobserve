@@ -42,6 +42,19 @@ describe("sampleData state calls", () => {
     });
   });
 
+  it("answers with the window a failed save left in this tab, until the state is deleted", async () => {
+    client.get.mockResolvedValue({ data: { status: "none" } });
+    sampleData.keepWindow("acme", 10, 20);
+    expect((await sampleData.getState("acme")).data).toMatchObject({
+      status: "loaded",
+      start_time: 10,
+      end_time: 20,
+    });
+    expect((await sampleData.getState("other")).data).toEqual({ status: "none" });
+    await sampleData.deleteState("acme");
+    expect((await sampleData.getState("acme")).data).toEqual({ status: "none" });
+  });
+
   it("saves the window as a loaded state", async () => {
     await sampleData.putState("acme", 10, 20);
     expect(client.put).toHaveBeenCalledWith("/api/acme/sample_data", {
@@ -78,7 +91,7 @@ describe("sampleData ingest credential", () => {
     await sampleData.ingestTraces("acme", "t", {});
     expect(client.post).toHaveBeenCalledTimes(3);
     for (const call of client.post.mock.calls) {
-      expect(call[2]).toEqual({ keepSessionOn401: true });
+      expect(call[2]).toEqual({ keepSessionOn401: true, silentForbidden: true });
     }
   });
 

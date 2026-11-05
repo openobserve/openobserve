@@ -50,16 +50,29 @@ export interface SampleDataState {
   updated_by?: string;
 }
 
+// windows whose save failed, so this tab's tour still has the absolute range
+const unsavedWindows = new Map<string, SampleDataState>();
+
 const sampleData = {
-  getState: (org: string) =>
-    http().get<SampleDataState>(`/api/${org}/sample_data`, { skipAccessToast: true }),
+  keepWindow: (org: string, startUs: number, endUs: number) =>
+    unsavedWindows.set(org, { status: "loaded", start_time: startUs, end_time: endUs }),
+  getState: async (org: string) => {
+    const res = await http().get<SampleDataState>(`/api/${org}/sample_data`, {
+      skipAccessToast: true,
+    });
+    const kept = unsavedWindows.get(org);
+    return kept && res.data?.status !== "loaded" ? { ...res, data: kept } : res;
+  },
   putState: (org: string, startUs: number, endUs: number) =>
     http().put<SampleDataState>(`/api/${org}/sample_data`, {
       status: "loaded",
       start_time: startUs,
       end_time: endUs,
     }),
-  deleteState: (org: string) => http().delete(`/api/${org}/sample_data`),
+  deleteState: (org: string) => {
+    unsavedWindows.delete(org);
+    return http().delete(`/api/${org}/sample_data`);
+  },
   ingestLogs: async (org: string, stream: string, rows: unknown[]) =>
     http({ headers: await ingestAuth(org) }).post(`/api/${org}/${stream}/_json`, rows, keepSession),
   ingestMetrics: async (org: string, rows: unknown[]) =>
