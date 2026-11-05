@@ -130,14 +130,10 @@
       "dashboard-save-conflict.spec.js",
       "refreshCancelButtons.spec.js",
       "dashboard-refresh-button.spec.js",
-      "panelNotices.spec.js"
+      "panelNotices.spec.js",
+      "promqlAutocomplete.spec.js"
     ],
-    "disabled": [
-      {
-        "file": "promqlAutocomplete.spec.js",
-        "reason": "silently dead: manifest listed it under the wrong folder, so it never ran; revalidate before enabling"
-      }
-    ]
+    "disabled": []
   },
   {
     "testfolder": "Dashboards-Isolated",
