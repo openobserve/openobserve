@@ -2147,7 +2147,27 @@
       "view": "منظر",
       "frustration": "الإحباط",
       "failedRequest": "الطلبات الفاشلة",
-      "noResponse": "لا استجابة"
+      "noResponse": "لا استجابة",
+      "noResponseStatus": "0 — لا استجابة",
+      "failedRequestDetails": "تفاصيل الطلب الفاشل",
+      "browserStatus": "حالة المتصفح",
+      "serverStatus": "حالة الخادم",
+      "noServerSpanFound": "لم يُعثر على امتداد خادم",
+      "noServerSpanHint": "قد يعني غياب الامتداد أيضًا أخذ العينات أو تأخر الاستيعاب أو مسارًا غير مُجهّز بالتتبع أو الاحتفاظ بالبيانات.",
+      "unknownNoTrace": "غير معروف (لا يوجد تتبع)",
+      "unknown": "غير معروف",
+      "abortedByApp": "أُلغي بواسطة التطبيق",
+      "method": "الطريقة",
+      "url": "URL",
+      "duration": "المدة",
+      "timing": "التوقيت",
+      "timingDns": "DNS",
+      "timingConnect": "الاتصال",
+      "timingSsl": "SSL",
+      "timingFirstByte": "أول بايت",
+      "timingDownload": "التنزيل",
+      "size": "الحجم",
+      "initiatedBy": "المُبادر"
     },
     "replayCanvasNotRecorded": "لم يتم تسجيل محتوى Canvas",
     "actionOnTarget": "{action} في \"{target}\"",
@@ -2256,7 +2276,8 @@
       "showElements": "إظهار العناصر",
       "markerLabel": "الرتبة {rank}، {name}، {count} نقرة | الرتبة {rank}، {name}، {count} نقرات",
       "markerLabelFrustrated": "الرتبة {rank}، {name}، {count} نقرة، {frustrated} محبَط | الرتبة {rank}، {name}، {count} نقرات، {frustrated} محبَط",
-      "markerClicks": "{count} نقرة | {count} نقرات"
+      "markerClicks": "{count} نقرة | {count} نقرات",
+      "noReplayLegacySdk": "تحتاج لقطات الصفحة إلى إصدار أحدث من RUM SDK. إعادة تشغيل الجلسة المسجلة هنا تأتي من SDK أقدم، لذا لا توجد لقطة شاشة للرسم عليها."
     },
     "analytics": {
       "title": "تحليلات المنتج",
@@ -6231,7 +6252,14 @@
       "askAiRejected": "تُرفض الطلبات بسبب {status} {reason} على {path}.",
       "askAiNoRequests": "لم يصل أي شيء ولم يُرفض أي طلب.",
       "askAiUnavailable": "تعذّرت قراءة الطلبات المرفوضة، لذا السبب غير معروف.",
-      "thisGuide": "مصدر بيانات"
+      "thisGuide": "مصدر بيانات",
+      "hintWaitingAfter": "يتحول هذا إلى اللون الأخضر من تلقاء نفسه عند وصول أول سجل. إذا لم يصل شيء خلال {elapsed} فسيعرض سبب المشكلة؛ تتحقق أداة استكشاف الأخطاء الآن.",
+      "idleInPrompt": "{stream} يتلقى البيانات بالفعل. تبدأ الفحوصات عند نسخ النص التوجيهي.",
+      "idleMatchesPrompt": "التدفقات المطابقة تتلقى البيانات بالفعل. تبدأ الفحوصات عند نسخ النص التوجيهي.",
+      "idleNewPrompt": "تبدأ الفحوصات عند نسخ النص التوجيهي.",
+      "fixInvalidCredentialsPrompt": "الرمز في ملف .env لا يطابق رمز المؤسسة {token}. نزّل ملف .env مرة أخرى واطلب من وكيل البرمجة إعادة تنفيذ الطلب.",
+      "fixInvalidCredentialsPromptUnnamed": "الرمز في ملف .env لا يطابق رمز هذه المؤسسة الحالي. نزّل ملف .env مرة أخرى واطلب من وكيل البرمجة إعادة تنفيذ الطلب.",
+      "copyPrompt": "نسخ النص التوجيهي"
     },
     "firstDataNotice": {
       "pill": "وصلت بياناتك الأولى",
@@ -6383,7 +6411,18 @@
         "envButton": "نزّل .env",
         "promptTitle": "الصق هذا في {client1} أو {client2} أو {client3}",
         "promptLabel": "المطالبة",
-        "promptCopied": "تم نسخ المطالبة"
+        "promptCopied": "تم نسخ المطالبة",
+        "health": {
+          "title": "سلامة بيانات الذكاء الاصطناعي",
+          "scopeAgent": "الامتدادات من الوكيل {agent} في {stream} منذ بدء الفحص",
+          "scopeStream": "الامتدادات في {stream} منذ بدء الفحص",
+          "checking": "جارٍ التحقق من سلامة بيانات الذكاء الاصطناعي…",
+          "checkAgain": "تحقق مرة أخرى",
+          "checkAgainHint": "بعد أن يغيّر وكيل البرمجة الشيفرة ويشغّل طلبًا آخر، تحقق مرة أخرى.",
+          "unsupported": "لا يتحقق إصدار OpenObserve هذا من سلامة بيانات الذكاء الاصطناعي. وصل أول امتداد لديك، لذا يعمل التتبع.",
+          "error": "تعذّر تشغيل فحوصات سلامة بيانات الذكاء الاصطناعي. وصل أول امتداد لديك، لذا يعمل التتبع.",
+          "noGenAiSpans": "وصلت الامتدادات، لكن لا شيء منها استدعاء LLM، لذا عميل LLM غير مُجهّز بالتتبع. اطلب من وكيل البرمجة تجهيز عميل LLM بالتتبع، ثم شغّل طلبًا وتحقق مرة أخرى."
+        }
       }
     },
     "header": "مصادر البيانات",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count}s منذ",
     "minutesAgo": "منذ {count}m",
     "hoursAgo": "منذ {count}h",
-    "daysAgo": "منذ {count}d"
+    "daysAgo": "منذ {count}d",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "الدردشات",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "كتم التكرارات",
       "suppressRepeatsTooltip": "إشعار مرة واحدة عندما يبدأ التنبيه في الإطلاق أو يتغير مستواه، وليس عند كل تقييم. اتركه معطّلًا لمواصلة تلقّي التذكيرات بعد كل فترة كتم.",
       "keepFiringForInvalid": "أدخل 0 ثانية أو أكثر",
-      "keepFiringForTooLong": "أدخل 86400 ثانية (24 ساعة) كحد أقصى"
+      "keepFiringForTooLong": "أدخل 86400 ثانية (24 ساعة) كحد أقصى",
+      "helpApplyToObject": "استخدام هذا القالب",
+      "helpTemplateExplainObject": "القالب هو الرسالة التي تُرسَل: النص بالإضافة إلى المتغيرات. اختيار قالب هنا يستبدل قالب كل وجهة، لهذا الإعداد فقط.",
+      "helpTemplateWhenDescObject": "إذا تُرك هذا فارغًا، تستخدم كل وجهة قالبها الخاص إن كان ينطبق على هذا النوع، ثم الرسالة المدمجة. عيّن تجاوزًا لإرسال رسالة واحدة إلى كل وجهة مطابقة.",
+      "helpCurrentHeadingObject": "ما يُرسَل الآن",
+      "helpCurrentOverrideSome": "تستخدم الوجهات المطابقة هذا القالب:",
+      "helpCurrentResolved": "لم يتم تعيين أي تجاوز. تستخدم كل وجهة:"
     },
     "advanced": {
       "addVariable": "إضافة متغير",
@@ -13430,7 +13496,8 @@
             "ended": "انتهت",
             "cancelled": "أُلغيت",
             "extended": "مُددت"
-          }
+          },
+          "template": "القالب"
         },
         "test": {
           "send": "إرسال اختبار",
@@ -13500,7 +13567,43 @@
       "firingFor": "قيد الإطلاق لمدة {duration}",
       "incident": "الحادث"
     },
-    "priorityUnsetPagesAs": "غير محددة (تنبيه بمستوى P2)"
+    "priorityUnsetPagesAs": "غير محددة (تنبيه بمستوى P2)",
+    "notificationKinds": {
+      "alert": "التنبيه",
+      "incident": "الحادث",
+      "anomaly": "الشذوذ",
+      "synthetics": "المراقبة الاصطناعية",
+      "downtime": "فترة الصيانة",
+      "on_call": "المناوبة"
+    },
+    "templateOverride": {
+      "label": "تجاوز القالب",
+      "placeholder": "استخدام قالب الوجهة",
+      "help": "يتجاوز قالب الوجهة لرسائل {kind}. لا يمكن اختيار القوالب المُعدّة مسبقًا؛ انسخ أحدها أولًا.",
+      "empty": "لا توجد قوالب تنطبق على {kind} بعد.",
+      "create": "أنشئ قالبًا",
+      "loadFailed": "تعذّر تحميل القوالب",
+      "forbidden": "يتطلب سرد القوالب إذن قراءة القوالب",
+      "mismatch": "لا يناسب {count} من وجهاتك ({names})؛ وستعود تلك الوجهات إلى قالبها الخاص.",
+      "groupContent": "المحتوى",
+      "groupCustom": "مخصص",
+      "webhookOnly": "(Webhook فقط)",
+      "emailOnly": "(البريد الإلكتروني فقط)",
+      "snsOnly": "(SNS فقط)",
+      "stale": "لم يعد القالب {name} موجودًا. اختر قالبًا آخر أو امسح الحقل.",
+      "willUse": "سيُستخدم: {template}",
+      "willUsePerDestination": "سيُستخدم لكل وجهة:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "رسالة {kind} المضمنة",
+      "sourceExplicit": "هذا التجاوز",
+      "sourceDestination": "قالب الوجهة",
+      "sourceOrgDefault": "افتراضي المؤسسة",
+      "sourceCompiled": "مضمن",
+      "sourcePlatformResolve": "تحديد المنصة",
+      "sourceLegacy": "الحمولة القديمة",
+      "sourceLegacyPayload": "حمولة JSON الخاصة بالنوع (Webhook عام)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "فتح",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "هذا سيرسل رسالة حقيقية إلى القناة المختارة، مع علامة [اختبار].",
     "testSendSuccess": "تم إرسال رسالة الاختبار",
     "testSendRateLimited": "الكثير من الاختبارات — يرجى الانتظار لحظة والمحاولة مرة أخرى",
-    "testSendNoDestination": "اختر وجهة أولا"
+    "testSendNoDestination": "اختر وجهة أولا",
+    "playgroundLabel": "ساحة التجربة",
+    "playgroundHelp": "لا يتم إرسال أي شيء من هنا.",
+    "emptyVariables": "فارغة لـ {kind}: {names}",
+    "appliesTo": "ينطبق على",
+    "appliesToAll": "جميع الأنواع",
+    "appliesToAny": "أي نوع",
+    "allKindsNotice": "القوالب التي تنطبق على جميع الأنواع: {count}. تستخدمها وجهاتها أيضًا لرسائل الشذوذ والمراقبة الاصطناعية والمناوبة وفترة الصيانة والحوادث. راجعها.",
+    "allKindsNoticeReview": "راجع",
+    "appliesToInferred": "مستنتج من المتغيرات في النص",
+    "appliesToManual": "اختيارك",
+    "appliesToReset": "أعد التعيين إلى المستنتج",
+    "previewKind": "النوع",
+    "previewForbidden": "ليس لديك إذن لمعاينة القوالب",
+    "previewFailed": "فشلت المعاينة: {message}",
+    "severityFailed": "فشل",
+    "severityDegraded": "متدهور",
+    "severityFlaky": "متقلب",
+    "severityRecovered": "متعافى",
+    "variableGroupCommon": "عامة"
   },
   "alert_sources": {
     "header": "مصادر تنبيه خارجية",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "حوادث الأخطاء القياسية",
     "severityWarningDescription": "حوادث مستوى التحذير",
     "severityInfoDescription": "الحوادث الإعلامية",
-    "urlRecipientsChannel": "URL / المستلمون / القناة"
+    "urlRecipientsChannel": "URL / المستلمون / القناة",
+    "payloadFormat": "تنسيق الحمولة",
+    "payloadFormatAuto": "تلقائي",
+    "payloadFormatLegacy": "JSON قديم",
+    "payloadFormatRendered": "قالب مُصيَّر",
+    "payloadFormatHelp": "يرسل الوضع التلقائي متن JSON القديم لرسائل الشذوذ والمراقبة الاصطناعية والمناوبة حتى يتم إرفاق قالب. يُخزَّن كمفتاح البيانات الوصفية payload_format."
   },
   "pipeline_destinations": {
     "header": "وجهات مسارات المعالجة",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "تعذّرت المطالبة بـ {paths}",
     "claimSignalsMorePaths": "{paths} و{count} أخرى",
     "toastSignalsClaimedPartly": "{claimed} من {count} إشارة تذهب الآن إلى {team}؛ تعذّرت المطالبة بـ {paths} | {claimed} من {count} إشارات تذهب الآن إلى {team}؛ تعذّرت المطالبة بـ {paths}",
-    "scopeNotSeenYet": "لم يُرَ في بياناتك بعد"
+    "scopeNotSeenYet": "لم يُرَ في بياناتك بعد",
+    "deliveryTemplate": "القالب: {templates}",
+    "policyMailBanner": "تتلقى وجهات البريد الإلكتروني وSNS نداءات المناوبة من هذا الإصدار: {names}."
   },
   "paidUsage": {
     "consentTitle": "هل تريد تشغيل استخدام الذكاء الاصطناعي المدفوع؟",

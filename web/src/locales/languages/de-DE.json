@@ -2147,7 +2147,27 @@
       "view": "Ansicht",
       "frustration": "Frustration",
       "failedRequest": "Fehlgeschlagene Anfragen",
-      "noResponse": "Keine Antwort"
+      "noResponse": "Keine Antwort",
+      "noResponseStatus": "0 — Keine Antwort",
+      "failedRequestDetails": "Details zur fehlgeschlagenen Anfrage",
+      "browserStatus": "Browserstatus",
+      "serverStatus": "Serverstatus",
+      "noServerSpanFound": "Kein Server-Span gefunden",
+      "noServerSpanHint": "Ein fehlender Span kann auch auf Sampling, Erfassungsverzögerung, eine nicht instrumentierte Route oder Aufbewahrung hindeuten.",
+      "unknownNoTrace": "Unbekannt (kein Trace)",
+      "unknown": "Unbekannt",
+      "abortedByApp": "von der App abgebrochen",
+      "method": "Methode",
+      "url": "URL",
+      "duration": "Dauer",
+      "timing": "Timing",
+      "timingDns": "DNS",
+      "timingConnect": "Verbindung",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Erstes Byte",
+      "timingDownload": "Download",
+      "size": "Größe",
+      "initiatedBy": "Initiiert von"
     },
     "replayCanvasNotRecorded": "Canvas-Inhalt nicht aufgezeichnet",
     "actionOnTarget": "{action} auf \"{target}\"",
@@ -2256,7 +2276,8 @@
       "showElements": "Elemente einblenden",
       "markerLabel": "Rang {rank}, {name}, {count} Klick | Rang {rank}, {name}, {count} Klicks",
       "markerLabelFrustrated": "Rang {rank}, {name}, {count} Klick, {frustrated} frustriert | Rang {rank}, {name}, {count} Klicks, {frustrated} frustriert",
-      "markerClicks": "{count} Klick | {count} Klicks"
+      "markerClicks": "{count} Klick | {count} Klicks",
+      "noReplayLegacySdk": "Seiten-Snapshots benötigen ein neueres RUM-SDK. Das hier aufgezeichnete Session-Replay stammt von einem älteren SDK, daher gibt es keinen Screenshot, auf dem gezeichnet werden kann."
     },
     "analytics": {
       "title": "Produktanalyse",
@@ -6231,7 +6252,14 @@
       "askAiRejected": "Anfragen werden mit {status} {reason} auf {path} abgewiesen.",
       "askAiNoRequests": "es ist nichts angekommen und keine Anfrage wurde abgewiesen.",
       "askAiUnavailable": "abgewiesene Anfragen konnten nicht gelesen werden, daher ist keine Ursache bekannt.",
-      "thisGuide": "eine Datenquelle"
+      "thisGuide": "eine Datenquelle",
+      "hintWaitingAfter": "Dieser Punkt wird automatisch grün, sobald der erste Datensatz eintrifft. Kommt innerhalb von {elapsed} nichts an, wird angezeigt, was schiefgelaufen ist; Fehlerbehebung prüft jetzt.",
+      "idleInPrompt": "{stream} empfängt bereits Daten. Die Prüfungen starten, sobald Sie den Prompt kopieren.",
+      "idleMatchesPrompt": "Passende Streams empfangen bereits Daten. Die Prüfungen starten, sobald Sie den Prompt kopieren.",
+      "idleNewPrompt": "Die Prüfungen starten, sobald Sie den Prompt kopieren.",
+      "fixInvalidCredentialsPrompt": "Das Token in Ihrer .env stimmt nicht mit dem Organisations-Token {token} überein. Laden Sie die .env erneut herunter und bitten Sie Ihren Coding-Agenten, die Anfrage erneut auszuführen.",
+      "fixInvalidCredentialsPromptUnnamed": "Das Token in Ihrer .env stimmt nicht mit dem aktuellen Token dieser Organisation überein. Laden Sie die .env erneut herunter und bitten Sie Ihren Coding-Agenten, die Anfrage erneut auszuführen.",
+      "copyPrompt": "Prompt kopieren"
     },
     "firstDataNotice": {
       "pill": "Ihre ersten Daten sind angekommen",
@@ -6383,7 +6411,18 @@
         "envButton": ".env herunterladen",
         "promptTitle": "Fügen Sie dies in {client1}, {client2} oder {client3} ein",
         "promptLabel": "Prompt",
-        "promptCopied": "Prompt kopiert"
+        "promptCopied": "Prompt kopiert",
+        "health": {
+          "title": "KI-Datenzustand",
+          "scopeAgent": "Spans von Agent {agent} in {stream} seit Beginn der Prüfung",
+          "scopeStream": "Spans in {stream} seit Beginn der Prüfung",
+          "checking": "KI-Datenzustand wird geprüft…",
+          "checkAgain": "Erneut prüfen",
+          "checkAgainHint": "Nachdem Ihr Coding-Agent den Code geändert und eine weitere Anfrage ausgeführt hat, prüfen Sie erneut.",
+          "unsupported": "Diese OpenObserve-Version prüft den KI-Datenzustand nicht. Ihr erster Span ist angekommen, daher funktioniert das Tracing.",
+          "error": "Die Prüfungen des KI-Datenzustands konnten nicht ausgeführt werden. Ihr erster Span ist angekommen, daher funktioniert das Tracing.",
+          "noGenAiSpans": "Spans sind angekommen, aber keiner davon ist ein LLM-Aufruf, daher ist der LLM-Client nicht instrumentiert. Bitten Sie Ihren Coding-Agenten, den LLM-Client zu instrumentieren, eine Anfrage auszuführen und dann erneut zu prüfen."
+        }
       }
     },
     "header": "Datenquellen",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count}s her",
     "minutesAgo": "{count}m her",
     "hoursAgo": "{count}h her",
-    "daysAgo": "{count}d her"
+    "daysAgo": "{count}d her",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Chats",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "Wiederholungen unterdrücken",
       "suppressRepeatsTooltip": "Einmal benachrichtigen, wenn der Alarm ausgelöst wird oder die Stufe wechselt, nicht bei jeder Auswertung. Lassen Sie es ausgeschaltet, um nach jeder Stummschaltung weiterhin Erinnerungen zu erhalten.",
       "keepFiringForInvalid": "Geben Sie 0 oder mehr Sekunden ein",
-      "keepFiringForTooLong": "Geben Sie höchstens 86400 Sekunden (24 Stunden) ein"
+      "keepFiringForTooLong": "Geben Sie höchstens 86400 Sekunden (24 Stunden) ein",
+      "helpApplyToObject": "Diese Vorlage verwenden",
+      "helpTemplateExplainObject": "Eine Vorlage ist die Nachricht, die gesendet wird: der Text plus Variablen. Wenn Sie hier eine auswählen, wird die eigene Vorlage jedes Ziels ersetzt – nur für diese Konfiguration.",
+      "helpTemplateWhenDescObject": "Lassen Sie dies leer, und jedes Ziel verwendet seine eigene Vorlage, sofern sie für diese Art gilt, andernfalls die integrierte Nachricht. Legen Sie eine Überschreibung fest, um eine Nachricht an jedes passende Ziel zu senden.",
+      "helpCurrentHeadingObject": "Was jetzt gesendet wird",
+      "helpCurrentOverrideSome": "Passende Ziele verwenden diese Vorlage:",
+      "helpCurrentResolved": "Keine Überschreibung festgelegt. Jedes Ziel verwendet:"
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
@@ -13430,7 +13496,8 @@
             "ended": "Beendet",
             "cancelled": "Abgebrochen",
             "extended": "Verlängert"
-          }
+          },
+          "template": "Vorlage"
         },
         "test": {
           "send": "Test senden",
@@ -13500,7 +13567,43 @@
       "firingFor": "ausgelöst seit {duration}",
       "incident": "Vorfall"
     },
-    "priorityUnsetPagesAs": "Nicht gesetzt (alarmiert als P2)"
+    "priorityUnsetPagesAs": "Nicht gesetzt (alarmiert als P2)",
+    "notificationKinds": {
+      "alert": "Alarm",
+      "incident": "Vorfall",
+      "anomaly": "Anomalie",
+      "synthetics": "Synthetics",
+      "downtime": "Wartungsfenster",
+      "on_call": "On-Call"
+    },
+    "templateOverride": {
+      "label": "Vorlagenüberschreibung",
+      "placeholder": "Vorlage des Ziels verwenden",
+      "help": "Überschreibt die Zielvorlage für {kind}-Nachrichten. Vorgefertigte Vorlagen können nicht ausgewählt werden; kopieren Sie zuerst eine.",
+      "empty": "Für {kind} gelten noch keine Vorlagen.",
+      "create": "Vorlage erstellen",
+      "loadFailed": "Vorlagen konnten nicht geladen werden",
+      "forbidden": "Das Auflisten von Vorlagen erfordert die Berechtigung zum Lesen von Vorlagen",
+      "mismatch": "Passt nicht zu {count} Ihrer Ziele ({names}); diese greifen auf ihre eigene Vorlage zurück.",
+      "groupContent": "Inhalt",
+      "groupCustom": "Benutzerdefiniert",
+      "webhookOnly": "(nur Webhook)",
+      "emailOnly": "(nur E-Mail)",
+      "snsOnly": "(nur SNS)",
+      "stale": "Vorlage {name} existiert nicht mehr. Wählen Sie eine andere oder leeren Sie das Feld.",
+      "willUse": "Verwendet: {template}",
+      "willUsePerDestination": "Wird je Ziel verwendet:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Integrierte {kind}-Nachricht",
+      "sourceExplicit": "diese Überschreibung",
+      "sourceDestination": "Zielvorlage",
+      "sourceOrgDefault": "Organisationsstandard",
+      "sourceCompiled": "integriert",
+      "sourcePlatformResolve": "Plattformauflösung",
+      "sourceLegacy": "Legacy-Nutzlast",
+      "sourceLegacyPayload": "die eigene JSON-Nutzlast des Typs (generischer Webhook)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "Dadurch wird eine echte Nachricht an den ausgewählten Kanal gesendet, gekennzeichnet mit [TEST].",
     "testSendSuccess": "Testnachricht gesendet",
     "testSendRateLimited": "Zu viele Testsendungen – bitte warten Sie einen Moment und versuchen Sie es erneut.",
-    "testSendNoDestination": "Wählen Sie zuerst ein Ziel aus"
+    "testSendNoDestination": "Wählen Sie zuerst ein Ziel aus",
+    "playgroundLabel": "Playground",
+    "playgroundHelp": "Hier wird nichts gesendet.",
+    "emptyVariables": "Leer für {kind}: {names}",
+    "appliesTo": "Gilt für",
+    "appliesToAll": "Alle Typen",
+    "appliesToAny": "Beliebiger Typ",
+    "allKindsNotice": "Vorlagen, die für alle Typen gelten: {count}. Die zugehörigen Ziele verwenden sie auch für Anomalie-, Synthetics-, On-Call-, Wartungsfenster- und Vorfallnachrichten. Prüfen Sie sie.",
+    "allKindsNoticeReview": "Prüfen",
+    "appliesToInferred": "Aus den Variablen im Inhalt abgeleitet",
+    "appliesToManual": "Von Ihnen gewählt",
+    "appliesToReset": "Auf abgeleitet zurücksetzen",
+    "previewKind": "Typ",
+    "previewForbidden": "Sie haben keine Berechtigung, Vorlagen in der Vorschau anzuzeigen",
+    "previewFailed": "Vorschau fehlgeschlagen: {message}",
+    "severityFailed": "Fehlgeschlagen",
+    "severityDegraded": "Beeinträchtigt",
+    "severityFlaky": "Instabil",
+    "severityRecovered": "Wiederhergestellt",
+    "variableGroupCommon": "Allgemein"
   },
   "alert_sources": {
     "header": "Externe Alarmquellen",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "Standardfehler-Vorfälle",
     "severityWarningDescription": "Vorfälle auf Warnstufe",
     "severityInfoDescription": "Informationelle Vorfälle",
-    "urlRecipientsChannel": "URL / Empfänger / Kanal"
+    "urlRecipientsChannel": "URL / Empfänger / Kanal",
+    "payloadFormat": "Nutzlastformat",
+    "payloadFormatAuto": "Automatisch",
+    "payloadFormatLegacy": "Legacy-JSON",
+    "payloadFormatRendered": "Gerenderte Vorlage",
+    "payloadFormatHelp": "Automatisch sendet den alten JSON-Body für Anomalie-, Synthetics- und On-Call-Nachrichten, bis eine Vorlage angehängt wird. Wird als Metadatenschlüssel payload_format gespeichert."
   },
   "pipeline_destinations": {
     "header": "Pipeline-Ziele",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "Konnte {paths} nicht übernehmen",
     "claimSignalsMorePaths": "{paths} und {count} weitere",
     "toastSignalsClaimedPartly": "{claimed} von {count} Signal geht jetzt an {team}; konnte {paths} nicht übernehmen | {claimed} von {count} Signalen gehen jetzt an {team}; konnte {paths} nicht übernehmen",
-    "scopeNotSeenYet": "Noch nicht in Ihren Daten gesehen"
+    "scopeNotSeenYet": "Noch nicht in Ihren Daten gesehen",
+    "deliveryTemplate": "Vorlage: {templates}",
+    "policyMailBanner": "E-Mail- und SNS-Ziele empfangen Alarmierungen aus dieser Version: {names}."
   },
   "paidUsage": {
     "consentTitle": "Kostenpflichtige KI-Nutzung aktivieren?",

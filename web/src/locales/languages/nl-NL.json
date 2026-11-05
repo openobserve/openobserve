@@ -2147,7 +2147,27 @@
       "view": "Weergave",
       "frustration": "Frustratie",
       "failedRequest": "Mislukte verzoeken",
-      "noResponse": "Geen antwoord"
+      "noResponse": "Geen antwoord",
+      "noResponseStatus": "0 — Geen reactie",
+      "failedRequestDetails": "Details van mislukte aanvraag",
+      "browserStatus": "Browserstatus",
+      "serverStatus": "Serverstatus",
+      "noServerSpanFound": "Geen server-span gevonden",
+      "noServerSpanHint": "Een ontbrekende span kan ook wijzen op sampling, ingestievertraging, een niet-geïnstrumenteerde route of retentie.",
+      "unknownNoTrace": "Onbekend (geen trace)",
+      "unknown": "Onbekend",
+      "abortedByApp": "afgebroken door de app",
+      "method": "Methode",
+      "url": "URL",
+      "duration": "Duur",
+      "timing": "Timing",
+      "timingDns": "DNS",
+      "timingConnect": "Verbinden",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Eerste byte",
+      "timingDownload": "Download",
+      "size": "Grootte",
+      "initiatedBy": "Geïnitieerd door"
     },
     "replayCanvasNotRecorded": "Canvas-inhoud niet opgenomen",
     "actionOnTarget": "{action} op \"{target}\"",
@@ -2256,7 +2276,8 @@
       "showElements": "Elementen tonen",
       "markerLabel": "Rang {rank}, {name}, {count} klik | Rang {rank}, {name}, {count} klikken",
       "markerLabelFrustrated": "Rang {rank}, {name}, {count} klik, {frustrated} gefrustreerd | Rang {rank}, {name}, {count} klikken, {frustrated} gefrustreerd",
-      "markerClicks": "{count} klik | {count} klikken"
+      "markerClicks": "{count} klik | {count} klikken",
+      "noReplayLegacySdk": "Paginasnapshots vereisen een nieuwere RUM SDK. De sessie-replay die hier is opgenomen, is afkomstig van een oudere SDK, dus er is geen schermafbeelding om op te tekenen."
     },
     "analytics": {
       "title": "Productanalyse",
@@ -6231,7 +6252,14 @@
       "askAiRejected": "verzoeken worden geweigerd met {status} {reason} op {path}.",
       "askAiNoRequests": "er is niets aangekomen en geen enkel verzoek is geweigerd.",
       "askAiUnavailable": "geweigerde verzoeken konden niet worden gelezen, dus er is geen oorzaak bekend.",
-      "thisGuide": "een gegevensbron"
+      "thisGuide": "een gegevensbron",
+      "hintWaitingAfter": "Dit wordt vanzelf groen wanneer het eerste record binnenkomt. Als er niets aankomt binnen {elapsed}, laat het zien wat er misging; Probleemoplossing controleert nu.",
+      "idleInPrompt": "{stream} ontvangt al gegevens. De controles starten wanneer je de prompt kopieert.",
+      "idleMatchesPrompt": "Overeenkomende streams ontvangen al gegevens. De controles starten wanneer je de prompt kopieert.",
+      "idleNewPrompt": "De controles starten wanneer je de prompt kopieert.",
+      "fixInvalidCredentialsPrompt": "Het token in je .env komt niet overeen met org-token {token}. Download de .env opnieuw en vraag je codingagent om het verzoek opnieuw uit te voeren.",
+      "fixInvalidCredentialsPromptUnnamed": "Het token in je .env komt niet overeen met het huidige token van deze org. Download de .env opnieuw en vraag je codingagent om het verzoek opnieuw uit te voeren.",
+      "copyPrompt": "Prompt kopiëren"
     },
     "firstDataNotice": {
       "pill": "Je eerste gegevens zijn aangekomen",
@@ -6383,7 +6411,18 @@
         "envButton": ".env downloaden",
         "promptTitle": "Plak dit in {client1}, {client2} of {client3}",
         "promptLabel": "Prompt",
-        "promptCopied": "Prompt gekopieerd"
+        "promptCopied": "Prompt gekopieerd",
+        "health": {
+          "title": "Gezondheid van AI-gegevens",
+          "scopeAgent": "Spans van agent {agent} in {stream} sinds de controle begon",
+          "scopeStream": "Spans in {stream} sinds de controle begon",
+          "checking": "Gezondheid van AI-gegevens controleren…",
+          "checkAgain": "Opnieuw controleren",
+          "checkAgainHint": "Nadat je codingagent de code heeft gewijzigd en nog een verzoek heeft uitgevoerd, kun je opnieuw controleren.",
+          "unsupported": "Deze versie van OpenObserve controleert de gezondheid van AI-gegevens niet. Je eerste span is aangekomen, dus tracing werkt.",
+          "error": "Gezondheidscontroles van AI-gegevens konden niet worden uitgevoerd. Je eerste span is aangekomen, dus tracing werkt.",
+          "noGenAiSpans": "Er zijn spans aangekomen, maar geen ervan is een LLM-aanroep, dus de LLM-client is niet geïnstrumenteerd. Vraag je codingagent om de LLM-client te instrumenteren, een verzoek uit te voeren en daarna opnieuw te controleren."
+        }
       }
     },
     "header": "Gegevensbronnen",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count} sec geleden",
     "minutesAgo": "{count} min geleden",
     "hoursAgo": "{count} uur geleden",
-    "daysAgo": "{count} d geleden"
+    "daysAgo": "{count} d geleden",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Chats",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "Herhalingen onderdrukken",
       "suppressRepeatsTooltip": "Meld één keer wanneer het alarm begint af te gaan of van niveau verandert, niet bij elke evaluatie. Laat dit uit staan om na elke stilteperiode herinneringen te blijven ontvangen.",
       "keepFiringForInvalid": "Voer 0 of meer seconden in",
-      "keepFiringForTooLong": "Voer maximaal 86400 seconden in (24 uur)"
+      "keepFiringForTooLong": "Voer maximaal 86400 seconden in (24 uur)",
+      "helpApplyToObject": "Dit sjabloon gebruiken",
+      "helpTemplateExplainObject": "Een sjabloon is het bericht dat wordt verzonden: de tekst plus variabelen. Als je er hier een kiest, vervangt dat het eigen sjabloon van elke bestemming, alleen voor deze configuratie.",
+      "helpTemplateWhenDescObject": "Laat dit leeg en elke bestemming gebruikt zijn eigen sjabloon als dat van toepassing is op dit soort, en anders het ingebouwde bericht. Stel een override in om één bericht te sturen naar elke bestemming waarop die van toepassing is.",
+      "helpCurrentHeadingObject": "Wat dit nu verzendt",
+      "helpCurrentOverrideSome": "Passende bestemmingen gebruiken dit sjabloon:",
+      "helpCurrentResolved": "Geen override ingesteld. Elke bestemming gebruikt:"
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
@@ -13430,7 +13496,8 @@
             "ended": "Beëindigd",
             "cancelled": "Geannuleerd",
             "extended": "Verlengd"
-          }
+          },
+          "template": "Sjabloon"
         },
         "test": {
           "send": "Test versturen",
@@ -13500,7 +13567,43 @@
       "firingFor": "gaat al {duration} af",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "Niet ingesteld (meldt als P2)"
+    "priorityUnsetPagesAs": "Niet ingesteld (meldt als P2)",
+    "notificationKinds": {
+      "alert": "Alarm",
+      "incident": "Incident",
+      "anomaly": "Anomalie",
+      "synthetics": "Synthetics",
+      "downtime": "Onderhoudsperiode",
+      "on_call": "Piket"
+    },
+    "templateOverride": {
+      "label": "Sjabloon-override",
+      "placeholder": "Gebruik het sjabloon van de bestemming",
+      "help": "Overschrijft het sjabloon van de bestemming voor {kind}-berichten. Vooraf gebouwde sjablonen kunnen niet worden gekozen; kopieer er eerst een.",
+      "empty": "Er zijn nog geen sjablonen van toepassing op {kind}.",
+      "create": "Sjabloon maken",
+      "loadFailed": "Kan sjablonen niet laden",
+      "forbidden": "Voor het weergeven van sjablonen is de leesmachtiging voor sjablonen nodig",
+      "mismatch": "Past niet bij {count} van je bestemmingen ({names}); die vallen terug op hun eigen sjabloon.",
+      "groupContent": "Inhoud",
+      "groupCustom": "Aangepast",
+      "webhookOnly": "(alleen webhook)",
+      "emailOnly": "(alleen e-mail)",
+      "snsOnly": "(alleen SNS)",
+      "stale": "Sjabloon {name} bestaat niet meer. Kies een ander of maak het veld leeg.",
+      "willUse": "Zal gebruiken: {template}",
+      "willUsePerDestination": "Zal gebruiken, per bestemming:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Ingebouwd bericht voor {kind}",
+      "sourceExplicit": "deze overschrijving",
+      "sourceDestination": "bestemmingssjabloon",
+      "sourceOrgDefault": "organisatiestandaard",
+      "sourceCompiled": "ingebouwd",
+      "sourcePlatformResolve": "platformresolutie",
+      "sourceLegacy": "verouderde payload",
+      "sourceLegacyPayload": "de eigen JSON-payload van het berichttype (generieke webhook)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "Hiermee wordt een echt bericht naar het geselecteerde kanaal verzonden, gemarkeerd met [TEST].",
     "testSendSuccess": "Testbericht verzonden",
     "testSendRateLimited": "Te veel testverzendingen — wacht even en probeer het opnieuw",
-    "testSendNoDestination": "Selecteer eerst een bestemming"
+    "testSendNoDestination": "Selecteer eerst een bestemming",
+    "playgroundLabel": "Playground",
+    "playgroundHelp": "Er wordt hier niets verzonden.",
+    "emptyVariables": "Leeg voor {kind}: {names}",
+    "appliesTo": "Van toepassing op",
+    "appliesToAll": "Alle typen",
+    "appliesToAny": "Elk type",
+    "allKindsNotice": "Sjablonen die op elk type van toepassing zijn: {count}. De betreffende bestemmingen gebruiken ze ook voor berichten over anomalieën, synthetics, piket, onderhoudsperiodes en incidenten. Controleer ze.",
+    "allKindsNoticeReview": "Controleren",
+    "appliesToInferred": "Afgeleid van de variabelen in de body",
+    "appliesToManual": "Door jou gekozen",
+    "appliesToReset": "Terugzetten naar afgeleid",
+    "previewKind": "Type",
+    "previewForbidden": "Je hebt geen machtiging om een voorbeeld van sjablonen te bekijken",
+    "previewFailed": "Voorbeeld mislukt: {message}",
+    "severityFailed": "Mislukt",
+    "severityDegraded": "Gedegradeerd",
+    "severityFlaky": "Instabiel",
+    "severityRecovered": "Hersteld",
+    "variableGroupCommon": "Algemeen"
   },
   "alert_sources": {
     "header": "Externe alarmbronnen",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "Standaard foutincidenten",
     "severityWarningDescription": "Incidenten op waarschuwingsniveau",
     "severityInfoDescription": "Informatieve incidenten",
-    "urlRecipientsChannel": "URL / ontvangers / kanaal"
+    "urlRecipientsChannel": "URL / ontvangers / kanaal",
+    "payloadFormat": "Payloadformaat",
+    "payloadFormatAuto": "Automatisch",
+    "payloadFormatLegacy": "Verouderde JSON",
+    "payloadFormatRendered": "Gerenderd sjabloon",
+    "payloadFormatHelp": "Automatisch verzendt de oude JSON-body voor berichten over anomalieën, synthetics en piket totdat een sjabloon is gekoppeld. Opgeslagen als de metagegevenssleutel payload_format."
   },
   "pipeline_destinations": {
     "header": "Pipelinebestemmingen",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "Kon {paths} niet opeisen",
     "claimSignalsMorePaths": "{paths} en nog {count}",
     "toastSignalsClaimedPartly": "{claimed} van {count} signaal gaat nu naar {team}; kon {paths} niet opeisen | {claimed} van {count} signalen gaan nu naar {team}; kon {paths} niet opeisen",
-    "scopeNotSeenYet": "Nog niet gezien in je gegevens"
+    "scopeNotSeenYet": "Nog niet gezien in je gegevens",
+    "deliveryTemplate": "Sjabloon: {templates}",
+    "policyMailBanner": "E-mail- en SNS-bestemmingen ontvangen oproepen van deze versie: {names}."
   },
   "paidUsage": {
     "consentTitle": "Betaald AI-gebruik inschakelen?",

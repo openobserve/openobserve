@@ -2191,6 +2191,7 @@
       "pageLabel": "Page",
       "noDeviceData": "No clicks recorded on this device type for this page.",
       "noReplay": "No session replay was recorded for this page, so there is no screenshot to draw on. Turn on session replay for the app.",
+      "noReplayLegacySdk": "Page snapshots need a newer RUM SDK. The session replay recorded here comes from an older SDK, so there is no screenshot to draw on.",
       "loadFailed": "Couldn't load the click data.",
       "snapshotFailed": "Couldn't load the page snapshot.",
       "noPosition": "No clicks in this period for this page.",
@@ -6383,7 +6384,8 @@
         "envButton": "Download .env",
         "promptTitle": "Paste this into {client1}, {client2} or {client3}",
         "promptLabel": "Prompt",
-        "promptCopied": "Prompt copied"
+        "promptCopied": "Prompt copied",
+        "health": {}
       }
     },
     "header": "Data sources",
@@ -9960,7 +9962,28 @@
     "secondsAgo": "{count}s ago",
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
-    "daysAgo": "{count}d ago"
+    "daysAgo": "{count}d ago",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Chats",
@@ -13501,7 +13524,9 @@
       "firingFor": "firing for {duration}",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "Not set (pages as P2)"
+    "priorityUnsetPagesAs": "Not set (pages as P2)",
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "Open",

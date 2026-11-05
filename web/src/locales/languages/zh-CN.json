@@ -2147,7 +2147,27 @@
       "view": "视图",
       "frustration": "挫败",
       "failedRequest": "失败请求",
-      "noResponse": "无响应"
+      "noResponse": "无响应",
+      "noResponseStatus": "0 — 无响应",
+      "failedRequestDetails": "失败请求详情",
+      "browserStatus": "浏览器状态",
+      "serverStatus": "服务器状态",
+      "noServerSpanFound": "未找到服务端 Span",
+      "noServerSpanHint": "缺少 Span 也可能意味着采样、摄取延迟、未埋点的路由或保留策略。",
+      "unknownNoTrace": "未知（无追踪）",
+      "unknown": "未知",
+      "abortedByApp": "被应用中止",
+      "method": "方法",
+      "url": "URL",
+      "duration": "持续时间",
+      "timing": "耗时",
+      "timingDns": "DNS",
+      "timingConnect": "连接",
+      "timingSsl": "SSL",
+      "timingFirstByte": "首字节",
+      "timingDownload": "下载",
+      "size": "大小",
+      "initiatedBy": "发起方"
     },
     "replayCanvasNotRecorded": "未录制 Canvas 内容",
     "actionOnTarget": "在 \"{target}\" 上 {action}",
@@ -2256,7 +2276,8 @@
       "showElements": "显示元素",
       "markerLabel": "排名 {rank}，{name}，{count} 次点击 | 排名 {rank}，{name}，{count} 次点击",
       "markerLabelFrustrated": "排名 {rank}，{name}，{count} 次点击，{frustrated} 次受挫 | 排名 {rank}，{name}，{count} 次点击，{frustrated} 次受挫",
-      "markerClicks": "{count} 次点击 | {count} 次点击"
+      "markerClicks": "{count} 次点击 | {count} 次点击",
+      "noReplayLegacySdk": "页面快照需要较新版本的 RUM SDK。此处记录的会话回放来自较旧版本的 SDK，因此没有可用于绘制的截图。"
     },
     "analytics": {
       "title": "产品分析",
@@ -6231,7 +6252,14 @@
       "askAiRejected": "请求在 {path} 上被拒绝，状态为 {status} {reason}。",
       "askAiNoRequests": "尚未收到任何数据，也没有请求被拒绝。",
       "askAiUnavailable": "无法读取被拒绝的请求，因此原因未知。",
-      "thisGuide": "某个数据源"
+      "thisGuide": "某个数据源",
+      "hintWaitingAfter": "第一条记录到达后，此处会自动变绿。如果 {elapsed} 内没有任何数据到达，它会显示哪里出了问题；「排查」会立即检查。",
+      "idleInPrompt": "{stream} 已在接收数据。复制提示词后即开始检查。",
+      "idleMatchesPrompt": "匹配的数据流已在接收数据。复制提示词后即开始检查。",
+      "idleNewPrompt": "复制提示词后即开始检查。",
+      "fixInvalidCredentialsPrompt": "你 .env 中的令牌与组织令牌 {token} 不匹配。请重新下载 .env，并让你的编码智能体重新运行该请求。",
+      "fixInvalidCredentialsPromptUnnamed": "你 .env 中的令牌与该组织当前的令牌不匹配。请重新下载 .env，并让你的编码智能体重新运行该请求。",
+      "copyPrompt": "复制提示词"
     },
     "firstDataNotice": {
       "pill": "你的首批数据已到达",
@@ -6383,7 +6411,18 @@
         "envButton": "下载 .env",
         "promptTitle": "将此内容粘贴到 {client1}、{client2} 或 {client3}",
         "promptLabel": "提示词",
-        "promptCopied": "提示词已复制"
+        "promptCopied": "提示词已复制",
+        "health": {
+          "title": "AI 数据健康",
+          "scopeAgent": "自检查开始以来 {stream} 中来自智能体 {agent} 的 Span",
+          "scopeStream": "自检查开始以来 {stream} 中的 Span",
+          "checking": "正在检查 AI 数据健康…",
+          "checkAgain": "重新检查",
+          "checkAgainHint": "在你的编码智能体修改代码并再次运行请求后，请重新检查。",
+          "unsupported": "此 OpenObserve 版本不检查 AI 数据健康。你的首个 Span 已到达，说明追踪工作正常。",
+          "error": "无法运行 AI 数据健康检查。你的首个 Span 已到达，说明追踪工作正常。",
+          "noGenAiSpans": "Span 已到达，但其中没有 LLM 调用，说明 LLM 客户端未埋点。请让你的编码智能体为 LLM 客户端埋点，运行一次请求，然后重新检查。"
+        }
       }
     },
     "header": "数据源",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count} 秒前",
     "minutesAgo": "{count} 分钟前",
     "hoursAgo": "{count} 小时前",
-    "daysAgo": "{count} 天前"
+    "daysAgo": "{count} 天前",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "聊天",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "抑制重复通知",
       "suppressRepeatsTooltip": "告警开始触发或级别发生变化时通知一次，而不是每次评估都通知。保持关闭可在每个静默期后继续收到提醒。",
       "keepFiringForInvalid": "请输入 0 或更大的秒数",
-      "keepFiringForTooLong": "最多输入 86400 秒（24 小时）"
+      "keepFiringForTooLong": "最多输入 86400 秒（24 小时）",
+      "helpApplyToObject": "使用此模板",
+      "helpTemplateExplainObject": "模板就是要发送的消息：文本加上变量。在此选择一个模板会替换各目标自身的模板，且仅对本配置生效。",
+      "helpTemplateWhenDescObject": "留空时，每个目标会使用其自身适用于此类通知的模板，否则使用内置消息。设置覆盖项可向所有适配的目标发送同一条消息。",
+      "helpCurrentHeadingObject": "当前发送内容",
+      "helpCurrentOverrideSome": "适配的目标使用此模板：",
+      "helpCurrentResolved": "未设置覆盖项。每个目标使用："
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -13430,7 +13496,8 @@
             "ended": "已结束",
             "cancelled": "已取消",
             "extended": "已延长"
-          }
+          },
+          "template": "模板"
         },
         "test": {
           "send": "发送测试",
@@ -13500,7 +13567,43 @@
       "firingFor": "已触发 {duration}",
       "incident": "事件"
     },
-    "priorityUnsetPagesAs": "未设置（按 P2 呼叫）"
+    "priorityUnsetPagesAs": "未设置（按 P2 呼叫）",
+    "notificationKinds": {
+      "alert": "告警",
+      "incident": "事件",
+      "anomaly": "异常",
+      "synthetics": "合成监控",
+      "downtime": "静默期",
+      "on_call": "值班"
+    },
+    "templateOverride": {
+      "label": "模板覆盖",
+      "placeholder": "使用目标的模板",
+      "help": "覆盖 {kind} 消息的目标模板。无法选择预置模板；请先复制一个。",
+      "empty": "暂无适用于 {kind} 的模板。",
+      "create": "创建模板",
+      "loadFailed": "无法加载模板",
+      "forbidden": "列出模板需要模板读取权限",
+      "mismatch": "不适用于您的 {count} 个目标（{names}）；这些目标将回退到其自身的模板。",
+      "groupContent": "内容",
+      "groupCustom": "自定义",
+      "webhookOnly": "（仅 Webhook）",
+      "emailOnly": "（仅邮件）",
+      "snsOnly": "（仅 SNS）",
+      "stale": "模板 {name} 已不存在。请选择其他模板或清空该字段。",
+      "willUse": "将使用：{template}",
+      "willUsePerDestination": "按目标分别使用：",
+      "willUseRow": "{destination}：{template}",
+      "templateWithSource": "{name}（{source}）",
+      "builtIn": "内置 {kind} 消息",
+      "sourceExplicit": "此覆盖",
+      "sourceDestination": "目标模板",
+      "sourceOrgDefault": "组织默认",
+      "sourceCompiled": "内置",
+      "sourcePlatformResolve": "平台解析",
+      "sourceLegacy": "旧版载荷",
+      "sourceLegacyPayload": "该类型自身的 JSON 载荷（通用 Webhook）"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "这将向所选频道发布一条真实消息，并标记为 [TEST]。",
     "testSendSuccess": "测试消息已发送",
     "testSendRateLimited": "测试发送过于频繁——请稍等片刻后重试",
-    "testSendNoDestination": "请先选择目标"
+    "testSendNoDestination": "请先选择目标",
+    "playgroundLabel": "演练场",
+    "playgroundHelp": "此处不会发送任何内容。",
+    "emptyVariables": "{kind} 为空：{names}",
+    "appliesTo": "适用于",
+    "appliesToAll": "所有类型",
+    "appliesToAny": "任意类型",
+    "allKindsNotice": "适用于所有类型的模板：{count} 个。它们的目标也会将其用于异常、合成监控、值班、静默期和事件消息。请检查。",
+    "allKindsNoticeReview": "检查",
+    "appliesToInferred": "根据正文中的变量推断",
+    "appliesToManual": "由您选择",
+    "appliesToReset": "重置为推断值",
+    "previewKind": "类型",
+    "previewForbidden": "您没有预览模板的权限",
+    "previewFailed": "预览失败：{message}",
+    "severityFailed": "失败",
+    "severityDegraded": "降级",
+    "severityFlaky": "不稳定",
+    "severityRecovered": "已恢复",
+    "variableGroupCommon": "通用"
   },
   "alert_sources": {
     "header": "外部告警源",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "标准错误事件",
     "severityWarningDescription": "警告级事件",
     "severityInfoDescription": "信息级事件",
-    "urlRecipientsChannel": "URL / 收件人 / 频道"
+    "urlRecipientsChannel": "URL / 收件人 / 频道",
+    "payloadFormat": "载荷格式",
+    "payloadFormatAuto": "自动",
+    "payloadFormatLegacy": "旧版 JSON",
+    "payloadFormatRendered": "渲染后的模板",
+    "payloadFormatHelp": "在附加模板之前，自动模式会为异常、合成监控和值班消息发送旧的 JSON 正文。存储为元数据键 payload_format。"
   },
   "pipeline_destinations": {
     "header": "流水线目标",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "无法认领 {paths}",
     "claimSignalsMorePaths": "{paths} 以及另外 {count} 个",
     "toastSignalsClaimedPartly": "{count} 个信号中有 {claimed} 个现在发送给 {team}；无法认领 {paths} | {count} 个信号中有 {claimed} 个现在发送给 {team}；无法认领 {paths}",
-    "scopeNotSeenYet": "尚未在你的数据中出现"
+    "scopeNotSeenYet": "尚未在你的数据中出现",
+    "deliveryTemplate": "模板：{templates}",
+    "policyMailBanner": "此版本会向以下邮箱和 SNS 目标发送值班通知：{names}。"
   },
   "paidUsage": {
     "consentTitle": "开启付费 AI 使用？",

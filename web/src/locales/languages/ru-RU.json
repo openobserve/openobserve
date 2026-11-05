@@ -2147,7 +2147,27 @@
       "view": "Представление",
       "frustration": "Фрустрация",
       "failedRequest": "Неудачные запросы",
-      "noResponse": "Нет ответа"
+      "noResponse": "Нет ответа",
+      "noResponseStatus": "0 — Нет ответа",
+      "failedRequestDetails": "Детали неудачного запроса",
+      "browserStatus": "Статус браузера",
+      "serverStatus": "Статус сервера",
+      "noServerSpanFound": "Серверный спан не найден",
+      "noServerSpanHint": "Отсутствие спана также может объясняться сэмплированием, задержкой приёма, неинструментированным маршрутом или политикой хранения.",
+      "unknownNoTrace": "Неизвестно (нет трейса)",
+      "unknown": "Неизвестно",
+      "abortedByApp": "прервано приложением",
+      "method": "Метод",
+      "url": "URL",
+      "duration": "Длительность",
+      "timing": "Тайминги",
+      "timingDns": "DNS",
+      "timingConnect": "Подключение",
+      "timingSsl": "SSL",
+      "timingFirstByte": "Первый байт",
+      "timingDownload": "Загрузка",
+      "size": "Размер",
+      "initiatedBy": "Инициатор"
     },
     "replayCanvasNotRecorded": "Содержимое canvas не записано",
     "actionOnTarget": "{action} на \"{target}\"",
@@ -2256,7 +2276,8 @@
       "showElements": "Показать элементы",
       "markerLabel": "Ранг {rank}, {name}, {count} клик | Ранг {rank}, {name}, {count} кликов",
       "markerLabelFrustrated": "Ранг {rank}, {name}, {count} клик, {frustrated} с фрустрацией | Ранг {rank}, {name}, {count} кликов, {frustrated} с фрустрацией",
-      "markerClicks": "{count} клик | {count} кликов"
+      "markerClicks": "{count} клик | {count} кликов",
+      "noReplayLegacySdk": "Снимки страниц требуют более новой версии RUM SDK. Записанный здесь сеанс воспроизведения получен от более старой версии SDK, поэтому скриншота для отрисовки нет."
     },
     "analytics": {
       "title": "Продуктовая аналитика",
@@ -6231,7 +6252,14 @@
       "askAiRejected": "запросы отклоняются с {status} {reason} по пути {path}.",
       "askAiNoRequests": "ничего не поступило, и ни один запрос не был отклонён.",
       "askAiUnavailable": "отклонённые запросы не удалось прочитать, поэтому причина неизвестна.",
-      "thisGuide": "источник данных"
+      "thisGuide": "источник данных",
+      "hintWaitingAfter": "Это само станет зелёным, когда поступит первая запись. Если за {elapsed} ничего не придёт, здесь будет показано, что пошло не так; «Диагностика» запустит проверку сейчас.",
+      "idleInPrompt": "{stream} уже получает данные. Проверки начнутся, когда вы скопируете промпт.",
+      "idleMatchesPrompt": "Подходящие потоки уже получают данные. Проверки начнутся, когда вы скопируете промпт.",
+      "idleNewPrompt": "Проверки начнутся, когда вы скопируете промпт.",
+      "fixInvalidCredentialsPrompt": "Токен в вашем .env не совпадает с токеном организации {token}. Скачайте .env заново и попросите своего агента для написания кода повторно выполнить запрос.",
+      "fixInvalidCredentialsPromptUnnamed": "Токен в вашем .env не совпадает с текущим токеном этой организации. Скачайте .env заново и попросите своего агента для написания кода повторно выполнить запрос.",
+      "copyPrompt": "Копировать промпт"
     },
     "firstDataNotice": {
       "pill": "Поступили первые данные",
@@ -6383,7 +6411,18 @@
         "envButton": "Скачать .env",
         "promptTitle": "Вставьте это в {client1}, {client2} или {client3}",
         "promptLabel": "Промпт",
-        "promptCopied": "Промпт скопирован"
+        "promptCopied": "Промпт скопирован",
+        "health": {
+          "title": "Состояние данных ИИ",
+          "scopeAgent": "Спаны от агента {agent} в {stream} с момента начала проверки",
+          "scopeStream": "Спаны в {stream} с момента начала проверки",
+          "checking": "Проверка состояния данных ИИ…",
+          "checkAgain": "Проверить снова",
+          "checkAgainHint": "После того как ваш агент для написания кода изменит код и выполнит ещё один запрос, проверьте снова.",
+          "unsupported": "Эта версия OpenObserve не проверяет состояние данных ИИ. Ваш первый спан поступил, значит трассировка работает.",
+          "error": "Не удалось запустить проверки состояния данных ИИ. Ваш первый спан поступил, значит трассировка работает.",
+          "noGenAiSpans": "Спаны поступили, но ни один из них не является вызовом LLM, значит клиент LLM не инструментирован. Попросите своего агента для написания кода инструментировать клиент LLM, выполните запрос, затем проверьте снова."
+        }
       }
     },
     "header": "Источники данных",
@@ -9962,7 +10001,28 @@
     "secondsAgo": "{count} сек. назад",
     "minutesAgo": "{count} мин. назад",
     "hoursAgo": "{count} ч назад",
-    "daysAgo": "{count} дн. назад"
+    "daysAgo": "{count} дн. назад",
+    "cards": {},
+    "state": {},
+    "time": {},
+    "level": {},
+    "sections": {},
+    "alerts": {},
+    "dataHealth": {
+      "status": {}
+    },
+    "streams": {},
+    "signals": {
+      "openAria": {}
+    },
+    "storage": {},
+    "limit": {},
+    "empty": {},
+    "stale": {},
+    "status": {
+      "items": {}
+    },
+    "timeRange": {}
   },
   "chatHistory": {
     "title": "Чаты",
@@ -12236,7 +12296,13 @@
       "suppressRepeats": "Подавлять повторы",
       "suppressRepeatsTooltip": "Уведомлять один раз, когда оповещение начинает срабатывать или меняет уровень, а не при каждой проверке. Если выключено, напоминания будут приходить после каждого периода тишины.",
       "keepFiringForInvalid": "Введите 0 или более секунд",
-      "keepFiringForTooLong": "Введите не более 86400 секунд (24 часа)"
+      "keepFiringForTooLong": "Введите не более 86400 секунд (24 часа)",
+      "helpApplyToObject": "Использовать этот шаблон",
+      "helpTemplateExplainObject": "Шаблон — это отправляемое сообщение: текст и переменные. Выбор шаблона здесь заменяет собственный шаблон каждого получателя, только для этой конфигурации.",
+      "helpTemplateWhenDescObject": "Оставьте это поле пустым, и каждый получатель будет использовать свой шаблон, если он подходит для этого типа, а в противном случае — встроенное сообщение. Задайте переопределение, чтобы отправлять одно сообщение каждому подходящему получателю.",
+      "helpCurrentHeadingObject": "Что отправляется сейчас",
+      "helpCurrentOverrideSome": "Подходящие получатели используют этот шаблон:",
+      "helpCurrentResolved": "Переопределение не задано. Каждый получатель использует:"
     },
     "advanced": {
       "addVariable": "Добавить переменную",
@@ -13430,7 +13496,8 @@
             "ended": "Закончилось",
             "cancelled": "Отменено",
             "extended": "Продлено"
-          }
+          },
+          "template": "Шаблон"
         },
         "test": {
           "send": "Отправить тест",
@@ -13500,7 +13567,43 @@
       "firingFor": "срабатывает уже {duration}",
       "incident": "Инцидент"
     },
-    "priorityUnsetPagesAs": "Не задан (вызывает как P2)"
+    "priorityUnsetPagesAs": "Не задан (вызывает как P2)",
+    "notificationKinds": {
+      "alert": "Оповещение",
+      "incident": "Инцидент",
+      "anomaly": "Аномалия",
+      "synthetics": "Синтетика",
+      "downtime": "Окно обслуживания",
+      "on_call": "Дежурства"
+    },
+    "templateOverride": {
+      "label": "Переопределение шаблона",
+      "placeholder": "Использовать шаблон получателя",
+      "help": "Переопределяет шаблон получателя для сообщений типа {kind}. Предустановленные шаблоны выбрать нельзя; сначала скопируйте один.",
+      "empty": "Для {kind} пока нет подходящих шаблонов.",
+      "create": "Создать шаблон",
+      "loadFailed": "Не удалось загрузить шаблоны",
+      "forbidden": "Чтобы просмотреть список шаблонов, нужно разрешение на чтение шаблонов",
+      "mismatch": "Не подходит для получателей ({count}): {names}; они будут использовать собственный шаблон.",
+      "groupContent": "Содержимое",
+      "groupCustom": "Пользовательские",
+      "webhookOnly": "(только вебхук)",
+      "emailOnly": "(только email)",
+      "snsOnly": "(только SNS)",
+      "stale": "Шаблон {name} больше не существует. Выберите другой или очистите поле.",
+      "willUse": "Будет использован: {template}",
+      "willUsePerDestination": "Будет использоваться для каждого получателя:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Встроенное сообщение типа {kind}",
+      "sourceExplicit": "это переопределение",
+      "sourceDestination": "шаблон получателя",
+      "sourceOrgDefault": "по умолчанию в организации",
+      "sourceCompiled": "встроенный",
+      "sourcePlatformResolve": "определяется платформой",
+      "sourceLegacy": "устаревшая полезная нагрузка",
+      "sourceLegacyPayload": "собственная JSON-полезная нагрузка этого типа (универсальный вебхук)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -13820,7 +13923,26 @@
     "testSendConfirm": "Это отправит реальное сообщение в выбранный канал с пометкой [TEST].",
     "testSendSuccess": "Тестовое сообщение отправлено",
     "testSendRateLimited": "Слишком много тестовых отправок — подождите немного и попробуйте снова",
-    "testSendNoDestination": "Сначала выберите получателя"
+    "testSendNoDestination": "Сначала выберите получателя",
+    "playgroundLabel": "Песочница",
+    "playgroundHelp": "Здесь ничего не отправляется.",
+    "emptyVariables": "Пусто для {kind}: {names}",
+    "appliesTo": "Применяется к",
+    "appliesToAll": "Все типы",
+    "appliesToAny": "Любой тип",
+    "allKindsNotice": "Шаблоны, применяемые ко всем типам: {count}. Получатели этих шаблонов также используют их для сообщений по аномалиям, синтетическим проверкам, дежурствам, окнам обслуживания и инцидентам. Проверьте эти шаблоны.",
+    "allKindsNoticeReview": "Проверить",
+    "appliesToInferred": "Определяется по переменным в теле",
+    "appliesToManual": "Выбрано вами",
+    "appliesToReset": "Сбросить к выведенному значению",
+    "previewKind": "Тип",
+    "previewForbidden": "У вас нет разрешения на предварительный просмотр шаблонов",
+    "previewFailed": "Ошибка предварительного просмотра: {message}",
+    "severityFailed": "Сбой",
+    "severityDegraded": "Деградация",
+    "severityFlaky": "Нестабильно",
+    "severityRecovered": "Восстановлено",
+    "variableGroupCommon": "Общие"
   },
   "alert_sources": {
     "header": "Внешние источники оповещений",
@@ -14076,7 +14198,12 @@
     "severityErrorDescription": "Стандартные инциденты ошибок",
     "severityWarningDescription": "Инциденты уровня предупреждения",
     "severityInfoDescription": "Информационные инциденты",
-    "urlRecipientsChannel": "URL / получатели / канал"
+    "urlRecipientsChannel": "URL / получатели / канал",
+    "payloadFormat": "Формат полезной нагрузки",
+    "payloadFormatAuto": "Автоматический",
+    "payloadFormatLegacy": "Устаревший JSON",
+    "payloadFormatRendered": "Отрендеренный шаблон",
+    "payloadFormatHelp": "Режим «Автоматический» отправляет старое JSON-тело для сообщений по аномалиям, синтетическим проверкам и дежурствам, пока не привязан шаблон. Сохраняется в ключе метаданных payload_format."
   },
   "pipeline_destinations": {
     "header": "Получатели конвейера",
@@ -27322,7 +27449,9 @@
     "claimSignalsFailedPaths": "Не удалось назначить {paths}",
     "claimSignalsMorePaths": "{paths} и ещё {count}",
     "toastSignalsClaimedPartly": "{claimed} из {count} сигнала теперь направляется в {team}; не удалось назначить {paths} | {claimed} из {count} сигналов теперь направляются в {team}; не удалось назначить {paths}",
-    "scopeNotSeenYet": "Пока не встречался в ваших данных"
+    "scopeNotSeenYet": "Пока не встречался в ваших данных",
+    "deliveryTemplate": "Шаблон: {templates}",
+    "policyMailBanner": "Получатели Email и SNS получают вызовы из этой версии: {names}."
   },
   "paidUsage": {
     "consentTitle": "Включить платное использование ИИ?",
