@@ -29,6 +29,7 @@ import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
 import stream from "@/services/stream";
 import billings from "@/services/billings";
+import configService from "@/services/config";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
@@ -2063,6 +2064,27 @@ describe("MainLayout — first-time cloud login", () => {
       localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
     ).toBeNull();
     wrapper.unmount();
+  });
+
+  // the bootstrap config has no switches, so a failed full config must not read as onboarding on
+  it("decides nothing while the full config is unknown, and decides once it lands", async () => {
+    const version = store.state.zoConfig.version;
+    delete store.state.zoConfig.version;
+    vi.mocked(configService.get_config_full).mockRejectedValueOnce(new Error("offline"));
+    try {
+      const { wrapper, router } = await mountAtHome();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+      expect(startCalls()).toEqual([]);
+
+      // a retry lands the full config of a deployment that runs onboarding
+      store.commit("setConfig", { ...store.state.zoConfig, version });
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("onboarding");
+      wrapper.unmount();
+    } finally {
+      store.state.zoConfig.version = version;
+    }
   });
 
   it("with both first-run flows off, sends no one to onboarding and ends the first login", async () => {

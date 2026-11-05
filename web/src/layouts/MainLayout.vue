@@ -334,7 +334,7 @@ import {
   redirectPending,
 } from "@/components/onboarding/onboardingFlow";
 import { orgHasUserData } from "@/composables/useOrgHasUserData";
-import { onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
+import { flowsKnown, onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
 import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
@@ -799,6 +799,8 @@ export default defineComponent({
       await router.isReady();
       // the flow switches arrive with the full config
       await fullConfigReady();
+      // a failed full config decides nothing; the flag waits for a retry or the next Home visit
+      if (!flowsKnown(store.state.zoConfig)) return;
       if (!onboardingFlowOn(store.state.zoConfig)) {
         // the sample data welcome ends the first login itself; with neither flow it ends here
         if (!sampleDataFlowOn(store.state.zoConfig)) {
@@ -842,10 +844,10 @@ export default defineComponent({
       }
     };
     onMounted(onboardFirstLogin);
-    // A first login a pending redirect deferred onboards on the next Home visit, remount or not.
+    // A first login a pending redirect deferred onboards on the next Home visit, remount or not, or once a late full config lands.
     watch(
-      () => router.currentRoute.value.name,
-      (name) => {
+      [() => router.currentRoute.value.name, () => flowsKnown(store.state.zoConfig)],
+      ([name]) => {
         const firstLogin = name === "home" && isFirstLoginOf(store.state.userInfo?.email);
         // Only Home waits on the decision: a page the user moved to while the lists load shows at once.
         holdForOnboarding.value = firstLogin && config.isCloud === "true";
