@@ -581,6 +581,7 @@ async fn dispatch_per_group(
     rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
     triggered_at: i64,
+    handler_started_at: i64,
 ) -> Option<GroupDispatchOutcome> {
     use config::meta::alerts::dispatch::{plan_dispatch, rows_by_group_key};
 
@@ -754,8 +755,10 @@ async fn dispatch_per_group(
             continue;
         }
         // A failed delivery opens no silence window, so a later evaluation sends this group.
-        if config::meta::alerts::dispatch::group_firing_deadline_passed(triggered_at, now_micros())
-        {
+        if config::meta::alerts::dispatch::group_firing_deadline_passed(
+            handler_started_at,
+            now_micros(),
+        ) {
             let err_msg = format!(
                 "not sent: the {}s firing deadline passed",
                 config::meta::alerts::dispatch::GROUP_FIRING_DEADLINE_SECS
@@ -4291,6 +4294,7 @@ async fn handle_alert_triggers(
                 eval_level,
                 Some(start_time),
                 triggered_at,
+                now,
             )
             .await
         {
@@ -7487,6 +7491,7 @@ mod tests {
             now,
             Some(AlertLevel::Critical),
             None,
+            now,
             now - 1_801 * 1_000_000,
         )
         .await

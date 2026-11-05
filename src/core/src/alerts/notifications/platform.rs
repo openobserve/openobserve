@@ -234,13 +234,14 @@ async fn request(
     let resp = req.send().await.map_err(reqwest::Error::without_url)?;
     let status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let text = resp.text().await.unwrap_or_default();
+    let text = resp.text().await;
     if status.is_success() {
-        Ok(text)
+        // An empty answer means "nothing to close", so a body that times out must stay an error.
+        Ok(text.map_err(reqwest::Error::without_url)?)
     } else {
         Err(PlatformRejected {
             status,
-            body: (!hide_body).then_some(text),
+            body: (!hide_body).then_some(text.unwrap_or_default()),
         }
         .into())
     }
@@ -268,6 +269,28 @@ mod tests {
                 let endpoint = Endpoint::default();
                 let url = format!("{base}/hang");
                 let send = request(&endpoint, reqwest::Method::POST, &url, None);
+                let sent = tokio::time::timeout(std::time::Duration::from_secs(10), send).await;
+                assert!(sent.expect("the platform send has no limit").is_err());
+            },
+        );
+    }
+
+    #[test]
+    fn a_success_whose_body_never_arrives_is_a_failed_send() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::a_success_whose_body_never_arrives_is_a_failed_send"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::truncated_server().await;
+                let endpoint = Endpoint::default();
+                let url = format!("{base}/stall");
+                let send = request(&endpoint, reqwest::Method::GET, &url, None);
                 let sent = tokio::time::timeout(std::time::Duration::from_secs(10), send).await;
                 assert!(sent.expect("the platform send has no limit").is_err());
             },
