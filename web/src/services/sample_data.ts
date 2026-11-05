@@ -39,8 +39,8 @@ const ingestAuth = async (org: string) => {
   return { Authorization: `Basic ${b64EncodeStandard(`${name}:${secret}`)}` };
 };
 
-// a refused ingest credential fails the load; it says nothing about the signed-in session
-const keepSession = { keepSessionOn401: true };
+// a refused ingest credential fails the load, not the session; the load reports a 403 itself
+const keepSession = { keepSessionOn401: true, silentForbidden: true };
 
 export interface SampleDataState {
   status: "none" | "loaded";

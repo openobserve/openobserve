@@ -66,10 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <span
-        v-if="session.error.value"
+        v-if="session.forbidden.value || session.error.value"
         class="text-text-secondary text-xs"
         data-test="sample-data-progress-dock-error"
-        >{{ raw(session.error.value) }}</span
+        >{{
+          session.forbidden.value ? t("sampleData.loadForbidden") : raw(session.error.value)
+        }}</span
       >
       <div class="flex justify-end">
         <OButton

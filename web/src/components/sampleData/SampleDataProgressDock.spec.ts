@@ -28,6 +28,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     status: ref("loading"),
     loadingOrg: ref("test-org"),
     error: ref<string | null>(null),
+    forbidden: ref(false),
     welcomeOpen: ref(false),
     fraction: ref(0.2),
     counts: reactive({ logs: 0, spans: 0, metrics: 0 }),
@@ -62,6 +63,7 @@ describe("SampleDataProgressDock", () => {
   afterEach(() => {
     session.status.value = "loading";
     session.error.value = null;
+    session.forbidden.value = false;
     session.start.mockClear();
   });
 
@@ -90,6 +92,17 @@ describe("SampleDataProgressDock", () => {
     expect(dock.text()).toContain("boom");
     await wrapper.get('[data-test="sample-data-progress-dock-retry"]').trigger("click");
     expect(session.start).toHaveBeenCalledWith(ORG, 6);
+  });
+
+  it("says the user needs write access when the load is refused", async () => {
+    const wrapper = mountDock();
+    session.status.value = "failed";
+    session.error.value = "Unauthorized Access";
+    session.forbidden.value = true;
+    await flushPromises();
+    expect(wrapper.get('[data-test="sample-data-progress-dock-error"]').text()).toBe(
+      enLocale.sampleData.loadForbidden,
+    );
   });
 
   it("falls back to the generic message and can be closed", async () => {

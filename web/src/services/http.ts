@@ -95,6 +95,18 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
 
+let silentForbiddenStarts = 0;
+
+/** Runs `start` and marks the requests it creates silentForbidden; JS runs it to its first await alone, so no other caller's request is marked. */
+export const withSilentForbidden = <T>(start: () => T): T => {
+  silentForbiddenStarts++;
+  try {
+    return start();
+  } finally {
+    silentForbiddenStarts--;
+  }
+};
+
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
 
@@ -107,6 +119,7 @@ const http = ({ headers } = {} as any) => {
     withCredentials: true,
     baseURL: store.state.API_ENDPOINT,
     headers,
+    silentForbidden: silentForbiddenStarts > 0,
   });
 
   instance.interceptors.request.use((requestConfig) => {

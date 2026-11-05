@@ -130,6 +130,24 @@ describe("useSampleDataSession load end", () => {
   });
 });
 
+describe("useSampleDataSession refused load", () => {
+  it("flags a load the server refused, and the next load clears the flag", async () => {
+    vi.resetModules();
+    mocks.load
+      .mockReset()
+      .mockRejectedValueOnce({
+        response: { status: 403, data: { message: "Unauthorized Access" } },
+      })
+      .mockResolvedValueOnce(loaded);
+    const session = (await import("./useSampleDataSession")).useSampleDataSession();
+    await session.start("org-a");
+    expect(session.status.value).toBe("failed");
+    expect(session.forbidden.value).toBe(true);
+    await session.start("org-a");
+    expect(session.forbidden.value).toBe(false);
+  });
+});
+
 describe("useSampleDataSession progress", () => {
   it("settles each asset step as soon as it reports its end", async () => {
     vi.resetModules();

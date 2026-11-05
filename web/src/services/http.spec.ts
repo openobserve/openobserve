@@ -63,7 +63,7 @@ vi.mock("@/composables/useLicenseDenials", () => ({ addLicenseDeniedError }));
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import http, { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh, withSilentForbidden } from "./http";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -348,6 +348,18 @@ describe("403 handling", () => {
       expect(recordForbidden).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("withSilentForbidden", () => {
+  it("marks only the requests its callback starts", () => {
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+    } as any);
+    withSilentForbidden(() => http());
+    http();
+    const calls = vi.mocked(axios.create).mock.calls.slice(-2);
+    expect(calls.map(([defaults]) => !!defaults?.silentForbidden)).toEqual([true, false]);
+  });
 });
 
 describe("401 handling", () => {

@@ -133,8 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="error" size="md" />
           </span>
-          <p class="text-text-body m-0 max-w-md text-sm">{{ t("sampleData.welcome.errorBody") }}</p>
-          <p v-if="session.error.value" class="text-text-secondary m-0 max-w-md text-xs">
+          <p v-if="session.forbidden.value" class="text-text-body m-0 max-w-md text-sm">
+            {{ t("sampleData.loadForbidden") }}
+          </p>
+          <p v-else class="text-text-body m-0 max-w-md text-sm">
+            {{ t("sampleData.welcome.errorBody") }}
+          </p>
+          <p
+            v-if="session.error.value && !session.forbidden.value"
+            class="text-text-secondary m-0 max-w-md text-xs"
+          >
             {{ session.error.value }}
           </p>
         </div>

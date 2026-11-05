@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import alertsService from "@/services/alerts";
+import { withSilentForbidden as quiet } from "@/services/http";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import commonService from "@/services/common";
@@ -113,18 +114,20 @@ export const sampleWindowHours = (ingestAllowedUptoHours: number | undefined) =>
 };
 
 const findOrCreateFolder = async (org: string, type: "dashboards" | "alerts") => {
-  const res = await commonService.list_Folders(org, type);
+  const res = await quiet(() => commonService.list_Folders(org, type));
   const existing = (res.data?.list ?? []).find((f: any) => f.name === SAMPLE_FOLDER_NAME);
   if (existing) return String(existing.folderId);
-  const created = await commonService.new_Folder(org, type, {
-    name: SAMPLE_FOLDER_NAME,
-    description: "Created by Explore with sample data",
-  });
+  const created = await quiet(() =>
+    commonService.new_Folder(org, type, {
+      name: SAMPLE_FOLDER_NAME,
+      description: "Created by Explore with sample data",
+    }),
+  );
   return String(created.data?.folderId);
 };
 
 const findFolder = async (org: string, type: "dashboards" | "alerts") => {
-  const res = await commonService.list_Folders(org, type);
+  const res = await quiet(() => commonService.list_Folders(org, type));
   const folder = (res.data?.list ?? []).find((f: any) => f.name === SAMPLE_FOLDER_NAME);
   return folder ? String(folder.folderId) : undefined;
 };
@@ -217,7 +220,9 @@ const ingestTelemetry = async (
 
 const createDashboards = async (org: string, range: SampleWindow) => {
   const folderId = await findOrCreateFolder(org, "dashboards");
-  const existing = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
+  const existing = await quiet(() =>
+    dashboardService.list(0, 1000, "name", false, "", org, folderId, ""),
+  );
   const idByTitle = new Map<string, string>(
     (existing.data?.dashboards ?? [])
       .map(toSearchHit)
@@ -227,13 +232,13 @@ const createDashboards = async (org: string, range: SampleWindow) => {
     // a reload moves the window, and a kept dashboard would still query the old one
     const oldId = idByTitle.get(dash.title);
     if (oldId) await ignoreMissing(() => dashboardService.delete(org, oldId, folderId));
-    await dashboardService.create(org, dash, folderId);
+    await quiet(() => dashboardService.create(org, dash, folderId));
   }
 };
 
 const createIfMissing = async (fn: () => Promise<unknown>) => {
   try {
-    await fn();
+    await quiet(fn);
   } catch (e: any) {
     // re-running the loader finds the assets from the previous run
     if (e?.response?.status !== 409 && e?.response?.status !== 400) throw e;
@@ -248,10 +253,14 @@ const createAlerts = async (org: string) => {
     destinationService.create({ org_identifier: org, data: sampleAlertDestination() }),
   );
   const folderId = await findOrCreateFolder(org, "alerts");
-  const existing = await alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId);
+  const existing = await quiet(() =>
+    alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId),
+  );
   const names = new Set((existing.data?.list ?? []).map((a: any) => a.name));
   for (const alert of sampleAlerts(folderId)) {
-    if (!names.has(alert.name)) await alertsService.create_by_alert_id(org, alert, folderId);
+    if (!names.has(alert.name)) {
+      await quiet(() => alertsService.create_by_alert_id(org, alert, folderId));
+    }
   }
 };
 
@@ -262,17 +271,16 @@ const createFunctions = async (org: string) => {
 };
 
 const findPipelineId = async (org: string): Promise<string | undefined> => {
-  const res = await pipelineService.getPipelines(org);
+  const res = await quiet(() => pipelineService.getPipelines(org));
   const hit = (res.data?.list ?? []).find((p: any) => p.name === SAMPLE_PIPELINE);
   return hit?.pipeline_id;
 };
 
 const createPipeline = async (org: string) => {
   if (await findPipelineId(org)) return;
-  await pipelineService.createPipeline({
-    org_identifier: org,
-    data: sampleAccessLogPipeline(org),
-  });
+  await quiet(() =>
+    pipelineService.createPipeline({ org_identifier: org, data: sampleAccessLogPipeline(org) }),
+  );
 };
 
 const createEnrichmentTable = async (org: string) => {
@@ -282,7 +290,9 @@ const createEnrichmentTable = async (org: string) => {
     new Blob([sampleServiceOwnersCsv()], { type: "text/csv" }),
     `${SAMPLE_ENRICHMENT_TABLE}.csv`,
   );
-  await jsTransformService.create_enrichment_table(org, SAMPLE_ENRICHMENT_TABLE, form, false);
+  await quiet(() =>
+    jsTransformService.create_enrichment_table(org, SAMPLE_ENRICHMENT_TABLE, form, false),
+  );
 };
 
 export const loadSampleData = async (
@@ -299,7 +309,9 @@ export const loadSampleData = async (
     let failed = false;
     try {
       await fn();
-    } catch (e) {
+    } catch (e: any) {
+      // without write access every later step is refused too
+      if (e?.response?.status === 403) throw e;
       console.warn(`Sample data step "${step}" failed`, e);
       failedSteps.push(step);
       failed = true;
@@ -316,7 +328,9 @@ export const loadSampleData = async (
   counts = telemetry.counts;
   result.counts = counts;
   try {
-    await sampleDataService.putState(org, telemetry.window.startUs, telemetry.window.endUs);
+    await quiet(() =>
+      sampleDataService.putState(org, telemetry.window.startUs, telemetry.window.endUs),
+    );
   } catch (e) {
     // the data is already loaded; without the saved window the tour falls back to relative ranges
     console.warn("Sample data window was not saved", e);
@@ -330,7 +344,7 @@ export const loadSampleData = async (
 
 const ignoreMissing = async (fn: () => Promise<unknown>) => {
   try {
-    await fn();
+    await quiet(fn);
   } catch (e: any) {
     if (e?.response?.status !== 404) throw e;
   }
@@ -345,7 +359,9 @@ const SAMPLE_ALERT_NAMES: ReadonlySet<string> = new Set(sampleAlerts("").map((a)
 const removeDashboards = async (org: string) => {
   const folderId = await findFolder(org, "dashboards");
   if (!folderId) return;
-  const res = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
+  const res = await quiet(() =>
+    dashboardService.list(0, 1000, "name", false, "", org, folderId, ""),
+  );
   const hits = (res.data?.dashboards ?? []).map(toSearchHit);
   const sample = hits.filter((hit: { title: string }) => SAMPLE_DASHBOARD_TITLE_SET.has(hit.title));
   for (const hit of sample) {
@@ -359,7 +375,9 @@ const removeDashboards = async (org: string) => {
 const removeAlerts = async (org: string) => {
   const folderId = await findFolder(org, "alerts");
   if (!folderId) return;
-  const res = await alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId);
+  const res = await quiet(() =>
+    alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId),
+  );
   const alerts = res.data?.list ?? [];
   const sample = alerts.filter((alert: any) => SAMPLE_ALERT_NAMES.has(alert.name));
   for (const alert of sample) {
@@ -431,7 +449,7 @@ export const removeSampleData = async (org: string): Promise<string[]> => {
     ),
   );
   try {
-    await sampleDataService.deleteState(org);
+    await quiet(() => sampleDataService.deleteState(org));
   } catch (e) {
     // everything else is already deleted; a stale state only points the tour at a window with no data
     console.warn("Sample data window was not deleted", e);

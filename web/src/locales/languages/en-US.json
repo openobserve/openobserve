@@ -30447,6 +30447,7 @@
   "sampleData": {
     "delete": "Delete Sample Data",
     "remove": "Delete Sample Data",
+    "loadForbidden": "You need write access to this organization to load sample data.",
     "steps": {
       "functions": "Creating functions",
       "pipeline": "Creating a real-time pipeline",

@@ -50,6 +50,8 @@ type OrgFlag = (typeof ORG_FLAGS)[number];
 const status = ref<SampleLoadStatus>("idle");
 const loadingOrg = ref("");
 const error = ref<string | null>(null);
+// the server refused the load, so only write access to the org can help
+const forbidden = ref(false);
 const telemetryFraction = ref(0);
 const counts = reactive<SampleCounts>({ logs: 0, spans: 0, metrics: 0 });
 const steps = reactive<Record<SampleStepId, SampleStepStatus>>(
@@ -131,6 +133,7 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
   if (status.value === "loading") return;
   resetProgress();
   error.value = null;
+  forbidden.value = false;
   loadingOrg.value = org;
   status.value = "loading";
   window.addEventListener("beforeunload", confirmLeave);
@@ -147,6 +150,7 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
     void queryClient.invalidateQueries({ queryKey: orgKey(org) });
     steps.telemetry = "failed";
     error.value = e?.response?.data?.message ?? e?.message ?? "";
+    forbidden.value = e?.response?.status === 403;
     status.value = "failed";
     return undefined;
   } finally {
@@ -241,6 +245,7 @@ export const useSampleDataSession = () => ({
   status,
   loadingOrg,
   error,
+  forbidden,
   counts,
   recentLogs,
   steps,

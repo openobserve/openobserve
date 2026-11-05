@@ -47,6 +47,18 @@ const mocks = vi.hoisted(() => ({
   },
   dashboardCreate: vi.fn(),
   streamDelete: vi.fn(),
+  silent: 0,
+}));
+
+vi.mock("@/services/http", () => ({
+  withSilentForbidden: <T>(start: () => T) => {
+    mocks.silent++;
+    try {
+      return start();
+    } finally {
+      mocks.silent--;
+    }
+  },
 }));
 
 vi.mock("@/services/sample_data", () => ({ default: mocks.sampleData }));
@@ -267,6 +279,48 @@ describe("loadSampleData", () => {
       ["alerts", false],
       ["enrichment", false],
     ]);
+  });
+
+  it("stops at the first refusal, since every later step would be refused too", async () => {
+    const refused = { response: { status: 403 } };
+    vi.mocked(jsTransformService.create).mockRejectedValueOnce(refused);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(refused);
+    expect(jsTransformService.create).toHaveBeenCalledTimes(1);
+    expect(pipelineService.createPipeline).not.toHaveBeenCalled();
+    expect(mocks.sampleData.ingestLogs).not.toHaveBeenCalled();
+  });
+
+  it("starts every asset request with the silent-403 option", async () => {
+    const outside: string[] = [];
+    const watched = {
+      list_Folders: commonService.list_Folders,
+      new_Folder: commonService.new_Folder,
+      dashboards_list: dashboardService.list,
+      dashboards_create: dashboardService.create,
+      alerts_list: alertsService.listByFolderId,
+      alerts_create: alertsService.create_by_alert_id,
+      template_create: templateService.create,
+      destination_create: destinationService.create,
+      function_create: jsTransformService.create,
+      enrichment_create: jsTransformService.create_enrichment_table,
+      pipelines_list: pipelineService.getPipelines,
+      pipeline_create: pipelineService.createPipeline,
+      put_state: mocks.sampleData.putState,
+    };
+    const impls = Object.entries(watched).map(([name, fn]) => {
+      const impl = vi.mocked(fn).getMockImplementation();
+      vi.mocked(fn).mockImplementation(((...args: unknown[]) => {
+        if (!mocks.silent) outside.push(name);
+        return (impl as any)?.(...args);
+      }) as any);
+      return [fn, impl] as const;
+    });
+    try {
+      await loadSampleData("acme", 5, () => {});
+    } finally {
+      for (const [fn, impl] of impls) vi.mocked(fn).mockImplementation(impl as any);
+    }
+    expect(outside).toEqual([]);
   });
 
   it("still finishes when the window cannot be saved", async () => {

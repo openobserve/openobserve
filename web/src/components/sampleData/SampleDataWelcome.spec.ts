@@ -67,6 +67,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     status: ref("idle"),
     loadingOrg: ref(""),
     error: ref(null),
+    forbidden: ref(false),
     welcomeOpen: ref(false),
     welcomeDeciding: ref(false),
     tour: ref(null),
@@ -201,6 +202,7 @@ describe("SampleDataWelcome finish", () => {
     session.status.value = "idle";
     session.loadingOrg.value = "";
     session.error.value = null;
+    session.forbidden.value = false;
     session.welcomeOpen.value = false;
     session.welcomeDeciding.value = false;
     session.tour.value = null;
@@ -445,6 +447,16 @@ describe("SampleDataWelcome finish", () => {
       expect(error.text()).toContain("HTTP 500");
       expect(wrapper!.findComponent({ name: "OBanner" }).exists()).toBe(false);
       expect(byTest("sample-welcome-retry").exists()).toBe(true);
+    });
+
+    it("says only that the user needs write access when the load is refused", async () => {
+      await mountAtHome();
+      await click("onboarding-get-started-sample-btn");
+      session.error.value = "Unauthorized Access";
+      session.forbidden.value = true;
+      session.status.value = "failed";
+      await flush();
+      expect(byTest("sample-welcome-error").text()).toBe(enLocale.sampleData.loadForbidden);
     });
 
     it("closing the progress view is not a skip", async () => {
