@@ -38,19 +38,6 @@ export function basicIngestToken(email: string, passcode: string): string {
   return b64EncodeStandard(`${email}:${passcode}`) ?? "";
 }
 
-interface OrgTokenData {
-  organizationPasscode?: string;
-  orgTokens?: Array<{ name: string; token: string; enabled?: boolean }>;
-}
-
-/** The token a snippet carries, named so the user can tell tokens apart; with only one there is nothing to tell apart. */
-export function snippetTokenName(orgData: OrgTokenData | undefined): string | undefined {
-  const passcode = orgData?.organizationPasscode;
-  const tokens = orgData?.orgTokens ?? [];
-  if (!passcode || tokens.filter((token) => token.enabled !== false).length < 2) return undefined;
-  return tokens.find((token) => token.token === passcode)?.name;
-}
-
 /** Builds the real and the masked snippet from one template, so OCodeBlock can map a masked selection back to the real token. */
 export function useCredentialSnippet(content: Ref<string>) {
   const store = useStore();
@@ -75,7 +62,12 @@ export function useCredentialSnippet(content: Ref<string>) {
   const { ready } = useOrgCredential(needsPasscode);
   const hasCredential = computed(() => !!passcode.value);
   const forbidden = computed(() => !!store.state.organizationData?.organizationPasscodeForbidden);
-  const tokenName = computed(() => snippetTokenName(store.state.organizationData));
+  const tokenName = computed<string | undefined>(() => {
+    if (!passcode.value) return undefined;
+    const tokens: Array<{ name: string; token: string }> =
+      store.state.organizationData?.orgTokens ?? [];
+    return tokens.find((t) => t.token === passcode.value)?.name;
+  });
 
   return { code, codeMasked, needsPasscode, forbidden, tokenName, ready, hasCredential };
 }

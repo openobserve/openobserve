@@ -51,11 +51,7 @@ const makeStore = () =>
       organizationData: {
         organizationPasscode: PASSCODE,
         organizationPasscodeForbidden: false,
-        orgTokens: [
-          { name: "default", token: PASSCODE, enabled: true },
-          // A second token, so the snippet names the one it carries.
-          { name: "ci", token: "other", enabled: true },
-        ],
+        orgTokens: [{ name: "default", token: PASSCODE, enabled: true }],
       },
     },
   });

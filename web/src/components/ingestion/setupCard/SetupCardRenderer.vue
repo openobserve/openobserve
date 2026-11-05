@@ -46,7 +46,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
-import { OPEN_TOKEN_PICKER, snippetTokenName } from "@/composables/useCredentialSnippet";
+import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import type {
   FirstEventResult,
   FirstEventState,
@@ -295,7 +295,12 @@ const copyFirstSnippet = () => {
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
 
-const tokenName = computed(() => snippetTokenName(store.state.organizationData));
+const tokenName = computed<string | undefined>(() => {
+  const passcode = store.state.organizationData?.organizationPasscode;
+  const tokens: Array<{ name: string; token: string }> =
+    store.state.organizationData?.orgTokens ?? [];
+  return passcode ? tokens.find((tk) => tk.token === passcode)?.name : undefined;
+});
 
 // Fires once per false→true transition — a remount starts idle and stays silent.
 watch(detected, (connected, was) => {

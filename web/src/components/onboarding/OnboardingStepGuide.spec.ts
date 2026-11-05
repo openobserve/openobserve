@@ -632,12 +632,6 @@ describe("OnboardingStepGuide", () => {
       expect(focus).toHaveBeenCalledTimes(1);
     });
 
-    it("shows no token button and no picker when the org has one token, as a new org does", async () => {
-      const w = await mountGuide(false, undefined, curl);
-      expect(w.find('[data-test="ingestion-snippet-code-block-token-link"]').exists()).toBe(false);
-      expect(w.findComponent(SelectStub).exists()).toBe(false);
-    });
-
     it("is not offered on the RUM guide, which uses its own token", async () => {
       const w = await mountGuide(false, undefined, {
         choice: frontend,
