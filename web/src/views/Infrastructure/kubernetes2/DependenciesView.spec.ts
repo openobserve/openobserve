@@ -587,7 +587,7 @@ describe("DependenciesView", () => {
       expect(card).toMatchObject({
         label: "backend",
         detail: "1 workload",
-        icon: "widgets",
+        icon: "folder-outline",
         clickable: true,
       });
       expect(card.color).toBe(
@@ -622,12 +622,42 @@ describe("DependenciesView", () => {
       ).toEqual([BOUNDARY_API, BOUNDARY_WEB]);
     });
 
+    it("drops the collapse chips once grouping is off", async () => {
+      await mountView();
+      await setMode("collapsed");
+      chart().vm.$emit("open", BOUNDARY_API);
+      await flushPromises();
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(true);
+      await setMode("expanded");
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(false);
+    });
+
     it("does not open the details drawer for a namespace card", async () => {
       await mountView();
       await setMode("collapsed");
       chart().vm.$emit("open", BOUNDARY_API);
       await flushPromises();
       expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
+    it("does not fold workloads while a search is set", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      await setMode("collapsed");
+      expect(nodes().some((n: any) => n.group === true)).toBe(false);
+    });
+
+    it("counts the header total over grouped connections too", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const header = wrapper.findComponent({ name: "K8sListHeader" });
+      expect(header.props("total")).toBe(header.props("count"));
+    });
+
+    it("marks a namespace card as a group so it reads as expandable, not openable", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const group = nodes().find((n: any) => n.id === BOUNDARY_API);
+      expect(group.group).toBe(true);
     });
 
     it("expands from the edge panel's namespace button instead of opening a drawer", async () => {

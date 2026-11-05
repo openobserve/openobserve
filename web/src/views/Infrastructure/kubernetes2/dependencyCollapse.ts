@@ -15,16 +15,15 @@
 
 import type { FlowEdge, FlowEnd } from "./dependencyGraph";
 
-export type CollapseMode = "auto" | "expanded" | "collapsed";
+export type { CollapseMode } from "@/utils/traces/applyGraphCollapse";
+import type { CollapseMode } from "@/utils/traces/applyGraphCollapse";
 
 export interface CollapseState {
   mode: CollapseMode;
-  // Namespace ids, see namespaceId.
   expanded: ReadonlySet<string>;
   threshold: number;
 }
 
-// Past this many distinct ends the auto mode folds workloads into their namespaces.
 export const COLLAPSE_THRESHOLD = 40;
 
 const BOUNDARY_PREFIX = "__ns__";
@@ -56,15 +55,22 @@ interface Merge {
   unknown: number;
 }
 
-// Folds the workloads of every namespace not in `expanded` into one boundary end each, and merges the edges that meet.
 export function collapseNamespaces(edges: FlowEdge[], state: CollapseState): FlowEdge[] {
   if (!shouldCollapse(edges, state)) return edges;
+  // A namespace whose traffic never leaves it would have no edge left to draw, so it stays as its workloads.
+  const foldable = (end: FlowEnd) =>
+    end.kind === "workload" && !state.expanded.has(namespaceId(end.cluster, end.namespace));
+  const groupOf = (end: FlowEnd) =>
+    foldable(end) ? namespaceId(end.cluster, end.namespace) : end.id;
+  const linked = new Set<string>();
+  for (const e of edges) {
+    if (groupOf(e.source) === groupOf(e.target)) continue;
+    for (const end of [e.source, e.target]) if (foldable(end)) linked.add(groupOf(end));
+  }
   const members = new Map<string, Set<string>>();
   const boundaries = new Map<string, FlowEnd>();
   const fold = (end: FlowEnd): FlowEnd => {
-    if (end.kind !== "workload" || state.expanded.has(namespaceId(end.cluster, end.namespace))) {
-      return end;
-    }
+    if (!foldable(end) || !linked.has(groupOf(end))) return end;
     const id = `${BOUNDARY_PREFIX}${namespaceId(end.cluster, end.namespace)}`;
     if (!boundaries.has(id)) {
       boundaries.set(id, {
@@ -114,7 +120,8 @@ export function collapseNamespaces(edges: FlowEdge[], state: CollapseState): Flo
   for (const [id, set] of members) boundaries.get(id)!.members = set.size;
 
   const merged = [...merges.entries()].map(([id, m]): FlowEdge => {
-    const directed = m.aClient > 0 || m.bClient > 0;
+    const total = m.ab + m.ba;
+    const directed = Math.max(m.aClient, m.bClient) > total / 2;
     const flip = directed && m.bClient > m.aClient;
     return {
       id,
@@ -126,7 +133,7 @@ export function collapseNamespaces(edges: FlowEdge[], state: CollapseState): Flo
       request: m.request,
       response: m.response,
       unknown: m.unknown,
-      total: m.ab + m.ba,
+      total,
     };
   });
   return [...kept, ...merged];

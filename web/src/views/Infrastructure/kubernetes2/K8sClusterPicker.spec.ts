@@ -51,6 +51,16 @@ describe("K8sClusterPicker", () => {
     expect(trigger.text()).toBe("stage");
   });
 
+  it("names the active cluster for screen readers", () => {
+    const trigger = mountPicker("stage").find('[data-test="k8s2-cluster-picker"]');
+    expect(trigger.attributes("aria-label")).toBe("Cluster: stage");
+  });
+
+  it("falls back to a label while no cluster is resolved", () => {
+    const trigger = mountPicker(null).find('[data-test="k8s2-cluster-picker"]');
+    expect(trigger.text()).toBe("Cluster");
+  });
+
   it("lists every cluster with a health dot once opened", async () => {
     await openPicker();
     for (const c of clusters) expect(option(c.name)).not.toBeNull();

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
@@ -44,6 +44,7 @@ import {
   collapseNamespaces,
   isBoundary,
   namespaceId,
+  shouldCollapse,
   type CollapseMode,
 } from "./dependencyCollapse";
 import {
@@ -117,6 +118,7 @@ async function load() {
     totals.value = [];
     loaded.value = false;
     selectedEdgeId.value = null;
+    expandedNamespaces.value = new Set();
     loadedFor = null;
   }
   if (!hasFlows.value || props.clusterPending) {
@@ -182,13 +184,16 @@ const edges = computed(() =>
   ),
 );
 
-const collapsedEdges = computed(() =>
-  collapseNamespaces(edges.value, {
-    mode: collapseMode.value,
-    expanded: expandedNamespaces.value,
-    threshold: COLLAPSE_THRESHOLD,
-  }),
-);
+// A namespace filter or a search is the user asking to see workloads, so it never folds them.
+const filtering = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
+
+const collapseState = computed(() => ({
+  mode: filtering.value ? ("expanded" as const) : collapseMode.value,
+  expanded: expandedNamespaces.value,
+  threshold: COLLAPSE_THRESHOLD,
+}));
+
+const collapsedEdges = computed(() => collapseNamespaces(edges.value, collapseState.value));
 
 const graph = computed(() => buildGraph(collapsedEdges.value));
 
@@ -196,9 +201,16 @@ const capped = computed(() => graph.value.edges.length < collapsedEdges.value.le
 
 const hasGroups = computed(() => graph.value.nodes.some((n) => isBoundary(n.end)));
 
-const expandedList = computed(() =>
-  [...expandedNamespaces.value].sort((a, b) => a.localeCompare(b)),
-);
+// Only while grouping is on, and only for namespaces the map still draws, so a chip always undoes something.
+const expandedList = computed(() => {
+  if (!shouldCollapse(edges.value, collapseState.value)) return [];
+  const drawn = new Set(
+    graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => boundaryKey(n.end)),
+  );
+  return [...expandedNamespaces.value]
+    .filter((id) => drawn.has(id))
+    .sort((a, b) => a.localeCompare(b));
+});
 
 function toggleNamespace(id: string) {
   const next = new Set(expandedNamespaces.value);
@@ -207,15 +219,16 @@ function toggleNamespace(id: string) {
 }
 
 const setCollapseMode = (mode: unknown) => {
-  if (COLLAPSE_MODES.includes(mode as CollapseMode)) collapseMode.value = mode as CollapseMode;
+  if (!COLLAPSE_MODES.includes(mode as CollapseMode)) return;
+  collapseMode.value = mode as CollapseMode;
+  expandedNamespaces.value = new Set();
 };
 
-const collapseLabel = (mode: CollapseMode) =>
-  mode === "auto"
-    ? t("infra.k8s2.depsCollapseAuto")
-    : mode === "expanded"
-      ? t("infra.k8s2.depsCollapseExpanded")
-      : t("infra.k8s2.depsCollapseCollapsed");
+const COLLAPSE_LABEL: Record<CollapseMode, I18nKey> = {
+  auto: "infra.k8s2.depsCollapseAuto",
+  expanded: "infra.k8s2.depsCollapseExpanded",
+  collapsed: "infra.k8s2.depsCollapseCollapsed",
+};
 
 const boundaryKey = (end: FlowEnd) => namespaceId(end.cluster, end.namespace);
 
@@ -302,7 +315,7 @@ const colorOf = (end: FlowEnd) =>
 
 // A workload by its owner's kind, as the resource tree shows it.
 function iconOf(end: FlowEnd): IconName {
-  if (isBoundary(end)) return "widgets";
+  if (isBoundary(end)) return VIEW_ICON.namespaces;
   if (end.kind === "external") return "public";
   if (end.kind === "node") return VIEW_ICON.nodes;
   return (VIEW_ICON as Record<string, IconName>)[`${end.ownerType.toLowerCase()}s`] ?? "widgets";
@@ -317,10 +330,11 @@ const mapNodes = computed<MapNode[]>(() => {
     position: positions.get(end.id)!,
     label: endLabel(end),
     detail: kindText(end),
-    title: `${fullLabel(end)}\n${endDetail(end)}`,
+    title: `${fullLabel(end)} · ${endDetail(end)}`,
     icon: iconOf(end),
     color: colorOf(end),
     clickable: canOpen(end),
+    group: isBoundary(end),
     total,
   }));
 });
@@ -464,6 +478,13 @@ const switchedEdges = computed(() => {
   return [...new Map([...shown, ...picked].map((e) => [e.id, e])).values()];
 });
 
+// Grouped like the map, so the header compares connections of the same kind.
+const switchedTotal = computed(() =>
+  filtering.value
+    ? switchedEdges.value.length
+    : collapseNamespaces(switchedEdges.value, collapseState.value).length,
+);
+
 // Only the namespace filter and search; the switches keep what they show.
 function clearFilters() {
   emit("update", { namespaces: [], search: "" });
@@ -478,7 +499,7 @@ function clearFilters() {
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
       :count="graph.edges.length"
-      :total="switchedEdges.length"
+      :total="switchedTotal"
       :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
       namespaced
       :namespace-options="namespaceChoices"
@@ -525,9 +546,15 @@ function clearFilters() {
       <div class="flex items-center gap-2" data-test="k8s2-deps-collapse">
         <OText tag="span" class="text-text-secondary text-xs">
           {{ t("infra.k8s2.depsCollapseMode") }}
+          <OTooltip
+            :content="t('infra.k8s2.depsCollapseHint', { count: COLLAPSE_THRESHOLD })"
+            side="top"
+          />
         </OText>
         <OToggleGroup
           :model-value="collapseMode"
+          :aria-label="t('infra.k8s2.depsCollapseMode')"
+          mobile-dropdown
           data-test="k8s2-deps-collapse-mode"
           @update:model-value="setCollapseMode"
         >
@@ -538,7 +565,7 @@ function clearFilters() {
             size="xs"
             :data-test="`k8s2-deps-collapse-${m}`"
           >
-            {{ collapseLabel(m) }}
+            {{ t(COLLAPSE_LABEL[m]) }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
