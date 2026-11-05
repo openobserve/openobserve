@@ -339,3 +339,109 @@ describe("licenseKeyLosses", () => {
     expect(losses(key(), pasted)).toEqual({ expiredAt: 1_500_000, lost: [] });
   });
 });
+
+describe("splitLicenseFeatures", () => {
+  // Revision 1 as licenses issued before RBAC was ungated embed it (feature-definitions 34d6043).
+  const preFlip = {
+    features: {
+      ai_assistant: { display_name: "AI Assistant", gate: true },
+      workflows: { display_name: "Workflows", gate: true },
+      rbac: { display_name: "Role-Based Access Control", gate: true },
+      logs: { display_name: "Logs" },
+      sso: { display_name: "Single Sign-On", plumbing: true },
+    },
+  };
+  const paidOn = { ai_assistant: "enabled", workflows: "locked", logs: "enabled" } as const;
+
+  it("moves an enabled, unlisted gated key out of missing and paid into its own group", () => {
+    const split = splitLicenseFeatures(
+      { features: ["ai_assistant"], feature_definition: preFlip },
+      { ...paidOn, rbac: "enabled" },
+    );
+
+    expect(split).toMatchObject({
+      unlocked: ["ai_assistant"],
+      missing: ["workflows"],
+      free: ["logs", "sso"],
+      freeNotIncluded: ["rbac"],
+      paid: 2,
+    });
+  });
+
+  it.each([
+    ["locked", { ...paidOn, rbac: "locked" }, ["rbac", "workflows"], ["logs", "sso"]],
+    ["hidden", { ...paidOn, rbac: "hidden" }, ["rbac", "workflows"], ["logs", "sso"]],
+    ["absent", paidOn, ["rbac", "workflows"], ["logs", "sso"]],
+    ["an empty states map", {}, ["rbac", "workflows"], ["logs", "sso"]],
+  ] as const)("keeps today's split for %s", (_name, states, missing, free) => {
+    const split = splitLicenseFeatures(
+      { features: ["ai_assistant"], feature_definition: preFlip },
+      states,
+    );
+
+    expect(split).toMatchObject({ missing, free, freeNotIncluded: [], paid: 3 });
+  });
+
+  describe("while the license has not been evaluated", () => {
+    const downgraded = { features: ["ai_assistant"], feature_definition: preFlip };
+    const oldKeyStates = { ...paidOn, workflows: "enabled", rbac: "enabled" } as const;
+
+    it("keeps enabled, unlisted gated keys under missing and paid at evaluated_at 0", () => {
+      expect(splitLicenseFeatures(downgraded, oldKeyStates, 0)).toMatchObject({
+        unlocked: ["ai_assistant"],
+        missing: ["rbac", "workflows"],
+        freeNotIncluded: [],
+        paid: 3,
+      });
+    });
+
+    it.each([
+      ["an evaluated license", 1792000000000000],
+      ["a caller with no evaluated_at", undefined],
+    ])("trusts the config for %s", (_name, evaluatedAt) => {
+      expect(splitLicenseFeatures(downgraded, oldKeyStates, evaluatedAt)).toMatchObject({
+        missing: [],
+        freeNotIncluded: ["rbac", "workflows"],
+        paid: 1,
+      });
+    });
+  });
+
+  it('keeps every gated key unlocked on a license listing only "all"', () => {
+    const split = splitLicenseFeatures(
+      { features: ["all"], feature_definition: preFlip },
+      { ...paidOn, rbac: "enabled" },
+    );
+
+    expect(split).toMatchObject({
+      unlocked: ["ai_assistant", "rbac", "workflows"],
+      missing: [],
+      freeNotIncluded: [],
+      paid: 3,
+    });
+  });
+
+  it("keeps a listed key unlocked when it is also enabled", () => {
+    const split = splitLicenseFeatures(
+      { features: ["rbac"], feature_definition: preFlip },
+      { rbac: "enabled" },
+    );
+
+    expect(split?.unlocked).toEqual(["rbac"]);
+    expect(split?.freeNotIncluded).toEqual([]);
+  });
+
+  it("has nothing to move without a definition", () => {
+    const split = splitLicenseFeatures(
+      { features: ["workflows"] },
+      { workflows: "enabled", rbac: "locked", logs: "enabled" },
+    );
+
+    expect(split).toMatchObject({
+      unlocked: ["workflows"],
+      missing: ["rbac"],
+      free: ["logs"],
+      freeNotIncluded: [],
+    });
+  });
+});

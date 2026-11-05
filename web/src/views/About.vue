@@ -449,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </p>
               <LicenseFeatures
                 :license="licenseData.license"
+                :evaluated-at="licenseData.evaluated_at"
                 :hide-request-access="!licenseData.can_update_license"
                 @request-access="openLicenseRequest"
               />

@@ -1602,10 +1602,12 @@ describe("License.vue", () => {
     const mountWith = async (
       license: Record<string, unknown>,
       features: object = configFeatures,
+      response: object = {},
     ) => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({
           ...mockLicenseData,
+          ...response,
           license: { ...mockLicenseData.license, ...license },
         }),
       );
@@ -1679,8 +1681,18 @@ describe("License.vue", () => {
     it("reads 0 of N for an empty features list", async () => {
       await mountWith({ features: [], feature_definition: featureDefinition });
 
-      expect(find("-summary").text()).toContain("0 of 3 paid features");
+      expect(find("-summary").text()).toContain("0 of 2 paid features");
+      expect(items("free-not-included")).toEqual(["sso"]);
       expect(find("-unlocked").exists()).toBe(false);
+    });
+
+    it("passes evaluated_at 0 down, so a stale enabled key stays missing", async () => {
+      await mountWith({ features: [], feature_definition: featureDefinition }, configFeatures, {
+        evaluated_at: 0,
+      });
+
+      expect(find("-free-not-included").exists()).toBe(false);
+      expect(items("missing")).toContain("sso");
     });
 
     it("shows only the all-features summary for a license without a features list", async () => {

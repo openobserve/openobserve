@@ -108,10 +108,11 @@ export interface LicenseFeatureSource {
   feature_definition?: { features?: Record<string, FeatureDefinition> } | null;
 }
 
-/** A license's features as unlocked / missing / free / added keys, or null for a pre-entitlement license. */
+/** A license's features as unlocked / missing / free / freeNotIncluded / added keys, or null for a pre-entitlement license. */
 export const splitLicenseFeatures = (
   license: LicenseFeatureSource | null | undefined,
   states: FeatureStates,
+  evaluatedAt?: number,
 ) => {
   if (!license?.features) return null;
   const definition = license.feature_definition?.features;
@@ -122,8 +123,14 @@ export const splitLicenseFeatures = (
   const listsOnlyAll =
     license.features.length > 0 && license.features.every((key) => key === "all");
   const unlocked = (listsOnlyAll ? [...gated] : [...license.features]).sort();
+  // `states`, not featureState(): an absent key means an older backend, not a feature that is on.
+  // At evaluated_at 0 the config can still hold the previous key's states.
+  const freeNotIncluded =
+    evaluatedAt === 0
+      ? []
+      : gated.filter((key) => !unlocked.includes(key) && states[key] === "enabled").sort();
   // A listed key counts as paid even when ungated, so "unlocked of paid" never exceeds the total.
-  const paid = new Set([...gated, ...unlocked]);
+  const paid = new Set([...gated.filter((key) => !freeNotIncluded.includes(key)), ...unlocked]);
   const missing = [...paid].filter((key) => !unlocked.includes(key)).sort();
   const freeCandidates = definition
     ? Object.keys(definition).filter((key) => !definition[key].gate || definition[key].plumbing)
@@ -139,7 +146,7 @@ export const splitLicenseFeatures = (
         .sort()
     : [];
   const addedLocked = added.filter((key) => featureState(states, key) === "locked");
-  return { unlocked, missing, free, added, addedLocked, paid: paid.size };
+  return { unlocked, missing, free, freeNotIncluded, added, addedLocked, paid: paid.size };
 };
 
 export type LicenseFeatureSplit = ReturnType<typeof splitLicenseFeatures>;

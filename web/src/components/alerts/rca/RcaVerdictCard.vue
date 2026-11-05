@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.incidents.rcaResume.button") }}
         </OButton>
-        <ODropdown v-if="hasEarlierReport" align="end">
+        <ODropdown v-if="hasEarlierReport && !startLockedReason" align="end">
           <template #trigger>
             <OButton
               data-test="rca-retry-btn"
@@ -406,18 +406,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ option.label }}
           </ODropdownItem>
         </ODropdown>
-        <OButton
-          v-else
-          data-test="rca-retry-btn"
-          variant="outline"
-          size="sm"
-          :loading="triggering"
-          :disabled="resuming"
-          @click="$emit('retry', { buildOnPrevious: false })"
-        >
-          <OIcon name="refresh" size="sm" class="me-1" />
-          {{ t("alerts.incidents.rcaRetry") }}
-        </OButton>
+        <OTooltip v-else :content="startLockedReason" :disabled="!startLockedReason">
+          <span class="inline-flex">
+            <OButton
+              data-test="rca-retry-btn"
+              variant="outline"
+              size="sm"
+              :loading="triggering"
+              :disabled="resuming || !!startLockedReason"
+              @click="$emit('retry', { buildOnPrevious: false })"
+            >
+              <OIcon
+                :name="startLockedReason ? 'lock' : 'refresh'"
+                size="sm"
+                class="me-1"
+                :class="{ 'lock-chip': startLockedReason }"
+              />
+              {{ t("alerts.incidents.rcaRetry") }}
+            </OButton>
+          </span>
+        </OTooltip>
       </template>
     </OBanner>
 
@@ -535,6 +543,8 @@ const props = withDefaults(
     reanalyzeCreditCost?: number | null;
     /** Impacted services of the shown completed run's verdict. */
     verdictDetails?: RcaVerdictDetails | null;
+    /** Why no new run can start: Retry stays visible, disabled, with this reason. */
+    startLockedReason?: I18nText;
   }>(),
   {
     waitingInput: false,
@@ -562,6 +572,7 @@ const props = withDefaults(
     refusal: null,
     reanalyzeCreditCost: null,
     verdictDetails: null,
+    startLockedReason: undefined,
   },
 );
 

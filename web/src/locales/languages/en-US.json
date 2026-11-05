@@ -3642,6 +3642,7 @@
     "features_no_match": "No features match your search",
     "features_none": "No features in this group",
     "features_free_heading": "Free, included with every license",
+    "features_free_not_included": "Free, not included in your license",
     "features_new": "New after your license",
     "features_filter_new": "New",
     "request_new_license": "Request new License",
