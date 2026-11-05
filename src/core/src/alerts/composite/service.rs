@@ -928,6 +928,7 @@ mod tests {
             owner: None,
             last_edited_by: None,
             pending_period_sec: 0,
+            incident_title_template: None,
         }
     }
 

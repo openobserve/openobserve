@@ -860,6 +860,7 @@ mod tests {
             updated_at: Set(None),
             evaluation_generation: Set(0),
             pending_period_sec: Set(0),
+            incident_title_template: Set(None),
         };
         infra::table::alert_composites::create_with_children(
             infra::db::get_orm_client_rw().await,
