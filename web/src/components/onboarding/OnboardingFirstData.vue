@@ -14,33 +14,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The pinned bar once the first record lands. The page's inline status keeps the
-     first-record preview and the test-or-real outcome; this links to it instead of repeating it.
-     The `rail` variant stacks its actions for a side rail, whose page shows no inline status. -->
+<!-- The success panel once the first record lands. The page's inline status keeps the
+     first-record preview and the test-or-real outcome; this links to it instead of repeating it. -->
 <template>
   <div
-    :class="[
-      'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 flex flex-col motion-safe:duration-300',
-      rail ? 'gap-3' : 'gap-4 p-5 max-md:p-4',
-    ]"
+    class="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 flex flex-col gap-4 p-5 motion-safe:duration-300 max-md:p-4"
     data-test="onboarding-first-data"
   >
     <div class="flex items-center gap-3.5">
       <span
-        v-if="!rail"
         class="bg-icon-chip-success-bg text-icon-chip-success-text inline-flex size-11 shrink-0 items-center justify-center rounded-full"
       >
         <OIcon name="check-circle" size="md" />
       </span>
       <div class="min-w-0">
-        <h2 :class="['text-text-heading leading-snug font-semibold', rail ? 'text-sm' : 'text-lg']">
+        <h2 class="text-text-heading text-lg leading-snug font-semibold">
           {{ title }}
         </h2>
         <i18n-t
           keypath="onboarding.firstData.count"
           tag="p"
           :plural="result.count"
-          :class="['text-text-secondary text-compact min-w-0', rail ? 'break-words' : 'truncate']"
+          class="text-text-secondary text-compact min-w-0 truncate"
           data-test="onboarding-first-data-count"
         >
           <template #count>{{ countText }}</template>
@@ -48,16 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><span class="text-text-heading font-medium">{{ streamText }}</span></template
           >
         </i18n-t>
-        <p
-          v-if="note"
-          class="text-text-body text-compact mt-1"
-          data-test="onboarding-first-data-note"
-        >
-          {{ note }}
-        </p>
       </div>
     </div>
-    <div :class="rail ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'">
+    <div class="flex flex-wrap items-center gap-2">
       <OButton
         variant="primary"
         size="sm"
@@ -68,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ openLabel }}
       </OButton>
-      <slot name="actions" />
       <OButton
         variant="outline"
         size="sm"
@@ -97,18 +84,13 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{
   title: I18nText;
-  /** One line under the count, for what to do next. */
-  note?: I18nText;
   /** What the page's first-event watch found: stream, count and time range. */
   result: FirstEventResult;
   /** The app route the page sets up, for analytics. */
   route: string;
-  /** `rail`: stacked for a side rail, with no link to an inline status. */
-  variant?: "bar" | "rail";
 }>();
 
 const { t } = useI18nTyped();
-const rail = computed(() => props.variant === "rail");
 const router = useRouter();
 const store = useStore();
 

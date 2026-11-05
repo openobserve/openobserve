@@ -267,21 +267,20 @@ describe("OnboardingAgentSetup", () => {
     expect(start).toHaveBeenLastCalledWith("copy", "metrics");
   });
 
-  it("shows the bar only once the setup's own data arrives, as a setup guide does", async () => {
+  it("shows the success panel only once the setup's own data arrives, as a setup guide does", async () => {
     const w = await mountPage();
     const status = w.findComponent(StatusStub);
-    // The inline status shows the wait; a second waiting bar would repeat it.
-    expect(w.find('[data-test="onboarding-listen-bar"]').exists()).toBe(false);
+    // The inline status shows the wait; a second waiting panel would repeat it.
+    expect(byTest(w, "onboarding-first-data").exists()).toBe(false);
     status.vm.$emit("state", "rejected");
     await flushPromises();
-    expect(w.find('[data-test="onboarding-listen-bar"]').exists()).toBe(false);
+    expect(byTest(w, "onboarding-first-data").exists()).toBe(false);
     status.vm.$emit("detected", RECEIVED);
     await flushPromises();
     const panel = byTest(w, "onboarding-first-data");
     expect(panel.text()).toContain("Your data is arriving");
     expect(panel.text()).toContain("3 records arrived in default");
     expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore Your Traces");
-    expect(byTest(w, "onboarding-first-data-note").exists()).toBe(false);
   });
 
   it("names each step once, as a heading, with no disabled button", async () => {

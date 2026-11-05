@@ -37,7 +37,7 @@ const resultFor = (
   streamName = "default",
 ): FirstEventResult => ({ streamType, streamName, count, ...RANGE });
 
-async function mountPanel(result: FirstEventResult = resultFor(), note?: string) {
+async function mountPanel(result: FirstEventResult = resultFor()) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -53,7 +53,6 @@ async function mountPanel(result: FirstEventResult = resultFor(), note?: string)
   const wrapper = mount(OnboardingFirstData, {
     props: {
       title: raw("Linux is sending data"),
-      note: note ? raw(note) : undefined,
       result,
       route: "ingestFromLinux",
     },
@@ -142,15 +141,5 @@ describe("OnboardingFirstData", () => {
       expect(queryClient.getQueryState(streamKeys.nameList(org, type))?.isInvalidated).toBe(true);
     }
     queryClient.clear();
-  });
-
-  it("shows a next-step line only when the page gives one", async () => {
-    expect(
-      (await mountPanel()).wrapper.find('[data-test="onboarding-first-data-note"]').exists(),
-    ).toBe(false);
-    const { wrapper } = await mountPanel(resultFor(), "Next, run your app.");
-    expect(wrapper.find('[data-test="onboarding-first-data-note"]').text()).toBe(
-      "Next, run your app.",
-    );
   });
 });

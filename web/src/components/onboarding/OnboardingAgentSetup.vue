@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("onboarding.agent.mcp", { mcp: raw("MCP") }) }}
             </OButton>
-            <div ref="statusEl" class="mt-4">
+            <div class="mt-4">
               <FirstEventStatus
                 :key="focus"
                 ref="status"
@@ -199,7 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :target-stream="detect.streamName"
                 :match="detect.match"
                 :filter="detect.filter"
-                @state="state = $event"
                 @detected="result = $event"
                 @copy-command="copySnippet(exportLine)"
               />
@@ -207,16 +206,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OnboardingSetupStep>
         </ol>
 
-        <!-- The inline status above already shows the wait, so the bar only shows the success. -->
-        <OnboardingListenBar
+        <!-- The inline status above already shows the wait, so only the success shows here. -->
+        <div
           v-if="result"
-          :state="state"
-          :copy="barCopy"
-          :result="result"
-          :success-title="t('onboarding.firstData.title')"
-          route="onboarding-agent"
-          :status-root="statusEl"
-        />
+          class="rounded-surface border-banner-success-border mt-8 border"
+          aria-live="polite"
+        >
+          <OnboardingFirstData
+            :title="t('onboarding.firstData.title')"
+            :result="result"
+            route="onboarding-agent"
+          />
+        </div>
         <OnboardingStepFooter quiet />
       </div>
     </section>
@@ -258,10 +259,7 @@ import { otlpTracesDetect } from "@/components/ingestion/setupCard/content/otlpT
 import { rumDetect } from "@/components/ingestion/setupCard/content/rum";
 import type { RichCardDetect } from "@/components/ingestion/setupCard/types";
 import { FIRST_EVENT_SNIPPET_COPIED } from "@/composables/firstEvent/firstEventCopied";
-import type {
-  FirstEventResult,
-  FirstEventState,
-} from "@/composables/firstEvent/useFirstEventWatch";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { useCredentialSnippet } from "@/composables/useCredentialSnippet";
 import useIngestion from "@/composables/useIngestion";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -279,7 +277,7 @@ import { downloadFile } from "@/utils/dom";
 
 import { buildAgentPrompt, buildAgentSetupFile, type AgentFocus } from "./agentSetupFile";
 import { CODING_AGENTS } from "./onboardingChoices";
-import OnboardingListenBar, { type ListenBarCopy } from "./OnboardingListenBar.vue";
+import OnboardingFirstData from "./OnboardingFirstData.vue";
 import OnboardingPreview from "./OnboardingPreview.vue";
 import OnboardingSetupStep from "./OnboardingSetupStep.vue";
 import OnboardingStepFooter from "./OnboardingStepFooter.vue";
@@ -372,9 +370,6 @@ const mcpHref = computed(
 );
 
 const status = ref<InstanceType<typeof FirstEventStatus> | null>(null);
-const statusEl = ref<HTMLElement | null>(null);
-// The watch starts on mount, so the bar starts waiting.
-const state = ref<FirstEventState>("waiting");
 const result = ref<FirstEventResult>();
 // A copy restarts the watch's fast checks, as a copy on a setup card does.
 const tokenCopied = ref(false);
@@ -420,28 +415,4 @@ const download = () => {
     usedPrompt("downloaded");
   }
 };
-
-const barCopy = computed((): ListenBarCopy => ({
-  // Only when the watched stream already has data: the watch holds until a copy.
-  idle: {
-    title: t("onboarding.agent.bar.idle"),
-    hint: t("onboarding.agent.bar.idleHint", { stream: raw(detect.value.streamName ?? STREAM) }),
-  },
-  waiting: {
-    title: t("onboarding.agent.bar.waiting"),
-    hint: t("onboarding.agent.bar.waitingHint"),
-  },
-  stopped: {
-    title: t("onboarding.agent.bar.stopped"),
-    hint: t("onboarding.agent.bar.stoppedHint"),
-  },
-  "no-requests": {
-    title: t("onboarding.agent.bar.noRequests"),
-    hint: t("onboarding.agent.bar.noRequestsHint"),
-  },
-  rejected: {
-    title: t("onboarding.agent.bar.rejected"),
-    hint: t("onboarding.agent.bar.rejectedHint"),
-  },
-}));
 </script>

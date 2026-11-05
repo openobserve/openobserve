@@ -29882,18 +29882,6 @@
         "line3": "Keep the token in the environment",
         "line4": "Send one test event to stream {stream}",
         "line5": "Report which files changed"
-      },
-      "bar": {
-        "idle": "Copy the prompt to start checking",
-        "idleHint": "Stream {stream} already gets data, so checking starts when you copy the token or the prompt.",
-        "waiting": "Waiting for your coding agent's first event",
-        "waitingHint": "Keep this page open. It turns green when your coding agent sends its first event.",
-        "stopped": "Nothing has arrived yet",
-        "stoppedHint": "Checking has stopped. Check again from the status above.",
-        "rejected": "Data from your coding agent is being rejected",
-        "rejectedHint": "The status above shows the cause and the fix.",
-        "noRequests": "No data has reached your organization yet",
-        "noRequestsHint": "The status above lists the values your coding agent must use."
       }
     },
     "collect": {
