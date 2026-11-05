@@ -56,8 +56,8 @@ test.describe(
         await expect(vp.locator(vhttp.toggle)).toBeDisabled();
         await expect(vp.locator(vhttp.rotate)).toHaveCount(0);
         await expect(vp.locator(vhttp.advanced)).toHaveCount(0);
-        await expect(vp.locator(`${vhttp.credentials} [data-test$="-show"]`)).toHaveCount(0);
-        await expect(vp.locator(`${vhttp.credentials} [data-test$="-revoke"]`)).toHaveCount(0);
+        await expect(vp.locator(vhttp.credentialShowAny)).toHaveCount(0);
+        await expect(vp.locator(vhttp.credentialRevokeAny)).toHaveCount(0);
         await expect(vp.locator(vhttp.url)).toBeVisible();
       } finally {
         await ctx.close();
