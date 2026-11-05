@@ -53,7 +53,8 @@
       "alerts-14796-destination-usage.spec.js",
       "alerts-15091-alert-edit-flow.spec.js",
       "alerts-15096-query-mode-regressions.spec.js",
-      "alerts-15636-cross-type-join.spec.js"
+      "alerts-15636-cross-type-join.spec.js",
+      "alerts-15497-clone-composite-load-races.spec.js"
     ],
     "disabled": []
   },
