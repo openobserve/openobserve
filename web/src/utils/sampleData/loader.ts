@@ -187,11 +187,17 @@ const ingestTelemetry = async (
   org: string,
   hours: number,
   report: (fraction: number, counts: SampleCounts, logs: SampleLogLine[]) => void,
+  stored: { any: boolean },
 ) => {
   const endUs = Date.now() * 1000;
   const range: SampleWindow = { startUs: endUs - hours * HOUR_US, endUs };
   const gen = createSampleGenerator(range);
   const counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
+  // an outcome that landed before a sibling request failed still counts as stored
+  const keep = (o: IngestOutcome) => {
+    if (o.accepted) stored.any = true;
+    return o;
+  };
   const signals = SIGNALS.map(() => ({
     sent: 0,
     accepted: 0,
@@ -199,22 +205,26 @@ const ingestTelemetry = async (
   }));
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
-    const outcomes: IngestOutcome[] = await Promise.all([
+    // settle all four so a rollback never races a sibling request still storing data
+    const settled = await Promise.allSettled([
       withRetry(() =>
         sampleDataService.ingestLogs(org, SAMPLE_STREAMS.appLogs, batch.appLogs),
-      ).then((res) => jsonOutcome(res, batch.appLogs.length)),
+      ).then((res) => keep(jsonOutcome(res, batch.appLogs.length))),
       withRetry(() =>
         sampleDataService.ingestLogs(org, SAMPLE_STREAMS.accessLogs, batch.accessLogs),
-      ).then((res) => jsonOutcome(res, batch.accessLogs.length)),
+      ).then((res) => keep(jsonOutcome(res, batch.accessLogs.length))),
       withRetry(() => sampleDataService.ingestMetrics(org, batch.metrics)).then((res) =>
-        jsonOutcome(res, batch.metrics.length),
+        keep(jsonOutcome(res, batch.metrics.length)),
       ),
       batch.spanCount
         ? withRetry(() =>
             sampleDataService.ingestTraces(org, SAMPLE_STREAMS.traces, batch.traces),
-          ).then((res) => tracesOutcome(res, batch.spanCount))
+          ).then((res) => keep(tracesOutcome(res, batch.spanCount)))
         : { accepted: 0 },
     ]);
+    const failure = settled.find((r) => r.status === "rejected");
+    if (failure) throw (failure as PromiseRejectedResult).reason;
+    const outcomes = settled.map((r) => (r as PromiseFulfilledResult<IngestOutcome>).value);
     const [app, access, metrics, traces] = outcomes;
     counts.logs += app.accepted + access.accepted;
     counts.spans += traces.accepted;
@@ -263,9 +273,11 @@ const createDashboards = async (org: string, range: SampleWindow) => {
 const createIfMissing = async (fn: () => Promise<unknown>) => {
   try {
     await quiet(fn);
+    return true;
   } catch (e: any) {
     // re-running the loader finds the assets from the previous run
     if (e?.response?.status !== 409 && e?.response?.status !== 400) throw e;
+    return false;
   }
 };
 
@@ -288,9 +300,17 @@ const createAlerts = async (org: string) => {
   }
 };
 
-const createFunctions = async (org: string) => {
+// what this run created, so a load that stores nothing can undo it without touching reused assets
+interface Created {
+  functions: string[];
+  pipeline: boolean;
+}
+
+const createFunctions = async (org: string, created: Created) => {
   for (const fn of sampleFunctions()) {
-    await createIfMissing(() => jsTransformService.create(org, fn));
+    if (await createIfMissing(() => jsTransformService.create(org, fn))) {
+      created.functions.push(fn.name);
+    }
   }
 };
 
@@ -300,11 +320,33 @@ const findPipelineId = async (org: string): Promise<string | undefined> => {
   return hit?.pipeline_id;
 };
 
-const createPipeline = async (org: string) => {
+const createPipeline = async (org: string, created: Created) => {
   if (await findPipelineId(org)) return;
   await quiet(() =>
     pipelineService.createPipeline({ org_identifier: org, data: sampleAccessLogPipeline(org) }),
   );
+  created.pipeline = true;
+};
+
+// best effort: a failed rollback must not hide the error that stopped the load
+const rollback = async (org: string, created: Created) => {
+  try {
+    const pipelineId = created.pipeline ? await findPipelineId(org) : undefined;
+    if (pipelineId) {
+      await ignoreMissing(() =>
+        pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
+      );
+    }
+  } catch (e) {
+    console.warn("Sample pipeline was not rolled back", e);
+  }
+  for (const name of created.functions) {
+    try {
+      await ignoreMissing(() => jsTransformService.delete(org, name));
+    } catch (e) {
+      console.warn(`Sample function "${name}" was not rolled back`, e);
+    }
+  }
 };
 
 const createEnrichmentTable = async (org: string) => {
@@ -342,13 +384,25 @@ export const loadSampleData = async (
     }
     onProgress({ step, fraction: 1, counts, failed });
   };
-  await run("functions", () => createFunctions(org));
-  await run("pipeline", () => createPipeline(org));
+  const created: Created = { functions: [], pipeline: false };
+  await run("functions", () => createFunctions(org, created));
+  await run("pipeline", () => createPipeline(org, created));
 
   onProgress({ step: "telemetry", fraction: 0, counts });
-  const telemetry = await ingestTelemetry(org, hours, (fraction, c, logs) =>
-    onProgress({ step: "telemetry", fraction, counts: c, logs }),
-  );
+  const stored = { any: false };
+  let telemetry: Awaited<ReturnType<typeof ingestTelemetry>>;
+  try {
+    telemetry = await ingestTelemetry(
+      org,
+      hours,
+      (fraction, c, logs) => onProgress({ step: "telemetry", fraction, counts: c, logs }),
+      stored,
+    );
+  } catch (e) {
+    // the UI offers Delete only when a sample stream exists, so nothing else could clean these up
+    if (!stored.any) await rollback(org, created);
+    throw e;
+  }
   counts = telemetry.counts;
   result.counts = counts;
   try {

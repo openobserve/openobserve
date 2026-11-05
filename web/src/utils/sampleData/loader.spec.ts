@@ -523,3 +523,61 @@ describe("loadSampleData while a removal is finishing", () => {
     await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(stillRemoving);
   });
 });
+
+describe("loadSampleData rollback", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const bad = { response: { status: 400 } };
+
+  it("removes the functions and pipeline this run created when no telemetry was accepted", async () => {
+    mocks.sampleData.ingestLogs.mockRejectedValueOnce(bad).mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestTraces.mockRejectedValueOnce(bad);
+    vi.mocked(pipelineService.getPipelines)
+      .mockResolvedValueOnce({ data: { list: [] } } as any)
+      .mockResolvedValueOnce({
+        data: { list: [{ name: SAMPLE_PIPELINE, pipeline_id: "p1" }] },
+      } as any);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(bad);
+    expect(pipelineService.deletePipeline).toHaveBeenCalledWith({
+      pipeline_id: "p1",
+      org_id: "acme",
+    });
+    for (const name of SAMPLE_FUNCTIONS) {
+      expect(jsTransformService.delete).toHaveBeenCalledWith("acme", name);
+    }
+  });
+
+  it("leaves a function and pipeline it only found and reused", async () => {
+    mocks.sampleData.ingestLogs.mockRejectedValueOnce(bad).mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestTraces.mockRejectedValueOnce(bad);
+    vi.mocked(jsTransformService.create).mockRejectedValueOnce({ response: { status: 409 } });
+    vi.mocked(pipelineService.getPipelines).mockResolvedValueOnce({
+      data: { list: [{ name: SAMPLE_PIPELINE, pipeline_id: "p1" }] },
+    } as any);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(bad);
+    expect(pipelineService.deletePipeline).not.toHaveBeenCalled();
+    expect(jsTransformService.delete).not.toHaveBeenCalledWith("acme", SAMPLE_FUNCTIONS[0]);
+    expect(jsTransformService.delete).toHaveBeenCalledWith("acme", SAMPLE_FUNCTIONS[1]);
+  });
+
+  it("keeps everything once some telemetry was accepted", async () => {
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(bad);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(bad);
+    expect(jsTransformService.delete).not.toHaveBeenCalled();
+  });
+
+  it("reports the load's own error when the rollback fails too", async () => {
+    mocks.sampleData.ingestLogs.mockRejectedValueOnce(bad).mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(bad);
+    mocks.sampleData.ingestTraces.mockRejectedValueOnce(bad);
+    vi.mocked(jsTransformService.delete).mockRejectedValue(new Error("rollback down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(bad);
+    } finally {
+      warn.mockRestore();
+      vi.mocked(jsTransformService.delete).mockReset();
+    }
+  });
+});
