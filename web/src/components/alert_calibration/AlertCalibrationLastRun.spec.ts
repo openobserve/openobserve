@@ -82,6 +82,21 @@ describe("AlertCalibrationLastRun", () => {
     wrapper.unmount();
   });
 
+  it("shows a run whose ingestion token was not active yet as an error too", async () => {
+    const wrapper = await mountWith({
+      status: "error",
+      error:
+        "Results were not saved because the Alert Calibration ingestion token is not active yet. The next run retries.",
+      finished_at: NOW - 1_000_000,
+    });
+    const banner = wrapper.find('[data-test="alert-calibration-last-run-failed"]');
+    expect(banner.text()).toContain("ingestion token is not active yet");
+    expect(banner.classes()).toContain("bg-banner-error-bg");
+    expect(banner.classes().some((c) => c.includes("warning"))).toBe(false);
+    expect(banner.attributes("role")).toBe("alert");
+    wrapper.unmount();
+  });
+
   // The runs and overview pages only speak up for a failure, so nothing on them moves.
   it("stays quiet about a deferred run where only failures are shown", async () => {
     const wrapper = await mountWith(
