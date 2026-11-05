@@ -111,7 +111,7 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
 /**
  * Annotating a namespace makes the operator inject the language's auto-
  * instrumentation into every pod in it — no application code or image change.
- * One line per language, each in its own namespace.
+ * One line per language; languages that share a namespace restart it once.
  */
 export const annotate = (langs: { id: string; namespace: string }[]) =>
   `# Every pod in the namespace is instrumented — no code or image change.
@@ -123,7 +123,9 @@ ${langs
   .join("\n")}
 
 # Restart so running pods pick up the injection
-${langs.map(({ namespace }) => `kubectl rollout restart deployment -n ${namespace}`).join("\n")}`;
+${[...new Set(langs.map(({ namespace }) => namespace))]
+  .map((namespace) => `kubectl rollout restart deployment -n ${namespace}`)
+  .join("\n")}`;
 
 /** The languages the collector's Instrumentation resources cover; onboarding offers the same ones. */
 export const LANGUAGES: { id: string; label: string; icon: string }[] = [
@@ -247,15 +249,10 @@ const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardSte
     ...step,
     titleKey: "ingestion.setupCard.k8sTraceAppsTitle",
     descriptionKey: "ingestion.setupCard.k8sTraceLibraryDesc",
-    inputs: langs.map((l) => ({
-      id: `${l.id}Namespace`,
-      label: t("ingestion.setupCard.k8sTraceNamespaceLabel", { language: raw(l.label) }),
-      default: "my-namespace",
-      width: "sm",
-    })),
+    // As on the Data sources page, the user swaps in their own namespace.
     code: {
       lang: "bash",
-      raw: annotate(langs.map((l) => ({ id: l.id, namespace: `{${l.id}Namespace}` }))),
+      raw: annotate(langs.map((l) => ({ id: l.id, namespace: "my-namespace" }))),
     },
     note: t("ingestion.setupCard.k8sAnnotatePodNote"),
   };

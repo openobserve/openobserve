@@ -7072,7 +7072,6 @@
       "k8sTraceAppsTitle": "Trace your apps",
       "k8sTraceEbpfDesc": "Turn on eBPF tracing in the collector, then pick the apps to trace by port, executable path or command line.",
       "k8sTraceLibraryDesc": "Annotate the namespace of each language, so the operator adds its library to the pods there. Then restart those apps once.",
-      "k8sTraceNamespaceLabel": "{language} Namespace",
       "k8sTroubleAnnotationA": "Injection happens at pod creation, so existing pods are unaffected until they restart — run `kubectl rollout restart deployment -n my-namespace`. Confirm the annotation landed with `kubectl get ns my-namespace -o yaml`, and check that the value matches `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "I annotated a namespace but no traces appear",
       "k8sTroubleEndpointA": "Use the **Internal endpoint** only when OpenObserve itself runs in this cluster; traffic then stays inside it and never crosses the network. The URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — the default assumes release `o2` in namespace `openobserve`, so edit it if yours differ. Everyone else uses the external endpoint.",

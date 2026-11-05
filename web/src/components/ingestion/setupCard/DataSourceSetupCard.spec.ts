@@ -565,7 +565,8 @@ describe("DataSourceSetupCard — onboarding's tracing answer", () => {
   it("builds the tracing step from onboarding's answer", () => {
     const step = instrument(mountK8s({ traces: "library", languages: ["java"] }));
     expect(step.collapsed).toBeUndefined();
-    expect(step.inputs.map((i: { id: string }) => i.id)).toEqual(["javaNamespace"]);
+    expect(step.inputs).toBeUndefined();
+    expect(step.code.raw).toContain("kubectl annotate namespace my-namespace");
   });
 
   it("folds the optional step only inside onboarding", () => {

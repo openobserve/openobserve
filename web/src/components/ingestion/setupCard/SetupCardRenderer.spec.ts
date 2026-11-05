@@ -1341,7 +1341,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
     expect(instrumentCode()).toContain("--set-string 'ebpf.trace.ports={8080}'");
   });
 
-  it("gives one annotate line per language, each with its own namespace input", async () => {
+  it("gives one annotate line per language in my-namespace, restarted once, with no input", () => {
     mountOnboarding({ traces: "library", languages: ["java", "nodejs"] });
     expect(titles()).toEqual([
       "Quick install (recommended)",
@@ -1350,24 +1350,17 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
       "Check Your Data",
     ]);
     expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
-    for (const id of ["javaNamespace", "nodejsNamespace"]) {
-      expect((find(`ai-input-${id}`).find("input").element as HTMLInputElement).value).toBe(
-        "my-namespace",
-      );
-    }
-    await find("ai-input-javaNamespace").find("input").setValue("shop");
-    await find("ai-input-nodejsNamespace").find("input").setValue("web");
+    expect(find("ai-step-instrument").find('[data-test^="ai-input-"]').exists()).toBe(false);
     expect(instrumentCode()).toBe(
       [
         "# Every pod in the namespace is instrumented — no code or image change.",
-        "kubectl annotate namespace shop \\",
+        "kubectl annotate namespace my-namespace \\",
         '  instrumentation.opentelemetry.io/inject-java="openobserve-collector/openobserve-java"',
-        "kubectl annotate namespace web \\",
+        "kubectl annotate namespace my-namespace \\",
         '  instrumentation.opentelemetry.io/inject-nodejs="openobserve-collector/openobserve-nodejs"',
         "",
         "# Restart so running pods pick up the injection",
-        "kubectl rollout restart deployment -n shop",
-        "kubectl rollout restart deployment -n web",
+        "kubectl rollout restart deployment -n my-namespace",
       ].join("\n"),
     );
   });
