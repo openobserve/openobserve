@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use config::{TIMESTAMP_COL_NAME, meta::inverted_index::IndexOptimizeMode};
+use config::{
+    TIMESTAMP_COL_NAME,
+    meta::{histogram_origin::histogram_bucket_offset, inverted_index::IndexOptimizeMode},
+};
 use datafusion::{
     common::{
         Result,
@@ -106,7 +109,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                         let (start_time, end_time) = self.time_range;
                         // round the bucket edges to even start
                         let rounding_by = histogram_interval as i64;
-                        let min_value = start_time - start_time % rounding_by;
+                        let min_value =
+                            start_time - histogram_bucket_offset(start_time, rounding_by);
                         let max_value = end_time;
                         let num_buckets = ((max_value - min_value) as f64
                             / histogram_interval as f64)
@@ -269,7 +273,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                             if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
                                 let (start_time, end_time) = self.time_range;
                                 let rounding_by = histogram_interval as i64;
-                                let min_value = start_time - start_time % rounding_by;
+                                let min_value =
+                                    start_time - histogram_bucket_offset(start_time, rounding_by);
                                 let max_value = end_time;
                                 self.simple_multi_histogram = Some((
                                     min_value,
@@ -380,6 +385,16 @@ mod tests {
                     0,
                 )),
             ),
+            // 30 days does not divide the 2001 origin, so the first key must come from that grid
+            (
+                "SELECT histogram(_timestamp, '30 days') as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1755907200000000,
+                    2592000000000,
+                    1,
+                    0,
+                )),
+            ),
             (
                 "SELECT name, histogram(_timestamp) as ts, count(*) as cnt from t group by name, ts",
                 None,
@@ -472,6 +487,16 @@ mod tests {
                     1757401680000000,
                     1757402594060000,
                     60000000,
+                    0,
+                    "level".to_string(),
+                )),
+            ),
+            (
+                "SELECT histogram(_timestamp, '30 days') as ts, level, count(*) as cnt from t group by ts, level",
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1755907200000000,
+                    1757402594060000,
+                    2592000000000,
                     0,
                     "level".to_string(),
                 )),
