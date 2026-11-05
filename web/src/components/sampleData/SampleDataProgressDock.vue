@@ -138,7 +138,10 @@ const failedInBackground = ref(false);
 // the dialog shows the same progress, so the dock only takes over once it is closed
 const ownLoad = computed(
   () =>
-    session.loadingOrg.value === org.value && !session.welcomeOpen.value && !store.state.kioskMode,
+    session.loadingOrg.value === org.value &&
+    !session.welcomeOpen.value &&
+    !store.state.kioskMode &&
+    !store.state.printMode,
 );
 const loading = computed(() => ownLoad.value && session.status.value === "loading");
 const done = computed(

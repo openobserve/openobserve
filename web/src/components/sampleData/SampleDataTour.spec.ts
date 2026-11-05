@@ -43,6 +43,7 @@ const mountTour = async (
   start = "/",
   attachTo?: HTMLElement,
   features: Record<string, string> = {},
+  printMode = false,
 ) => {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -60,7 +61,12 @@ const mountTour = async (
   });
   await router.push(start);
   const store = createStore({
-    state: { selectedOrganization: { identifier: ORG }, kioskMode: false, zoConfig: { features } },
+    state: {
+      selectedOrganization: { identifier: ORG },
+      kioskMode: false,
+      printMode,
+      zoConfig: { features },
+    },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale } });
   const wrapper = mount(SampleDataTour, { attachTo, global: { plugins: [store, router, i18n] } });
@@ -207,5 +213,11 @@ describe("SampleDataTour", () => {
     await wrapper.get('[data-test="sample-tour-back"]').trigger("click");
     await flushPromises();
     expect(session.tour.value?.index).toBe(0);
+  });
+
+  it("stays hidden in print mode", async () => {
+    session.startTour(ORG, 0);
+    const { wrapper } = await mountTour("/", undefined, {}, true);
+    expect(wrapper.find('[data-test="sample-tour-panel"]').exists()).toBe(false);
   });
 });

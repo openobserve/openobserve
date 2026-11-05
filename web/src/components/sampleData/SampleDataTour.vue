@@ -198,6 +198,7 @@ const visible = computed(
   () =>
     active.value &&
     !store.state.kioskMode &&
+    !store.state.printMode &&
     (tour.value?.ownData === true || !presence.hasRealData.value),
 );
 const index = computed(() => tour.value?.index ?? 0);

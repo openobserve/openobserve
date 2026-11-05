@@ -43,7 +43,7 @@ import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSess
 
 const session = useSampleDataSession() as any;
 
-const mountDock = () => {
+const mountDock = (printMode = false) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: "/", component: { template: "<div />" } }],
@@ -52,6 +52,7 @@ const mountDock = () => {
     state: {
       selectedOrganization: { identifier: ORG },
       kioskMode: false,
+      printMode,
       zoConfig: { ingest_allowed_upto: 6 },
     },
   });
@@ -111,6 +112,12 @@ describe("SampleDataProgressDock", () => {
     await flushPromises();
     expect(wrapper.text()).toContain(enLocale.sampleData.toast.loadFailed);
     await wrapper.get('[data-test="sample-data-progress-dock-close"]').trigger("click");
+    expect(wrapper.find('[data-test="sample-data-progress-dock"]').exists()).toBe(false);
+  });
+
+  it("stays hidden in print mode", async () => {
+    const wrapper = mountDock(true);
+    await flushPromises();
     expect(wrapper.find('[data-test="sample-data-progress-dock"]').exists()).toBe(false);
   });
 });
