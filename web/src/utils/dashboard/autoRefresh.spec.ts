@@ -18,6 +18,7 @@ import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import {
   autoRefreshLabel,
+  autoRefreshShortLabel,
   effectiveDefaultRefresh,
   minAutoRefreshSeconds,
   resolveOpenRefreshInterval,
@@ -84,5 +85,19 @@ describe("autoRefreshLabel", () => {
     expect(autoRefreshLabel(7200, t)).toBe("2 hr");
     expect(autoRefreshLabel(86400, t)).toBe("1 day");
     expect(autoRefreshLabel(45, t)).toBe("45 sec");
+  });
+});
+
+describe("autoRefreshShortLabel", () => {
+  it.each([
+    [0, "Off"],
+    [30, "30s"],
+    [60, "1m"],
+    [90, "90s"],
+    [3600, "1h"],
+    [7200, "2h"],
+    [86400, "1d"],
+  ])("labels %i seconds as %s", (seconds, expected) => {
+    expect(autoRefreshShortLabel(seconds, t)).toBe(expected);
   });
 });

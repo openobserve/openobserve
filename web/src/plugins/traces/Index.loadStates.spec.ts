@@ -656,6 +656,43 @@ describe("Traces page load states", () => {
       expect(mockRecordRecent).toHaveBeenCalledTimes(1);
     });
 
+    describe("recorded no_results", () => {
+      const recordedResult = async (stream: (handlers: any) => void) => {
+        setRouteQuery({ stream: "default" });
+        mockTakeLanding.mockReturnValueOnce({ run: true });
+        searchObj.data.editorValue = "span_status = 'ERROR'";
+        mountKeptAlive();
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+        const handlers = lastCall("main")[1];
+        stream(handlers);
+        handlers.complete(null);
+        await flushPromises();
+        expect(mockRecordRecent).toHaveBeenCalledTimes(1);
+        return mockRecordRecent.mock.calls[0][0].context.no_results;
+      };
+      const hitsResponse = (results: Record<string, unknown>) => ({
+        type: "search_response_hits",
+        content: { results },
+      });
+
+      it("flags a finished run that wrote no rows", async () => {
+        expect(await recordedResult(() => {})).toBe(true);
+      });
+
+      it("does not flag a run that wrote rows", async () => {
+        const hit = { trace_id: "t1", start_time: 1, end_time: 2, spans: 1 };
+        expect(
+          await recordedResult((h) => h.data(null, hitsResponse({ hits: [hit] }))),
+        ).toBeUndefined();
+      });
+
+      it("does not flag a partial run as having no results", async () => {
+        expect(
+          await recordedResult((h) => h.data(null, hitsResponse({ hits: [], is_partial: true }))),
+        ).toBeUndefined();
+      });
+    });
+
     it("starts no search from a URL tab change while it sits in the cache", async () => {
       const route = ref({ query: { stream: "default" } as Record<string, string>, name: "traces" });
       routeSpy.mockReturnValue(route as any);
