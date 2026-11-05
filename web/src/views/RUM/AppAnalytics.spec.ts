@@ -134,7 +134,6 @@ describe("AppAnalytics shell", () => {
           ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
         },
       },
-      attachTo: document.body,
     });
     await flushPromises();
     await flushPromises();
