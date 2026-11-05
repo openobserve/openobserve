@@ -512,10 +512,10 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
-            // the plan's own filter still evaluates a LIKE
-            Condition::All() | Condition::Like { .. } => {
-                Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true)))))
-            }
+            Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
+            Condition::Like { field, .. } => Err(anyhow::anyhow!(
+                "LIKE on {field} stays in the plan's filter and has no physical expression"
+            )),
             Condition::Or(items) => {
                 let exprs = items
                     .iter()
@@ -1008,18 +1008,11 @@ mod tests {
     }
 
     #[test]
-    fn test_condition_like_physical_expr_leaves_rows_to_plan_filter() {
-        let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
-            "service",
-            arrow_schema::DataType::Utf8,
-            true,
-        )]);
-        let expr = like("message", "err")
-            .to_physical_expr(&schema, &[])
-            .unwrap();
-        assert_eq!(
-            expr.downcast_ref::<Literal>().unwrap().value(),
-            &ScalarValue::Boolean(Some(true))
-        );
+    fn test_condition_like_has_no_physical_expr() {
+        let schema = arrow_schema::Schema::empty();
+        let condition = like("message", "err");
+        assert!(condition.to_physical_expr(&schema, &[]).is_err());
+        let nested = Condition::Or(vec![condition]);
+        assert!(nested.to_physical_expr(&schema, &[]).is_err());
     }
 }
