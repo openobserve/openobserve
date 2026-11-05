@@ -14,6 +14,33 @@ const OVERVIEW_SECTIONS = [
     /\/api\/v2\/[^/]+\/alerts\/incidents/,
     /\/api\/[^/]+\/traces\/service_graph\/topology\/current/,
 ];
+const OVERVIEW_ENDPOINT = /\/api\/[^/]+\/overview(\?.*)?$/;
+const FIRING_RULE = 'checkout_latency_p95';
+
+// one firing rule, pipelines refused and streams failed, so every section state shows on one page
+function overviewWithGaps() {
+    const nowUs = Date.now() * 1000;
+    return {
+        streams: { status: 'error', error: 'stubbed failure' },
+        alerts: {
+            status: 'ok',
+            data: {
+                total: 4,
+                enabled: 4,
+                disabled: 0,
+                by_state: { firing: 1, normal: 3, notify_failed: 0 },
+                by_level: { ok: 0, warning: 0, critical: 1, no_data: 0, unclassified: 0 },
+                failed_evaluation: 0,
+                firing: [{ name: FIRING_RULE, stream: 'checkout_traces', level: 'critical', since: nowUs - 25 * 60 * 1_000_000 }],
+                firing_by_level: { ok: 0, warning: 0, critical: 1, no_data: 0, unclassified: 0 },
+            },
+        },
+        pipelines: { status: 'forbidden' },
+        limits: { status: 'locked' },
+        generated_at: nowUs,
+        cached: false,
+    };
+}
 
 // Cloud lets only root create orgs, so the empty screens use the stack's one empty org and never write to it.
 async function emptyOrgId(page, name) {
@@ -81,6 +108,26 @@ async function failSections(page, status, which = OVERVIEW_SECTIONS) {
     }
 }
 
+async function answerSectionsEmpty(page) {
+    await page.route(OVERVIEW_SECTIONS[0], (route) => route.fulfill({ json: { total: 0, hits: [] } }));
+    await page.route(OVERVIEW_SECTIONS[1], (route) => route.fulfill({ json: [] }));
+    await page.route(OVERVIEW_SECTIONS[2], (route) => route.fulfill({ json: { incidents: [], total: 0 } }));
+    await page.route(OVERVIEW_SECTIONS[3], (route) => route.fulfill({ json: { nodes: [], edges: [] } }));
+}
+
+async function stubOverview(page, reply) {
+    await page.route(OVERVIEW_ENDPOINT, (route) => route.fulfill(reply));
+}
+
+// an org whose summary counts no rules takes the not-monitored hero, which would hide the cards under test
+async function pinSummaryRules(page) {
+    await page.route(/\/api\/[^/]+\/summary(\?.*)?$/, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json().catch(() => ({}));
+        await route.fulfill({ response, json: { ...body, alerts: { ...(body.alerts || {}), num_realtime: 4, num_scheduled: 0 } } });
+    });
+}
+
 async function openHome(page, orgId, tab) {
     await page.evaluate((t) => localStorage.setItem('o2_home_active_tab', t), tab);
     await page.goto(`${base()}/web/?org_identifier=${orgId}`);
@@ -91,7 +138,6 @@ const tid = (page, id) => page.locator(`[data-test="${id}"]`);
 
 async function expectNoOverviewToolbar(page) {
     await expect(tid(page, 'date-time-btn')).toHaveCount(0);
-    await expect(page.locator('[data-test="home-page"] [data-test="overview-all-clear-empty-state"]')).toHaveCount(0);
 }
 
 const SCREENS = [
@@ -169,7 +215,6 @@ const SCREENS = [
             await expect(tid(page, 'first-data-panel-arrived-summary')).toHaveText('1,204 records in stream default');
             await expect(tid(page, 'overview-not-monitored-empty-state')).toBeVisible({ timeout: 20000 });
             await expect(tid(page, 'overview-not-monitored-alert-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             expect(loads).toEqual([]);
         },
     },
@@ -180,24 +225,19 @@ const SCREENS = [
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
         },
     },
     {
         id: 'h-home-overview-summary-error',
         async init({ page }) {
-            await page.route(OVERVIEW_SECTIONS[0], (route) => route.fulfill({ json: { total: 0, hits: [] } }));
-            await page.route(OVERVIEW_SECTIONS[1], (route) => route.fulfill({ json: [] }));
-            await page.route(OVERVIEW_SECTIONS[2], (route) => route.fulfill({ json: { incidents: [], total: 0 } }));
-            await page.route(OVERVIEW_SECTIONS[3], (route) => route.fulfill({ json: { nodes: [], edges: [] } }));
+            await answerSectionsEmpty(page);
             await page.route(/\/api\/[^/]+\/summary(\?.*)?$/, (route) => route.fulfill({ status: 500, json: { code: 500, message: 'stubbed failure' } }));
         },
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'overview-not-monitored-empty-state')).toHaveCount(0);
         },
     },
@@ -283,7 +323,6 @@ const SCREENS = [
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(tid(page, 'first-event-status')).toHaveCount(0);
         },
@@ -307,7 +346,6 @@ const SCREENS = [
             await expect(tid(page, 'date-time-btn')).toBeVisible();
             await expect(page.locator('[data-test="home-page"] [data-test="refresh-button"]')).toBeVisible();
             await expect(page.locator('[data-test="home-page"]').getByText('just now')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(tid(page, 'first-event-status')).toHaveCount(0);
             // the load's one-shot first-data notice probes are all; no watcher polls behind the flag-off hero
@@ -334,7 +372,6 @@ const SCREENS = [
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'home-first-data-hero')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(page.locator('[data-test="home-page"]').getByText('just now')).toHaveCount(0);
@@ -342,7 +379,6 @@ const SCREENS = [
             await tid(page, 'overview-load-error-retry-card').click();
             await expect.poll(() => streamReads.length, { timeout: 15000 }).toBeGreaterThan(beforeRetry);
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await page.mouse.move(760, 880);
         },
     },
@@ -379,7 +415,69 @@ const SCREENS = [
             await expect(tid(page, 'overview-recent-events-section')).toBeVisible();
             await expect(tid(page, 'overview-services-section')).toBeVisible();
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
+        },
+    },
+    {
+        id: 'h-home-overview-section-states',
+        async init({ page }) {
+            await answerSectionsEmpty(page);
+            await pinSummaryRules(page);
+            await stubOverview(page, { json: overviewWithGaps() });
+        },
+        async run({ page, orgId }) {
+            await openHome(page, orgId, 'overview');
+            const tileValue = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-value"]`);
+            const tileNote = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-note"]`);
+
+            await expect(tid(page, 'overview-status-danger')).toBeVisible({ timeout: 30000 });
+            await expect(tid(page, 'overview-status-text')).toHaveText('Needs attention');
+            await expect(page.locator('[data-test^="overview-status-item-"]')).toHaveText(['1 alert firing']);
+            await expect(tid(page, 'overview-status-clear')).toHaveCount(0);
+
+            await expect(tileValue('firing')).toHaveText('1');
+            await expect(tileValue('failing')).toHaveText('0');
+            await expect(tileValue('delivery')).toHaveText('0');
+            await expect(tileValue('pipelines')).toHaveText('—');
+            await expect(tileNote('pipelines')).toHaveText('No access');
+            await expect(tileValue('quiet')).toHaveText('—');
+            await expect(tileNote('quiet')).toHaveText('Could not load');
+
+            await expect(tid(page, `overview-alerts-firing-${FIRING_RULE}`)).toBeVisible();
+            await expect(tid(page, 'overview-alerts-error')).toHaveCount(0);
+            await expect(tid(page, 'overview-alerts-forbidden')).toHaveCount(0);
+
+            await expect(tid(page, 'overview-data-health-status-pipelines')).toHaveText('No access');
+            await expect(tid(page, 'overview-data-health-value-pipelines')).toHaveText('—');
+            await expect(tid(page, 'overview-data-health-status-quiet')).toHaveText('Could not load');
+            await expect(tid(page, 'overview-data-health-value-quiet')).toHaveText('—');
+            await expect(tid(page, 'overview-data-health-retry-btn')).toHaveCount(0);
+
+            await expect(tid(page, 'overview-streams-error')).toBeVisible();
+            await expect(tid(page, 'overview-streams-retry-btn')).toBeVisible();
+            await expect(tid(page, 'overview-streams-top')).toHaveCount(0);
+
+            await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
+            await expect(tid(page, 'overview-no-access-empty-state')).toHaveCount(0);
+        },
+    },
+    {
+        id: 'h-home-overview-forbidden',
+        async init({ page }) {
+            await failSections(page, 403);
+            await stubOverview(page, { status: 403, json: { code: 403, message: 'Unauthorized Access' } });
+        },
+        async run({ page, orgId }) {
+            await openHome(page, orgId, 'overview');
+            const noAccess = tid(page, 'overview-no-access-empty-state');
+            await expect(noAccess).toBeVisible({ timeout: 30000 });
+            await expect(noAccess).toContainText("You don't have access");
+            await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
+            await expect(tid(page, 'overview-load-error-retry-card')).toHaveCount(0);
+            await expect(page.locator('[data-test$="-retry-btn"]')).toHaveCount(0);
+            await expect(tid(page, 'overview-headline-strip')).toHaveCount(0);
+            await expect(page.locator('[data-test="home-page"] [data-test="refresh-button"]')).toHaveCount(0);
+            await expectNoOverviewToolbar(page);
+            await expect(page.locator('[data-test^="o-toast-"]')).toHaveCount(0);
         },
     },
 ];

@@ -13,16 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod decompression;
+pub mod middlewares;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_oncall_off_tests;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_tests;
+pub mod openapi;
+#[cfg(test)]
+mod openapi_coverage;
+#[cfg(test)]
+mod search_gate_tests;
+
 use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    extract::{DefaultBodyLimit, FromRequestParts, MatchedPath, Path, RawPathParams, Request},
     http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
+use common::meta::http::ERROR_HEADER;
 use config::{get_config, meta::feature::Feature};
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
@@ -33,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status,
-    status_pages, stream, synthetics, users,
+    query_history, rum_analytics, service_accounts, service_streams, short_url, slack, slos,
+    sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -67,8 +80,7 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers,
-        service_streams, workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -77,6 +89,8 @@ use {
 use super::request::mcp;
 #[cfg(feature = "enterprise")]
 use super::request::ratelimit;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::router::middlewares::search_license_middleware;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -90,18 +104,6 @@ use crate::{
         },
     },
 };
-
-pub mod decompression;
-pub mod middlewares;
-#[cfg(all(test, feature = "enterprise"))]
-mod one_ack_oncall_off_tests;
-#[cfg(all(test, feature = "enterprise"))]
-mod one_ack_tests;
-pub mod openapi;
-#[cfg(test)]
-mod openapi_coverage;
-
-use common::meta::http::ERROR_HEADER;
 
 /// How long a refused agent waits before reconnecting while fleet management is off.
 #[cfg(feature = "enterprise")]
@@ -326,6 +328,14 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
     None
 }
 
+/// The route template axum matched, which a caller cannot shape the way it shapes the path.
+pub(crate) fn matched_route(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|route| route.as_str().to_owned())
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -337,6 +347,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     // Extract auth info from request (synchronous now, no await)
@@ -409,6 +420,7 @@ pub async fn aws_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_aws(&req_data).await {
@@ -431,6 +443,7 @@ pub async fn gcp_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_gcp(&req_data).await {
@@ -453,6 +466,7 @@ pub async fn rum_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_rum(&req_data).await {
@@ -475,6 +489,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     let (mut parts, body) = request.into_parts();
@@ -702,20 +717,16 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    let ingestion_path = if path.starts_with("api/") {
-        path.split_once("api/")
-            .map(|(_, rest)| rest)
-            .unwrap_or(&path)
-    } else {
-        &path
-    };
-
     let (audit_org, after_org) = audit_org_and_next(&path_columns);
 
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
+            || common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                &path,
+                matched_route(&request).as_deref(),
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = if audit_org == "organizations" {
@@ -1271,22 +1282,14 @@ fn alert_calibration_routes(router: Router) -> Router {
 }
 
 #[rustfmt::skip]
-pub fn service_routes() -> Router {
-    let cfg = get_config();
-
-    // Set server header
-    #[cfg(feature = "enterprise")]
-    let server = format!(
-        "{}-{}",
-        get_o2_config().super_cluster.region,
-        cfg.common.instance_name_short
-    );
-    #[cfg(not(feature = "enterprise"))]
-    let server = cfg.common.instance_name_short.to_string();
-
-    // Downtimes and Slack live in their own tables to keep this function under the line limit.
-    let mut router =
-        public_dashboard_admin_routes(Router::new().merge(downtime_routes()).merge(slack_routes()));
+fn service_route_table() -> Router {
+    // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
+    let mut router = Router::new()
+        .merge(downtime_routes())
+        .merge(slack_routes())
+        .merge(search_routes());
+    router = public_dashboard_admin_routes(router);
+    router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1344,6 +1347,7 @@ pub fn service_routes() -> Router {
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
+        .route("/{org_id}/overview", get(organization::org::org_overview))
         .route("/{org_id}/ingest/recent_rejections", get(ingest_rejections::recent_rejections))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
@@ -1392,7 +1396,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/time_range", get(traces::time_index::get_trace_time_range))
-        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Profiles query (ingest remains under /v1/profiles)
@@ -1401,43 +1404,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
         .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
-
-        // Database Monitoring — its own top-level module, not under /traces.
-        // The path segment must stay `db_monitoring` to match the OFGA resource
-        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
-        // ROUTE_PERMISSIONS).
-        //
-        // Every route below is registered in both builds; the build-type gate
-        // lives in the handlers, three of which (deadlocks/blocking/
-        // table_health) are dual-implemented and answer 403 on OSS. Registering
-        // them in the enterprise-gated block instead would 404 them, losing the
-        // distinction between "not licensed" and "no such endpoint". Runtime
-        // off-switch is ZO_DB_MONITORING_ENABLED.
-        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
-        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
-        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
-        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
-        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
-        // Server-vantage events (read the canonical o2_dbm_* columns)
-        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
-        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
-        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
-        // `query/insights` returns the query-detail page's Logs-side pair in one
-        // round trip; `query/plans` and `query/server_metrics` are superseded by
-        // it (same sections, same envelopes) and stay registered for
-        // compatibility.
-        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
-        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
-        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
-        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
-        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
-        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
-        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
-        .route(
-            "/{org_id}/db_monitoring/instance_metrics",
-            get(db_monitoring::handler::get_dbm_instance_metrics),
-        )
-        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
@@ -1461,7 +1427,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/metadata", get(promql::metadata))
         .route("/{org_id}/prometheus/api/v1/series", get(promql::series_get).post(promql::series_post))
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
-        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
         .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
@@ -1473,12 +1438,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
-
-        // Multi-stream search
-        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
-        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
-        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
-        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
 
         // HTTP/2 streaming
         .route("/{org_id}/_search_stream", post(search::search_stream::search_http2_stream))
@@ -1564,8 +1523,6 @@ pub fn service_routes() -> Router {
             post(alerts::mute::cancel_alert_mute),
         )
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
-        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
-        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
@@ -1633,8 +1590,7 @@ pub fn service_routes() -> Router {
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
-            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
-            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
         router = alert_calibration_routes(router);
@@ -1745,21 +1701,11 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items",
-                    post(annotation_queues::enqueue_annotation_queue_item)
-                        .delete(annotation_queues::clear_annotation_queue_items),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
-                    get(annotation_queues::get_annotation_queue_item),
+                    delete(annotation_queues::clear_annotation_queue_items),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
-                    get(annotation_queues::list_annotation_queue_item_reviews)
-                        .post(annotation_queues::review_annotation_queue_item),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
-                    post(datasets::push_annotation_queue_item_to_dataset),
+                    post(annotation_queues::review_annotation_queue_item),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/archive",
@@ -1781,9 +1727,7 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items)
-                        .post(datasets::push_dataset_item)
-                        .put(datasets::upsert_dataset_items),
+                    get(datasets::list_dataset_items).put(datasets::upsert_dataset_items),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/rows",
@@ -1810,25 +1754,13 @@ pub fn service_routes() -> Router {
                     get(experiments::list_experiments).post(experiments::create_experiment),
                 )
                 .route(
-                    "/{org_id}/experiments/compare",
-                    get(experiments::compare_experiments),
-                )
-                .route(
                     "/{org_id}/experiments/{experiment_id}",
-                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                    delete(experiments::delete_experiment),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/baseline",
                     put(experiments::set_experiment_baseline)
                         .delete(experiments::clear_experiment_baseline),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows",
-                    get(experiments::list_experiment_result_rows),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
-                    get(experiments::get_experiment_row),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
@@ -1862,9 +1794,6 @@ pub fn service_routes() -> Router {
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
 
-                // LLM score-based Discovery
-                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
-
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/test", post(providers::test_provider_config))
@@ -1882,7 +1811,6 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
                 .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
                 .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
-                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
                 .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
                 .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
                 .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
@@ -1915,7 +1843,6 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
-                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
         }
     }
@@ -1924,11 +1851,9 @@ pub fn service_routes() -> Router {
     {
         router = fleet_routes(router)
             // Search jobs
-            .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs", get(search::search_job::list_status))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
-            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
             .route("/{org_id}/search_jobs/{job_id}/cancel", post(search::search_job::cancel_job))
-            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
@@ -1965,23 +1890,11 @@ pub fn service_routes() -> Router {
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
             .route("/license/refresh", post(license::refresh_license_limits))
-
-            // Topology
-            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
-            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
-            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
-            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
-
-            // Patterns
-            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
+            .route("/license/rotate_key", post(license::rotate_license_key))
 
             // Service streams
             .route("/{org_id}/service_streams", get(service_streams::list_services))
-            .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
-            .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
         router = ai_chat_routes(router);
 
@@ -2329,6 +2242,21 @@ pub fn service_routes() -> Router {
             );
     }
 
+    router
+}
+
+fn with_service_layers(router: Router) -> Router {
+    let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let server = format!(
+        "{}-{}",
+        get_o2_config().super_cluster.region,
+        cfg.common.instance_name_short
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let server = cfg.common.instance_name_short.to_string();
+
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
@@ -2356,14 +2284,110 @@ pub fn service_routes() -> Router {
         }))
 }
 
+/// Registered in both builds so OSS answers the handlers' 403 enterprise-only stub, not a 404.
+#[rustfmt::skip]
+fn service_streams_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
+        .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
+        .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
+}
+
+/// Routes that read customer data through search; the licence gate answers 429 while search is blocked.
+#[rustfmt::skip]
+fn search_routes() -> Router {
+    #[cfg(feature = "enterprise")]
+    let llm_eval = get_o2_config().llm_eval_config.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let llm_eval = false;
+    search_routes_with(llm_eval)
+}
+
+#[rustfmt::skip]
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+fn search_routes_with(llm_eval: bool) -> Router {
+    let router = Router::new()
+        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
+        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
+        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
+        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
+        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
+        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
+
+        // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.
+        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
+        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
+        // plans and server_metrics are superseded by query/insights; kept for compatibility
+        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(db_monitoring::handler::get_dbm_instance_metrics),
+        )
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges));
+    #[cfg(feature = "enterprise")]
+    let router = {
+        let router = router
+            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model))
+            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/search_jobs", post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
+            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
+            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
+            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
+            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
+            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns));
+        if llm_eval {
+            router
+                .route("/{org_id}/annotation_queues/{queue_id}/items", post(annotation_queues::enqueue_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}", get(annotation_queues::get_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews", get(annotation_queues::list_annotation_queue_item_reviews))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset", post(datasets::push_annotation_queue_item_to_dataset))
+                .route("/{org_id}/datasets/{dataset_id}/items", post(datasets::push_dataset_item))
+                .route("/{org_id}/experiments/compare", get(experiments::compare_experiments))
+                .route("/{org_id}/experiments/{experiment_id}", get(experiments::get_experiment))
+                .route("/{org_id}/experiments/{experiment_id}/rows", get(experiments::list_experiment_result_rows))
+                .route("/{org_id}/experiments/{experiment_id}/rows/{row_id}", get(experiments::get_experiment_row))
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
+        } else {
+            router
+        }
+    };
+    // A route layer, not a layer: it must not reach the ungated methods merged onto the same paths.
+    #[cfg(feature = "enterprise")]
+    let router = router.route_layer(middleware::from_fn(search_license_middleware));
+    router
+}
+
+pub fn service_routes() -> Router {
+    with_service_layers(service_route_table())
+}
+
 /// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
 #[rustfmt::skip]
 pub fn downtime_routes() -> Router {
     Router::new()
         .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
         .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
-        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
-        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
         .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
@@ -3226,6 +3250,42 @@ mod tests {
                 .unwrap();
             let json: Value = serde_json::from_slice(&bytes).unwrap();
             assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_streams_routes_answer_403_not_404_in_the_oss_build() {
+        let routes = [
+            (
+                Method::GET,
+                "/default/service_streams/_analytics",
+                Body::empty(),
+            ),
+            (
+                Method::POST,
+                "/default/service_streams/_correlate",
+                Body::from(
+                    r#"{"source_stream":"s","source_type":"logs","available_dimensions":{}}"#,
+                ),
+            ),
+            (
+                Method::DELETE,
+                "/default/service_streams/_reset",
+                Body::empty(),
+            ),
+        ];
+        for (method, uri, body) in routes {
+            let what = format!("{method} {uri}");
+            let req = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("user_id", "root@example.com")
+                .header("content-type", "application/json")
+                .body(body)
+                .unwrap();
+            let response = service_streams_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
         }
     }
 
@@ -5022,8 +5082,8 @@ mod tests {
     /// `service_routes()` minus comments, whitespace and wrap commas.
     fn service_routes_registrations() -> String {
         let source = include_str!("mod.rs");
-        let start = source.find("pub fn service_routes() -> Router {").unwrap();
-        let end = start + source[start..].find("\npub fn ").unwrap();
+        let start = source.find("fn service_route_table() -> Router {").unwrap();
+        let end = start + source[start..].find("\n}\n").unwrap();
         let mut body = String::new();
         let mut rest = &source[start..end];
         while let Some(at) = rest.find("/*") {
@@ -5039,6 +5099,14 @@ mod tests {
             .split_whitespace()
             .collect::<String>()
             .replace(",)", ")")
+    }
+
+    #[test]
+    fn service_streams_routes_are_merged_unconditionally_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(".merge(service_streams_routes())"),
+            "service_routes() must merge service_streams_routes() outside the enterprise block"
+        );
     }
 
     #[test]
@@ -5571,6 +5639,67 @@ mod tests {
                 .unwrap();
             let status = app.clone().oneshot(req).await.unwrap().status();
             assert_eq!(status, expected, "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_ingestion_token_is_judged_by_the_route_each_auth_layer_matched() {
+        let org = "route_wiring_org";
+        let token = "o2oi_route_wiring";
+        common::infra::config::ORGANIZATIONS.write().await.insert(
+            org.to_string(),
+            common::meta::organization::Organization {
+                identifier: org.to_string(),
+                name: org.to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+        );
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{org}/{token}"), "wiring-token".to_string());
+        let credentials = config::utils::base64::encode(&format!("collector@example.com:{token}"));
+        let app = Router::new().nest(
+            "/o2",
+            Router::new()
+                .nest("/api", service_routes())
+                .merge(other_service_routes()),
+        );
+        for (uri, header, accepted) in [
+            (format!("/o2/api/{org}/_bulk"), "Authorization", true),
+            (format!("/o2/api/{org}/kv/_json"), "Authorization", false),
+            (
+                format!("/o2/api/{org}/streams/_sub"),
+                "Authorization",
+                false,
+            ),
+            (
+                format!("/o2/aws/{org}/s/_kinesis_firehose"),
+                "X-Amz-Firehose-Access-Key",
+                true,
+            ),
+            (
+                format!("/o2/gcp/{org}/s/_sub?API-Key={credentials}"),
+                "",
+                true,
+            ),
+        ] {
+            let mut req = Request::builder().method(Method::POST).uri(&uri);
+            if header == "Authorization" {
+                req = req.header(header, format!("Basic {credentials}"));
+            } else if !header.is_empty() {
+                req = req.header(header, &credentials);
+            }
+            let status = app
+                .clone()
+                .oneshot(req.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status();
+            assert_eq!(
+                status != StatusCode::UNAUTHORIZED,
+                accepted,
+                "POST {uri}: {status}"
+            );
         }
     }
 

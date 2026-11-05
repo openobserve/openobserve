@@ -30,9 +30,10 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
-    Order, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
-    prelude::Expr, sea_query::Func,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait,
+    FromQueryResult, JoinType, ModelTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, RelationTrait, Set, TransactionTrait, TryIntoModel, prelude::Expr,
+    sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -46,6 +47,17 @@ use crate::{
 };
 
 pub mod intermediate;
+
+/// The alert columns a summary needs, read without parsing the stored alert body.
+#[derive(Clone, Debug, FromQueryResult)]
+pub struct AlertSummaryRow {
+    pub id: String,
+    pub name: String,
+    /// The folder's public id, not its surrogate key.
+    pub folder_id: String,
+    pub stream_name: String,
+    pub enabled: bool,
+}
 
 impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
@@ -465,6 +477,28 @@ pub async fn list<C: ConnectionTrait>(
         })
         .collect::<Result<_, errors::Error>>()?;
     Ok(alerts)
+}
+
+/// Lists every alert in the org as [`AlertSummaryRow`], selecting only the columns it needs.
+pub async fn list_summary_rows<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<AlertSummaryRow>, errors::Error> {
+    Ok(alerts::Entity::find()
+        .select_only()
+        .columns([
+            alerts::Column::Id,
+            alerts::Column::Name,
+            alerts::Column::StreamName,
+            alerts::Column::Enabled,
+        ])
+        .column_as(folders::Column::FolderId, "folder_id")
+        .join(JoinType::InnerJoin, alerts::Relation::Folders.def())
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
+        .filter(folders::Column::Org.eq(org_id))
+        .into_model::<AlertSummaryRow>()
+        .all(conn)
+        .await?)
 }
 
 /// The `(long, short)` burn-window pairs of every alert pointing at this SLO.
@@ -1867,6 +1901,77 @@ pub(super) mod tests {
             only_enabled.slo_id = Some(SLO_A.to_string());
             only_enabled.enabled = Some(true);
             assert_eq!(ids_of(&db, only_enabled).await, vec![on]);
+        }
+
+        #[tokio::test]
+        async fn list_summary_rows_returns_public_folder_id_and_enabled_flag() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "ops").await;
+            let (on, off) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&on, "on")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&off, "off")
+                    .disabled()
+                    .in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let mut rows = super::super::list_summary_rows(&db, ORG).await.unwrap();
+            rows.sort_by(|a, b| a.name.cmp(&b.name));
+            let got: Vec<(&str, &str, &str, bool)> = rows
+                .iter()
+                .map(|r| {
+                    (
+                        r.id.as_str(),
+                        r.name.as_str(),
+                        r.folder_id.as_str(),
+                        r.enabled,
+                    )
+                })
+                .collect();
+            assert_eq!(
+                got,
+                vec![
+                    (off.as_str(), "alert-off", "ops", false),
+                    (on.as_str(), "alert-on", "default", true),
+                ]
+            );
+            assert_eq!(rows[0].stream_name, "default");
+        }
+
+        #[tokio::test]
+        async fn list_summary_rows_excludes_other_orgs_and_non_alert_folders() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_OTHER_ORG_PK, OTHER_ORG, "default").await;
+            folders::Entity::insert(folders::ActiveModel {
+                id: Set("folder_pk_00000000000000009".to_string()),
+                org: Set(ORG.to_string()),
+                folder_id: Set("dash".to_string()),
+                name: Set("folder-dash".to_string()),
+                description: Set(None),
+                r#type: Set(folder_type_into_i16(FolderType::Dashboards)),
+                icon: Set(None),
+            })
+            .exec(&db)
+            .await
+            .unwrap();
+            let (mine, theirs, dash) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&mine, "mine")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&theirs, "theirs").in_folder(OTHER_ORG, FOLDER_OTHER_ORG_PK),
+            )
+            .await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&dash, "dash").in_folder(ORG, "folder_pk_00000000000000009"),
+            )
+            .await;
+
+            let rows = super::super::list_summary_rows(&db, ORG).await.unwrap();
+            let ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+            assert_eq!(ids, vec![mine.as_str()]);
         }
 
         /// No filter = historical behaviour, including non-SLO alerts.

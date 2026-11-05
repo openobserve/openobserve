@@ -397,10 +397,12 @@ pub async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let physical_plan = create_physical_plan(&ctx, &sql.sql).await.map_err(|e| {
-        log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
-        e
-    })?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql, req.analyze_profile)
+        .await
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
+            e
+        })?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan");

@@ -13,14 +13,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
-    <!-- Header: refresh + time picker -->
-    <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
-      <div class="flex items-center gap-2">
+  <!-- one p-3 inset and gap-3 rhythm, the same panel layout as the Kubernetes overview -->
+  <div
+    class="text-text-body flex h-full min-w-0 flex-col gap-3 overflow-y-auto p-3"
+    data-test="overview-canvas"
+  >
+    <div
+      v-if="pageState !== 'forbidden' && !errorIsForbidden"
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+    >
+      <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
+      <div class="ms-auto flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
-          :loading="isLoading"
-          :disabled="isLoading"
+          :loading="isLoading || overviewState.loading"
+          :disabled="isLoading || overviewState.loading"
+          :tooltip="dataAsOf"
           @click="() => loadAll(true)"
         />
         <DateTime
@@ -38,38 +46,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Sections rendered top-to-bottom; each collapses when empty -->
+    <OBanner
+      v-if="showOverviewCards && overviewRefreshFailed"
+      variant="warning"
+      inline-actions
+      data-test="overview-stale-notice"
+    >
+      {{ t("overview.stale.message", { time: generatedAtLabel }) }}
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="overview-stale-retry-btn"
+          @click="() => loadOverview(true)"
+        >
+          {{ t("overview.stale.retry") }}
+        </OButton>
+      </template>
+    </OBanner>
+
+    <OverviewHeadlineStrip
+      v-if="showOverviewCards"
+      :overview="overview"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      :incidents-state="incidentsTile"
+      :incidents-total="incidentsTotal"
+      @select="onHeadlineSelect"
+    />
+
+    <div
+      v-if="showOverviewCards"
+      class="grid grid-cols-[1.15fr_1fr] gap-3 max-lg:grid-cols-1"
+      data-test="overview-alerts-health-grid"
+    >
+      <OverviewAlertsCard
+        :section="overview?.alerts"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        :incidents-state="incidentsTile"
+        :incidents-total="incidentsTotal"
+        :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
+        @retry="() => loadOverview(true)"
+        @open="goToAlertList"
+        @create="goToAddAlert"
+        @select="onHeadlineSelect"
+      />
+      <OverviewDataHealthCard
+        :overview="overview"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="onHealthOpen"
+      />
+    </div>
 
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
-      class="mb-5"
       data-test="overview-incidents-section"
     >
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+      <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+        <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
           {{ t("overview.activeIncidents") }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span
+          <OText
             v-if="incidentsTotal > incidents.length"
-            class="text-text-secondary ms-2 align-middle text-xs font-normal"
-            >{{ t("overview.showingOf", { shown: incidents.length, total: incidentsTotal }) }}</span
+            variant="meta"
+            class="text-text-secondary"
+            >{{
+              t("overview.showingOf", { shown: incidents.length, total: incidentsTotal })
+            }}</OText
           >
-        </div>
-        <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+        </OText>
+        <OButton
+          variant="ghost-primary"
+          size="sm"
+          data-test="overview-incidents-view-all"
           @click="goToIncidentList"
         >
-          {{ t("overview.viewAll") }} {{ "→" }}
-        </button>
+          {{ t("overview.viewAll") }}
+        </OButton>
       </div>
       <div
-        class="border-border-default rounded-default flex flex-col overflow-hidden border border-[0.0625em]"
+        class="border-border-default rounded-surface flex flex-col overflow-hidden border border-[0.0625em]"
       >
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
+          class="group bg-surface-panel border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3 py-2 last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
@@ -84,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </svg>
           </span>
           <div class="min-w-0 flex-1">
-            <div class="text-text-heading flex flex-wrap items-center gap-1 text-sm font-medium">
+            <div class="text-text-body flex flex-wrap items-center gap-1 text-sm">
               <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
               {{ inc.title || t("overview.untitledIncident") }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
@@ -108,7 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
+          <span
+            class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+          >
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -126,23 +197,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('incidents')"
+      section="incidents"
+      kind="forbidden"
+      :title="t('overview.activeIncidents')"
+    />
 
-    <!-- Locked: no license to unlock Incidents, shown instead of omitted so
-         the capability is discoverable from a build that can't enable it. -->
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('incidents')"
+      section="incidents"
+      kind="empty"
+      :title="t('overview.activeIncidents')"
+    />
+
+    <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
     <section
-      v-else-if="!incidentsAccess.allowed || incidentsLicenseLocked"
-      class="mb-5"
+      v-if="!incidentsAccess.allowed || incidentsLicenseLocked"
       data-test="overview-incidents-locked"
     >
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+      <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+        <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
           {{ t("overview.activeIncidents") }}
-        </div>
+        </OText>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
-        :class="{ 'cursor-pointer': !incidentsLicenseLocked }"
+        class="border-border-default bg-surface-subtle rounded-surface focus-visible:ring-button-ghost-focus-ring flex items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+        :class="{ 'hover:border-accent cursor-pointer': !incidentsLicenseLocked }"
+        :role="incidentsLicenseLocked ? undefined : 'button'"
+        :tabindex="incidentsLicenseLocked ? undefined : 0"
         @click="!incidentsLicenseLocked && openUpgradeDialog()"
+        @keydown.enter="!incidentsLicenseLocked && openUpgradeDialog()"
+        @keydown.space.prevent="!incidentsLicenseLocked && openUpgradeDialog()"
       >
         <OIcon name="lock" size="md" class="lock-chip shrink-0" />
         <span class="text-text-secondary text-sm">{{
@@ -151,362 +237,477 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
 
-    <!-- SERVICES (enterprise only — needs service graph data) -->
-    <section
-      v-if="incidentsAccess.allowed && services.length > 0"
-      class="mb-5"
-      data-test="overview-services-section"
+    <div
+      v-if="showOverviewCards"
+      class="grid grid-cols-[2fr_1fr] gap-3 max-lg:grid-cols-1"
+      data-test="overview-streams-limit-grid"
     >
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
-          {{ t("overview.services") }}
-          <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-          <span
-            v-if="servicePanelVisible && selectedService"
-            class="text-text-secondary ms-1 text-xs font-normal"
-          >
-            {{ t("overview.viewingLabel") }}
-            <strong class="text-text-body font-semibold">{{
-              selectedService.label ?? selectedService.id
-            }}</strong>
-          </span>
-        </div>
-        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
-          <button
-            class="text-text-link aria-disabled:text-text-disabled inline-flex cursor-pointer items-center gap-1 border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:no-underline"
-            :aria-disabled="tracesLock.locked.value || undefined"
-            data-test="overview-services-view-all"
-            @click="goToServiceGraph"
-          >
-            <OIcon
-              v-if="tracesLock.locked.value"
-              name="lock"
-              class="text-icon-locked"
-              size="sm"
-              data-test="overview-services-view-all-lock"
-            />
-            {{ t("overview.viewAll") }}
-            <template v-if="!tracesLock.locked.value">{{ "→" }}</template>
-          </button>
-        </OTooltip>
+      <OverviewTopStreamsCard
+        :section="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="goToStreams"
+        @start-ingesting="goToIngestion"
+      />
+      <OverviewLimitCard
+        :limits="overview?.limits"
+        :streams="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+      />
+    </div>
+
+    <OverviewSignalCards
+      v-if="showOverviewCards"
+      :section="overview?.streams"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      :locked-reasons="signalLockedReasons"
+      @open="onSignalOpen"
+    />
+
+    <section class="flex flex-col gap-3" data-test="overview-time-range-group">
+      <div
+        v-if="showOverviewCards && pageShowsSections"
+        class="flex flex-wrap items-baseline gap-x-2 ps-1"
+        data-test="overview-time-range-heading"
+      >
+        <h2 class="text-text-heading text-base font-semibold">
+          {{ t("overview.timeRange.heading") }}
+        </h2>
+        <OText
+          v-if="rangeLabel"
+          variant="meta"
+          class="text-text-secondary"
+          data-test="overview-time-range-label"
+          >{{ rangeLabel }}</OText
+        >
       </div>
-      <div class="relative">
-        <!-- Left fade + floating scroll control (only present when scrollable) -->
-        <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
-          :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
-        >
-          <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
-            :tabindex="svcScrollCanLeft ? 0 : -1"
-            :aria-hidden="!svcScrollCanLeft"
-            :aria-label="t('overview.scrollLeft')"
-            @click="scrollServices(-1)"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18l-6-6 6-6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+      <!-- SERVICES (enterprise only — needs service graph data) -->
+      <section
+        v-if="incidentsAccess.allowed && services.length > 0"
+        data-test="overview-services-section"
+      >
+        <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+          <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+            {{ t("overview.services") }}
+            <OTag type="countChip" value="warning">{{ services.length }}</OTag>
+            <OText
+              v-if="servicePanelVisible && selectedService"
+              variant="meta"
+              class="text-text-secondary"
+            >
+              {{ t("overview.viewingLabel") }}
+              <strong class="text-text-body font-semibold">{{
+                selectedService.label ?? selectedService.id
+              }}</strong>
+            </OText>
+          </OText>
+          <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              :aria-disabled="tracesLock.locked.value || undefined"
+              data-test="overview-services-view-all"
+              @click="goToServiceGraph"
+            >
+              <OIcon
+                v-if="tracesLock.locked.value"
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="overview-services-view-all-lock"
               />
-            </svg>
-          </button>
+              {{ t("overview.viewAll") }}
+            </OButton>
+          </OTooltip>
         </div>
-        <div
-          ref="svcGridRef"
-          class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
-          @scroll="onSvcScroll"
-        >
+        <div class="relative">
+          <!-- Left fade + floating scroll control (only present when scrollable) -->
           <div
-            v-for="svc in services"
-            :key="svc.id"
-            class="rounded-default border-border-default bg-surface-base max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150"
-            :class="[
-              serviceCardClass(svc),
-              selectedService?.id === svc.id && servicePanelVisible
-                ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
-                : 'hover:bg-table-row-hover-bg',
-            ]"
-            @click="openServicePanel(svc)"
+            class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
+            :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
           >
-            <div class="mb-2 flex items-center justify-between">
-              <OTruncatedText
-                class="text-text-heading block flex-1 cursor-default text-sm font-medium"
-                >{{ svc.label }}</OTruncatedText
-              >
-              <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
-                <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+            <button
+              class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
+              :tabindex="svcScrollCanLeft ? 0 : -1"
+              :aria-hidden="!svcScrollCanLeft"
+              :aria-label="t('overview.scrollLeft')"
+              @click="scrollServices(-1)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M15 18l-6-6 6-6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            ref="svcGridRef"
+            class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            @scroll="onSvcScroll"
+          >
+            <div
+              v-for="svc in services"
+              :key="svc.id"
+              class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
+              tabindex="0"
+              :class="[
+                serviceCardClass(svc),
+                selectedService?.id === svc.id && servicePanelVisible
+                  ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                  : 'hover:bg-table-row-hover-bg',
+              ]"
+              @click="openServicePanel(svc)"
+              @keydown.enter.self="openServicePanel(svc)"
+              @keydown.space.self.prevent="openServicePanel(svc)"
+            >
+              <div class="mb-2 flex items-center justify-between">
+                <OTruncatedText class="text-text-body block flex-1 text-sm">{{
+                  svc.label
+                }}</OTruncatedText>
+                <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                  <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+                    <OButton
+                      variant="ghost-muted"
+                      size="icon"
+                      disabled
+                      :aria-label="t('traces.servicesCatalog.viewTraces')"
+                      data-test="overview-service-view-traces"
+                    >
+                      <OIcon
+                        name="lock"
+                        class="text-icon-locked"
+                        size="sm"
+                        data-test="overview-service-view-traces-lock"
+                      />
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <span v-else class="ms-1 inline-flex shrink-0 items-center">
                   <OButton
                     variant="ghost-muted"
                     size="icon"
-                    disabled
-                    :aria-label="t('traces.servicesCatalog.viewTraces')"
+                    :title="t('traces.servicesCatalog.viewTraces')"
                     data-test="overview-service-view-traces"
+                    @click="goToService(svc, $event)"
                   >
-                    <OIcon
-                      name="lock"
-                      class="text-icon-locked"
-                      size="sm"
-                      data-test="overview-service-view-traces-lock"
-                    />
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                      <path
+                        d="M12 16v-4m0-4h.01"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
                   </OButton>
                 </span>
-              </OTooltip>
-              <span v-else class="ms-1 inline-flex shrink-0 items-center">
-                <OButton
-                  variant="ghost-muted"
-                  size="icon"
-                  :title="t('traces.servicesCatalog.viewTraces')"
-                  data-test="overview-service-view-traces"
-                  @click="goToService(svc, $event)"
+              </div>
+              <div class="mt-2 flex flex-col gap-1">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-text-label text-xs">{{ t("overview.colErrorRate") }}</span>
+                  <span
+                    class="text-sm font-semibold tabular-nums"
+                    :class="svc.errorFlag ? 'text-error-600' : 'text-text-heading'"
+                  >
+                    {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
+                  </span>
+                </div>
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-text-label text-xs">{{ t("overview.colLatency") }}</span>
+                  <span
+                    class="text-sm font-semibold tabular-nums"
+                    :class="svc.latencyFlag ? 'text-warning-700' : 'text-text-heading'"
+                  >
+                    {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
+                  </span>
+                </div>
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-text-label text-xs">{{ t("overview.colReqs") }}</span>
+                  <span class="text-text-heading text-sm font-semibold tabular-nums">{{
+                    formatReqRate(svc.requests)
+                  }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Right fade + floating scroll control (only present when scrollable) -->
+          <div
+            class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
+            :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
+          >
+            <button
+              class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
+              :tabindex="svcScrollCanRight ? 0 : -1"
+              :aria-hidden="!svcScrollCanRight"
+              :aria-label="t('overview.scrollRight')"
+              @click="scrollServices(1)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 18l6-6-6-6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+      <OverviewSkeleton
+        v-else-if="servicesEnabled && isSectionPending('services')"
+        section="services"
+      />
+      <OverviewSectionError
+        v-else-if="showSectionError('services')"
+        section="services"
+        :title="t('overview.services')"
+        @retry="() => loadAll(true)"
+      />
+      <OverviewSectionEmpty
+        v-else-if="showSectionForbidden('services')"
+        section="services"
+        kind="forbidden"
+        :title="t('overview.services')"
+      />
+
+      <!-- Locked: Services shares the Incidents gate, and its data comes from traces, so a license without traces locks it too. -->
+      <section
+        v-else-if="!incidentsAccess.allowed || servicesLicenseLocked"
+        data-test="overview-services-locked"
+      >
+        <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+          <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+            {{ t("overview.services") }}
+          </OText>
+        </div>
+        <div
+          class="border-border-default bg-surface-subtle rounded-surface focus-visible:ring-button-ghost-focus-ring flex items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+          :class="{ 'hover:border-accent cursor-pointer': !servicesLicenseLocked }"
+          :role="servicesLicenseLocked ? undefined : 'button'"
+          :tabindex="servicesLicenseLocked ? undefined : 0"
+          @click="!servicesLicenseLocked && openUpgradeDialog()"
+          @keydown.enter="!servicesLicenseLocked && openUpgradeDialog()"
+          @keydown.space.prevent="!servicesLicenseLocked && openUpgradeDialog()"
+        >
+          <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+          <span class="text-text-secondary text-sm">{{
+            servicesLicenseLocked ? tracesLock.lockedReason.value : incidentsAccess.message
+          }}</span>
+        </div>
+      </section>
+
+      <OverviewSectionEmpty
+        v-else-if="showSectionEmpty('services')"
+        section="services"
+        kind="empty"
+        :title="t('overview.services')"
+      />
+
+      <!-- Service node side panel (latency / RED charts) -->
+      <template v-if="incidentsAccess.allowed && selectedService">
+        <div
+          v-if="servicePanelVisible"
+          class="fixed inset-0 z-99 bg-transparent"
+          @click="closeServicePanel"
+        />
+        <ServiceGraphNodeSidePanel
+          :selected-node="selectedService"
+          :graph-data="graphData"
+          :time-range="timeRange"
+          :visible="servicePanelVisible"
+          :stream-filter="selectedService?.stream_name ?? graphStream"
+          @close="closeServicePanel"
+          @view-traces="goToService(selectedService)"
+        />
+      </template>
+
+      <div
+        :class="slimPair ? 'grid grid-cols-2 gap-3 max-md:grid-cols-1' : 'contents'"
+        data-test="overview-time-range-pair"
+      >
+        <!-- ACTIVE ANOMALIES -->
+        <section v-if="anomalies.length > 0" data-test="overview-anomalies-section">
+          <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+              {{ t("overview.activeAnomalies") }}
+              <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
+            </OText>
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              data-test="overview-anomalies-view-all"
+              @click="goToAnomalies"
+            >
+              {{ t("overview.viewAll") }}
+            </OButton>
+          </div>
+          <div
+            class="border-border-default rounded-surface bg-surface-panel flex flex-col overflow-hidden border border-[0.0625em]"
+          >
+            <div
+              v-for="item in anomalies"
+              :key="item.id"
+              class="group border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
+              :class="severityRowClass(item.severity)"
+            >
+              <span class="flex shrink-0 items-center" :class="severityIconClass(item.severity)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-text-body flex flex-wrap items-center gap-1 [row-gap:0.25rem] text-sm"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
-                    <path
-                      d="M12 16v-4m0-4h.01"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
+                  {{ item.title }}
+                  <span class="text-text-secondary mx-[0.1rem] text-xs font-normal">·</span>
+                  <span class="text-text-secondary text-xs font-normal">{{
+                    item.description
+                  }}</span>
+                </div>
+              </div>
+              <span
+                class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+              >
+                <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
+                  {{ t("overview.investigate") }}
                 </OButton>
               </span>
             </div>
-            <div class="mt-2 flex flex-col gap-1">
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
-                  t("overview.colErrorRate")
-                }}</span>
-                <span
-                  class="text-text-body text-sm font-medium"
-                  :class="svc.errorFlag ? 'text-error-600' : ''"
-                >
-                  {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
-                </span>
-              </div>
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
-                  t("overview.colLatency")
-                }}</span>
-                <span
-                  class="text-text-body text-sm font-medium"
-                  :class="svc.latencyFlag ? 'text-warning-700' : ''"
-                >
-                  {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
-                </span>
-              </div>
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
-                  t("overview.colReqs")
-                }}</span>
-                <span class="text-text-body text-sm font-medium">{{
-                  formatReqRate(svc.requests)
-                }}</span>
-              </div>
-            </div>
           </div>
-        </div>
-        <!-- Right fade + floating scroll control (only present when scrollable) -->
-        <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
-          :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
-        >
-          <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
-            :tabindex="svcScrollCanRight ? 0 : -1"
-            :aria-hidden="!svcScrollCanRight"
-            :aria-label="t('overview.scrollRight')"
-            @click="scrollServices(1)"
+        </section>
+        <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
+        <OverviewSectionError
+          v-else-if="showSectionError('anomalies')"
+          section="anomalies"
+          :title="t('overview.activeAnomalies')"
+          @retry="() => loadAll(true)"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionForbidden('anomalies')"
+          section="anomalies"
+          kind="forbidden"
+          :title="t('overview.activeAnomalies')"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionEmpty('anomalies')"
+          section="anomalies"
+          kind="empty"
+          :no-checks="anomalyConfigCount === 0"
+          :title="t('overview.activeAnomalies')"
+        />
+        <section v-else-if="anomalyLocked" data-test="overview-anomalies-locked">
+          <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+              {{ t("overview.activeAnomalies") }}
+            </OText>
+          </div>
+          <div
+            class="border-border-default bg-surface-subtle rounded-surface flex items-center gap-3 border border-[0.0625em] px-4 py-5"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 18l6-6-6-6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </section>
-    <OverviewSkeleton
-      v-else-if="incidentsAccess.allowed && isSectionPending('services')"
-      section="services"
-    />
-    <OverviewSectionError
-      v-else-if="showSectionError('services')"
-      section="services"
-      :title="t('overview.services')"
-      @retry="() => loadAll(true)"
-    />
+            <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+            <span class="text-text-secondary text-sm">{{ anomalyLock.lockedReason.value }}</span>
+          </div>
+        </section>
 
-    <!-- Locked: Services shares the Incidents license gate, and its data comes from traces,
-         so a license without traces locks it too. -->
-    <section
-      v-else-if="!incidentsAccess.allowed || tracesLock.locked.value"
-      class="mb-5"
-      data-test="overview-services-locked"
-    >
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
-          {{ t("overview.services") }}
-        </div>
-      </div>
-      <div
-        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
-        :class="{ 'cursor-pointer': !servicesLicenseLocked }"
-        @click="!servicesLicenseLocked && openUpgradeDialog()"
-      >
-        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
-        <span class="text-text-secondary text-sm">{{
-          incidentsAccess.allowed ? tracesLock.lockedReason.value : incidentsAccess.message
-        }}</span>
-      </div>
-    </section>
-
-    <!-- Service node side panel (latency / RED charts) -->
-    <template v-if="incidentsAccess.allowed && selectedService">
-      <div
-        v-if="servicePanelVisible"
-        class="fixed inset-0 z-99 bg-transparent"
-        @click="closeServicePanel"
-      />
-      <ServiceGraphNodeSidePanel
-        :selected-node="selectedService"
-        :graph-data="graphData"
-        :time-range="timeRange"
-        :visible="servicePanelVisible"
-        :stream-filter="selectedService?.stream_name ?? graphStream"
-        @close="closeServicePanel"
-        @view-traces="goToService(selectedService)"
-      />
-    </template>
-
-    <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="mb-5" data-test="overview-anomalies-section">
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
-          {{ t("overview.activeAnomalies") }}
-          <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
-        </div>
-        <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
-          @click="goToAnomalies"
-        >
-          {{ t("overview.viewAll") }} {{ "→" }}
-        </button>
-      </div>
-      <div class="flex flex-col gap-1.5">
-        <div
-          v-for="item in anomalies"
-          :key="item.id"
-          class="group rounded-default border-border-default bg-surface-base hover:bg-table-row-hover-bg flex items-center gap-3 border border-[0.0625em] px-3.5 py-2.5 transition-[background] duration-150"
-          :class="severityRowClass(item.severity)"
-        >
-          <span class="flex shrink-0 items-center" :class="severityIconClass(item.severity)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </span>
-          <div class="min-w-0 flex-1">
-            <div
-              class="text-text-heading flex flex-wrap items-center gap-1 [row-gap:0.25rem] text-sm font-medium"
+        <!-- RECENT EVENTS (alert firing feed) -->
+        <section v-if="recentEvents.length > 0" data-test="overview-recent-events-section">
+          <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
+              {{ t("overview.recentEvents") }}
+              <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
+            </OText>
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              data-test="overview-recent-events-view-all"
+              @click="goToAlertList"
             >
-              {{ item.title }}
-              <span class="text-text-secondary mx-[0.1rem] text-xs font-normal">·</span>
-              <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
+              {{ t("overview.viewAll") }}
+            </OButton>
+          </div>
+          <div
+            class="border-border-default rounded-surface bg-surface-panel flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
+          >
+            <div
+              v-for="ev in recentEvents"
+              :key="ev.id"
+              class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3 py-2 last:border-b-0 max-sm:flex-wrap max-sm:gap-y-1"
+              data-test="overview-recent-events-row"
+            >
+              <!-- a phone puts status and age on one line and gives the name the whole second line -->
+              <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0 max-sm:order-1" />
+              <OTruncatedText
+                :class="[
+                  'text-text-secondary max-w-[12.5em] min-w-[7.5em] text-xs max-sm:order-5 max-sm:min-w-0',
+                  hasEventStream(ev) ? '' : 'max-sm:hidden',
+                ]"
+                >{{ ev.service }}</OTruncatedText
+              >
+              <OTruncatedText
+                class="text-text-body flex-1 text-sm font-medium max-sm:order-4 max-sm:min-w-0"
+                data-test="overview-recent-events-name"
+                >{{ ev.description }}</OTruncatedText
+              >
+              <OTag
+                v-if="ev.failCount > 1"
+                type="countChip"
+                value="error"
+                class="shrink-0 max-sm:order-2"
+                :title="t('common.failedTimesInWindow', { count: ev.failCount })"
+                >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
+              >
+              <span
+                class="text-text-secondary shrink-0 text-xs whitespace-nowrap max-sm:order-2 max-sm:ms-auto"
+                >{{ ev.timeAgo }}</span
+              >
+              <span class="hidden h-0 basis-full max-sm:order-3 max-sm:block" aria-hidden="true" />
             </div>
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
-            <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
-              {{ t("overview.investigate") }}
-            </OButton>
-          </span>
-        </div>
+        </section>
+        <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
+        <OverviewSectionError
+          v-else-if="showSectionError('recentEvents')"
+          section="recentEvents"
+          :title="t('overview.recentEvents')"
+          @retry="() => loadAll(true)"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionForbidden('recentEvents')"
+          section="recentEvents"
+          kind="forbidden"
+          :title="t('overview.recentEvents')"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionEmpty('recentEvents')"
+          section="recentEvents"
+          kind="empty"
+          :title="t('overview.recentEvents')"
+        />
       </div>
     </section>
-    <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
-    <OverviewSectionError
-      v-else-if="showSectionError('anomalies')"
-      section="anomalies"
-      :title="t('overview.activeAnomalies')"
-      @retry="() => loadAll(true)"
-    />
-    <section v-else-if="anomalyLocked" class="mb-5" data-test="overview-anomalies-locked">
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
-          {{ t("overview.activeAnomalies") }}
-        </div>
-      </div>
-      <div
-        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
-      >
-        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
-        <span class="text-text-secondary text-sm">{{ anomalyLock.lockedReason.value }}</span>
-      </div>
-    </section>
-
-    <!-- RECENT EVENTS (alert firing feed) -->
-    <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
-      <div class="mb-2 flex items-center justify-between ps-1">
-        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
-          {{ t("overview.recentEvents") }}
-          <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
-        </div>
-        <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
-          @click="goToAlertList"
-        >
-          {{ t("overview.viewAll") }} {{ "→" }}
-        </button>
-      </div>
-      <div
-        class="border-border-default rounded-default bg-surface-base flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
-      >
-        <div
-          v-for="ev in recentEvents"
-          :key="ev.id"
-          class="border-b-border-default text-compact hover:bg-table-row-hover-bg flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 transition-[background] duration-150 last:border-b-0"
-        >
-          <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-          <OTruncatedText class="text-text-heading max-w-[12.5em] min-w-[7.5em] font-medium">{{
-            ev.service
-          }}</OTruncatedText>
-          <OTruncatedText class="text-text-secondary flex-1">{{ ev.description }}</OTruncatedText>
-          <OTag
-            v-if="ev.failCount > 1"
-            type="countChip"
-            value="error"
-            class="shrink-0"
-            :title="t('common.failedTimesInWindow', { count: ev.failCount })"
-            >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
-          >
-          <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
-            ev.timeAgo
-          }}</span>
-        </div>
-      </div>
-    </section>
-    <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
-    <OverviewSectionError
-      v-else-if="showSectionError('recentEvents')"
-      section="recentEvents"
-      :title="t('overview.recentEvents')"
-      @retry="() => loadAll(true)"
-    />
 
     <OEmptyState
-      v-if="pageState === 'forbidden'"
+      v-if="pageState === 'forbidden' || errorIsForbidden"
       preset="no-access"
       size="block"
       data-test="overview-no-access-empty-state"
@@ -578,70 +779,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <HomeNoDataState v-else-if="pageState === 'no-data'" tab="overview" flag-off />
 
-    <!-- Empty state — everything is healthy or no data yet -->
-    <OEmptyState
-      v-else-if="pageState === 'all-clear'"
-      illustration="check"
-      size="hero"
-      :hide-action="true"
-      data-test="overview-all-clear-empty-state"
-    >
-      <template #title>{{
-        uncheckedAreas.length ? t("overview.allClearPartial") : t("overview.allClear")
-      }}</template>
-      <template #description>{{
-        uncheckedAreas.length
-          ? t("overview.allClearPartialDesc", { areas: raw(uncheckedAreas.join(", ")) })
-          : flagOn
-            ? t("overview.allClearDescScoped")
-            : t("overview.allClearDesc")
-      }}</template>
-      <template #actions>
-        <OTooltip
-          v-if="showAlertsCard"
-          :content="alertsLock.lockedReason.value"
-          :disabled="!alertsLocked"
-        >
-          <EmptyStateActionCard
-            :icon="alertsLocked ? 'lock' : 'notifications'"
-            :label="t('overview.emptyActionAlerts')"
-            :sublabel="t('overview.emptyActionAlertsDesc')"
-            :unavailable="alertsLocked"
-            data-test="overview-empty-alerts-card"
-            @click="goToAlertList"
-          />
-        </OTooltip>
-        <OTooltip
-          v-if="showLogsCard"
-          :content="logsLock.lockedReason.value"
-          :disabled="!logsLock.locked.value"
-        >
-          <EmptyStateActionCard
-            :icon="logsLock.locked.value ? 'lock' : 'search'"
-            :label="t('overview.emptyActionLogs')"
-            :sublabel="t('overview.emptyActionLogsDesc')"
-            :unavailable="logsLock.locked.value"
-            data-test="overview-empty-logs-card"
-            @click="goToLogs"
-          />
-        </OTooltip>
-        <OTooltip
-          v-if="showTracesCard"
-          :content="tracesLock.lockedReason.value"
-          :disabled="!tracesLock.locked.value"
-        >
-          <EmptyStateActionCard
-            :icon="tracesLock.locked.value ? 'lock' : 'account-tree'"
-            :label="t('overview.emptyActionTraces')"
-            :sublabel="t('overview.emptyActionTracesDesc')"
-            :unavailable="tracesLock.locked.value"
-            data-test="overview-empty-traces-card"
-            @click="goToTraces"
-          />
-        </OTooltip>
-      </template>
-    </OEmptyState>
-
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
     <AlertHistoryDrawer
       v-model:open="showAlertHistoryDrawer"
@@ -677,13 +814,39 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OverviewSectionError from "./OverviewSectionError.vue";
+import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OverviewHeadlineStrip, {
+  type OverviewTarget,
+  type IncidentsTile,
+} from "./overview/OverviewHeadlineStrip.vue";
+import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
+import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
+import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
+import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
+import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
+import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
+import { resolveBrowserTimezone } from "@/utils/timezone";
+import {
+  overviewChecks,
+  overviewStatus,
+  type AttentionCheck,
+  type OverviewDestination,
+  type OverviewSignal,
+} from "./overview/overviewFormat";
+import { overviewKeys } from "@/services/overview.querykeys";
+import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -704,11 +867,6 @@ const router = useRouter();
 // enterprise/cloud bundle as Incidents, with no upsell story of its own.
 const incidentsAccess = useLockedAffordance("incidents");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-const isIncidentsEnabled = computed(
-  () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
-);
-const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
-// a deployment with anomaly detection off answers 403 by design, which is no load failure
 const alertsLock = useLicenseLock("alerts");
 const alertsLocked = alertsLock.locked;
 const { locked: incidentsFeatureLocked, lockedReason: incidentsLockedReason } =
@@ -720,22 +878,27 @@ const anomalyLock = useLicenseLock("anomaly_detection");
 const anomalyLocked = anomalyLock.locked;
 const logsLock = useLicenseLock("logs");
 const tracesLock = useLicenseLock("traces");
-// a license lock on traces locks Services too
+// Services reads the trace topology, so a license without traces locks it
 const servicesLicenseLocked = computed(
-  () => incidentsLicenseLocked.value || (incidentsAccess.value.allowed && tracesLock.locked.value),
+  () => incidentsAccess.value.allowed && tracesLock.locked.value,
 );
-// areas the license keeps the page from reading, so "all clear" must not claim them
-const uncheckedAreas = computed<string[]>(() => {
-  const areas: string[] = [];
-  if (alertsLocked.value) areas.push(t("overview.areaAlerts"));
-  if (anomalyLocked.value) areas.push(t("overview.areaAnomalies"));
-  if (incidentsLicenseLocked.value) areas.push(t("overview.areaIncidents"));
-  if (servicesLicenseLocked.value) areas.push(t("overview.areaServices"));
-  return areas;
-});
+const servicesEnabled = computed(() => incidentsAccess.value.allowed && !tracesLock.locked.value);
+const isIncidentsEnabled = computed(
+  () =>
+    incidentsAccess.value.allowed &&
+    !incidentsFeatureLocked.value &&
+    store.state.zoConfig?.incidents_enabled === true,
+);
+const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+// a deployment with anomaly detection off answers 403 by design, which is no load failure
 const anomalyEnabled = computed(
   () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
 );
+// a license-locked signal shows its reason instead of stats, and its page is never opened
+const signalLockedReasons = computed(() => ({
+  ...(logsLock.locked.value ? { logs: logsLock.lockedReason.value } : {}),
+  ...(tracesLock.locked.value ? { traces: tracesLock.lockedReason.value } : {}),
+}));
 
 // ── Date / time picker ───────────────────────────────────────────────────────
 const LS_TIME_KEY = "o2_overview_time";
@@ -833,6 +996,14 @@ const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boo
   recentEvents: { loading: false, loaded: false },
 });
 
+let alertCountSeq = 0;
+const sectionSeq: Record<SectionKey, number> = {
+  incidents: 0,
+  services: 0,
+  anomalies: 0,
+  recentEvents: 0,
+};
+
 const isSectionPending = (key: SectionKey) =>
   sectionState[key].loading && !sectionState[key].loaded;
 
@@ -843,12 +1014,36 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
   anomalies: null,
   recentEvents: null,
 });
+const overview = ref<OrgOverview | null>(null);
+const overviewFailed = ref(false);
+const overviewState = reactive({ loading: false });
+let overviewSeq = 0;
+let overviewOrg = "";
+const overviewForbidden = ref(false);
+// a failed refresh keeps the last good snapshot on screen instead of blanking every card
+const overviewRefreshFailed = ref(false);
+const generatedAtLabel = computed(() => {
+  if (!overview.value) return "";
+  const zone = safeTimezone(resolveBrowserTimezone(store.state.timezone || "UTC"));
+  const time = formatTimestampInTimezone(overview.value.generated_at, "YYYY-MM-DD HH:mm", zone);
+  return `${time} (${zone})`;
+});
+const dataAsOf = computed(() =>
+  overview.value ? t("overview.dataAsOf", { time: generatedAtLabel.value }) : undefined,
+);
+// the picker owns its label, so the heading names the range in the same words the picker shows
+const rangeLabel = computed(() => raw(dateTimeRef.value?.triggerLabel ?? ""));
+const showOverviewCards = computed(
+  () => !["forbidden", "no-data", "not-monitored"].includes(pageState.value),
+);
+const overviewPending = computed(
+  () => overviewState.loading && (!overview.value || overviewFailed.value),
+);
 const alertCount = ref<number | null>(null);
-const summaryFailed = ref(false);
 const anomalyConfigCount = ref<number | null>(null);
-// null keeps all clear: only answered lists prove an org empty, and only the flag-off page asks
+// null leaves no-data undecided: only answered lists prove an org empty, and only the flag-off page asks
 const noUserStreams = ref<boolean | null>(null);
-// a probe that failed for any reason but 403 leaves "no streams" unproven, so all clear may not show
+// a probe that failed for any reason but 403 leaves "no streams" unproven, so the first-data hero may not show
 const streamProbeFailed = ref(false);
 
 const isForbidden = (err: unknown) => {
@@ -860,7 +1055,7 @@ const attemptedSections = computed<SectionKey[]>(() => {
   if (!alertsLocked.value) keys.push("recentEvents");
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
-  if (incidentsAccess.value.allowed && !tracesLock.locked.value) keys.push("services");
+  if (servicesEnabled.value) keys.push("services");
   return keys;
 });
 const isFailed = (key: SectionKey) =>
@@ -871,35 +1066,107 @@ const allFailed = computed(
 
 type PageState =
   "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
+// no /overview answer yet leaves the heroes undecided, since each one weighs whether the cards loaded
+const overviewUnanswered = computed(
+  () =>
+    overviewState.loading && !overview.value && !overviewFailed.value && !overviewForbidden.value,
+);
 const pageState = computed<PageState>(() => {
-  if (isLoading.value || hasAnyData.value) return "content";
+  if (isLoading.value || hasAnyData.value || overviewUnanswered.value) return "content";
   if (allFailed.value) {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
-    return flagOn.value && allForbidden ? "forbidden" : "error";
+    const cardsLoaded = !!overview.value && !overviewFailed.value && !overviewForbidden.value;
+    if (flagOn.value && allForbidden && !cardsLoaded) return "forbidden";
+    // the cards loaded, so the failed sections keep their own inline Retry
+    return cardsLoaded ? "partial" : "error";
   }
   if (attemptedSections.value.some(isFailed)) return "partial";
-  if (!flagOn.value && streamProbeFailed.value) return "error";
   if (!flagOn.value && noUserStreams.value === true) return "no-data";
-  // without the summary the page cannot tell all clear from nothing watched, so neither may show
-  if (flagOn.value && summaryFailed.value) return "error";
+  // a failed summary leaves alertCount null, so the page never claims nothing is watched
   if (flagOn.value && alertCount.value === 0 && (anomalyConfigCount.value ?? 0) === 0) {
     return "not-monitored";
   }
   return "all-clear";
 });
+// every attempted call was refused, so "could not load" would contradict the No access cards
+const errorIsForbidden = computed(
+  () =>
+    pageState.value === "error" &&
+    overviewForbidden.value &&
+    attemptedSections.value.every((k) => !isFailed(k) || isDenied(k)),
+);
+const pageShowsSections = computed(
+  () => pageState.value !== "error" && pageState.value !== "forbidden",
+);
+// an edition without the service graph refuses it with 403, which is no outage
+const isDenied = (key: SectionKey) => isForbidden(sectionFailure[key]);
 const showSectionError = (key: SectionKey) =>
-  isFailed(key) && pageState.value !== "error" && pageState.value !== "forbidden";
+  isFailed(key) && !isDenied(key) && pageShowsSections.value;
+const showSectionForbidden = (key: SectionKey) =>
+  isFailed(key) && isDenied(key) && pageShowsSections.value;
+const sectionApplies = (key: SectionKey) => {
+  if (key === "incidents") return isIncidentsEnabled.value;
+  if (key === "anomalies") return anomalyEnabled.value;
+  if (key === "services") return servicesEnabled.value;
+  return !alertsLocked.value;
+};
+// an empty message needs a settled, successful, applicable section on a page that shows the cards
+const showSectionEmpty = (key: SectionKey) =>
+  showOverviewCards.value &&
+  pageShowsSections.value &&
+  sectionState[key].loaded &&
+  !isFailed(key) &&
+  sectionApplies(key);
+
+// two one-line messages share a row instead of stacking as two full-width boxes
+const rendersSlim = (key: "anomalies" | "recentEvents") => {
+  const rows = key === "anomalies" ? anomalies.value : recentEvents.value;
+  if (rows.length > 0 || isSectionPending(key) || showSectionError(key)) return false;
+  return showSectionForbidden(key) || showSectionEmpty(key);
+};
+const slimPair = computed(() => rendersSlim("anomalies") && rendersSlim("recentEvents"));
 
 /* Wraps a loader with its section's state. The loaders swallow their own errors,
    and `finally` also covers the early `return` in the enterprise-gated ones, so
    a section can never be left stuck pending. */
-const runSection = async (key: SectionKey, load: () => Promise<void>) => {
+const runSection = async (key: SectionKey, load: (current: () => boolean) => Promise<void>) => {
+  const seq = ++sectionSeq[key];
+  const current = () => seq === sectionSeq[key];
+  // a retry after a failure has no valid answer on screen, so it takes the first-load placeholder again
+  if (sectionFailure[key]) sectionState[key].loaded = false;
   sectionState[key].loading = true;
   try {
-    await load();
+    await load(current);
   } finally {
+    // a superseded call must not mark the newer call's section as settled
+    if (current()) {
+      sectionState[key].loading = false;
+      sectionState[key].loaded = true;
+    }
+  }
+};
+
+// bumping every sequence makes responses still in flight for the previous org discard themselves
+const resetLegacySections = () => {
+  anomalies.value = [];
+  incidents.value = [];
+  incidentsTotal.value = 0;
+  services.value = [];
+  recentEvents.value = [];
+  alertCount.value = null;
+  alertCountSeq++;
+  lastFetched.value = null;
+  graphData.value = { nodes: [], edges: [] };
+  selectedService.value = null;
+  servicePanelVisible.value = false;
+  showAlertHistoryDrawer.value = false;
+  selectedAlertForHistory.value = null;
+  selectedAlertIdForHistory.value = "";
+  for (const key of Object.keys(sectionState) as SectionKey[]) {
+    sectionSeq[key]++;
     sectionState[key].loading = false;
-    sectionState[key].loaded = true;
+    sectionState[key].loaded = false;
+    sectionFailure[key] = null;
   }
 };
 
@@ -940,23 +1207,97 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
+  // the full-page heroes weigh whether the cards loaded, so they wait for /overview too
   await Promise.allSettled([
-    runSection("recentEvents", () => loadHistoryAndSplit(force)),
-    runSection("anomalies", () => loadAnomalies(force)),
-    runSection("incidents", () => loadIncidents(force)),
-    runSection("services", () => loadServiceGraph(force)),
+    loadOverview(force),
+    runSection("recentEvents", (current) => loadHistoryAndSplit(force, current)),
+    runSection("anomalies", (current) => loadAnomalies(force, current)),
+    runSection("incidents", (current) => loadIncidents(force, current)),
+    runSection("services", (current) => loadServiceGraph(force, current)),
     loadAlertCount(force),
   ]);
   await loadUserStreams(force);
   isLoading.value = false;
-  // the refresh button keeps the last good run, so a fresh dot never sits beside the error
-  if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
+  // only a full-page hero means nothing loaded; loaded cards beside failed sections are still a run
+  if (pageShowsSections.value) lastFetched.value = new Date();
 };
 
-// only the flag-on page tells "nothing is watched" apart from "all clear"
+// only the latest call may set the result or clear loading
+const loadOverview = async (force = false) => {
+  const org = orgId.value;
+  const seq = ++overviewSeq;
+  if (org !== overviewOrg) {
+    overviewOrg = org;
+    overview.value = null;
+    overviewFailed.value = false;
+    overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
+    resetLegacySections();
+  }
+  overviewState.loading = true;
+  try {
+    const key = overviewKeys.data(org, OVERVIEW_TOP);
+    if (force) {
+      // an in-flight read would be shared and never send refresh=true
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      await queryClient.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
+    }
+    const res = await queryClient.fetchQuery(orgOverviewQuery(org, { refresh: force }));
+    if (seq !== overviewSeq) return;
+    overview.value = res;
+    overviewFailed.value = false;
+    overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
+  } catch (err) {
+    if (seq !== overviewSeq) return;
+    overviewForbidden.value = isForbidden(err);
+    if (overview.value && !overviewForbidden.value) {
+      overviewRefreshFailed.value = true;
+      return;
+    }
+    overview.value = null;
+    overviewRefreshFailed.value = false;
+    overviewFailed.value = !overviewForbidden.value;
+  } finally {
+    if (seq === overviewSeq) {
+      overviewState.loading = false;
+    }
+  }
+};
+
+const incidentsTile = computed<IncidentsTile>(() => {
+  if (!incidentsAccess.value.allowed || incidentsFeatureLocked.value) return "locked";
+  if (!isIncidentsEnabled.value) return "unavailable";
+  if (isSectionPending("incidents")) return "loading";
+  if (isDenied("incidents") && isFailed("incidents")) return "forbidden";
+  if (isFailed("incidents")) return "error";
+  return "ok";
+});
+
+// a source not loaded yet is still being checked; one this deployment lacks is left out
+const incidentsCheck = computed<Omit<AttentionCheck, "key" | "monitors"> | undefined>(() => {
+  if (!isIncidentsEnabled.value) return undefined;
+  if (!sectionState.incidents.loaded) return { state: "loading", count: 0 };
+  if (isFailed("incidents")) return { state: "unavailable", count: 0 };
+  return { state: "ok", count: incidentsTotal.value };
+});
+const status = computed(() =>
+  overviewStatus(
+    overviewChecks({
+      overview: overview.value,
+      pending: overviewPending.value,
+      failed: overviewFailed.value,
+      forbidden: overviewForbidden.value,
+      incidents: incidentsCheck.value,
+    }),
+  ),
+);
+
+// only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
   if (!flagOn.value) return;
-  summaryFailed.value = false;
+  const org = orgId.value;
+  const seq = ++alertCountSeq;
   try {
     const options = orgSummaryQuery(orgId.value);
     if (force) {
@@ -967,10 +1308,11 @@ const loadAlertCount = async (force = false) => {
       });
     }
     const summary: any = await queryClient.fetchQuery(options);
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = (summary?.alerts?.num_realtime ?? 0) + (summary?.alerts?.num_scheduled ?? 0);
   } catch {
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = null;
-    summaryFailed.value = true;
   }
 };
 
@@ -994,7 +1336,7 @@ const typeHasUserStream = async (org: string, type: string, reread: boolean) => 
   return page.list.length >= head.total ? false : null;
 };
 
-// Refresh and Retry re-read only while the hero waits or a probe failed; an org the notice saw data in asks nothing
+// Refresh and Retry re-read only while the first-data hero waits or a probe failed; an org the notice saw data in asks nothing
 const loadUserStreams = async (force = false) => {
   const org = orgId.value;
   const reread = force && (noUserStreams.value === true || streamProbeFailed.value);
@@ -1023,7 +1365,7 @@ const loadUserStreams = async (force = false) => {
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
-const loadAnomalies = async (force = false) => {
+const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
   if (anomalyLocked.value) {
     anomalies.value = [];
@@ -1053,6 +1395,7 @@ const loadAnomalies = async (force = false) => {
     // Fire list first; only fetch history if configs exist
     try {
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -1060,6 +1403,7 @@ const loadAnomalies = async (force = false) => {
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
       const bulkRes = await readHistory(org, 20);
+      if (!current()) return;
       const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
@@ -1069,6 +1413,7 @@ const loadAnomalies = async (force = false) => {
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -1078,6 +1423,7 @@ const loadAnomalies = async (force = false) => {
       const results = await Promise.allSettled(
         configs.map((c) => anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig)),
       );
+      if (!current()) return;
       rawHits = configs.map((cfg, idx) => ({
         cfg,
         hits:
@@ -1126,6 +1472,7 @@ const loadAnomalies = async (force = false) => {
 
     anomalies.value = result;
   } catch (err) {
+    if (!current()) return;
     anomalies.value = [];
     anomalyConfigCount.value = null;
     sectionFailure.anomalies = err;
@@ -1133,7 +1480,7 @@ const loadAnomalies = async (force = false) => {
 };
 
 // Alert trigger history feeds recentEvents only
-const loadHistoryAndSplit = async (force = false) => {
+const loadHistoryAndSplit = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.recentEvents = null;
   if (alertsLocked.value) {
     recentEvents.value = [];
@@ -1157,6 +1504,7 @@ const loadHistoryAndSplit = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(historyOptions);
+    if (!current()) return;
     const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
@@ -1206,12 +1554,13 @@ const loadHistoryAndSplit = async (force = false) => {
       .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
       .slice(0, 5);
   } catch (err) {
+    if (!current()) return;
     recentEvents.value = [];
     sectionFailure.recentEvents = err;
   }
 };
 
-const loadIncidents = async (force = false) => {
+const loadIncidents = async (force = false, current: () => boolean = () => true) => {
   if (!isIncidentsEnabled.value) return;
   sectionFailure.incidents = null;
   try {
@@ -1224,17 +1573,19 @@ const loadIncidents = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(incidentOptions);
+    if (!current()) return;
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch (err) {
+    if (!current()) return;
     incidents.value = [];
     incidentsTotal.value = 0;
     sectionFailure.incidents = err;
   }
 };
 
-const loadServiceGraph = async (force = false) => {
-  if (!incidentsAccess.value.allowed || tracesLock.locked.value) return;
+const loadServiceGraph = async (force = false, current: () => boolean = () => true) => {
+  if (!servicesEnabled.value) return;
   sectionFailure.services = null;
   try {
     graphStream.value = "all";
@@ -1251,6 +1602,7 @@ const loadServiceGraph = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(topologyOptions);
+    if (!current()) return;
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };
@@ -1297,6 +1649,7 @@ const loadServiceGraph = async (force = false) => {
     await nextTick();
     onSvcScroll();
   } catch (err) {
+    if (!current()) return;
     services.value = [];
     sectionFailure.services = err;
   }
@@ -1429,14 +1782,52 @@ const goToIncident = (inc: any) => {
 // ever offering a card the user has no way to actually land on.
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
-const showTracesCard = computed(() => router.hasRoute("traces"));
+
+// events without a stream carry a dash placeholder, which a phone row has no room to repeat
+const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
 const goToAlertList = () => {
+  if (alertsLocked.value) return;
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
 
 const goToAddAlert = () => {
+  if (alertsLocked.value) return;
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
+};
+
+const goToPipelines = () => {
+  router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
+};
+
+const goToStreams = () => {
+  router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
+};
+
+const goToIngestion = () => {
+  router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
+};
+
+const onHealthOpen = (destination: OverviewDestination) => {
+  if (destination === "alerts") goToAlertList();
+  else if (destination === "pipelines") goToPipelines();
+  else goToStreams();
+};
+
+const onSignalOpen = (signal: OverviewSignal) => {
+  if (signal in signalLockedReasons.value) return;
+  router.push({ name: signal, query: { org_identifier: orgId.value } });
+};
+
+const onHeadlineSelect = (target: OverviewTarget) => {
+  if (target === "firing" || target === "failing" || target === "delivery") goToAlertList();
+  else if (target === "pipelines") goToPipelines();
+  else if (target === "quiet") goToStreams();
+  else if (incidentsLicenseLocked.value) return;
+  else if (incidentsTile.value === "locked") openUpgradeDialog();
+  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
+    goToIncidentList();
+  }
 };
 
 const goToIncidentList = () => {
@@ -1453,11 +1844,6 @@ const goToAnomalies = () => {
 const goToLogs = () => {
   if (logsLock.locked.value) return;
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
-};
-
-const goToTraces = () => {
-  if (tracesLock.locked.value) return;
-  router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
@@ -1490,6 +1876,9 @@ watch(
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
-  if (enabled && incidents.value.length === 0) loadIncidents();
+  if (!enabled || incidents.value.length > 0) return;
+  // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
+  sectionState.incidents.loaded = false;
+  void runSection("incidents", (current) => loadIncidents(false, current));
 });
 </script>
