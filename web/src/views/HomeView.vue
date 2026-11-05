@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabs-below="tabOrder.length > 1"
       bleed
     >
-      <template v-if="isMobile && activeHomeTab === 'ai'" #actions>
+      <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
         <OButton
           variant="outline"
           size="sm"
@@ -60,8 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tab.id"
             :name="tab.id"
             :data-test="`home-tab-${tab.id}`"
+            :tooltip="tab.id === 'ai' ? tabLockReason(tab.id) : undefined"
           >
             <span class="o-tab__label truncate">{{ tab.label }}</span>
+            <template v-if="tabLockReason(tab.id)">
+              <OIcon
+                name="lock"
+                size="xs"
+                class="lock-chip ms-1 shrink-0"
+                :data-test="`home-tab-lock-${tab.id}`"
+              />
+              <span class="sr-only">{{ tabLockReason(tab.id) }}</span>
+            </template>
             <template v-if="tab.id.startsWith('dash:')" #trailing>
               <button
                 type="button"
@@ -105,9 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dismiss="arrived = undefined"
           @open="openArrived"
         />
+        <LicenseDeniedState
+          v-if="activeHomeTab === 'ai' && aiLocked"
+          :features="['ai_assistant']"
+          data-test="home-ai-locked"
+        />
         <!-- O2 AI Assistant tab -->
         <div
-          v-if="activeHomeTab === 'ai'"
+          v-else-if="activeHomeTab === 'ai'"
           class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
@@ -178,7 +193,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </HomeNoDataState>
           </div>
-          <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
+          <div
+            v-else-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
@@ -189,7 +209,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <!-- Overview tab (no inner card-container — the outer section panel
                already provides the border; avoids a double-bordered card). -->
-          <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+          <div
+            v-if="activeHomeTab === 'overview'"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-overview-panel"
+          >
             <OverviewTab />
           </div>
 
@@ -225,6 +249,8 @@ import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { menuState } from "@/utils/featureGate";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -236,6 +262,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
@@ -260,11 +287,28 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor } = useHomeDashboard(t);
+    const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor, load } =
+      useHomeDashboard(t);
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
+    const { lockedReason: aiLockedReason } = useLicenseLock("ai_assistant");
+    const aiState = computed(() =>
+      menuState(
+        store.state.zoConfig?.features,
+        "ai_assistant",
+        Boolean(store.state.zoConfig?.ai_enabled),
+      ),
+    );
+    const aiLocked = computed(() => aiState.value === "locked");
+    const tabLockReason = (id: string) => {
+      if (id === "ai" && aiLocked.value) return aiLockedReason.value;
+      if (id.startsWith("dash:") && dashboardsLocked.value) return dashboardsLockedReason.value;
+      return undefined;
+    };
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
+      if (isEnterpriseOrCloud && aiState.value !== "hidden") {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
       // Always reachable — Incidents/Services inside render locked (not
@@ -304,9 +348,29 @@ export default defineComponent({
       }
     }
 
+    let verifyingPin = false;
+
     // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
     // the pin and tell the user why — distinct from a deliberate close.
-    function onPinnedUnavailable() {
+    async function onPinnedUnavailable(dashboardId: string, folderId: string) {
+      const org = store.state.selectedOrganization?.identifier;
+      if (!org || verifyingPin) return;
+      verifyingPin = true;
+      try {
+        await load(org, true);
+      } finally {
+        verifyingPin = false;
+      }
+      const failed = `dash:${folderId}:${dashboardId}`;
+      const pin = homeDashboard.value;
+      if (pin?.dashboardId !== dashboardId) return;
+      const pinTab = `dash:${pin.folderId}:${pin.dashboardId}`;
+      // The pin is org-wide, so it is only deleted when a fresh read still names the folder that failed; a late failure from a replaced tab must not.
+      if (pinTab !== failed) {
+        if (activeHomeTab.value === failed) activeHomeTab.value = pinTab;
+        return;
+      }
+      if (activeHomeTab.value !== failed) return;
       removeHomePin();
       toast({
         variant: "error",
@@ -354,7 +418,16 @@ export default defineComponent({
       },
     );
 
-    const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
+    // The tab id carries the folder, so a saved tab for the pinned dashboard takes the pin's current folder.
+    function pinTabFor(id: string) {
+      const pin = homeDashboard.value;
+      if (!pin || !id.startsWith("dash:")) return id;
+      if (parsePinnedTabId(id).dashboardId !== pin.dashboardId) return id;
+      return `dash:${pin.folderId}:${pin.dashboardId}`;
+    }
+
+    const storedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
+    const savedActiveTab = storedActiveTab && pinTabFor(storedActiveTab);
     const isAvailableTab = (id: string) => DEFAULT_TABS.value.some((tb) => tb.id === id);
     const pinnedTabPending = ref(
       !!savedActiveTab?.startsWith("dash:") &&
@@ -369,13 +442,15 @@ export default defineComponent({
     if (pinnedTabPending.value) {
       const stopHold = watch(
         () => [
-          isAvailableTab(activeHomeTab.value),
+          isAvailableTab(pinTabFor(activeHomeTab.value)),
           isLoadedFor(store.state.selectedOrganization?.identifier),
         ],
         ([available, loaded]) => {
           if (!available && !loaded) return;
           pinnedTabPending.value = false;
-          if (!available) activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+          activeHomeTab.value = available
+            ? pinTabFor(activeHomeTab.value)
+            : (tabOrder.value[0]?.id ?? "usage");
           stopHold();
         },
       );
@@ -383,16 +458,35 @@ export default defineComponent({
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
-    // When the user opens the pinned dashboard tab, re-read the authoritative
-    // home_dashboard org setting so a snapshot that went stale on another system
-    // (e.g. the dashboard was moved to a different folder elsewhere) self-corrects
-    // before we render / navigate with its folderId.
-    watch(activeHomeTab, (val) => {
-      if (val.startsWith("dash:")) {
-        const org = store.state.selectedOrganization?.identifier;
-        if (org) useHomeDashboard(t).load(org);
-      }
+    // The cached pin can be stale from another device, so it is re-read without holding the tab; a stale folder is caught by onPinnedUnavailable.
+    function revalidatePin() {
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) void load(org, true);
+    }
+
+    watch(activeHomeTab, (val, prev) => {
+      if (!val.startsWith("dash:")) return;
+      // Only the folder changed, by the watch below, which already applied the fresh pin.
+      if (
+        prev?.startsWith("dash:") &&
+        parsePinnedTabId(prev).dashboardId === parsePinnedTabId(val).dashboardId
+      )
+        return;
+      revalidatePin();
     });
+
+    // The tab id carries the folder, so a re-read that moved, replaced or dropped the pin must move the open tab with it.
+    watch(homeDashboard, (pin) => {
+      if (pinnedTabPending.value || !activeHomeTab.value.startsWith("dash:")) return;
+      if (!pin || pin.dashboardId !== parsePinnedTabId(activeHomeTab.value).dashboardId) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+        return;
+      }
+      const nextId = `dash:${pin.folderId}:${pin.dashboardId}`;
+      if (activeHomeTab.value !== nextId) activeHomeTab.value = nextId;
+    });
+
+    if (homeDashboard.value && !pinnedTabPending.value) revalidatePin();
 
     // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
     // side of the target) and we apply it to our own ordered list, then persist.
@@ -481,12 +575,15 @@ export default defineComponent({
       isDataTab,
       arrived,
       openArrived,
+      aiLocked,
+      tabLockReason,
     };
   },
   components: {
     OverviewTab,
     UsageTab,
     O2AIChat,
+    LicenseDeniedState,
     HomeChatHistory,
     OTabs,
     OTab,

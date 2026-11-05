@@ -3107,6 +3107,29 @@ export class PipelinesPage {
         return (dataTest ?? '').replace(`logs-search-subfield-add-${fieldName}-`, '');
     }
 
+    /** Replace the Associate Query SQL through the Monaco model; the field list reads the editor value. */
+    async setQuerySourceSql(query) {
+        const host = '[data-test="scheduled-pipeline-sql-editor"]';
+        await this.page.locator(host).waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.evaluate(({ selector, value }) => {
+            const root = document.querySelector(selector);
+            const editor = (window.monaco?.editor?.getEditors?.() ?? []).find((ed) => root?.contains(ed.getDomNode?.()));
+            if (!editor) throw new Error('Associate Query SQL editor not found');
+            const model = editor.getModel();
+            editor.executeEdits('setQuerySourceSql', [{ range: model.getFullModelRange(), text: value }]);
+        }, { selector: host, value: query });
+        await expect.poll(() => this.getQuerySourceSql(), { timeout: 5000 }).toBe(query);
+    }
+
+    /** The Associate Query SQL exactly as the editor model holds it. */
+    async getQuerySourceSql() {
+        return await this.page.evaluate((selector) => {
+            const root = document.querySelector(selector);
+            const editor = (window.monaco?.editor?.getEditors?.() ?? []).find((ed) => root?.contains(ed.getDomNode?.()));
+            return editor ? editor.getValue() : null;
+        }, '[data-test="scheduled-pipeline-sql-editor"]');
+    }
+
     /** Untick every selected value for the open field, which removes its query condition. */
     async clearQueryFieldValueFilter() {
         const clearBtn = this.page.locator('[data-test="field-values-panel-clear-selection-btn"]');

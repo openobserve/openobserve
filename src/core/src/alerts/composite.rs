@@ -28,6 +28,43 @@ pub use service::{
 #[cfg(test)]
 pub mod test_support;
 
+/// The `Alert` a composite delivers and renders as, built from its stored definition. [pure]
+pub fn notification_alert(
+    definition: &infra::table::entity::alert_composites::Model,
+) -> config::meta::alerts::alert::Alert {
+    let mut alert = config::meta::alerts::alert::Alert::default();
+    alert.id = definition.id.parse::<svix_ksuid::Ksuid>().ok();
+    alert.org_id = definition.org.clone();
+    alert.name = definition.name.clone();
+    alert.description = definition.description.clone().unwrap_or_default();
+    alert.destinations =
+        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
+    alert.template = definition.template.clone();
+    alert.context_attributes = definition
+        .context_attributes
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok());
+    alert.creates_incident = definition.creates_incident;
+    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
+    alert.priority = definition
+        .priority
+        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+    alert.tags = definition
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    alert.trigger_condition.silence = definition.silence_seconds;
+    alert.pending_period_sec = definition.pending_period_sec;
+    alert.enabled = definition.enabled;
+    alert.last_edited_by = definition.last_edited_by.clone();
+    alert.updated_at = definition
+        .updated_at
+        .and_then(chrono::DateTime::from_timestamp_micros)
+        .map(|at| at.fixed_offset());
+    alert
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;

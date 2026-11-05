@@ -74,6 +74,7 @@ import {
   parseObjects,
   type ObjectRecord,
 } from "./kubernetesObjects";
+import { setStreamColumns } from "./kubernetesFlatten";
 import { encodeDetails, type DetailsRef, type K8sUrlState } from "./kubernetesUrlState";
 
 export type Detection = "unknown" | "error" | "undetected" | "detected";
@@ -232,14 +233,15 @@ export function useKubernetesInventory(
       ]);
       const logNames = new Set(((logs?.list ?? []) as Array<{ name: string }>).map((s) => s.name));
       let scoped = false;
+      let columns: string[] | null = null;
       if (logNames.has(EVENTS_STREAM)) {
         // A failed lookup must not read as "no k8s_cluster field", which would run events unscoped.
         const schema: any = await getStream(EVENTS_STREAM, "logs", true);
-        scoped = ((schema?.schema ?? []) as Array<{ name: string }>).some(
-          (f) => f.name === "k8s_cluster",
-        );
+        columns = ((schema?.schema ?? []) as Array<{ name: string }>).map((f) => f.name);
+        scoped = columns.includes("k8s_cluster");
       }
       if (gen !== streamsGeneration) return;
+      setStreamColumns(columns);
       metricStreams.value = new Set(
         ((metrics?.list ?? []) as Array<{ name: string }>).map((s) => s.name),
       );
@@ -248,6 +250,7 @@ export function useKubernetesInventory(
       streamsError.value = false;
     } catch {
       if (gen !== streamsGeneration) return;
+      setStreamColumns(null);
       metricStreams.value = null;
       logStreams.value = null;
       streamsError.value = true;
@@ -260,6 +263,7 @@ export function useKubernetesInventory(
     countsGeneration++;
     detailsTarget = undefined;
     streamsGeneration++;
+    setStreamColumns(null);
     metricStreams.value = null;
     logStreams.value = null;
     eventsScoped.value = false;

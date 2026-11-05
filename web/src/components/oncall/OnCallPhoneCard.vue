@@ -246,6 +246,7 @@ import {
   refusalOf,
   samePhone,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 // The server's minimum gap between two codes for one number (R17).
 const RESEND_SECS = 60;
@@ -270,7 +271,10 @@ const contactRead = useQuery(() =>
   }),
 );
 const contact = computed(() => contactRead.data.value ?? null);
-const loadFailed = computed(() => contactRead.isError.value);
+// A license denial is not a failed read: the license bar already says why.
+const loadFailed = computed(
+  () => contactRead.isError.value && !licenseDeniedFeatures(contactRead.error.value),
+);
 
 const saveContact = useMutation(() => setContactMutation(orgId.value, email.value));
 const sendCodeWrite = useMutation(() => sendCodeMutation(orgId.value, email.value));

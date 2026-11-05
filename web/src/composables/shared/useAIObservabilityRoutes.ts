@@ -363,6 +363,17 @@ const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
   },
 ];
 
+/** Sections whose backend API the server registers only with online evaluations on. */
+export const ONLINE_EVAL_FEATURE_KEYS: Partial<Record<FeatureKey, true>> = {
+  discovery: true,
+  queues: true,
+  datasets: true,
+  playground: true,
+  experiments: true,
+  remoteTasks: true,
+  evaluations: true,
+};
+
 /**
  * Builds the full `/ai` children array — the redirect stub, every primary
  * route (deduped by `routeName`, so the four Evaluate nav entries yield ONE
@@ -391,7 +402,11 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       path: section.path!,
       name: section.routeName,
       component: section.component!,
-      meta: { titleKey: section.metaTitleKey ?? section.labelKey, keepAlive: false },
+      meta: {
+        titleKey: section.metaTitleKey ?? section.labelKey,
+        keepAlive: false,
+        requiresOnlineEvals: !!section.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
+      },
       ...(section.routeProps ? { props: section.routeProps } : {}),
       ...(section.featureKey
         ? { beforeEnter: withFeatureGate(section.featureKey, routeGuard) }
@@ -403,7 +418,11 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
         path: sub.path,
         name: sub.routeName,
         component: sub.component,
-        meta: { titleKey: sub.metaTitleKey, keepAlive: false },
+        meta: {
+          titleKey: sub.metaTitleKey,
+          keepAlive: false,
+          requiresOnlineEvals: !!ONLINE_EVAL_FEATURE_KEYS[sub.featureKey],
+        },
         beforeEnter: withFeatureGate(sub.featureKey, routeGuard),
       } as RouteRecordRaw);
     }

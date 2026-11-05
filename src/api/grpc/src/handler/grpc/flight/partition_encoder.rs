@@ -23,6 +23,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use flight::encoder::{ChunkCoalescer, FlightDataEncoder};
 use futures::{Stream, StreamExt};
 
+use super::stream::MAX_FLIGHT_DATA_SIZE;
+
 /// Coalesces and ZSTD-encodes one datafusion output partition into FlightData. do_get runs one per
 /// partition on its own tokio task, so partitions execute and encode in parallel.
 ///
@@ -39,15 +41,11 @@ pub(super) struct PartitionEncoderStream {
 }
 
 impl PartitionEncoderStream {
-    pub(super) fn new(
-        inner: SendableRecordBatchStream,
-        options: IpcWriteOptions,
-        max_flight_data_size: usize,
-    ) -> Self {
+    pub(super) fn new(inner: SendableRecordBatchStream, options: IpcWriteOptions) -> Self {
         Self {
             inner,
             coalescer: ChunkCoalescer::new(),
-            encoder: FlightDataEncoder::new(options, max_flight_data_size),
+            encoder: FlightDataEncoder::new(options, MAX_FLIGHT_DATA_SIZE),
             out: VecDeque::new(),
             inner_done: false,
         }

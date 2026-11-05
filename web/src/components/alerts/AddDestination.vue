@@ -198,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-key-input`"
                         :name="`apiHeaders[${index}].key`"
                         :placeholder="t('alert_destinations.api_header')"
+                        :aria-label="t('alert_destinations.api_header')"
                         tabindex="0"
                       />
                     </div>
@@ -206,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-value-input`"
                         :name="`apiHeaders[${index}].value`"
                         :placeholder="t('alert_destinations.api_header_value')"
+                        :aria-label="t('alert_destinations.api_header_value')"
                         tabindex="0"
                       />
                     </div>
@@ -361,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
                       :placeholder="t('alert_destinations.api_header')"
+                      :aria-label="t('alert_destinations.api_header')"
                       tabindex="0"
                     />
                   </div>
@@ -369,6 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
                       :placeholder="t('alert_destinations.api_header_value')"
+                      :aria-label="t('alert_destinations.api_header_value')"
                       tabindex="0"
                     />
                   </div>
@@ -402,6 +406,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"
                   :label="t('alert_destinations.skip_tls_verify')"
+                />
+              </div>
+              <div
+                v-if="isCustomWebhook"
+                class="w-1/2 py-2"
+                data-test="add-destination-payload-format"
+              >
+                <OFormSelect
+                  data-test="add-destination-payload-format-select"
+                  name="payload_format"
+                  :label="t('alert_destinations.payloadFormat')"
+                  :options="payloadFormatOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  :help-text="t('alert_destinations.payloadFormatHelp')"
+                  tabindex="0"
                 />
               </div>
 
@@ -889,6 +909,11 @@ const showPrebuiltFinalActions = computed(
 const isCustomWebhook = computed(
   () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
+const payloadFormatOptions = computed(() => [
+  { label: t("alert_destinations.payloadFormatAuto"), value: "auto" },
+  { label: t("alert_destinations.payloadFormatLegacy"), value: "legacy" },
+  { label: t("alert_destinations.payloadFormatRendered"), value: "rendered" },
+]);
 const handleSlackFlowChange = (): void => {
   clearTestResult();
 };
@@ -1078,6 +1103,7 @@ const setupDestinationData = () => {
       url: props.destination.url ?? "",
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
+      payload_format: storedPayloadFormat(parsedMetadata),
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
@@ -1450,6 +1476,30 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
   return headers;
 }
 
+/** The stored metadata.payload_format as the select's value; anything else is automatic. */
+function storedPayloadFormat(
+  metadata: Record<string, unknown> | null,
+): "auto" | "legacy" | "rendered" {
+  const stored = metadata?.payload_format;
+  return stored === "legacy" || stored === "rendered" ? stored : "auto";
+}
+
+/** The destination's metadata with payload_format set, or removed for automatic. */
+function withPayloadFormat(
+  stored: DestinationPayload["metadata"],
+  format: string | undefined,
+): Record<string, string> {
+  let metadata: Record<string, string> = {};
+  try {
+    metadata = typeof stored === "string" ? JSON.parse(stored || "{}") : { ...(stored ?? {}) };
+  } catch {
+    metadata = {};
+  }
+  delete metadata.payload_format;
+  if (format === "legacy" || format === "rendered") metadata.payload_format = format;
+  return metadata;
+}
+
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
 // types). OForm calls the submit only once the schema (incl. the type-keyed
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
@@ -1479,6 +1529,10 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (value.type === "email") {
     payload["type"] = "email";
     payload["emails"] = value.emails ?? [];
+  }
+
+  if (isCustomWebhook.value) {
+    payload.metadata = withPayloadFormat(props.destination?.metadata, value.payload_format);
   }
 
   if (isUpdatingDestination.value) {

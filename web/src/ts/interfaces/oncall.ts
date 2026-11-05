@@ -16,6 +16,8 @@
 // Mirrors `config::meta::oncall`. Every wire form here is the snake_case the
 // API emits — nothing is renamed on the way in.
 
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
+
 /**
  * Who a level of the ladder pages.
  *
@@ -546,6 +548,8 @@ export interface OnCallPolicy {
   final_action?: PolicyFinalAction;
   /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
   l0?: L0Policy;
+  /** Template override for this team's on-call messages; null uses each destination's. */
+  template?: string | null;
   /** Read-only. The ladder still has the shape the server generated, so removing a rotation rewrites it rather than being refused. */
   ladder_is_generated?: boolean;
 }
@@ -594,6 +598,8 @@ export interface OnCallResponse {
   reached_rung_micros?: number | null;
   /** Server-computed, and only present on a record somebody answered. */
   time_to_ack_micros?: number | null;
+  /** The linked incident's title; absent when the incident is gone, untitled or unreadable. */
+  incident_title?: string;
 }
 
 /**
@@ -1005,11 +1011,14 @@ export interface EscalationProgress {
   next_targets: string[];
   next_at?: number | null;
   exhausted: boolean;
-  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
+  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved, unrouted, team deleted, or exhausted (check `exhausted`). */
   stopped_because?: string | null;
   /** While the first page is held for AI triage, when the hold ends (micros). */
   held_until_micros?: number | null;
 }
+
+/** `GET /oncall/responses/escalation` answers each record it could read, by id. */
+export type EscalationProgressEntry = EscalationProgress & { response_id: string };
 
 export interface OnCallResponseEvent {
   kind: ResponseEventKind;
@@ -1150,6 +1159,8 @@ export interface DeliveryRecord {
   channel?: Channel | null;
   /** `false` is a RECORDED failure — not the same as the field being absent. */
   delivered?: boolean | null;
+  /** The template each destination rendered with; absent on rows written before it was recorded. */
+  templates?: SentTemplate[];
 }
 
 /** `GET /oncall/responses/{id}/deliveries`. `total` is exact; `deliveries` is a page. */
@@ -1226,6 +1237,14 @@ export interface MyOnCall {
   /** True if any team is true. */
   on_call_now: boolean;
   teams: MyOnCallTeam[];
+}
+
+/** One team in `GET /oncall/teams/context`; a field the server could not read is absent, not empty. */
+export interface OnCallTeamContext {
+  team_id: string;
+  policy?: OnCallPolicy;
+  on_call?: OnCallPosition[];
+  schedule?: OnCallSchedule | null;
 }
 
 /** `GET /oncall/contacts/{email}` — the caller's own phone and whether a code can be sent to it. */

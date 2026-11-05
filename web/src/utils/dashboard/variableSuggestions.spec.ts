@@ -39,6 +39,23 @@ describe("getVariableSuggestions", () => {
     ]);
   });
 
+  it("adds every date format, with an example, for a date variable only", () => {
+    expect(suggest([{ name: "from", type: "date" }])).toEqual([
+      { name: "from", description: "Date" },
+      { name: "from:iso", description: "Date (YYYY-MM-DD): 2026-03-08" },
+      { name: "from:dmy", description: "Day first (DD/MM/YYYY): 08/03/2026" },
+      { name: "from:mdy", description: "Month first (MM/DD/YYYY): 03/08/2026" },
+      { name: "from:epochms", description: "Epoch milliseconds: 1772928000000" },
+      { name: "from:epochus", description: "Epoch microseconds: 1772928000000000" },
+      { name: "from:epoch", description: "Epoch seconds: 1772928000" },
+    ]);
+    const others = suggest([
+      { name: "q", type: "textbox" },
+      { name: "rack", type: "query_values", multiSelect: true },
+    ]).map((s) => s.name);
+    expect(others.some((name) => /:(iso|dmy|mdy|epoch)/.test(name))).toBe(false);
+  });
+
   it("adds every list format the resolver supports for a multi-select variable", () => {
     expect(suggest([{ name: "rack", type: "query_values", multiSelect: true }])).toEqual([
       { name: "rack", description: "Query values · a, b" },

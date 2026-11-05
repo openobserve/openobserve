@@ -12,6 +12,7 @@ export type CodeBlockChrome = "terminal" | "editor";
 export interface CodeBlockProps {
   /** Raw code to display and copy; the Copy button always copies this. */
   code: string;
+  sensitive?: boolean;
   /** Fence language (e.g. "bash", "python"). Auto-detected when omitted. */
   lang?: string;
   /**

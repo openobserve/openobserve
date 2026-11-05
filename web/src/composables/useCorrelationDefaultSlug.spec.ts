@@ -40,6 +40,9 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
+const mockStoreState = vi.hoisted(() => ({ zoConfig: {} as Record<string, unknown> }));
+vi.mock("vuex", () => ({ useStore: () => ({ state: mockStoreState }) }));
+
 import { loadIdentityConfig } from "@/utils/identityConfig";
 import {
   clearSemanticGroupsCache,
@@ -538,6 +541,18 @@ describe("useCorrelationFilters", () => {
       const { save } = useCorrelationFilters(opts);
       await save();
       expect(loadCorrelationFilters("org1", "logs", "mystream")).toEqual([]);
+    });
+
+    it("skips the identity config when correlation is license-locked", async () => {
+      mockStoreState.zoConfig = { features: { correlation: "locked" } };
+      try {
+        const opts = makeOpts({ getQuery: () => "host = 'web-01'" });
+        await useCorrelationFilters(opts).save();
+        expect(loadIdentityConfig).not.toHaveBeenCalled();
+        expect(serviceStreamsApi.getSemanticGroups).not.toHaveBeenCalled();
+      } finally {
+        mockStoreState.zoConfig = {};
+      }
     });
 
     it("saves matched filters from query", async () => {

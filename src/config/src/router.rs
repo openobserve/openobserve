@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 43] = [
+const QUERIER_ROUTES: [(&str, usize); 48] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
+    ("overview", 2),             // /api/{org_id}/overview
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
     ("schema", 3),               // /api/{org_id}/streams/{stream_name}/schema
@@ -56,12 +57,19 @@ const QUERIER_ROUTES: [(&str, usize); 43] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("discovery", 2),         // /api/{org_id}/discovery
-    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
-    ("playground", 2),        // /api/{org_id}/playground/...
-    ("service_streams", 2),   // /api/{org_id}/service_streams/...
-    ("node/list", 2),         // /api/_meta/node/list
+    ("discovery", 2),           // /api/{org_id}/discovery
+    ("annotation_queues", 2),   // /api/{org_id}/annotation_queues/...
+    ("playground", 2),          // /api/{org_id}/playground/...
+    ("service_streams", 2),     // /api/{org_id}/service_streams/...
+    ("node/list", 2),           // /api/_meta/node/list
+    ("gen_ai/data_health", 2),  // /api/{org_id}/gen_ai/data_health
+    ("llm/models/unpriced", 2), // /api/{org_id}/llm/models/unpriced
+    // Queriers own the built-in GitHub sync, so its node-local sync time lives there.
+    ("llm/models/built-in", 2), // /api/{org_id}/llm/models/built-in
+    ("llm/models/refresh-built-in", 2), // /api/{org_id}/llm/models/refresh-built-in
 ];
+/// Entries that match their whole remaining path, so `overview_x/...` stays unrouted.
+const EXACT_QUERIER_ROUTES: [&str; 1] = ["overview"];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",
@@ -112,7 +120,12 @@ pub fn is_querier_route(path: &str) -> bool {
             }
             // Join remaining segments without collecting into a Vec
             let route_part = segments.collect::<Vec<_>>().join("/");
-            route_part.starts_with(route)
+            let matched = if EXACT_QUERIER_ROUTES.contains(route) {
+                extract_path_without_query(&route_part) == *route
+            } else {
+                route_part.starts_with(route)
+            };
+            matched
                 && INGESTER_ROUTES
                     .iter()
                     .all(|ingest_route| !route_part.ends_with(ingest_route))
@@ -151,10 +164,29 @@ pub fn is_public_dashboard_slug(slug: &str) -> bool {
     slug.len() == PUBLIC_DASHBOARD_SLUG_LEN && slug.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
+/// Whether `path` is the MCP endpoint `/api/{org}/mcp`, under any base URI.
+pub fn is_mcp_endpoint(path: &str) -> bool {
+    let mut segments = extract_path_without_query(path)
+        .trim_end_matches('/')
+        .rsplit('/');
+    segments.next() == Some("mcp")
+        && segments.next().is_some_and(|org| !org.is_empty())
+        && segments.next() == Some("api")
+}
+
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
-    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x)) || is_org_overview_route(path)
+}
+
+/// Only `/api/{org}/overview` itself; a substring match would pin streams named `overview_*`.
+fn is_org_overview_route(path: &str) -> bool {
+    let segments: Vec<&str> = extract_path_without_query(path)
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    matches!(segments.as_slice(), ["api", _, "overview"])
 }
 
 /// The public routes, and the status calls that answer from the querier owning a link's files.
@@ -200,6 +232,14 @@ mod tests {
         assert!(is_querier_route("/api/org1/summary"));
         assert!(!is_querier_route("/summary")); // Should fail as it needs org_id
 
+        assert!(is_querier_route("/api/org1/overview"));
+        assert!(!is_querier_route("/overview"));
+        assert!(is_querier_route("/api/org1/overview?top=5"));
+        assert!(is_querier_route("/api/org1/overview/"));
+        assert!(!is_querier_route("/api/default/overview_x/_json"));
+        assert!(!is_querier_route("/api/default/overview_events/_search"));
+        assert!(!is_querier_route("/api/default/overview/extra"));
+
         // Test streams route
         assert!(is_querier_route("/api/org1/streams"));
         assert!(is_querier_route("/api/org1/streams/mystream"));
@@ -240,6 +280,12 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/traces/time_range?trace_id=a,b,c"
         ));
+        // Built-in catalogue status and refresh read the querier's sync state.
+        assert!(is_querier_route(
+            "/api/org1/llm/models/built-in?metadata_only=true"
+        ));
+        assert!(is_querier_route("/api/org1/llm/models/refresh-built-in"));
+        assert!(!is_querier_route("/api/org1/llm/models"));
         // the org-level entry must not swallow the OTLP ingest route
         assert!(!is_querier_route("/api/org1/traces"));
         for leaf in ["meta", "tag_values", "series", "merge", "diff"] {
@@ -248,6 +294,32 @@ mod tests {
             )));
         }
         assert!(!is_querier_route("/api/org1/v1/profiles"));
+    }
+
+    #[test]
+    fn test_is_mcp_endpoint() {
+        for path in [
+            "/api/default/mcp",
+            "/api/default/mcp?x=1",
+            "/api/default/mcp/",
+            "/o2/api/default/mcp",
+            "/api/3GjLqZseGw8M8qmh6zEx7dgGUTY/mcp",
+        ] {
+            assert!(is_mcp_endpoint(path), "{path}");
+        }
+        // a stream named "mcp", or anything that only resembles the endpoint
+        for path in [
+            "/api/default/streams/mcp",
+            "/api/mcp",
+            "/api//mcp",
+            "/mcp",
+            "/web/mcp",
+            "/api/default/mcp/extra",
+            "/api/default/mcpx",
+            "/api/default/_search",
+        ] {
+            assert!(!is_mcp_endpoint(path), "{path}");
+        }
     }
 
     #[test]
@@ -272,11 +344,31 @@ mod tests {
     #[test]
     fn test_is_fixed_querier_route() {
         assert!(is_fixed_querier_route("/summary"));
+        assert!(is_fixed_querier_route("/api/org1/overview"));
         assert!(is_fixed_querier_route("/schema"));
         assert!(is_fixed_querier_route("/streams"));
 
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
+    }
+
+    #[test]
+    fn test_overview_pin_matches_only_the_org_route() {
+        assert!(is_fixed_querier_route("/api/default/overview"));
+        assert!(is_fixed_querier_route("/api/default/overview/"));
+        assert!(is_fixed_querier_route("/api/default/overview?top=5"));
+        assert!(!is_fixed_querier_route(
+            "/api/default/overview_events/_search"
+        ));
+        for path in [
+            "/api/default/streams/overview/schema",
+            "/api/default/streams/overview_x/_around",
+            "/api/default/overview_events/_search",
+            "/api/default/overview/extra",
+            "/overview",
+        ] {
+            assert!(!is_org_overview_route(path), "{path}");
+        }
     }
 
     #[test]

@@ -143,6 +143,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             locations,
             enabled: m.enabled,
             destinations,
+            template: m.template,
             retries: settings.retries,
             cooldown_mins: settings.cooldown_mins,
             wait_before_retry_secs: settings.wait_before_retry_secs,
@@ -943,6 +944,144 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// `(org, name)` of each check whose template override is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .filter(Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .order_by_asc(Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?)
+}
+
+/// The status badge and the status page run streaks, as one completed run leaves them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StatusStreaks {
+    pub last_check_status: i32,
+    pub down_runs: i32,
+    pub up_runs: i32,
+    /// `scheduled_ts` of the run that wrote these values, in microseconds.
+    pub run_ts: i64,
+}
+
+/// Reads the badge and run streaks of one check. `None` when the check is not in this region.
+pub async fn get_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StatusStreaks>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::LastCheckStatus)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .into_tuple::<(i32, i32, i32, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+        },
+    ))
+}
+
+/// [`get_status_streaks`] as a locking current read, so a retry inside a repeatable-read
+/// transaction sees the latest row.
+pub async fn lock_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StatusStreaks>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::LastCheckStatus)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .lock_exclusive()
+        .into_tuple::<(i32, i32, i32, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+        },
+    ))
+}
+
+/// Writes `next` only if the row still holds `expected`; `updated_at` moves only when a status page
+/// value changed.
+pub async fn swap_status_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    expected: &StatusStreaks,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    let mut q = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts));
+    if streaks_differ(expected, next) {
+        q = q.col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        );
+    }
+    let res = q
+        .filter(Column::Id.eq(id))
+        .filter(Column::LastCheckStatus.eq(expected.last_check_status))
+        .filter(Column::StatusDownRuns.eq(expected.down_runs))
+        .filter(Column::StatusUpRuns.eq(expected.up_runs))
+        .filter(Column::StatusRunTs.eq(expected.run_ts))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Applies replicated streaks unless the local row holds a newer run; `run_ts = 0` is a badge-only
+/// message.
+pub async fn apply_replicated_streaks<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    next: &StatusStreaks,
+) -> Result<bool, errors::Error> {
+    if next.run_ts == 0 {
+        return update_last_check_status(conn, id, next.last_check_status).await;
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
+        .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
+        .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        // `<=` so a late run's rebuilt streaks, which keep the newest `run_ts`, still replicate.
+        .filter(Column::StatusRunTs.lte(next.run_ts))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
 /// The alert bookkeeping a completed run needs in order to decide whether to
 /// notify. Read and written by the ack path only.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1001,7 +1140,7 @@ pub async fn get_alert_state<C: ConnectionTrait>(
 /// The three columns are guarded, not just the counter: a lost `alerting`
 /// transition is what produces a recovery for an incident nobody was told about.
 ///
-/// Compare `synthetics_runs::increment_jobs_done`, which is a single atomic
+/// Compare `synthetics_runs::finalize_run`, which is a single atomic
 /// `jobs_done = jobs_done + 1`. That shape is not available here because the new
 /// value depends on a policy decision, not on arithmetic over the old one.
 pub async fn update_alert_state_if<C: ConnectionTrait>(
@@ -1187,6 +1326,7 @@ fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), 
     am.locations = Set(locations);
     am.enabled = Set(check.enabled);
     am.destinations = Set(destinations);
+    am.template = Set(check.template.clone());
     am.settings = Set(settings);
     am.secrets = Set(pack_secrets(check)?);
     Ok(())
@@ -1208,10 +1348,17 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
         locations: Set(locations),
         enabled: Set(check.enabled),
         destinations: Set(destinations),
+        template: Set(check.template.clone()),
         settings: Set(settings),
         secrets: Set(pack_secrets(check)?),
         ..Default::default()
     })
+}
+
+fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
+    a.last_check_status != b.last_check_status
+        || a.down_runs != b.down_runs
+        || a.up_runs != b.up_runs
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1281,6 +1428,10 @@ pub(crate) mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            template: None,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -1940,6 +2091,28 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    #[tokio::test]
+    async fn names_using_template_finds_the_checks_that_name_it() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            names_using_template(&db, Some("org1"), "ops-card")
+                .await
+                .unwrap(),
+            vec![("org1".to_string(), "Login Flow".to_string())]
+        );
+        assert!(
+            names_using_template(&db, Some("other"), "ops-card")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {

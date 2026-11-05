@@ -236,52 +236,45 @@ pub async fn get_versions(org_id: &str, entity_id: &str) -> Result<Vec<Scorer>, 
     Ok(records)
 }
 
+/// Updating a scorer deactivates its previous versions, so each entity has one
+/// active row; the dedupe only guards legacy rows written before that rule.
+/// Use the primary: provider deletion also uses this list to reject dependencies.
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<Scorer>, errors::Error> {
-    let client = get_orm_client_rw().await;
-
     let records: Vec<Model> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Name, Order::Asc)
         .order_by(Column::Version, Order::Desc)
-        .all(client)
+        .all(get_orm_client_rw().await)
         .await?;
 
-    // Deduplicate: keep highest version per logical entity.
-    let mut seen = std::collections::HashSet::new();
-    let records: Vec<_> = records
-        .into_iter()
-        .map(Scorer::from)
-        .filter(|s| seen.insert(s.entity_id.clone()))
-        .collect();
-
-    Ok(records)
+    Ok(latest_per_entity(records))
 }
 
 pub async fn get_by_type(
     org_id: &str,
     scorer_type: &ScorerType,
 ) -> Result<Vec<Scorer>, errors::Error> {
-    let client = get_orm_client_rw().await;
-
     let records: Vec<Model> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::ScorerType.eq(*scorer_type))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Name, Order::Asc)
         .order_by(Column::Version, Order::Desc)
-        .all(client)
+        .all(get_orm_client_ro().await)
         .await?;
 
-    // Deduplicate by logical entity.
+    Ok(latest_per_entity(records))
+}
+
+/// Keep the highest version per logical entity (rows arrive version-descending).
+fn latest_per_entity(records: Vec<Model>) -> Vec<Scorer> {
     let mut seen = std::collections::HashSet::new();
-    let records: Vec<_> = records
+    records
         .into_iter()
         .map(Scorer::from)
         .filter(|s| seen.insert(s.entity_id.clone()))
-        .collect();
-
-    Ok(records)
+        .collect()
 }
 
 pub async fn has_active_by_score_config_id(

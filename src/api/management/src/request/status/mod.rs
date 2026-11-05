@@ -32,6 +32,7 @@ use config::{
     get_config, get_instance_id,
     meta::{
         cluster::{NodeStatus, Role, RoleGroup},
+        feature::{Feature, FeatureState},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
@@ -76,7 +77,8 @@ use {
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
+        block_feature_for_report_failure, check_features, last_reported_timestamp,
+        runtime_definition,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -269,6 +271,11 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+    workflow_hooks_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    feature_revision: u32,
+    features: HashMap<Feature, FeatureState>,
+    feature_names: HashMap<String, String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -516,7 +523,7 @@ pub async fn zo_config(
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -537,33 +544,51 @@ pub async fn zo_config(
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
-    let ai_chat_persistence_enabled = enterprise_value!(
+    let ai_enabled = enterprise_value!(
         false,
-        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
     );
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let ai_chat_persistence_enabled =
+        enterprise_value!(false, ai_enabled && o2cfg.ai.chat_persistence_enabled);
+    let incidents_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+    );
+    let downtimes_enabled = enterprise_value!(
+        false,
+        o2cfg.downtimes.enabled && check_features(&[Feature::Alerts])
+    );
+    let alert_calibration_enabled = enterprise_value!(
+        false,
+        o2cfg.alert_calibration.enabled && check_features(&[Feature::Alerts])
+    );
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
-        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+        incidents_enabled
+            && o2cfg.incidents.rca_enabled
+            && openobserve_core::alerts::incidents::rca_agent_available()
     );
-    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
-    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
+    let online_evals_enabled = enterprise_value!(
+        false,
+        o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+    );
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
-    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_enabled = enterprise_value!(
+        false,
+        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+    );
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -593,7 +618,59 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled;
+    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
+    #[cfg(feature = "enterprise")]
+    let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_hooks_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let featuremap: HashMap<Feature, FeatureState> = Feature::all()
+        .map(|variant| {
+            // operator-off hides whatever the license says; operator-on but unlicensed locks
+            let switched_on = match variant {
+                Feature::AiAssistant => o2cfg.ai.enabled,
+                Feature::Incidents => o2cfg.incidents.enabled,
+                Feature::Oncall => o2cfg.oncall.enabled,
+                Feature::Workflows => o2cfg.common.workflows_enabled,
+                _ => true,
+            };
+            let entitled = check_features(&[variant]);
+            let key: &str = variant.into();
+            let listed = o2cfg
+                .common
+                .custom_hide_menus
+                .split(',')
+                .any(|m| m.trim() == key);
+            let state = if listed || !switched_on {
+                FeatureState::Hidden
+            } else if entitled {
+                FeatureState::Enabled
+            } else {
+                FeatureState::Locked
+            };
+            (variant, state)
+        })
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let featuremap: HashMap<Feature, FeatureState> = [
+        Feature::AiAssistant,
+        Feature::AiObservability,
+        Feature::Incidents,
+        Feature::Oncall,
+        Feature::Workflows,
+    ]
+    .into_iter()
+    .map(|variant| (variant, FeatureState::Locked))
+    .collect();
+    #[cfg(feature = "enterprise")]
+    let feature_names: HashMap<String, String> = runtime_definition()
+        .features
+        .iter()
+        .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let feature_names: HashMap<String, String> = HashMap::new();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -709,6 +786,11 @@ pub async fn zo_config(
         billing_group_allowed_orgs,
         #[cfg(feature = "enterprise")]
         workflows_enabled,
+        workflow_hooks_enabled,
+        #[cfg(feature = "enterprise")]
+        feature_revision: runtime_definition().feature_revision,
+        features: featuremap,
+        feature_names,
     })
 }
 
@@ -752,17 +834,12 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
             use_all_org: true,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         },
         user.role,
         user.is_external,
     )
     .await
-}
-
-/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
-#[cfg(feature = "enterprise")]
-async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
-    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
 }
 
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
@@ -1110,6 +1187,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     })
     .await;
     (
@@ -1231,6 +1310,8 @@ pub async fn redirect(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
@@ -1482,6 +1563,8 @@ pub async fn refresh_token_with_dex(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1773,6 +1856,8 @@ pub async fn logout(
                 trace_id: None,
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -2059,15 +2144,6 @@ mod tests {
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
         reload_downtimes(false).await.unwrap();
         assert!(db::downtimes::all_cached().is_empty());
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
-        assert!(block_feature_for_report_failure().await);
-        assert_eq!(last_reported_timestamp().await, 0);
-        assert!(rbac_enabled_for_config(true).await);
-        assert!(!rbac_enabled_for_config(false).await);
     }
 
     #[test]
@@ -2639,8 +2715,34 @@ mod tests {
         let json = zo_config_json().await;
         assert_eq!(
             json["incidents_rca_enabled"],
-            o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+            openobserve_core::alerts::incidents::incidents_enabled()
+                && o2cfg.incidents.rca_enabled
+                && openobserve_core::alerts::incidents::rca_agent_available()
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_online_evals_need_the_observability_license() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["online_evals_enabled"],
+            o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_feature_names_come_from_the_embedded_definition() {
+        let json = zo_config_json().await;
+        for (key, gate) in &runtime_definition().features {
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                gate.display_name.as_deref(),
+                "{key}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -2693,5 +2795,68 @@ mod tests {
         ] {
             assert!(json.get(k).is_some(), "flatten must keep {k}");
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn report_grace_license(now: i64, active: bool) -> o2_enterprise::enterprise::license::License {
+        serde_json::from_value(serde_json::json!({
+            "version":2,"license_id":"grace-authz","installation_id":"*","active":true,
+            "created_at":now-1_000_000,"expires_at":now+86_400_000_000i64,"msv":"0.0.0",
+            "company":"Test Co","address":"1 Test Way","contact_name":"Test User",
+            "contact_email":"test@example.com","additional_emails":[],"base_urls":[],
+            "limits":{"Ingestion":{"typ":"PerDayCount","value":100}},"company_id":"test",
+            "environment_type":"online","limit_breach_allowed_count":0,
+            "allow_search_after_limit_exceeded":false,"validator_url":"","validator_auth":"",
+            "no_usage_report_allowed_duration":1,
+            "waivers":[{"id":"g","type":"report_grace","starts_at":now-3_600_000_000i64,
+                "ends_at":if active {now+3_600_000_000i64} else {now-1}}]
+        }))
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn report_grace_sso_availability_and_unauthenticated_refresh_denial() {
+        use o2_enterprise::enterprise::license::{
+            TEST_STATICS_LOCK, replace_license_for_tests, set_last_reported_timestamp_for_tests,
+        };
+        let held = TEST_STATICS_LOCK.lock().await;
+        let previous_ts = o2_enterprise::enterprise::license::last_reported_timestamp().await;
+        let now = chrono::Utc::now().timestamp_micros();
+        let previous = replace_license_for_tests(
+            &held,
+            Some(("grace".into(), report_grace_license(now, true))),
+        )
+        .await;
+        set_last_reported_timestamp_for_tests(&held, now - 86_400_000_000i64);
+        for active in [true, false] {
+            replace_license_for_tests(
+                &held,
+                Some(("grace".into(), report_grace_license(now, active))),
+            )
+            .await;
+            let response = zo_config_bootstrap().await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let config: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                config["sso_enabled"],
+                get_dex_config().dex_enabled && active
+            );
+            let denied =
+                refresh_token_with_dex(CookieJar::new(), Query(std::collections::HashMap::new()))
+                    .await;
+            assert_eq!(
+                denied.status(),
+                if active {
+                    StatusCode::UNAUTHORIZED
+                } else {
+                    StatusCode::FORBIDDEN
+                }
+            );
+        }
+        replace_license_for_tests(&held, previous).await;
+        set_last_reported_timestamp_for_tests(&held, previous_ts);
     }
 }

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               icon-left="restart-alt"
-              :disabled="!canRestart"
+              :disabled="!!restartBlocked"
               :loading="actions.restarting.value"
               data-test="fleet-collector-drawer-restart"
               @click="actions.restart([collector])"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("fleet.collectors.restart") }}
             </OButton>
             <!-- A disabled button gets no pointer events, so the reason hangs on its wrapper. -->
-            <OTooltip v-if="!canRestart" :content="t('fleet.collectors.restartUnsupported')" />
+            <OTooltip v-if="restartBlocked" :content="restartBlocked" />
           </span>
           <OButton
             v-if="collector.config"
@@ -447,11 +447,13 @@ const forbidden = computed(() => isForbidden(error.value));
 const refetch = () => query.refetch();
 const tokens = useFleetTokens(() => props.open);
 
-const canRestart = computed(
-  () =>
-    !collector.value?.capabilities.length ||
-    collector.value.capabilities.includes("AcceptsRestartCommand"),
-);
+const restartBlocked = computed<I18nText | null>(() => {
+  if (collector.value?.status === "offline") return t("fleet.collectors.restartOffline");
+  const capabilities = collector.value?.capabilities;
+  return !capabilities?.length || capabilities.includes("AcceptsRestartCommand")
+    ? null
+    : t("fleet.collectors.restartUnsupported");
+});
 
 const tokenName = computed<I18nText | null>(() => {
   const id = collector.value?.tokenId;

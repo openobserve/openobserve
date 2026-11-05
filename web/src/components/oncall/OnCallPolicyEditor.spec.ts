@@ -508,6 +508,61 @@ describe("OnCallPolicyEditor", () => {
       );
     });
 
+    it("saves the template override and null once cleared", async () => {
+      service.setPolicy.mockResolvedValue({ data: {} } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: { ...webhookPolicy, template: "ops-card" }, open: true },
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            TemplateOverridePicker: {
+              name: "TemplateOverridePicker",
+              props: ["kind", "modelValue", "destinations"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+      const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+      expect(picker.props("kind")).toBe("on_call");
+      expect(picker.props("modelValue")).toBe("ops-card");
+
+      await picker.vm.$emit("update:modelValue", null);
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+      expect(service.setPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ template: null }) }),
+      );
+    });
+
+    it("tells the team once that an email destination now receives pages", async () => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "ops-mail", type: "email" }],
+      } as any);
+      localStorage.removeItem("oncall-mail-banner:team_1");
+      const mount_ = () =>
+        mount(OnCallPolicyEditor, {
+          props: {
+            teamId: "team_1",
+            policy: { ...webhookPolicy, destinations: ["slack-oncall", "ops-mail"] },
+            open: true,
+          },
+          global: { plugins: [i18n, store], stubs },
+        });
+      const wrapper = mount_();
+      await flushPromises();
+      const banner = wrapper.find('[data-test="oncall-policy-mail-banner"]');
+      expect(banner.text()).toContain("ops-mail");
+
+      await wrapper.find('[data-test="oncall-policy-mail-banner-dismiss"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
+      const again = mount_();
+      await flushPromises();
+      expect(again.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
+    });
+
     /// The editor is still worth using when the destination list is unreachable.
     it("still renders when destinations cannot be loaded", async () => {
       destinations.list.mockRejectedValue(new Error("boom"));
@@ -767,6 +822,55 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(false);
+    });
+
+    // Room posts use policy.template, so the override picker is not gated on a webhook rung alone.
+    describe("the template override for room posts", () => {
+      const pickerStub = {
+        TemplateOverridePicker: {
+          name: "TemplateOverridePicker",
+          props: ["kind", "modelValue", "destinations"],
+          template: "<div />",
+        },
+      };
+      const mountWithPicker = (p: OnCallPolicy = policy) =>
+        mount(OnCallPolicyEditor, {
+          props: { teamId: "team_1", policy: p, open: true, rotations: ROTATIONS },
+          global: { plugins: [i18n, store], stubs: { ...stubs, ...pickerStub } },
+        });
+
+      it("shows the picker for the team's own room without a webhook rung", async () => {
+        destinations.list.mockResolvedValue({ data: [{ name: "slack-eng", type: "http" }] } as any);
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(true);
+        const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+        expect(picker.props("destinations")).toEqual([{ name: "slack-eng", type: "http" }]);
+      });
+
+      it("shows the picker when the room falls back to the policy's destinations", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["ops-hook"], source: "policy" },
+        } as any);
+        const wrapper = mountWithPicker({ ...policy, destinations: ["ops-hook"] });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(true);
+      });
+
+      it("hides the picker when no rung pages by webhook and the room is empty", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: [], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+      });
     });
 
     /// RO-1: the Slack card sits under the team channel; its changes are written at once.
@@ -1170,6 +1274,49 @@ describe("targets that name a rotation", () => {
     await flushPromises();
 
     expect(savedTargets().filter((t: any) => t.rotation_id === "rot_primary")).toHaveLength(2);
+  });
+
+  /// R8: a rotation lands on the open priority alone until "All priorities" is ticked.
+  it("adds a rotation to the open priority only, unless All priorities is ticked", async () => {
+    const twoPriorities: OnCallPolicy = {
+      ...policy,
+      rungs: [1, 2].map((priority) => ({
+        priority,
+        steps: [{ after_micros: 0, targets: [{ kind: "user", email: "ana@o2.ai" }] }],
+        channels: ["email"],
+      })),
+    };
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: twoPriorities, open: true, rotations: TWO },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+    const pick = async (rotationId: string, allPriorities?: boolean) => {
+      targetPicker(wrapper).vm.$emit("update:modelValue", "rotation");
+      await flushPromises();
+      const box = wrapper.findComponent('[data-test="oncall-policy-rotation-all-priorities"]');
+      if (allPriorities === undefined) expect(box.props("modelValue")).toBe(false);
+      else box.vm.$emit("update:modelValue", allPriorities);
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="oncall-policy-pick-rotation-1-0"]')
+        .vm.$emit("update:modelValue", rotationId);
+      await flushPromises();
+    };
+    await pick("rot_primary");
+    await pick("rot_secondary", true);
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    const { rungs } = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    const rotationsOf = (priority: number) =>
+      rungs
+        .find((r: any) => r.priority === priority)
+        .steps[0].targets.filter((t: any) => t.kind === "rotation")
+        .map((t: any) => t.rotation_id);
+    expect(rotationsOf(1)).toEqual(["rot_primary", "rot_secondary"]);
+    expect(rotationsOf(2)).toEqual(["rot_secondary"]);
   });
 
   /// Found by this suite leaking between tests: `reset` shallow-copied each

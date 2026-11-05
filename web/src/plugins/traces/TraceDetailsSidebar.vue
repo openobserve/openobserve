@@ -205,8 +205,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="shrink-0">
-            <!-- Single button with wrapper for tooltip functionality -->
-            <span class="inline-block" tabindex="0">
+            <OTooltip v-if="logsLocked" :content="logsLockedReason">
+              <span class="inline-flex">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="h-full text-xs!"
+                  disabled
+                  icon-left="lock"
+                  data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+                >
+                  {{ t("traces.viewLogs") }}
+                </OButton>
+              </span>
+            </OTooltip>
+            <span v-else class="inline-block" tabindex="0">
               <OButton
                 variant="outline"
                 size="xs"
@@ -220,8 +233,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
+            <OTooltip v-if="profilingLocked && spanProfileRequest" :content="profilingLockedReason">
+              <span class="ms-1 inline-flex">
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="h-full text-xs!"
+                  disabled
+                  data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
+                >
+                  <template #icon-left>
+                    <OIcon name="lock" class="lock-chip" size="sm" />
+                  </template>
+                  {{ t("traces.viewProfile") }}
+                </OButton>
+              </span>
+            </OTooltip>
             <OButton
-              v-if="spanProfileMatch"
+              v-else-if="spanProfileMatch"
               variant="outline"
               size="xs"
               class="ms-1 h-full text-xs!"
@@ -236,6 +265,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                row itself has no gap (its children carry their own margins), so
                these three are grouped and spaced on the header's rhythm. -->
           <div class="ms-2 flex items-center gap-2">
+            <OButton
+              v-if="showAskAi"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('traces.askAi.askAboutSpan')"
+              data-test="trace-span-ask-ai-btn"
+              @click.stop="askAiAboutSpan"
+            >
+              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              <OTooltip side="bottom" :content="t('traces.askAi.askAboutSpan')" />
+            </OButton>
+
             <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               variant="outline"
@@ -451,7 +492,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
-          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
+          :suffix-icon="correlationTabLocked ? 'lock' : undefined"
+          :tooltip="correlationTabLocked ? correlationLockedReason : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
@@ -459,7 +501,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
-          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
+          :suffix-icon="correlationTabLocked ? 'lock' : undefined"
+          :tooltip="correlationTabLocked ? correlationLockedReason : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
         />
@@ -635,13 +678,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View mode toggle toolbar -->
           <div class="flex h-fit! items-center justify-start pb-1.5!">
             <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
-              <OToggleGroupItem value="json" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="json"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-json"
+              >
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 {{ t("common.json") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="table"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-table"
+              >
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
@@ -915,8 +968,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-logs"
           class="traces-correlated-logs-container h-full max-h-full overflow-hidden p-0"
         >
+          <LicenseDeniedState
+            v-if="correlationLicenseLocked"
+            :features="['correlation']"
+            data-test="trace-details-sidebar-correlated-logs-license-denied"
+          />
           <CorrelatedLogsTable
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -954,8 +1012,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="correlated-metrics"
           class="traces-correlated-metrics-container h-full max-h-full overflow-hidden p-0"
         >
+          <LicenseDeniedState
+            v-if="correlationLicenseLocked"
+            :features="['correlation']"
+            data-test="trace-details-sidebar-correlated-metrics-license-denied"
+          />
           <TelemetryCorrelationDashboard
-            v-if="correlationProps"
+            v-else-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
@@ -1036,11 +1099,16 @@ import {
   onUnmounted,
   defineAsyncComponent,
   nextTick,
+  unref,
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
+import { useAiIcon } from "@/composables/useAiIcon";
+import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -1195,6 +1263,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAskAi: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -1215,6 +1287,7 @@ export default defineComponent({
     LLMContentRenderer,
     OTable,
     CorrelatedLogsTable,
+    LicenseDeniedState,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
@@ -1246,6 +1319,7 @@ export default defineComponent({
     "evaluate",
     "add-to-dataset",
     "update:activeTab",
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
@@ -1285,6 +1359,17 @@ export default defineComponent({
       const num = parseInt(String(count), 10);
       return !isNaN(num) && num > 0 ? num : null;
     });
+
+    const correlationAccess = useLockedAffordance("correlation");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
+      useLicenseLock("correlation");
+    const correlationTabLocked = computed(
+      () => !correlationAccess.value.allowed || correlationLicenseLocked.value,
+    );
+    const { locked: profilingLocked, lockedReason: profilingLockedReason } =
+      useLicenseLock("continuous_profiling");
+    const { locked: logsLocked, lockedReason: logsLockedReason } = useLicenseLock("logs");
 
     const activeTabModel = computed({
       get: () => props.activeTab,
@@ -1567,6 +1652,7 @@ export default defineComponent({
 
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
+      if (logsLocked.value) return true;
       // Enterprise loading state
       if (config.isEnterprise === "true" && correlationLoading.value) {
         return true;
@@ -1582,6 +1668,7 @@ export default defineComponent({
 
     // Get tooltip content based on disabled state
     const viewLogsTooltipContent = computed(() => {
+      if (logsLocked.value) return logsLockedReason.value;
       // Enterprise loading state
       if (config.isEnterprise === "true" && correlationLoading.value) {
         return t("correlation.loadingCorrelation");
@@ -1909,7 +1996,7 @@ export default defineComponent({
     );
 
     const viewSpanLogs = async () => {
-      if (config.isEnterprise === "true") {
+      if (config.isEnterprise === "true" && !correlationLicenseLocked.value) {
         const clickedSpan = spanKey(props.span);
         await loadCorrelation();
         // The user moved to another span while this lookup ran: do nothing.
@@ -2022,12 +2109,18 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const operationPercentile = computed(() => {
+    const reliableOperationStats = computed((): OperationStats | null => {
       const req = operationStatsRequest.value;
       const stats = req ? operationStatsCache.value[req.key] : null;
-      const duration = Number(props.span?.duration);
       // approx_percentile_cont returns 0 when the column type is not inferred.
       if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
+      return stats;
+    });
+
+    const operationPercentile = computed(() => {
+      const stats = reliableOperationStats.value;
+      const duration = Number(props.span?.duration);
+      if (!stats) return null;
       if (!Number.isFinite(duration)) return null;
       let band = t("traces.traceDetailsSidebar.operationBandAboveP99");
       let variant: BadgeVariant = "error-soft";
@@ -2049,6 +2142,23 @@ export default defineComponent({
       });
       return { band, variant, tooltip };
     });
+
+    const { aiIconSrc } = useAiIcon();
+
+    const askAiAboutSpan = () => {
+      const trace = searchObj.data?.traceDetails?.selectedTrace;
+      emit(
+        "sendToAiChat",
+        buildSpanAiPayload(t, {
+          span: props.span,
+          stream: spanSourceStream.value,
+          traceStartTime: Number(trace?.trace_start_time) || 0,
+          traceEndTime: Number(trace?.trace_end_time) || 0,
+          operationP50Us: reliableOperationStats.value?.p50 ?? null,
+          hasError: !!unref(hasSpanError),
+        }),
+      );
+    };
 
     const spanProfileCache = ref<Record<string, SpanProfileMatch | null>>({});
     const pendingSpanProfiles = new Set<string>();
@@ -2142,7 +2252,7 @@ export default defineComponent({
     watch(
       spanProfileRequest,
       (req) => {
-        if (req) detectSpanProfile(req);
+        if (req && !profilingLocked.value) detectSpanProfile(req);
       },
       { immediate: true },
     );
@@ -2260,6 +2370,8 @@ export default defineComponent({
           from: convertTimeFromNsToUs(props.span.start_time) - 3600000000,
           to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
+          // Apply & Search in the linked trace returns to the search tab the user came from.
+          tab: router.currentRoute.value.query.tab,
         };
 
         if (query.trace_id === props.span.trace_id) {
@@ -2412,7 +2524,7 @@ export default defineComponent({
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
     const loadCorrelation = (): Promise<void> => {
-      if (correlationProps.value) return Promise.resolve();
+      if (correlationProps.value || correlationLicenseLocked.value) return Promise.resolve();
       const key = spanKey(props.span);
       if (correlationRequest?.key !== key) {
         const promise: Promise<void> = fetchCorrelation(key).finally(() => {
@@ -2762,12 +2874,15 @@ export default defineComponent({
       });
     };
 
-    const correlationAccess = useLockedAffordance("correlation");
-    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-
     return {
       t,
       correlationAccess,
+      correlationLicenseLocked,
+      correlationLockedReason,
+      correlationTabLocked,
+      profilingLocked,
+      profilingLockedReason,
+      spanProfileRequest,
       activeTabModel,
       filterActions,
       closeSidebar,
@@ -2797,6 +2912,8 @@ export default defineComponent({
       navigateToError,
       getDuration,
       operationPercentile,
+      aiIconSrc,
+      askAiAboutSpan,
       spanProfileMatch,
       viewSpanProfile,
       getTTFT,
@@ -2855,6 +2972,8 @@ export default defineComponent({
       isDarkMode,
       isViewLogsDisabled,
       viewLogsTooltipContent,
+      logsLocked,
+      logsLockedReason,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

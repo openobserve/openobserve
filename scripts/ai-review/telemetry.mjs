@@ -36,6 +36,14 @@ export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// opencode provider ids carry a suffix (anthropic-review); gen_ai.provider.name wants the well-known vendor value.
+export function genAiProviderName(providerId) {
+  const id = String(providerId ?? "").toLowerCase();
+  if (id.includes("anthropic")) return "anthropic";
+  if (id.includes("deepseek")) return "deepseek";
+  return providerId;
+}
+
 export function genAiRequestAttributes(systemInstructions, userMessage) {
   return {
     "gen_ai.system_instructions": JSON.stringify([

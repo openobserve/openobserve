@@ -37,6 +37,7 @@ import {
   fleetTokensQuery,
 } from "@/services/fleet.queries";
 import type {
+  FleetAuditParams,
   FleetCollector,
   FleetCollectorDetail,
   FleetCollectorEvent,
@@ -188,7 +189,7 @@ export const NO_OVERRIDES: FleetSettings = {
 
 export const HALT_EXITS: FleetHaltExit[] = ["rollback", "resume", "fix_forward", "skip"];
 
-const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled"];
+const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled", "waiting"];
 
 const ENV_REF = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
@@ -566,15 +567,20 @@ export function useFleetConfigVersion(
   };
 }
 
-export function useFleetAudit() {
+export function useFleetAudit(params: () => FleetAuditParams = () => ({})) {
   const orgId = useOrgId();
   const query = useQuery(() =>
-    Object.assign(fleetAuditQuery(orgId.value), { enabled: !!orgId.value }),
+    Object.assign(fleetAuditQuery(orgId.value, params()), {
+      enabled: !!orgId.value,
+      placeholderData: keepPreviousData,
+    }),
   );
   return {
     rows: computed(() => (isForbidden(query.error.value) ? [] : (query.data.value?.items ?? []))),
+    total: computed(() => (isForbidden(query.error.value) ? 0 : (query.data.value?.total ?? 0))),
     disabled: computed(() => !!query.data.value?.audit_disabled),
-    loading: query.isPending,
+    // The previous page stays on screen while the next one loads, and the table dims it.
+    loading: computed(() => query.isPending.value || query.isPlaceholderData.value),
     fetching: query.isFetching,
     lastUpdatedAt: query.dataUpdatedAt,
     error: query.error,

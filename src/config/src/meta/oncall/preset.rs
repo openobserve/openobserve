@@ -60,6 +60,9 @@ const MINUTES_PER_DAY: u32 = 1440;
 
 const DEFAULT_BUSINESS_START_MINUTE: u32 = 9 * 60;
 const DEFAULT_BUSINESS_END_MINUTE: u32 = 17 * 60;
+/// Thursday 00:00: the boundary the split-the-week summary describes before anything is chosen.
+const DEFAULT_SPLIT_BOUNDARY_DAY: u8 = 3;
+const DEFAULT_SPLIT_BOUNDARY_MINUTE: u32 = 0;
 
 fn default_business_days() -> Vec<u8> {
     vec![0, 1, 2, 3, 4]
@@ -71,6 +74,14 @@ fn default_business_start() -> u32 {
 
 fn default_business_end() -> u32 {
     DEFAULT_BUSINESS_END_MINUTE
+}
+
+fn default_split_boundary_day() -> u8 {
+    DEFAULT_SPLIT_BOUNDARY_DAY
+}
+
+fn default_split_boundary_minute() -> u32 {
+    DEFAULT_SPLIT_BOUNDARY_MINUTE
 }
 
 /// Which preset. Serialises to the id the catalogue publishes.
@@ -156,9 +167,11 @@ pub enum PresetSpec {
         first: Group,
         /// Covers from the boundary to the end of the week.
         second: Group,
-        /// 0 = Monday … 6 = Sunday.
+        /// 0 = Monday … 6 = Sunday. Defaults to Thursday.
+        #[serde(default = "default_split_boundary_day")]
         boundary_day: u8,
-        /// Minutes from midnight in the team's timezone.
+        /// Minutes from midnight in the team's timezone. Defaults to 00:00.
+        #[serde(default = "default_split_boundary_minute")]
         boundary_minute: u32,
     },
     /// A working-hours layer over an out-of-hours catch-all.
@@ -1018,8 +1031,10 @@ pub fn catalogue() -> Vec<PresetDescriptor> {
                     "Hand over on",
                     "0 = Monday … 6 = Sunday. Monday 00:00 is refused: it would give the first group none of the week.",
                 )
-                .bounded(0, 6),
-                minute_input("boundary_minute", "Hand over at"),
+                .bounded(0, 6)
+                .defaulting(serde_json::json!(DEFAULT_SPLIT_BOUNDARY_DAY)),
+                minute_input("boundary_minute", "Hand over at")
+                    .defaulting(serde_json::json!(DEFAULT_SPLIT_BOUNDARY_MINUTE)),
             ]),
         },
         PresetDescriptor {
@@ -1791,6 +1806,38 @@ mod tests {
                 days: vec![0, 1, 2, 3, 4],
                 start_minute: 540,
                 end_minute: 1020,
+            }]
+        );
+    }
+
+    /// The split-the-week form opens on the boundary its summary shows, so Save works untouched.
+    #[test]
+    fn test_split_the_week_defaults_to_thursday_midnight() {
+        let entries = catalogue();
+        let split = entries
+            .iter()
+            .find(|e| e.id == PresetId::SplitTheWeek)
+            .unwrap();
+        let default_of = |field: &str| {
+            let input = split.inputs.iter().find(|i| i.field == field).unwrap();
+            assert!(!input.required, "{field} is still required");
+            input.default.clone()
+        };
+        assert_eq!(default_of("boundary_day"), Some(serde_json::json!(3)));
+        assert_eq!(default_of("boundary_minute"), Some(serde_json::json!(0)));
+        let spec: PresetSpec = serde_json::from_str(
+            r#"{"preset":"split_the_week",
+                "first":{"members":["ana@o2.ai"]},
+                "second":{"members":["bo@o2.ai"]}}"#,
+        )
+        .unwrap();
+        let rotations = build(&spec, chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
+        assert_eq!(
+            rotations[0].restrictions,
+            vec![TimeWindow {
+                days: vec![0, 1, 2],
+                start_minute: 0,
+                end_minute: MINUTES_PER_DAY,
             }]
         );
     }

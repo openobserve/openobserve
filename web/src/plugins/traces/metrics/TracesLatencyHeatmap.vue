@@ -43,6 +43,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("traces.latencyHeatmap.colorBy.errors") }}
         </OToggleGroupItem>
       </OToggleGroup>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            :aria-label="t('traces.redActions.durationActions')"
+            variant="ghost"
+            size="icon"
+            class="shrink-0"
+            data-test="traces-duration-actions-btn"
+          >
+            <OIcon name="more-vert" size="sm" />
+          </OButton>
+        </template>
+        <ODropdownItem
+          data-test="traces-duration-create-alert"
+          icon-left="shield-alert-outline"
+          @select="emit('create-alert')"
+        >
+          {{ t("dashboard.panelContainer.exploreCreateAlert") }}
+        </ODropdownItem>
+        <ODropdownItem
+          data-test="traces-duration-add-to-dashboard"
+          icon-left="dashboard"
+          @select="emit('add-to-dashboard')"
+        >
+          {{ t("dashboard.panelContainer.exploreAddToDashboard") }}
+        </ODropdownItem>
+      </ODropdown>
     </PanelBar>
     <div class="relative min-h-0 flex-1">
       <div
@@ -182,6 +209,7 @@ import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -236,6 +264,8 @@ const emit = defineEmits<{
   (e: "drill-down"): void;
   (e: "clear"): void;
   (e: "ask-ai", payload: LatencyHeatmapAskAi): void;
+  (e: "create-alert"): void;
+  (e: "add-to-dashboard"): void;
 }>();
 
 const { t } = useI18nTyped();

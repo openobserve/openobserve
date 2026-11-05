@@ -47,6 +47,7 @@ use crate::{
         openobserve_api_management::request::organization::org::rename_org,
         openobserve_api_management::request::organization::assume_service_account::assume_service_account,
         openobserve_api_management::request::organization::org::org_summary,
+        openobserve_api_management::request::organization::org::org_overview,
         openobserve_api_management::request::organization::org::get_user_passcode,
         openobserve_api_management::request::organization::org::update_user_passcode,
         openobserve_api_management::request::organization::org::get_user_rumtoken,
@@ -311,10 +312,13 @@ use crate::{
         service_streams::correlate_streams,
         service_streams::get_identity_config,
         service_streams::save_identity_config,
+        service_streams::reset_services,
         gen_ai::clear_agent_registry,
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        openobserve_api_management::request::gen_ai_health::get_data_health,
+        openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
@@ -339,6 +343,7 @@ use crate::{
         openobserve_api_management::request::downtimes::update_downtime,
         openobserve_api_management::request::downtimes::cancel_downtime,
         openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::test_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
         openobserve_api_management::request::fleet::list_collectors,
@@ -607,6 +612,18 @@ use crate::{
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_api_management::request::gen_ai_health::DataHealthResponse,
+            openobserve_api_management::request::gen_ai_health::HealthCheck,
+            openobserve_api_management::request::gen_ai_health::ModelUsage,
+            openobserve_api_management::request::gen_ai_health::CheckId,
+            openobserve_api_management::request::gen_ai_health::CheckStatus,
+            openobserve_api_management::request::model_pricing::UnpricedModelsResponse,
+            openobserve_api_management::request::model_pricing::UnpricedModel,
+            openobserve_api_management::request::model_pricing::UnpricedModelMatch,
+            openobserve_api_management::request::gen_ai_health::UnpricedModelRow,
+            config::meta::model_pricing::CostStatus,
+            config::meta::model_pricing::PricingSource,
+            config::meta::model_pricing::PricingTierDefinition,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
             config::meta::dashboards::v1::Dashboard,
@@ -781,6 +798,7 @@ use crate::{
             config::meta::downtimes::NotificationEvents,
             config::meta::downtimes::NotificationEvent,
             config::meta::downtimes::DowntimeNotificationLogEntry,
+            config::meta::downtimes::DowntimeNotificationTemplate,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -945,6 +963,7 @@ use crate::{
             config::meta::fleet::ValidationFailed,
             config::meta::fleet::AuditEvent,
             config::meta::fleet::AuditList,
+            config::meta::fleet::AuditModule,
             config::meta::fleet::DeliveryState,
             config::meta::fleet::RolloutStart,
             config::meta::fleet::Batching,
@@ -1050,6 +1069,7 @@ use crate::{
         (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
         (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
         (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
         (name = "Groups", description = "User group management"),
         (name = "Keys", description = "Cipher key management (enterprise)"),
         (name = "LLM", description = "LLM model pricing definitions"),
@@ -1173,6 +1193,13 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1242,6 +1269,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::keys::delete_bulk,
     openobserve_api_management::request::license::get_license_info,
     openobserve_api_management::request::license::refresh_license_limits,
+    openobserve_api_management::request::license::rotate_license_key,
     openobserve_api_management::request::license::store_license,
     openobserve_api_management::request::oncall::acknowledge_response,
     openobserve_api_management::request::oncall::add_member,
@@ -1283,6 +1311,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::handoff_response,
     openobserve_api_management::request::oncall::list_coverage_gaps,
     openobserve_api_management::request::oncall::list_deliveries,
+    openobserve_api_management::request::oncall::list_escalation_progress,
     openobserve_api_management::request::oncall::list_members,
     openobserve_api_management::request::oncall::list_my_deliveries,
     openobserve_api_management::request::oncall::list_my_teams,
@@ -1293,6 +1322,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::list_responses_for_incident,
     openobserve_api_management::request::oncall::list_schedule_presets,
     openobserve_api_management::request::oncall::list_team_config_risks,
+    openobserve_api_management::request::oncall::list_team_context,
     openobserve_api_management::request::oncall::list_teams,
     openobserve_api_management::request::oncall::list_unavailability,
     openobserve_api_management::request::oncall::list_unrouted_signals,
@@ -1313,6 +1343,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::snooze_response,
     openobserve_api_management::request::oncall::test_team_slack_channel,
     openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
     openobserve_api_management::request::oncall::update_ownership_rule,
     openobserve_api_management::request::oncall::update_team,
     openobserve_api_management::request::oncall::who_is_on_call,
@@ -1343,7 +1374,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::scorers::preview_llm_judge_output_schema,
     openobserve_api_management::request::scorers::test_scorer,
     openobserve_api_management::request::scorers::update_scorer,
-    openobserve_api_management::request::service_streams::reset_services,
     openobserve_api_management::request::synthetics::agent_setup,
     openobserve_api_management::request::users::service_accounts::exchange_token,
     openobserve_api_pipelines::request::re_pattern::delete,
@@ -1654,7 +1684,10 @@ mod tests {
     const ROUTER_SOURCE: &str = include_str!("mod.rs");
 
     #[cfg(feature = "enterprise")]
-    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+    const SERVICE_ROUTES_SIGNATURE: &str = "fn service_route_table(";
+
+    #[cfg(feature = "enterprise")]
+    const SEARCH_ROUTES_SIGNATURE: &str = "fn search_routes_with(";
 
     #[cfg(feature = "enterprise")]
     const HTTP_METHODS: &[&str] = &[
@@ -1702,6 +1735,22 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put"),
         ("/api/{org_id}/workflows/{id}/history", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
     ];
 
     /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
@@ -1723,6 +1772,33 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
         ("/api/{org_id}/workflows/{id}/history", "get", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
     ];
 
     const SLACK_OPERATIONS: &[(&str, &str)] = &[
@@ -1839,13 +1915,18 @@ mod tests {
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
+        router_fn_body(SERVICE_ROUTES_SIGNATURE)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn router_fn_body(signature: &str) -> &'static str {
         let start = ROUTER_SOURCE
-            .find(SERVICE_ROUTES_SIGNATURE)
-            .expect("the router must define service_routes()");
-        let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
+            .find(signature)
+            .unwrap_or_else(|| panic!("the router must define {signature}"));
+        let after_signature = &ROUTER_SOURCE[start + signature.len()..];
         let end = after_signature
             .find("\n}\n")
-            .expect("service_routes() must end at a column-0 close brace");
+            .unwrap_or_else(|| panic!("{signature} must end at a column-0 close brace"));
         &after_signature[..end]
     }
 
@@ -1944,7 +2025,13 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
-        let live = normalize(&strip_comments(service_routes_body()));
+        // The licence-gated search routes are a separate group that service_routes() merges in.
+        let routes = [
+            service_routes_body(),
+            router_fn_body(SEARCH_ROUTES_SIGNATURE),
+        ]
+        .concat();
+        let live = normalize(&strip_comments(&routes));
         let mut routes = BTreeSet::new();
         for call in live.split(".route(").skip(1) {
             let Some(arguments) = balanced_arguments(call) else {
@@ -2152,6 +2239,34 @@ mod tests {
         );
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn unpriced_models_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/llm/models/unpriced"]["get"];
+        assert_eq!(op["operationId"], "ListUnpricedModels", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/UnpricedModelsResponse"
+        );
+        for code in ["403", "429"] {
+            assert!(op["responses"][code].is_object(), "{code}");
+            assert!(
+                spec["paths"]["/api/{org_id}/gen_ai/data_health"]["get"]["responses"][code]
+                    .is_object(),
+                "data_health {code}"
+            );
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "UnpricedModelsResponse",
+            "UnpricedModel",
+            "UnpricedModelMatch",
+            "UnpricedModelRow",
+        ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
@@ -2533,6 +2648,9 @@ mod tests {
     fn workflows_document_the_statuses_their_handlers_return() {
         let base = "/api/{org_id}/workflows";
         let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
             (base, "get", &["200", "403", "404", "500"]),
@@ -2547,7 +2665,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
@@ -2573,6 +2691,29 @@ mod tests {
                 "/api/{org_id}/workflows/promote/{id}",
                 "post",
                 &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
             ),
         ]);
     }

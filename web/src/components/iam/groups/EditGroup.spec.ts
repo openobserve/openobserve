@@ -271,6 +271,27 @@ describe("EditGroup Component", () => {
       consoleSpy.mockRestore();
     });
 
+    it("stays on the page for a license denial and leaves the list redirect to other failures", async () => {
+      const { getGroup } = await import("@/services/iam");
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+
+      vi.mocked(getGroup).mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "rbac" } },
+      });
+      await wrapper.vm.getGroupDetails();
+      await flushPromises();
+      expect(pushSpy).not.toHaveBeenCalled();
+
+      vi.mocked(getGroup).mockRejectedValueOnce(new Error("Network error"));
+      await wrapper.vm.getGroupDetails();
+      await flushPromises();
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "groups" }));
+
+      pushSpy.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
     it("stores group details in groupsState", async () => {
       const { getGroup } = await import("@/services/iam");
       const mockGroupData = {

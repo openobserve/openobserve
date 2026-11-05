@@ -243,7 +243,9 @@ describe("AddTemplate drafts", () => {
 
     const draft = readEditorDraft<{ values: { body: string } }>(editScope);
     expect(draft?.data.values.body).toBe('{"text":"changed"}');
-    expect(draft?.baseHash).toBe(hashDraftValue(savedTemplate));
+    expect(draft?.baseHash).toBe(
+      hashDraftValue({ ...savedTemplate, appliesTo: [], appliesToMode: "manual" }),
+    );
     expect(localStorage.getItem(editorDraftKey(newScope))).toBeNull();
   });
 

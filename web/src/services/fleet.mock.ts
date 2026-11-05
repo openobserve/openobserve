@@ -31,6 +31,7 @@ import type {
   FleetSettings,
   FleetToken,
 } from "./fleet";
+import { AUDIT_MODULES, auditKind } from "@/components/fleet/auditKind";
 
 /** The one switch for the in-memory Fleet backend; delete this file once the server serves every endpoint. */
 export const FLEET_MOCK = import.meta.env.VITE_FLEET_MOCK === "true";
@@ -413,6 +414,11 @@ function fail(status: number, message: string, extra: Record<string, unknown> = 
   return new Promise<never>((_, reject) => setTimeout(() => reject(err), LATENCY_MS));
 }
 
+function auditModule(action: string) {
+  const kind = auditKind(action);
+  return kind === "other" ? null : AUDIT_MODULES[kind];
+}
+
 function audit(action: string, target: string) {
   store.audit.unshift({
     id: `a${store.seq++}`,
@@ -476,16 +482,26 @@ function detailOf(c: FleetCollector): FleetCollectorDetail {
   };
 }
 
+const onlineIn = (fleetId: string) =>
+  store.collectors.filter(
+    (c) => c.fleet.id === fleetId && (c.status === "online" || c.status === "degraded"),
+  ).length;
+
 function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollout {
   const fleet = store.fleets.find((f) => f.id === fleetId);
   const state = fleet?.state;
   for (const r of store.rollouts) {
-    if (r.fleet.id === fleetId && ["scheduled", "in_progress", "halted"].includes(r.status))
+    if (
+      r.fleet.id === fleetId &&
+      ["scheduled", "waiting", "in_progress", "halted"].includes(r.status)
+    )
       r.status = "superseded";
   }
-  const eligible = store.collectors.filter((c) => c.fleet.id === fleetId).length;
-  const { phases } = planPhases(body.batching, eligible);
   const scheduled = body.start.kind === "at";
+  // Like the server, members are the collectors online when the rollout starts.
+  const eligible = scheduled ? 0 : onlineIn(fleetId);
+  const { phases } = planPhases(body.batching, eligible);
+  const toStable = state?.stable?.config === body.config && state?.stable?.version === body.version;
   const rollout: FleetRollout = {
     id: `r-${store.seq++}`,
     fleet: { id: fleetId, name: fleet?.name ?? fleetId },
@@ -496,7 +512,7 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
     batching: body.batching,
     verify: body.verify,
     auto_rollback: body.auto_rollback,
-    status: scheduled ? "scheduled" : eligible ? "in_progress" : "completed",
+    status: scheduled ? "scheduled" : eligible ? "in_progress" : toStable ? "completed" : "waiting",
     halt: null,
     total: eligible,
     running: 0,
@@ -513,6 +529,9 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
     members: membersOf(store, fleetId, phases),
     events: [
       { at: Date.now(), key: scheduled ? "scheduled" : "started", phase: null, detail: null },
+      ...(!scheduled && !eligible && !toStable
+        ? [{ at: Date.now(), key: "waiting", phase: null, detail: null }]
+        : []),
     ],
     started_by: "root@example.com",
     started_at: body.start.kind === "at" ? body.start.at : Date.now(),
@@ -521,7 +540,6 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
   store.rollouts.unshift(rollout);
   if (state) {
     state.desired = { config: body.config, version: body.version };
-    if (!eligible) state.stable = state.desired;
     state.rollout = { id: rollout.id, status: rollout.status };
   }
   audit("fleet.audit.setDesired", fleetId);
@@ -531,8 +549,11 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
 function exitRollout(id: string, exit: "resume" | "skip" | "rollback", skip: string[] = []) {
   const r = store.rollouts.find((x) => x.id === id);
   if (!r) return fail(404, "rollout not found");
-  if (r.status !== "halted" || !r.halt?.exits.includes(exit))
-    return fail(409, `rollout cannot ${exit} from ${r.status}`);
+  const offered =
+    r.status === "waiting"
+      ? exit === "rollback"
+      : r.status === "halted" && r.halt?.exits.includes(exit);
+  if (!offered) return fail(409, `rollout cannot ${exit} from ${r.status}`);
   const state = store.fleets.find((f) => f.id === r.fleet.id)?.state;
   if (exit === "rollback") {
     r.status = "rolled_back";
@@ -547,6 +568,15 @@ function exitRollout(id: string, exit: "resume" | "skip" | "rollback", skip: str
         verify: false,
         auto_rollback: false,
       });
+    } else {
+      if (state) {
+        state.desired = null;
+        state.rollout = null;
+      }
+      for (const c of store.collectors.filter((x) => x.fleet.id === r.fleet.id)) {
+        c.config = null;
+        c.config_version = null;
+      }
     }
     return reply(r);
   }
@@ -663,7 +693,10 @@ export const fleetMock: FleetApi = {
     store.collectors = store.collectors.filter((c) => c.id !== id);
     return reply(undefined as unknown);
   },
-  restartCollector: () => reply({ queued: true }),
+  restartCollector: (_org, id) =>
+    store.collectors.find((c) => c.id === id)?.status === "offline"
+      ? fail(409, `collector ${id} is offline; restart it when it is back`)
+      : reply({ queued: true }),
   redeliverCollector: (_org, id) => {
     const c = findCollector(id);
     if (c?.config) c.delivery = "assigned";
@@ -766,7 +799,22 @@ export const fleetMock: FleetApi = {
     store.configs = store.configs.filter((x) => x.id !== id);
     return reply(undefined as unknown);
   },
-  listAudit: () => reply({ items: store.audit }),
+  listAudit: (_org, params = {}) => {
+    const from = params.from ?? Date.now() - 30 * DAY;
+    const keyword = params.q?.trim().toLowerCase();
+    const matching = store.audit.filter(
+      (e) =>
+        e.at >= from &&
+        e.at < (params.to ?? Infinity) &&
+        (!params.module || auditModule(e.action) === params.module) &&
+        (!keyword || [e.actor, e.target].some((s) => s.toLowerCase().includes(keyword))),
+    );
+    const offset = params.offset ?? 0;
+    return reply({
+      total: matching.length,
+      items: matching.slice(offset, offset + (params.limit ?? 100)),
+    });
+  },
   listRollouts: () => reply({ items: store.rollouts, total: store.rollouts.length }),
   getRollout: (_org, id) => {
     const r = store.rollouts.find((x) => x.id === id);
@@ -792,8 +840,13 @@ export const fleetMock: FleetApi = {
   },
   deleteFleet: (_org, id) => {
     if (id === "default") return fail(400, "the default fleet cannot be deleted");
-    if (store.collectors.some((c) => c.fleet.id === id))
-      return fail(409, "move or remove the fleet's collectors first");
+    const collectors = store.collectors.filter((c) => c.fleet.id === id).length;
+    const tokens = store.tokens.filter((t) => t.fleet?.id === id && !t.revoked).length;
+    if (collectors || tokens) {
+      return fail(409, "move or remove the fleet's collectors and revoke its tokens first", {
+        references: { fleets: 0, collectors, rollouts: 0, tokens },
+      });
+    }
     store.fleets = store.fleets.filter((f) => f.id !== id);
     return reply(undefined as unknown);
   },
@@ -813,12 +866,12 @@ export const fleetMock: FleetApi = {
         r.fleet.id === fleetId &&
         r.config === body.config &&
         r.to_version === body.version &&
-        ["scheduled", "in_progress"].includes(r.status),
+        ["scheduled", "waiting", "in_progress"].includes(r.status),
     );
     return reply(active ?? startRollout(fleetId, body));
   },
   previewDesired: (_org, fleetId, body) => {
-    const eligible = store.collectors.filter((c) => c.fleet.id === fleetId).length;
+    const eligible = onlineIn(fleetId);
     const preview: FleetPlanPreview = { ...planPhases(body.batching, eligible), eligible };
     return reply(preview);
   },

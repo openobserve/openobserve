@@ -311,6 +311,18 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("does not report success when the refresh fails", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
+      await (wrapper.vm as any).refreshIncidents();
+      await flushPromises();
+      expect(incidentsService.list).toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 
@@ -927,7 +939,8 @@ describe("IncidentList.vue", () => {
       listMock.mockResolvedValue({
         data: { incidents: [createIncident({ id: "1", rca: liveRca() })], total: 1 },
       });
-      const pushSpy = vi.spyOn(router, "push");
+      // No call-through: a real navigation lazy-loads the app's route pages, which took over 5 s on a loaded runner.
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       wrapper = createWrapper();
       await flushPromises();
 
@@ -942,7 +955,7 @@ describe("IncidentList.vue", () => {
           query: expect.objectContaining({ tab: "incidentAnalysis" }),
         }),
       );
-      await router.push({ query: {} });
+      pushSpy.mockRestore();
     });
 
     it("RR-34: one live row on the current page refetches after 30 s", async () => {

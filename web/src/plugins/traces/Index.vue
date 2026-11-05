@@ -216,6 +216,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
+                    <div v-else-if="searchCancelled && !searchObj.loading">
+                      <OEmptyState
+                        preset="search-cancelled"
+                        size="hero"
+                        data-test="traces-search-cancelled-state"
+                        @action="() => searchData()"
+                      />
+                    </div>
                     <div v-else data-test="logs-search-search-result" class="h-full!">
                       <SearchResult
                         ref="searchResultRef"
@@ -331,14 +339,13 @@ import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
-import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -520,6 +527,7 @@ let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
+const searchCancelled = ref(false);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -705,18 +713,7 @@ function buildSearch(reuseLastWindow = false) {
     let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
-      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-      whereClause = parseSpanKindWhereClause(
+      whereClause = resolveTracesFilter(
         whereClause,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
@@ -868,13 +865,11 @@ const updateFieldValues = (data) => {
 
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
-  const streamName = searchObj.data.stream.selectedStream.value;
-  let filter = searchObj.data.editorValue.trim();
-  const filterParseResult = parseDurationWhereClause(filter, tracesParser.value, streamName);
-  if (typeof filterParseResult === "string") {
-    filter = filterParseResult;
-  }
-  return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
+  return resolveTracesFilter(
+    searchObj.data.editorValue,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 }
 
 // Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
@@ -915,6 +910,7 @@ async function getQueryData(
     searchObj.loading = true;
 
     if (!isPagination) {
+      searchCancelled.value = false;
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -1238,11 +1234,32 @@ const rebuildColumns = () => {
   );
 };
 
+// Rows a cancelled search streamed are a partial answer, so none of them stay on screen.
+const showSearchCancelled = () => {
+  searchObj.data.queryResults = {
+    hits: [],
+    total: 0,
+    countPending: false,
+    from: 0,
+    size: searchObj.meta.resultGrid.rowsPerPage,
+    took: 0,
+  };
+  searchObj.data.sortedQueryResults = [];
+  searchObj.meta.resultGrid.showPagination = false;
+  searchObj.data.resultGrid.currentPage = 0;
+  isLLMSpanPresent.value = false;
+  searchCancelled.value = true;
+};
+
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
-  if (currentSearchTraceId) dropKeptCount(searchObj.data.queryResults);
+  if (!currentSearchTraceId) return;
+  dropKeptCount(searchObj.data.queryResults);
+  const isPageLoad = searchObj.data.resultGrid.pageRequest?.requestId === currentSearchTraceId;
   cancelMainSearch();
+  // Only the user's cancel shows the cancelled state; a page left mid-search re-runs it on return.
+  if (!isPageLoad) showSearchCancelled();
 };
 
 function cancelMainSearch() {
@@ -1469,10 +1486,14 @@ function generateHistogramData() {
 
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
-async function loadPageData() {
+/** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
+async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
   pageLoaded = false;
-  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
+  const query = router.currentRoute.value.query;
+  // The header switch re-keys the page before the router may have left the old org's URL.
+  const urlFromLeftOrg = !!leftOrg && (query.org_identifier ?? leftOrg) === leftOrg;
+  const streamFromUrl = !urlFromLeftOrg && typeof query.stream === "string";
   // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
   // A newer restore wins over one a left load never acted on.
   const landing = takeRecentLanding("traces") ?? pendingLanding;
@@ -1559,10 +1580,9 @@ function stopInFlightRequests() {
 async function initializePage() {
   const generation = pageGeneration;
   pageLoaded = false;
-  if (
-    searchObj.organizationIdentifier &&
-    searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
-  ) {
+  const lastOrg = searchObj.organizationIdentifier;
+  const leftOrg = lastOrg && lastOrg !== store.state.selectedOrganization.identifier ? lastOrg : "";
+  if (leftOrg) {
     resetSearchObj();
   }
   restoreUrlQueryParams();
@@ -1574,7 +1594,7 @@ async function initializePage() {
   await loadTracesParser().catch((e) => console.error("Failed to load the traces parser", e));
   if (generation !== pageGeneration) return;
   if (!searchObj.loading) {
-    await loadPageData();
+    await loadPageData({ leftOrg });
   } else {
     searchObj.loadingStream = false;
     pendingUrlPage = null;
@@ -1642,9 +1662,10 @@ onActivated(async () => {
   }
 
   if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
+    const leftOrg = searchObj.organizationIdentifier;
     resetSearchObj();
     restoreUrlQueryParams();
-    await loadPageData();
+    await loadPageData({ leftOrg });
     if (left()) return;
     reloaded = true;
   }

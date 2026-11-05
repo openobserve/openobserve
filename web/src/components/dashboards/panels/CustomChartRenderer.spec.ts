@@ -18,6 +18,11 @@ import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
+import {
+  fakeCanvasPainter,
+  fakeDevicePixelRatio,
+  type DevicePixelRatioFake,
+} from "@/test/unit/helpers/devicePixelRatioFake";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
@@ -29,6 +34,7 @@ const mockChart = {
   on: vi.fn(),
   off: vi.fn(),
   clear: vi.fn(),
+  getZr: vi.fn((): any => ({})),
 };
 
 // Mock ECharts
@@ -234,6 +240,7 @@ describe("CustomChartRenderer", () => {
 
       expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
         renderer: "canvas",
+        devicePixelRatio: 1,
       });
     });
   });
@@ -423,6 +430,7 @@ describe("CustomChartRenderer", () => {
 
       expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
         renderer: "canvas",
+        devicePixelRatio: 1,
       });
       expect(lastOption()).not.toHaveProperty("backgroundColor");
     });
@@ -436,6 +444,7 @@ describe("CustomChartRenderer", () => {
 
       expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), "dark", {
         renderer: "canvas",
+        devicePixelRatio: 1,
       });
       expect(lastOption().backgroundColor).toBe("transparent");
     });
@@ -490,6 +499,7 @@ describe("CustomChartRenderer", () => {
       expect(mockChart.dispose).toHaveBeenCalledTimes(1);
       expect(echarts.init).toHaveBeenLastCalledWith(expect.any(Object), "dark", {
         renderer: "canvas",
+        devicePixelRatio: 1,
       });
     });
   });
@@ -811,6 +821,77 @@ describe("CustomChartRenderer", () => {
 
       // Should be able to receive focus
       expect(chartElement.element.tabIndex).toBeDefined();
+    });
+  });
+
+  describe("Device pixel ratio", () => {
+    let display: DevicePixelRatioFake;
+
+    afterEach(() => {
+      display.restore();
+      mockChart.getZr.mockImplementation(() => ({}));
+    });
+
+    it("inits at the live ratio", async () => {
+      const echarts = await import("echarts");
+      display = fakeDevicePixelRatio(2);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        renderer: "canvas",
+        devicePixelRatio: 2,
+      });
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+    });
+
+    it("pixel-snaps its canvases only while the ratio is fractional", async () => {
+      display = fakeDevicePixelRatio(1.25);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
+      expect(pixelated()).toBe(true);
+
+      display.setRatio(2);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1);
+      await flushPromises();
+      expect(pixelated()).toBe(false);
+      display.setRatio(1.5);
+      await flushPromises();
+      expect(pixelated()).toBe(true);
+    });
+
+    it("re-rasterizes the instance in place when the window changes display", async () => {
+      const echarts = await import("echarts");
+      display = fakeDevicePixelRatio(1);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const painter = fakeCanvasPainter(1);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      mockChart.setOption.mockClear();
+
+      display.setRatio(2);
+      await flushPromises();
+
+      expect(echarts.init).toHaveBeenCalledTimes(1);
+      expect(mockChart.dispose).not.toHaveBeenCalled();
+      expect(mockChart.clear).not.toHaveBeenCalled();
+      expect(mockChart.setOption).not.toHaveBeenCalled();
+      expect(painter.dpr).toBe(2);
+      expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+    });
+
+    it("stops listening on unmount", async () => {
+      display = fakeDevicePixelRatio(1);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(display.listenerCount()).toBe(1);
+
+      wrapper.unmount();
+      wrapper = undefined as any;
+      expect(display.listenerCount()).toBe(0);
     });
   });
 });

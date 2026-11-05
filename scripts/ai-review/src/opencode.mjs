@@ -23,7 +23,11 @@ export const BUILTIN_TOOL_IDS = new Set([
 const ALLOWED_TOOL_IDS = new Set(["read", "glob", "grep"]);
 const EDIT_TOOL_IDS = new Set(["edit", "write"]);
 // What ci-full must actually grant without asking; a config that fell back to the defaults fails here.
-const CI_FULL_TOOL_IDS = ["read", "glob", "grep", "edit", "write", "shell", "webfetch"];
+const CI_FULL_TOOL_IDS = ["read", "glob", "grep", "edit", "write"];
+// question waits on an answer nobody in CI gives; execute runs JavaScript with fetch, so it would bypass the webfetch deny.
+const CI_FULL_DENIED_TOOL_IDS = ["webfetch", "websearch", "subagent", "question", "execute", "skill"];
+// Offered, but only for the commands the config allowlists.
+const CI_FULL_RESTRICTED_TOOL_IDS = ["shell"];
 
 // 2.x dropped OPENCODE_PURE and the plugin, skill and LSP-download flags; sanitizePrTree covers what they did.
 const SANDBOX_FLAGS = {
@@ -42,6 +46,7 @@ const INTERRUPTED_ERROR = { type: "interrupted", message: "opencode interrupted 
 const DEFAULT_REQUEST_HEADERS_TIMEOUT_MS = 30_000;
 const STATUS_POLL_MS = 15_000;
 const STREAM_RETRY_MS = 1_000;
+const INTERRUPT_SETTLE_MS = 20_000;
 const TRANSIENT_ERROR_RE = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|overloaded|rate limit|too many requests|temporarily unavailable|bad gateway|service unavailable|gateway timeout/i;
 // opencode 2.x StructuredError types; the first set is worth a fresh session, the second never is, whatever the message says.
 const TRANSIENT_ERROR_TYPES = new Set(["provider.rate-limit", "provider.transport", "provider.timeout", "provider.internal"]);
@@ -217,7 +222,7 @@ export class OpencodeClient {
   }
 
   // Sends the prompt (2.x admits it and returns at once) and waits on the event stream, so no request ever blocks for the length of an agent run (undici's 300 s headersTimeout killed every long review).
-  async prompt({ agent, model, variant, system, text, title, timeoutMs }) {
+  async prompt({ agent, model, variant, system, text, title, timeoutMs, wrapUp = null }) {
     await this.ensureEventStream();
     // 2.x binds agent, model and variant to the session; the prompt itself carries only text.
     const session = (await this.json("POST", "/api/session", {
@@ -233,17 +238,20 @@ export class OpencodeClient {
       if (system) {
         await this.json("PUT", `/api/experimental/session/${session.id}/instructions/entries/${SYSTEM_ENTRY_KEY}`, { value: system });
       }
+      const softMs = wrapUpStartMs(timeoutMs, wrapUp);
       // Armed before the POST: the run can fail before the prompt call returns, and nothing would replay it.
-      const finished = waiter.wait(timeoutMs);
+      const finished = waiter.wait(softMs);
       await this.json("POST", `/api/session/${session.id}/prompt`, { text });
-      const outcome = await finished;
+      let outcome = await finished;
+      let wrappedUp = false;
+      if (outcome.timedOut && softMs < timeoutMs) ({ outcome, wrappedUp } = await this.wrapUpSession(session.id, waiter, wrapUp.text, timeoutMs - softMs));
       if (outcome.timedOut) {
         await this.request("POST", `/api/session/${session.id}/interrupt`).catch(() => {});
         throw new OpencodeError(`opencode agent ${agent} timed out after ${timeoutMs}ms`, { name: "TimeoutError" });
       }
       const messages = await this.json("GET", `/api/session/${session.id}/message?type=assistant&order=desc&limit=1`);
       totals = await this.json("GET", `/api/session/${session.id}`).catch(() => null);
-      return finalAssistantResult(messages?.data, totals?.data, outcome.error, waiter.rejectedPermissions);
+      return { ...finalAssistantResult(messages?.data, totals?.data, outcome.error, waiter.rejectedPermissions), wrappedUp };
     } catch (err) {
       // A failed or timed-out session was still billed; its totals are gone once the session is deleted.
       totals ??= await this.json("GET", `/api/session/${session.id}`).catch(() => null);
@@ -254,6 +262,23 @@ export class OpencodeClient {
       this.waiters.delete(session.id);
       await this.request("DELETE", `/api/session/${session.id}`).catch(() => {});
     }
+  }
+
+  // The interrupt keeps the finished steps in the session, so the follow-up prompt answers from everything the agent already read.
+  async wrapUpSession(sessionID, waiter, text, budgetMs) {
+    const deadline = Date.now() + budgetMs;
+    const stopped = waiter.wait(Math.min(INTERRUPT_SETTLE_MS, budgetMs));
+    await this.request("POST", `/api/session/${sessionID}/interrupt`).catch(() => {});
+    const stop = await stopped;
+    // An unconfirmed interrupt ends as the hard timeout; a run that ended on its own keeps its own outcome.
+    if (stop.timedOut || stop.error?.type !== "interrupted") return { outcome: stop, wrappedUp: false };
+    // Nothing interrupts the follow-up before its wait ends, so a late interrupted event or idle record is the first run's.
+    waiter.ignoreInterrupted = true;
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) return { outcome: { timedOut: true, error: null }, wrappedUp: true };
+    const finished = waiter.wait(remainingMs);
+    await this.json("POST", `/api/session/${sessionID}/prompt`, { text });
+    return { outcome: await finished, wrappedUp: true };
   }
 
   close() {
@@ -270,6 +295,7 @@ class SessionWaiter {
     this.sessionID = sessionID;
     this.rejectedPermissions = 0;
     this.settle = null;
+    this.ignoreInterrupted = false;
   }
 
   wait(timeoutMs) {
@@ -291,6 +317,7 @@ class SessionWaiter {
   }
 
   onError(error) {
+    if (this.ignoreInterrupted && error?.type === "interrupted") return;
     this.settle?.({ timedOut: false, error: error || { type: "unknown", message: "opencode run failed" } });
   }
 
@@ -353,11 +380,13 @@ function permissionAction(toolId) {
   return EDIT_TOOL_IDS.has(toolId) ? "edit" : toolId;
 }
 
+// Same as opencode 2.2.0: a trailing " *" also matches the bare command, so "git diff *" covers "git diff".
 export function wildcardMatch(input, pattern) {
-  const escaped = pattern
+  let escaped = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*/g, ".*")
     .replace(/\?/g, ".");
+  if (escaped.endsWith(" .*")) escaped = `${escaped.slice(0, -3)}( .*)?`;
   return new RegExp(`^${escaped}$`, "s").test(input);
 }
 
@@ -375,7 +404,7 @@ export async function selfCheck(client, expectedAgents, { readOnly = true } = {}
   const broken = plugins.filter(p => p.state?.status !== "active");
   if (broken.length > 0) throw new OpencodeError(`opencode plugins failed to load: ${broken.map(p => `${p.id}: ${p.state?.error || "unknown"}`).join("; ")}`);
   const active = new Set(plugins.map(p => p.id));
-  const missing = (readOnly ? [...ALLOWED_TOOL_IDS] : CI_FULL_TOOL_IDS).filter(id => !active.has(`opencode.tool.${id}`));
+  const missing = (readOnly ? [...ALLOWED_TOOL_IDS] : [...CI_FULL_TOOL_IDS, ...CI_FULL_RESTRICTED_TOOL_IDS]).filter(id => !active.has(`opencode.tool.${id}`));
   if (missing.length > 0) throw new OpencodeError(`opencode tools did not load: ${missing.join(", ")}`);
   const mcp = (await client.json("GET", "/api/mcp"))?.data || [];
   if (mcp.length > 0) throw new OpencodeError(`opencode loaded MCP servers; refusing to review`);
@@ -397,9 +426,7 @@ export async function selfCheck(client, expectedAgents, { readOnly = true } = {}
       const problem = externalDirectoryProblem(ruleset);
       if (problem) problems.push(`${name}: ${problem}`);
     } else {
-      for (const toolId of CI_FULL_TOOL_IDS) {
-        if (!toolAllowedWithoutAsking(toolId, ruleset)) problems.push(`${name}: ${toolId} not fully allowed`);
-      }
+      problems.push(...ciFullProblems(ruleset).map(problem => `${name}: ${problem}`));
     }
   }
   if (problems.length > 0) throw new OpencodeError(`opencode permission self-check failed: ${problems.join("; ")}`);
@@ -413,6 +440,28 @@ export function externalDirectoryProblem(ruleset) {
   if (lastDeny === -1) return "external_directory is not denied";
   const extra = ruleset.slice(lastDeny + 1).filter(r => applies(r) && r.effect !== "deny");
   return extra.length > 0 ? `external_directory allows ${extra.map(r => r.resource).join(", ")}` : "";
+}
+
+// ci-full grants the file tools outright, denies the tools that only cost time, and keeps the shell on an allowlist.
+export function ciFullProblems(ruleset) {
+  const problems = CI_FULL_TOOL_IDS.filter(id => !toolAllowedWithoutAsking(id, ruleset)).map(id => `${id} not fully allowed`);
+  problems.push(...CI_FULL_DENIED_TOOL_IDS.filter(id => toolEnabled(id, ruleset)).map(id => `${id} allowed`));
+  for (const id of CI_FULL_RESTRICTED_TOOL_IDS) {
+    if (!toolEnabled(id, ruleset)) problems.push(`${id} denied`);
+    else if (toolAllowedWithoutAsking(id, ruleset)) problems.push(`${id} allows every command`);
+  }
+  return problems;
+}
+
+// The follow-up only gets a slot when the first run keeps at least as long as the follow-up; shorter sessions run to the hard timeout.
+export function wrapUpStartMs(timeoutMs, wrapUp) {
+  return wrapUp?.ms > 0 && wrapUp.text && timeoutMs >= 2 * wrapUp.ms ? timeoutMs - wrapUp.ms : timeoutMs;
+}
+
+// The variant ids a model declares in an opencode config; a variant opencode does not know must fail the run before any session starts.
+export function modelVariantIds(config, providerId, modelId) {
+  const variants = config?.providers?.[providerId]?.models?.[modelId]?.variants;
+  return Array.isArray(variants) ? variants.map(v => v?.id).filter(Boolean) : [];
 }
 
 // A retry must leave room for its own full timeout plus whatever still has to run after it (the coordinator).

@@ -70,6 +70,10 @@ export interface SelectOption {
   parentValue?: SelectValue;
   /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  /** Listbox mode: label shown in the list rows instead of `label`, which still names the selected value in the trigger. */
+  listLabel?: I18nText;
+  /** Listbox mode: small muted detail right-aligned in the list row, such as a UTC offset. */
+  suffix?: I18nText;
   [key: string]: unknown;
 }
 

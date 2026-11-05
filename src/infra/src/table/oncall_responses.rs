@@ -174,7 +174,19 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         // A channel this build cannot name loses its dedup key, not its existence: one page twice.
         channel: m.channel.and_then(Channel::from_i32),
         delivered: m.delivered,
+        // Rows written before the column, or by an old node, have none.
+        templates: m
+            .templates
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or_default(),
     })
+}
+
+/// The column value for an event's templates; null when there are none.
+pub(super) fn templates_json(event: &ResponseEvent) -> Option<String> {
+    (!event.templates.is_empty())
+        .then(|| serde_json::to_string(&event.templates).ok())
+        .flatten()
 }
 
 /// Opens a record for one firing.
@@ -658,6 +670,36 @@ pub async fn snooze(
         id,
         vec![
             (oncall_responses::Column::SnoozedUntil, Expr::value(until)),
+            (oncall_responses::Column::LadderAnchor, Expr::value(anchor)),
+        ],
+    )
+    .await
+}
+
+/// Ends a snooze at `now`, giving the ladder's clock back the quiet that was not used.
+pub async fn unsnooze(org_id: &str, id: &str, now: i64) -> Result<Option<Response>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let anchor = config::meta::oncall::response::unsnoozed_ladder_anchor(
+        existing.ladder_anchor,
+        existing.opened_at,
+        existing.snoozed_until,
+        now,
+    );
+    save(
+        org_id,
+        id,
+        vec![
+            (
+                oncall_responses::Column::SnoozedUntil,
+                Expr::value(Option::<i64>::None),
+            ),
             (oncall_responses::Column::LadderAnchor, Expr::value(anchor)),
         ],
     )
@@ -1274,6 +1316,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         recipient: Set(event.recipient.clone()),
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
+        templates: Set(templates_json(event)),
     };
     let Err(e) = model.insert(conn).await else {
         return Ok(());
@@ -1318,6 +1361,10 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         .col_expr(
             oncall_response_events::Column::Delivered,
             Expr::value(event.delivered),
+        )
+        .col_expr(
+            oncall_response_events::Column::Templates,
+            Expr::value(templates_json(event)),
         )
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
         .filter(oncall_response_events::Column::LadderRun.eq(event.ladder_run))
@@ -2121,6 +2168,7 @@ mod tests {
             recipient: None,
             channel: None,
             delivered: None,
+            templates: None,
         }
     }
 
@@ -2240,6 +2288,43 @@ mod tests {
         let prefix = format!("{}#", "al_ck");
         assert!(!"al_ckt#1".starts_with(&prefix));
         assert!("al_ck#1".starts_with(&prefix));
+    }
+
+    #[tokio::test]
+    async fn test_a_delivery_keeps_the_templates_it_was_sent_with() {
+        use config::meta::oncall::response::SentTemplate;
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(oncall_response_events::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+
+        let sent = vec![SentTemplate {
+            destination: "team_slack".into(),
+            template_name: "play_oncall_card".into(),
+            template_source: "org_default".into(),
+        }];
+        let with = ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "posted")
+            .delivered_to("payments channel", Channel::Webhook, true)
+            .with_templates(sent.clone());
+        let without = ResponseEvent::new(ResponseEventKind::Delivery, 11, "o2-engine", "sent")
+            .delivered_to("ana@o2.ai", Channel::Email, true);
+        add_event_in(&db, "resp_1", &with).await.unwrap();
+        add_event_in(&db, "resp_1", &without).await.unwrap();
+
+        let mut events: Vec<ResponseEvent> = oncall_response_events::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter_map(to_event)
+            .collect();
+        events.sort_by_key(|e| e.at);
+        assert_eq!(events[0].templates, sent);
+        assert!(events[1].templates.is_empty());
+        let json = serde_json::to_value(&events[1]).unwrap();
+        assert!(json.get("templates").is_none());
     }
 
     /// Reachability judges each channel on its own, so SMS failures must not be

@@ -2054,6 +2054,101 @@ describe("Index.vue (Main Traces Page)", () => {
       const events = vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
       expect(events).not.toContain("traces_search_completed");
     });
+
+    // o2-enterprise#3126 B2: a cancelled search must not claim the time window has no data.
+    describe("cancelling a new search", () => {
+      const showOldResults = () => {
+        mockSearchObj.data.queryResults = { hits: spans("old", 25), total: 80, from: 50, size: 25 };
+        mockSearchObj.data.resultGrid.currentPage = 2;
+        mockSearchObj.meta.resultGrid.showPagination = true;
+      };
+      const shownIds = () => mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+
+      afterEach(() => {
+        mockSearchObj.meta.resultGrid.showPagination = false;
+        mockSearchObj.data.resultGrid.currentPage = 0;
+      });
+
+      it("shows the cancelled state with no rows, count or paging from the search it replaced", async () => {
+        await mountPage();
+        showOldResults();
+        await wrapper.vm.getQueryData(false);
+
+        wrapper.vm.cancelSearch();
+
+        expect(wrapper.vm.searchCancelled).toBe(true);
+        expect(shownIds()).toEqual([]);
+        expect(mockSearchObj.data.queryResults.total).toBe(0);
+        expect(mockSearchObj.meta.resultGrid.showPagination).toBe(false);
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        expect(mockSearchObj.loading).toBe(false);
+      });
+
+      it("drops the partial rows the cancelled search already streamed", async () => {
+        await mountPage();
+        await wrapper.vm.getQueryData(false);
+        lastCallbacks().data(null, chunk(spans("new", 5)));
+        expect(shownIds()).toHaveLength(5);
+
+        wrapper.vm.cancelSearch();
+
+        expect(wrapper.vm.searchCancelled).toBe(true);
+        expect(shownIds()).toEqual([]);
+      });
+
+      it("shows the cancelled state when there were no earlier results", async () => {
+        await mountPage();
+        await wrapper.vm.getQueryData(false);
+        expect(wrapper.vm.searchCancelled).toBe(false);
+
+        wrapper.vm.cancelSearch();
+
+        expect(wrapper.vm.searchCancelled).toBe(true);
+        expect(mockSearchObj.loading).toBe(false);
+      });
+
+      it("ignores rows that arrive from the cancelled search afterwards", async () => {
+        await mountPage();
+        await wrapper.vm.getQueryData(false);
+        const cancelled = lastCallbacks();
+        wrapper.vm.cancelSearch();
+
+        cancelled.data(null, chunk(spans("late", 3)));
+
+        expect(shownIds()).toEqual([]);
+        expect(wrapper.vm.searchCancelled).toBe(true);
+      });
+
+      it("control: cancelling a page request keeps the page on screen and no cancelled state", async () => {
+        await mountPage();
+        showOldResults();
+        mockSearchObj.meta.resultGrid.navigation.pendingPageSelection = {
+          page: 3,
+          position: "first",
+          requestId: null,
+        };
+        await wrapper.vm.getQueryData(true);
+
+        wrapper.vm.cancelSearch();
+
+        expect(wrapper.vm.searchCancelled).toBe(false);
+        expect(shownIds()).toHaveLength(25);
+        mockSearchObj.meta.resultGrid.navigation.pendingPageSelection = null;
+        mockSearchObj.data.resultGrid.pageRequest = null;
+        mockSearchObj.data.resultGrid.pageLoad = null;
+      });
+
+      it("clears the cancelled state when the next search starts", async () => {
+        await mountPage();
+        await wrapper.vm.getQueryData(false);
+        wrapper.vm.cancelSearch();
+        expect(wrapper.vm.searchCancelled).toBe(true);
+
+        await wrapper.vm.getQueryData(false);
+
+        expect(wrapper.vm.searchCancelled).toBe(false);
+      });
+    });
   });
 
   describe("Metrics Filters Integration", () => {
@@ -3143,6 +3238,52 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
+    // The header org switch re-keys MainLayout's content, so the page remounts; the router may not have left the old URL yet.
+    describe("remount after a header org switch", () => {
+      afterEach(() => {
+        delete store.state.zoConfig.auto_query_enabled;
+        globalThis.localStorage.removeItem("oo_toggle_auto_run");
+      });
+
+      async function remountWith(query: Record<string, string>, autoRun: boolean, lastOrg: string) {
+        store.state.zoConfig.auto_query_enabled = true;
+        globalThis.localStorage.setItem("oo_toggle_auto_run", String(autoRun));
+        mockSearchObj.meta.liveMode = autoRun;
+        mockSearchObj.organizationIdentifier = lastOrg;
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query, name: "traces", path: "/traces" },
+        } as any);
+        wrapper = mountIndexStubbed();
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false), { timeout: 10000 });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await flushPromises();
+      }
+
+      it.each([
+        ["the old org's URL", { stream: "default", org_identifier: "old-org" }],
+        ["the new org's bare URL", { org_identifier: "default" }],
+      ])("does not search with Auto Run off while the router still shows %s", async (_l, query) => {
+        await remountWith(query, false, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+      });
+
+      it("still searches with Auto Run on", async () => {
+        await remountWith({ stream: "default", org_identifier: "old-org" }, true, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("searches a shared link for the org being switched to with Auto Run off", async () => {
+        await remountWith({ stream: "default", org_identifier: "default" }, false, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("searches a shared link for another org opened without an org switch", async () => {
+        await remountWith({ stream: "default", org_identifier: "other-org" }, false, "default");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+    });
+
     describe("onActivated", () => {
       // Helper: mount Index inside a KeepAlive wrapper so that toggling
       // the `show` ref produces real deactivate/activate lifecycle calls.
@@ -3202,6 +3343,42 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockGetStreams).toHaveBeenCalled();
 
         parentWrapper.unmount();
+      });
+
+      it.each([
+        ["does not search", "false", false],
+        ["still searches", "true", true],
+      ])("%s on an org switch when the Auto Run toggle is %s", async (_label, toggle, searches) => {
+        store.state.zoConfig.auto_query_enabled = true;
+        globalThis.localStorage.setItem("oo_toggle_auto_run", toggle);
+        // The page's own URL sync always writes stream=, so the URL looks like a shared link.
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+        } as any);
+        mockSearchObj.organizationIdentifier = "default";
+        const { parentWrapper, show } = mountWithKeepAlive();
+        // The first load must settle, or reactivation re-runs the first-load path instead.
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+        await flushPromises();
+
+        show.value = false;
+        await flushPromises();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        mockSearchObj.organizationIdentifier = "old-org";
+        show.value = true;
+        await flushPromises();
+        if (searches) {
+          await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled());
+        } else {
+          await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await flushPromises();
+          expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        }
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+
+        parentWrapper.unmount();
+        delete store.state.zoConfig.auto_query_enabled;
       });
 
       it("should read oo_toggle_auto_run from localStorage and set liveMode on activation", async () => {

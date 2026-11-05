@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
@@ -518,6 +519,25 @@ describe("Header Component", () => {
       expect(aiButton.exists()).toBe(true);
       expect(aiButton.attributes("disabled")).toBeUndefined();
 
+      aiWrapper.unmount();
+    });
+
+    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
+      expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
     });
 
@@ -1551,13 +1571,16 @@ describe("Header Component", () => {
     });
   });
 
-  describe("My on-call item (U1)", () => {
-    const mountMenu = (oncall_enabled: boolean | undefined, hasRoute: boolean) => {
+  describe("My on-call item (U1, removed)", () => {
+    const mountMenu = () => {
       const store = {
         ...mockStore,
-        state: { ...mockStore.state, zoConfig: { ...mockStore.state.zoConfig, oncall_enabled } },
+        state: {
+          ...mockStore.state,
+          zoConfig: { ...mockStore.state.zoConfig, oncall_enabled: true },
+        },
       };
-      const router = { ...mockRouter, hasRoute: vi.fn(() => hasRoute) };
+      const router = { ...mockRouter, hasRoute: vi.fn(() => true) };
       return mount(Header, {
         props: { ...defaultProps, store, router },
         global: {
@@ -1578,30 +1601,10 @@ describe("Header Component", () => {
       });
     };
 
-    it("renders before Language when on-call is on and routes to My on-call in the current org", async () => {
-      const w = mountMenu(true, true);
-      const item = w.find('[data-test="header-my-oncall"]');
-      expect(item.exists()).toBe(true);
-      expect(item.text()).toBe("My on-call");
-      const tests = w.findAll("[data-test]").map((el: any) => el.attributes("data-test"));
-      expect(tests.indexOf("header-my-oncall")).toBeLessThan(
-        tests.indexOf("header-language-submenu-trigger"),
-      );
-      await item.trigger("click");
-      expect(w.props("router").push).toHaveBeenCalledWith({
-        name: "onCallMine",
-        query: { org_identifier: "test-org" },
-      });
-      w.unmount();
-    });
-
-    it.each([
-      ["on-call is off", false, true],
-      ["the build has no on-call routes", true, false],
-      ["the full config has not loaded yet", undefined, true],
-    ])("is absent when %s", (_case, oncallEnabled, hasRoute) => {
-      const w = mountMenu(oncallEnabled, hasRoute);
+    it("is gone from the profile menu even with on-call on and its route present", () => {
+      const w = mountMenu();
       expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(false);
+      expect(w.text()).not.toContain("My on-call");
       w.unmount();
     });
   });

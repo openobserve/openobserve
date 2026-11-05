@@ -244,6 +244,8 @@ export function clearCorrelationCache(): void {
 // ── Generic composable ────────────────────────────────────────────────────────
 
 import { watch, type WatchSource } from "vue";
+import { useStore } from "vuex";
+import { featureState } from "@/utils/featureGate";
 
 export interface CorrelationFiltersOptions {
   orgId: () => string;
@@ -257,6 +259,7 @@ export interface CorrelationFiltersOptions {
 }
 
 export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
+  const store = useStore();
   // Tracks which (org, streamType, streamName) keys we've already attempted to
   // restore for in this session. Without this, every extractFields() call
   // (which happens after every query) would re-apply saved filters whenever
@@ -276,6 +279,8 @@ export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
         return;
       }
 
+      // The identity config endpoint is tagged correlation; a locked license would 403 it.
+      if (featureState(store?.state.zoConfig?.features, "correlation") === "locked") return;
       const trackedFields = await getCorrelationFieldNames(
         orgId,
         streamType,

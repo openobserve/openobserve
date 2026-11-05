@@ -322,6 +322,26 @@ describe("DateTime Component", () => {
       expect(result2).toBe(false);
     });
 
+    // C8: a forward-looking caller lifts the cap; every other caller keeps today.
+    it("caps the calendar at today unless a later max date is passed", () => {
+      // "Today" is the mocked timestampToTimezoneDate above.
+      wrapper = createWrapper({ disableRelative: true });
+      expect(wrapper.vm.calendarMaxDate).toBe("2025/01/01");
+      wrapper.unmount();
+
+      wrapper = createWrapper({ disableRelative: true, maxDate: "2099/01/01" });
+      expect(wrapper.vm.calendarMaxDate).toBe("2099/01/01");
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        disableRelative: true,
+        minDate: "2023/01/01",
+        maxDate: "2099/01/01",
+      });
+      expect(wrapper.vm.optionsFn("2098/06/15")).toBe(true);
+      expect(wrapper.vm.optionsFn("2099/01/02")).toBe(false);
+    });
+
     it("should test computeRelativePeriod function", () => {
       wrapper = createWrapper({
         queryRangeRestrictionInHour: 48,
@@ -659,6 +679,24 @@ describe("DateTime Component", () => {
         expect(
           wrapper.find('[data-test="date-time-next-btn"]').attributes("disabled"),
         ).toBeUndefined();
+      });
+
+      // F2: a caller that lifts the calendar cap lifts the › cap with it, up to the end of maxDate.
+      it("should shift forward past now up to the end of maxDate", () => {
+        wrapper = createWrapper({ disableRelative: true, maxDate: "2026/09/11" });
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/10", to: "2026/09/10" };
+        wrapper.vm.selectedTime = { startTime: "11:00:00", endTime: "12:00:00" };
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(false);
+
+        wrapper.vm.shiftTimeRange("next");
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "12:00:00", endTime: "13:00:00" });
+
+        wrapper.vm.selectedDate = { from: "2026/09/11", to: "2026/09/11" };
+        wrapper.vm.selectedTime = { startTime: "23:00:00", endTime: "23:59:59" };
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(true);
       });
 
       it("should still shift backward from a window that ends at now", () => {

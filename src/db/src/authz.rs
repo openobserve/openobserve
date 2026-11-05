@@ -72,6 +72,39 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
+/// Moves the tuples `orgs` hold on `from` to `to`: ownership and role grants, failing loudly;
+/// `every_role` also moves other orgs' grants on a shared default org object.
+#[cfg(feature = "enterprise")]
+pub async fn rename_object(
+    orgs: &[String],
+    obj_type: &str,
+    from: &str,
+    to: &str,
+    every_role: bool,
+) -> Result<(), anyhow::Error> {
+    if !o2_openfga::config::get_config().enabled {
+        return Ok(());
+    }
+    let (Some((old, _)), Some((new, _))) = (
+        ofga_object(obj_type, &Authz::new(from)),
+        ofga_object(obj_type, &Authz::new(to)),
+    ) else {
+        return Ok(());
+    };
+    o2_openfga::authorizer::authz::rename_object(orgs, &old, &new, every_role).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn rename_object(
+    _orgs: &[String],
+    _obj_type: &str,
+    _from: &str,
+    _to: &str,
+    _every_role: bool,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
 /// Whether ownership tuples are written and removed at all.
 #[cfg(feature = "enterprise")]
 pub fn tracks_ownership() -> bool {
