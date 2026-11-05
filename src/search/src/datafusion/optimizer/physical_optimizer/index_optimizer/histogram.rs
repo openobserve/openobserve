@@ -105,10 +105,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                     && let Some(func) = get_data_bin(group_expr)
                     && let Some((histogram_interval, ts_offset)) = get_fast_path_buckets(func)
                 {
-                    let (start_time, end_time) = self.time_range;
-                    let min_value =
-                        start_time - histogram_bucket_offset(start_time, histogram_interval as i64);
-                    let max_value = end_time;
+                    let (min_value, max_value) =
+                        fast_path_bounds(self.time_range, histogram_interval, ts_offset);
                     let num_buckets = ((max_value - min_value) as f64 / histogram_interval as f64)
                         .ceil() as usize;
                     self.simple_histogram =
@@ -156,15 +154,13 @@ fn get_fast_path_buckets(func: &ScalarFunctionExpr) -> Option<(u64, i64)> {
     };
     let ts_offset = get_timestamp_offset(source)?;
     let interval = get_histogram_interval(interval).filter(|width| *width > 0)?;
-    let width = interval as i64;
-    if !is_on_histogram_origin_grid(origin, width) {
-        return None;
-    }
-    // shifted bounds are not supported yet, and only the grids that match UTC stay correct
-    if ts_offset != 0 && histogram_bucket_offset(0, width) != 0 {
-        return None;
-    }
-    Some((interval, ts_offset))
+    is_on_histogram_origin_grid(origin, interval as i64).then_some((interval, ts_offset))
+}
+
+/// The collector compares shifted timestamps, so both bounds live in local wall-clock space.
+fn fast_path_bounds((start, end): (i64, i64), interval: u64, ts_offset: i64) -> (i64, i64) {
+    let min_value = start + ts_offset - histogram_bucket_offset(start, interval as i64, ts_offset);
+    (min_value, end + ts_offset)
 }
 
 /// The index always counts from the `histogram()` origin, so any other grid needs a real scan.
@@ -295,12 +291,11 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                         // Extract histogram parameters from the date_bin expression
                         let func = get_data_bin(&groups[db_idx].0).unwrap();
                         if let Some((histogram_interval, ts_offset)) = get_fast_path_buckets(func) {
-                            let (start_time, end_time) = self.time_range;
-                            let min_value = start_time
-                                - histogram_bucket_offset(start_time, histogram_interval as i64);
+                            let (min_value, max_value) =
+                                fast_path_bounds(self.time_range, histogram_interval, ts_offset);
                             self.simple_multi_histogram = Some((
                                 min_value,
-                                end_time,
+                                max_value,
                                 histogram_interval,
                                 ts_offset,
                                 column_name.to_string(),
@@ -414,7 +409,7 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '+08:00') as ts, count(*) as cnt from t group by ts",
                 Some(IndexOptimizeMode::SimpleHistogram(
-                    1757401680000000,
+                    1757430480000000,
                     60000000,
                     16,
                     28800000000,
@@ -440,10 +435,25 @@ mod tests {
                     0,
                 )),
             ),
-            // a 30-day bucket with a timezone must scan until the bounds carry the offset
+            // 2025-09-09 01:48:14 UTC is 2025-09-08 17:48:14 at -08:00, so the bucket stays 08-23
             (
                 "SELECT histogram(_timestamp, '30 days', '-08:00') as ts, count(*) as cnt from t group by ts",
-                None,
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1755907200000000,
+                    2592000000000,
+                    1,
+                    -28800000000,
+                )),
+            ),
+            // the bounds shift with the offset, so labels stay on local midnight
+            (
+                "SELECT histogram(_timestamp, '1 day', '+05:30') as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757376000000000,
+                    86400000000,
+                    1,
+                    19800000000,
+                )),
             ),
             // any origin off the 2001 grid must scan, because the index would relabel its rows
             (
@@ -542,8 +552,8 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '-05:30') as ts, level, count(*) as cnt from t group by ts, level",
                 Some(IndexOptimizeMode::SimpleMultiHistogram(
-                    1757401680000000,
-                    1757402594060000,
+                    1757381880000000,
+                    1757382794060000,
                     60000000,
                     -19800000000,
                     "level".to_string(),
@@ -561,7 +571,13 @@ mod tests {
             ),
             (
                 "SELECT histogram(_timestamp, '30 days', '-08:00') as ts, level, count(*) as cnt from t group by ts, level",
-                None,
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1755907200000000,
+                    1757373794060000,
+                    2592000000000,
+                    -28800000000,
+                    "level".to_string(),
+                )),
             ),
             (
                 "SELECT date_bin(interval '30 days', to_timestamp_micros(_timestamp), to_timestamp_micros('1970-01-01T00:00:00')) as ts, level, count(*) as cnt from t group by ts, level",

@@ -17,6 +17,7 @@ import logging
 import os
 import time
 import uuid
+import zoneinfo
 
 import pytest
 import requests
@@ -198,3 +199,65 @@ def test_date_bin_with_its_own_origin_keeps_its_labels(fixture, filtered):
         label = _label(ts - ts % interval)
         expected[label] = expected.get(label, 0) + 1
     assert _rows(fixture.search(sql, fixture.start, fixture.end)) == expected
+
+
+TIMEZONES = [("+05:30", 19_800_000_000), ("-08:00", -28_800_000_000)]
+
+
+@pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
+@pytest.mark.parametrize("days", INTERVAL_DAYS)
+@pytest.mark.parametrize("timezone,offset", TIMEZONES, ids=["ist", "pst"])
+@pytest.mark.parametrize("use_argument", [True, False], ids=["sql_argument", "request_timezone"])
+def test_timezone_rows_match_the_fixture(fixture, days, filtered, timezone, offset, use_argument):
+    interval = days * DAY
+    sql = _sql(fixture.stream, days, filtered, timezone if use_argument else None)
+    query = {} if use_argument else {"timezone": timezone}
+    expected = _expected_rows(fixture.events, fixture.start, fixture.end, interval, offset)
+    assert _rows(fixture.search(sql, fixture.start, fixture.end, **query)) == expected
+    assert _rows(fixture.search_stream(sql, fixture.start, fixture.end, **query)) == expected
+
+
+@pytest.mark.parametrize("filtered", [False, True], ids=["plain", "filtered"])
+@pytest.mark.parametrize("days", INTERVAL_DAYS)
+@pytest.mark.parametrize("timezone,offset", TIMEZONES, ids=["ist", "pst"])
+@pytest.mark.parametrize("use_argument", [True, False], ids=["sql_argument", "request_timezone"])
+def test_timezone_rows_stay_correct_through_the_cache(fixture, days, filtered, timezone, offset, use_argument):
+    interval = days * DAY
+    sql = _sql(fixture.stream, days, filtered, timezone if use_argument else None)
+    query = {} if use_argument else {"timezone": timezone}
+    first_edge = _bucket_edge(fixture.start - 1, interval, offset) + interval
+    last_edge = _bucket_edge(fixture.end, interval, offset)
+    if last_edge <= first_edge:
+        pytest.skip(f"ZO_INGEST_ALLOWED_UPTO={WINDOW_HOURS} holds no whole bucket")
+    expected = _expected_rows(fixture.events, first_edge, last_edge, interval, offset)
+    _warm_cache(fixture, sql, first_edge, last_edge, expected, **query)
+
+    shorter_end = last_edge - interval // 2
+    expected = _expected_rows(fixture.events, first_edge, shorter_end, interval, offset)
+    assert _rows(fixture.search(sql, first_edge, shorter_end, use_cache=True, **query)) == expected
+    assert _rows(fixture.search_stream(sql, first_edge, shorter_end, use_cache=True, **query)) == expected
+
+
+@pytest.mark.parametrize("days", [1, 30])
+def test_a_request_timezone_does_not_share_a_cache_entry_with_utc(fixture, days):
+    interval = days * DAY
+    sql = _sql(fixture.stream, days, False)
+    first_edge, last_edge = fixture.whole_buckets(interval)
+    utc = _expected_rows(fixture.events, first_edge, last_edge, interval)
+    _warm_cache(fixture, sql, first_edge, last_edge, utc)
+    offset = 19_800_000_000
+    expected = _expected_rows(fixture.events, first_edge, last_edge, interval, offset)
+    body = fixture.search(sql, first_edge, last_edge, use_cache=True, timezone="+05:30")
+    assert _rows(body) == expected
+
+
+def test_a_named_zone_uses_one_offset_for_the_whole_request(fixture):
+    interval = 7 * DAY
+    sql = _sql(fixture.stream, 7, True, "America/Los_Angeles")
+    end_zone = dt.datetime.fromtimestamp(fixture.end / 1_000_000, tz=dt.timezone.utc).astimezone(
+        zoneinfo.ZoneInfo("America/Los_Angeles")
+    )
+    offset = int(end_zone.utcoffset().total_seconds()) * 1_000_000
+    expected = _expected_rows(fixture.events, fixture.start, fixture.end, interval, offset)
+    assert _rows(fixture.search(sql, fixture.start, fixture.end, use_cache=True)) == expected
+    assert _rows(fixture.search_stream(sql, fixture.start, fixture.end)) == expected

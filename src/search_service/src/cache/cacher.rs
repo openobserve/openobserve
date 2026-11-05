@@ -38,7 +38,7 @@ use crate::{
             get_ts_value, has_non_timestamp_ordering, is_timestamp_field, is_ts_order_field,
         },
     },
-    sql::Sql,
+    sql::{Sql, histogram::histogram_offset_micros},
 };
 
 /// Invalidate cached response by stream min ts
@@ -49,6 +49,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     file_path: &str,
     responses: &[CachedQueryResponse],
     histogram_interval: i64, // microseconds; 0 for non-histogram queries
+    ts_offset: i64,
 ) -> Result<Vec<CachedQueryResponse>, String> {
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
@@ -85,7 +86,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
             .filter_map(|mut meta| {
                 meta.cached_response.hits.retain(|hit| {
                     let hit_ts = get_ts_value(&meta.ts_column, hit);
-                    hit_ts + histogram_interval > stream_min_ts
+                    bucket_outlives(hit_ts, histogram_interval, ts_offset, stream_min_ts)
                 });
                 if meta.cached_response.hits.is_empty() {
                     None
@@ -111,6 +112,11 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     };
 
     Ok(filtered_responses)
+}
+
+/// A hit label carries the timezone shift, and the stream minimum is in UTC.
+fn bucket_outlives(label: i64, interval: i64, ts_offset: i64, stream_min_ts: i64) -> bool {
+    label - ts_offset + interval > stream_min_ts
 }
 
 #[tracing::instrument(
@@ -175,12 +181,18 @@ pub async fn check_cache(
     }
 
     let mut histogram_interval = -1;
+    let mut ts_offset = 0;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
         // Note: handle_histogram is now called in prepare_cache_response() before hash computation
         // to ensure consistent hashing. We just need to update req.query.sql with the normalized
         // SQL.
         req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
+        ts_offset = histogram_offset_micros(
+            origin_sql,
+            req.query.timezone.as_deref(),
+            req.query.end_time,
+        );
     }
 
     // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
@@ -205,6 +217,7 @@ pub async fn check_cache(
     };
     if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
+        multi_resp.ts_offset = ts_offset;
     }
     log::info!(
         "[trace_id {trace_id}] check_cache: result_ts_col: {}, histogram_interval: {}, time range: {} - {}",
@@ -224,6 +237,7 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
+                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -240,6 +254,7 @@ pub async fn check_cache(
             file_path,
             &cached_responses,
             histogram_interval,
+            ts_offset,
         )
         .await
         {
@@ -309,6 +324,7 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
+                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -322,6 +338,7 @@ pub async fn check_cache(
                     file_path,
                     &[cached_resp.clone()],
                     histogram_interval,
+                    ts_offset,
                 )
                 .await
                 {
@@ -434,8 +451,16 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
-                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
+                && (histogram_bucket_offset(
+                    m.start_time,
+                    cache_req.histogram_interval,
+                    cache_req.ts_offset,
+                ) != 0
+                    || histogram_bucket_offset(
+                        m.end_time,
+                        cache_req.histogram_interval,
+                        cache_req.ts_offset,
+                    ) != 0)
             {
                 return false;
             }
@@ -521,7 +546,7 @@ fn trim_cached_response(
         return true;
     }
     response.hits.retain(|hit| {
-        let hit_ts = get_ts_value(&cache_req.ts_column, hit);
+        let hit_ts = cached_hit_utc_ts(hit, cache_req);
         let fits_end = if interval > 0 {
             hit_ts + interval <= q_end
         } else {
@@ -538,9 +563,14 @@ fn trim_cached_response(
     true
 }
 
+/// Hit labels carry the timezone shift, and every bound they meet is in UTC.
+fn cached_hit_utc_ts(hit: &json::Value, cache_req: &CacheQueryRequest) -> i64 {
+    get_ts_value(&cache_req.ts_column, hit) - cache_req.ts_offset
+}
+
 /// Hits sorted by another column need a full scan, since the ends of the list are not the ends.
 fn cached_hits_time_range(response: &Response, cache_req: &CacheQueryRequest) -> (i64, i64) {
-    let ts_of = |hit| get_ts_value(&cache_req.ts_column, hit);
+    let ts_of = |hit| cached_hit_utc_ts(hit, cache_req);
     if cache_req.is_histogram_non_ts_order {
         return response
             .hits
@@ -1358,7 +1388,7 @@ mod tests {
         ];
 
         let file_path = "test_org/logs/test_stream";
-        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0).await;
+        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0, 0).await;
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
@@ -1416,6 +1446,7 @@ mod tests {
             is_aggregate: false,
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
+            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1454,6 +1485,7 @@ mod tests {
             is_aggregate: true,
             ts_column: "ts".to_string(),
             histogram_interval: DAY,
+            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         }
@@ -1597,6 +1629,38 @@ mod tests {
             (deltas[0].delta_start_time, deltas[0].delta_end_time),
             (d0 + DAY, q_end)
         );
+    }
+
+    #[test]
+    fn test_retention_compares_a_shifted_label_in_utc() {
+        const HOUR: i64 = 3_600_000_000;
+        // at -08:00 the label Jan 1 covers Jan 1 08:00Z to Jan 2 08:00Z
+        let label = EDGE_30D;
+        let (end_of_bucket, offset) = (label + DAY + 8 * HOUR, -8 * HOUR);
+        assert!(bucket_outlives(label, DAY, offset, end_of_bucket - 1));
+        assert!(!bucket_outlives(label, DAY, offset, end_of_bucket));
+    }
+
+    #[test]
+    fn test_trim_compares_shifted_labels_in_utc() {
+        const IST: i64 = 19_800_000_000;
+        // at +05:30 a local day starts at 18:30 UTC, and its label reads the local midnight
+        let d0 = EDGE_30D + DAY - IST;
+        let (label0, label1) = (d0 + IST, d0 + DAY + IST);
+        let mut response = cached_buckets(86_400, &[(label0, 1), (label1, 2)]);
+        let mut meta = agg_meta(d0, d0 + 2 * DAY);
+        let mut req = histogram_cache_req(d0, d0 + 2 * DAY);
+        req.ts_offset = IST;
+        // both local days fit, although the shifted label of the second is past the end in UTC
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 2);
+        assert_eq!((meta.start_time, meta.end_time), (d0, d0 + 2 * DAY));
+
+        let mut req = histogram_cache_req(d0, d0 + DAY + DAY / 2);
+        req.ts_offset = IST;
+        assert!(trim_cached_response(&mut response, &mut meta, &req));
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!((meta.start_time, meta.end_time), (d0, d0 + DAY));
     }
 
     #[tokio::test]
