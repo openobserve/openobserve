@@ -114,7 +114,7 @@ impl Cidr {
 
 #[cfg(test)]
 mod tests {
-    use super::super::query_column;
+    use super::super::tests::query_column;
 
     async fn contains(cidr: &str, ip: &str) -> String {
         let sql = format!("SELECT ip_cidr_contains('{cidr}', ip) FROM (VALUES ('{ip}')) AS t(ip)");

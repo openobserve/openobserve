@@ -65,7 +65,7 @@ impl ScalarUDFImpl for IsIpv6Udf {
 
 #[cfg(test)]
 mod tests {
-    use super::super::query_column;
+    use super::super::tests::query_column;
 
     #[tokio::test]
     async fn only_ipv6_text_is_ipv6() {

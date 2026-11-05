@@ -82,31 +82,6 @@ pub(super) fn v6_mask(len: u8) -> u128 {
     u128::MAX.checked_shl(128 - u32::from(len)).unwrap_or(0)
 }
 
-/// Runs `sql` with the IP UDFs registered and renders the first column, NULL as "NULL".
-#[cfg(test)]
-pub(super) async fn query_column(sql: &str) -> Result<Vec<String>> {
-    use datafusion::{arrow::util::display::array_value_to_string, prelude::SessionContext};
-
-    let ctx = SessionContext::new();
-    ctx.register_udf(ip_cidr_contains::IP_CIDR_CONTAINS_UDF.clone());
-    ctx.register_udf(ip_subnet::IP_SUBNET_UDF.clone());
-    ctx.register_udf(is_ipv4::IS_IPV4_UDF.clone());
-    ctx.register_udf(is_ipv6::IS_IPV6_UDF.clone());
-    ctx.register_udf(is_private_ip::IS_PRIVATE_IP_UDF.clone());
-    let mut out = Vec::new();
-    for batch in ctx.sql(sql).await?.collect().await? {
-        let column = batch.column(0);
-        for row in 0..column.len() {
-            out.push(if column.is_null(row) {
-                "NULL".to_string()
-            } else {
-                array_value_to_string(column, row)?
-            });
-        }
-    }
-    Ok(out)
-}
-
 fn map_rows<'a, S, T, B>(array: S, mut f: impl FnMut(&str) -> Option<T>) -> B
 where
     S: StringArrayType<'a>,
@@ -117,7 +92,31 @@ where
 
 #[cfg(test)]
 mod tests {
+    use datafusion::{arrow::util::display::array_value_to_string, prelude::SessionContext};
+
     use super::*;
+
+    /// Runs `sql` with the IP UDFs registered and renders the first column, NULL as "NULL".
+    pub(super) async fn query_column(sql: &str) -> Result<Vec<String>> {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ip_cidr_contains::IP_CIDR_CONTAINS_UDF.clone());
+        ctx.register_udf(ip_subnet::IP_SUBNET_UDF.clone());
+        ctx.register_udf(is_ipv4::IS_IPV4_UDF.clone());
+        ctx.register_udf(is_ipv6::IS_IPV6_UDF.clone());
+        ctx.register_udf(is_private_ip::IS_PRIVATE_IP_UDF.clone());
+        let mut out = Vec::new();
+        for batch in ctx.sql(sql).await?.collect().await? {
+            let column = batch.column(0);
+            for row in 0..column.len() {
+                out.push(if column.is_null(row) {
+                    "NULL".to_string()
+                } else {
+                    array_value_to_string(column, row)?
+                });
+            }
+        }
+        Ok(out)
+    }
 
     #[test]
     fn prefix_len_accepts_plain_decimals_up_to_max() {

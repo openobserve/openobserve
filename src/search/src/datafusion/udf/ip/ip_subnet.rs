@@ -149,7 +149,7 @@ fn subnet(ip: IpAddr, v4: Mask, v6: Mask) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::query_column;
+    use super::super::tests::query_column;
 
     async fn subnet(args: &str) -> String {
         let sql = format!("SELECT ip_subnet({args}) FROM (VALUES (1)) AS t(x)");

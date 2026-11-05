@@ -72,7 +72,7 @@ impl ScalarUDFImpl for IsPrivateIpUdf {
 
 #[cfg(test)]
 mod tests {
-    use super::super::query_column;
+    use super::super::tests::query_column;
 
     #[tokio::test]
     async fn private_means_rfc1918_or_unique_local() {
