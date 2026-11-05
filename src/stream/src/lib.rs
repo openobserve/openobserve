@@ -1077,6 +1077,8 @@ fn apply_partition_level_settings(
     level: Option<PartitionTimeLevel>,
     now: i64,
 ) -> Result<(), &'static str> {
+    // older clients send unset for a level they leave alone
+    let level = level.filter(|level| *level != PartitionTimeLevel::Unset);
     if dynamic.is_none() && level.is_none() {
         return Ok(());
     }
@@ -1093,8 +1095,9 @@ fn apply_partition_level_settings(
     let Some(level) = level else {
         return Ok(());
     };
-    if level == PartitionTimeLevel::Unset {
-        return Err("partition_time_level must be hourly or daily");
+    // a client that sends back the level it read asks for nothing
+    if level == settings.partition_time_level.current_level() {
+        return Ok(());
     }
     if get_stream_setting_dynamic_partition(stream_type, Some(settings)) {
         return Err("partition_time_level can only be set while dynamic_partition is off");
@@ -2194,14 +2197,13 @@ mod tests {
             apply(Some(false), Some(true), None).unwrap().dynamic,
             Some(true)
         );
-        // no change of level, nothing recorded; unset is not a level
-        assert!(
-            apply(Some(false), None, Some(Hourly))
-                .unwrap()
-                .changes
-                .is_empty()
-        );
-        assert!(apply(Some(false), None, Some(Unset)).is_err());
+        // older clients resend unset or the level they read: nothing changes, nothing is refused
+        for own in [Some(false), Some(true)] {
+            for level in [Hourly, Unset] {
+                let same = apply(own, None, Some(level)).unwrap();
+                assert!(same.changes.is_empty(), "{own:?} {level}");
+            }
+        }
 
         let mut settings = StreamSettings::default();
         let refused = apply_partition_level_settings(
@@ -2212,6 +2214,14 @@ mod tests {
             0,
         );
         assert!(refused.is_err());
+        let unset = apply_partition_level_settings(
+            StreamType::Profiles,
+            &mut settings,
+            None,
+            Some(Unset),
+            0,
+        );
+        assert!(unset.is_ok());
     }
 
     #[tokio::test]
