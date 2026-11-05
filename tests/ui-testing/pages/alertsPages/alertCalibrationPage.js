@@ -19,6 +19,7 @@ export class AlertCalibrationPage {
     this.tabDashboard = '[data-test="alert-calibration-tab-alertCalibration"]';
     this.tabRuns = '[data-test="alert-calibration-tab-alertCalibrationRuns"]';
     this.alertListPage = '[data-test="alert-list-page"]';
+    this.digestPage = '[data-test="alert-calibration-digest-page"]';
 
     // Settings form — the enabled toggle. OFormSwitch forwards data-test to the
     // OSwitch button as `<data-test>-btn`; the button exposes role="switch".
@@ -48,6 +49,11 @@ export class AlertCalibrationPage {
       reopen: '[data-test="alert-calibration-dismissed-reopen"]',
       dismissedEmpty: '[data-test="alert-calibration-dismissed-empty"]',
       toast: (variant) => `[data-test-variant="${variant}"] [data-test="o-toast-message"]`,
+      card: '[data-test="alert-calibration-finding-no_destination"]',
+      cardDismiss: '[data-test="alert-calibration-finding-dismiss"]',
+      cardBadge: '[data-test="alert-calibration-finding-dismissed"]',
+      cardFold: '[data-test="alert-calibration-finding-fold"]',
+      cardReopen: '[data-test="alert-calibration-finding-reopen"]',
     };
   }
 
@@ -174,6 +180,14 @@ export class AlertCalibrationPage {
     await this.page.route(/\/alert_calibration\/digests(\?|$)/, (route) =>
       route.fulfill({ json: [run] }),
     );
+    return run;
+  }
+
+  async navigateToDigest(run) {
+    const url = `${process.env["ZO_BASE_URL"]}/web/alert-calibration/digests/${run.window_start}/${run.window_end}?org_identifier=${process.env["ORGNAME"]}`;
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await expect(this.page.locator(this.dismiss.card)).toBeVisible({ timeout: 20000 });
   }
 
   async openNoDestinationGroup() {

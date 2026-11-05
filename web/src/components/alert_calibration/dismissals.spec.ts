@@ -227,4 +227,15 @@ describe("dismissals", () => {
     expect(DISMISS_REASONS.filter((reason) => !(reason in REASON_LABEL))).toEqual([]);
     expect(used.size).toBeGreaterThan(40);
   });
+
+  it("fold_parts_join_actor_reason_and_until", () => {
+    expect(copy.foldParts(view())).toEqual([
+      "Dismissed by u-ops@example.com",
+      "Known issue, handled elsewhere",
+      "Hidden until Feb 3, 2027",
+    ]);
+    expect(
+      copy.foldParts(view({ reason: "made_up" as never, duration_days: null, expires_at: null })),
+    ).toEqual(["Dismissed by u-ops@example.com", "Another reason", "Hidden until reopened"]);
+  });
 });
