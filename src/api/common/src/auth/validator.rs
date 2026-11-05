@@ -72,6 +72,8 @@ pub struct RequestData {
 pub enum AuthError {
     Unauthorized(String),
     Forbidden(String),
+    /// A valid credential whose role was refused; `Forbidden` also means a failed credential.
+    RoleRefused(String),
     NotFound(String),
     /// Refused by the failed-login lockout rather than by the credential itself. Only the seconds
     /// left are disclosed: the thresholds behind them stay admin-only, since a brute-forcer who
@@ -87,7 +89,9 @@ impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AuthError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            AuthError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                write!(f, "Forbidden: {}", msg)
+            }
             AuthError::NotFound(msg) => write!(f, "NotFound: {}", msg),
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
@@ -125,7 +129,9 @@ impl IntoResponse for AuthError {
                     .body(Body::from(msg))
                     .unwrap()
             }
-            AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg).into_response(),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                (StatusCode::FORBIDDEN, msg).into_response()
+            }
             AuthError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
             // 429 rather than 423: `Retry-After` is canonical on it, and clients and proxies
             // already know to back off rather than retry immediately.
@@ -268,7 +274,7 @@ pub async fn validator(
                         delegation: None,
                     })
                 } else {
-                    Err(AuthError::Forbidden("Unauthorized Access".to_string()))
+                    Err(AuthError::RoleRefused("Unauthorized Access".to_string()))
                 }
             } else {
                 Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -813,7 +819,7 @@ pub async fn validate_credentials(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -939,7 +945,7 @@ pub async fn validate_credentials_ext(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -2455,6 +2461,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+        exercise_user_path_refusal_is_a_role_refusal(org_id).await;
 
         let static_token = users::get_user(Some(org_id), init_user)
             .await
@@ -2564,6 +2571,26 @@ CN5lTowpVXP2OIiiNTGa75Fj
         db::org_users::add_with_flags(org_id, email, role, token, None, true)
             .await
             .unwrap();
+    }
+
+    // The user lookup ignores case and the email comparison does not, which reaches this refusal.
+    async fn exercise_user_path_refusal_is_a_role_refusal(org_id: &str) {
+        let pwd = "Complexpass#123";
+        let login = "Path-Viewer@example.com";
+        let stored = login.to_lowercase();
+        seed_user_without_password_ext(org_id, &stored, UserRole::Viewer, pwd, "path-viewer").await;
+        let path = "default/stream/traces/user";
+        let refused = validate_credentials(login, pwd, path, None, &Method::GET, false).await;
+        assert!(
+            matches!(&refused, Err(AuthError::RoleRefused(msg)) if msg == "Not allowed"),
+            "a verified non-admin on a /user path: {:?}",
+            refused.map(|res| res.is_valid)
+        );
+        let bad = validate_credentials(login, "wrong", path, None, &Method::GET, false).await;
+        assert!(
+            !bad.unwrap().is_valid,
+            "a bad password stays a failed login"
+        );
     }
 
     // Each URI is what the auth layer sees once axum has stripped its mount.
@@ -3282,6 +3309,40 @@ CN5lTowpVXP2OIiiNTGa75Fj
             Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
             Err(other) => panic!("expected 401, got {other}"),
             Ok(_) => panic!("a forged delegated token was accepted"),
+        }
+    }
+
+    /// The source pins what may reveal a locked license; files outside this list are not read.
+    #[test]
+    fn test_role_refused_sites_are_pinned_with_no_auth_error_after_their_role_check() {
+        const GUARDS: [&str; 2] = ["check_permissions(", "path.contains(\"/user\")"];
+        for (file, source, sites) in [
+            ("validator.rs", include_str!("validator.rs"), 3),
+            ("token.rs", include_str!("token.rs"), 1),
+            ("delegation.rs", include_str!("delegation.rs"), 1),
+        ] {
+            let (production, _) = source
+                .split_once("\n#[cfg(test)]\nmod tests {")
+                .unwrap_or_else(|| panic!("{file}: test module marker moved; update this scan"));
+            let refusals: Vec<usize> = production
+                .match_indices("Err(AuthError::RoleRefused(")
+                .map(|(at, _)| at)
+                .collect();
+            assert_eq!(
+                refusals.len(),
+                sites,
+                "{file}: RoleRefused site count changed; it reveals the license, review each site"
+            );
+            for at in refusals {
+                let before = &production[..at];
+                let guard = GUARDS.iter().filter_map(|g| before.rfind(g)).max();
+                let guard = guard.unwrap_or_else(|| panic!("{file}: no role check before {at}"));
+                assert!(
+                    !before[guard..].contains("AuthError::"),
+                    "{file}: another auth error sits between the role check and RoleRefused: {}",
+                    &before[guard..]
+                );
+            }
         }
     }
 }
