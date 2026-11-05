@@ -719,7 +719,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       expect(formValues().defaultRefreshInterval).toBe(300);
-      expect(refreshSelect().text()).toContain("5 min");
+      expect(refreshSelect().text()).toContain("5m");
     });
 
     it("shows the effective value when the saved one is below the server minimum", async () => {
@@ -731,8 +731,8 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       expect(formValues().defaultRefreshInterval).toBe(30);
-      expect(helpText()).toContain("10 sec");
-      expect(helpText()).toContain("30 sec");
+      expect(helpText()).toContain("10s");
+      expect(helpText()).toContain("30s");
     });
 
     it("saves the picked interval in seconds", async () => {
