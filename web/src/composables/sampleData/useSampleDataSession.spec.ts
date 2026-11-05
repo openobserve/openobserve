@@ -88,6 +88,19 @@ describe("useSampleDataSession remove", () => {
     expect(session.status.value).toBe("loaded");
   });
 
+  it("refuses to start a load while a removal runs", async () => {
+    let settle!: () => void;
+    mocks.remove.mockReturnValue(new Promise<void>((r) => (settle = r)));
+    const removal = session.remove("org-a");
+    await flushPromises();
+    await session.start("org-a");
+    await session.loadInDialog("org-a");
+    expect(mocks.load).not.toHaveBeenCalled();
+    expect(session.status.value).toBe("idle");
+    settle();
+    await removal;
+  });
+
   it("refuses to remove the org whose load is still running, so the load cannot bring it back", async () => {
     const load = session.start("org-a");
     await flushPromises();

@@ -46,7 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div class="min-w-56">
-      <ODropdownItem v-if="unfinished" data-test="header-sample-data-finish" @select="load">
+      <ODropdownItem
+        v-if="unfinished"
+        :disabled="session.removing.value"
+        data-test="header-sample-data-finish"
+        @select="load"
+      >
         {{ t("sampleData.header.finish") }}
       </ODropdownItem>
       <ODropdownItem data-test="header-sample-data-tour" @select="startTour">
@@ -69,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="outline"
     size="xs"
     class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple! max-md:hidden"
+    :disabled="session.removing.value"
     data-test="header-sample-data-try"
     @click="load"
   >

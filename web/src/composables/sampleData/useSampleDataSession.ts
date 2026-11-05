@@ -137,7 +137,8 @@ const confirmLeave = (e: BeforeUnloadEvent) => {
 
 /** Runs the loader once per app; every surface watching this session sees the same progress. */
 const start = async (org: string, ingestAllowedUptoHours?: number) => {
-  if (status.value === "loading") return;
+  // a removal in progress would be undone by the streams this load creates
+  if (status.value === "loading" || removing.value) return;
   resetProgress();
   error.value = null;
   forbidden.value = false;
@@ -284,6 +285,7 @@ export const useSampleDataSession = () => ({
   openWelcome: () => (welcomeOpen.value = true),
   /** Starts a load with its progress on screen in the welcome dialog. */
   loadInDialog: (org: string, ingestAllowedUptoHours?: number) => {
+    if (removing.value) return Promise.resolve(undefined);
     markWelcomeSeen(org);
     welcomeOpen.value = true;
     return start(org, ingestAllowedUptoHours);

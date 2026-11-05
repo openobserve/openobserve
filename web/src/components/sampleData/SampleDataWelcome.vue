@@ -148,7 +148,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="mt-auto flex justify-end gap-2">
           <OButton variant="ghost" size="sm" @click="close">{{ t("common.cancel") }}</OButton>
-          <OButton variant="primary" size="sm" data-test="sample-welcome-retry" @click="load">
+          <OButton
+            variant="primary"
+            size="sm"
+            :disabled="session.removing.value"
+            data-test="sample-welcome-retry"
+            @click="load"
+          >
             {{ t("common.retry") }}
           </OButton>
         </div>
@@ -291,6 +297,7 @@ const dismiss = () => (view.value === "choose" ? skip() : close());
 
 // picking sample data is the go-ahead, so the load starts without the confirm step
 const pickSample = () => {
+  if (session.removing.value) return;
   finish("sample");
   load();
 };

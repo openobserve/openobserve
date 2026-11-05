@@ -23,6 +23,7 @@ import SampleDataCallout from "./SampleDataCallout.vue";
 const session = vi.hoisted(() => ({
   status: { value: "idle" },
   loadingOrg: { value: "" },
+  removing: { value: false },
   loadInDialog: vi.fn(),
 }));
 vi.mock("@/composables/sampleData/useSampleDataSession", () => ({

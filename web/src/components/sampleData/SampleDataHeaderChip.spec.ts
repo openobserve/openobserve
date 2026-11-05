@@ -263,6 +263,13 @@ describe("SampleDataHeaderChip", () => {
       expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
     });
 
+    it("disables Finish Loading while a removal runs", async () => {
+      Object.assign(data, { state: "none", removing: true });
+      mountChip();
+      await flushPromises();
+      expect(items()[0].attributes("disabled")).toBeDefined();
+    });
+
     it("offers no Finish Loading while a load runs", async () => {
       Object.assign(data, { state: "none", loadingHere: true });
       mountChip();

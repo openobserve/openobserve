@@ -68,6 +68,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     loadingOrg: ref(""),
     error: ref(null),
     forbidden: ref(false),
+    removing: ref(false),
     welcomeOpen: ref(false),
     welcomeDeciding: ref(0),
     tour: ref(null),
