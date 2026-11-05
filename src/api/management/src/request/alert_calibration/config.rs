@@ -87,7 +87,21 @@ pub async fn update_alert_calibration_config(
         return disabled;
     }
     match alert_calibration_service::update_config(&org_id, update).await {
-        Ok(config) => MetaHttpResponse::json(config),
+        Ok(config) => {
+            if config.enabled {
+                prepare_writer_token(&org_id).await;
+            }
+            MetaHttpResponse::json(config)
+        }
         Err(error) => error_response(&error),
+    }
+}
+
+/// Made when calibration is turned on, so the first pass finds it in every ingester's cache.
+async fn prepare_writer_token(org_id: &str) {
+    use openobserve_core::ingestion::feature_writer::{self, FeatureWriter};
+    // Each pass looks the token up again and reports why it could not write, so this only logs.
+    if let Err(e) = feature_writer::token(FeatureWriter::AlertCalibration, org_id).await {
+        log::warn!("[alert_calibration] could not prepare the ingestion token for {org_id}: {e}");
     }
 }

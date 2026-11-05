@@ -20,10 +20,12 @@ use std::collections::HashMap;
 use arrow_schema::{DataType, Field, Schema};
 pub use config::meta::alerts::alert_calibration::DIGEST_STREAM;
 use config::{get_config, meta::stream::StreamType, utils::time::now_micros};
-use proto::cluster_rpc;
 use serde_json::Value;
 
-use crate::traces::service_graph::v4::writer::{ReplyClass, chunk, classify, max_request_bytes};
+use crate::{
+    ingestion::feature_writer::{self, GrpcTransport, WriteError, WriterToken, WriterTransport},
+    traces::service_graph::v4::writer::{chunk, max_request_bytes},
+};
 
 /// The columns a run read tells a marker by; a read planned without them sees a skip as a run.
 const CLASSIFYING_COLUMNS: [&str; 2] = ["kind", "rule_id"];
@@ -54,10 +56,12 @@ trait DigestStore {
     async fn write(&self, org_id: &str, records: Vec<Value>) -> Result<(), anyhow::Error>;
 }
 
-/// The meta store and the ingester.
-struct Ingest;
+/// The meta store, and the ingester reached with the org's calibration writer token.
+struct Ingest<'a> {
+    token: &'a WriterToken,
+}
 
-impl DigestStore for Ingest {
+impl DigestStore for Ingest<'_> {
     fn now(&self) -> i64 {
         now_micros()
     }
@@ -75,17 +79,18 @@ impl DigestStore for Ingest {
         Ok(())
     }
 
-    async fn write(&self, org_id: &str, records: Vec<Value>) -> Result<(), anyhow::Error> {
-        write_chunks(org_id, records).await
+    async fn write(&self, _org_id: &str, records: Vec<Value>) -> Result<(), anyhow::Error> {
+        write_chunks(&GrpcTransport, self.token, records).await
     }
 }
 
 /// The stream is a pass's only record, so a lost chunk fails the pass rather than shortening it.
 pub(crate) async fn write_digest_records(
     org_id: &str,
+    token: &WriterToken,
     records: Vec<Value>,
 ) -> Result<DigestWrite, anyhow::Error> {
-    write_once_ready(&Ingest, org_id, records).await
+    write_once_ready(&Ingest { token }, org_id, records).await
 }
 
 async fn write_once_ready(
@@ -206,18 +211,28 @@ fn settle_window_micros() -> i64 {
     i64::try_from(secs.saturating_mul(1_000_000)).unwrap_or(i64::MAX)
 }
 
-async fn write_chunks(org_id: &str, records: Vec<Value>) -> Result<(), anyhow::Error> {
+async fn write_chunks(
+    transport: &dyn WriterTransport,
+    token: &WriterToken,
+    records: Vec<Value>,
+) -> Result<(), anyhow::Error> {
+    let org_id = token.org();
     let chunks = chunk(&records, max_request_bytes());
     let total = chunks.len();
     let mut lost = 0usize;
+    let mut not_ready = false;
     for (index, data) in chunks.into_iter().enumerate() {
         // Retrying would duplicate the chunks that landed, since records carry no idempotency key.
-        if let Err(e) = write_chunk(org_id, data).await {
+        if let Err(e) = write_chunk(transport, token, data).await {
             lost += 1;
+            not_ready |= matches!(e, WriteError::NotReady(_));
             log::error!(
                 "[alert_calibration] digest chunk {index} of {total} failed for {org_id}: {e}"
             );
         }
+    }
+    if not_ready {
+        anyhow::bail!("{}", token.writer().not_ready_message());
     }
     if lost > 0 {
         anyhow::bail!("{lost} of {total} digest chunks were not written for {org_id}");
@@ -225,25 +240,12 @@ async fn write_chunks(org_id: &str, records: Vec<Value>) -> Result<(), anyhow::E
     Ok(())
 }
 
-async fn write_chunk(org_id: &str, data: Vec<u8>) -> Result<(), anyhow::Error> {
-    let request = cluster_rpc::IngestionRequest {
-        org_id: org_id.to_string(),
-        stream_type: StreamType::Logs.as_str().to_string(),
-        stream_name: DIGEST_STREAM.to_string(),
-        data: Some(cluster_rpc::IngestionData { data }),
-        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
-        metadata: None,
-    };
-    let response = crate::ingestion::ingestion_service::ingest(request).await?;
-    match classify(response.status_code) {
-        ReplyClass::Ok => Ok(()),
-        // Rows a pipeline refused leave the digest short, yet it would read as complete.
-        ReplyClass::Partial | ReplyClass::Rejected | ReplyClass::Retry => anyhow::bail!(
-            "ingest refused the chunk: code {} {}",
-            response.status_code,
-            response.message
-        ),
-    }
+async fn write_chunk(
+    transport: &dyn WriterTransport,
+    token: &WriterToken,
+    data: Vec<u8>,
+) -> Result<(), WriteError> {
+    feature_writer::write(transport, token, DIGEST_STREAM, data).await
 }
 
 #[cfg(test)]
@@ -587,5 +589,59 @@ mod tests {
         assert_eq!(store.written(), [2]);
         assert_eq!(store.merges(), 0);
         assert!(digest_schema(org).await.fields().is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_digest_write_carries_the_org_writer_token_not_the_internal_token() {
+        use crate::ingestion::feature_writer::{FeatureWriter, tests::RecordingTransport};
+        let transport = RecordingTransport::answering(200);
+        let token = WriterToken::for_tests(FeatureWriter::AlertCalibration, "demo-org", "o2oi_d");
+        write_chunk(&transport, &token, b"[]".to_vec())
+            .await
+            .unwrap();
+        let sent = transport.credentials();
+        assert_eq!(sent.len(), 1);
+        let (credentials, org, body) = &sent[0];
+        assert_eq!(credentials, "alert_calibration@system.local:o2oi_d");
+        assert_eq!(org, "demo-org");
+        assert_eq!(
+            (body.org_id.as_str(), body.stream_name.as_str()),
+            ("demo-org", DIGEST_STREAM)
+        );
+        config::cache_instance_id("instance");
+        let internal = config::meta::cluster::get_internal_grpc_token();
+        let authorization = transport.sent.lock().unwrap()[0]
+            .metadata()
+            .get("authorization")
+            .map(|v| v.to_str().unwrap().to_string());
+        assert_ne!(authorization.as_deref(), Some(internal.as_str()));
+    }
+
+    #[tokio::test]
+    async fn a_storage_failure_or_refused_rows_fail_the_digest_write() {
+        use crate::ingestion::feature_writer::{FeatureWriter, tests::RecordingTransport};
+        let token = WriterToken::for_tests(FeatureWriter::AlertCalibration, "demo-org", "o2oi_d");
+        for code in [500, 207] {
+            let transport = RecordingTransport::answering(code);
+            let records = vec![serde_json::json!({"kind": "run"})];
+            assert!(
+                write_chunks(&transport, &token, records).await.is_err(),
+                "a {code} reply read as written"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_chunk_the_interceptor_has_not_cached_fails_the_pass_as_not_ready() {
+        use crate::ingestion::feature_writer::{FeatureWriter, tests::UncachedTransport};
+        let token = WriterToken::for_tests(FeatureWriter::AlertCalibration, "demo-org", "o2oi_d");
+        let records = vec![serde_json::json!({"kind": "run"})];
+        let err = write_chunks(&UncachedTransport, &token, records)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            FeatureWriter::AlertCalibration.not_ready_message()
+        );
     }
 }

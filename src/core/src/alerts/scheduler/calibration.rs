@@ -287,11 +287,16 @@ async fn analyse(
 ) -> Result<((i64, i64), bool), anyhow::Error> {
     use o2_enterprise::enterprise::alert_calibration_service::run_pass;
 
-    use crate::alerts::alert_calibration::{
-        SearchAdapter,
-        sink::{DigestWrite, write_digest_records},
+    use crate::{
+        alerts::alert_calibration::{
+            SearchAdapter,
+            sink::{DigestWrite, write_digest_records},
+        },
+        ingestion::feature_writer::{self, FeatureWriter},
     };
 
+    // Looked up before the analysis, so a token made now reaches the ingesters' caches first.
+    let token = feature_writer::token(FeatureWriter::AlertCalibration, &trigger.org).await?;
     let pass = tokio::time::timeout(
         time_left,
         run_pass(
@@ -320,7 +325,7 @@ async fn analyse(
     if !held {
         anyhow::bail!("lost the claim before writing the digest");
     }
-    let written = write_digest_records(&trigger.org, pass.records).await?;
+    let written = write_digest_records(&trigger.org, &token, pass.records).await?;
     let window = (pass.window.start_micros, pass.window.end_micros);
     Ok((window, written == DigestWrite::Deferred))
 }
@@ -619,6 +624,32 @@ mod tests {
         assert_eq!(
             (row.delay_in_secs, row.time_in_queue_ms, row.retries),
             (Some(60), Some(120_000), 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_revoked_writer_token_fails_the_pass_with_the_revoked_line() {
+        use crate::ingestion::feature_writer::{self, FeatureWriter, tests::meta_store};
+        meta_store().await;
+        let org = format!("demo-org-pass-{}", now_micros());
+        feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .unwrap();
+        crate::ingestion_tokens::set_enabled_token(&org, "_o2_alert_calibration", false)
+            .await
+            .unwrap();
+        let lookup = feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .map_err(|e| e.to_string());
+        let error = lookup.expect_err("a disabled token was handed to the pass");
+        let config = config(true, 60);
+        let pass = Pass::Due(&config);
+        let mut data = JobData::default();
+        let outcome = pass.settle(&mut data, 0, 1_000_000, Some(Err(error)));
+        assert_eq!(outcome.status, RunOutcome::Error);
+        assert_eq!(
+            outcome.error.as_deref(),
+            Some(FeatureWriter::AlertCalibration.revoked_message().as_str())
         );
     }
 }

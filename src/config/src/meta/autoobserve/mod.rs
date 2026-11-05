@@ -19,6 +19,8 @@ pub mod marks;
 pub const KV_PREFIX: &str = "_o2_ao/";
 pub const KV_MARK_PREFIX: &str = "_o2_ao/mark/";
 pub const KV_SUGGESTION_PREFIX: &str = "_o2_ao/suggestion/";
+/// Every engine stream starts with this (ENT `autoobserve::names`), so it is the writer's scope.
+pub const AUTOOBSERVE_STREAM_PREFIX: &str = "_o2_autoobserve_";
 
 /// Whether a user-supplied kv key could land in the reserved namespace, however it is encoded.
 pub fn is_reserved_kv_key(key: &str) -> bool {

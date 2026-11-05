@@ -21,12 +21,13 @@ use config::{
 use http::StatusCode;
 use infra::errors::{Error, Result};
 use ingestion_common::{IngestUser, SystemJobType};
+use openobserve_core::ingestion::feature_writer::{self, FeatureWriter, WRITER_METADATA_KEY};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::ingestion::create_log_ingestion_req;
+use crate::{handler::grpc::auth::basic_password, service::ingestion::create_log_ingestion_req};
 
 #[derive(Default)]
 pub struct Ingester;
@@ -72,6 +73,89 @@ fn destination_org(
     Ok(header_org.to_string())
 }
 
+/// The feature writer `check_ingest_auth` marked the request with, if any.
+fn feature_writer(request: &Request<IngestionRequest>) -> Result<Option<FeatureWriter>, Status> {
+    let Some(value) = request.metadata().get(WRITER_METADATA_KEY) else {
+        return Ok(None);
+    };
+    value
+        .to_str()
+        .ok()
+        .and_then(FeatureWriter::from_token_name)
+        .map(Some)
+        .ok_or_else(|| Status::permission_denied("unknown feature writer"))
+}
+
+/// A writer token reaches only its own Logs stream and format, in its token's org.
+fn writer_caller(
+    writer: FeatureWriter,
+    header_org: Option<&str>,
+    req: &IngestionRequest,
+) -> std::result::Result<(String, IngestUser, bool), Status> {
+    let in_scope = header_org == Some(req.org_id.as_str())
+        && writer.token_org(&req.org_id) == req.org_id
+        && StreamType::from(req.stream_type.as_str()) == StreamType::Logs
+        && req.ingestion_type == Some(writer.ingestion_type() as i32)
+        && writer.allows(&req.stream_name);
+    if !in_scope {
+        return Err(Status::permission_denied(
+            writer.out_of_scope_message(&req.stream_name),
+        ));
+    }
+    Ok((
+        req.org_id.clone(),
+        IngestUser::SystemJob(writer.job()),
+        false,
+    ))
+}
+
+/// Where a request writes, as whom, and whether its rows are pipeline-derived.
+fn resolve_caller(
+    writer: Option<FeatureWriter>,
+    user_id: Option<&str>,
+    header_org: Option<&str>,
+    req: &IngestionRequest,
+) -> std::result::Result<(String, IngestUser, bool), Status> {
+    if let Some(writer) = writer {
+        return writer_caller(writer, header_org, req);
+    }
+    let org_id = destination_org(user_id, header_org, req.org_id.clone())?;
+    let is_derived = req
+        .metadata
+        .as_ref()
+        .and_then(|m| {
+            m.data
+                .get("is_derived")
+                .and_then(|v| v.parse::<bool>().ok())
+        })
+        .unwrap_or(false);
+    let (user, is_derived) = caller_identity(user_id, req.ingestion_type, is_derived)?;
+    Ok((org_id, user, is_derived))
+}
+
+/// The interceptor trusted its cache; only the primary says whether a writer's token is still live.
+async fn confirm_writer(
+    writer: FeatureWriter,
+    org_id: &str,
+    token: Option<&str>,
+) -> std::result::Result<(), Status> {
+    let refused = || Status::unauthenticated("No valid auth token[8]");
+    let token = token.ok_or_else(refused)?;
+    match feature_writer::confirm(writer, org_id, token).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(refused()),
+        Err(e) => Err(Status::unavailable(e.to_string())),
+    }
+}
+
+/// A writer must learn of a failed storage write or refused rows; other Logs callers keep a 200.
+fn writer_logs_reply(
+    writer: Option<FeatureWriter>,
+    resp: &ingestion_common::IngestionResponse,
+) -> Option<IngestionResponse> {
+    writer.map(|_| encode_logs_reply(resp))
+}
+
 #[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
@@ -92,23 +176,17 @@ impl Ingest for Ingester {
             .get(&config::get_config().grpc.org_header_key)
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let writer = feature_writer(&request)?;
+        let writer_token = writer.and_then(|_| basic_password(request.metadata()));
         let req = request.into_inner();
-        let org_id = destination_org(user_id.as_deref(), header_org.as_deref(), req.org_id)?;
+        let (org_id, internal_user, is_derived) =
+            resolve_caller(writer, user_id.as_deref(), header_org.as_deref(), &req)?;
+        if let Some(writer) = writer {
+            confirm_writer(writer, &org_id, writer_token.as_deref()).await?;
+        }
         let stream_type: StreamType = req.stream_type.into();
         let stream_name = req.stream_name;
         let in_data = req.data.unwrap_or_default();
-        let is_derived = req
-            .metadata
-            .as_ref()
-            .and_then(|m| {
-                m.data
-                    .get("is_derived")
-                    .and_then(|v| v.parse::<bool>().ok())
-            })
-            .unwrap_or(false);
-
-        let (internal_user, is_derived) =
-            caller_identity(user_id.as_deref(), req.ingestion_type, is_derived)?;
 
         let mut metrics_reply: Option<IngestionResponse> = None;
         let resp = match stream_type {
@@ -127,7 +205,7 @@ impl Ingest for Ingester {
                         is_derived,
                     )
                     .await
-                    .map_or_else(Err, |_| Ok(())),
+                    .map(|resp| metrics_reply = writer_logs_reply(writer, &resp)),
                 }
             }
             StreamType::Metrics => {
@@ -329,6 +407,260 @@ mod tests {
     use proto::cluster_rpc::{IngestRequestMetadata, IngestionData};
 
     use super::*;
+
+    fn writer_req(
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        kind: IngestionType,
+    ) -> IngestionRequest {
+        IngestionRequest {
+            org_id: org_id.to_string(),
+            stream_type: stream_type.as_str().to_string(),
+            stream_name: stream.to_string(),
+            data: None,
+            ingestion_type: Some(kind as i32),
+            metadata: None,
+        }
+    }
+
+    #[test]
+    fn a_writer_token_reaches_only_its_own_stream() {
+        let writer = Some(FeatureWriter::AlertCalibration);
+        let digests = "_o2_alert_calibration_digests";
+        let req = writer_req("demo-org", StreamType::Logs, digests, IngestionType::Json);
+        let (org, user, derived) = resolve_caller(writer, None, Some("demo-org"), &req).unwrap();
+        assert_eq!(org, "demo-org");
+        assert_eq!(user, IngestUser::SystemJob(SystemJobType::AlertCalibration));
+        assert!(!derived);
+
+        let denied = [
+            (
+                "demo-org",
+                "demo-org",
+                StreamType::Logs,
+                "default",
+                IngestionType::Json,
+            ),
+            (
+                "demo-org",
+                "demo-org",
+                StreamType::Logs,
+                "_o2_autoobserve_health",
+                IngestionType::Json,
+            ),
+            (
+                "demo-org",
+                "other-org",
+                StreamType::Logs,
+                digests,
+                IngestionType::Json,
+            ),
+            (
+                "demo-org",
+                "demo-org",
+                StreamType::Metrics,
+                digests,
+                IngestionType::Json,
+            ),
+            (
+                "demo-org",
+                "demo-org",
+                StreamType::Logs,
+                digests,
+                IngestionType::Usage,
+            ),
+        ];
+        for (header, body_org, stream_type, stream, kind) in denied {
+            let req = writer_req(body_org, stream_type, stream, kind);
+            let status = resolve_caller(writer, None, Some(header), &req).unwrap_err();
+            assert_eq!(
+                status.code(),
+                tonic::Code::PermissionDenied,
+                "{body_org} {stream} {kind:?}"
+            );
+        }
+        let req = writer_req("demo-org", StreamType::Logs, digests, IngestionType::Json);
+        assert!(resolve_caller(writer, None, None, &req).is_err());
+    }
+
+    #[test]
+    fn the_autoobserve_writer_reaches_only_autoobserve_streams_in_meta() {
+        let writer = Some(FeatureWriter::AutoObserve);
+        let meta = config::META_ORG_ID;
+        for stream in [
+            "_o2_autoobserve_health",
+            "_o2_autoobserve_stream_silence_decisions",
+        ] {
+            let req = writer_req(meta, StreamType::Logs, stream, IngestionType::Usage);
+            let (org, user, _) = resolve_caller(writer, None, Some(meta), &req).unwrap();
+            assert_eq!(org, meta);
+            assert_eq!(user, IngestUser::SystemJob(SystemJobType::AutoObserve));
+        }
+        let json = writer_req(
+            meta,
+            StreamType::Logs,
+            "_o2_autoobserve_health",
+            IngestionType::Json,
+        );
+        assert!(
+            resolve_caller(writer, None, Some(meta), &json).is_err(),
+            "AutoObserve rows are Usage rows"
+        );
+        let digests = writer_req(
+            meta,
+            StreamType::Logs,
+            "_o2_alert_calibration_digests",
+            IngestionType::Usage,
+        );
+        assert!(resolve_caller(writer, None, Some(meta), &digests).is_err());
+        let elsewhere = writer_req(
+            "demo-org",
+            StreamType::Logs,
+            "_o2_autoobserve_health",
+            IngestionType::Usage,
+        );
+        assert!(resolve_caller(writer, None, Some("demo-org"), &elsewhere).is_err());
+    }
+
+    #[test]
+    fn an_unknown_writer_mark_is_denied() {
+        let mut request = Request::new(writer_req(
+            "demo-org",
+            StreamType::Logs,
+            "x",
+            IngestionType::Json,
+        ));
+        assert_eq!(feature_writer(&request).unwrap(), None);
+        request
+            .metadata_mut()
+            .insert(WRITER_METADATA_KEY, "_o2_x".parse().unwrap());
+        assert!(feature_writer(&request).is_err());
+        request
+            .metadata_mut()
+            .insert(WRITER_METADATA_KEY, "_o2_autoobserve".parse().unwrap());
+        assert_eq!(
+            feature_writer(&request).unwrap(),
+            Some(FeatureWriter::AutoObserve)
+        );
+    }
+
+    #[test]
+    fn a_writer_hears_of_a_failed_storage_write_or_refused_rows() {
+        let writer = Some(FeatureWriter::AutoObserve);
+        let failed = metrics_resp(200, 0, None).with_write_failed(true);
+        assert_eq!(writer_logs_reply(writer, &failed).unwrap().status_code, 500);
+        let refused = metrics_resp(200, 2, None);
+        assert_eq!(
+            writer_logs_reply(writer, &refused).unwrap().status_code,
+            207
+        );
+        let clean = metrics_resp(200, 0, None);
+        assert_eq!(writer_logs_reply(writer, &clean).unwrap().status_code, 200);
+        assert!(writer_logs_reply(None, &failed).is_none());
+    }
+
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    fn writer_request(org: &str, token: &str) -> Request<IngestionRequest> {
+        let digests = "_o2_alert_calibration_digests";
+        let mut request = Request::new(writer_req(
+            org,
+            StreamType::Logs,
+            digests,
+            IngestionType::Json,
+        ));
+        let basic =
+            config::utils::base64::encode(&format!("alert_calibration@system.local:{token}"));
+        let org_key = tonic::metadata::MetadataKey::from_bytes(
+            config::get_config().grpc.org_header_key.as_bytes(),
+        )
+        .unwrap();
+        let metadata = request.metadata_mut();
+        metadata.insert("authorization", format!("Basic {basic}").parse().unwrap());
+        metadata.insert(org_key, org.parse().unwrap());
+        metadata.insert(
+            WRITER_METADATA_KEY,
+            "_o2_alert_calibration".parse().unwrap(),
+        );
+        request
+    }
+
+    #[tokio::test]
+    async fn a_late_cache_insert_cannot_revive_a_disabled_or_rotated_writer_token() {
+        use common::infra::config::ORG_INGESTION_TOKENS;
+        meta_store().await;
+        let org = format!("demo-org-late-{}", config::utils::time::now_micros());
+        let name = "_o2_alert_calibration";
+        feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .unwrap();
+        let old = db::org_ingestion_tokens::get_by_name(&org, name)
+            .await
+            .unwrap()
+            .unwrap()
+            .token;
+        let key = db::org_ingestion_tokens::cache_key(&org, &old);
+        openobserve_core::ingestion_tokens::set_enabled_token(&org, name, false)
+            .await
+            .unwrap();
+        ORG_INGESTION_TOKENS.insert(key.clone(), name.to_string());
+        let refused = Ingester
+            .ingest(writer_request(&org, &old))
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code(), tonic::Code::Unauthenticated, "{refused}");
+        assert!(
+            !ORG_INGESTION_TOKENS.contains_key(&key),
+            "a disabled token stayed cached"
+        );
+
+        openobserve_core::ingestion_tokens::set_enabled_token(&org, name, true)
+            .await
+            .unwrap();
+        db::org_ingestion_tokens::rotate_token(&org, name)
+            .await
+            .unwrap();
+        ORG_INGESTION_TOKENS.insert(key.clone(), name.to_string());
+        let refused = Ingester
+            .ingest(writer_request(&org, &old))
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code(), tonic::Code::Unauthenticated, "{refused}");
+        assert!(
+            !ORG_INGESTION_TOKENS.contains_key(&key),
+            "a rotated-out token stayed cached"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_handler_tells_a_writer_its_rows_were_refused() {
+        meta_store().await;
+        let org = format!("demo-org-reply-{}", config::utils::time::now_micros());
+        feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .unwrap();
+        let token = db::org_ingestion_tokens::get_by_name(&org, "_o2_alert_calibration")
+            .await
+            .unwrap()
+            .unwrap()
+            .token;
+        let mut request = writer_request(&org, &token);
+        let rows = r#"[{"kind":"run"},{"kind":"old","_timestamp":1000000}]"#;
+        request.get_mut().data = Some(IngestionData {
+            data: rows.as_bytes().to_vec(),
+        });
+        let reply = Ingester.ingest(request).await.unwrap().into_inner();
+        assert_eq!(reply.status_code, 207, "{}", reply.message);
+    }
 
     #[test]
     fn test_caller_identity_keeps_platform_identity_for_the_internal_token_only() {

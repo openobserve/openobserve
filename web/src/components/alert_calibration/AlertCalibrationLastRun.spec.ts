@@ -67,6 +67,21 @@ describe("AlertCalibrationLastRun", () => {
     wrapper.unmount();
   });
 
+  it("shows a failed run, such as one stopped by a disabled ingestion token, as an error", async () => {
+    const wrapper = await mountWith({
+      status: "error",
+      error:
+        "Results were not saved because the Alert Calibration ingestion token is disabled. Enable it under Ingestion tokens to resume.",
+      finished_at: NOW - 1_000_000,
+    });
+    const banner = wrapper.find('[data-test="alert-calibration-last-run-failed"]');
+    expect(banner.text()).toContain("ingestion token is disabled");
+    expect(banner.classes()).toContain("bg-banner-error-bg");
+    expect(banner.classes().some((c) => c.includes("warning"))).toBe(false);
+    expect(banner.attributes("role")).toBe("alert");
+    wrapper.unmount();
+  });
+
   // The runs and overview pages only speak up for a failure, so nothing on them moves.
   it("stays quiet about a deferred run where only failures are shown", async () => {
     const wrapper = await mountWith(
