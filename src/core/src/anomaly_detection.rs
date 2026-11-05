@@ -7468,6 +7468,28 @@ mod tests {
             assert_eq!(super::super::anomaly_explore_link(&c), empty);
         }
 
+        /// A detector that scores one bucket per run gets a window one interval wide,
+        /// not a zero-width one, so the link survives the guard and `from`..`to` is the
+        /// lead-in plus that one bucket.
+        #[test]
+        fn a_one_bucket_window_keeps_the_link_and_spans_the_bucket() {
+            const MIN_US: i64 = 60 * 1_000_000;
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            // Bucket 00:00..00:05 behind a 15 minute (3 x 5m) lead-in.
+            c.window_start_us = 1_704_067_200_000_000;
+            c.window_end_us = c.window_start_us + 5 * MIN_US;
+            c.explore.as_mut().unwrap().start_us = c.window_start_us - 15 * MIN_US;
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            assert!(!url.is_empty());
+            let (_, p) = pairs(&url);
+            let from: i64 = get(&p, "from").unwrap().parse().unwrap();
+            let to: i64 = get(&p, "to").unwrap().parse().unwrap();
+            assert_eq!(from, c.window_start_us - 15 * MIN_US);
+            assert_eq!(to, c.window_end_us);
+            assert_eq!(to - from, 20 * MIN_US);
+            assert_eq!(label, FILTERED);
+        }
+
         #[test]
         fn an_over_long_filter_is_dropped_and_labeled() {
             let long = "x".repeat(5000);
