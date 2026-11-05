@@ -23,16 +23,14 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
-    ast::{SetExpr, Statement},
+    ast::{SetExpr, Statement, VisitMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::{
     RE_HISTOGRAM,
-    visitor::histogram_interval::{
-        convert_histogram_interval_to_seconds, generate_histogram_interval,
-    },
+    visitor::histogram_interval::{HistogramIntervalVisitor, generate_histogram_interval},
 };
 
 pub fn handle_histogram(
@@ -77,15 +75,18 @@ pub fn handle_histogram(
 
 /// Whether the first `histogram()` uses an interval without a fixed width, such as a month.
 pub fn has_calendar_histogram_interval(sql: &str) -> bool {
-    RE_HISTOGRAM
-        .captures(sql)
-        .and_then(|captures| {
-            let args = captures.get(1)?.as_str();
-            let interval = args.split(',').nth(1)?;
-            let interval = interval.trim().trim_matches(['\'', '"']);
-            Some(convert_histogram_interval_to_seconds(interval).is_err())
-        })
-        .unwrap_or(false)
+    if !RE_HISTOGRAM.is_match(sql) {
+        return false;
+    }
+    // parsed, because the regex stops at the first `)` of `histogram((_timestamp), '1 month')`
+    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
+        return false;
+    };
+    let mut visitor = HistogramIntervalVisitor::new((0, 0));
+    for mut statement in statements {
+        let _ = statement.visit(&mut visitor);
+    }
+    visitor.is_histogram && visitor.error.is_none() && visitor.interval.is_none()
 }
 
 /// The timezone argument of the first `histogram()` in the SQL.
@@ -309,6 +310,8 @@ mod tests {
     fn test_calendar_interval_detection() {
         for interval in ["1 month", "2 months", "1 year", "1 week"] {
             let sql = format!("SELECT histogram(_timestamp, '{interval}') FROM t");
+            assert!(has_calendar_histogram_interval(&sql), "{interval}");
+            let sql = format!("SELECT histogram((_timestamp), '{interval}') FROM t");
             assert!(has_calendar_histogram_interval(&sql), "{interval}");
         }
         for sql in [

@@ -538,17 +538,19 @@ fn trim_cached_response(
     // convert histogram interval to microseconds
     let interval = response.histogram_interval.unwrap_or_default() * 1_000_000;
     // a bucket that ends after the request holds counts from outside it, even if its label fits
-    if data_start >= q_start && data_end + interval <= q_end {
+    let fits_end = |ts: i64| {
+        if interval > 0 {
+            ts + interval <= q_end
+        } else {
+            ts < q_end
+        }
+    };
+    if data_start >= q_start && fits_end(data_end) {
         return true;
     }
     response.hits.retain(|hit| {
         let hit_ts = cached_hit_utc_ts(hit, cache_req);
-        let fits_end = if interval > 0 {
-            hit_ts + interval <= q_end
-        } else {
-            hit_ts < q_end
-        };
-        fits_end && hit_ts >= q_start
+        fits_end(hit_ts) && hit_ts >= q_start
     });
     if response.hits.is_empty() {
         return false;
@@ -1601,12 +1603,13 @@ mod tests {
             ..Default::default()
         };
         let mut meta = agg_meta(100, 300);
-        let mut req = histogram_cache_req(100, 200);
+        let mut req = histogram_cache_req(100, 201);
         req.histogram_interval = 0;
-        // the last hit sits on the end, which a half-open query range does not include
         assert!(trim_cached_response(&mut response, &mut meta, &req));
         assert_eq!(response.hits.len(), 2);
-        let mut req = histogram_cache_req(100, 150);
+        assert_eq!((meta.start_time, meta.end_time), (100, 300));
+        // the last hit sits on the end, which a half-open query range does not include
+        let mut req = histogram_cache_req(100, 200);
         req.histogram_interval = 0;
         assert!(trim_cached_response(&mut response, &mut meta, &req));
         assert_eq!(response.hits.len(), 1);

@@ -368,3 +368,8 @@ def test_a_raw_query_excludes_a_row_at_exactly_the_end_time(fixture):
     end_on_a_row = inside[len(inside) // 2]
     body = fixture.search(sql, start, end_on_a_row, use_cache=True, size=2000)
     assert sorted(hit["_timestamp"] for hit in body["hits"]) == [ts for ts in inside if ts < end_on_a_row]
+
+    # The newest row sits on the end, so the list ends alone would keep it.
+    last_row = inside[-1]
+    body = fixture.search(sql, start, last_row, use_cache=True, size=2000)
+    assert sorted(hit["_timestamp"] for hit in body["hits"]) == inside[:-1]

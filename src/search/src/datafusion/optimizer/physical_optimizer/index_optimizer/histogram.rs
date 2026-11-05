@@ -172,7 +172,8 @@ fn is_on_histogram_origin_grid(origin: &Arc<dyn PhysicalExpr>, width_micros: i64
         ScalarValue::TimestampSecond(Some(v), _) => *v * 1_000_000,
         ScalarValue::TimestampMillisecond(Some(v), _) => *v * 1_000,
         ScalarValue::TimestampMicrosecond(Some(v), _) => *v,
-        ScalarValue::TimestampNanosecond(Some(v), _) => *v / 1_000,
+        // the index counts in microseconds, so a finer origin is off every grid it can use
+        ScalarValue::TimestampNanosecond(Some(v), _) if *v % 1_000 == 0 => *v / 1_000,
         _ => return false,
     };
     (origin_micros - DATE_BIN_ORIGIN_SECS * 1_000_000).rem_euclid(width_micros) == 0
@@ -364,6 +365,10 @@ mod tests {
             ScalarValue::TimestampMicrosecond(Some(y2001 * 1_000_000), None),
         ));
         assert!(is_on_histogram_origin_grid(&micros, 30 * DAY));
+        let one_nano_off: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(
+            ScalarValue::TimestampNanosecond(Some(y2001 * 1_000_000_000 + 1), None),
+        ));
+        assert!(!is_on_histogram_origin_grid(&one_nano_off, 30 * DAY));
         let text: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::from("2001")));
         assert!(!is_on_histogram_origin_grid(&text, 30 * DAY));
     }
