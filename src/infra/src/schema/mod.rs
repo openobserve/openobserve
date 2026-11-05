@@ -26,7 +26,7 @@ use config::{
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::{
-        self_reporting::usage::INTERNAL_STREAM_NAMES,
+        self_reporting::usage::is_user_data_stream,
         stream::{PartitionTimeLevel, StreamSettings, StreamType},
     },
     stats::MemorySize,
@@ -201,14 +201,6 @@ pub fn remove_latest(map: &mut hashbrown::HashMap<String, SchemaCache>, key: &st
 /// Whether the org has a logs, metrics, traces or profiles stream outside the internal ones; O(1).
 pub fn org_has_user_stream(org_id: &str) -> bool {
     ORG_USER_STREAMS.contains_key(org_id)
-}
-
-pub fn is_user_data_stream(stream_type: StreamType, stream_name: &str) -> bool {
-    matches!(
-        stream_type,
-        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
-    ) && !INTERNAL_STREAM_NAMES.contains(&stream_name)
-        && !stream_name.starts_with("_o2_")
 }
 
 pub async fn get_from_db(
@@ -1162,7 +1154,7 @@ fn user_data_org(key: &str) -> Option<&str> {
         "profiles" => StreamType::Profiles,
         _ => return None,
     };
-    is_user_data_stream(stream_type, stream_name).then_some(org_id)
+    is_user_data_stream(org_id, stream_name, stream_type).then_some(org_id)
 }
 
 #[cfg(test)]
@@ -1998,12 +1990,14 @@ mod tests {
     fn test_internal_names_o2_prefix_and_non_user_types_never_count() {
         let mut map = hashbrown::HashMap::new();
         let index = RwHashMap::default();
-        let mut keys = INTERNAL_STREAM_NAMES
+        let mut keys = config::meta::self_reporting::usage::INTERNAL_STREAM_NAMES
             .iter()
-            .map(|name| format!("acme/logs/{name}"))
+            .map(|name| format!("{}/logs/{name}", config::META_ORG_ID))
             .collect::<Vec<_>>();
         keys.extend([
             "acme/logs/_o2_pipeline".to_string(),
+            "acme/logs/slo_slices".to_string(),
+            "acme/logs/usage".to_string(),
             "acme/metrics/_o2_x".to_string(),
             "acme/enrichment_tables/lookup".to_string(),
             "acme/metadata/meta".to_string(),
@@ -2015,10 +2009,7 @@ mod tests {
             insert_counted(&mut map, &index, key, empty_cache());
         }
         assert!(index.is_empty());
-        assert!(is_user_data_stream(StreamType::Metrics, "cpu_usage"));
-        assert!(is_user_data_stream(StreamType::Profiles, "default"));
-        assert!(!is_user_data_stream(StreamType::Logs, "usage"));
-        assert!(!is_user_data_stream(StreamType::EnrichmentTables, "app"));
+        assert_eq!(user_data_org("acme/metrics/cpu_usage"), Some("acme"));
         assert_eq!(user_data_org("acme/metrics/up/with/slash"), Some("acme"));
         assert_eq!(user_data_org("acme/profiles/default"), Some("acme"));
     }
@@ -2055,6 +2046,26 @@ mod tests {
             .collect::<hashbrown::HashMap<_, _>>();
         assert_eq!(indexed, recount(&map));
         assert!(index.iter().all(|item| *item.value() > 0));
+    }
+
+    #[test]
+    fn test_user_stream_index_classifies_names_by_org() {
+        assert_eq!(user_data_org("acme/logs/errors"), Some("acme"));
+        assert_eq!(user_data_org("acme/logs/_o2_dbm_server"), Some("acme"));
+        assert_eq!(user_data_org("acme/logs/slo_slices"), None);
+        let meta_errors = format!("{}/logs/errors", config::META_ORG_ID);
+        assert_eq!(user_data_org(&meta_errors), None);
+    }
+
+    #[test]
+    fn test_org_has_user_stream_counts_a_customer_errors_stream() {
+        let org = "infra_schema_errors_only_org";
+        let key = format!("{org}/logs/errors");
+        let mut map = hashbrown::HashMap::new();
+        insert_latest(&mut map, key.clone(), empty_cache());
+        assert!(org_has_user_stream(org));
+        remove_latest(&mut map, &key);
+        assert!(!org_has_user_stream(org));
     }
 
     #[test]
