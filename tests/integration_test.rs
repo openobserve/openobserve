@@ -6637,13 +6637,13 @@ mod tests {
         log::info!("{:?}", status);
         assert!(status.is_success());
         let alert_response: GetAlertResponseBody = serde_json::from_slice(&body).unwrap();
-        assert_eq!(alert_response.0.name, "alertChk");
+        assert_eq!(alert_response.alert.name, "alertChk");
         assert_eq!(
-            alert_response.0.stream_type,
+            alert_response.alert.stream_type,
             openobserve_api_management::models::alerts::StreamType::Logs
         );
-        assert_eq!(alert_response.0.stream_name, "olympics_schema");
-        assert!(alert_response.0.enabled);
+        assert_eq!(alert_response.alert.stream_name, "olympics_schema");
+        assert!(alert_response.alert.enabled);
     }
 
     async fn e2e_handle_alert_after_destination_retries() {

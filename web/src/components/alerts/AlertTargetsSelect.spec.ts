@@ -387,6 +387,70 @@ describe("AlertTargetsSelect", () => {
     expect(isOpen.value).toBe(false);
   });
 
+  describe("selected workflows the closed group cannot list", () => {
+    const lockedProps = {
+      workflowsEnabled: false,
+      workflowsLocked: true,
+      workflows: ["wf1", "wf2"],
+    };
+    const row = (wrapper: any, value: string) =>
+      select(wrapper)
+        .props("options")
+        .find((option: any) => option.value === value);
+
+    it("lists them by name with the muted badge, falling back when the name is unknown", () => {
+      const wrapper = createWrapper({
+        ...lockedProps,
+        lockedWorkflowNames: { wf1: "Restart pods" },
+      });
+      expect(row(wrapper, "wf:wf1")).toMatchObject({
+        label: "Restart pods",
+        badge: "Locked",
+        badgeMuted: true,
+      });
+      expect(row(wrapper, "wf:wf2")).toMatchObject({ label: "Locked workflow", badge: "Locked" });
+    });
+
+    it("puts them under the Workflows header, after the destinations", () => {
+      const options = select(createWrapper(lockedProps)).props("options");
+      expect(options.map((option: any) => option.label)).toEqual([
+        "Destinations",
+        "Workflows",
+        "Locked workflow",
+        "Locked workflow",
+      ]);
+    });
+
+    it("lists them with no lock badge when an operator hid workflows", () => {
+      const wrapper = createWrapper({
+        workflows: ["wf1"],
+        lockedWorkflowNames: { wf1: "Restart pods" },
+      });
+      expect(row(wrapper, "wf:wf1").label).toBe("Restart pods");
+      expect(row(wrapper, "wf:wf1").badge).toBeUndefined();
+    });
+
+    it("renders the name on the real select's chip, never the raw value", () => {
+      const wrapper = mount(AlertTargetsSelect, {
+        global: { plugins: [i18n, store] },
+        props: {
+          ...baseProps,
+          ...lockedProps,
+          workflows: ["wf1"],
+          lockedWorkflowNames: { wf1: "Restart pods" },
+        },
+      });
+      expect(wrapper.text()).toContain("Restart pods");
+      expect(wrapper.text()).not.toContain("wf:wf1");
+    });
+
+    it("keeps the value on removal, so the alert saves without it", () => {
+      const wrapper = createWrapper({ ...lockedProps, workflows: ["wf1"] });
+      select(wrapper).vm.$emit("update:modelValue", []);
+      expect(wrapper.emitted("update:workflows")).toEqual([[[]]]);
+    });
+  });
+
   // ── Malformed / partially-loaded lists ─────────────────────────────────────
   // REGRESSION: with the backend unreachable, `getFormattedDestinations` maps
   // `destination.name` over rows that have no `name`, producing [undefined].

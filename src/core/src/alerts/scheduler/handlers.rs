@@ -1708,21 +1708,20 @@ async fn handle_composite_alert_trigger(
 
         // Outside the deliverable branch: a silenced composite never reaches correlation.
         #[cfg(feature = "enterprise")]
-        if !composite_incident_handled && downtime.is_none() {
-            if o2_enterprise::enterprise::oncall::is_enabled() {
-                let notification_alert =
-                    crate::alerts::composite::notification_alert(&definition.definition);
-                let rows = [composite_notification_row(
-                    &definition.definition.expression,
-                    evaluated.result,
-                    &evaluated.children,
-                )];
+        if downtime.is_none() {
+            let notification_alert =
+                crate::alerts::composite::notification_alert(&definition.definition);
+            let rows = [composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            )];
+            if !composite_incident_handled && o2_enterprise::enterprise::oncall::is_enabled() {
                 page_for_alert_firing(trace_id, &notification_alert, &rows).await;
             }
             delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
                 delivery_error,
-                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&trigger.org)
-                    .await,
+                unlicensed_reason_for_firing(&notification_alert, &rows).await,
             );
         }
     }
@@ -1902,7 +1901,7 @@ fn composite_delivery_error(
     let delivery_error = match delivery {
         Ok(outcome) if outcome.failed.is_empty() => None,
         Ok(outcome) => Some(outcome.error_message.trim().to_owned()),
-        Err(error) => Some(format!("error sending notification for alert: {error}")),
+        Err(error) => Some(crate::alerts::alert::send_failure_message(error)),
     };
     match incident_notify_error {
         None => delivery_error,
@@ -1913,6 +1912,11 @@ fn composite_delivery_error(
     }
 }
 
+/// Whether a failed send ends its cycle; a license denial does at once, since no retry can pass.
+fn retries_exhausted(error: &AlertError, retries: i32, max_retries: i32) -> bool {
+    retries + 1 >= max_retries || matches!(error, AlertError::FeatureNotLicensed(_))
+}
+
 /// Whether this send ends a composite's notification cycle instead of retrying what failed.
 fn composite_cycle_ends(
     delivery: &Result<NotificationOutcome, AlertError>,
@@ -1921,7 +1925,7 @@ fn composite_cycle_ends(
 ) -> bool {
     match delivery {
         Ok(outcome) => outcome.failed.is_empty() || retries + 1 >= max_retries,
-        Err(_) => retries + 1 >= max_retries,
+        Err(error) => retries_exhausted(error, retries, max_retries),
     }
 }
 
@@ -2559,6 +2563,25 @@ pub(crate) async fn page_for_alert_firing(
     }
     let group_dimensions = alert_identity(alert, rows).await;
     page_for_alert_identity(trace_id, alert, &group_dimensions).await;
+}
+
+/// Why this firing's page was withheld, when it would have reached a team under a valid license.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn unlicensed_reason_for_firing(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> Option<&'static str> {
+    if !o2_enterprise::enterprise::oncall::is_unlicensed() || rows.is_empty() || alert.id.is_none()
+    {
+        return None;
+    }
+    let groups = alert_identity(alert, rows).await;
+    o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
+        &alert.org_id,
+        alert.oncall_team.as_deref(),
+        &groups,
+    )
+    .await
 }
 
 /// Pages on maps `alert_identity` built, so paging and the downtime check read the same identity.
@@ -4345,11 +4368,24 @@ async fn handle_alert_triggers(
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
             }
         }
+        // Not `unlicensed_reason_for_firing`: a muted group loses no page, a zero-row match does.
+        #[cfg(feature = "enterprise")]
+        let unlicensed_reason =
+            if o2_enterprise::enterprise::oncall::is_unlicensed() && alert.id.is_some() {
+                let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
+                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
+                    &alert.org_id,
+                    alert.oncall_team.as_deref(),
+                    &identity,
+                )
+                .await
+            } else {
+                None
+            };
         #[cfg(feature = "enterprise")]
         let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
             incident_notify_error,
-            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id)
-                .await,
+            unlicensed_reason,
         );
 
         let vars = get_row_column_map(&data);
@@ -4637,7 +4673,7 @@ async fn handle_alert_triggers(
                         new_trigger.org,
                         new_trigger.module_key
                     );
-                    if trigger.retries + 1 >= max_retries {
+                    if retries_exhausted(&e, trigger.retries, max_retries) {
                         // It has been tried the maximum time, just update the
                         // next_run_at to the next expected trigger time
                         log::debug!(
@@ -4700,7 +4736,7 @@ async fn handle_alert_triggers(
                     // undercount every time a destination is down.
                     trigger_data_stream.status = RunOutcome::NotifyFailed;
                     trigger_data_stream.error =
-                        Some(format!("error sending notification for alert: {e}"));
+                        Some(crate::alerts::alert::send_failure_message(&e));
                 }
             }
         }
@@ -9294,6 +9330,57 @@ mod tests {
             10,
         );
         assert!(no_state.is_none());
+    }
+
+    #[test]
+    fn test_a_license_denial_ends_the_retry_cycle_at_once() {
+        let denied = crate::alerts::alert::all_workflows_failed_error(1, 1, String::new());
+        let mixed = crate::alerts::alert::all_workflows_failed_error(1, 2, "timed out".to_string());
+        let failed = AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        };
+        for (error, retries, max_retries, exhausted) in [
+            (&denied, 0, 3, true),
+            (&denied, 2, 3, true),
+            (&mixed, 0, 3, false),
+            (&failed, 0, 3, false),
+            (&failed, 1, 3, false),
+            (&failed, 2, 3, true),
+        ] {
+            assert_eq!(
+                retries_exhausted(error, retries, max_retries),
+                exhausted,
+                "{error} at {retries}/{max_retries}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_a_license_denial_leaves_a_composite_to_its_normal_sweep() {
+        let denied = Err(crate::alerts::alert::all_workflows_failed_error(
+            1,
+            1,
+            String::new(),
+        ));
+        assert!(composite_cycle_ends(&denied, 0, 3));
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(!composite_cycle_ends(&failed, 0, 3));
+        assert!(composite_cycle_ends(&failed, 2, 3));
+    }
+
+    #[test]
+    fn test_composite_history_quotes_a_license_denial() {
+        let denied = Err(crate::alerts::alert::all_workflows_failed_error(
+            1,
+            1,
+            String::new(),
+        ));
+        assert_eq!(
+            composite_delivery_error(&denied, None).as_deref(),
+            Some(crate::alerts::alert::WORKFLOWS_UNLICENSED_REASON)
+        );
     }
 
     #[test]
