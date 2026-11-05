@@ -133,6 +133,7 @@ import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
 import { BillingGroupPage } from "./generalPages/billingGroupPage.js";
+import { BillingUsagePage } from "./generalPages/billingUsagePage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
@@ -344,6 +345,7 @@ class PageManager {
     this.statusPagesPage = new StatusPagesPage(page);
     this.queryManagementPage = new QueryManagementPage(page);
     this.billingGroupPage = new BillingGroupPage(page);
+    this.billingUsagePage = new BillingUsagePage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);
