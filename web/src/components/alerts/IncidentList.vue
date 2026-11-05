@@ -397,7 +397,7 @@ import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import { dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -1001,9 +1001,9 @@ export default defineComponent({
       if (!dimensions || typeof dimensions !== "object") return [];
       const cached = sortedDimCache.get(dimensions);
       if (cached) return cached;
-      const sorted = Object.keys(dimensions)
-        .sort()
-        .map((key) => [key, dimensions[key]] as [string, string]);
+      const sorted = chipDimensionKeys(dimensions).map(
+        (key) => [key, dimensions[key]] as [string, string],
+      );
       sortedDimCache.set(dimensions, sorted);
       return sorted;
     };

@@ -88,8 +88,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-h-35 px-3 pb-3 outline-none sm:px-4"
       data-test="autoobserve2-paged-body"
     >
-      <ul v-if="skeleton" aria-hidden="true" data-test="autoobserve2-paged-skeleton">
-        <li class="border-border-subtle rounded-default flex flex-col gap-1.5 border px-3 py-2.5">
+      <ul
+        v-if="skeleton"
+        class="flex flex-col gap-2.5"
+        aria-hidden="true"
+        data-test="autoobserve2-paged-skeleton"
+      >
+        <li
+          v-for="n in skeletonRows(cap)"
+          :key="n"
+          class="border-border-subtle rounded-default flex flex-col gap-1.5 border px-3 py-2.5"
+        >
           <div class="flex h-5 items-center">
             <OSkeleton animation="none" class="h-3 w-[85%]" />
           </div>
@@ -212,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="settled && rows.length && hasMore" #footer>
       <div class="flex items-center gap-2">
         <span class="text-text-secondary text-xs" data-test="autoobserve2-paged-more">{{
-          moreText(t, locale)
+          moreText(t, locale, cap)
         }}</span>
         <OButton
           variant="ghost-primary"
@@ -253,8 +262,10 @@ import {
   moreText,
   newFindingsText,
   openedText,
+  PAGED_CAP,
   pagedCopy,
   pagingNote,
+  skeletonRows,
   statusLabel,
 } from "./incidentsCopy";
 import { liveLoadText, liveNotice, type LiveFailure } from "./liveCopy";
@@ -267,9 +278,11 @@ const NOTICE_TEST: Record<LiveFailure, string> = {
   failed: "autoobserve2-paged-error",
 };
 
+const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
+
 const { t, locale } = useI18nTyped();
 const router = useRouter();
-const paged = useLivePaged();
+const paged = useLivePaged(props.cap);
 
 const slotEl = ref<HTMLElement | null>(null);
 const bodyEl = ref<HTMLElement | null>(null);

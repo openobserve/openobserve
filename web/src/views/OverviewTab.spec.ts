@@ -1074,6 +1074,47 @@ describe("OverviewTab", () => {
       expect(wrapper.findComponent({ name: "ServiceGraphNodeSidePanel" }).exists()).toBe(false);
     });
 
+    it("a finding's chips read what, name, type everywhere, and another incident's stay alphabetical", async () => {
+      const list = mockOverview.buildIncidentList();
+      list.incidents = [
+        {
+          ...list.incidents[0],
+          id: "incident-0",
+          title: "checkout (logs) stopped sending data",
+          group_values: {
+            env: "prod",
+            stream_type: "logs",
+            stream_name: "checkout",
+            autoobserve_finding: "stream_silence",
+          } as never,
+        },
+        {
+          ...list.incidents[0],
+          id: "incident-1",
+          title: "payments errors",
+          group_values: { service: "api", env: "prod", cluster: "eu" } as never,
+        },
+      ];
+      vi.mocked(incidentsService.list).mockResolvedValue({ data: list } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const keys = wrapper
+        .find(INCIDENTS)
+        .findAllComponents(ODimensionChip)
+        .map((c) => c.props("dimKey"));
+      expect(keys).toEqual([
+        "autoobserve_finding",
+        "stream_name",
+        "stream_type",
+        "env",
+        "cluster",
+        "env",
+        "service",
+      ]);
+    });
+
     it("the home incidents rows show a finding's chips in words", async () => {
       const list = mockOverview.buildIncidentList();
       list.incidents.unshift({

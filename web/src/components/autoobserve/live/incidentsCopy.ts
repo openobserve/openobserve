@@ -46,6 +46,12 @@ export interface IncidentRoute {
 // Three rows keep the card short above the rail's suggestion cards (RAIL_CAP = 5).
 export const PAGED_CAP = 3;
 
+// The main column shows what the fixture problem list showed per step (ThisWeek's STEP = 10).
+export const MAIN_PAGED_CAP = 10;
+
+// The rail card's single placeholder row stays; a longer card holds three, its few-rows shape.
+export const MAX_SKELETON_ROWS = 3;
+
 // The incident list's poll while a run on its page is live (RCA_LIVE_POLL_MS).
 export const PAGED_POLL_MS = 30_000;
 
@@ -199,8 +205,11 @@ const count = (locale: string, n: number): I18nText => raw(new Intl.NumberFormat
 export const newFindingsText = (t: TranslateFn, locale: string, n: number): I18nText =>
   t("autoobserveLive.incidents.newFindings", { count: count(locale, n) }, n);
 
-export const moreText = (t: TranslateFn, locale: string): I18nText =>
-  t("autoobserveLive.incidents.more", { count: count(locale, PAGED_CAP) });
+export const moreText = (t: TranslateFn, locale: string, cap = PAGED_CAP): I18nText =>
+  t("autoobserveLive.incidents.more", { count: count(locale, cap) });
+
+export const skeletonRows = (cap: number): number =>
+  cap > PAGED_CAP ? Math.min(cap, MAX_SKELETON_ROWS) : 1;
 
 // The card's fixed words, so the component holds no key of its own.
 export const pagedCopy = (t: TranslateFn) => ({

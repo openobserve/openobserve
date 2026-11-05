@@ -1457,8 +1457,8 @@ describe("IncidentDetailDrawer.vue", () => {
         .map((row) => row.text().replace(/\s+/g, " "));
       expect(rows).toEqual([
         "Finding: Stopped sending data",
-        "Stream Type: logs",
         "Stream Name: checkout",
+        "Stream Type: logs",
       ]);
       expect(rows.join(" ")).not.toMatch(RAW);
       wrapper.unmount();
@@ -1561,7 +1561,7 @@ describe("IncidentDetailDrawer.vue", () => {
         .findAll("tbody tr")
         .map((row) => row.findAll('[data-test="trigger-label-chip"]').map((chip) => chip.text()));
       expect(labels).toEqual([
-        ["Finding=Stopped sending data", "Stream Type=logs", "Stream Name=checkout"],
+        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
         ["env=prod"],
       ]);
     });

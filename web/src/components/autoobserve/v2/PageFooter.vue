@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoobserve2.footer.seeAll") }}
       </OButton>
       <OButton
+        v-if="!live"
         variant="ghost-primary"
         size="xs"
         icon-right="arrow-forward"
@@ -54,6 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+withDefaults(defineProps<{ live?: boolean }>(), { live: false });
 
 const emit = defineEmits<{ "open-coverage": []; "open-activity": [] }>();
 

@@ -45,9 +45,11 @@ import {
 } from "./liveAdapter";
 import {
   RAIL_CAP,
+  checkedView,
   liveErrorDetail,
   liveFailureOf,
   statusOf,
+  todayText,
   userTimeZone,
   type LivePhase,
 } from "./liveCopy";
@@ -229,6 +231,8 @@ export const useLiveAutoObserve = () => {
     requests: computed(() => rail.value.requests),
     coverageSkeleton,
     railSkeleton,
+    today: computed(() => todayText(zone.value.locale, zone.value.timeZone, minute.value * 60_000)),
+    checked: computed(() => checkedView(t, zone.value.locale, source.value)),
   };
 };
 
@@ -249,7 +253,7 @@ export const keepLatched = (
     return item ? [item] : [];
   });
 
-export const useLivePaged = () => {
+export const useLivePaged = (cap = PAGED_CAP) => {
   const store = useStore();
   const live = useLiveMode();
   const now = useNow();
@@ -258,7 +262,7 @@ export const useLivePaged = () => {
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
   const enabled = computed(() => live.value && !!org.value);
   const query = useQuery(() =>
-    Object.assign(autoobserveIncidentsPageQuery(org.value, PAGED_CAP, 0), {
+    Object.assign(autoobserveIncidentsPageQuery(org.value, cap, 0), {
       enabled: enabled.value,
     }),
   );
@@ -284,7 +288,7 @@ export const useLivePaged = () => {
   const latch = shallowRef<PagedLatch | null>(null);
   // A row that left the response keeps its last copy until Show, so nothing moves under the reader.
   const rows = shallowRef<AutoObserveIncidentItem[]>([]);
-  const items = computed(() => (query.data.value?.items ?? []).slice(0, PAGED_CAP));
+  const items = computed(() => (query.data.value?.items ?? []).slice(0, cap));
   const relatch = () => {
     latch.value = {
       ids: items.value.map((item) => item.finding.id),

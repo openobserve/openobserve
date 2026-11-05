@@ -45,11 +45,11 @@ export interface FindingFacts {
   startedAt: number | null;
 }
 
-// Display order of a finding's labels: what happened, then where.
+// Display order of a finding's labels: what happened, then the stream, its name before its type.
 const FINDING_DIMENSIONS = [
   FINDING_KIND_DIMENSION,
-  FINDING_STREAM_TYPE_DIMENSION,
   FINDING_STREAM_NAME_DIMENSION,
+  FINDING_STREAM_TYPE_DIMENSION,
 ] as const;
 
 const LABEL_KEY: Record<(typeof FINDING_DIMENSIONS)[number], I18nKey> = {
@@ -115,6 +115,12 @@ export const orderedDimensionKeys = (
     ...keys.filter((key) => !isFindingDimension(key)),
   ];
 };
+
+/** Chip order for lists: a finding's in display order, any other incident's alphabetical. */
+export const chipDimensionKeys = (groupValues: GroupValues): string[] =>
+  isFindingIncident(groupValues)
+    ? orderedDimensionKeys(groupValues)
+    : Object.keys(groupValues ?? {}).sort();
 
 /** What the side panel shows for a finding, or null when its dimensions cannot be read. */
 export const findingFacts = (
