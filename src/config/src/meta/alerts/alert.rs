@@ -145,6 +145,9 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_url: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident_title_template: Option<String>,
+
     #[serde(default)]
     pub pending_period_sec: i64,
 
@@ -241,6 +244,7 @@ impl Default for Alert {
         Self {
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),

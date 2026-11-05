@@ -56,6 +56,7 @@ pub fn notification_alert(
         .unwrap_or_default();
     alert.trigger_condition.silence = definition.silence_seconds;
     alert.pending_period_sec = definition.pending_period_sec;
+    alert.incident_title_template = definition.incident_title_template.clone();
     alert.enabled = definition.enabled;
     alert.last_edited_by = definition.last_edited_by.clone();
     alert.updated_at = definition

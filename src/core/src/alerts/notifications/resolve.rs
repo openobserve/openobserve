@@ -186,7 +186,7 @@ pub fn resolve_content(
 /// Same input-scan discipline as `substitute_raw`: "unmatched" is decided
 /// from the ORIGINAL `input`, not the substituted output, so a row value
 /// that happens to look like `{something}` is never marker-stamped.
-fn substitute_raw_row(
+pub(crate) fn substitute_raw_row(
     input: &str,
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
@@ -437,7 +437,7 @@ fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
     super::examples::is_kind_variable(name).then(String::new)
 }
 
-fn scan_unmatched(tpl: &str) -> Vec<String> {
+pub(crate) fn scan_unmatched(tpl: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = tpl.as_bytes();
     let mut i = 0usize;
