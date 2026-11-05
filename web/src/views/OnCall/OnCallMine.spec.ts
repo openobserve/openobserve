@@ -30,6 +30,8 @@ vi.mock("@/services/oncall", () => ({
     whoIsOnCall: vi.fn(),
     resolvedSchedule: vi.fn(),
     createUnavailability: vi.fn(),
+    listUnavailability: vi.fn(),
+    deleteUnavailability: vi.fn(),
     testPage: vi.fn(),
     listMembers: vi.fn(),
     getSchedule: vi.fn(),
@@ -157,6 +159,7 @@ describe("OnCallMine", () => {
     service.listTeams.mockResolvedValue(axiosReply([]));
     service.whoIsOnCall.mockRejectedValue({ response: { status: 403 } });
     service.resolvedSchedule.mockResolvedValue(axiosReply([]));
+    service.listUnavailability.mockResolvedValue(axiosReply([]));
   });
 
   /// Mounts the real page layout so the tag is proven to reach the rendered header.
@@ -334,6 +337,31 @@ describe("OnCallMine", () => {
     const data = service.createUnavailability.mock.calls[0][0].data;
     expect(data.user_email).toBeUndefined();
     expect(data.end_at).toBeGreaterThan(data.start_at);
+  });
+
+  it("offers Clear away only while the reader has an absence", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-mine-clear-away"]').exists()).toBe(false);
+  });
+
+  /// Back early: clearing deletes the reader's own absence, so the rota puts them back on.
+  it("clears the reader's current absence", async () => {
+    const now = Date.now() * 1000;
+    service.listUnavailability.mockResolvedValue(
+      axiosReply([
+        { id: "un_later", user_email: "me@example.com", start_at: now + 9e10, end_at: now + 1e11 },
+        { id: "un_now", user_email: "me@example.com", start_at: now - 1e9, end_at: now + 1e10 },
+      ]),
+    );
+    service.deleteUnavailability.mockResolvedValue(axiosReply({}));
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-mine-clear-away"]').trigger("click");
+    await flushPromises();
+
+    expect(service.deleteUnavailability.mock.calls[0][0].unavailability_id).toBe("un_now");
   });
 
   it("keeps Save focusable until both ends are picked, and describes it by what is missing", async () => {

@@ -33,6 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
       </OButton>
+      <OButton
+        v-if="!unavailable && myAway"
+        variant="outline"
+        size="sm"
+        :loading="awayClearing"
+        data-test="oncall-mine-clear-away"
+        @click="clearAway"
+      >
+        <OTooltip side="bottom" :content="myAwayLabel" />
+        <OIcon name="event-available" size="sm" />{{ t("oncall.awayClear") }}
+      </OButton>
       <ORefreshButton
         v-if="!unavailable"
         class="md:min-w-23"
@@ -505,12 +516,14 @@ import { useOnCallClock } from "@/composables/useOnCallClock";
 import {
   createOverrideMutation,
   createUnavailabilityMutation,
+  deleteUnavailabilityMutation,
   myOnCallQuery,
   oncallTeamsQuery,
   resolvedScheduleQuery,
   teamMembersQuery,
   teamScheduleQuery,
   testPageMutation,
+  unavailabilityQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 import { orgUsersQuery } from "@/services/users.queries";
@@ -520,6 +533,7 @@ import type {
   OnCallTeamMember,
   ResolvedSegment,
   Rotation,
+  Unavailability,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -789,7 +803,7 @@ async function fetchMine(force = false) {
     mine.value = await readQuery(options, force);
     loadError.value = null;
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
-    await Promise.all([fetchShifts(force), fetchTeamNames(force)]);
+    await Promise.all([fetchShifts(force), fetchTeamNames(force), fetchMyAway(force)]);
   } catch (err: unknown) {
     if (isOnCallUnavailable(err)) {
       unavailable.value = true;
@@ -987,6 +1001,55 @@ const setupRef = ref<{ refresh: () => Promise<void> } | null>(null);
 
 // Members hear nothing about Slack while it is off, as in the policy editor.
 const slackOffered = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
+
+const myAway = ref<Unavailability | null>(null);
+const awayClearing = ref(false);
+const awayDelete = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
+/// Current first, else the next upcoming one, as the Members tab shows it.
+async function fetchMyAway(force = false) {
+  const now = Date.now() * 1000;
+  try {
+    const absences = await readQuery(
+      unavailabilityQuery(orgId.value, viewerEmail.value, now, now + SHIFT_LOOKAHEAD_MICROS * 4),
+      force,
+    );
+    myAway.value =
+      absences
+        .filter((absence) => absence.end_at > now)
+        .sort((a, b) => a.start_at - b.start_at)[0] ?? null;
+  } catch {
+    // Without the read the reader can still clear it from the team's Members tab.
+    myAway.value = null;
+  }
+}
+
+const myAwayLabel = computed<I18nText>(() => {
+  const away = myAway.value;
+  if (!away) return raw("");
+  const day = (micros: number) =>
+    formatTimestampInTimezone(micros, "MMM d, HH:mm", store.state.timezone);
+  return nowMicros.value >= away.start_at
+    ? t("oncall.awayUntil", { date: raw(day(away.end_at)) })
+    : t("oncall.awayWindow", { from: raw(day(away.start_at)), to: raw(day(away.end_at)) });
+});
+
+async function clearAway() {
+  if (!myAway.value) return;
+  awayClearing.value = true;
+  try {
+    await awayDelete.mutateAsync(myAway.value.id);
+    toast({ variant: "success", message: t("oncall.awayRemoved") });
+    await fetchMine(true);
+  } catch (err: unknown) {
+    toast({
+      variant: "error",
+      message: raw(apiErrorMessage(err)) || t("oncall.awayRemoveFailed"),
+    });
+  } finally {
+    awayClearing.value = false;
+  }
+}
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
