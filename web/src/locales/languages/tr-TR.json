@@ -27343,7 +27343,7 @@
     "routingDetails": "Yönlendirme detayları",
     "whatFired": "Tetiklenen uyarı",
     "alertId": "Uyarı Kimliği",
-    "responseSubtitle": "{team} · tetiklenme {firing} · açılma {opened}",
+    "responseSubtitle": "{team} · açılma {opened}",
     "onCallNowCount": "Nöbetçi ekipler ({count})",
     "coverageGapCount": "{count} kapsama boşluğu | {count} kapsama boşluğu",
     "moreActions": "Diğer işlemler",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Socket Modu",
       "modeHttp": "HTTP modu",
-      "connectedBy": "{mode} · {user} tarafından {date} tarihinde bağlandı",
+      "connectedBy": "{user} tarafından {date} tarihinde bağlandı",
       "eventsReceived": "Alınan olaylar",
       "noEvents": "Henüz olay alınmadı",
       "sockets": "{up} / {want} socket · {time} itibarıyla",

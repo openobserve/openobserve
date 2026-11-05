@@ -27343,7 +27343,7 @@
     "routingDetails": "라우팅 세부정보",
     "whatFired": "트리거된 알림",
     "alertId": "알림 ID",
-    "responseSubtitle": "{team} · 발생 {firing} · 열림 {opened}",
+    "responseSubtitle": "{team} · 열림 {opened}",
     "onCallNowCount": "온콜 팀 ({count})",
     "coverageGapCount": "{count}건의 공백 | {count}건의 공백",
     "moreActions": "추가 작업",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Socket 모드",
       "modeHttp": "HTTP 모드",
-      "connectedBy": "{mode} · {user}님이 {date}에 연결",
+      "connectedBy": "{user}님이 {date}에 연결",
       "eventsReceived": "수신된 이벤트",
       "noEvents": "아직 수신된 이벤트가 없습니다",
       "sockets": "소켓 {want}개 중 {up}개 · {time} 기준",

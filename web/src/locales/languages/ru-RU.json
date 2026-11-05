@@ -27343,7 +27343,7 @@
     "routingDetails": "Детали маршрутизации",
     "whatFired": "Что сработало",
     "alertId": "ID оповещения",
-    "responseSubtitle": "{team} · срабатывание {firing} · открыто {opened}",
+    "responseSubtitle": "{team} · открыто {opened}",
     "onCallNowCount": "Дежурные команды ({count})",
     "coverageGapCount": "{count} пробел | Пробелов: {count}",
     "moreActions": "Ещё действия",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Режим Socket",
       "modeHttp": "Режим HTTP",
-      "connectedBy": "{mode} · подключено пользователем {user}, {date}",
+      "connectedBy": "Подключено пользователем {user}, {date}",
       "eventsReceived": "Получено событий",
       "noEvents": "События пока не получены",
       "sockets": "{up} из {want} сокетов · по состоянию на {time}",

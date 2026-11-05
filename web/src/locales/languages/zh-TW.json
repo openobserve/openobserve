@@ -27338,7 +27338,7 @@
     "routingDetails": "路由詳情",
     "whatFired": "觸發的警示",
     "alertId": "警示 ID",
-    "responseSubtitle": "{team} · 觸發中 {firing} · 已開啟 {opened}",
+    "responseSubtitle": "{team} · 已開啟 {opened}",
     "onCallNowCount": "目前值班團隊 ({count})",
     "coverageGapCount": "{count} 個空窗 | {count} 個空窗",
     "moreActions": "更多操作",
@@ -28787,7 +28787,7 @@
     "card": {
       "modeSocket": "Socket 模式",
       "modeHttp": "HTTP 模式",
-      "connectedBy": "{mode} · 由 {user} 於 {date} 連線",
+      "connectedBy": "由 {user} 於 {date} 連線",
       "eventsReceived": "已接收事件",
       "noEvents": "尚未收到任何事件",
       "sockets": "{up}/{want} 個 Socket · 截至 {time}",

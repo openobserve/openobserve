@@ -27343,7 +27343,7 @@
     "routingDetails": "Szczegóły routingu",
     "whatFired": "Co zostało uruchomione",
     "alertId": "ID alertu",
-    "responseSubtitle": "{team} · uruchomiono {firing} · otwarto {opened}",
+    "responseSubtitle": "{team} · otwarto {opened}",
     "onCallNowCount": "Zespoły dyżurne ({count})",
     "coverageGapCount": "{count} luka | luki: {count}",
     "moreActions": "Więcej akcji",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Tryb Socket",
       "modeHttp": "Tryb HTTP",
-      "connectedBy": "{mode} · połączono przez {user} dnia {date}",
+      "connectedBy": "Połączono przez {user} dnia {date}",
       "eventsReceived": "Odebrane zdarzenia",
       "noEvents": "Nie odebrano jeszcze żadnych zdarzeń",
       "sockets": "{up} z {want} gniazd · stan na {time}",

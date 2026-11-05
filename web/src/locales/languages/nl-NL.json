@@ -27343,7 +27343,7 @@
     "routingDetails": "Routeringsdetails",
     "whatFired": "Wat ging er af",
     "alertId": "Alarm-ID",
-    "responseSubtitle": "{team} · actief {firing} · geopend {opened}",
+    "responseSubtitle": "{team} · geopend {opened}",
     "onCallNowCount": "Piket-teams ({count})",
     "coverageGapCount": "{count} gat | {count} gaten",
     "moreActions": "Meer acties",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Socketmodus",
       "modeHttp": "HTTP-modus",
-      "connectedBy": "{mode} · verbonden door {user} op {date}",
+      "connectedBy": "Verbonden door {user} op {date}",
       "eventsReceived": "Ontvangen gebeurtenissen",
       "noEvents": "Nog geen gebeurtenissen ontvangen",
       "sockets": "{up} van {want} sockets · per {time}",

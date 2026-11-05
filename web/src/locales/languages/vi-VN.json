@@ -27343,7 +27343,7 @@
     "routingDetails": "Chi tiết định tuyến",
     "whatFired": "Điều gì đã kích hoạt",
     "alertId": "ID cảnh báo",
-    "responseSubtitle": "{team} · kích hoạt {firing} · mở {opened}",
+    "responseSubtitle": "{team} · mở {opened}",
     "onCallNowCount": "Nhóm trực ({count})",
     "coverageGapCount": "{count} khoảng trống | {count} khoảng trống",
     "moreActions": "Thêm hành động",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Chế độ Socket",
       "modeHttp": "Chế độ HTTP",
-      "connectedBy": "{mode} · kết nối bởi {user} vào {date}",
+      "connectedBy": "Kết nối bởi {user} vào {date}",
       "eventsReceived": "Sự kiện đã nhận",
       "noEvents": "Chưa nhận được sự kiện nào",
       "sockets": "{up} trên {want} socket · tính đến {time}",

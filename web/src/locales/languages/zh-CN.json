@@ -27343,7 +27343,7 @@
     "routingDetails": "路由详情",
     "whatFired": "触发告警",
     "alertId": "告警 ID",
-    "responseSubtitle": "{team} · 触发中 {firing} · 已开启 {opened}",
+    "responseSubtitle": "{team} · 已开启 {opened}",
     "onCallNowCount": "值班团队 ({count})",
     "coverageGapCount": "{count} 个缺口 | {count} 个缺口",
     "moreActions": "更多操作",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Socket 模式",
       "modeHttp": "HTTP 模式",
-      "connectedBy": "{mode} · 由 {user} 于 {date} 连接",
+      "connectedBy": "由 {user} 于 {date} 连接",
       "eventsReceived": "已接收事件",
       "noEvents": "尚未接收任何事件",
       "sockets": "{up}/{want} 个套接字 · 截至 {time}",

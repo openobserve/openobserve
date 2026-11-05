@@ -27343,7 +27343,7 @@
     "routingDetails": "Detalles de enrutamiento",
     "whatFired": "Qué se disparó",
     "alertId": "ID de alerta",
-    "responseSubtitle": "{team} · disparo {firing} · apertura {opened}",
+    "responseSubtitle": "{team} · apertura {opened}",
     "onCallNowCount": "Equipos de guardia ({count})",
     "coverageGapCount": "{count} hueco | {count} huecos",
     "moreActions": "Más acciones",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Modo Socket",
       "modeHttp": "Modo HTTP",
-      "connectedBy": "{mode} · conectado por {user} el {date}",
+      "connectedBy": "Conectado por {user} el {date}",
       "eventsReceived": "Eventos recibidos",
       "noEvents": "Aún no se han recibido eventos",
       "sockets": "{up} de {want} sockets · a fecha de {time}",

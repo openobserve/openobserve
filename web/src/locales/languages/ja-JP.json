@@ -27343,7 +27343,7 @@
     "routingDetails": "ルーティング詳細",
     "whatFired": "発火元",
     "alertId": "アラートID",
-    "responseSubtitle": "{team} · 発火中 {firing} · 作成 {opened}",
+    "responseSubtitle": "{team} · 作成 {opened}",
     "onCallNowCount": "オンコールチーム ({count})",
     "coverageGapCount": "カバレッジギャップ {count}件 | カバレッジギャップ {count}件",
     "moreActions": "その他のアクション",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "Socket モード",
       "modeHttp": "HTTP モード",
-      "connectedBy": "{mode} · {date} に {user} が接続",
+      "connectedBy": "{date} に {user} が接続",
       "eventsReceived": "受信したイベント",
       "noEvents": "まだイベントを受信していません",
       "sockets": "{want} 個中 {up} 個のソケット · {time} 時点",

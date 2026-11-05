@@ -27343,7 +27343,7 @@
     "routingDetails": "تفاصيل التوجيه",
     "whatFired": "التنبيه المُطلق",
     "alertId": "معرّف التنبيه",
-    "responseSubtitle": "{team} · أُطلق في {firing} · فُتح في {opened}",
+    "responseSubtitle": "{team} · فُتح في {opened}",
     "onCallNowCount": "فرق المناوبة ({count})",
     "coverageGapCount": "{count} فجوة | الفجوات: {count}",
     "moreActions": "مزيد من الإجراءات",
@@ -28792,7 +28792,7 @@
     "card": {
       "modeSocket": "وضع Socket",
       "modeHttp": "وضع HTTP",
-      "connectedBy": "{mode} · متصل بواسطة {user} في {date}",
+      "connectedBy": "متصل بواسطة {user} في {date}",
       "eventsReceived": "الأحداث المستلمة",
       "noEvents": "لم يتم استلام أي أحداث بعد",
       "sockets": "{up} من {want} اتصالات Socket · اعتبارًا من {time}",
