@@ -97,6 +97,16 @@ describe("OnCallCoverList", () => {
     service.deleteOverride.mockResolvedValue(ok({ deleted: true }));
   });
 
+  it("tells the page when the license refuses the read", async () => {
+    service.listOverrides.mockRejectedValueOnce({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = render({ teamId: "team_denied" });
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+  });
+
   // The delete targets the team now shown, so the previous team's covers must not stay listed while its read is in flight.
   it("drops the previous team's covers the moment the team changes", async () => {
     service.listOverrides.mockResolvedValue(ok([cover({ team_id: "team_a" })]));

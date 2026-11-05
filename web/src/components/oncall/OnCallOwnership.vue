@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :can-configure="canConfigure"
         @run="tester.run"
         @send-test="tester.sendTest"
+        @license-denied="emit('licenseDenied', $event)"
       />
     </ODrawer>
 
@@ -113,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:open="(v: boolean) => (editorOpen = v)"
       @save="saveRule"
       @preview="previewConflict"
+      @license-denied="emit('licenseDenied', $event)"
     />
 
     <ConfirmDialog
@@ -172,6 +174,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { SERVICE_DIMENSION, readableConditions } from "@/utils/oncall";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
@@ -183,7 +186,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** How many rules route to this team, so the page header counts the same list. */
   (e: "rules-loaded", count: number): void;
+  (e: "licenseDenied", features: string[]): void;
 }>();
+
+/// True when the license refused the read, so the page's lock says it and no toast has to.
+function noteDenial(err: unknown): boolean {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+  return !!denied;
+}
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -231,7 +242,7 @@ const ruleCreate = useMutation(() => createOwnershipRuleMutation(orgId.value));
 const ruleUpdate = useMutation(() => updateOwnershipRuleMutation(orgId.value));
 const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
 
-function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
+function writeFailed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
   toast({
     variant: "error",
@@ -241,7 +252,16 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
   });
 }
 
-const tester = useOnCallRoutingTester({ orgId, signals: openSignals, onError: failed });
+function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
+  if (!noteDenial(err)) writeFailed(err, fallback);
+}
+
+const tester = useOnCallRoutingTester({
+  orgId,
+  signals: openSignals,
+  onError: failed,
+  onSendError: writeFailed,
+});
 
 function readable(dimensions: Record<string, string>): string {
   return readableConditions(dimensions, aliases.value, {
@@ -321,7 +341,8 @@ async function previewConflict(dimensions: Record<string, string>) {
       data: { dimensions },
     });
     if (run === conflictRun) conflict.value = res.data ?? null;
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     if (run === conflictRun) conflict.value = null;
   }
 }
@@ -343,7 +364,8 @@ async function fetchRules() {
 async function fetchSignals() {
   try {
     signals.value = (await queryClient.fetchQuery(unroutedSignalsQuery(orgId.value))) ?? [];
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     signals.value = [];
   }
 }
@@ -368,7 +390,7 @@ async function saveRule(draft: RuleDraft) {
     });
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
-    failed(err, t("oncall.saveRuleFailed"));
+    writeFailed(err, t("oncall.saveRuleFailed"));
   } finally {
     saving.value = false;
   }
@@ -386,7 +408,7 @@ async function deleteRule() {
     });
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
-    failed(err, t("oncall.deleteRuleFailed"));
+    writeFailed(err, t("oncall.deleteRuleFailed"));
   }
 }
 
@@ -408,6 +430,6 @@ onMounted(() => {
   fetchRules();
   fetchSignals();
   fetchAliases();
-  loadRoutingConfig(orgId.value);
+  loadRoutingConfig(orgId.value).then((denied) => denied && emit("licenseDenied", denied));
 });
 </script>

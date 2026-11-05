@@ -50,6 +50,7 @@ import {
   teamPolicyQuery,
 } from "@/services/oncall.queries";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 const props = withDefaults(
   defineProps<{
@@ -58,6 +59,16 @@ const props = withDefaults(
   }>(),
   { onCreateTeam: undefined },
 );
+
+const emit = defineEmits<{ licenseDenied: [features: string[]] }>();
+
+// Per read: `Promise.all` below surfaces only the first failure, which need not be the denial.
+const read: typeof readQuery = (options, force) =>
+  readQuery(options, force).catch((err: unknown) => {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
+    throw err;
+  });
 
 const store = useStore();
 const router = useRouter();
@@ -101,7 +112,7 @@ async function anyPolicy(
   let unread = false;
   for (const team of teamList) {
     try {
-      if (await readQuery(teamPolicyQuery(org, team.id), force)) return true;
+      if (await read(teamPolicyQuery(org, team.id), force)) return true;
     } catch {
       unread = true;
     }
@@ -115,10 +126,10 @@ async function load(force = false) {
   if (!org || dismissed.value) return;
   try {
     const [teamList, gaps, rules, pages] = await Promise.all([
-      readQuery(oncallTeamsQuery(org), force),
-      readQuery(coverageGapsQuery(org), force),
-      readQuery(ownershipRulesQuery(org), force),
-      readQuery(responsesQuery(org, { include_resolved: true, limit: 20 }), force),
+      read(oncallTeamsQuery(org), force),
+      read(coverageGapsQuery(org), force),
+      read(ownershipRulesQuery(org), force),
+      read(responsesQuery(org, { include_resolved: true, limit: 20 }), force),
     ]);
     const hasPolicy = await anyPolicy(org, teamList, force);
     teams.value = teamList;

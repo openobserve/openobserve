@@ -30,6 +30,7 @@ export function useOnCallRoutingTester(options: {
   orgId: Ref<string>;
   signals: Ref<UnroutedSignal[]>;
   onError: (err: unknown, fallback: I18nText) => void;
+  onSendError?: (err: unknown, fallback: I18nText) => void;
 }) {
   const { t } = useI18nTyped();
   const { noteConfigurationDenied } = useOnCallPermissions();
@@ -85,7 +86,7 @@ export function useOnCallRoutingTester(options: {
       testResult.value = res.data ?? null;
     } catch (err) {
       noteConfigurationDenied(err);
-      options.onError(err, t("oncall.testPageFailed"));
+      (options.onSendError ?? options.onError)(err, t("oncall.testPageFailed"));
     } finally {
       sending.value = false;
     }

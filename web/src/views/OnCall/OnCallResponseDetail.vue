@@ -667,6 +667,13 @@
       </OContent>
     </template>
 
+    <!-- Ahead of the skeleton: the reads run together, so a slow one must not hold the lock back. -->
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-response-detail-license-denied"
+    />
+
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
     <OContent v-else-if="loadError !== null" y>
@@ -888,6 +895,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
@@ -979,6 +987,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
@@ -1036,6 +1045,7 @@ const teamDeleted = computed(() => isDeletedTeam(response.value?.team_id, knownT
 const loading = ref(false);
 /// Set only when a load fails with nothing on screen; a 404 leaves it null and reads as not found.
 const loadError = ref<string | null>(null);
+const licenseDenied = ref<string[] | null>(null);
 const resolving = ref(false);
 const confirmRecoveryOpen = ref(false);
 const confirmingRecovery = ref(false);
@@ -1396,24 +1406,43 @@ const snoozedUntilLabel = computed(() => {
 });
 const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
+// Any on-call read can carry the denial, because the others may be answered from cache; the callers still see the error.
+const read: typeof readQuery = (options, force) =>
+  readQuery(options, force).catch((err: unknown) => {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      licenseDenied.value = denied;
+      // Clearing these takes off the record's actions and the progress rechecks; the server would refuse each one.
+      response.value = null;
+      escalation.value = null;
+      // A lock drawn behind an open form would be out of sight, and saving there can only be refused.
+      showHandoff.value = false;
+      confirmRecoveryOpen.value = false;
+      promoteOpen.value = false;
+      confirmResolve.value = false;
+    }
+    throw err;
+  });
+
 // The newest read: a slower record for an id the route has already left must not overwrite the current one.
 let latestResponseRead = 0;
 
 type ReadGuard = () => boolean;
 
-/// True while no newer record read has started; every page read checks it before it writes.
+/// True while no newer record read has started and no read was denied; every page read checks it before it writes.
 function readGuard(readId = latestResponseRead): ReadGuard {
-  return () => readId === latestResponseRead;
+  return () => readId === latestResponseRead && !licenseDenied.value;
 }
 
 // `force` reaches the record alone — it is the only thing a promote conflict moved.
 async function fetchResponse(force = false) {
   loading.value = true;
   loadError.value = null;
+  licenseDenied.value = null;
   const readId = ++latestResponseRead;
   const isCurrent = readGuard(readId);
   try {
-    const data = await readQuery(responseQuery(orgId.value, responseId.value), force);
+    const data = await read(responseQuery(orgId.value, responseId.value), force);
     if (!isCurrent()) return;
     response.value = data?.response ?? null;
     events.value = data?.events ?? [];
@@ -1447,7 +1476,7 @@ async function fetchResponse(force = false) {
       message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
     });
   } finally {
-    if (isCurrent()) loading.value = false;
+    if (readId === latestResponseRead) loading.value = false;
   }
 }
 
@@ -1471,7 +1500,7 @@ async function refreshPage() {
 /// The org's teams: whether this page's team still exists, its name, and where it can be handed.
 async function fetchTeams(isCurrent: ReadGuard) {
   try {
-    const teams = await readQuery(oncallTeamsQuery(orgId.value), false);
+    const teams = await read(oncallTeamsQuery(orgId.value), false);
     if (!isCurrent()) return;
     knownTeamIds.value = teams.map((tm) => tm.id);
     teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
@@ -1490,7 +1519,7 @@ async function fetchTeamName(isCurrent: ReadGuard) {
     return;
   }
   try {
-    const team = await readQuery(oncallTeamQuery(orgId.value, teamId), false);
+    const team = await read(oncallTeamQuery(orgId.value, teamId), false);
     if (isCurrent()) teamName.value = team?.name || "—";
   } catch {
     if (isCurrent()) teamName.value = "—";
@@ -1686,7 +1715,7 @@ async function fetchHandoffTargets(isCurrent: ReadGuard) {
   // An unrouted page or a deleted team has no members to hand to, but the team list still offers a team.
   const teamId = teamDeleted.value ? null : r.team_id;
   try {
-    const members = teamId ? await readQuery(teamMembersQuery(orgId.value, teamId), false) : [];
+    const members = teamId ? await read(teamMembersQuery(orgId.value, teamId), false) : [];
     if (!isCurrent()) return;
     // Names can repeat, so the email rides along in the option itself.
     memberOptions.value = members.map((m) => ({
@@ -1745,7 +1774,7 @@ async function fetchIncidentTitle(isCurrent: ReadGuard) {
     const incident = await readQuery(incidentQuery(orgId.value, incidentId), false);
     if (isCurrent()) incidentTitle.value = incident?.title ?? null;
   } catch {
-    // The rail falls back to the id.
+    // The rail falls back to the id; Incidents has its own license feature, so a denial here does not lock this page.
   } finally {
     if (isCurrent()) incidentLoading.value = false;
   }
@@ -1758,8 +1787,8 @@ async function fetchPriorCauses(isCurrent: ReadGuard) {
   priorCausesLoading.value = true;
   try {
     const [causeRes, historyRes] = await Promise.allSettled([
-      readQuery(responsePriorCausesQuery(orgId.value, responseId.value), false),
-      readQuery(responseHistoryQuery(orgId.value, responseId.value), false),
+      read(responsePriorCausesQuery(orgId.value, responseId.value), false),
+      read(responseHistoryQuery(orgId.value, responseId.value), false),
     ]);
     if (!isCurrent()) return;
     priorCauses.value = causeRes.status === "fulfilled" ? causeRes.value : [];
@@ -1774,7 +1803,7 @@ async function fetchPriorCauses(isCurrent: ReadGuard) {
 async function fetchReport(isCurrent: ReadGuard) {
   reportLoading.value = true;
   try {
-    const next = await readQuery(responseReportQuery(orgId.value, responseId.value), false);
+    const next = await read(responseReportQuery(orgId.value, responseId.value), false);
     if (isCurrent()) report.value = next;
   } catch {
     if (isCurrent()) report.value = null;
@@ -1795,7 +1824,7 @@ const deliveriesLoading = ref(false);
 async function fetchDeliveries(isCurrent: ReadGuard) {
   deliveriesLoading.value = true;
   try {
-    const ledger = await readQuery(responseDeliveriesQuery(orgId.value, responseId.value), false);
+    const ledger = await read(responseDeliveriesQuery(orgId.value, responseId.value), false);
     if (!isCurrent()) return;
     deliveries.value = ledger?.deliveries ?? [];
     deliveriesTotal.value = ledger?.total ?? 0;
@@ -1840,9 +1869,9 @@ async function readTeamContext(isCurrent: ReadGuard) {
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
       // A closed record asks about its own last moment — the live rotation is not its history.
-      readQuery(whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined), false),
-      readQuery(teamPolicyQuery(orgId.value, teamId), false),
-      readQuery(teamReachabilityQuery(orgId.value, teamId), false),
+      read(whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined), false),
+      read(teamPolicyQuery(orgId.value, teamId), false),
+      read(teamReachabilityQuery(orgId.value, teamId), false),
     ]);
     if (!isCurrent()) return;
     onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
@@ -1870,10 +1899,7 @@ async function fetchHandover(isCurrent: ReadGuard) {
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
-    const resolved = await readQuery(
-      resolvedScheduleQuery(orgId.value, r.team_id, from, to),
-      false,
-    );
+    const resolved = await read(resolvedScheduleQuery(orgId.value, r.team_id, from, to), false);
     if (!isCurrent()) return;
     const segments = [...resolved].sort((a, b) => a.from - b.from);
     const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
@@ -1954,7 +1980,7 @@ function openReachability() {
 
 async function fetchEscalation(force = false, isCurrent: ReadGuard = readGuard()) {
   try {
-    const progress = await readQuery(responseProgressQuery(orgId.value, responseId.value), force);
+    const progress = await read(responseProgressQuery(orgId.value, responseId.value), force);
     if (!isCurrent()) return;
     escalation.value = progress;
     // An empty body is no answer, so the header makes no paging claim from it.
@@ -1970,12 +1996,12 @@ async function fetchEscalation(force = false, isCurrent: ReadGuard = readGuard()
 async function refreshRecord() {
   const id = responseId.value;
   try {
-    const data = await readQuery(responseQuery(orgId.value, id), true);
-    if (!data?.response || id !== responseId.value) return;
+    const data = await read(responseQuery(orgId.value, id), true);
+    if (!data?.response || id !== responseId.value || licenseDenied.value) return;
     response.value = data.response;
     events.value = data.events ?? [];
   } catch (err: unknown) {
-    if (id !== responseId.value) return;
+    if (id !== responseId.value || licenseDenied.value) return;
     toast({
       variant: "error",
       message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
@@ -1987,7 +2013,7 @@ async function refreshRecord() {
 async function recheckProgress() {
   const isCurrent = readGuard();
   try {
-    const progress = await readQuery(responseProgressQuery(orgId.value, responseId.value), true);
+    const progress = await read(responseProgressQuery(orgId.value, responseId.value), true);
     if (isCurrent()) escalation.value = progress;
   } catch {
     // The next tick retries.
