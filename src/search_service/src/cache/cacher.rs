@@ -1429,6 +1429,7 @@ mod tests {
             search_type: Some(SearchEventType::UI),
             search_event_context: None,
             use_cache: true,
+            use_index: true,
             clear_cache: false,
             local_mode: None,
             agent_options: None,
