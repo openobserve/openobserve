@@ -282,7 +282,7 @@ import { isRuleId, ruleLabelKey, rulesOfVersion } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const route = useRoute();
@@ -390,7 +390,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "findings",
       label: t("alertCalibration.detail.statFindings"),
-      value: countOrDash(r.finding_count),
+      value: countOrDash(r.finding_count, locale.value),
       sub: t(verdict.labelKey),
       icon: "fact-check",
       tone: hasFindings.value ? "warning" : "neutral",
@@ -398,7 +398,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "scope",
       label: t("alertCalibration.detail.statAlertsInScope"),
-      value: scope.value,
+      value: countOrDash(scope.count, locale.value),
       sub: scope.sub,
       subIcon: scope.subIcon,
       icon: "notifications",
@@ -406,7 +406,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "declined",
       label: t("alertCalibration.detail.statDeclined"),
-      value: countOrDash(r.skip_count),
+      value: countOrDash(r.skip_count, locale.value),
       sub: t("alertCalibration.detail.statDeclinedSub"),
       subTooltip: t("alertCalibration.detail.statDeclinedTooltip"),
       icon: "block",
@@ -429,7 +429,7 @@ const dismissedStat = (r: RunRow): StatItem[] => {
     {
       key: "dismissed",
       label: t("alertCalibration.dismiss.stat"),
-      value: countOrDash(r.dismissed_count),
+      value: countOrDash(r.dismissed_count, locale.value),
       sub: hidden
         ? t("alertCalibration.visibility.orgTotalHidden")
         : t("alertCalibration.dismiss.statSub"),

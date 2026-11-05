@@ -315,8 +315,8 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 export const isScoped = (row: Pick<RunRow, "visibility">) => row.visibility === "scoped";
 
 /** A count the read did not get is a dash, never a zero that would read as nothing found. */
-export const countOrDash = (count: number | null | undefined): number | I18nText =>
-  count ?? raw("—");
+export const countOrDash = (count: number | null | undefined, locale: string): I18nText =>
+  typeof count === "number" ? raw(new Intl.NumberFormat(locale).format(count)) : raw("—");
 
 /** No finding, no gap and nothing declined, over the alerts the reader can see. */
 export const isQuiet = (row: RunRow) =>
@@ -328,7 +328,7 @@ export const isClean = (row: RunRow) => isQuiet(row) && !isScoped(row);
 export interface VisibilityCopy {
   allClear: I18nText;
   nothingDescription: I18nText;
-  alertsInScope: { value: number | I18nText; sub?: I18nText; subIcon?: IconName };
+  alertsInScope: { count: number | null; sub?: I18nText; subIcon?: IconName };
   pending: { banner: I18nText; badge: I18nText };
 }
 
@@ -344,7 +344,7 @@ export function visibilityCopy(t: TranslateFn, row: RunRow): VisibilityCopy {
       nothingDescription: t("alertCalibration.detail.nothingDescription", {
         count: row.alerts_in_scope ?? 0,
       }),
-      alertsInScope: { value: row.alerts_in_scope ?? raw("—") },
+      alertsInScope: { count: row.alerts_in_scope ?? null },
       pending,
     };
   }
@@ -352,7 +352,7 @@ export function visibilityCopy(t: TranslateFn, row: RunRow): VisibilityCopy {
     allClear: t("alertCalibration.visibility.allClear"),
     nothingDescription: t("alertCalibration.visibility.nothingDescription"),
     alertsInScope: {
-      value: raw("—"),
+      count: null,
       sub: t("alertCalibration.visibility.orgTotalHidden"),
       subIcon: "info-outline",
     },

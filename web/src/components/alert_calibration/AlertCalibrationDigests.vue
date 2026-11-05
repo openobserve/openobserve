@@ -247,7 +247,7 @@ import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const { search: searchDigests, orgId } = useDigestSearch();
@@ -304,7 +304,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
-      value: run ? countOrDash(run.finding_count) : raw("—"),
+      value: countOrDash(run?.finding_count, locale.value),
       sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
       icon: "fact-check",
       tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",

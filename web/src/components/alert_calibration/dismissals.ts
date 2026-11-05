@@ -16,7 +16,7 @@
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { httpStatus } from "@/services/alert_calibration";
-import { schemaVersion, type FindingRecord, type RunRow } from "./digests";
+import { countOrDash, schemaVersion, type FindingRecord, type RunRow } from "./digests";
 import { ERROR_CLASS_LABEL, isRuleId, ruleLabelKey, type NotWorkingPattern } from "./rules";
 
 /** The server's reasons (ENT dismissals.rs `DismissReason`). */
@@ -198,7 +198,7 @@ export function hiddenByRun(
 
 /** The one copy helper for every P5a surface (spec-detail 7); server text is never shown. */
 export function dismissalCopy(t: TranslateFn, locale: string) {
-  const count = (value: number): I18nText => raw(new Intl.NumberFormat(locale).format(value));
+  const count = (value: number): I18nText => countOrDash(value, locale);
   const date = (micros: number): I18nText => raw(format(micros / 1000, "MMM d, yyyy"));
   const ago = (micros: number): I18nText =>
     raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
