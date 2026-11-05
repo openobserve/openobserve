@@ -196,9 +196,7 @@ impl TreeNodeRewriter for IndexOptimizer {
                 if is_expr_valid_for_index(expr, &self.index_fields) {
                     let condition = Condition::from_physical_expr(expr);
                     index_conditions.add_condition(condition);
-                } else if let Some(condition) =
-                    fts_like_condition(expr, &self.index_fields, &self.fts_fields)
-                {
+                } else if let Some(condition) = fts_like_condition(expr, &self.fts_fields) {
                     // `_all` only narrows the candidates, so the LIKE has to stay in the plan
                     other_conditions.push(expr.clone());
                     index_conditions.add_condition(condition);
@@ -331,7 +329,6 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
 // only `col [I]LIKE '%x%'` on a plain column, since the index stores the uncast value
 fn fts_like_condition(
     expr: &Arc<dyn PhysicalExpr>,
-    index_fields: &HashSet<String>,
     fts_fields: &HashSet<String>,
 ) -> Option<Condition> {
     let like = expr.downcast_ref::<LikeExpr>()?;
@@ -343,8 +340,7 @@ fn fts_like_condition(
         return None;
     }
     let field = like.expr().downcast_ref::<Column>()?.name();
-    // a field that is also a secondary index keeps its terms out of `_all`
-    if index_fields.contains(field) || !fts_fields.contains(field) {
+    if !fts_fields.contains(field) {
         return None;
     }
     let pattern = extract_string_literal(like.pattern()).ok()?;
@@ -577,8 +573,8 @@ mod tests {
 
     #[test]
     fn test_fts_like_condition() {
-        let index_fields = HashSet::from(["name".to_string(), "both".to_string()]);
-        let fts_fields = HashSet::from(["message".to_string(), "both".to_string()]);
+        let index_fields = HashSet::from(["name".to_string()]);
+        let fts_fields = HashSet::from(["message".to_string()]);
         let fts_like = |value: &str| Condition::Like {
             field: "message".to_string(),
             value: value.to_string(),
@@ -601,7 +597,6 @@ mod tests {
                 Some(fts_like(&"a".repeat(63))),
             ),
             (like("name", "%open%", false, false), None),
-            (like("both", "%open%", false, false), None),
             (like("message", &long_term, false, false), None),
             (like("message", "%e%", false, false), None),
             (like("message", "%auth-gw%", false, false), None),
@@ -621,18 +616,13 @@ mod tests {
         ];
 
         for (expr, condition) in cases {
-            assert_eq!(
-                fts_like_condition(&expr, &index_fields, &fts_fields),
-                condition,
-                "{expr}"
-            );
+            assert_eq!(fts_like_condition(&expr, &fts_fields), condition, "{expr}");
             assert!(!is_expr_valid_for_index(&expr, &index_fields), "{expr}");
         }
     }
 
     #[test]
     fn test_fts_like_condition_accepts_every_string_literal_type() {
-        let index_fields = HashSet::new();
         let fts_fields = HashSet::from(["message".to_string()]);
         let scalars: [fn(Option<String>) -> ScalarValue; 3] = [
             ScalarValue::Utf8,
@@ -648,7 +638,7 @@ mod tests {
                     Arc::new(Literal::new(scalar(Some("%Err42%".to_string())))),
                 ));
                 assert_eq!(
-                    fts_like_condition(&expr, &index_fields, &fts_fields),
+                    fts_like_condition(&expr, &fts_fields),
                     Some(Condition::Like {
                         field: "message".to_string(),
                         value: "Err42".to_string(),
@@ -682,48 +672,42 @@ mod tests {
             field: "message".to_string(),
             value: "error".to_string(),
         };
-        // sql, expected conditions, can_optimize, LIKE left in the plan
+        // sql, expected conditions, LIKE left in the plan
         let cases = vec![
             (
                 "SELECT count(*) FROM t WHERE message LIKE '%error%' AND _timestamp > 1",
                 Some(vec![message_like.clone()]),
-                false,
-                Some("LIKE %error%"),
+                "LIKE %error%",
             ),
             (
                 "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND _timestamp > 1",
                 None,
-                false,
-                Some("ILIKE %open%"),
+                "ILIKE %open%",
             ),
             (
                 "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND message LIKE '%error%'",
                 Some(vec![message_like]),
-                false,
-                Some("LIKE %error%"),
+                "LIKE %error%",
             ),
             (
                 "SELECT count(*) FROM t WHERE message NOT LIKE '%error%'",
                 None,
-                false,
-                Some("NOT LIKE %error%"),
+                "NOT LIKE %error%",
             ),
             (
                 "SELECT count(*) FROM t WHERE message LIKE '%error%' OR name = 'a'",
                 None,
-                false,
-                Some("LIKE %error%"),
+                "LIKE %error%",
             ),
             (
                 "SELECT count(*) FROM t WHERE name LIKE '%open%' OR name LIKE '%obs%'",
                 None,
-                false,
-                Some("LIKE %open%"),
+                "LIKE %open%",
             ),
         ];
 
         for is_remove_filter in [true, false] {
-            for (sql, conditions, can_optimize, kept_like) in cases.clone() {
+            for (sql, conditions, kept_like) in cases.clone() {
                 let plan = ctx.state().create_logical_plan(sql).await.unwrap();
                 let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
                 let index_condition = Arc::new(Mutex::new(None));
@@ -744,11 +728,8 @@ mod tests {
                     conditions,
                     "{sql}"
                 );
-                assert_eq!(rewriter.can_optimize, can_optimize, "{sql}");
-                match kept_like {
-                    Some(like) => assert!(plan.contains(like), "{sql}\n{plan}"),
-                    None => assert!(!plan.contains("LIKE"), "{sql}\n{plan}"),
-                }
+                assert!(!rewriter.can_optimize, "{sql}");
+                assert!(plan.contains(kept_like), "{sql}\n{plan}");
             }
         }
     }

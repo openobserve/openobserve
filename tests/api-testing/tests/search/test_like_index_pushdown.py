@@ -1,10 +1,4 @@
-"""`col LIKE '%x%'` uses the inverted index only to narrow candidates.
-
-A LIKE on a full-text-search field is answered by the `_all` field as a superset
-and re-checked by the original predicate; on a secondary index field it is rewritten
-to `str_match()`. Either way the rows must equal a plain scan, which the `use_index=false`
-request field forces.
-"""
+"""`col LIKE '%x%'` returns the same rows with the inverted index as a `use_index=false` scan."""
 from __future__ import annotations
 
 import time
@@ -43,6 +37,21 @@ QUERIES = [
 ]
 
 
+def _search(
+    client: OpenObserveClient,
+    sql: str,
+    *,
+    start: int | None = None,
+    use_index: bool = True,
+    size: int = 1,
+) -> list[dict]:
+    window_start, end = time_window(minutes=60)
+    body = search_payload(sql, start_time=start or window_start, end_time=end, size=size)
+    body["use_index"] = use_index
+    resp = client.post("_search?type=logs", json=body, raise_for_status=True)
+    return resp.json().get("hits", [])
+
+
 def _count(
     client: OpenObserveClient,
     sql: str,
@@ -50,11 +59,7 @@ def _count(
     start: int | None = None,
     use_index: bool = True,
 ) -> int:
-    window_start, end = time_window(minutes=60)
-    body = search_payload(sql, start_time=start or window_start, end_time=end, size=1)
-    body["use_index"] = use_index
-    resp = client.post("_search?type=logs", json=body, raise_for_status=True)
-    hits = resp.json().get("hits", [])
+    hits = _search(client, sql, start=start, use_index=use_index)
     return int(hits[0]["n"]) if hits else 0
 
 
@@ -115,11 +120,8 @@ def test_like_distinct_on_index_field_matches_scan(
     )
 
     def services(use_index: bool) -> list[str]:
-        _, end = time_window(minutes=60)
-        body = search_payload(sql, start_time=start, end_time=end, size=10)
-        body["use_index"] = use_index
-        resp = client.post("_search?type=logs", json=body, raise_for_status=True)
-        return [hit["service"] for hit in resp.json().get("hits", [])]
+        hits = _search(client, sql, start=start, use_index=use_index, size=10)
+        return [hit["service"] for hit in hits]
 
     assert services(True) == ["AuthService", "billingAuth"]
     assert services(False) == ["AuthService", "billingAuth"]

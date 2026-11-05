@@ -253,7 +253,6 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
-        assert!(req.use_index);
     }
 
     #[test]

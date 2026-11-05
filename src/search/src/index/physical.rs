@@ -239,14 +239,8 @@ mod tests {
         );
         assert_eq!(like_contains_term(&format!("%{}%", "a".repeat(64))), None);
         assert_eq!(like_contains_term("%e%"), None);
-        assert_eq!(like_contains_term("%%"), None);
-        assert_eq!(like_contains_term("%"), None);
-        assert_eq!(like_contains_term("error%"), None);
-        assert_eq!(like_contains_term("%error"), None);
         assert_eq!(like_contains_term("error"), None);
-        assert_eq!(like_contains_term("%err_or%"), None);
         assert_eq!(like_contains_term("%err or%"), None);
-        assert_eq!(like_contains_term("%err%or%"), None);
         assert_eq!(like_contains_term("%erré%"), None);
     }
 

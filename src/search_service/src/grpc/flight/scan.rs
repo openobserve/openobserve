@@ -146,12 +146,14 @@ impl StreamSearchSettings {
         self.fts_fields
             .iter()
             .filter(|field| {
-                get_stream_setting_index_updated_at_for_fields(
-                    &self.settings,
-                    self.stream_type,
-                    std::slice::from_ref(*field),
-                    0,
-                ) <= start_time
+                // a field that is also a secondary index keeps its terms out of `_all`
+                !self.index_fields.contains(*field)
+                    && get_stream_setting_index_updated_at_for_fields(
+                        &self.settings,
+                        self.stream_type,
+                        std::slice::from_ref(*field),
+                        0,
+                    ) <= start_time
             })
             .cloned()
             .collect()
