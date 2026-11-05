@@ -63,17 +63,20 @@ export type SandboxMessage =
   | { type: "started"; runId: number }
   | { type: "rendered"; runId: number }
   | { type: "error"; runId: number; message: string }
-  | { type: "drilldown"; drilldown: CustomChartDrilldown };
+  | { type: "drilldown"; drilldown: CustomChartDrilldown }
+  | { type: "pointer" };
 
 export interface CustomChartSandboxHandlers {
   onError: (message: string) => void;
   onDrilldown: (drilldown: CustomChartDrilldown) => void;
   onRendered?: () => void;
+  onPointer?: () => void;
 }
 
 export interface CustomChartSandbox {
   render: (run: CustomChartRun, appearance: CustomChartAppearance) => void;
   setAppearance: (appearance: CustomChartAppearance) => void;
+  hideTooltip: () => void;
   clear: () => void;
   destroy: () => void;
 }
@@ -94,6 +97,10 @@ interface Frame {
 }
 
 let sandboxFontPromise: Promise<SandboxFont | null> | null = null;
+
+// The parent sees no pointer events over a sandboxed frame, so "the frame reported pointer" stands in for "the pointer is inside it".
+const liveSandboxes = new Set<CustomChartSandbox>();
+const pointerSandboxes = new Set<CustomChartSandbox>();
 
 /** True when the chart code names an echarts-gl series or coordinate system. */
 export const usesEchartsGl = (code: string): boolean => GL_CHART_PATTERN.test(code);
@@ -143,6 +150,7 @@ export const parseSandboxMessage = (data: unknown): SandboxMessage | null => {
   if (data.type === "error" && isRunId(data.runId) && typeof data.message === "string") {
     return { type: "error", runId: data.runId, message: data.message.slice(0, MAX_ERROR_LENGTH) };
   }
+  if (data.type === "pointer") return { type: "pointer" };
   if (data.type === "drilldown") {
     const drilldown = parseDrilldown(data.name, data.detail);
     return drilldown ? { type: "drilldown", drilldown } : null;
@@ -206,6 +214,11 @@ export const createCustomChartSandbox = (
       handlers.onDrilldown(message.drilldown);
       return;
     }
+    if (message.type === "pointer") {
+      enterSandbox(sandbox);
+      handlers.onPointer?.();
+      return;
+    }
     if (message.type === "started") {
       armWatchdog(message.runId);
       return;
@@ -266,7 +279,7 @@ export const createCustomChartSandbox = (
     send(target, { type: "appearance", ...next, palette: [...next.palette] });
   };
 
-  return {
+  const sandbox: CustomChartSandbox = {
     render(run, nextAppearance) {
       const validationError = validateUserCode(run.code ?? "");
       if (validationError) {
@@ -291,14 +304,21 @@ export const createCustomChartSandbox = (
     setAppearance(nextAppearance) {
       if (frame) postAppearance(frame, nextAppearance);
     },
+    hideTooltip() {
+      // A tooltip exists only after the frame connected, so nothing is queued.
+      if (frame?.connected) frame.channel.port1.postMessage({ type: "hideTip" });
+    },
     clear() {
       activeRunId = null;
       if (frame) send(frame, { type: "clear" });
     },
     destroy() {
       destroyFrame();
+      untrackSandbox(sandbox);
     },
   };
+  trackSandbox(sandbox);
+  return sandbox;
 };
 
 /** Test-only: forget the fetched font so the next frame fetches it again. */
@@ -318,6 +338,34 @@ const loadSandboxFont = (): Promise<SandboxFont | null> => {
         : Promise.resolve(null);
   }
   return sandboxFontPromise;
+};
+
+// Any parent pointermove means the pointer is over no frame; one hideTip per exit, since the record is cleared.
+const onParentPointerMove = () => {
+  pointerSandboxes.forEach((entered) => entered.hideTooltip());
+  pointerSandboxes.clear();
+};
+
+// Moving from one panel straight into another never reaches the parent, so the newly entered frame's report hides the rest.
+const enterSandbox = (sandbox: CustomChartSandbox) => {
+  pointerSandboxes.forEach((entered) => {
+    if (entered !== sandbox) entered.hideTooltip();
+  });
+  pointerSandboxes.clear();
+  pointerSandboxes.add(sandbox);
+};
+
+const trackSandbox = (sandbox: CustomChartSandbox) => {
+  if (!liveSandboxes.size) {
+    document.addEventListener("pointermove", onParentPointerMove, { passive: true });
+  }
+  liveSandboxes.add(sandbox);
+};
+
+const untrackSandbox = (sandbox: CustomChartSandbox) => {
+  if (!liveSandboxes.delete(sandbox)) return;
+  pointerSandboxes.delete(sandbox);
+  if (!liveSandboxes.size) document.removeEventListener("pointermove", onParentPointerMove);
 };
 
 const parseDrilldown = (name: unknown, detail: unknown): CustomChartDrilldown | null => {
@@ -481,6 +529,17 @@ const sandboxRuntime = (messagesJson: string): string => `(function () {
       finish(runId);
     });
   };
+  var pointerReported = false;
+  var hideTip = function () {
+    pointerReported = false;
+    if (chart) chart.dispatchAction({ type: "hideTip" });
+  };
+  // Once per entry: the parent's hideTip re-arms it, so moves inside the panel post nothing.
+  var reportPointer = function () {
+    if (pointerReported || !port) return;
+    pointerReported = true;
+    post({ type: "pointer" });
+  };
   var enqueue = function (task) {
     queue = queue
       .then(function () {
@@ -515,6 +574,8 @@ const sandboxRuntime = (messagesJson: string): string => `(function () {
       enqueue(function () {
         return run(message);
       });
+    } else if (message.type === "hideTip") {
+      hideTip();
     } else if (message.type === "clear") {
       enqueue(function () {
         lastOption = null;
@@ -533,6 +594,8 @@ const sandboxRuntime = (messagesJson: string): string => `(function () {
       finish(activeRun, messages.cspViolationPrefix + event.violatedDirective + " blocked " + event.blockedURI);
     }
   });
+  document.documentElement.addEventListener("mouseleave", hideTip);
+  document.addEventListener("pointermove", reportPointer);
   window.addEventListener("resize", function () {
     if (deferred) draw();
     else if (chart) chart.resize();

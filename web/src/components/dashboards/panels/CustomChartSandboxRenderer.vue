@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="hostRef"
-    class="h-full w-full"
-    data-test="dashboard-custom-chart-sandbox"
-    @mouseover="onMouseOver"
-  ></div>
+  <div ref="hostRef" class="h-full w-full" data-test="dashboard-custom-chart-sandbox"></div>
 </template>
 
 <script setup lang="ts">
@@ -47,7 +42,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  error: [detail: { message: string; code: string }];
+  error: [detail: { message: string; code: string }, run: CustomChartRun | null];
 }>();
 
 const { t } = useI18nTyped();
@@ -81,8 +76,8 @@ const render = () => {
   else sandbox.clear();
 };
 
-// The frame swallows pointer events, but entering it still fires mouseover on the host.
-const onMouseOver = () => {
+// The parent gets no mouseover over a sandboxed frame, so the frame's own pointer report marks the hover.
+const onPointer = () => {
   const state = unref(hoveredSeriesState);
   if (state) state.panelId = props.run?.panelId;
 };
@@ -92,8 +87,9 @@ onMounted(() => {
   sandbox = createCustomChartSandbox(
     hostRef.value,
     {
-      onError: (message) => emit("error", { message, code: "" }),
+      onError: (message) => emit("error", { message, code: "" }, props.run),
       onDrilldown,
+      onPointer,
     },
     t("dashboard.chartSelection.customChart"),
   );

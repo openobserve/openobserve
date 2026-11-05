@@ -106,13 +106,26 @@ describe("CustomChartSandboxRenderer", () => {
     expect(received.find((message) => message.type === "appearance").dark).toBe(false);
   });
 
-  it("emits the frame's error in the shape the panel shows", async () => {
-    wrapper = mountRenderer();
+  it("emits the frame's error in the shape the panel shows, with the run it belongs to", async () => {
+    const failing = run();
+    wrapper = mountRenderer({ run: failing });
     const { port } = await connect();
 
     port.postMessage({ type: "error", runId: 1, message: "Execution Error: boom" });
 
-    expect(wrapper.emitted("error")).toEqual([[{ message: "Execution Error: boom", code: "" }]]);
+    expect(wrapper.emitted("error")).toEqual([
+      [{ message: "Execution Error: boom", code: "" }, failing],
+    ]);
+  });
+
+  it("hides this panel's tooltip when the pointer moves over the page", async () => {
+    wrapper = mountRenderer();
+    const { port, received } = await connect();
+    port.postMessage({ type: "pointer" });
+
+    document.dispatchEvent(new Event("pointermove"));
+
+    expect(received.at(-1)).toEqual({ type: "hideTip" });
   });
 
   it("turns an allowed drilldown into the event the curated page listens for", async () => {
@@ -161,10 +174,11 @@ describe("CustomChartSandboxRenderer", () => {
     expect(received.at(-1)).toMatchObject({ type: "appearance", dark: true });
   });
 
-  it("marks this panel as hovered when the pointer enters the frame", async () => {
+  it("marks this panel as hovered when the frame reports the pointer", async () => {
     wrapper = mountRenderer();
+    const { port } = await connect();
 
-    await wrapper.find('[data-test="dashboard-custom-chart-sandbox"]').trigger("mouseover");
+    port.postMessage({ type: "pointer" });
 
     expect(hoveredSeriesState.panelId).toBe("panel-7");
   });
@@ -177,7 +191,8 @@ describe("CustomChartSandboxRenderer", () => {
       global: { plugins: [i18n, store], provide: { hoveredSeriesState: provided } },
     });
 
-    await wrapper.find('[data-test="dashboard-custom-chart-sandbox"]').trigger("mouseover");
+    const { port } = await connect();
+    port.postMessage({ type: "pointer" });
 
     expect(provided.value.panelId).toBe("panel-7");
   });

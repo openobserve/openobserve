@@ -24,6 +24,7 @@ import {
   parseSandboxMessage,
   usesEchartsGl,
   type CustomChartAppearance,
+  type CustomChartSandbox,
 } from "./customChartSandbox";
 
 type PortHandler = ((event: { data: unknown }) => void) | null;
@@ -82,6 +83,7 @@ interface FakeChart {
   clear: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
   resize: ReturnType<typeof vi.fn>;
+  dispatchAction: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
   off: ReturnType<typeof vi.fn>;
 }
@@ -101,6 +103,7 @@ const bootFrame = (code: string) => {
         clear: vi.fn(),
         dispose: vi.fn(),
         resize: vi.fn(),
+        dispatchAction: vi.fn(),
         on: vi.fn((name: string, fn: (params: unknown) => void) => {
           chart.handlers[name] = fn;
         }),
@@ -114,6 +117,7 @@ const bootFrame = (code: string) => {
   };
   const listeners: Record<string, ((event?: any) => void)[]> = {};
   const docListeners: Record<string, ((event?: any) => void)[]> = {};
+  const rootListeners: Record<string, ((event?: any) => void)[]> = {};
   const parentWindow = {};
   const frameWindow: any = {
     echarts,
@@ -125,7 +129,11 @@ const bootFrame = (code: string) => {
     getElementById: () => el,
     addEventListener: (type: string, fn: (event?: any) => void) =>
       (docListeners[type] ??= []).push(fn),
-    documentElement: { style: {} as Record<string, string> },
+    documentElement: {
+      style: {} as Record<string, string>,
+      addEventListener: (type: string, fn: (event?: any) => void) =>
+        (rootListeners[type] ??= []).push(fn),
+    },
     fonts: { add: vi.fn() },
   };
   new Function("window", "document", "parent", "FontFace", runtime)(
@@ -158,6 +166,7 @@ const bootFrame = (code: string) => {
     frameDocument,
     fire: (type: string, event?: unknown) => listeners[type]?.forEach((fn) => fn(event)),
     fireDocument: (type: string, event?: unknown) => docListeners[type]?.forEach((fn) => fn(event)),
+    fireRoot: (type: string, event?: unknown) => rootListeners[type]?.forEach((fn) => fn(event)),
   };
 };
 
@@ -443,6 +452,40 @@ describe("sandbox runtime", () => {
     expect(frame.charts[0].clear).toHaveBeenCalled();
   });
 
+  it("reports the pointer once per entry, re-armed by the parent's hideTip", async () => {
+    const frame = bootFrame("var option = {};");
+    frame.fireDocument("pointermove");
+    frame.fireDocument("pointermove");
+    frame.fireDocument("pointermove");
+    expect(frame.sent.filter((message) => message.type === "pointer")).toHaveLength(1);
+
+    frame.send({ type: "hideTip" });
+    frame.fireDocument("pointermove");
+    expect(frame.sent.filter((message) => message.type === "pointer")).toHaveLength(2);
+  });
+
+  it("hides the tooltip when the parent asks, as the panel's pointer leaves", async () => {
+    const frame = bootFrame("var option = { tooltip: { trigger: 'item' } };");
+    frame.send({ type: "hideTip" });
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+    frame.send({ type: "hideTip" });
+
+    expect(frame.charts[0].dispatchAction).toHaveBeenCalledTimes(1);
+    expect(frame.charts[0].dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+  });
+
+  it("hides the tooltip when the pointer leaves the frame document", async () => {
+    const frame = bootFrame("var option = { tooltip: { trigger: 'item' } };");
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+    frame.fireRoot("mouseleave");
+
+    expect(frame.charts[0].dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+  });
+
   it("ignores a second connect, so only the first port ever talks to the frame", async () => {
     const frame = bootFrame("var option = {};");
     const intruder = { postMessage: vi.fn(), onmessage: null };
@@ -453,7 +496,8 @@ describe("sandbox runtime", () => {
 });
 
 describe("parseSandboxMessage", () => {
-  it("accepts the three known message types", () => {
+  it("accepts the known message types", () => {
+    expect(parseSandboxMessage({ type: "pointer", x: 1 })).toEqual({ type: "pointer" });
     expect(parseSandboxMessage({ type: "rendered", runId: 1 })).toEqual({
       type: "rendered",
       runId: 1,
@@ -498,6 +542,13 @@ describe("parseSandboxMessage", () => {
 
 describe("createCustomChartSandbox", () => {
   let host: HTMLElement;
+  // Destroyed after each test, so the shared pointer listener starts from no live sandbox.
+  let made: CustomChartSandbox[] = [];
+  const make = (...args: Parameters<typeof createCustomChartSandbox>) => {
+    const sandbox = createCustomChartSandbox(...args);
+    made.push(sandbox);
+    return sandbox;
+  };
   const run = (code = "var option = {};", data: unknown = [[1]]) => ({ code, data, panelId: "p1" });
 
   beforeEach(() => {
@@ -512,12 +563,19 @@ describe("createCustomChartSandbox", () => {
   });
 
   afterEach(() => {
+    made.forEach((sandbox) => sandbox.destroy());
+    made = [];
     host.remove();
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
-  const handlers = () => ({ onError: vi.fn(), onDrilldown: vi.fn(), onRendered: vi.fn() });
+  const handlers = () => ({
+    onError: vi.fn(),
+    onDrilldown: vi.fn(),
+    onRendered: vi.fn(),
+    onPointer: vi.fn(),
+  });
 
   // Plays the frame's ready handshake and returns everything the parent then sends over the port.
   const connect = async (iframe: HTMLIFrameElement, token?: string) => {
@@ -537,7 +595,7 @@ describe("createCustomChartSandbox", () => {
   };
 
   it("mounts one script-only sandboxed frame", () => {
-    const sandbox = createCustomChartSandbox(host, handlers(), "Custom Chart");
+    const sandbox = make(host, handlers(), "Custom Chart");
     sandbox.render(run(), LIGHT);
 
     const frames = host.querySelectorAll("iframe");
@@ -547,7 +605,7 @@ describe("createCustomChartSandbox", () => {
   });
 
   it("hands over the port first and sends font, look and data only over it", async () => {
-    const sandbox = createCustomChartSandbox(host, handlers());
+    const sandbox = make(host, handlers());
     sandbox.render(run("var option = {};", [[42]]), LIGHT);
     const { post, received } = await connect(host.querySelector("iframe")!);
 
@@ -560,7 +618,7 @@ describe("createCustomChartSandbox", () => {
   });
 
   it("re-runs the same code in the same frame, and rebuilds it only when the code changes", async () => {
-    const sandbox = createCustomChartSandbox(host, handlers());
+    const sandbox = make(host, handlers());
     sandbox.render(run(), LIGHT);
     const first = host.querySelector("iframe")!;
     const { received } = await connect(first);
@@ -578,7 +636,7 @@ describe("createCustomChartSandbox", () => {
   });
 
   it("ignores a ready message from another window or with the wrong token", async () => {
-    const sandbox = createCustomChartSandbox(host, handlers());
+    const sandbox = make(host, handlers());
     sandbox.render(run(), LIGHT);
     const iframe = host.querySelector("iframe")!;
     const post = vi.spyOn(iframe.contentWindow!, "postMessage");
@@ -597,7 +655,7 @@ describe("createCustomChartSandbox", () => {
 
   it("surfaces an error for the current run and ignores one from a superseded run", async () => {
     const h = handlers();
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run(), LIGHT);
     const { port } = await connect(host.querySelector("iframe")!);
     sandbox.render(run("var option = {};", [[2]]), LIGHT);
@@ -611,7 +669,7 @@ describe("createCustomChartSandbox", () => {
 
   it("passes only a validated drilldown on", async () => {
     const h = handlers();
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run(), LIGHT);
     const { port } = await connect(host.querySelector("iframe")!);
 
@@ -625,7 +683,7 @@ describe("createCustomChartSandbox", () => {
   it("gives up on a hung frame with the timeout message and starts fresh next time", async () => {
     const h = handlers();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run("while (1) {}"), LIGHT);
     const { port } = await connect(host.querySelector("iframe")!);
     port!.postMessage({ type: "started", runId: 1 });
@@ -641,7 +699,7 @@ describe("createCustomChartSandbox", () => {
   it("does not count a slow frame boot or a run still queued in the frame against the timeout", async () => {
     const h = handlers();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run(), LIGHT);
     vi.advanceTimersByTime(SANDBOX_RUN_TIMEOUT_MS * 2);
     const { port } = await connect(host.querySelector("iframe")!);
@@ -660,7 +718,7 @@ describe("createCustomChartSandbox", () => {
   it("still times out a hung run after a newer run was queued behind it", async () => {
     const h = handlers();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run(), LIGHT);
     const { port } = await connect(host.querySelector("iframe")!);
     port!.postMessage({ type: "started", runId: 1 });
@@ -674,7 +732,7 @@ describe("createCustomChartSandbox", () => {
   it("does not time out a run that rendered", async () => {
     const h = handlers();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run(), LIGHT);
     const { port } = await connect(host.querySelector("iframe")!);
     port!.postMessage({ type: "started", runId: 1 });
@@ -687,7 +745,7 @@ describe("createCustomChartSandbox", () => {
 
   it("refuses unsafe code before building any frame", () => {
     const h = handlers();
-    const sandbox = createCustomChartSandbox(host, h);
+    const sandbox = make(host, h);
     sandbox.render(run("fetch('https://evil.example');"), LIGHT);
 
     expect(h.onError).toHaveBeenCalledWith(
@@ -697,7 +755,7 @@ describe("createCustomChartSandbox", () => {
   });
 
   it("sends the look again only when it changes", async () => {
-    const sandbox = createCustomChartSandbox(host, handlers());
+    const sandbox = make(host, handlers());
     sandbox.render(run(), LIGHT);
     const { received } = await connect(host.querySelector("iframe")!);
 
@@ -708,9 +766,81 @@ describe("createCustomChartSandbox", () => {
     expect(looks.map((message) => message.dark)).toEqual([false, true]);
   });
 
+  it("asks a connected frame to hide its tooltip and never queues the request", async () => {
+    const sandbox = make(host, handlers());
+    sandbox.hideTooltip();
+    sandbox.render(run(), LIGHT);
+    sandbox.hideTooltip();
+    const { received } = await connect(host.querySelector("iframe")!);
+    sandbox.hideTooltip();
+
+    expect(received.map((message) => message.type)).toEqual([
+      "init",
+      "appearance",
+      "run",
+      "hideTip",
+    ]);
+  });
+
+  // Each sandbox in its own host, connected, with what the parent sends it collected.
+  const connectedSandbox = async () => {
+    const own = document.createElement("div");
+    host.appendChild(own);
+    const h = handlers();
+    const sandbox = make(own, h);
+    sandbox.render(run(), LIGHT);
+    const { port, received } = await connect(own.querySelector("iframe")!);
+    const hideTips = () => received.filter((message) => message.type === "hideTip").length;
+    return { sandbox, h, port: port!, hideTips };
+  };
+
+  it("hides every other frame's tooltip when the pointer enters a frame", async () => {
+    const a = await connectedSandbox();
+    const b = await connectedSandbox();
+
+    a.port.postMessage({ type: "pointer" });
+    expect(a.h.onPointer).toHaveBeenCalledTimes(1);
+    expect(b.hideTips()).toBe(0);
+
+    b.port.postMessage({ type: "pointer" });
+    expect(a.hideTips()).toBe(1);
+    expect(b.hideTips()).toBe(0);
+    expect(b.h.onPointer).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the last-entered frame's tooltip once when the pointer moves over the page", async () => {
+    const a = await connectedSandbox();
+    const b = await connectedSandbox();
+    a.port.postMessage({ type: "pointer" });
+
+    document.dispatchEvent(new Event("pointermove"));
+    document.dispatchEvent(new Event("pointermove"));
+
+    expect(a.hideTips()).toBe(1);
+    expect(b.hideTips()).toBe(0);
+  });
+
+  it("listens for page pointer moves only while a sandbox is live", () => {
+    const add = vi.spyOn(document, "addEventListener");
+    const remove = vi.spyOn(document, "removeEventListener");
+    const pointerCalls = (spy: typeof add) =>
+      spy.mock.calls.filter(([type]) => type === "pointermove");
+    const a = make(host, handlers());
+    const b = make(host, handlers());
+    expect(pointerCalls(add)).toHaveLength(1);
+    expect(pointerCalls(add)[0][2]).toEqual({ passive: true });
+
+    a.destroy();
+    a.destroy();
+    expect(pointerCalls(remove)).toHaveLength(0);
+    b.destroy();
+    expect(pointerCalls(remove)).toHaveLength(1);
+    expect(pointerCalls(remove)[0][1]).toBe(pointerCalls(add)[0][1]);
+  });
+
   it("removes the frame and stops listening on destroy", async () => {
     const remove = vi.spyOn(window, "removeEventListener");
-    const sandbox = createCustomChartSandbox(host, handlers());
+    const sandbox = make(host, handlers());
     sandbox.render(run(), LIGHT);
     sandbox.destroy();
 
