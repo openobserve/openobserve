@@ -30,6 +30,12 @@ const props = withDefaults(
     rowTemplateType?: string;
     facts?: AlertFormFacts;
     extra?: ExtraLiveValues;
+    /** `object` is the override picker of a non-alert kind: kind-neutral copy, resolved rows. */
+    subject?: "alert" | "object";
+    /** Destinations the override does not fit; they keep their own template. */
+    unfitDestinations?: string[];
+    /** The picker's per-destination answer to "which template will be sent". */
+    resolvedDestinations?: { destination: string; label: string }[];
   }>(),
   {
     templates: () => [],
@@ -41,6 +47,9 @@ const props = withDefaults(
     rowTemplateType: "String",
     facts: () => ({}),
     extra: () => ({}),
+    subject: "alert",
+    unfitDestinations: () => [],
+    resolvedDestinations: () => [],
   },
 );
 
@@ -336,13 +345,21 @@ defineExpose({ applyTemplate, previewTemplate });
             {{ t("alerts.alertSettings.helpWhatThisDoes") }}
           </h3>
           <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
-            {{ t("alerts.alertSettings.helpTemplateExplain") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpTemplateExplainObject")
+                : t("alerts.alertSettings.helpTemplateExplain")
+            }}
           </p>
           <p class="text-text-secondary m-0 leading-[1.5]" data-test="help-template-when">
             <span class="text-text-heading font-semibold">{{
               t("alerts.alertSettings.helpTemplateWhenHeading")
             }}</span>
-            {{ t("alerts.alertSettings.helpTemplateWhenDesc") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpTemplateWhenDescObject")
+                : t("alerts.alertSettings.helpTemplateWhenDesc")
+            }}
           </p>
         </section>
 
@@ -350,13 +367,21 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <section class="flex flex-col" data-test="help-current-section">
           <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
-            {{ t("alerts.alertSettings.helpCurrentHeading") }}
+            {{
+              subject === "object"
+                ? t("alerts.alertSettings.helpCurrentHeadingObject")
+                : t("alerts.alertSettings.helpCurrentHeading")
+            }}
           </h3>
 
           <!-- Override set: one rendered body -->
           <template v-if="snapshotTemplate">
             <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
-              {{ t("alerts.alertSettings.helpCurrentOverrideHeading") }}
+              {{
+                unfitDestinations.length
+                  ? t("alerts.alertSettings.helpCurrentOverrideSome")
+                  : t("alerts.alertSettings.helpCurrentOverrideHeading")
+              }}
             </p>
             <pre
               v-if="currentSegments.length"
@@ -368,6 +393,36 @@ defineExpose({ applyTemplate, previewTemplate });
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
+            <p
+              v-if="unfitDestinations.length"
+              class="text-status-warning-text m-0 mt-2 text-xs"
+              data-test="help-current-unfit"
+            >
+              {{
+                t("alerts.templateOverride.mismatch", {
+                  count: unfitDestinations.length,
+                  names: unfitDestinations.join(", "),
+                })
+              }}
+            </p>
+          </template>
+
+          <!-- No override on a non-alert kind: the template each destination resolves to -->
+          <template v-else-if="subject === 'object' && resolvedDestinations.length">
+            <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
+              {{ t("alerts.alertSettings.helpCurrentResolved") }}
+            </p>
+            <ul class="m-0 flex list-none flex-col gap-1 p-0">
+              <li
+                v-for="d in resolvedDestinations"
+                :key="d.destination"
+                data-test="help-resolved-row"
+                class="flex items-baseline justify-between gap-3"
+              >
+                <span class="text-text-heading font-semibold">{{ d.destination }}</span>
+                <span class="text-text-muted text-xs">{{ d.label }}</span>
+              </li>
+            </ul>
           </template>
 
           <!-- No override: each destination's current message, side by side -->
@@ -435,7 +490,11 @@ defineExpose({ applyTemplate, previewTemplate });
               class="mt-3"
               @click="applyTemplate"
             >
-              {{ t("alerts.alertSettings.helpApplyToAlert") }}
+              {{
+                subject === "object"
+                  ? t("alerts.alertSettings.helpApplyToObject")
+                  : t("alerts.alertSettings.helpApplyToAlert")
+              }}
             </OButton>
           </template>
           <p v-else class="text-text-secondary m-0 italic" data-test="help-preview-select-empty">

@@ -26,8 +26,9 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, ObjectName, ObjectNamePart, Select, SelectItem, SetExpr, Statement,
-        TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor, VisitorMut,
+        BinaryOperator, Expr, Ident, ObjectName, ObjectNamePart, Query, Select, SelectItem,
+        SetExpr, Statement, TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor,
+        VisitorMut,
     },
     dialect::PostgreSqlDialect,
     keywords::ALL_KEYWORDS,
@@ -133,6 +134,15 @@ pub struct WhereInfo {
     pub where_by_stream: HashMap<String, String>,
 }
 
+/// The one table and its row filter of a detector SQL, when the link can carry them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SingleStream {
+    pub table: String,
+    pub where_clause: Option<String>,
+    /// The SQL has a WHERE, so a None `where_clause` means a filter the link could not carry.
+    pub has_where: bool,
+}
+
 /// Parse `sql` once and return both the full outer WHERE (single-stream base filter)
 /// and the per-stream join WHERE. "" / empty for no-WHERE / unparseable.
 pub fn extract_where(sql: &str) -> WhereInfo {
@@ -185,6 +195,59 @@ pub fn extract_where(sql: &str) -> WhereInfo {
         }
     }
     info
+}
+
+/// None unless the SQL is one plain SELECT over one plain table; WHERE kept only if safe to reuse.
+pub fn single_stream(sql: &str, expected: Option<&str>) -> Option<SingleStream> {
+    if sql.len() > MAX_WHERE_SQL_BYTES {
+        return None;
+    }
+    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
+    if statements.len() != 1 {
+        return None;
+    }
+    let Statement::Query(query) = statements.pop()? else {
+        return None;
+    };
+    if query.with.is_some() {
+        return None;
+    }
+    let SetExpr::Select(select) = *query.body else {
+        return None;
+    };
+    let [twj] = select.from.as_slice() else {
+        return None;
+    };
+    if !twj.joins.is_empty() {
+        return None;
+    }
+    // `args` is Some for a table-valued function such as `FROM generate_series(1, 3)`.
+    let TableFactor::Table {
+        name,
+        alias,
+        args: None,
+        ..
+    } = &twj.relation
+    else {
+        return None;
+    };
+    let table = object_name_last(name);
+    if table.is_empty() || expected.is_some_and(|e| e != table) {
+        return None;
+    }
+    // A column list renames the table's columns, so its WHERE names are not the stream's own.
+    let renames_columns = alias.as_ref().is_some_and(|a| !a.columns.is_empty());
+    let alias = alias.as_ref().map(|a| &a.name);
+    let where_clause = select
+        .selection
+        .as_ref()
+        .filter(|_| !renames_columns)
+        .and_then(|selection| checked_where(selection, &table, alias));
+    Some(SingleStream {
+        table,
+        where_clause,
+        has_where: select.selection.is_some(),
+    })
 }
 
 /// The equality conditions that hold in every case where this SQL matches.
@@ -335,6 +398,19 @@ fn from_streams(from: &[TableWithJoins]) -> (HashMap<String, String>, Vec<String
     (map, streams)
 }
 
+/// None when the WHERE holds a subquery or a column of another table.
+fn checked_where(selection: &Expr, table: &str, alias: Option<&Ident>) -> Option<String> {
+    if Visit::visit(selection, &mut SubqueryFinder).is_break() {
+        return None;
+    }
+    let mut cleaned = selection.clone();
+    let mut unqualifier = OwnQualifierRemover { table, alias };
+    if VisitMut::visit(&mut cleaned, &mut unqualifier).is_break() {
+        return None;
+    }
+    Some(cleaned.to_string())
+}
+
 fn split_and(expr: &Expr) -> Vec<&Expr> {
     const MAX_CONJUNCTS: usize = 1024;
     let mut out: Vec<&Expr> = Vec::new();
@@ -403,6 +479,52 @@ impl VisitorMut for QualifierStripper {
         {
             *expr = Expr::Identifier(last.clone());
         }
+        ControlFlow::Continue(())
+    }
+}
+
+/// Breaks on any nested query, which covers scalar, EXISTS, IN and ANY/ALL subqueries.
+struct SubqueryFinder;
+
+impl Visitor for SubqueryFinder {
+    type Break = ();
+    fn pre_visit_query(&mut self, _query: &Query) -> ControlFlow<Self::Break> {
+        ControlFlow::Break(())
+    }
+}
+
+/// Turns `t.col` into `col` for the one table or its alias; breaks on any other qualifier.
+struct OwnQualifierRemover<'a> {
+    table: &'a str,
+    alias: Option<&'a Ident>,
+}
+
+impl VisitorMut for OwnQualifierRemover<'_> {
+    type Break = ();
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        let Expr::CompoundIdentifier(ids) = expr else {
+            return ControlFlow::Continue(());
+        };
+        // More parts may be a struct field or a schema, so only `t.col` is trusted.
+        let [qualifier, column] = ids.as_slice() else {
+            return ControlFlow::Break(());
+        };
+        // An unquoted name folds case, as Postgres does; a quoted one matches exactly.
+        let same = |name: &str, quoted: bool| {
+            if qualifier.quote_style.is_none() && !quoted {
+                qualifier.value.eq_ignore_ascii_case(name)
+            } else {
+                qualifier.value == name
+            }
+        };
+        let own = same(self.table, false)
+            || self
+                .alias
+                .is_some_and(|a| same(&a.value, a.quote_style.is_some()));
+        if !own {
+            return ControlFlow::Break(());
+        }
+        *expr = Expr::Identifier(column.clone());
         ControlFlow::Continue(())
     }
 }
@@ -761,6 +883,129 @@ mod tests {
         assert_eq!(
             guaranteed_equalities("SELECT count(*) FROM t WHERE msg = 'somewhere else'"),
             vec![("msg".to_string(), "somewhere else".to_string())]
+        );
+    }
+
+    fn stream(table: &str, where_clause: Option<&str>) -> Option<SingleStream> {
+        Some(SingleStream {
+            table: table.to_string(),
+            where_clause: where_clause.map(str::to_string),
+            has_where: true,
+        })
+    }
+
+    #[test]
+    fn test_single_stream_keeps_table_and_where() {
+        let sql = "SELECT histogram(_timestamp, '1 minute') AS time_bucket, \
+                   avg(duration_ms) AS value FROM \"api_gateway\" \
+                   WHERE status_code >= 500 AND route = '/checkout' \
+                   GROUP BY time_bucket ORDER BY time_bucket";
+        assert_eq!(
+            single_stream(sql, Some("api_gateway")),
+            stream(
+                "api_gateway",
+                Some("status_code >= 500 AND route = '/checkout'")
+            )
+        );
+    }
+
+    #[test]
+    fn test_single_stream_strips_alias_qualifier() {
+        let sql = "SELECT histogram(a._timestamp, '1 minute') AS time_bucket, count(*) AS value \
+                   FROM \"app\" a WHERE a.level = 'error' AND a.host LIKE 'web-%' \
+                   GROUP BY time_bucket";
+        assert_eq!(
+            single_stream(sql, Some("app")),
+            stream("app", Some("level = 'error' AND host LIKE 'web-%'"))
+        );
+        assert_eq!(
+            single_stream(
+                "SELECT * FROM \"app\" WHERE app.level = 'error'",
+                Some("app")
+            ),
+            stream("app", Some("level = 'error'"))
+        );
+    }
+
+    #[test]
+    fn test_single_stream_rejects_other_shapes() {
+        for sql in [
+            "SELECT * FROM (SELECT * FROM \"app\") t WHERE level = 'error'",
+            "SELECT * FROM \"app\" a JOIN \"hosts\" h ON a.host = h.name",
+            "SELECT * FROM \"app\", \"hosts\"",
+            "WITH x AS (SELECT * FROM \"app\") SELECT * FROM x",
+            "SELECT * FROM \"app\" UNION SELECT * FROM \"app\"",
+            "SELECT * FROM generate_series(1, 3)",
+            "SELECT 1; SELECT 2",
+        ] {
+            assert_eq!(single_stream(sql, None), None, "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_single_stream_rejects_unexpected_table() {
+        assert_eq!(
+            single_stream(
+                "SELECT * FROM \"app_v2\" WHERE level = 'error'",
+                Some("app")
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_single_stream_drops_unsafe_where() {
+        for sql in [
+            "SELECT * FROM \"app\" WHERE host IN (SELECT name FROM \"hosts\")",
+            "SELECT * FROM \"app\" WHERE EXISTS (SELECT 1 FROM \"hosts\")",
+            "SELECT * FROM \"app\" WHERE n > (SELECT max(n) FROM \"hosts\")",
+            "SELECT * FROM \"app\" a WHERE b.level = 'error'",
+            "SELECT * FROM \"app\" a WHERE x.y.z = 'error'",
+            "SELECT * FROM \"app\" AS a(_timestamp, level) WHERE a.level = 'error'",
+            "SELECT * FROM \"app\" \"A\" WHERE a.level = 'error'",
+        ] {
+            assert_eq!(
+                single_stream(sql, Some("app")),
+                stream("app", None),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_single_stream_without_expected_or_where() {
+        assert_eq!(
+            single_stream("SELECT * FROM \"payments\" WHERE level = 'error'", None),
+            stream("payments", Some("level = 'error'"))
+        );
+        assert_eq!(
+            single_stream("SELECT count(*) FROM \"payments\"", None),
+            Some(SingleStream {
+                has_where: false,
+                ..stream("payments", None).unwrap()
+            })
+        );
+    }
+
+    #[test]
+    fn test_single_stream_ignores_having_and_parse_errors() {
+        let sql = "SELECT host, count(*) AS value FROM \"app\" WHERE level = 'error' \
+                   GROUP BY host HAVING count(*) > 5";
+        assert_eq!(
+            single_stream(sql, Some("app")),
+            stream("app", Some("level = 'error'"))
+        );
+        assert_eq!(single_stream("SELEC x", None), None);
+    }
+
+    #[test]
+    fn test_single_stream_folds_an_unquoted_alias() {
+        assert_eq!(
+            single_stream(
+                "SELECT * FROM \"app\" AS A WHERE a.level = 'error'",
+                Some("app")
+            ),
+            stream("app", Some("level = 'error'"))
         );
     }
 }

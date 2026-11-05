@@ -133,7 +133,16 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 133: add status page run streaks to synthetics.
 // 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
 // 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
-pub const DB_SCHEMA_VERSION: u64 = 135;
+// 136: add applies_to to templates.
+// 137: rename user templates under the reserved o2_default_ prefix.
+// 138: add template to anomaly_detection_config.
+// 139: add template to synthetics.
+// 140: add template to oncall_policies.
+// 141: add templates to downtime_notifications.
+// 142: add templates to oncall_response_events.
+// 143: fold the retired compiled default templates into prebuilt_default.
+// 144: turn a json templates column from an earlier 141 or 142 into text.
+pub const DB_SCHEMA_VERSION: u64 = 144;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

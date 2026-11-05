@@ -159,6 +159,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Template override: a user template that applies to anomaly, or the destination's own. -->
+      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
+          {{ t("alerts.templateOverride.label") }}
+        </div>
+        <div class="min-w-0 flex-1 basis-60">
+          <TemplateOverridePicker
+            kind="anomaly"
+            :model-value="config.template ?? null"
+            :destinations="selectedDestinations"
+            :server-error="config.template_error ?? null"
+            @update:model-value="onTemplateChange"
+          />
+        </div>
+      </div>
+
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.alertDirection") }}
@@ -265,6 +281,7 @@ import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   ANOMALY_DIRECTION_KEYS,
@@ -274,7 +291,17 @@ import {
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag },
+  components: {
+    OButton,
+    OSwitch,
+    OSelect,
+    OInput,
+    OTagInput,
+    OTooltip,
+    OIcon,
+    OTag,
+    TemplateOverridePicker,
+  },
 
   props: {
     config: {
@@ -381,6 +408,20 @@ export default defineComponent({
       props.destinations.filter((d) => d.destination_type_name !== "jira"),
     );
 
+    // The chosen destinations with their transport, for the picker's Custom fit warning.
+    const selectedDestinations = computed(() =>
+      (props.config.alert_destination_ids ?? []).map((name: string) => {
+        const dest = props.destinations.find((d) => d.name === name) as
+          { name: string; type?: string } | undefined;
+        return { name, type: dest?.type };
+      }),
+    );
+
+    const onTemplateChange = (value: string | null) => {
+      configModel.value.template = value;
+      configModel.value.template_error = null;
+    };
+
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -398,6 +439,8 @@ export default defineComponent({
       tagsModel,
       openAddDestination,
       destinationOptions,
+      selectedDestinations,
+      onTemplateChange,
       visibleChipCount,
       destinationStatus,
       directionOptions,

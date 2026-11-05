@@ -135,6 +135,7 @@ all GetFleetSummary
 all GetFolder
 all GetFolderByName
 all GetGenAiAgentMapping
+all GetGenAiDataHealth
 all GetGroup
 all GetIncident
 all GetIncidentStats

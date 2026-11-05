@@ -145,10 +145,12 @@ describe("health checks", () => {
         name: "modelPricingGaps",
         query: { stream: "default", org_identifier: "org1" },
       },
+      feature: "modelPricing",
     });
     expect(fixTarget("missing_agent_identity", "default", "org1")).toMatchObject({
       kind: "route",
       to: { name: "genAiAgentMapping" },
+      feature: "genAiAgentMapping",
     });
     expect(fixTarget("zero_duration_spans", "default", "org1").kind).toBe("url");
   });

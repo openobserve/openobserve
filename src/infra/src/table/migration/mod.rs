@@ -254,6 +254,15 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
+mod m20261120_000001_add_template_applies_to;
+mod m20261120_000002_rename_reserved_template_collisions;
+mod m20261120_000003_add_anomaly_template;
+mod m20261201_000001_add_synthetics_template;
+mod m20261210_000001_add_oncall_policy_template;
+mod m20261211_000001_add_templates_to_downtime_notifications;
+mod m20261212_000001_add_templates_to_oncall_response_events;
+mod m20261213_000001_retire_compiled_default_templates;
+mod m20261214_000001_templates_columns_to_text;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -414,8 +423,12 @@ pub(crate) async fn create_downtime_notifications_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
     m20261009_000005_create_downtime_notifications::Migration
-        .up(&SchemaManager::new(db))
+        .up(&manager)
+        .await?;
+    m20261211_000001_add_templates_to_downtime_notifications::Migration
+        .up(&manager)
         .await
 }
 
@@ -806,6 +819,15 @@ impl MigratorTrait for Migrator {
             Box::new(m20261026_000002_create_workflow_http_trigger_credentials::Migration),
             Box::new(m20261026_000003_create_workflow_http_trigger_requests::Migration),
             Box::new(m20261102_000001_add_workflow_run_data_run_id_index::Migration),
+            Box::new(m20261120_000001_add_template_applies_to::Migration),
+            Box::new(m20261120_000002_rename_reserved_template_collisions::Migration),
+            Box::new(m20261120_000003_add_anomaly_template::Migration),
+            Box::new(m20261201_000001_add_synthetics_template::Migration),
+            Box::new(m20261210_000001_add_oncall_policy_template::Migration),
+            Box::new(m20261211_000001_add_templates_to_downtime_notifications::Migration),
+            Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
+            Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
+            Box::new(m20261214_000001_templates_columns_to_text::Migration),
         ]
     }
 }
@@ -909,6 +931,21 @@ mod tests {
         (133, "m20261103_000001_add_status_streaks_to_synthetics"),
         (134, "m20261028_000001_add_llm_dataset_item_write_version"),
         (135, "m20261102_000001_add_workflow_run_data_run_id_index"),
+        (136, "m20261120_000001_add_template_applies_to"),
+        (137, "m20261120_000002_rename_reserved_template_collisions"),
+        (138, "m20261120_000003_add_anomaly_template"),
+        (139, "m20261201_000001_add_synthetics_template"),
+        (140, "m20261210_000001_add_oncall_policy_template"),
+        (
+            141,
+            "m20261211_000001_add_templates_to_downtime_notifications",
+        ),
+        (
+            142,
+            "m20261212_000001_add_templates_to_oncall_response_events",
+        ),
+        (143, "m20261213_000001_retire_compiled_default_templates"),
+        (144, "m20261214_000001_templates_columns_to_text"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1038,6 +1075,22 @@ mod tests {
             (
                 "m20261009_000001_create_downtimes",
                 "m20261009_000005_create_downtime_notifications",
+            ),
+            (
+                "m20261009_000005_create_downtime_notifications",
+                "m20261211_000001_add_templates_to_downtime_notifications",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261212_000001_add_templates_to_oncall_response_events",
+            ),
+            (
+                "m20261210_000001_add_oncall_policy_template",
+                "m20261213_000001_retire_compiled_default_templates",
+            ),
+            (
+                "m20261212_000001_add_templates_to_oncall_response_events",
+                "m20261214_000001_templates_columns_to_text",
             ),
             (
                 "m20260923_000001_create_ai_chat_sessions",

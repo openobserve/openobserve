@@ -68,6 +68,7 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
+            | AlertError::AlertTemplateNotForAlert { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
             // trigger-condition validations.
@@ -169,6 +170,9 @@ pub fn template_error_response(value: TemplateError) -> Response {
         TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
         TemplateError::DeleteWithDestination(destination) => {
             MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::DeleteWithBinding(by) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithBinding(by))
         }
         TemplateError::PrebuiltReadOnly(name) => {
             MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
