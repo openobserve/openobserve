@@ -142,10 +142,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 142: add templates to oncall_response_events.
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
-// 145: add last_run_class, last_run_class_at and last_tested_at to synthetics.
-// 146: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
-// 147: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
-pub const DB_SCHEMA_VERSION: u64 = 147;
+// 145: add alerts.incident_title_template.
+// 146: add last_run_class, last_run_class_at and last_tested_at to synthetics.
+// 147: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+// 148: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
+pub const DB_SCHEMA_VERSION: u64 = 148;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

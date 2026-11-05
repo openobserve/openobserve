@@ -396,6 +396,8 @@ const props = defineProps<{
   schemaLoading: boolean;
   /** Best-effort value suggestions; may resolve empty or reject. */
   loadValues: (label: string) => Promise<string[]>;
+  /** Changes when the sample `loadValues` draws from does; an open value step then reloads. */
+  valueScope?: string;
 }>();
 
 const emit = defineEmits<{
@@ -640,31 +642,45 @@ const onLabelPicked = async (value: unknown) => {
 
   draftLabel.value = label;
   labelError.value = "";
-  valueOptions.value = [];
-  suggestionsUnavailable.value = false;
 
   // Advance straight to the value: the label alone is not a filter, so making
   // the user click onward would be asking for a decision they already made.
   step.value = "value";
-  valuesLoading.value = true;
   autoOpen(() => valueSelectRef.value);
+  await loadValueOptions(label);
+};
+
+/** Bumped per load; an answer lands only if no later load, label pick or cancel superseded it. */
+let valuesRequest = 0;
+
+const loadValueOptions = async (label: string) => {
+  const request = ++valuesRequest;
+  const isCurrent = () => request === valuesRequest && draftLabel.value === label;
+  valueOptions.value = [];
+  suggestionsUnavailable.value = false;
+  valuesLoading.value = true;
 
   try {
     const values = await props.loadValues(label);
-    // The draft moved on while this was in flight — the user picked another
-    // label, or cancelled. A slow answer for label A must not overwrite the
-    // picker that is now showing label B.
-    if (draftLabel.value !== label) return;
+    if (!isCurrent()) return;
     valueOptions.value = (values ?? []).map((v) => ({ label: raw(v), value: v }));
     suggestionsUnavailable.value = valueOptions.value.length === 0;
   } catch {
-    if (draftLabel.value !== label) return;
+    if (!isCurrent()) return;
     valueOptions.value = [];
     suggestionsUnavailable.value = true;
   } finally {
-    if (draftLabel.value === label) valuesLoading.value = false;
+    if (isCurrent()) valuesLoading.value = false;
   }
 };
+
+// Only the suggestions follow the scope: the draft's label, operator and typed value stay as they are.
+watch(
+  () => props.valueScope,
+  () => {
+    if (step.value === "value" && draftLabel.value) loadValueOptions(draftLabel.value);
+  },
+);
 
 const commit = (value: string) => {
   const label = (draftLabel.value ?? "").trim();
