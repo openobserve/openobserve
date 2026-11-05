@@ -109,7 +109,8 @@ const WINDOW_MARGIN_HOURS = 10 / 60;
 /** Stays inside the server's back-fill window so no record is rejected as too old. */
 export const sampleWindowHours = (ingestAllowedUptoHours: number | undefined) => {
   const limit = Number(ingestAllowedUptoHours) || 5;
-  return Math.min(4, limit - WINDOW_MARGIN_HOURS);
+  // a limit under the margin would leave no window at all
+  return Math.min(4, Math.max(limit / 2, limit - WINDOW_MARGIN_HOURS));
 };
 
 const findOrCreateFolder = async (org: string, type: "dashboards" | "alerts") => {
@@ -165,15 +166,14 @@ const STILL_REMOVING = "Sample data is still being removed. Try again in a few m
 const isStreamDeleting = (e: any) =>
   /is being deleted/.test(e?.response?.data?.message ?? e?.message ?? "");
 
-// only a dropped connection or a server fault is worth sending again; a 4xx would fail the same way
+// only a dropped connection or a server fault is worth sending again; a 4xx or a local error would fail the same way
 const withRetry = async <T>(send: () => Promise<T>): Promise<T> => {
   for (let attempt = 0; ; attempt++) {
     try {
       return await send();
     } catch (e: any) {
       if (isStreamDeleting(e)) throw new Error(STILL_REMOVING);
-      const status = e?.response?.status;
-      const transient = !e?.response || status >= 500;
+      const transient = e?.response ? e.response.status >= 500 : !!e?.request;
       if (!transient || attempt >= RETRY_DELAYS_MS.length) throw e;
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
     }
@@ -265,22 +265,38 @@ const createDashboards = async (org: string, range: SampleWindow) => {
   }
 };
 
-const createIfMissing = async (fn: () => Promise<unknown>) => {
+const namesOf = (list: { name: string }[] | undefined) => new Set((list ?? []).map((x) => x.name));
+
+// a duplicate name gets the same 400 as a VRL or validation error, so the name is looked up first
+const createIfMissing = async (
+  existing: ReadonlySet<string>,
+  name: string,
+  fn: () => Promise<unknown>,
+) => {
+  if (existing.has(name)) return false;
   try {
     await fn();
     return true;
   } catch (e: any) {
-    // re-running the loader finds the assets from the previous run
-    if (e?.response?.status !== 409 && e?.response?.status !== 400) throw e;
+    // another tab created it between the lookup and this create
+    if (e?.response?.status !== 409) throw e;
     return false;
   }
 };
 
 const createAlerts = async (org: string) => {
-  await createIfMissing(() =>
+  const templates = await templateService.list({ org_identifier: org });
+  await createIfMissing(namesOf(templates.data), SAMPLE_ALERT_TEMPLATE, () =>
     templateService.create({ org_identifier: org, data: sampleAlertTemplate() }),
   );
-  await createIfMissing(() =>
+  const destinations = await destinationService.list({
+    org_identifier: org,
+    page_num: 1,
+    page_size: 1000,
+    sort_by: "name",
+    desc: false,
+  });
+  await createIfMissing(namesOf(destinations.data), SAMPLE_ALERT_DESTINATION, () =>
     destinationService.create({ org_identifier: org, data: sampleAlertDestination() }),
   );
   const folderId = await findOrCreateFolder(org, "alerts");
@@ -300,8 +316,10 @@ interface Created {
 }
 
 const createFunctions = async (org: string, created: Created) => {
+  const res = await jsTransformService.list(1, 1000, "name", false, "", org);
+  const existing = namesOf(res.data?.list);
   for (const fn of sampleFunctions()) {
-    if (await createIfMissing(() => jsTransformService.create(org, fn))) {
+    if (await createIfMissing(existing, fn.name, () => jsTransformService.create(org, fn))) {
       created.functions.push(fn.name);
     }
   }
@@ -359,24 +377,33 @@ export const loadSampleData = async (
   const failedSteps: SampleStepId[] = [];
   let counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
   const result: SampleLoadResult = { counts, failedSteps };
+  const created: Created = { functions: [], pipeline: false };
+  const stored = { any: false };
+  // the UI offers Delete only when a sample stream exists, so nothing else could clean these up
+  const undoIfNothingStored = async () => {
+    if (!stored.any) await rollback(org, created);
+  };
   const run = async (step: SampleStepId, fn: () => Promise<void>) => {
     onProgress({ step, fraction: 0, counts });
     let failed = false;
     try {
       await fn();
     } catch (e: any) {
+      // without write access every later step would be refused too
+      if (e?.response?.status === 403) {
+        await undoIfNothingStored();
+        throw e;
+      }
       console.warn(`Sample data step "${step}" failed`, e);
       failedSteps.push(step);
       failed = true;
     }
     onProgress({ step, fraction: 1, counts, failed });
   };
-  const created: Created = { functions: [], pipeline: false };
   await run("functions", () => createFunctions(org, created));
   await run("pipeline", () => createPipeline(org, created));
 
   onProgress({ step: "telemetry", fraction: 0, counts });
-  const stored = { any: false };
   let telemetry: Awaited<ReturnType<typeof ingestTelemetry>>;
   try {
     telemetry = await ingestTelemetry(
@@ -386,8 +413,7 @@ export const loadSampleData = async (
       stored,
     );
   } catch (e) {
-    // the UI offers Delete only when a sample stream exists, so nothing else could clean these up
-    if (!stored.any) await rollback(org, created);
+    await undoIfNothingStored();
     throw e;
   }
   counts = telemetry.counts;
@@ -421,38 +447,55 @@ const SAMPLE_DASHBOARD_TITLE_SET: ReadonlySet<string> = new Set(
 );
 const SAMPLE_ALERT_NAMES: ReadonlySet<string> = new Set(sampleAlerts("").map((a) => a.name));
 
+// every delete is tried even after one fails, so a single refusal does not strand the rest
+const attempt = async (failures: unknown[], fn: () => Promise<unknown>) => {
+  try {
+    await fn();
+  } catch (e) {
+    failures.push(e);
+  }
+};
+
 // the folder may predate the load or hold the user's own assets, so only sample names go
-const removeDashboards = async (org: string) => {
+const removeDashboards = async (org: string, failures: unknown[]) => {
   const folderId = await findFolder(org, "dashboards");
   if (!folderId) return;
   const res = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
   const hits = (res.data?.dashboards ?? []).map(toSearchHit);
   const sample = hits.filter((hit: { title: string }) => SAMPLE_DASHBOARD_TITLE_SET.has(hit.title));
   for (const hit of sample) {
-    await ignoreMissing(() => dashboardService.delete(org, hit.dashboardId, folderId));
+    await attempt(failures, () =>
+      ignoreMissing(() => dashboardService.delete(org, hit.dashboardId, folderId)),
+    );
   }
   if (sample.length === hits.length) {
-    await ignoreMissing(() => commonService.delete_Folder(org, "dashboards", folderId));
+    await attempt(failures, () =>
+      ignoreMissing(() => commonService.delete_Folder(org, "dashboards", folderId)),
+    );
   }
 };
 
-const removeAlerts = async (org: string) => {
+const removeAlerts = async (org: string, failures: unknown[]) => {
   const folderId = await findFolder(org, "alerts");
   if (!folderId) return;
   const res = await alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId);
   const alerts = res.data?.list ?? [];
   const sample = alerts.filter((alert: any) => SAMPLE_ALERT_NAMES.has(alert.name));
   for (const alert of sample) {
-    await ignoreMissing(() =>
-      alertsService.delete_by_alert_id(org, alert.alert_id ?? alert.id, folderId),
+    await attempt(failures, () =>
+      ignoreMissing(() =>
+        alertsService.delete_by_alert_id(org, alert.alert_id ?? alert.id, folderId),
+      ),
     );
   }
   if (sample.length === alerts.length) {
-    await ignoreMissing(() => commonService.delete_Folder(org, "alerts", folderId));
+    await attempt(failures, () =>
+      ignoreMissing(() => commonService.delete_Folder(org, "alerts", folderId)),
+    );
   }
 };
 
-// a user alert or destination that uses it blocks the delete (409); the rest must still go
+// something of the user's that uses it blocks the delete (409); the rest must still go
 const deleteUnlessInUse = async (name: string, kept: string[], fn: () => Promise<unknown>) => {
   try {
     await ignoreMissing(fn);
@@ -463,12 +506,19 @@ const deleteUnlessInUse = async (name: string, kept: string[], fn: () => Promise
   }
 };
 
-const removeAlertDelivery = async (org: string, kept: string[]) => {
-  await deleteUnlessInUse(SAMPLE_ALERT_DESTINATION, kept, () =>
-    destinationService.delete({ org_identifier: org, destination_name: SAMPLE_ALERT_DESTINATION }),
+const removeAlertDelivery = async (org: string, kept: string[], failures: unknown[]) => {
+  await attempt(failures, () =>
+    deleteUnlessInUse(SAMPLE_ALERT_DESTINATION, kept, () =>
+      destinationService.delete({
+        org_identifier: org,
+        destination_name: SAMPLE_ALERT_DESTINATION,
+      }),
+    ),
   );
-  await deleteUnlessInUse(SAMPLE_ALERT_TEMPLATE, kept, () =>
-    templateService.delete({ org_identifier: org, template_name: SAMPLE_ALERT_TEMPLATE }),
+  await attempt(failures, () =>
+    deleteUnlessInUse(SAMPLE_ALERT_TEMPLATE, kept, () =>
+      templateService.delete({ org_identifier: org, template_name: SAMPLE_ALERT_TEMPLATE }),
+    ),
   );
 };
 
@@ -486,28 +536,29 @@ const SAMPLE_STREAM_SET: { name: string; type: string }[] = [
  */
 export const removeSampleData = async (org: string): Promise<string[]> => {
   const kept: string[] = [];
-  await removeAlerts(org);
-  await removeAlertDelivery(org, kept);
-  await removeDashboards(org);
-  const pipelineId = await findPipelineId(org);
-  if (pipelineId) {
-    await ignoreMissing(() =>
-      pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
-    );
-  }
-  for (const name of SAMPLE_FUNCTIONS) {
-    try {
-      await ignoreMissing(() => jsTransformService.delete(org, name));
-    } catch (e) {
-      // a user pipeline or stream that uses the function blocks its delete; the rest must still go
-      console.warn(`Sample function "${name}" was kept`, e);
-      kept.push(name);
+  const failures: unknown[] = [];
+  await attempt(failures, () => removeAlerts(org, failures));
+  await removeAlertDelivery(org, kept, failures);
+  await attempt(failures, () => removeDashboards(org, failures));
+  await attempt(failures, async () => {
+    const pipelineId = await findPipelineId(org);
+    if (pipelineId) {
+      await ignoreMissing(() =>
+        pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
+      );
     }
+  });
+  for (const name of SAMPLE_FUNCTIONS) {
+    await attempt(failures, () =>
+      deleteUnlessInUse(name, kept, () => jsTransformService.delete(org, name)),
+    );
   }
   // the sample alerts and pipeline are gone by name; the cascade would also take the user's own
   await Promise.all(
     SAMPLE_STREAM_SET.map((s) =>
-      ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
+      attempt(failures, () =>
+        ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
+      ),
     ),
   );
   try {
@@ -516,5 +567,6 @@ export const removeSampleData = async (org: string): Promise<string[]> => {
     // everything else is already deleted; a stale state only points the tour at a window with no data
     console.warn("Sample data window was not deleted", e);
   }
+  if (failures.length) throw failures[0];
   return kept;
 };

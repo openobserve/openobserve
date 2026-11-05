@@ -75,10 +75,19 @@ vi.mock("@/services/alerts", () => ({
     delete_by_alert_id: vi.fn(),
   },
 }));
-vi.mock("@/services/alert_destination", () => ({ default: { create: vi.fn(), delete: vi.fn() } }));
-vi.mock("@/services/alert_templates", () => ({ default: { create: vi.fn(), delete: vi.fn() } }));
+vi.mock("@/services/alert_destination", () => ({
+  default: { list: vi.fn(async () => ({ data: [] })), create: vi.fn(), delete: vi.fn() },
+}));
+vi.mock("@/services/alert_templates", () => ({
+  default: { list: vi.fn(async () => ({ data: [] })), create: vi.fn(), delete: vi.fn() },
+}));
 vi.mock("@/services/jstransform", () => ({
-  default: { create: vi.fn(), delete: vi.fn(), create_enrichment_table: vi.fn() },
+  default: {
+    list: vi.fn(async () => ({ data: { list: [] } })),
+    create: vi.fn(),
+    delete: vi.fn(),
+    create_enrichment_table: vi.fn(),
+  },
 }));
 vi.mock("@/services/pipelines", () => ({
   default: {
@@ -270,9 +279,8 @@ describe("loadSampleData", () => {
     ]);
   });
 
-  it("marks only the refused optional step failed and goes on loading", async () => {
-    const refused = { response: { status: 403 } };
-    vi.mocked(templateService.create).mockRejectedValueOnce(refused);
+  it("marks only the failed optional step failed and goes on loading", async () => {
+    vi.mocked(templateService.create).mockRejectedValueOnce({ response: { status: 500 } });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = await loadSampleData("acme", 5, () => {});
     warn.mockRestore();
@@ -283,14 +291,61 @@ describe("loadSampleData", () => {
 
   it("fails the load with the refusal when the ingest itself is refused", async () => {
     const refused = { response: { status: 403 } };
-    vi.mocked(jsTransformService.create).mockRejectedValueOnce(refused);
-    vi.mocked(pipelineService.createPipeline).mockRejectedValueOnce(refused);
     mocks.sampleData.ingestLogs.mockRejectedValueOnce(refused).mockRejectedValueOnce(refused);
     mocks.sampleData.ingestMetrics.mockRejectedValueOnce(refused);
     mocks.sampleData.ingestTraces.mockRejectedValueOnce(refused);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(refused);
     warn.mockRestore();
+  });
+
+  it("stops the whole load at a refused step and removes what this run created", async () => {
+    const refused = { response: { status: 403 } };
+    vi.mocked(pipelineService.createPipeline).mockRejectedValueOnce(refused);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(refused);
+    expect(mocks.sampleData.ingestLogs).not.toHaveBeenCalled();
+    expect(mocks.dashboardCreate).not.toHaveBeenCalled();
+    for (const name of SAMPLE_FUNCTIONS) {
+      expect(jsTransformService.delete).toHaveBeenCalledWith("acme", name);
+    }
+  });
+
+  it("stops at a refused step after the ingest and keeps the loaded data", async () => {
+    const refused = { response: { status: 403 } };
+    vi.mocked(templateService.create).mockRejectedValueOnce(refused);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(refused);
+    expect(jsTransformService.create_enrichment_table).not.toHaveBeenCalled();
+    expect(jsTransformService.delete).not.toHaveBeenCalled();
+    expect(mocks.sampleData.putState).toHaveBeenCalled();
+  });
+
+  it("fails the step when the server refuses a sample function it does not already have", async () => {
+    // the same 400 the server sends for a VRL compile error
+    vi.mocked(jsTransformService.create).mockRejectedValueOnce({ response: { status: 400 } });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await loadSampleData("acme", 5, () => {});
+    warn.mockRestore();
+    expect(result.failedSteps).toEqual(["functions"]);
+  });
+
+  it("creates only the sample functions, template and destination that are not listed yet", async () => {
+    vi.mocked(jsTransformService.list).mockResolvedValueOnce({
+      data: { list: [{ name: SAMPLE_FUNCTIONS[0] }] },
+    } as any);
+    vi.mocked(templateService.list).mockResolvedValueOnce({
+      data: [{ name: SAMPLE_ALERT_TEMPLATE }],
+    } as any);
+    const result = await loadSampleData("acme", 5, () => {});
+    expect(result.failedSteps).toEqual([]);
+    expect(vi.mocked(jsTransformService.create).mock.calls).toEqual([
+      ["acme", expect.objectContaining({ name: SAMPLE_FUNCTIONS[1] })],
+    ]);
+    expect(templateService.create).not.toHaveBeenCalled();
+    expect(destinationService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a positive window when the server allows less than ten minutes", () => {
+    expect(sampleWindowHours(0.1)).toBe(0.05);
   });
 
   it("still finishes when the window cannot be saved", async () => {
@@ -389,6 +444,55 @@ describe("removeSampleData", () => {
     expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
   });
 
+  it("counts a failed sample function delete as a failure, not as kept, and still removes the rest", async () => {
+    const down = { response: { status: 500 } };
+    vi.mocked(jsTransformService.delete).mockRejectedValueOnce(down);
+    await expect(removeSampleData("acme")).rejects.toBe(down);
+    expect(jsTransformService.delete).toHaveBeenCalledTimes(SAMPLE_FUNCTIONS.length);
+    expect(mocks.streamDelete).toHaveBeenCalled();
+    expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
+  });
+
+  it("removes the pipeline, functions and streams even when a sample folder cannot be deleted, then fails", async () => {
+    const down = { response: { status: 500 } };
+    vi.mocked(commonService.list_Folders).mockResolvedValue({
+      data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
+    } as any);
+    vi.mocked(commonService.delete_Folder).mockRejectedValueOnce(down);
+    vi.mocked(pipelineService.getPipelines).mockResolvedValueOnce({
+      data: { list: [{ name: SAMPLE_PIPELINE, pipeline_id: "p1" }] },
+    } as any);
+    try {
+      await expect(removeSampleData("acme")).rejects.toBe(down);
+    } finally {
+      vi.mocked(commonService.list_Folders).mockResolvedValue({ data: { list: [] } } as any);
+    }
+    expect(commonService.delete_Folder).toHaveBeenCalledWith("acme", "dashboards", "sf");
+    expect(pipelineService.deletePipeline).toHaveBeenCalledWith({
+      pipeline_id: "p1",
+      org_id: "acme",
+    });
+    expect(jsTransformService.delete).toHaveBeenCalledTimes(SAMPLE_FUNCTIONS.length);
+    expect(mocks.streamDelete).toHaveBeenCalled();
+    expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
+  });
+
+  it("waits for every stream delete before it fails", async () => {
+    const down = { response: { status: 500 } };
+    let finish!: () => void;
+    mocks.streamDelete
+      .mockRejectedValueOnce(down)
+      .mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)));
+    let settled = false;
+    const done = removeSampleData("acme")
+      .catch((e) => e)
+      .finally(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
+    finish();
+    expect(await done).toBe(down);
+  });
+
   it("keeps a sample destination and template that something still uses, and still removes the rest", async () => {
     vi.mocked(commonService.list_Folders).mockResolvedValue({
       data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
@@ -435,7 +539,7 @@ describe("loadSampleData ingest retries", () => {
 
   it("retries a batch after a network error, waiting 1 s and then 3 s", async () => {
     mocks.sampleData.ingestMetrics
-      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockRejectedValueOnce(Object.assign(new Error("Network Error"), { request: {} }))
       .mockRejectedValueOnce({ response: { status: 503 } });
     const done = loadSampleData("acme", 5, () => {});
     await vi.advanceTimersByTimeAsync(999);
@@ -460,6 +564,15 @@ describe("loadSampleData ingest retries", () => {
     } finally {
       mocks.sampleData.ingestMetrics.mockImplementation(async (_o, rows) => accepted(rows));
     }
+  });
+
+  it("does not retry an error raised before anything was sent", async () => {
+    const noCredential = new Error("No ingestion credential for this user");
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(noCredential);
+    const done = loadSampleData("acme", 5, () => {}).catch((e) => e);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(await done).toBe(noCredential);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry a refused request", async () => {
