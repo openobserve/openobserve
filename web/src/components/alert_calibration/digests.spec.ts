@@ -30,6 +30,7 @@ import {
   latestRun,
   limitationsOf,
   recordHits,
+  runIdentity,
   parseLagRows,
   qualityReasonsOf,
   schemaVersion,
@@ -212,6 +213,25 @@ describe("a run's verdict", () => {
     expect(ruleLabelKey("failure", 2)).toBe("alertCalibration.rules.notWorking");
     expect(ruleLabelKey("failure", 1)).toBe("alertCalibration.rules.failure");
     expect(ruleLabelKey("noise", 2)).toBe("alertCalibration.rules.noise");
+  });
+
+  it("explains_unassessed_error_types_once_in_amber", () => {
+    const rows = (count: number | null) =>
+      coverageNoteRows(gt, run({ coverage_error_classes_unassessed: count })).map((n) => [
+        n.text,
+        n.gap,
+      ]);
+    expect(rows(1)).toEqual([
+      ["Error types were not read for 1 alert, so its card shows counts only.", true],
+    ]);
+    expect(rows(12)).toEqual([
+      ["Error types were not read for 12 alerts, so their cards show counts only.", true],
+    ]);
+    expect(rows(0)).toEqual([]);
+    expect(rows(null)).toEqual([]);
+    expect(coverageNoteRows(gt, run())).toEqual([]);
+    const carried = runIdentity(record({ coverage_error_classes_unassessed: 3 }));
+    expect(carried.coverage_error_classes_unassessed).toBe(3);
   });
 
   it("names every coverage column off its default, in words", () => {
@@ -444,11 +464,66 @@ describe("a version-2 finding's typed columns", () => {
       "evidence_notworking_evaluations",
       "evidence_notworking_checked_at_micros",
     ]);
-    expect(columns(v2({}))).toContain("evidence_failure_error_ratio");
-    expect(columns(v2({ pattern: "future" }))).toContain("evidence_failure_error_ratio");
+    // Version 2 writes no v1 failure column, so a record with no pattern it knows shows the error rows.
+    const unclassified = {
+      evidence_notworking_evaluation_errors: 30,
+      evidence_notworking_evaluations: 100,
+      evidence_notworking_error_sample: "x",
+    };
+    const errorRows = [
+      "evidence_notworking_evaluation_errors",
+      "evidence_notworking_evaluations",
+      "evidence_notworking_error_sample",
+    ];
+    expect(columns(v2(unclassified))).toEqual(errorRows);
+    expect(columns(v2({ ...unclassified, pattern: "future" }))).toEqual(errorRows);
+    expect(columns(v2({}))).toEqual([]);
     expect(columns(record({ pattern: "stream_missing" }))).toContain(
       "evidence_failure_error_ratio",
     );
+  });
+
+  it("keeps_the_v1_failure_rows_of_a_version_two_record_written_before_error_classes", () => {
+    // The shape the base ENT FailureRule wrote (Evidence::Failure flattened by digest.rs), with no pattern.
+    const legacy: DigestRecord = {
+      _timestamp: 1_762_000_000_000_000,
+      schema_version: 2,
+      org: "default",
+      config_id: "cfg1",
+      cluster: "c1",
+      window_start: 1_759_400_000_000_000,
+      window_end: 1_762_000_000_000_000,
+      finding_count: 1,
+      skip_count: 0,
+      alerts_in_scope: 4,
+      coverage_gap: false,
+      kind: "finding",
+      rule_id: "failure",
+      severity: "High",
+      confidence: "High",
+      title: "payment failures failed 30 of 100 evaluations: stream not found",
+      alert_id: "a3",
+      alert_name: "payment failures",
+      scope_kind: "alert",
+      scope_key: "a3",
+      finding_id: "f1",
+      detector_version: 1,
+      quality: "usable",
+      audience: "owner",
+      insight_actions: JSON.stringify([{ type: "review_alert", alert_id: "a3", focus: "query" }]),
+      evidence_failure_evaluation_errors: 30,
+      evidence_failure_evaluations: 100,
+      evidence_failure_error_ratio: 0.3,
+      evidence_failure_top_error: "stream not found",
+      evidence_failure_top_error_count: 25,
+    } as DigestRecord;
+    expect(evidenceFor({ ...legacy, rule_id: "failure" }).map((f) => f.column)).toEqual([
+      "evidence_failure_evaluation_errors",
+      "evidence_failure_evaluations",
+      "evidence_failure_error_ratio",
+      "evidence_failure_top_error",
+      "evidence_failure_top_error_count",
+    ]);
   });
 
   it("carries the run's version and definition checks out of its own records", () => {

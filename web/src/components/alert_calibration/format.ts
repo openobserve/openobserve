@@ -16,7 +16,7 @@
 import { format as formatDate } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { Confidence, CoverageVerdict, Quality, Severity, Tier } from "./digests";
-import type { EvidenceFormat } from "./rules";
+import { ERROR_CLASS_LABEL, isErrorClass, type EvidenceFormat } from "./rules";
 
 const MINUTES_PER_DAY = 1440;
 const MINUTES_PER_YEAR = 365 * MINUTES_PER_DAY;
@@ -63,6 +63,7 @@ export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceF
   if (format === "seconds") return formatSeconds(t, Number(value));
   if (format === "count") return raw(Number(value).toLocaleString());
   if (format === "time") return raw(formatTime(Number(value)));
+  if (format === "errorClass") return isErrorClass(value) ? t(ERROR_CLASS_LABEL[value]) : raw("—");
   if (format === "boolean") {
     return value === true || value === "true"
       ? t("alertCalibration.evidence.yes")

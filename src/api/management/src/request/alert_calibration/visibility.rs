@@ -31,13 +31,14 @@ use crate::request::alert_grants::{AlertVisibility, Probe};
 /// A full probe is judged on the whole org's alerts, so the set is never cut (P3-D3).
 pub(super) const PROBE_CAP: usize = 10_000;
 /// Counted over the whole org, so a scoped reader gets null for each (P3-D5).
-const ORG_TOTALS: [&str; 6] = [
+const ORG_TOTALS: [&str; 7] = [
     "alerts_in_scope",
     "omitted_routine_skip_count",
     "coverage_unreadable_definitions",
     "coverage_facts_without_definition",
     "coverage_definitions_without_facts",
     "coverage_error_clusters_unattributed",
+    "coverage_error_classes_unassessed",
 ];
 /// The wire mark of every row a reader short of org-wide alert read gets (P3 spec, Scoped totals).
 const SCOPED: &str = "scoped";
@@ -672,6 +673,7 @@ mod tests {
             "_timestamp": at, "window_start": 1, "window_end": 2, "finding_count": 2,
             "skip_count": 1, "written_skip_count": 1, "omitted_routine_skip_count": 4,
             "alerts_in_scope": 140, "coverage_gap": false, "coverage_unreadable_definitions": 3,
+            "coverage_error_classes_unassessed": 2,
         });
         row.as_object_mut()
             .unwrap()
@@ -966,6 +968,11 @@ mod tests {
             assert_eq!(row["skip_count"], 0, "{row}");
             assert_eq!(row["written_skip_count"], 0, "{row}");
             assert_eq!(row["omitted_routine_skip_count"], Value::Null, "{row}");
+            assert_eq!(
+                row["coverage_error_classes_unassessed"],
+                Value::Null,
+                "{row}"
+            );
         }
     }
 
