@@ -140,11 +140,9 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             }
 
             // check if already running a job for this stream
-            if db::compact::stream::is_running(stream) {
+            if !db::compact::stream::set_running(stream) {
                 need_release_ids.push(*job_id); // another job is running
                 continue;
-            } else {
-                db::compact::stream::set_running(stream);
             }
         }
         // collect the dump jobs

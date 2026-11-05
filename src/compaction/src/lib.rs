@@ -340,11 +340,9 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             }
 
             // check if already running a job for this stream
-            if db::compact::stream::is_running(&job.stream) {
+            if !db::compact::stream::set_running(&job.stream) {
                 need_release_ids.push(job.id); // another job is running
                 continue;
-            } else {
-                db::compact::stream::set_running(&job.stream);
             }
         }
         // collect the merge jobs
