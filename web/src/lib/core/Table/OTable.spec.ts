@@ -2063,6 +2063,18 @@ describe("OTable", () => {
   });
 
   describe("windowed row model with row expansion", { timeout: 15000 }, () => {
+    // jsdom has no layout: a zero-height viewport yields no virtual rows, and the body then renders every row.
+    beforeEach(() => {
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: Element,
+      ) {
+        return new DOMRect(0, 0, 600, this.hasAttribute("data-index") ? 54 : 400);
+      });
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     // Just past the 200-row fallback window, so windowing is observable without mounting thousands.
     const ROWS = 210;
     const mountWindowed = (extra: Record<string, unknown>) =>
@@ -2076,6 +2088,7 @@ describe("OTable", () => {
           sorting: "server",
           expansion: "multiple",
           rowKey: (row: TestRow) => String(row.id),
+          overscan: 5,
           ...extra,
         },
         slots: { expansion: "<div data-test='detail'>detail</div>" },
@@ -2099,6 +2112,7 @@ describe("OTable", () => {
           columns: makeColumns().slice(0, 2),
           virtualScroll: true,
           windowRowModel: true,
+          overscan: 5,
           pagination: "none",
           sorting: "server",
         },

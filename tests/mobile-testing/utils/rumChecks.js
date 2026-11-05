@@ -233,6 +233,54 @@ function bgFgSuite({ name, tags, service, viewA, viewB, drive, device = '' }) {
   });
 }
 
+/** Logs upload: one tap's info/warn/error burst reaches _rumlog as exactly three rows (#16229). */
+function logsSuite({ name, tags, service, flows, device = '' }) {
+  const prefix = 'O2 log burst';
+  const sent = ['error', 'info', 'warn'];
+  // The newest burst is this run's tap; earlier bursts in the window come from retries.
+  const newestBurst = (rows) =>
+    rows.length ? rows.filter((r) => r.log_burst === rows[0].log_burst) : [];
+
+  test.describe(name, () => {
+    test(
+      'a multi-event log batch is uploaded and every event lands in _rumlog',
+      { tag: [...tags, '@logs', '@P0'] },
+      async () => {
+        const start = Date.now() - 30000;
+        for (const f of flows) runFlow(f, { device });
+
+        const rows = await q.logsUntil(
+          service,
+          start,
+          prefix,
+          (r) => newestBurst(r).length >= sent.length,
+          { tries: 24, delayMs: 5000 },
+        );
+
+        const burst = newestBurst(rows);
+        expect(
+          burst.length,
+          `rows for the newest log burst (saw ${rows.length} burst rows in total)`,
+        ).toBe(sent.length);
+        expect(burst[0].log_burst, 'the custom log attribute is stored').toBeTruthy();
+        expect(burst.map((r) => r.status).sort(), 'one row per level sent').toEqual(sent);
+        expect(
+          burst.every((r) => r.message === `${prefix} ${r.status}`),
+          'each message matches its level',
+        ).toBe(true);
+        expect(
+          burst.every((r) => r.service === service),
+          'every row tagged with the service',
+        ).toBe(true);
+        expect(
+          burst.every((r) => !!r.session_id),
+          'every log carries the RUM session_id',
+        ).toBe(true);
+      },
+    );
+  });
+}
+
 /** Security (negative): the installed Android APK must contain zero Datadog intake hosts. */
 function noPhoneHomeAndroidSuite({ name, tags, appId }) {
   test.describe(name, () => {
@@ -312,6 +360,7 @@ module.exports = {
   networkSuite,
   maskingSuite,
   bgFgSuite,
+  logsSuite,
   noPhoneHomeAndroidSuite,
   noPhoneHomeIosSuite,
 };

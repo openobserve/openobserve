@@ -359,6 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="svc in services"
               :key="svc.id"
+              :data-test="`overview-service-card-${svc.id}`"
               class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
               tabindex="0"
               :class="[
@@ -418,7 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-label text-xs">{{ t("overview.colErrorRate") }}</span>
                   <span
                     class="text-sm font-semibold tabular-nums"
-                    :class="svc.errorFlag ? 'text-error-600' : 'text-text-heading'"
+                    :class="SERVICE_ERROR_RATE_TEXT[svc.health]"
+                    :data-test="`overview-service-card-${svc.id}-error-rate`"
                   >
                     {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
                   </span>
@@ -850,6 +852,7 @@ import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -955,13 +958,25 @@ const onDateChange = (value: any) => {
   loadAll();
 };
 
+interface ServiceCard {
+  id: string;
+  label: string;
+  requests: number;
+  error_rate: number;
+  stream_name?: string;
+  health: ServiceHealthStatus;
+  errorFlag: boolean;
+  latencyFlag: boolean;
+  latencyMultiplier: string | null;
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 const isLoading = ref(false);
 const lastFetched = ref<Date | null>(null);
 const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
 const incidentsTotal = ref(0);
-const services = ref<any[]>([]);
+const services = ref<ServiceCard[]>([]);
 const recentEvents = ref<any[]>([]);
 
 // True once any section has something to show. Gates the skeleton and the empty
@@ -1624,18 +1639,20 @@ const loadServiceGraph = async (force = false, current: () => boolean = () => tr
       }
     }
 
-    services.value = nodes
-      .map((node) => {
-        const latInfo = latencyByNode.get(node.id);
-        const errorFlag = (node.error_rate ?? 0) >= 1;
-        const latencyFlag = !!latInfo;
-        return {
-          ...node,
-          errorFlag,
-          latencyFlag,
-          latencyMultiplier: latInfo ? latInfo.multiplier.toFixed(1) : null,
-        };
-      })
+    const cards = nodes.map((node) => {
+      const latInfo = latencyByNode.get(node.id);
+      const health = serviceHealthFromErrorRate(node.error_rate ?? 0);
+      const errorFlag = health !== "healthy";
+      const latencyFlag = !!latInfo;
+      return {
+        ...node,
+        health,
+        errorFlag,
+        latencyFlag,
+        latencyMultiplier: latInfo ? latInfo.multiplier.toFixed(1) : null,
+      };
+    });
+    services.value = cards
       // Show only services with at least one flag, then healthy ones after
       .sort((a, b) => {
         const aScore = (a.errorFlag ? 2 : 0) + (a.latencyFlag ? 1 : 0);
@@ -1646,6 +1663,13 @@ const loadServiceGraph = async (force = false, current: () => boolean = () => tr
         return a.id.localeCompare(b.id);
       })
       .slice(0, 12);
+    // The open side panel reads the selected card's numbers, so it must follow the refreshed card.
+    const selectedId = selectedService.value?.id;
+    if (selectedId) {
+      const refreshed = cards.find((c) => c.id === selectedId);
+      if (refreshed) selectedService.value = refreshed;
+      else closeServicePanel();
+    }
     await nextTick();
     onSvcScroll();
   } catch (err) {
@@ -1717,11 +1741,22 @@ const incidentIconClass = (severity: string) => {
   return "text-status-info-text";
 };
 
-const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "border-s-[0.1875em] border-s-error-600";
-  if (svc.errorFlag || svc.latencyFlag) return "border-s-[0.1875em] border-s-warning-600";
-  return "border-s-[0.1875em] border-s-status-positive";
+const SERVICE_CARD_BORDER: Record<ServiceHealthStatus, string> = {
+  critical: "border-s-[0.1875em] border-s-service-health-critical",
+  warning: "border-s-[0.1875em] border-s-service-health-warning",
+  degraded: "border-s-[0.1875em] border-s-service-health-degraded",
+  healthy: "border-s-[0.1875em] border-s-service-health-healthy",
 };
+
+const SERVICE_ERROR_RATE_TEXT: Record<ServiceHealthStatus, string> = {
+  critical: "text-service-health-critical",
+  warning: "text-service-health-warning",
+  degraded: "text-service-health-degraded",
+  healthy: "text-text-heading",
+};
+
+const serviceCardClass = (svc: { health: ServiceHealthStatus; latencyFlag: boolean }) =>
+  SERVICE_CARD_BORDER[svc.health === "healthy" && svc.latencyFlag ? "degraded" : svc.health];
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const goToAlert = (item: any) => {

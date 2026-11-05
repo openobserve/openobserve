@@ -29,6 +29,8 @@ export class SyntheticsRegressionPage {
     this.locators = this._initializeLocators();
     this.createdCheckIds = [];
     this.createdLocationIds = [];
+    this.createdDestinationNames = [];
+    this.createdTemplateNames = [];
   }
 
   _initializeLocators() {
@@ -140,7 +142,7 @@ export class SyntheticsRegressionPage {
   }
 
   // Disabled so the scheduler never claims it; the seeded runs stand in for real probes.
-  async createCheck(name, type, locationId) {
+  async createCheck(name, type, locationId, { destinations = [] } = {}) {
     const configs = {
       http: { method: 'GET', timeout_ms: 10000, follow_redirects: true, headers: [], assertions: [{ field: 'status_code', operator: 'eq', value: 200 }] },
       tcp: { port: 443, timeout_ms: 10000 },
@@ -160,6 +162,7 @@ export class SyntheticsRegressionPage {
       locations: [locationId],
       frequency: { type: 'minutes', interval: 5, cron: '' },
       config: configs[type],
+      destinations,
     });
     if (body?.id) this.createdCheckIds.push(body.id);
     expect([200, 201], `check ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
@@ -170,10 +173,44 @@ export class SyntheticsRegressionPage {
     await this.apiRequest('delete', `/api/${this.org()}/synthetics/${id}?folder=default`);
   }
 
-  // Checks go first: a location still referenced by a check may refuse deletion.
+  /** Deletes one check now and drops it from the afterEach cleanup list. */
+  async deleteCheckNow(id) {
+    const { status, body } = await this.apiRequest('delete', `/api/${this.org()}/synthetics/${id}?folder=default`);
+    expect(status, `check ${id} must delete: ${JSON.stringify(body)}`).toBe(200);
+    this.createdCheckIds = this.createdCheckIds.filter((created) => created !== id);
+  }
+
+  /** An http template + destination that are never meant to fire; returns the destination name. */
+  async createAlertDestination(tag) {
+    const templateName = `synreg_${tag}_tmpl`;
+    const destinationName = `synreg_${tag}_dest`;
+    const tpl = await this.apiRequest('post', `/api/${this.org()}/alerts/templates`, {
+      name: templateName, body: '{"text":"{alert_name}"}', type: 'http', title: '',
+    });
+    expect(tpl.status, `template must be created: ${JSON.stringify(tpl.body)}`).toBe(200);
+    this.createdTemplateNames.push(templateName);
+    const dest = await this.apiRequest('post', `/api/${this.org()}/alerts/destinations`, {
+      name: destinationName, url: 'http://127.0.0.1:1/never-called', method: 'post', template: templateName, type: 'http',
+    });
+    expect(dest.status, `destination must be created: ${JSON.stringify(dest.body)}`).toBe(200);
+    this.createdDestinationNames.push(destinationName);
+    return destinationName;
+  }
+
+  forgetDestination(name) {
+    this.createdDestinationNames = this.createdDestinationNames.filter((created) => created !== name);
+  }
+
+  // Checks go first: a location or destination still referenced by a check refuses deletion.
   async deleteCreated() {
     for (const id of this.createdCheckIds.splice(0)) await this.deleteCheck(id);
     for (const id of this.createdLocationIds.splice(0)) await this.deleteLocation(id);
+    for (const name of this.createdDestinationNames.splice(0)) {
+      await this.apiRequest('delete', `/api/${this.org()}/alerts/destinations/${encodeURIComponent(name)}`);
+    }
+    for (const name of this.createdTemplateNames.splice(0)) {
+      await this.apiRequest('delete', `/api/${this.org()}/alerts/templates/${encodeURIComponent(name)}`);
+    }
   }
 
   async seedRuns(check, locationId, runs) {

@@ -228,17 +228,16 @@ impl InputOutputExtractor {
             return true;
         }
 
-        // TraceLoop nested prompt/completion (`gen_ai.prompt.0.content`, …) and
-        // other `gen_ai.prompt.*` / `gen_ai.completion.*` keys such as prompt
-        // template variables are not stored as columns. The prompt reference
-        // (name/version/label) is not a message; the processor overwrites it
-        // with the normalised value, or removes it when the value is invalid.
+        // Prompt metadata and template variables stay on the span as attributes.
         if matches!(
             key,
             GenAiAttributes::PROMPT_NAME
                 | GenAiAttributes::PROMPT_VERSION
                 | GenAiAttributes::PROMPT_LABEL
         ) {
+            return false;
+        }
+        if key.starts_with("gen_ai.prompt.variable.") {
             return false;
         }
         key == TRACELOOP_PROMPT_PREFIX
@@ -781,7 +780,7 @@ mod tests {
 
         assert!(extractor.is_input_output_attribute("gen_ai.prompt.0.content"));
         assert!(extractor.is_input_output_attribute("gen_ai.completion.0.content"));
-        assert!(extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
         assert!(!extractor.is_input_output_attribute(GenAiAttributes::PROMPT_NAME));
     }
 
@@ -1080,5 +1079,50 @@ mod tests {
         let result = convert_key_path_to_nested_object(&input, "obj");
         assert!(result.is_object());
         assert_eq!(result["flat_key"], 42);
+    }
+
+    #[test]
+    fn test_is_input_output_attribute_preserves_variables_and_attribution() {
+        let extractor = InputOutputExtractor;
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.foo.bar"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.name"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.version"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.label"));
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt"));
+        assert!(extractor.is_input_output_attribute("gen_ai.completion"));
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt.foo"));
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt.0.role"));
+        assert!(extractor.is_input_output_attribute("gen_ai.completion.0.content"));
+    }
+
+    #[test]
+    fn test_extract_semconv_prompt_attrs_not_treated_as_traceloop() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.prompt.name".to_string(), json::json!("rules"));
+        attrs.insert("gen_ai.prompt.version".to_string(), json::json!("3"));
+        attrs.insert(
+            "gen_ai.prompt.variable.topic".to_string(),
+            json::json!("support"),
+        );
+        attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!([{"role": "user", "content": "hello"}]),
+        );
+        attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!([{"role": "assistant", "content": "world"}]),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "");
+        assert_eq!(
+            input,
+            Some(json::json!([{"role": "user", "content": "hello"}]))
+        );
+        assert_eq!(
+            output,
+            Some(json::json!([{"role": "assistant", "content": "world"}]))
+        );
     }
 }

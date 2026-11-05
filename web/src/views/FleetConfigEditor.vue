@@ -44,29 +44,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("fleet.editor.saveDraft") }}
       </OButton>
-      <OButton
-        v-if="undeployed"
-        variant="outline"
-        size="sm"
-        :disabled="!loaded"
-        data-test="fleet-config-editor-publish"
-        @click="onPublish"
-      >
-        {{ t("fleet.editor.publishVersion") }}
-      </OButton>
+      <span v-if="undeployed" class="inline-flex">
+        <OButton
+          variant="outline"
+          size="sm"
+          :disabled="!loaded || publishUnchanged"
+          data-test="fleet-config-editor-publish"
+          @click="onPublish"
+        >
+          {{ t("fleet.editor.publishVersion") }}
+        </OButton>
+        <OTooltip v-if="publishUnchanged" :content="t('fleet.editor.publishUnchanged')" />
+      </span>
     </template>
 
     <template #actions>
-      <OButton
-        v-if="!undeployed"
-        variant="primary"
-        size="sm"
-        :disabled="!loaded"
-        data-test="fleet-config-editor-publish"
-        @click="onPublish"
-      >
-        {{ t("fleet.editor.publishVersion") }}
-      </OButton>
+      <span v-if="!undeployed" class="inline-flex">
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="!loaded || publishUnchanged"
+          data-test="fleet-config-editor-publish"
+          @click="onPublish"
+        >
+          {{ t("fleet.editor.publishVersion") }}
+        </OButton>
+        <OTooltip v-if="publishUnchanged" :content="t('fleet.editor.publishUnchanged')" />
+      </span>
       <template v-if="undeployed">
         <OButton
           variant="primary"
@@ -576,6 +580,11 @@ const savedYaml = computed(
   () => detail.value?.draft?.yaml ?? savedVersion.version.value?.yaml ?? "",
 );
 const latestVersion = computed(() => detail.value?.versions[0] ?? null);
+// The hash covers the version number, so republishing the same text would roll out as new and fail alike.
+const publishUnchanged = computed(() => {
+  const latest = savedVersion.version.value?.yaml;
+  return latest !== undefined && yamlText.value.trimEnd() === latest.trimEnd();
+});
 const undeployed = computed(() =>
   latestVersion.value?.state === "published" ? latestVersion.value.version : null,
 );
