@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
@@ -143,6 +144,24 @@ describe("OnCallPolicyEditor", () => {
     vi.clearAllMocks();
     service.setPolicy.mockResolvedValue({ data: {} } as any);
     service.getContact.mockResolvedValue({ data: contact(true) } as any);
+  });
+
+  it.each([
+    "getContact",
+    "getTeamChannel",
+    "listMembers",
+    "whoIsOnCall",
+    "getRoutingConfig",
+  ] as const)("tells the page when the license refuses %s", async (read) => {
+    queryClient.clear();
+    __resetOnCallRoutingConfig();
+    service[read].mockRejectedValueOnce({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
   });
 
   it("offers the deliverable channels in the order Email, SMS, Voice call, Chat / webhook", async () => {
