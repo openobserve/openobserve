@@ -40,6 +40,7 @@ pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
 pub mod level;
+pub mod live_state;
 pub mod notification_kind;
 pub mod priority;
 pub mod prom_rule;

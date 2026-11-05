@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{
+    collections::{HashMap as StdHashMap, HashSet},
+    str::FromStr,
+};
 
 use axum::{
     Json,
@@ -23,7 +26,11 @@ use axum::{
 };
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
-    alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
+    alerts::{
+        alert::{Alert as MetaAlert, AlertTypeFilter},
+        live_state::{AlertLiveCounts, AlertLiveFacts, AlertLiveState},
+        state::{AlertState, ROLLUP_GROUP_KEY, StateTransition},
+    },
     triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
@@ -62,7 +69,7 @@ use crate::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
             AlertGroupTransitionItem, BulkDeleteAlertResponse, CompositeTimelineLane,
             CompositeTimelineResponse, CompositeTimelineTransition, EnableAlertResponseBody,
-            GenerateSqlMetadata, GenerateSqlResponseBody, GetAlertResponseBody,
+            GenerateSqlMetadata, GenerateSqlResponseBody, GetAlertResponseBody, LastRecoveredAlert,
             ListAlertGroupTransitionsResponseBody, ListAlertGroupsResponseBody,
             ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
@@ -110,6 +117,21 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
     "last_alert_fired_at",
     "last_recovery_notified_at",
 ];
+
+/// The `recovered` window when the request names none: one day in microseconds.
+const DEFAULT_RECOVERED_WINDOW_MICROS: i64 = 86_400_000_000;
+/// Any firing outcome in the window proves a recovery, so a flapping alert needs no more rows.
+const RECOVERY_TRANSITIONS_PER_ALERT: u64 = 200;
+
+/// The caller's visible object set: `None` means no filtering, else (org-wide grant, objects).
+type AlertVisibility = Option<(bool, hashbrown::HashSet<String>)>;
+
+/// The rows of one live read, with what the views classify and enrich them on.
+struct LiveAlertRows {
+    rows: Vec<ListAlertsResponseBodyItem>,
+    rollups: StdHashMap<String, AlertState>,
+    recovered: HashSet<String>,
+}
 
 #[derive(serde::Serialize, utoipa::ToSchema)]
 #[serde(untagged)]
@@ -2904,7 +2926,10 @@ pub async fn list_alert_tags(
     // regular-alert `visible_ids` path, rather than a per-composite
     // `check_permissions` call.
     #[cfg(feature = "enterprise")]
-    let visibility = permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await;
+    let visibility = match permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await {
+        Ok(visibility) => visibility,
+        Err(e) => return e.into(),
+    };
 
     let mut composite_counts = std::collections::BTreeMap::<String, u64>::new();
     if let Ok(composites) = infra::table::alert_composites::list_by_org(client, &org_id).await {
@@ -3005,10 +3030,292 @@ pub async fn list_alerts(
     // the composite merge below and the `referenced_by_composite_count`
     // enrichment, so we don't run per-row or duplicate permission lookups.
     let visibility = match user_id {
-        Some(user_id) => permitted_alert_visibility(&org_id, user_id).await,
+        Some(user_id) => match permitted_alert_visibility(&org_id, user_id).await {
+            Ok(visibility) => visibility,
+            Err(e) => return e.into(),
+        },
         None => None,
     };
 
+    if let Some(state) = query.state {
+        return list_alerts_in_state(&org_id, user_id, &visibility, query, state).await;
+    }
+
+    let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    // Opt-in (dependency view only): destinations/template ride the response only
+    // when asked for. Captured before `query` is moved below.
+    let include_dependencies = query.include_dependencies.unwrap_or(false);
+
+    let (list, merges_extra) = match merged_alert_rows(&org_id, user_id, &visibility, query).await {
+        Ok(merged) => merged,
+        Err(response) => return response,
+    };
+
+    // Apply pagination to the combined list. Single-kind lists were already
+    // paginated by the SQL query, so only re-paginate when extra kinds were
+    // merged in after it.
+    let list = if merges_extra {
+        if let Some((page_size, page_idx)) = page_size_and_idx {
+            // Use saturating_mul to prevent u64 overflow before casting to usize.
+            let start = page_idx.saturating_mul(page_size) as usize;
+            list.into_iter()
+                .skip(start)
+                .take(page_size as usize)
+                .collect()
+        } else {
+            list
+        }
+    } else {
+        list
+    };
+
+    // Enrich with durable run state (Part IV of alerts.md). One batched query
+    // over the page that is actually being returned — not per alert.
+    let mut list = list;
+    enrich_with_run_state(&org_id, &mut list).await;
+    enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
+
+    // Feature-scoped fields: keep destinations/template off the default list path
+    // (bytes + module-scoped names) unless the dependency view explicitly opted in.
+    if !include_dependencies {
+        strip_dependencies(&mut list);
+    }
+
+    MetaHttpResponse::json(ListAlertsResponseBody {
+        list,
+        counts: None,
+        total: None,
+        last_recovered: None,
+    })
+}
+
+/// The alert list narrowed to one live view, with every view's count over all visible alerts.
+async fn list_alerts_in_state(
+    org_id: &str,
+    user_id: Option<&str>,
+    visibility: &AlertVisibility,
+    mut query: ListAlertsQuery,
+    state: AlertLiveState,
+) -> Response {
+    let since = query
+        .since
+        .unwrap_or_else(|| config::utils::time::now_micros() - DEFAULT_RECOVERED_WINDOW_MICROS);
+    let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    let include_dependencies = query.include_dependencies.unwrap_or(false);
+    let narrowed = query.narrows_list();
+    let summary_query = live_summary_query(visibility, query.folder.clone());
+    // The view filters after the merge, so SQL must not page the rows it filters.
+    query.page_size = None;
+
+    let live = match live_alert_rows(org_id, user_id, visibility, query, since).await {
+        Ok(loaded) => loaded,
+        Err(response) => return response,
+    };
+    // The toolbar counts describe the whole board, whatever the filters narrow the table to.
+    let unfiltered = if narrowed {
+        match live_alert_rows(org_id, user_id, visibility, summary_query, since).await {
+            Ok(scope) => Some(scope),
+            Err(response) => return response,
+        }
+    } else {
+        None
+    };
+    let summary_of = unfiltered.as_ref().unwrap_or(&live);
+    let (counts, last_recovered) = live_summary(&summary_of.rows, &summary_of.recovered);
+
+    let LiveAlertRows {
+        rows,
+        rollups,
+        recovered,
+    } = live;
+    let (mut list, total) = live_page(rows, state, &recovered, page_size_and_idx);
+
+    enrich_with_composite_metadata(org_id, visibility, &mut list).await;
+    #[cfg(feature = "enterprise")]
+    enrich_with_incidents(org_id, &mut list, &rollups).await;
+    #[cfg(not(feature = "enterprise"))]
+    let _ = rollups;
+    if !include_dependencies {
+        strip_dependencies(&mut list);
+    }
+
+    MetaHttpResponse::json(ListAlertsResponseBody {
+        list,
+        counts: Some(counts),
+        total: Some(total),
+        last_recovered,
+    })
+}
+
+/// The counts' read: unfiltered visibility leaves only the route's folder check to scope them.
+fn live_summary_query(visibility: &AlertVisibility, folder: Option<String>) -> ListAlertsQuery {
+    ListAlertsQuery {
+        folder: folder.filter(|_| visibility.is_none()),
+        ..Default::default()
+    }
+}
+
+/// Every matching row with the run state, acks and downtimes the views classify on.
+async fn live_alert_rows(
+    org_id: &str,
+    user_id: Option<&str>,
+    visibility: &AlertVisibility,
+    query: ListAlertsQuery,
+    since: i64,
+) -> Result<LiveAlertRows, Response> {
+    let (mut rows, _) = merged_alert_rows(org_id, user_id, visibility, query).await?;
+    rows.retain(|item| anomaly_row_visible(visibility, item));
+    // Without run state every row reads as healthy, which would show "Nothing firing".
+    let rollups = load_run_state(org_id, &mut rows)
+        .await
+        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
+    crate::models::alerts::responses::fill_active_downtimes(org_id, &mut rows).await;
+    let recovered = recovered_alert_ids(&rows, since)
+        .await
+        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
+    Ok(LiveAlertRows {
+        rows,
+        rollups,
+        recovered,
+    })
+}
+
+/// Which `normal` rows reached it from a firing inside the window, one transitions read.
+async fn recovered_alert_ids(
+    rows: &[ListAlertsResponseBodyItem],
+    since: i64,
+) -> Result<HashSet<String>, infra::errors::Error> {
+    let candidates: Vec<String> = rows
+        .iter()
+        .filter(|item| {
+            item.last_outcome.as_deref() == Some("normal")
+                && item.last_outcome_since.is_some_and(|at| at >= since)
+        })
+        .map(|item| item.alert_id.to_string())
+        .collect();
+    if candidates.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let transitions = infra::table::alert_states::list_transitions_between_many(
+        &candidates,
+        Some(ROLLUP_GROUP_KEY),
+        since,
+        config::utils::time::now_micros(),
+        RECOVERY_TRANSITIONS_PER_ALERT,
+    )
+    .await?;
+    Ok(transitions
+        .into_iter()
+        .filter(|(_, transitions)| left_firing(transitions))
+        .map(|(alert_id, _)| alert_id)
+        .collect())
+}
+
+/// An error clearing to normal is no recovery; only a firing outcome leaving is.
+fn left_firing(transitions: &[StateTransition]) -> bool {
+    transitions
+        .iter()
+        .any(|t| t.from_outcome.as_ref().is_some_and(|o| o.is_firing()))
+}
+
+fn live_facts<'a>(
+    item: &'a ListAlertsResponseBodyItem,
+    recovered: &HashSet<String>,
+) -> AlertLiveFacts<'a> {
+    AlertLiveFacts {
+        last_outcome: item.last_outcome.as_deref(),
+        firing_started_at: item.firing_started_at,
+        priority: item.priority,
+        groups_firing: item.groups_firing,
+        groups_firing_is_lower_bound: item.groups_firing_is_lower_bound,
+        groups_acked: item.ack.as_ref().map(|ack| ack.groups_acked),
+        in_downtime: item.active_downtime.is_some(),
+        recovered: recovered.contains(&item.alert_id.to_string()),
+    }
+}
+
+fn live_summary(
+    rows: &[ListAlertsResponseBodyItem],
+    recovered: &HashSet<String>,
+) -> (AlertLiveCounts, Option<LastRecoveredAlert>) {
+    let mut counts = AlertLiveCounts::default();
+    for item in rows {
+        counts.add(&live_facts(item, recovered));
+    }
+    let last_recovered = rows
+        .iter()
+        .filter(|item| live_facts(item, recovered).is_in(AlertLiveState::Recovered))
+        .filter_map(|item| item.last_outcome_since.map(|at| (at, item)))
+        .max_by_key(|(at, _)| *at)
+        .map(|(at, item)| LastRecoveredAlert {
+            name: item.name.clone(),
+            at,
+        });
+    (counts, last_recovered)
+}
+
+/// One page of a view in triage order, and how many rows the view holds.
+fn live_page(
+    rows: Vec<ListAlertsResponseBodyItem>,
+    state: AlertLiveState,
+    recovered: &HashSet<String>,
+    page_size_and_idx: Option<(u64, u64)>,
+) -> (Vec<ListAlertsResponseBodyItem>, u64) {
+    let mut rows: Vec<_> = rows
+        .into_iter()
+        .filter(|item| live_facts(item, recovered).is_in(state))
+        .collect();
+    sort_live_alert_list(&mut rows, recovered);
+    let total = rows.len() as u64;
+    let list = match page_size_and_idx {
+        Some((page_size, page_idx)) => rows
+            .into_iter()
+            .skip(page_idx.saturating_mul(page_size) as usize)
+            .take(page_size as usize)
+            .collect(),
+        None => rows,
+    };
+    (list, total)
+}
+
+/// The triage order, with name, folder and id closing it so paging stays a total order.
+fn sort_live_alert_list(list: &mut [ListAlertsResponseBodyItem], recovered: &HashSet<String>) {
+    list.sort_by(|a, b| {
+        live_facts(a, recovered)
+            .sort_key()
+            .cmp(&live_facts(b, recovered).sort_key())
+            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.folder_name.cmp(&b.folder_name))
+            .then_with(|| a.alert_id.to_string().cmp(&b.alert_id.to_string()))
+    });
+}
+
+// The anomaly merge has no permission filter of its own, and the board must never leak a row.
+fn anomaly_row_visible(visibility: &AlertVisibility, item: &ListAlertsResponseBodyItem) -> bool {
+    item.alert_type != "anomaly_detection"
+        || visible_alert(
+            visibility,
+            &item.alert_id.to_string(),
+            &item.folder_id,
+            &item.name,
+        )
+}
+
+fn strip_dependencies(list: &mut [ListAlertsResponseBodyItem]) {
+    for item in list {
+        item.destinations = Vec::new();
+        item.template = None;
+    }
+}
+
+/// Regular, composite and anomaly rows merged and sorted, and whether SQL paging was widened.
+async fn merged_alert_rows(
+    org_id: &str,
+    user_id: Option<&str>,
+    visibility: &AlertVisibility,
+    query: ListAlertsQuery,
+) -> Result<(Vec<ListAlertsResponseBodyItem>, bool), Response> {
     let folder_slug = query.folder.clone();
     let name_substring = query.alert_name_substring.clone();
     let enabled_filter = query.enabled;
@@ -3020,20 +3327,16 @@ pub async fn list_alerts(
     // post-filtering an already-fetched page.
     let requested_tags = query.requested_tags();
 
-    // Opt-in (dependency view only): destinations/template ride the response only
-    // when asked for. Captured before `query` is moved into `params` below.
-    let include_dependencies = query.include_dependencies.unwrap_or(false);
-
     #[cfg(not(feature = "enterprise"))]
-    let mut params = query.into(&org_id);
+    let mut params = query.into(org_id);
     #[cfg(feature = "enterprise")]
-    let mut params = query.into(&org_id);
+    let mut params = query.into(org_id);
 
     if !requested_tags.is_empty() {
         // `Some(empty)` is meaningful: no alert carries these tags, so the
         // result must be empty. Leaving it `None` would match everything.
         params = params.with_tag_alert_ids(
-            db::alerts::alert::resolve_alert_ids_by_tags(&org_id, &requested_tags).await,
+            db::alerts::alert::resolve_alert_ids_by_tags(org_id, &requested_tags).await,
         );
     }
 
@@ -3059,7 +3362,7 @@ pub async fn list_alerts(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::Composite
     ) {
-        infra::table::alert_composites::list_by_org(db, &org_id)
+        infra::table::alert_composites::list_by_org(db, org_id)
             .await
             .unwrap_or_default()
     } else {
@@ -3076,7 +3379,7 @@ pub async fn list_alerts(
             !composite_definitions.is_empty() || {
                 #[cfg(feature = "enterprise")]
                 {
-                    openobserve_core::anomaly_detection::list_configs(&org_id, None, None)
+                    openobserve_core::anomaly_detection::list_configs(org_id, None, None)
                         .await
                         .map(|configs| !configs.is_empty())
                         .unwrap_or(false)
@@ -3106,7 +3409,7 @@ pub async fn list_alerts(
     ) {
         let client = get_orm_client_ro().await;
         let mut scheduled_jobs: HashMap<String, Trigger> =
-            scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
+            scheduler::list_by_org(org_id, Some(TriggerModule::Alert))
                 .await
                 .unwrap_or_default()
                 .into_iter()
@@ -3115,7 +3418,7 @@ pub async fn list_alerts(
 
         let folders_and_alerts = match alert::list_v2(client, user_id, params).await {
             Ok(v) => v,
-            Err(e) => return e.into(),
+            Err(e) => return Err(e.into()),
         };
 
         folders_and_alerts
@@ -3148,7 +3451,7 @@ pub async fn list_alerts(
     ) && !composite_definitions.is_empty()
     {
         let folder_names: HashMap<String, String> =
-            infra::table::folders::list_folders(&org_id, config::meta::folder::FolderType::Alerts)
+            infra::table::folders::list_folders(org_id, config::meta::folder::FolderType::Alerts)
                 .await
                 .map(|folders| {
                     folders
@@ -3157,7 +3460,7 @@ pub async fn list_alerts(
                         .collect()
                 })
                 .unwrap_or_default();
-        let mut trigger_data = scheduler::list_by_org(&org_id, Some(TriggerModule::CompositeAlert))
+        let mut trigger_data = scheduler::list_by_org(org_id, Some(TriggerModule::CompositeAlert))
             .await
             .unwrap_or_default()
             .into_iter()
@@ -3178,7 +3481,7 @@ pub async fn list_alerts(
                 continue;
             }
             if !visible_alert(
-                &visibility,
+                visibility,
                 &definition.id,
                 &definition.folder_id,
                 &definition.name,
@@ -3213,7 +3516,7 @@ pub async fn list_alerts(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
     ) && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
-        &org_id,
+        org_id,
         folder_slug.as_deref(),
         name_substring.as_deref(),
     )
@@ -3224,7 +3527,7 @@ pub async fn list_alerts(
         // would return every anomaly config alongside the matching alerts.
         let before = list.len();
         list.extend(
-            anomaly_list_items(&org_id, &configs)
+            anomaly_list_items(org_id, &configs)
                 .await
                 .into_iter()
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
@@ -3251,41 +3554,7 @@ pub async fn list_alerts(
 
     sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
 
-    // Apply pagination to the combined list. Single-kind lists were already
-    // paginated by the SQL query, so only re-paginate when extra kinds were
-    // merged in after it.
-    let list = if merges_extra {
-        if let Some((page_size, page_idx)) = page_size_and_idx {
-            // Use saturating_mul to prevent u64 overflow before casting to usize.
-            let start = page_idx.saturating_mul(page_size) as usize;
-            list.into_iter()
-                .skip(start)
-                .take(page_size as usize)
-                .collect()
-        } else {
-            list
-        }
-    } else {
-        list
-    };
-
-    // Enrich with durable run state (Part IV of alerts.md). One batched query
-    // over the page that is actually being returned — not per alert.
-    let mut list = list;
-    enrich_with_run_state(&org_id, &mut list).await;
-    enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
-    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
-
-    // Feature-scoped fields: keep destinations/template off the default list path
-    // (bytes + module-scoped names) unless the dependency view explicitly opted in.
-    if !include_dependencies {
-        for item in &mut list {
-            item.destinations = Vec::new();
-            item.template = None;
-        }
-    }
-
-    MetaHttpResponse::json(ListAlertsResponseBody { list })
+    Ok((list, merges_extra))
 }
 
 /// Resolve the caller's visible alert/composite object set in one bulk query,
@@ -3295,15 +3564,14 @@ pub async fn list_alerts(
 async fn permitted_alert_visibility(
     org_id: &str,
     user_id: &str,
-) -> Option<(bool, hashbrown::HashSet<String>)> {
-    let permitted = alert::permitted_alerts(org_id, Some(user_id), None)
-        .await
-        .ok()
-        .flatten()?;
+) -> Result<AlertVisibility, AlertError> {
+    let Some(permitted) = alert::permitted_alerts(org_id, Some(user_id), None).await? else {
+        return Ok(None);
+    };
     let is_all_permitted = permitted
         .iter()
         .any(|object| object == &format!("alert:_all_{org_id}"));
-    Some((is_all_permitted, permitted.into_iter().collect()))
+    Ok(Some((is_all_permitted, permitted.into_iter().collect())))
 }
 
 /// Render a stored `{id}` expression with child IDs replaced by names; `None`
@@ -3334,17 +3602,13 @@ fn name_resolved_expression(
     Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
-fn visible_alert(
-    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
-    id: &str,
-    folder_id: &str,
-    name: &str,
-) -> bool {
+fn visible_alert(visibility: &AlertVisibility, id: &str, folder_id: &str, name: &str) -> bool {
     match visibility {
         None => true,
         Some((is_all_permitted, permitted)) => {
             *is_all_permitted
                 || permitted.contains(&format!("alert:{}", name))
+                || permitted.contains(&format!("afolder:{}", folder_id))
                 || permitted.contains(&format!("alert:{}/{}", folder_id, id))
                 || permitted.contains(&format!("alert:{}", id))
         }
@@ -3353,7 +3617,7 @@ fn visible_alert(
 
 async fn enrich_with_composite_metadata(
     org_id: &str,
-    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
+    visibility: &AlertVisibility,
     list: &mut [ListAlertsResponseBodyItem],
 ) {
     let db = get_orm_client_ro().await;
@@ -3556,21 +3820,29 @@ async fn group_acks(
 }
 
 async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) {
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let rollups = load_run_state(org_id, list).await.unwrap_or_else(|e| {
+        log::warn!("failed to load alert run state for list: {e}");
+        StdHashMap::new()
+    });
+    #[cfg(feature = "enterprise")]
+    enrich_with_incidents(org_id, list, &rollups).await;
+}
+
+/// Run state and acks onto every row, returning the rollups by alert id.
+async fn load_run_state(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+) -> Result<StdHashMap<String, AlertState>, infra::errors::Error> {
     if list.is_empty() {
-        return;
+        return Ok(StdHashMap::new());
     }
     let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
-    let states = match infra::table::alert_states::get_rollups(&ids).await {
-        Ok(s) => s,
-        Err(e) => {
-            log::warn!("failed to load alert run state for list: {e}");
-            return;
-        }
-    };
+    let states = infra::table::alert_states::get_rollups(&ids).await?;
     if states.is_empty() {
-        return;
+        return Ok(StdHashMap::new());
     }
-    let by_id: std::collections::HashMap<_, _> = states
+    let by_id: StdHashMap<_, _> = states
         .into_iter()
         .map(|s| (s.alert_id.clone(), s))
         .collect();
@@ -3595,15 +3867,14 @@ async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyI
         }
     }
     enrich_with_acks(org_id, list, &by_id).await;
-    #[cfg(feature = "enterprise")]
-    enrich_with_incidents(org_id, list, &by_id).await;
+    Ok(by_id)
 }
 
 /// The list's ack chips: one read of every listed alert's acks, matched to each firing.
 async fn enrich_with_acks(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
-    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+    rollups: &StdHashMap<String, AlertState>,
 ) {
     let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
     let acks = match infra::table::alert_acks::list_for_alerts(org_id, &ids).await {
@@ -3645,28 +3916,57 @@ async fn enrich_with_acks(
 async fn enrich_with_incidents(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
-    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+    rollups: &StdHashMap<String, AlertState>,
 ) {
     use crate::models::alerts::responses::AlertIncidentLink;
 
-    for item in list.iter_mut() {
-        let id = item.alert_id.to_string();
-        let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) else {
-            continue;
-        };
-        let model = match rollup.episode_incident_id.as_deref() {
-            Some(incident_id) => infra::table::alert_incidents::get(org_id, incident_id).await,
-            None => {
-                infra::table::alert_incidents::find_open_incident_containing_alert(org_id, &id)
-                    .await
-            }
-        };
-        if let Ok(Some(m)) = model {
-            item.incident = Some(AlertIncidentLink {
-                id: m.id,
-                title: m.title,
-                status: m.status.parse().unwrap_or_default(),
+    let firing: Vec<_> = list
+        .iter()
+        .filter_map(|item| {
+            let id = item.alert_id.to_string();
+            let rollup = rollups.get(&id).filter(|r| r.is_firing())?;
+            Some((id, rollup.episode_incident_id.clone()))
+        })
+        .collect();
+    let episodes: Vec<String> = firing.iter().filter_map(|(_, e)| e.clone()).collect();
+    let unlinked: Vec<String> = firing
+        .iter()
+        .filter(|(_, e)| e.is_none())
+        .map(|(id, _)| id.clone())
+        .collect();
+    let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("failed to load episode incidents for alert list: {e}");
+            Default::default()
+        });
+    let by_alert =
+        infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!("failed to load open incidents for alert list: {e}");
+                Default::default()
             });
+    let links: StdHashMap<String, AlertIncidentLink> = firing
+        .into_iter()
+        .filter_map(|(id, episode)| {
+            let model = match episode {
+                Some(incident_id) => by_episode.get(&incident_id),
+                None => by_alert.get(&id),
+            }?;
+            Some((
+                id,
+                AlertIncidentLink {
+                    id: model.id.clone(),
+                    title: model.title.clone(),
+                    status: model.status.parse().unwrap_or_default(),
+                },
+            ))
+        })
+        .collect();
+    for item in list.iter_mut() {
+        if let Some(link) = links.get(&item.alert_id.to_string()) {
+            item.incident = Some(link.clone());
         }
     }
 }
@@ -4502,12 +4802,151 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::{
-        BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid, MetaAlert,
-        ONCALL_LOCKED_WARNING, Path, Query, UserEmail, WORKFLOWS_LOCKED_WARNING,
+        AlertLiveState, BulkDeleteRequest, GetAlertResponseBody, HashMap, HashSet, Headers, Json,
+        Ksuid, ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, Path, Query,
+        StateTransition, UserEmail, WORKFLOWS_LOCKED_WARNING, anomaly_row_visible,
         composite_created_response, composite_save_warnings, composite_updated_response,
-        delete_alert_bulk, known_target_names, locked_target_ids, locked_target_warnings,
-        resolve_generate_sql, save_warnings,
+        delete_alert_bulk, known_target_names, left_firing, live_page, live_summary,
+        live_summary_query, locked_target_ids, locked_target_warnings, resolve_generate_sql,
+        save_warnings, visible_alert,
     };
+
+    fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
+        let mut value = serde_json::json!({
+            "alert_id": Ksuid::new(None, None).to_string(),
+            "folder_id": "default",
+            "folder_name": "default",
+            "name": name,
+            "alert_type": "scheduled",
+            "enabled": true,
+            "is_real_time": false,
+        });
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn firing(name: &str, priority: u8, started: i64) -> ListAlertsResponseBodyItem {
+        row(
+            name,
+            serde_json::json!({
+                "last_outcome": "firing",
+                "priority": priority,
+                "firing_started_at": started,
+            }),
+        )
+    }
+
+    #[test]
+    fn test_live_page_filters_before_it_pages() {
+        let healthy = row("healthy", serde_json::json!({"last_outcome": "normal"}));
+        let rows = vec![
+            healthy.clone(),
+            firing("p3", 3, 1),
+            healthy.clone(),
+            firing("p1_late", 1, 50),
+            healthy,
+            firing("p1_early", 1, 10),
+        ];
+        let recovered = HashSet::new();
+
+        let (first, total) = live_page(
+            rows.clone(),
+            AlertLiveState::Firing,
+            &recovered,
+            Some((2, 0)),
+        );
+        let (empty, counted) = live_page(
+            rows.clone(),
+            AlertLiveState::Firing,
+            &recovered,
+            Some((0, 0)),
+        );
+        assert!(empty.is_empty());
+        assert_eq!(counted, total);
+        let (second, _) = live_page(rows, AlertLiveState::Firing, &recovered, Some((2, 1)));
+
+        assert_eq!(total, 3);
+        let names = |page: &[ListAlertsResponseBodyItem]| {
+            page.iter().map(|i| i.name.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(names(&first), ["p1_early", "p1_late"]);
+        assert_eq!(names(&second), ["p3"]);
+    }
+
+    #[test]
+    fn test_counts_cover_every_row_and_not_the_page() {
+        let done = row(
+            "done",
+            serde_json::json!({"last_outcome": "normal", "last_outcome_since": 40}),
+        );
+        let older = row(
+            "older",
+            serde_json::json!({"last_outcome": "normal", "last_outcome_since": 30}),
+        );
+        let recovered: HashSet<String> = [done.alert_id.to_string(), older.alert_id.to_string()]
+            .into_iter()
+            .collect();
+        let rows = vec![firing("a", 1, 1), firing("b", 2, 2), done, older];
+
+        let (counts, last) = live_summary(&rows, &recovered);
+        let (page, _) = live_page(rows, AlertLiveState::Firing, &recovered, Some((1, 0)));
+
+        assert_eq!(page.len(), 1);
+        assert_eq!((counts.firing, counts.recovered), (2, 2));
+        let last = last.unwrap();
+        assert_eq!((last.name.as_str(), last.at), ("done", 40));
+    }
+
+    #[test]
+    fn test_anomaly_rows_obey_the_callers_permissions() {
+        let anomaly = row("a", serde_json::json!({"alert_type": "anomaly_detection"}));
+        let regular = row("r", serde_json::json!({}));
+        let grant = format!("alert:{}", anomaly.alert_id);
+        let denied = Some((false, hashbrown::HashSet::new()));
+        let allowed = Some((false, [grant].into_iter().collect()));
+        let org_wide = Some((true, hashbrown::HashSet::new()));
+
+        assert!(!anomaly_row_visible(&denied, &anomaly));
+        assert!(anomaly_row_visible(&allowed, &anomaly));
+        assert!(anomaly_row_visible(&org_wide, &anomaly));
+        assert!(anomaly_row_visible(&None, &anomaly));
+        assert!(anomaly_row_visible(&denied, &regular), "SQL path filtered");
+    }
+
+    #[test]
+    fn test_only_leaving_a_firing_outcome_is_a_recovery() {
+        use config::meta::self_reporting::usage::RunOutcome;
+
+        let step = |from: Option<RunOutcome>, to: RunOutcome| StateTransition {
+            alert_id: "a".to_string(),
+            group_key: String::new(),
+            from_outcome: from,
+            to_outcome: to,
+            from_level: None,
+            to_level: None,
+            at: 1,
+            value: None,
+            rule_value: None,
+            group_labels: None,
+        };
+        assert!(left_firing(&[step(
+            Some(RunOutcome::Firing),
+            RunOutcome::Normal
+        )]));
+        assert!(left_firing(&[step(
+            Some(RunOutcome::NotifyFailed),
+            RunOutcome::Normal
+        )]));
+        assert!(!left_firing(&[step(
+            Some(RunOutcome::Error),
+            RunOutcome::Normal
+        )]));
+        assert!(!left_firing(&[step(None, RunOutcome::Normal)]));
+        assert!(!left_firing(&[]));
+    }
 
     /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
     #[cfg(feature = "enterprise")]
@@ -4872,6 +5311,25 @@ mod tests {
     }
 
     // 403 Forbidden
+    #[test]
+    fn test_folder_grant_makes_a_folders_rows_visible() {
+        let visibility = Some((false, ["afolder:mine".to_string()].into_iter().collect()));
+        assert!(visible_alert(&visibility, "a1", "mine", "n"));
+        assert!(!visible_alert(&visibility, "a1", "other", "n"));
+    }
+
+    #[test]
+    fn test_summary_query_stays_in_the_folder_only_without_visibility() {
+        let folder = Some("f1".to_string());
+        assert_eq!(
+            live_summary_query(&None, folder.clone()).folder.as_deref(),
+            Some("f1")
+        );
+        let filtered = Some((false, Default::default()));
+        assert_eq!(live_summary_query(&filtered, folder).folder, None);
+        assert_eq!(live_summary_query(&None, None).folder, None);
+    }
+
     #[test]
     fn test_permitted_alerts_missing_user_is_forbidden() {
         assert_eq!(
