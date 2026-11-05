@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use axum::{extract::Path, response::Response};
-use config::utils::json;
+use config::{meta::slack::PUBLIC_EMAIL_DOMAINS, utils::json};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 
@@ -95,7 +95,7 @@ pub async fn handle_new_attribution_event(
 }
 
 // Sign-ups through Google or GitHub carry these; their domain names no company.
-const FREE_MAIL_DOMAINS: [&str; 8] = [
+const FREE_MAIL_DOMAINS: [&str; 12] = [
     "icloud.com",
     "me.com",
     "mac.com",
@@ -104,6 +104,10 @@ const FREE_MAIL_DOMAINS: [&str; 8] = [
     "qq.com",
     "163.com",
     "126.com",
+    "fastmail.com",
+    "web.de",
+    "privaterelay.appleid.com",
+    "users.noreply.github.com",
 ];
 
 // Providers that run free mail under many country domains (yahoo.co.in, hotmail.co.uk).
@@ -125,7 +129,9 @@ const FREE_MAIL_PROVIDERS: [&str; 13] = [
 
 fn is_free_mail(domain: &str) -> bool {
     let domain = domain.to_ascii_lowercase();
-    if FREE_MAIL_DOMAINS.contains(&domain.as_str()) {
+    if FREE_MAIL_DOMAINS.contains(&domain.as_str())
+        || PUBLIC_EMAIL_DOMAINS.contains(&domain.as_str())
+    {
         return true;
     }
     // a country suffix is one or two short labels (fr, co.uk), so outlook.acme.io stays a company
@@ -237,6 +243,12 @@ mod tests {
             "jane@qq.com",
             "jane@163.com",
             "jane@pm.me",
+            "jane@mail.com",
+            "jane@Zoho.com",
+            "jane@fastmail.com",
+            "jane@web.de",
+            "jane@privaterelay.appleid.com",
+            "12345+jane@users.noreply.github.com",
         ] {
             let attribution: NewUserAttribution =
                 json::from_str(r#"{"from":"","company":""}"#).unwrap();
