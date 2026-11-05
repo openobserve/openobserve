@@ -75,19 +75,21 @@ describe("SampleDataProgress", () => {
     expect(tileText(wrapper, "logs")).toContain((1200).toLocaleString());
   });
 
-  it("shows sample data loaded earlier as complete, without counts it never saw", () => {
-    session.status.value = "idle";
+  it("shows the finished load as complete", () => {
+    session.status.value = "loaded";
+    session.loadingOrg.value = "test-org";
     const wrapper = mountProgress({ done: true });
     expect(wrapper.get('[data-test="sample-data-progress-percent"]').text()).toBe("100%");
-    expect(
-      wrapper.findAll('[data-test^="sample-data-step-"]').map((c) => c.attributes("data-status")),
-    ).toEqual(Array(6).fill("done"));
-    expect(tileText(wrapper, "logs")).toContain("—");
-    // no rows were sent in this session, so there is nothing real to replay
-    expect(wrapper.findComponent({ name: "SampleLivePreview" }).exists()).toBe(false);
   });
 
-  it("keeps one live region in the page that announces done and failed", async () => {
+  it("names the progress bar", () => {
+    const wrapper = mountProgress();
+    expect(wrapper.get('[role="progressbar"]').attributes("aria-label")).toBe(
+      "Loading sample data…",
+    );
+  });
+
+  it("keeps one live region in the page that announces done", async () => {
     const wrapper = mountProgress();
     const region = wrapper.get('[data-test="sample-data-progress-announcer"]');
     expect(region.attributes("role")).toBe("status");
@@ -98,10 +100,5 @@ describe("SampleDataProgress", () => {
       region.element,
     );
     expect(region.text()).toBe("Sample data loaded");
-    await wrapper.setProps({ done: false });
-    session.status.value = "failed";
-    await nextTick();
-    expect(region.text()).not.toBe("");
-    expect(region.text()).not.toBe("Sample data loaded");
   });
 });

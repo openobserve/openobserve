@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { RouteLocationRaw } from "vue-router";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardsByFolderQuery, toSearchHit } from "@/services/dashboards.queries";
@@ -34,28 +33,22 @@ export type SampleTourStepId =
 
 export interface SampleTourStep {
   id: SampleTourStepId;
-  icon: IconName;
   /** The capability the chapter demonstrates, shown as a tag. */
   capability: "dashboards" | "alerts" | "logs" | "traces" | "metrics" | "pipelines";
-  /** Route names on which the chapter counts as open. */
-  routes: string[];
+  /** Route name of the page the chapter opens, used to skip chapters the license locks. */
+  route: string;
 }
 
 /** One incident, investigated end to end: each chapter shows one capability on the same story. */
 export const SAMPLE_TOUR_STEPS: readonly SampleTourStep[] = [
-  { id: "dashboard", icon: "dashboard", capability: "dashboards", routes: ["viewDashboard"] },
-  {
-    id: "alert",
-    icon: "notifications",
-    capability: "alerts",
-    routes: ["alertList"],
-  },
-  { id: "logs", icon: "search", capability: "logs", routes: ["logs"] },
-  { id: "deploy", icon: "search", capability: "logs", routes: ["logs"] },
-  { id: "traces", icon: "account-tree", capability: "traces", routes: ["traces", "traceDetails"] },
-  { id: "metrics", icon: "bar-chart", capability: "metrics", routes: ["metrics"] },
-  { id: "pipeline", icon: "alt-route", capability: "pipelines", routes: ["pipelines"] },
-  { id: "business", icon: "dashboard", capability: "dashboards", routes: ["viewDashboard"] },
+  { id: "dashboard", capability: "dashboards", route: "viewDashboard" },
+  { id: "alert", capability: "alerts", route: "alertList" },
+  { id: "logs", capability: "logs", route: "logs" },
+  { id: "deploy", capability: "logs", route: "logs" },
+  { id: "traces", capability: "traces", route: "traces" },
+  { id: "metrics", capability: "metrics", route: "metrics" },
+  { id: "pipeline", capability: "pipelines", route: "pipelines" },
+  { id: "business", capability: "dashboards", route: "viewDashboard" },
 ];
 
 export interface SampleWindowQuery {

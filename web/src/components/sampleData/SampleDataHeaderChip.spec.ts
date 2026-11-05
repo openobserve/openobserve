@@ -309,6 +309,17 @@ describe("SampleDataHeaderChip", () => {
     expect(wrapper.find(".confirm").exists()).toBe(false);
   });
 
+  it("says how many sample functions stayed because pipelines use them", async () => {
+    remove.mockResolvedValue(["fn_a", "fn_b"]);
+    await deleteItem().trigger("click");
+    await wrapper.find(".ok").trigger("click");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "success",
+      message: "Sample data removed. 2 sample functions stay because pipelines use them.",
+    });
+  });
+
   it("never deletes the sample data of an org selected after the confirmation opened", async () => {
     await deleteItem().trigger("click");
     store.state.selectedOrganization = { identifier: "other-org" };

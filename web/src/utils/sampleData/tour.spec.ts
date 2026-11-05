@@ -107,6 +107,6 @@ describe("resolveTourTarget", () => {
     const res = await target("alert");
     expect(res.name).toBe("alertList");
     expect(res.query.folder).toBe("af1");
-    expect(SAMPLE_TOUR_STEPS.find((s) => s.id === "alert")?.routes).toEqual(["alertList"]);
+    expect(SAMPLE_TOUR_STEPS.find((s) => s.id === "alert")?.route).toBe("alertList");
   });
 });

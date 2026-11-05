@@ -495,6 +495,29 @@ describe("SampleDataWelcome finish", () => {
       expect(submitNewUserInfo).not.toHaveBeenCalled();
     });
 
+    it("disables Explore With Sample Data while sample data is being removed", async () => {
+      await mountAtHome();
+      (session as unknown as { removing: { value: boolean } }).removing.value = true;
+      await flush();
+      expect(byTest("onboarding-get-started-sample-btn").attributes("disabled")).toBeDefined();
+      (session as unknown as { removing: { value: boolean } }).removing.value = false;
+    });
+
+    it("toasts an error when a load fails in another org", async () => {
+      await mountAtHome();
+      session.loadingOrg.value = "other-org";
+      session.status.value = "loading";
+      await flush();
+      session.status.value = "failed";
+      await flush();
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: enLocale.sampleData.toast.loadFailed,
+        }),
+      );
+    });
+
     it("centres an error icon and the message when the load fails", async () => {
       await mountAtHome();
       await click("onboarding-get-started-sample-btn");
@@ -557,6 +580,15 @@ describe("SampleDataWelcome finish", () => {
       });
     });
 
+    it("names the answer list for assistive tech", async () => {
+      await mountAtHome();
+      expect(
+        byTest("onboarding-hear-about-us")
+          .find('[aria-label="How did you hear about us?"]')
+          .exists(),
+      ).toBe(true);
+    });
+
     it("offers the onboarding flow's answer list and sends its codes", async () => {
       await mountAtHome();
       const select = wrapper!.findComponent({ name: "OSelect" });
@@ -596,6 +628,15 @@ describe("SampleDataWelcome finish", () => {
   });
 
   describe("skip", () => {
+    it("still closes when storage throws", async () => {
+      await mountAtHome();
+      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+        throw new Error("denied");
+      });
+      await click("onboarding-get-started-skip-btn");
+      expect(session.welcomeOpen.value).toBe(false);
+    });
+
     it.each([
       ["Skip for Now", () => click("onboarding-get-started-skip-btn")],
       ["the close button", () => click("sample-welcome-close")],

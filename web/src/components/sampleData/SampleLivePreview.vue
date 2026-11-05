@@ -138,7 +138,7 @@ const tick = () => {
   const log = props.feed ? fromFeed() : newLog();
   if (!log) return;
   logs.value = [...logs.value, log].slice(-LOG_COUNT);
-  bars.value = [...bars.value.slice(1), newBar(log.level !== "info")];
+  if (props.chart) bars.value = [...bars.value.slice(1), newBar(log.level !== "info")];
 };
 
 let timer: ReturnType<typeof setInterval> | undefined;

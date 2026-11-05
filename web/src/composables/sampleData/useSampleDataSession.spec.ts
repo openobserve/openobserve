@@ -69,6 +69,17 @@ describe("useSampleDataSession remove", () => {
     expect(session.removing.value).toBe(false);
   });
 
+  it("ignores a second remove while one runs, so only one removal and one result", async () => {
+    let settle!: (kept: string[]) => void;
+    mocks.remove.mockReturnValue(new Promise<string[]>((r) => (settle = r)));
+    const first = session.remove("org-a");
+    await flushPromises();
+    expect(await session.remove("org-a")).toEqual([]);
+    expect(mocks.remove).toHaveBeenCalledTimes(1);
+    settle(["fn_a"]);
+    expect(await first).toEqual(["fn_a"]);
+  });
+
   it("keeps another org's running load and its progress", async () => {
     const load = session.start("org-a");
     await flushPromises();

@@ -32,7 +32,7 @@ vi.mock("@/composables/sampleData/useSampleDataSession", async () => {
     welcomeOpen: ref(false),
     fraction: ref(0.2),
     counts: reactive({ logs: 0, spans: 0, metrics: 0 }),
-    tour: ref(null),
+    tour: ref<{ org: string } | null>(null),
     start: vi.fn(),
     startTour: vi.fn(),
     openWelcome: vi.fn(),
@@ -65,6 +65,7 @@ describe("SampleDataProgressDock", () => {
     session.status.value = "loading";
     session.error.value = null;
     session.forbidden.value = false;
+    session.tour.value = null;
     session.start.mockClear();
   });
 
@@ -103,6 +104,24 @@ describe("SampleDataProgressDock", () => {
     await flushPromises();
     expect(wrapper.get('[data-test="sample-data-progress-dock-error"]').text()).toBe(
       enLocale.sampleData.loadForbidden,
+    );
+  });
+
+  it("hides Retry when the load was refused, since it would fail again", async () => {
+    const wrapper = mountDock();
+    session.status.value = "failed";
+    session.forbidden.value = true;
+    await flushPromises();
+    expect(wrapper.find('[data-test="sample-data-progress-dock-retry"]').exists()).toBe(false);
+  });
+
+  it("still shows the ready notice when the saved tour belongs to another org", async () => {
+    const wrapper = mountDock();
+    session.tour.value = { org: "other-org" };
+    session.status.value = "loaded";
+    await flushPromises();
+    expect(wrapper.get('[data-test="sample-data-progress-dock"]').attributes("data-state")).toBe(
+      "done",
     );
   });
 

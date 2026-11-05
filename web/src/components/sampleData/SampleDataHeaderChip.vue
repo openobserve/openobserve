@@ -164,8 +164,13 @@ const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_
 const removeAll = async () => {
   confirmRemove.value = false;
   try {
-    await session.remove(removeOrg);
-    toast({ variant: "success", message: t("sampleData.toast.removed") });
+    const kept = await session.remove(removeOrg);
+    toast({
+      variant: "success",
+      message: kept?.length
+        ? t("sampleData.toast.removedWithKept", kept.length)
+        : t("sampleData.toast.removed"),
+    });
   } catch (e: any) {
     toast({
       variant: "error",

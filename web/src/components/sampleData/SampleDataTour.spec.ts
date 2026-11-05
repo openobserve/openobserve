@@ -24,6 +24,9 @@ import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSess
 import { SAMPLE_TOUR_STEPS } from "@/utils/sampleData/tour";
 import { logsReapplyRequest } from "@/utils/queryHistory/logs";
 
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 const resolveMock = vi.hoisted(() => vi.fn());
 vi.mock("@/utils/sampleData/tour", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/sampleData/tour")>()),
@@ -95,6 +98,20 @@ describe("SampleDataTour", () => {
     await flushPromises();
     expect(session.tour.value?.index).toBe(0);
     expect(router.currentRoute.value.params.id).toBe(SAMPLE_TOUR_STEPS[0].id);
+  });
+
+  it("toasts and stays on the step when the next page cannot be resolved", async () => {
+    session.startTour(ORG, 1);
+    const { wrapper, router } = await mountTour();
+    resolveMock.mockRejectedValue(new Error("folders failed"));
+    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
+    await flushPromises();
+    expect(session.tour.value?.index).toBe(1);
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "error",
+      message: "Could not open this step. Try again.",
+    });
   });
 
   it("labels the finale buttons in Title Case", async () => {

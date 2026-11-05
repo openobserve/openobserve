@@ -46,4 +46,11 @@ describe("SampleLivePreview", () => {
     expect(setIntervalSpy).not.toHaveBeenCalled();
     expect(lineTexts(wrapper)).toEqual(before);
   });
+
+  it("leaves the bars alone on a tick when the chart is off", async () => {
+    const wrapper = mount(SampleLivePreview, { props: { chart: false } });
+    const before = (wrapper.vm as unknown as { bars: unknown }).bars;
+    await vi.advanceTimersByTimeAsync(1200);
+    expect((wrapper.vm as unknown as { bars: unknown }).bars).toBe(before);
+  });
 });

@@ -30734,7 +30734,6 @@
   },
   "sampleData": {
     "delete": "Delete Sample Data",
-    "remove": "Delete Sample Data",
     "loadForbidden": "You need write access to this organization to load sample data.",
     "steps": {
       "functions": "Creating functions",
@@ -30761,6 +30760,7 @@
       "loaded": "Sample data loaded. Happy exploring!",
       "loadFailed": "Could not load sample data",
       "removed": "Sample data removed",
+      "removedWithKept": "Sample data removed. {count} sample function stays because a pipeline uses it. | Sample data removed. {count} sample functions stay because pipelines use them.",
       "removeFailed": "Could not remove all sample data",
       "removeWhileLoading": "Wait for sample data to finish loading."
     },
@@ -30770,8 +30770,7 @@
     "callout": {
       "title": "Not ready to send data yet?",
       "body": "Explore {product} with a sample online store first: an incident in progress, and a guided tour through dashboards, alerts, logs, traces, metrics and pipelines.",
-      "cta": "Explore With Sample Data",
-      "loading": "Loading sample data…"
+      "cta": "Explore With Sample Data"
     },
     "header": {
       "label": "Sample Data",
@@ -30806,6 +30805,7 @@
       "position": "Guided tour · step {current} of {total}",
       "pill": "Tour {current}/{total}",
       "done": "Tour complete",
+      "stepFailed": "Could not open this step. Try again.",
       "minimize": "Minimize tour",
       "close": "End tour",
       "next": "Next",

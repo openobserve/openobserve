@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-surface flex size-12 shrink-0 items-center justify-center"
           :class="headerTint"
         >
-          <OIcon :name="headerIcon" size="md" />
+          <OIcon :name="headerIcon" size="md" :class="{ 'animate-spin': view === 'progress' }" />
         </span>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </h2>
             <div
               v-if="askHeard && view === 'choose'"
-              class="flex items-center gap-2"
+              class="flex flex-wrap items-center gap-2"
               data-test="onboarding-hear-about-us"
             >
               <label
@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 id="onboarding-hear-about-us"
                 v-model="heardFrom"
                 :options="heardOptions"
+                :aria-label="t('login.getStarted.heard.label')"
                 :placeholder="t('login.getStarted.heard.placeholder')"
                 size="xs"
                 width="sm"
@@ -259,7 +260,11 @@ const finish = (firstSource?: FirstSourceId) => {
   const id = org.value;
   if (firstSource) writeFirstSource(id, firstSource);
   const wasFirstLogin = firstLogin();
-  localStorage.removeItem("isFirstTimeLogin");
+  try {
+    localStorage.removeItem("isFirstTimeLogin");
+  } catch {
+    // blocked storage must not keep the dialog open
+  }
   if (config.isCloud !== "true" || !wasFirstLogin) return;
   const skipped = !firstSource;
   const from = heardFrom.value ?? "";
@@ -358,8 +363,14 @@ const maybeGreet = async () => {
 
 // every entry point loads through the session, so this one host announces the result
 watch(session.status, (now, before) => {
-  if (before !== "loading" || now !== "loaded") return;
+  if (before !== "loading" || (now !== "loaded" && now !== "failed")) return;
   const target = session.loadingOrg.value;
+  // the dialog's error view and the dock cover the current org
+  if (now === "failed") {
+    if (target !== org.value)
+      toast({ variant: "error", message: t("sampleData.toast.loadFailed") });
+    return;
+  }
   if (target === org.value) store.dispatch("setIsDataIngested", true);
   // the corner dock announces a finished load for this org; only a load left behind in another org needs a toast
   if (session.welcomeOpen.value || target === org.value) return;

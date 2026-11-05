@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           session.forbidden.value ? t("sampleData.loadForbidden") : raw(session.error.value)
         }}</span
       >
-      <div class="flex justify-end">
+      <div v-if="!session.forbidden.value" class="flex justify-end">
         <OButton
           variant="primary"
           size="sm"
@@ -150,7 +150,7 @@ const done = computed(
     session.status.value === "loaded" &&
     finishedInBackground.value &&
     !dismissed.value &&
-    !session.tour.value,
+    session.tour.value?.org !== org.value,
 );
 const failed = computed(
   () =>

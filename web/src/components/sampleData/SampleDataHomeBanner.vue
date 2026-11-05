@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="info"
     dense
     inline-actions
+    v-bind="$attrs"
     data-test="sample-data-cleanup-banner"
   >
     {{ t("sampleData.homeBanner.cleanup.message") }}
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="confirmRemove"
     :title="t('sampleData.removeConfirm.title')"
     :message="t('sampleData.removeConfirm.message')"
-    :ok-label="t('sampleData.remove')"
+    :ok-label="t('sampleData.delete')"
     ok-variant="destructive"
     focus-cancel
     data-test="sample-data-cleanup-dialog"
@@ -71,6 +72,9 @@ import {
 } from "@/composables/sampleData/useSampleDataSession";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 
+// the banner and its confirm dialog are siblings, so the parent's class goes to the banner
+defineOptions({ inheritAttrs: false });
+
 const { t } = useI18nTyped();
 const store = useStore();
 const session = useSampleDataSession();
@@ -89,8 +93,13 @@ const mode = computed<"cleanup" | null>(() => {
 const removeAll = async () => {
   confirmRemove.value = false;
   try {
-    await session.remove(org.value);
-    toast({ variant: "success", message: t("sampleData.toast.removed") });
+    const kept = await session.remove(org.value);
+    toast({
+      variant: "success",
+      message: kept?.length
+        ? t("sampleData.toast.removedWithKept", kept.length)
+        : t("sampleData.toast.removed"),
+    });
   } catch (e: any) {
     toast({
       variant: "error",

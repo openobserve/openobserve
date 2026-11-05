@@ -93,6 +93,30 @@ describe("SampleDataHomeBanner", () => {
   afterEach(() => wrapper.unmount());
 
   // Enter, Enter must not delete everything
+  it("passes the parent's class to the banner root", () => {
+    const w = mount(SampleDataHomeBanner, {
+      attrs: { class: "mt-2.5" },
+      global: {
+        plugins: [
+          i18n,
+          createStore({ state: { selectedOrganization: { identifier: ORG }, zoConfig: {} } }),
+        ],
+        stubs: { ConfirmDialog: ConfirmStub },
+      },
+    });
+    expect(w.get('[data-test="sample-data-cleanup-banner"]').classes()).toContain("mt-2.5");
+    w.unmount();
+  });
+
+  it("says how many sample functions stayed because pipelines use them", async () => {
+    vi.mocked(removeSampleData).mockResolvedValue(["fn_a"]);
+    await confirmRemove();
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "success",
+      message: "Sample data removed. 1 sample function stays because a pipeline uses it.",
+    });
+  });
+
   it("puts the focus on Cancel in the delete confirmation", () => {
     expect(wrapper.findComponent(ConfirmStub).props("focusCancel")).toBe(true);
   });

@@ -163,6 +163,7 @@ import { useRoute, useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -207,7 +208,7 @@ const current = computed<SampleTourStep | undefined>(() => SAMPLE_TOUR_STEPS[ind
 const { isLocked } = useLicenseLocks();
 const stepLocked = (step: SampleTourStep) => {
   try {
-    return isLocked(router.resolve({ name: step.routes[0] }).meta.licenseFeature);
+    return isLocked(router.resolve({ name: step.route }).meta.licenseFeature);
   } catch {
     return false;
   }
@@ -263,7 +264,8 @@ const cancelPendingStep = () => {
 // ending the tour, switching org or leaving must not let a pending step navigate
 watch([active, org], cancelPendingStep);
 onBeforeUnmount(cancelPendingStep);
-const showStep = async () => {
+// on failure the card goes back to `fallback`, so card and page agree
+const showStep = async (fallback: number) => {
   if (!current.value) return;
   const request = ++stepRequest;
   navigating.value = true;
@@ -280,26 +282,32 @@ const showStep = async () => {
       if (logsToLogs) requestLogsReapply(true);
     }
   } catch {
-    // a redundant navigation to the page already open is fine
+    if (request === stepRequest) {
+      session.setTourIndex(fallback);
+      toast({ variant: "error", message: t("sampleData.tour.stepFailed") });
+    }
   } finally {
     if (request === stepRequest) navigating.value = false;
   }
 };
 
 const next = async () => {
+  const from = index.value;
   session.setTourIndex(nextIndex.value);
-  if (current.value) await showStep();
+  if (current.value) await showStep(from);
   else cancelPendingStep();
 };
 
 const back = async () => {
-  session.setTourIndex(previousIndex.value ?? index.value);
-  if (current.value) await showStep();
+  const from = index.value;
+  session.setTourIndex(previousIndex.value ?? from);
+  if (current.value) await showStep(from);
 };
 
 const restart = async () => {
+  const from = index.value;
   session.setTourIndex(0);
-  await showStep();
+  await showStep(from);
 };
 
 const connectOwnData = () => {

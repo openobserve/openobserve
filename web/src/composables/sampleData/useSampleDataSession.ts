@@ -44,9 +44,8 @@ export class SampleLoadRunningError extends Error {}
 
 const TOUR_STORAGE_KEY = "o2_sample_tour";
 const WELCOME_SEEN_KEY = "o2_sample_welcome_seen";
-const TOUR_DONE_KEY = "o2_sample_tour_done";
 const CLEANUP_DISMISSED_KEY = "o2_sample_cleanup_dismissed";
-const ORG_FLAGS = [TOUR_DONE_KEY, CLEANUP_DISMISSED_KEY] as const;
+const ORG_FLAGS = [CLEANUP_DISMISSED_KEY] as const;
 
 type OrgFlag = (typeof ORG_FLAGS)[number];
 
@@ -166,7 +165,8 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
   }
 };
 
-const remove = async (org: string) => {
+const remove = async (org: string): Promise<string[]> => {
+  if (removing.value) return [];
   // the running load would recreate the streams and mark the org loaded again
   if (status.value === "loading" && loadingOrg.value === org) {
     throw new SampleLoadRunningError("Sample data is still loading");
@@ -227,7 +227,6 @@ const setTourIndex = (index: number) => {
   const next = Math.max(0, Math.min(last, index));
   tour.value = { ...tour.value, index: next, minimized: false };
   persistTour();
-  if (next === last) setOrgFlag(TOUR_DONE_KEY, tour.value.org, true);
 };
 
 const setTourOwnData = (ownData: boolean) => {
@@ -279,7 +278,6 @@ export const useSampleDataSession = () => ({
   setTourOwnData,
   welcomeSeen,
   markWelcomeSeen,
-  tourDone: (org: string) => orgFlag(TOUR_DONE_KEY, org),
   cleanupDismissed: (org: string) => orgFlag(CLEANUP_DISMISSED_KEY, org),
   dismissCleanup: (org: string) => setOrgFlag(CLEANUP_DISMISSED_KEY, org, true),
   openWelcome: () => (welcomeOpen.value = true),

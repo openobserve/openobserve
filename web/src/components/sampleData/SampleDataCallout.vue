@@ -36,11 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       icon-left="play-arrow"
       class="shrink-0"
+      :loading="loading"
       :disabled="session.status.value === 'loading' || session.removing.value"
       data-test="sample-data-callout-load"
       @click="session.loadInDialog(org, store.state.zoConfig?.ingest_allowed_upto)"
     >
-      {{ loading ? t("sampleData.callout.loading") : t("sampleData.callout.cta") }}
+      {{ t("sampleData.callout.cta") }}
     </OButton>
   </div>
 </template>

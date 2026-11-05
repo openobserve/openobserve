@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value="done ? 1 : session.fraction.value"
         :variant="done ? 'success' : 'default'"
         size="xs"
+        :aria-label="done ? t('sampleData.progress.done') : t('sampleData.progress.loading')"
       />
     </div>
 
@@ -50,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="tile.key"
         class="tabular-nums"
         :label="tile.label"
-        :value="counted ? shown[tile.key].toLocaleString() : '—'"
+        :value="shown[tile.key].toLocaleString()"
         :icon="tile.icon"
         :tone="tile.tone"
         :data-test="`sample-data-progress-${tile.key}`"
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <SampleLivePreview
       v-if="live || session.recentLogs.value.length"
+      class="shrink-0"
       :paused="!live"
       :chart="false"
       :feed="session.recentLogs.value"
@@ -89,7 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, watch } from "vue";
-import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
@@ -110,26 +111,12 @@ const COUNT_KEYS = ["logs", "spans", "metrics"] as const;
 const props = defineProps<{ done?: boolean }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
 const session = useSampleDataSession();
 const live = computed(() => !props.done && session.status.value === "loading");
 // the region stays in the page so the change of its text is announced
-const announcement = computed(() =>
-  props.done
-    ? t("sampleData.progress.done")
-    : session.status.value === "failed"
-      ? t("sampleData.toast.loadFailed")
-      : raw(""),
-);
+const announcement = computed(() => (props.done ? t("sampleData.progress.done") : raw("")));
 const percent = computed(() =>
   raw(`${props.done ? 100 : Math.round(session.fraction.value * 100)}%`),
-);
-// sample data loaded before this app session left no counts or step results behind
-const counted = computed(
-  () =>
-    !props.done ||
-    (session.status.value === "loaded" &&
-      session.loadingOrg.value === store.state.selectedOrganization?.identifier),
 );
 
 const tiles = computed<
@@ -180,7 +167,7 @@ const steps = computed(() =>
   SAMPLE_STEPS.map((id) => ({
     id,
     label: stepLabels.value[id],
-    status: counted.value ? session.steps[id] : ("done" as const),
+    status: session.steps[id],
   })),
 );
 
