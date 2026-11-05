@@ -558,7 +558,6 @@ pub async fn delete_by_date(
         return Err(e);
     }
 
-    // mark delete done
     // only tidies the settings, the next deletion retries
     if let Err(e) = prune_partition_time_level(org_id, stream_type, stream_name).await {
         log::warn!(
@@ -566,6 +565,7 @@ pub async fn delete_by_date(
         );
     }
 
+    // mark delete done
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
 }
 

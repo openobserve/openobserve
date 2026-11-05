@@ -83,8 +83,7 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    // an unsettled range can still receive files: seal full-size groups only, the scheduled pass
-    // seals the rest
+    // an unsettled range can still receive files: seal full-size groups only
     let offset = offset - offset % hour_micros(1);
     let settings = get_settings(org_id, stream_name, stream_type).await;
     let settings = settings.as_deref();
