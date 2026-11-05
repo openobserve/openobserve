@@ -86,6 +86,8 @@ export class ServicesCatalogPage {
     // data-test="service-graph-side-panel" from ServiceGraphNodeSidePanel.vue)
     // =====================================================================
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
+    this.sidePanelTitle = page.locator('[data-test="service-graph-side-panel"] [data-test="service-graph-side-panel-title"]');
+    this.sidePanelHealthBadge = page.locator('[data-test="service-graph-side-panel"] [data-test="service-health-badge"]');
     this.sidePanelViewRelatedBtn = page.locator('[data-test="service-graph-node-panel-view-related-btn"]');
     this.sidePanelViewRelatedTracesItem = page.locator('[data-test="service-graph-node-panel-view-related-traces-btn"]');
     this.tracesSearchBar = page.locator('[data-test="logs-search-bar"]');
@@ -449,6 +451,18 @@ export class ServicesCatalogPage {
 
   async expectSidePanelVisible() {
     await expect(this.sidePanel).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectSidePanelTitle(serviceName) {
+    await expect(this.sidePanelTitle).toHaveText(serviceName, { timeout: 15000 });
+  }
+
+  async expectSidePanelHealthBadge(label) {
+    await expect(this.sidePanelHealthBadge).toHaveText(label, { timeout: 15000 });
+  }
+
+  async expectStatusBadge(serviceName, label) {
+    await expect(this.getStatusBadgeLocator(serviceName)).toHaveText(label, { timeout: 30000 });
   }
 
   /** Leaves the catalog for the service's traces; the catalog component unmounts. */

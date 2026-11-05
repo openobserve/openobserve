@@ -448,6 +448,25 @@ describe("convertTraceData", () => {
       expect(result.options.series[0].orient).toBe("LR");
     });
 
+    it.each([
+      [0.99, "#52c41a"],
+      [1, "#faad14"],
+      [5, "#faad14"],
+      [5.01, "#fa8c16"],
+      [10.01, "#f5222d"],
+    ])(
+      "borders a node at an error rate of %s with %s on the shared health scale",
+      (errorRate, color) => {
+        const graphData = {
+          nodes: [{ id: "svc", label: "svc", error_rate: errorRate }],
+          edges: [],
+        };
+        const [node] = convertServiceGraphToTree(graphData, "horizontal", false).options.series[0]
+          .data;
+        expect(node.itemStyle.borderColor).toBe(color);
+      },
+    );
+
     it("auto-shrinks node symbol + label font when there are many leaf rows", () => {
       // ECharts fits the whole tree into the panel, so many leaf rows get
       // compressed until they'd overlap. The converter scales symbol + font down

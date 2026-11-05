@@ -25,6 +25,7 @@ import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
 import searchService from "@/services/search";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -3186,6 +3187,138 @@ describe("TraceDetails", () => {
       await wrapper.find('[data-test="trace-details-filters-drawer-primary"]').trigger("click");
 
       expect(wrapper.vm.searchObj.data.editorValue).toBe("status_code = 200");
+    });
+  });
+
+  // o2-enterprise#1578 (same-field conditions stacked) and #3126 B4 (always landed on Spans).
+  describe("Apply & Search from a span", () => {
+    let routerPushSpy: ReturnType<typeof vi.spyOn>;
+    const pushed = () => routerPushSpy.mock.calls.at(-1)?.[0] as any;
+    const pushedQueryText = () => b64DecodeUnicode(pushed().query.query);
+    const apply = (field: string, value: string, operator: "=" | "!=" = "=") =>
+      wrapper.vm.applyFilterImmediately({ field, value, operator });
+
+    beforeEach(() => {
+      routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper.vm.searchObj.data.editorValue = "";
+      wrapper.vm.searchObj.meta.searchMode = "traces";
+    });
+
+    afterEach(() => {
+      routerPushSpy.mockRestore();
+    });
+
+    it("replaces the earlier condition when the same field is applied twice", () => {
+      apply("service_name", "order-service");
+      expect(pushedQueryText()).toBe("service_name = 'order-service'");
+
+      apply("service_name", "frontend-app");
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("service_name = 'frontend-app'");
+      expect(pushedQueryText()).toBe("service_name = 'frontend-app'");
+    });
+
+    it("adds a second != on the same field, since excluding several values is valid", () => {
+      apply("service_name", "order-service", "!=");
+      apply("service_name", "inventory-service", "!=");
+      expect(pushedQueryText()).toBe(
+        "service_name != 'order-service' and service_name != 'inventory-service'",
+      );
+    });
+
+    it("does not repeat an identical != condition", () => {
+      apply("service_name", "order-service", "!=");
+      apply("service_name", "order-service", "!=");
+      expect(pushedQueryText()).toBe("service_name != 'order-service'");
+    });
+
+    it("wraps a query with a top-level or before adding the term", () => {
+      wrapper.vm.searchObj.data.editorValue = "service_name = 'a' or duration > 100";
+      apply("service_name", "b");
+      expect(pushedQueryText()).toBe(
+        "(service_name = 'a' or duration > 100) and service_name = 'b'",
+      );
+    });
+
+    it("keeps conditions on other fields and replaces only the repeated field", () => {
+      wrapper.vm.searchObj.data.editorValue = "duration > 100 and service_name = 'order-service'";
+      apply("operation_name", "create order");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and service_name = 'order-service' and operation_name = 'create order'",
+      );
+
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and service_name = 'frontend-app' and operation_name = 'create order'",
+      );
+    });
+
+    it("carries a pending sidebar filter into the query instead of dropping it", () => {
+      wrapper.vm.searchObj.data.editorValue = "duration > 100";
+      wrapper.vm.addFilterFromSidebar({ field: "http_method", value: "GET", operator: "=" });
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe(
+        "duration > 100 and http_method = 'GET' and service_name = 'frontend-app'",
+      );
+      expect(wrapper.vm.localEditorValue).toBe("");
+    });
+
+    it("lets the applied term replace a pending = on the same field", () => {
+      wrapper.vm.searchObj.data.editorValue = "service_name = 'order-service'";
+      wrapper.vm.addFilterFromSidebar({ field: "service_name", value: "cart", operator: "=" });
+      wrapper.vm.addFilterFromSidebar({ field: "http_method", value: "GET", operator: "!=" });
+      apply("service_name", "frontend-app");
+      expect(pushedQueryText()).toBe("service_name = 'frontend-app' and http_method != 'GET'");
+    });
+
+    it("returns to the Traces tab when the user came from it", () => {
+      apply("service_name", "order-service");
+      expect(pushed()).toMatchObject({
+        name: "traces",
+        query: { tab: "traces", "run-query": "true", stream: "test-stream" },
+      });
+      expect(pushed().query.trace_id).toBeUndefined();
+    });
+
+    it("returns to the Spans tab when the user came from it", () => {
+      wrapper.vm.searchObj.meta.searchMode = "spans";
+      apply("service_name", "order-service");
+      expect(pushed().query.tab).toBe("spans");
+    });
+
+    it("falls back to the Spans tab from a tab that does not search", () => {
+      wrapper.vm.searchObj.meta.searchMode = "services-catalog";
+      apply("service_name", "order-service");
+      expect(pushed().query.tab).toBe("spans");
+    });
+
+    it("carries the originating tab into the full-view URL", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const resolveSpy = vi.spyOn(router, "resolve").mockReturnValue({ href: "/full" } as any);
+
+      wrapper.vm.handleExpandToFullView();
+
+      expect(resolveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({ tab: "traces" }),
+        }),
+      );
+      windowOpenSpy.mockRestore();
+      resolveSpy.mockRestore();
+    });
+
+    it("returns to the Traces tab from a full view whose fresh search state says Spans", () => {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: { trace_id: "test-trace-id", stream: "test-stream", tab: "traces" },
+          name: "traceDetails",
+        },
+      } as any);
+      wrapper.vm.searchObj.meta.searchMode = "spans";
+
+      apply("service_name", "order-service");
+
+      expect(pushed()).toMatchObject({ name: "traces", query: { tab: "traces" } });
     });
   });
 
