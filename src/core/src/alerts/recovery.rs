@@ -20,7 +20,7 @@
 use config::meta::downtimes::TargetModule;
 use config::meta::{
     alerts::{alert::Alert, recovery::RecoveryEvent, state::AlertState},
-    self_reporting::usage::{TriggerData, TriggerDataType},
+    self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
 
 /// A clear run this long after the last window still closes the mute that window recorded.
@@ -170,6 +170,11 @@ async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Opt
             "[RECOVERY] destination consumer failed for {}: {e}",
             event.alert_id
         );
+        usage_reporting::publish_triggers_usage(failed_recovery_record(
+            alert,
+            event,
+            e.to_string(),
+        ));
     }
 
     if route.slack {
@@ -277,7 +282,23 @@ fn suppressed_recovery_record(
     event: &RecoveryEvent,
     downtime_id: String,
 ) -> TriggerData {
-    let mut data = TriggerData {
+    let mut data = recovery_record(alert, event);
+    crate::alerts::alert::record_suppressed_run(&mut data, "alerts", downtime_id);
+    data
+}
+
+/// The history record of a recovery a destination did not get.
+fn failed_recovery_record(alert: &Alert, event: &RecoveryEvent, error: String) -> TriggerData {
+    let mut data = recovery_record(alert, event);
+    data.status = RunOutcome::NotifyFailed;
+    data.error = Some(error);
+    data.delivery_attempted = Some(true);
+    data
+}
+
+/// The history record of one recovery.
+fn recovery_record(alert: &Alert, event: &RecoveryEvent) -> TriggerData {
+    TriggerData {
         _timestamp: event.emitted_at,
         org: event.org_id.clone(),
         module: TriggerDataType::Alert,
@@ -286,9 +307,7 @@ fn suppressed_recovery_record(
         end_time: event.emitted_at,
         is_realtime: alert.is_real_time,
         ..Default::default()
-    };
-    crate::alerts::alert::record_suppressed_run(&mut data, "alerts", downtime_id);
-    data
+    }
 }
 
 /// Asked at `recovered_at`, so a `keep_firing_for` hold that outlasts the window still mutes.
@@ -440,12 +459,9 @@ async fn recorded_downtime(alert_id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::{
-        alerts::{
-            recovery::{EpisodeInput, apply_episode, recovery_event},
-            state::AlertState,
-        },
-        self_reporting::usage::RunOutcome,
+    use config::meta::alerts::{
+        recovery::{EpisodeInput, apply_episode, recovery_event},
+        state::AlertState,
     };
 
     use super::*;
@@ -457,6 +473,37 @@ mod tests {
             keep_firing_for_secs: 0,
             episode_id: None,
         }
+    }
+
+    #[test]
+    fn a_failed_recovery_send_is_a_failed_run_in_history() {
+        let mut alert = Alert::default();
+        alert.name = "a".to_string();
+        let event = RecoveryEvent {
+            org_id: "o".to_string(),
+            alert_id: "id".to_string(),
+            group_key: String::new(),
+            episode_id: "ep".to_string(),
+            incident_id: None,
+            opened_at: 1,
+            recovered_at: 5,
+            emitted_at: 7,
+            last_notified_level: None,
+            group_labels: None,
+            firing_started_at: None,
+            reason: Default::default(),
+            group_label_set: None,
+            value: None,
+        };
+
+        let record = failed_recovery_record(&alert, &event, "destination rec: gone".to_string());
+
+        assert_eq!(record.status, RunOutcome::NotifyFailed);
+        assert_eq!(record.error.as_deref(), Some("destination rec: gone"));
+        assert_eq!(record.delivery_attempted, Some(true));
+        assert_eq!(record.key, "a/id");
+        assert_eq!(record.org, "o");
+        assert_eq!((record.start_time, record.end_time), (5, 7));
     }
 
     #[test]

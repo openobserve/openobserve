@@ -753,6 +753,23 @@ async fn dispatch_per_group(
         if muted_groups.contains_key(&item.group_key) {
             continue;
         }
+        // A failed delivery opens no silence window, so a later evaluation sends this group.
+        if config::meta::alerts::dispatch::group_firing_deadline_passed(triggered_at, now_micros())
+        {
+            let err_msg = format!(
+                "not sent: the {}s firing deadline passed",
+                config::meta::alerts::dispatch::GROUP_FIRING_DEADLINE_SECS
+            );
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: {err_msg}",
+                item.group_key
+            );
+            errors.push(format!("group {}: {err_msg}", item.group_key));
+            failed += 1;
+            let record = infra::table::alert_states::DeliveryOutcome::Failed { at: now_micros() };
+            record_group_delivery(alert, &alert_id, trace_id, item, record, None).await;
+            continue;
+        }
         // Chosen before the send: a resolve only closes a ticket opened under the key it quotes.
         let episode_key = (alert.notify_on_recovery || alert.suppresses_repeats()).then(|| {
             states
@@ -7388,6 +7405,85 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
+        use config::meta::alerts::{
+            Aggregation,
+            grouping::{GroupObservation, classify_groups_by, group_key},
+            level::AlertLevel,
+        };
+        use svix_ksuid::KsuidLike;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.org_id = format!("deadline_{}", now_micros());
+        alert.name = "deadline".to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.destinations = vec!["deadline-dest".to_string()];
+        alert.query_condition.aggregation = Some(
+            serde_json::from_value::<Aggregation>(serde_json::json!({
+                "group_by": ["host"],
+                "function": "count",
+                "having": {"column": "value", "operator": ">", "value": 1},
+            }))
+            .unwrap(),
+        );
+        let alert_id = alert.id.unwrap().to_string();
+        let hosts = ["a", "b"];
+        let labels = |host: &str| std::collections::BTreeMap::from([("host".into(), host.into())]);
+        let observations = hosts
+            .iter()
+            .map(|host| GroupObservation::new(labels(host), 5.0))
+            .collect();
+        let classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), 100);
+        let records: Vec<_> = hosts
+            .iter()
+            .map(|host| {
+                serde_json::json!({"host": host, "value": 5})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+        let now = now_micros();
+        let outcome = dispatch_per_group(
+            &alert,
+            "default",
+            "trace",
+            Some(&classification),
+            &records,
+            now,
+            Some(AlertLevel::Critical),
+            None,
+            now - 1_801 * 1_000_000,
+        )
+        .await
+        .expect("a classified alert with an id dispatches");
+
+        assert_eq!(outcome.failed, 2, "{:?}", outcome.errors);
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert!(
+            outcome.errors.iter().all(|e| e.contains("deadline")),
+            "{:?}",
+            outcome.errors
+        );
+        for host in hosts {
+            let state = infra::table::alert_states::get(&alert_id, &group_key(&labels(host)))
+                .await
+                .unwrap()
+                .expect("the plan wrote the group row");
+            assert_eq!(state.silenced_until, None);
+            assert_eq!(state.last_outcome, Some(RunOutcome::NotifyFailed));
+        }
+    }
 
     #[test]
     fn a_scheduled_run_refuses_a_pipeline_bound_to_another_org() {

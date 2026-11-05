@@ -318,6 +318,7 @@ pub struct UsedBy {
     pub anomaly: usize,
     pub synthetics: usize,
     pub on_call: usize,
+    pub composites: usize,
     #[serde(skip)]
     binding_names: Vec<String>,
 }
@@ -355,16 +356,27 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
             .into_iter()
             .map(|(_, team)| format!("on-call policy of team '{team}'"))
             .collect();
+    let composite_names: Vec<String> = infra::table::alert_composites::names_using_template(
+        infra::db::get_orm_client_ro().await,
+        binding_scope(org_id),
+        name,
+    )
+    .await?
+    .into_iter()
+    .map(|(_, composite)| format!("composite alert '{composite}'"))
+    .collect();
     Ok(UsedBy {
         destinations: destinations.len(),
         alerts: alerts.len(),
         anomaly: anomaly_names.len(),
         synthetics: synthetics_names.len(),
         on_call: on_call_names.len(),
+        composites: composite_names.len(),
         binding_names: anomaly_names
             .into_iter()
             .chain(synthetics_names)
             .chain(on_call_names)
+            .chain(composite_names)
             .collect(),
     })
 }
@@ -795,6 +807,63 @@ mod tests {
         })
         .await;
         true
+    }
+
+    /// Every firing of a composite whose template is gone fails before any destination is tried.
+    #[tokio::test]
+    async fn test_a_template_only_a_composite_uses_is_not_deleted() {
+        use infra::table::entity::alert_composites;
+        use sea_orm::ActiveValue::Set;
+
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let (org, name) = (format!("t_comp_org_{suffix}"), format!("t_comp_{suffix}"));
+        let template = Template {
+            org_id: org.clone(),
+            name: name.clone(),
+            body: "{}".to_string(),
+            ..Default::default()
+        };
+        infra::table::templates::put(template).await.unwrap();
+        let composite = alert_composites::ActiveModel {
+            id: Set(format!("t_comp_id_{suffix}")),
+            org: Set(org.clone()),
+            folder_id: Set("default".to_string()),
+            name: Set("the composite".to_string()),
+            description: Set(None),
+            expression: Set("true".to_string()),
+            warning_counts_as_firing: Set(false),
+            stale_child_policy: Set(0),
+            destinations: Set(serde_json::json!([])),
+            template: Set(Some(name.clone())),
+            context_attributes: Set(None),
+            enabled: Set(true),
+            silence_seconds: Set(0),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            priority: Set(None),
+            tags: Set(None),
+            owner: Set(None),
+            last_edited_by: Set(None),
+            updated_at: Set(None),
+            evaluation_generation: Set(0),
+            pending_period_sec: Set(0),
+        };
+        infra::table::alert_composites::create_with_children(
+            infra::db::get_orm_client_rw().await,
+            composite,
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        let refused = delete(&org, &name, false).await;
+        assert!(
+            matches!(&refused, Err(TemplateError::DeleteWithBinding(by)) if by.contains("the composite")),
+            "{refused:?}"
+        );
     }
 
     #[tokio::test]

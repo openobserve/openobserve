@@ -214,7 +214,11 @@ async fn alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationErr
     let mut uses = Vec::new();
     for (folder, alert) in alerts {
         let id = alert.id.map(|id| id.to_string()).unwrap_or_default();
-        for destination_name in unique_names(alert.destinations) {
+        let names = alert
+            .destinations
+            .into_iter()
+            .chain(alert.recovery_destinations);
+        for destination_name in unique_names(names.collect()) {
             uses.push(DestinationUse {
                 consumer: DestinationConsumer::Alert,
                 id: id.clone(),
@@ -492,6 +496,31 @@ mod tests {
             "destinations": [destination],
         }))
         .unwrap()
+    }
+
+    /// A recovery sent to a deleted destination is lost, so naming it only for recovery is a use.
+    #[tokio::test]
+    async fn test_alert_arm_counts_a_recovery_only_destination() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org_id = format!("du_recovery_{}", config::utils::time::now_micros());
+        ensure_default_folder(&org_id).await;
+        let mut alert = test_alert("du-recovery", "fire");
+        alert.recovery_destinations = vec!["rec".to_string(), "fire".to_string()];
+        let conn = get_orm_client_rw().await;
+        infra::table::alerts::create(conn, &org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let uses = destination_usage(&org_id, "rec").await.unwrap();
+        assert_eq!(uses.len(), 1);
+        assert_eq!(uses[0].consumer, DestinationConsumer::Alert);
+        assert_eq!(destination_usage(&org_id, "fire").await.unwrap().len(), 1);
     }
 
     /// The regression this module closes: `ALERTS` stays empty here, so a cache-backed guard would

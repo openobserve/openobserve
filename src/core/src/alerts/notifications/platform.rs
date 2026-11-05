@@ -208,11 +208,7 @@ async fn request(
         .await
         .map_err(|e| anyhow::anyhow!("URL blocked by SSRF guard: {e}"))?;
 
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = super::send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let mut req = client.request(method, url::Url::parse(url)?);
 
@@ -255,6 +251,28 @@ mod tests {
     use config::meta::destinations::{DestinationType, Endpoint};
 
     use super::*;
+
+    #[test]
+    fn a_platform_that_never_answers_fails_at_the_notification_timeout() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::a_platform_that_never_answers_fails_at_the_notification_timeout"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::hanging_server().await;
+                let endpoint = Endpoint::default();
+                let url = format!("{base}/hang");
+                let send = request(&endpoint, reqwest::Method::POST, &url, None);
+                let sent = tokio::time::timeout(std::time::Duration::from_secs(10), send).await;
+                assert!(sent.expect("the platform send has no limit").is_err());
+            },
+        );
+    }
 
     fn meta(routing_key: &str) -> hashbrown::HashMap<String, String> {
         let mut m = hashbrown::HashMap::new();

@@ -42,6 +42,9 @@ use crate::{
     utils::json::{Map, Value},
 };
 
+/// How long after its claim an evaluation may start a group send; each send can take its timeout.
+pub const GROUP_FIRING_DEADLINE_SECS: i64 = 1_800;
+
 /// The version a delayed delivery carries — the group's **level-episode** at
 /// enqueue time (§5.5 round-6): `level_since` advances only when the level
 /// changes, so it is stable across same-level evaluations.
@@ -542,6 +545,11 @@ impl DeliveryEpisode {
     }
 }
 
+/// Whether a firing claimed at `started_at` must stop sending; a claim with no start never does.
+pub fn group_firing_deadline_passed(started_at: i64, now: i64) -> bool {
+    started_at > 0 && now.saturating_sub(started_at) > GROUP_FIRING_DEADLINE_SECS * 1_000_000
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -577,6 +585,14 @@ mod tests {
     }
 
     // ===================== PromQL series identity =========================
+
+    #[test]
+    fn the_group_firing_deadline_stops_sends_only_after_its_limit() {
+        let limit = GROUP_FIRING_DEADLINE_SECS * 1_000_000;
+        assert!(!group_firing_deadline_passed(1_000, 1_000 + limit));
+        assert!(group_firing_deadline_passed(1_000, 1_001 + limit));
+        assert!(!group_firing_deadline_passed(0, i64::MAX));
+    }
 
     #[test]
     fn promql_series_labels_take_every_label_and_drop_the_measurements() {

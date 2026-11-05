@@ -793,6 +793,7 @@ fn composite_error_response(
             "jira_destination_not_supported",
             error,
         ),
+        CompositeServiceError::NotificationTarget(error) => error.into(),
     }
 }
 
@@ -4416,6 +4417,23 @@ mod tests {
             status(AlertError::MoveDestinationFolderNotFound),
             StatusCode::NOT_FOUND
         );
+    }
+
+    #[test]
+    fn test_composite_missing_destination_or_template_is_not_found() {
+        use openobserve_core::alerts::composite::CompositeServiceError;
+        for error in [
+            AlertError::AlertDestinationNotFound {
+                dest: "pagerduty".to_string(),
+            },
+            AlertError::AlertTemplateNotFound {
+                template: "default".to_string(),
+            },
+        ] {
+            let response =
+                super::composite_error_response(CompositeServiceError::NotificationTarget(error));
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        }
     }
 
     #[test]

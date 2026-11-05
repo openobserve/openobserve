@@ -2937,6 +2937,12 @@ pub struct Limit {
     )]
     pub alert_max_group_notifications_per_eval: usize,
     #[env_config(
+        name = "ZO_ALERT_NOTIFICATION_TIMEOUT",
+        default = 30,
+        help = "Total time limit in seconds for one notification request to a destination, connection included. 0 uses the default of 30."
+    )]
+    pub alert_notification_timeout: u64,
+    #[env_config(
         name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
         default = 60,
         help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
@@ -4307,6 +4313,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
+
+    // a zero limit fails every send, so it means the default
+    if cfg.limit.alert_notification_timeout == 0 {
+        cfg.limit.alert_notification_timeout = 30;
+    }
 
     // retain for atleast 1 hour
     if cfg.limit.workflow_error_retention_secs <= 3600 {
