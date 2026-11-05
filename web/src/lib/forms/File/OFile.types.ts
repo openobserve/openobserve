@@ -17,6 +17,8 @@ export interface FileProps {
   multiple?: boolean;
   /** Comma-separated list of MIME types / extensions (e.g. "image/*,.pdf") */
   accept?: string;
+  /** Toast a file the accept list rejects; false when the caller states the refusal itself. Defaults to true. */
+  typeErrorToast?: boolean;
   /** Maximum allowed file size in bytes — emits "size-error" when exceeded */
   maxFileSize?: number;
   /** Show drag-and-drop drop zone */

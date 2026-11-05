@@ -1,0 +1,10 @@
+{
+  "_source": "B-07 resource frame (00 §18); the resource type travels as resource_type because type is the frame discriminator",
+  "_item": "B-07",
+  "frame": {
+    "type": "resource_changed",
+    "resource_type": "alert",
+    "id": "2Yx9alert",
+    "op": "delete"
+  }
+}

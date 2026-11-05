@@ -19,7 +19,7 @@ use std::sync::Arc;
 // use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
 use common::{
     infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
-    meta::organization::{Organization, OrganizationSetting},
+    meta::organization::{OrgAiSettings, Organization, OrganizationSetting},
 };
 use config::{
     get_config,
@@ -45,23 +45,15 @@ pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
 
+/// Writes every field but `ai`, which keeps its stored value: only `/ai/settings` changes it.
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
-    db::put(
-        &key,
-        json::to_vec(&setting).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await?;
+    let setting = setting.clone();
+    write_merged(org_name, move |stored| keep_stored_ai(stored, setting)).await
+}
 
-    // cache the org setting
-    ORGANIZATION_SETTING
-        .clone()
-        .write()
-        .await
-        .insert(key.to_string(), setting.clone());
-    Ok(())
+/// Writes only `ai`, keeping every other stored field.
+pub async fn set_org_ai_settings(org_id: &str, ai: OrgAiSettings) -> errors::Result<()> {
+    write_merged(org_id, move |stored| with_ai(stored, ai)).await
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
@@ -198,6 +190,11 @@ where
         super_cluster::organization_setting_put(org_id, value.clone()).await?;
     }
     Ok(written.is_some())
+}
+
+/// An org's assistant settings, `None` when never saved; read from the cache like the others.
+pub async fn get_org_ai_settings(org_id: &str) -> Result<Option<OrgAiSettings>, Error> {
+    read_org_setting(org_id, |s| s.ai.clone()).await
 }
 
 /// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
@@ -551,7 +548,7 @@ fn to_organization(org: organizations::OrganizationRecord) -> Organization {
     }
 }
 
-/// Returns the stored bytes when it wrote, the full value the other regions must receive.
+/// The committed bytes, `None` when `apply` changed nothing; other regions get exactly these.
 async fn update_org_setting_in<F>(
     store: &dyn infra::db::Db,
     org_id: &str,
@@ -754,6 +751,37 @@ fn first_positive(levels: &[i64]) -> i64 {
         .map_or(0, |days| (*days).min(MAX_DATA_RETENTION_DAYS))
 }
 
+/// Applies `merge` through [`update_org_setting`], so no writer undoes another's fields.
+async fn write_merged(
+    org_id: &str,
+    merge: impl FnOnce(OrganizationSetting) -> OrganizationSetting + Send + 'static,
+) -> errors::Result<()> {
+    update_org_setting(org_id, move |settings| {
+        *settings = merge(std::mem::take(settings));
+        true
+    })
+    .await
+    .map(|_| ())
+    .map_err(|e| Error::Message(e.to_string()))
+}
+
+fn keep_stored_ai(
+    stored: OrganizationSetting,
+    setting: OrganizationSetting,
+) -> OrganizationSetting {
+    OrganizationSetting {
+        ai: stored.ai,
+        ..setting
+    }
+}
+
+fn with_ai(stored: OrganizationSetting, ai: OrgAiSettings) -> OrganizationSetting {
+    OrganizationSetting {
+        ai: Some(ai),
+        ..stored
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -874,6 +902,29 @@ mod tests {
         async fn add_start_dt_column(&self) -> errors::Result<()> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn a_general_save_keeps_the_stored_assistant_switch_and_the_switch_keeps_the_rest() {
+        let off = OrgAiSettings {
+            enabled: false,
+            ..Default::default()
+        };
+        let stored = OrganizationSetting {
+            ai: Some(off.clone()),
+            scrape_interval: 15,
+            ..Default::default()
+        };
+        let stale = OrganizationSetting {
+            ai: Some(OrgAiSettings::default()),
+            scrape_interval: 30,
+            ..Default::default()
+        };
+        let saved = keep_stored_ai(stored.clone(), stale);
+        assert_eq!((saved.ai.as_ref(), saved.scrape_interval), (Some(&off), 30));
+        let switched = with_ai(saved, OrgAiSettings::default());
+        assert_eq!(switched.scrape_interval, 30);
+        assert!(switched.ai.unwrap().enabled);
     }
 
     #[test]

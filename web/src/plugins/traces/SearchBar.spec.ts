@@ -1989,6 +1989,73 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("Set by assistant labels", () => {
+    const tag = (field: string) => wrapper.find(`[data-test="traces-assistant-set-${field}"]`);
+
+    it("labels the query and the time range the assistant set", async () => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["query", "time"]) });
+      await flushPromises();
+      // This suite's i18n echoes keys.
+      expect(tag("query").text()).toContain("traces.assistantSet.label");
+      expect(tag("query").attributes("role")).toBe("note");
+      expect(tag("time").exists()).toBe(true);
+    });
+
+    it("shows no label for a field the assistant did not set", async () => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["stream"]) });
+      await flushPromises();
+      expect(tag("query").exists()).toBe(false);
+      expect(tag("time").exists()).toBe(false);
+    });
+
+    it("reports the query label cleared on the user's edit", async () => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["query", "time"]) });
+      await flushPromises();
+      wrapper
+        .findComponent(sharedStubs.UnifiedQueryEditor as any)
+        .vm.$emit("user-edit", false, false);
+      expect(wrapper.emitted("assistant-set-cleared")).toEqual([["query"]]);
+    });
+
+    it("reports the time label cleared on the user's date change, not on a replay", async () => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["time"]) });
+      await flushPromises();
+      const picker = wrapper.findComponent(sharedStubs.DateTime as any);
+      picker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, userChangedValue: false });
+      await flushPromises();
+      expect(wrapper.emitted("assistant-set-cleared")).toBeUndefined();
+      picker.vm.$emit("on:date-change", { startTime: 1, endTime: 3, userChangedValue: true });
+      await flushPromises();
+      expect(wrapper.emitted("assistant-set-cleared")).toEqual([["time"]]);
+    });
+
+    it.each([
+      ["Reset", (vm: any) => vm.resetFilters()],
+      ["an applied filter", (vm: any) => vm.applyFilters(["span_status = 'ERROR'"], true)],
+      [
+        "a removed filter",
+        (vm: any) => {
+          searchObjInstance.data.editorValue = "span_status = 'ERROR'";
+          vm.removeFilterByField("span_status");
+        },
+      ],
+    ])("reports the query label cleared on %s", async (_name, act) => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["query", "time"]) });
+      await flushPromises();
+      act(wrapper.vm);
+      expect(wrapper.emitted("assistant-set-cleared")).toEqual([["query"]]);
+    });
+
+    it("reports nothing for a field the assistant did not set", async () => {
+      wrapper = mountSearchBar({ assistantSet: new Set(["stream"]) });
+      await flushPromises();
+      wrapper
+        .findComponent(sharedStubs.UnifiedQueryEditor as any)
+        .vm.$emit("user-edit", false, false);
+      expect(wrapper.emitted("assistant-set-cleared")).toBeUndefined();
+    });
+  });
+
   describe("updateDateTime", () => {
     it("should update datetime with absolute times when relativeTimePeriod is absent", async () => {
       wrapper = mountSearchBar();

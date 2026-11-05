@@ -163,4 +163,11 @@ describe("OTag removable", () => {
     });
     expect(w.find("[data-test='o2-badge-remove']").attributes("aria-label")).toBe("Remove prod");
   });
+
+  it("takes a caller-supplied data-test for the remove button", () => {
+    const w = mount(OTag, {
+      props: { value: "prod", removable: true, removeDataTest: "chip-remove" },
+    });
+    expect(w.find("button").attributes("data-test")).toBe("chip-remove");
+  });
 });

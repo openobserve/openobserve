@@ -150,7 +150,7 @@ fn v4_read_filter(query: &ServiceGraphQuery, scope: StreamScope) -> super::v4::r
 }
 
 /// `stream_name=all` is the front end's "every stream" choice, not a stream.
-#[cfg(feature = "enterprise")]
+#[cfg(any(feature = "enterprise", test))]
 fn trace_stream_filter(stream_name: Option<String>) -> Option<String> {
     stream_name.filter(|s| !s.is_empty() && s != "all")
 }
@@ -243,6 +243,89 @@ pub async fn get_edge_history(
     _org_id: &str,
     _user_id: &str,
     _query: EdgeHistoryQuery,
+) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ServicesTrendQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub baseline_hours: Option<i64>,
+    pub stream_name: Option<String>,
+    pub limit: Option<i64>,
+    pub include: Option<String>,
+}
+
+/// GetServicesTrend (Enterprise)
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/services/trend",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetServiceGraphServicesTrend",
+    summary = "Get per-service RED figures against a baseline",
+    description = "Returns each service's requests, error rate and p99 latency over the window (default: last 60 minutes, at most 7 days) against the preceding baseline hours, ranked by error and latency signals, with a per-step series. Only the trace streams the user may read are included.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds); alone, the window ends now"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds); alone, the window is the 60 minutes before it"),
+        ("baseline_hours" = Option<u32>, Query, description = "Hours of baseline before the window, 1 to 168 (default 24)"),
+        ("stream_name" = Option<String>, Query, description = "Trace stream filter"),
+        ("limit" = Option<u32>, Query, description = "Ranked services to return, clamped to 1..=50 (default 12)"),
+        ("include" = Option<String>, Query, description = "Comma-separated services returned even when they do not rank, at most 12"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::service_graph::ServicesTrendResponse),
+        (status = 400, description = "Invalid time window, a window over 7 days, baseline_hours outside 1..=168, more than 12 include names, or a name the metrics query cannot quote", content_type = "application/json", body = String),
+        (status = 403, description = "Forbidden: an enterprise feature, or the user may not read the requested trace stream or any trace stream"),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[cfg(feature = "enterprise")]
+pub async fn get_services_trend(
+    org_id: &str,
+    user_id: &str,
+    query: ServicesTrendQuery,
+) -> HttpResponse {
+    use super::v4::{Settings, services_trend::fetch_services_trend};
+
+    let now = chrono::Utc::now().timestamp_micros();
+    let max_days = max_window_days(config::get_config().compact.data_retention_days);
+    let mut req = match trend_request(query, now, max_days) {
+        Ok(req) => req,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
+    let readable = readable_trace_streams(org_id, user_id).await;
+    let Some(scope) = scope_streams(req.trace_stream.take(), readable) else {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    };
+    req.trace_stream = scope.trace_stream;
+    req.visible_streams = scope.visible_streams;
+    if let Err(e) = req.validate() {
+        return MetaHttpResponse::bad_request(e);
+    }
+    let horizon = Settings::from_config().horizon(now);
+    match fetch_services_trend(org_id, &req, horizon).await {
+        Ok(data) => MetaHttpResponse::json(data),
+        Err(e) => {
+            log::error!("[ServiceGraph] services trend query failed for org '{org_id}': {e}");
+            MetaHttpResponse::internal_error(e)
+        }
+    }
+}
+
+/// GetServicesTrend (OSS - Not Supported)
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_services_trend(
+    _org_id: &str,
+    _user_id: &str,
+    _query: ServicesTrendQuery,
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -349,6 +432,66 @@ fn scope_streams(requested: Option<String>, readable: Option<Vec<String>>) -> Op
 #[cfg(any(feature = "enterprise", test))]
 fn max_window_days(retention_days: i64) -> i64 {
     retention_days.max(MIN_MAX_WINDOW_DAYS)
+}
+
+/// Fills a missing bound from the other, since `resolve_window` drops a lone bound.
+#[cfg(any(feature = "enterprise", test))]
+fn trend_request(
+    query: ServicesTrendQuery,
+    now: i64,
+    max_days: i64,
+) -> Result<super::v4::services_trend::TrendRequest, String> {
+    use super::v4::services_trend::{
+        DEFAULT_BASELINE_HOURS, DEFAULT_LIMIT, MAX_BASELINE_HOURS, MAX_INCLUDE, MAX_LIMIT,
+        MAX_TREND_WINDOW_MICROS, TrendRequest,
+    };
+
+    let default_span = super::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
+    let (start, end) = match (query.start_time, query.end_time) {
+        (None, Some(end)) => (Some(end.saturating_sub(default_span)), Some(end)),
+        (Some(start), None) => (Some(start), Some(now)),
+        bounds => bounds,
+    };
+    let (start, end) = resolve_window(start, end, now, default_span, max_days)?;
+    if end - start > MAX_TREND_WINDOW_MICROS {
+        return Err("the window from start_time to end_time must not exceed 7 days".to_string());
+    }
+    let baseline_hours = query
+        .baseline_hours
+        .unwrap_or(i64::from(DEFAULT_BASELINE_HOURS));
+    if !(1..=i64::from(MAX_BASELINE_HOURS)).contains(&baseline_hours) {
+        return Err(format!(
+            "baseline_hours must be between 1 and {MAX_BASELINE_HOURS}"
+        ));
+    }
+    let mut include: Vec<String> = query
+        .include
+        .as_deref()
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    include.sort();
+    include.dedup();
+    if include.len() > MAX_INCLUDE {
+        return Err(format!("include must name at most {MAX_INCLUDE} services"));
+    }
+    let req = TrendRequest {
+        start,
+        end,
+        baseline_hours: baseline_hours as u32,
+        limit: query
+            .limit
+            .unwrap_or(DEFAULT_LIMIT as i64)
+            .clamp(1, MAX_LIMIT as i64) as usize,
+        include,
+        trace_stream: trace_stream_filter(query.stream_name),
+        visible_streams: None,
+    };
+    req.validate()?;
+    Ok(req)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -519,6 +662,109 @@ mod tests {
         assert!(readable_among(vec![], "_o2_all_", &reads).await.is_empty());
     }
 
+    fn trend(
+        query: ServicesTrendQuery,
+    ) -> Result<super::super::v4::services_trend::TrendRequest, String> {
+        trend_request(query, NOW, MAX_DAYS)
+    }
+
+    fn trend_window(start: Option<i64>, end: Option<i64>) -> ServicesTrendQuery {
+        ServicesTrendQuery {
+            start_time: start,
+            end_time: end,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_trend_request_fills_a_lone_bound_then_caps_at_seven_days() {
+        let week = 7 * DAY_MICROS;
+        let window = |q| trend(q).map(|r| (r.start, r.end));
+        assert_eq!(window(trend_window(None, None)), Ok((NOW - SPAN, NOW)));
+        assert_eq!(
+            window(trend_window(None, Some(NOW - 10))),
+            Ok((NOW - 10 - SPAN, NOW - 10))
+        );
+        assert_eq!(
+            window(trend_window(Some(NOW - 50), None)),
+            Ok((NOW - 50, NOW))
+        );
+        assert_eq!(
+            window(trend_window(Some(NOW - week), Some(NOW))),
+            Ok((NOW - week, NOW))
+        );
+        let err = trend(trend_window(Some(NOW - week - 1), Some(NOW))).unwrap_err();
+        assert!(err.contains("7 days"), "{err}");
+        assert!(trend(trend_window(Some(NOW), Some(NOW - 1))).is_err());
+        assert!(
+            trend(trend_window(None, Some(10))).is_err(),
+            "a filled start below zero is refused"
+        );
+    }
+
+    #[test]
+    fn test_trend_request_rejects_baseline_hours_out_of_range() {
+        let hours = |h| {
+            trend(ServicesTrendQuery {
+                baseline_hours: h,
+                ..Default::default()
+            })
+            .map(|r| r.baseline_hours)
+        };
+        assert_eq!(hours(None), Ok(24));
+        assert_eq!(hours(Some(1)), Ok(1));
+        assert_eq!(hours(Some(168)), Ok(168));
+        assert!(hours(Some(0)).is_err());
+        assert!(hours(Some(169)).is_err());
+        assert!(hours(Some(-1)).is_err());
+    }
+
+    #[test]
+    fn test_trend_request_clamps_limit_and_bounds_include() {
+        let limit = |l| {
+            trend(ServicesTrendQuery {
+                limit: l,
+                ..Default::default()
+            })
+            .map(|r| r.limit)
+        };
+        assert_eq!(limit(None), Ok(12));
+        assert_eq!(limit(Some(0)), Ok(1));
+        assert_eq!(limit(Some(99)), Ok(50));
+        let include = |names: &str| {
+            trend(ServicesTrendQuery {
+                include: Some(names.to_string()),
+                ..Default::default()
+            })
+            .map(|r| r.include)
+        };
+        let twelve: Vec<String> = (0..12).map(|i| format!("svc-{i:02}")).collect();
+        assert_eq!(include(&twelve.join(",")), Ok(twelve.clone()));
+        assert_eq!(
+            include(" b ,a,,b"),
+            Ok(vec!["a".to_string(), "b".to_string()])
+        );
+        let err = include(&format!("{},svc-12", twelve.join(","))).unwrap_err();
+        assert!(err.contains("12"), "{err}");
+        assert!(include("ok,bad\tname").is_err());
+        assert!(include("quote\"and\\slash").is_ok());
+    }
+
+    #[test]
+    fn test_trend_request_maps_stream_filter() {
+        let stream = |s: &str| {
+            trend(ServicesTrendQuery {
+                stream_name: Some(s.to_string()),
+                ..Default::default()
+            })
+            .map(|r| r.trace_stream)
+        };
+        assert_eq!(stream("all"), Ok(None));
+        assert_eq!(stream(""), Ok(None));
+        assert_eq!(stream("default"), Ok(Some("default".to_string())));
+        assert!(stream("bad\u{7}").is_err());
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_v4_read_filter_maps_scope_and_env_only() {
@@ -615,5 +861,27 @@ mod tests {
             near_max_topology.status(),
             axum::http::StatusCode::BAD_REQUEST
         );
+
+        let now = chrono::Utc::now().timestamp_micros();
+        let over_a_week = get_services_trend(
+            Path("default".to_string()),
+            Query(ServicesTrendQuery {
+                start_time: Some(now - 8 * DAY_MICROS),
+                end_time: Some(now),
+                ..Default::default()
+            }),
+        )
+        .await;
+        assert_eq!(over_a_week.status(), axum::http::StatusCode::BAD_REQUEST);
+
+        let bad_baseline = get_services_trend(
+            Path("default".to_string()),
+            Query(ServicesTrendQuery {
+                baseline_hours: Some(169),
+                ..Default::default()
+            }),
+        )
+        .await;
+        assert_eq!(bad_baseline.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 }

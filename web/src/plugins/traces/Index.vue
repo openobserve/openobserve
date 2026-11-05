@@ -81,6 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
+              :assistant-set="assistantSet"
+              @assistant-set-cleared="onAssistantSetCleared"
             />
           </div>
         </template>
@@ -105,6 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServicesCatalog
                 ref="servicesCatalogRef"
                 class="h-full"
+                :initial-service="initialService ?? undefined"
+                :service-handoff="serviceHandoff"
                 @view-traces="handleServicesCatalogViewTraces"
                 @request:stream-change="onChildStreamChangeRequest"
                 @jump-to-stream-data="onJumpToPanelStreamData"
@@ -139,6 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="h-full"
                       @update:changeStream="onChangeStream"
                       @update:selectedFields="updateFieldVisibility"
+                      :assistant-set="assistantSet"
+                      @assistant-set-cleared="onAssistantSetCleared"
                     />
                   </div>
                 </template>
@@ -182,7 +188,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="hero"
                         @ask-ai="onAskAiTracing"
                         @configure-resource="onConfigureTracesStream"
-                      />
+                      >
+                        <template v-if="assistantV2" #ai-door>
+                          <AiEntryButton v-bind="tracesErrorDoor" appearance="chip" />
+                        </template>
+                      </QueryErrorState>
                     </div>
                     <div
                       v-else-if="!searchObj.loadingStream && !isStreamSelected"
@@ -270,6 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-full"
           @update:changeStream="onChangeStream"
           @update:selectedFields="updateFieldVisibility"
+          :assistant-set="assistantSet"
+          @assistant-set-cleared="onAssistantSetCleared"
         />
       </div>
     </ODrawer>
@@ -307,7 +319,16 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
+import {
+  ASSISTANT_SET_QUERY_KEY,
+  decodeAssistantSet,
+  encodeAssistantSet,
+  type AssistantSetField,
+} from "@/composables/assistant/pure";
+import { HOME_RETURN_QUERY_KEY } from "@/composables/goto/homeReturn";
 
 import useTraces from "@/composables/useTraces";
 import { contextRegistry, createTracesContextProvider } from "@/composables/contextProviders";
@@ -407,6 +428,11 @@ const activeTab = computed(() => {
 const router = useRouter();
 trackPendingNavigation(router);
 const { t } = useI18nTyped();
+// The filters an assistant link set; each leaves once the user changes that control.
+const assistantSet = ref<Set<AssistantSetField>>(new Set());
+const initialService = ref<string | null>(null);
+// Bumped per URL read that names a service, so a kept-alive catalog re-applies a second link, even to the same name.
+const serviceHandoff = ref(0);
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
 const {
@@ -762,7 +788,7 @@ function buildSearch(reuseLastWindow = false) {
 
     req.query.sql = b64EncodeUnicode(req.query.sql);
 
-    const queryParams = getUrlQueryParams();
+    const queryParams = { ...getUrlQueryParams(), ...carriedQuery() };
 
     if (canWriteTracesUrl()) router.push({ query: queryParams });
     return req;
@@ -1609,6 +1635,28 @@ const sortNeedsSchema = () => {
   return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
 };
 
+// An assistant link applies its stream, window and filter but never runs them.
+const fromAssistant = () => assistantV2 && router.currentRoute.value.query.type === "ai_chat_query";
+
+// A service link lands on the catalog, which loads its own rows once the stream and handoff change.
+const serviceLinked = () => typeof router.currentRoute.value.query.service === "string";
+
+// A second assistant link to the open page changes only its query, so the reused page re-applies on the nonce.
+watch(
+  () => router.currentRoute.value.query.t,
+  async (nonce, previous) => {
+    // A link to another page lands here before onDeactivated; a hidden page loads on activation.
+    if (router.currentRoute.value.name !== "traces") return;
+    if (!pageActive.value || !nonce || nonce === previous) return;
+    if (fromAssistant()) {
+      restoreUrlQueryParams();
+      await loadPageData();
+    } else if (serviceLinked()) {
+      restoreUrlQueryParams();
+    }
+  },
+);
+
 /** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
 async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
@@ -1641,7 +1689,7 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;
-  if (searchObj.data.stream.selectedStream.value) {
+  if (searchObj.data.stream.selectedStream.value && !fromAssistant()) {
     // Only a restore from recent searches is a user run; any other landing runs without recording.
     if (landing) {
       if (landing.run) searchData();
@@ -1890,6 +1938,9 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+  } else if (fromAssistant()) {
+    // A link with no filter means none, so the last visit's text must not run under its name.
+    searchObj.data.editorValue = "";
   }
 
   searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
@@ -1902,6 +1953,37 @@ function restoreUrlQueryParams() {
   }
 
   pendingUrlPage = applyUrlListState(queryParams).currentPage;
+  assistantSet.value = decodeAssistantSet(queryParams[ASSISTANT_SET_QUERY_KEY]);
+  initialService.value =
+    typeof queryParams.service === "string" && queryParams.service ? queryParams.service : null;
+  if (initialService.value) serviceHandoff.value++;
+}
+
+// A search rebuilds the query from search state, which knows nothing of the way back or the assistant's labels.
+function carriedQuery(): Record<string, string> {
+  const carried: Record<string, string> = {};
+  const homeReturn = router.currentRoute.value.query[HOME_RETURN_QUERY_KEY];
+  if (typeof homeReturn === "string") carried[HOME_RETURN_QUERY_KEY] = homeReturn;
+  if (assistantSet.value.size > 0)
+    carried[ASSISTANT_SET_QUERY_KEY] = encodeAssistantSet([...assistantSet.value]);
+  return carried;
+}
+
+// The preselect is for the visit the link opened; coming back to the tab shows the user's own catalog.
+watch(activeTab, (tab, previous) => {
+  if (previous === "services-catalog" && tab !== previous) initialService.value = null;
+});
+
+function onAssistantSetCleared(field: AssistantSetField) {
+  if (!assistantSet.value.has(field)) return;
+  // A user stream change also empties the editor, so the query is no longer the assistant's either.
+  const dropped: AssistantSetField[] = field === "stream" ? ["stream", "query"] : [field];
+  const next = new Set([...assistantSet.value].filter((f) => !dropped.includes(f)));
+  assistantSet.value = next;
+  const query = { ...router.currentRoute.value.query };
+  if (next.size > 0) query[ASSISTANT_SET_QUERY_KEY] = encodeAssistantSet([...next]);
+  else delete query[ASSISTANT_SET_QUERY_KEY];
+  if (canWriteTracesUrl()) void router.replace({ query });
 }
 
 const onSplitterUpdate = () => {
@@ -1961,6 +2043,7 @@ const setHistogramDate = async (date: any) => {
 const onMetricsEditorFilterSet = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
+  onAssistantSetCleared("query");
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
@@ -1968,6 +2051,7 @@ const onMetricsEditorFilterSet = (text: string) => {
 const onMetricsEditorFilterRun = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
+  onAssistantSetCleared("query");
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
@@ -2186,6 +2270,24 @@ const onAskAiTracing = () => {
     false,
   );
 };
+
+// The traces error state's door: the error goes in a chip, the range is absolute.
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const tracesErrorDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "query_error" as const,
+  label: t("assistant.entry.troubleshootQuery"),
+  tooltip: t("assistant.entry.tooltip.troubleshootQuery"),
+  dataTest: "ai-entry-query-error-troubleshoot" as const,
+  build: tracingQueryBuild(
+    () => tracesDoorBase(searchObj, store.state),
+    () => String(searchObj.data.errorMsg ?? ""),
+  ),
+}));
 
 const onConfigureTracesStream = () => {
   const stream = searchObj.data.stream.selectedStream?.value;
@@ -2445,6 +2547,9 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   const query = { ...router.currentRoute.value.query, tab: view.searchMode };
   delete query.trace_id;
   delete query.span_id;
+  // The view replaces the stream, query and window, so none of them is the assistant's any more.
+  if (assistantSet.value.size > 0) assistantSet.value = new Set();
+  delete query[ASSISTANT_SET_QUERY_KEY];
   if (canWriteTracesUrl()) await router.replace({ query });
   if (seq !== savedViewApplySeq) return;
 

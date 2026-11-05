@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs:1124-1126 MetaHttpResponse::conflict",
+  "shape": "A",
+  "status": 409,
+  "body": {
+    "code": 409,
+    "message": "Another turn is already running in this conversation"
+  }
+}

@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import type { ShareView } from "@/services/ai_chat_share";
+import { formatOrgTime } from "@/utils/formatters";
 import AiChatShareRow from "./AiChatShareRow.vue";
 
 const share = (extra: Partial<ShareView> = {}): ShareView => ({
@@ -40,6 +41,11 @@ const find = (wrapper: ReturnType<typeof mount>, id: string) =>
   wrapper.find(`[data-test="ai-chat-share-row-${id}"]`);
 
 describe("AiChatShareRow", () => {
+  it("shows the expiry in the org's time zone", () => {
+    const wrapper = mount(AiChatShareRow, { props: { share: share() } });
+    expect(wrapper.text()).toContain(formatOrgTime(1_800_000_000_000));
+  });
+
   it("asks inline before revoking, and emits revoke only on confirm", async () => {
     const wrapper = mount(AiChatShareRow, { props: { share: share() } });
     await find(wrapper, "revoke").trigger("click");

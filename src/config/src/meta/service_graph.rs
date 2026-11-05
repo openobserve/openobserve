@@ -187,6 +187,89 @@ pub struct EdgeTrendResponse {
     pub data_points: Vec<EdgeTrendDataPoint>,
 }
 
+/// A time window in microseconds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ServicesTrendWindow {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ServicesTrendResponse {
+    /// The requested window shifted left so it ends at `data_until`.
+    pub window: ServicesTrendWindow,
+    pub baseline_window: ServicesTrendWindow,
+    pub data_until: i64,
+    pub source: TrendSource,
+    pub step_micros: i64,
+    /// First series timestamp; every point sits at `series_start + k * step_micros`.
+    pub series_start: i64,
+    /// Some query returned engine warnings, so figures may be truncated.
+    pub partial: bool,
+    pub warnings: Vec<String>,
+    pub services: Vec<ServiceTrend>,
+    pub total_services: u32,
+    pub degraded_total: u32,
+}
+
+/// Which metrics family the figures came from; never a mix of both.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TrendSource {
+    V4,
+    Collector,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ServiceSignal {
+    Errors,
+    Latency,
+    Normal,
+    LowTraffic,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ServiceTrend {
+    pub service: String,
+    pub current: RedFigures,
+    pub baseline: Option<RedBaseline>,
+    pub p99_ratio: Option<f64>,
+    /// Percentage points against the baseline.
+    pub error_rate_delta: Option<f64>,
+    pub signal: ServiceSignal,
+    /// Returned because the request named it in `include`, not because it ranked.
+    pub included: bool,
+    /// Steps without requests are omitted, so a missing step is a gap, never a zero.
+    pub series: Vec<ServiceTrendPoint>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct RedFigures {
+    pub requests: u64,
+    pub failed: u64,
+    /// Percent.
+    pub error_rate: f64,
+    pub p99_latency_ns: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct RedBaseline {
+    /// Percent.
+    pub error_rate: f64,
+    pub p99_latency_ns: Option<u64>,
+    pub requests_per_min: f64,
+    pub covered_hours: u32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ServiceTrendPoint {
+    pub timestamp: i64,
+    pub requests: u64,
+    pub failed: u64,
+    pub p99_latency_ns: Option<u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

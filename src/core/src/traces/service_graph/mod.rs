@@ -19,7 +19,7 @@
 pub mod api;
 pub mod v4;
 
-pub use api::{get_current_topology, get_edge_history};
+pub use api::{get_current_topology, get_edge_history, get_services_trend};
 use config::meta::stream::StreamType;
 
 /// Default window (in minutes) used when no explicit time range is provided.

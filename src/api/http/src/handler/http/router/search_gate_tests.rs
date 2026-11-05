@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 49] = [
+const GATED: [(&str, &str, &str); 50] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -57,6 +57,7 @@ const GATED: [(&str, &str, &str); 49] = [
     ("POST", "/{org_id}/search_jobs/{job_id}/retry", "search::search_job::retry_job"),
     ("GET", "/{org_id}/traces/service_graph/topology/current", "traces::get_current_topology"),
     ("GET", "/{org_id}/traces/service_graph/edge/history", "traces::get_edge_history"),
+    ("GET", "/{org_id}/traces/service_graph/services/trend", "traces::get_services_trend"),
     ("GET", "/{org_id}/traces/agent_signals", "traces::get_agent_signals"),
     ("POST", "/{org_id}/traces/agent_signals/compare", "traces::compare_agent_versions"),
     ("POST", "/{org_id}/streams/{stream_name}/patterns/extract", "patterns::extract_patterns"),
@@ -319,7 +320,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 75] = [
     ("api/search/src/traces/session.rs", "get_session_details", Caller::InHandler),
     ("api/search/src/traces/time_index/mod.rs", "search_index_window", Caller::InHandler),
     ("api/search/src/traces/user.rs", "get_latest_users", Caller::InHandler),
-    ("core/src/ai_chat.rs", "search_window", Caller::Operational),
+    ("core/src/ai_chat.rs", "search_rows", Caller::Operational),
     ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
     ("core/src/alerts/auto_investigate_decisions.rs", "query", Caller::Exempt("the org's own auto-investigate decision log from the meta org; its route stays open")),
     ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),
@@ -349,7 +350,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 75] = [
     ("core/src/traces/agent_signals/api.rs", "fetch_arm_failures", Caller::Routed("traces::get_agent_signals")),
     ("core/src/traces/agent_signals/api.rs", "get_agent_signals", Caller::Routed("traces::get_agent_signals")),
     ("core/src/traces/service_graph/mod.rs", "run_graph_search", Caller::Routed("traces::get_current_topology")),
-    ("core/src/traces/service_graph/v4/read.rs", "run_query", Caller::Background("incident topology and on-call blast radius on alert firing; the topology routes are gated")),
+    ("core/src/traces/service_graph/v4/read.rs", "run_query_scoped", Caller::Background("incident topology and on-call blast radius on alert firing; the topology and services trend routes are gated")),
     ("jobs/src/job/mod.rs", "init", Caller::Background("eval-job scoring")),
     ("jobs/src/job/red_insights.rs", "service_volumes", Caller::Background("red_insights")),
 ];

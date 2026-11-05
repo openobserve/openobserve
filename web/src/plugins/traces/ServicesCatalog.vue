@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="filterText"
             :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
+            @update:model-value="onFilterEdited"
             clearable
             :debounce="300"
             class="w-full!"
@@ -580,6 +581,13 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useH
 const store = useStore();
 const router = useRouter();
 
+const props = defineProps<{
+  /** A link's service: filtered to and opened on the first load, without replacing the user's saved filter. */
+  initialService?: string;
+  /** Changes on each new link to a service, so a reused catalog applies it again. */
+  serviceHandoff?: number;
+}>();
+
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
   "request:stream-change": [stream: string];
@@ -679,11 +687,10 @@ const viewState = useListViewState("servicesCatalog", {
   sortBy: "status",
   sortOrder: "desc" as "asc" | "desc",
 });
-// A link from another page (AutoObserve's service drawer) names the service to show.
-const linkedService = router.currentRoute.value?.query?.service;
-const filterText = ref(
-  typeof linkedService === "string" && linkedService ? linkedService : viewState.filterText,
-);
+// While the search shows the link's service, the user's own filter is what persists, until they edit the search.
+let persistedFilterText = viewState.filterText;
+const transientFilter = ref<string | null>(props.initialService || null);
+const filterText = ref(transientFilter.value ?? viewState.filterText);
 const typeFilter = ref<TypeFilter>(viewState.typeFilter);
 const currentPage = ref(viewState.currentPage);
 const rowsPerPage = ref(viewState.rowsPerPage);
@@ -692,16 +699,25 @@ const sortBy = ref<string>(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 const oTableRef = ref<any>(null);
 watch(filterText, () => (currentPage.value = 1));
-watch([filterText, typeFilter, currentPage, rowsPerPage, sortBy, sortOrder], () => {
-  Object.assign(viewState, {
-    filterText: filterText.value,
-    typeFilter: typeFilter.value,
-    currentPage: currentPage.value,
-    rowsPerPage: rowsPerPage.value,
-    sortBy: sortBy.value,
-    sortOrder: sortOrder.value,
-  });
-});
+watch(
+  [filterText, transientFilter, typeFilter, currentPage, rowsPerPage, sortBy, sortOrder],
+  () => {
+    Object.assign(viewState, {
+      filterText:
+        filterText.value === transientFilter.value ? persistedFilterText : filterText.value,
+      typeFilter: typeFilter.value,
+      currentPage: currentPage.value,
+      rowsPerPage: rowsPerPage.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+function onFilterEdited(): void {
+  preselectPending = false;
+  transientFilter.value = null;
+}
+
 let pageRestored = false;
 watch(isLoading, (loadingNow) => {
   if (loadingNow || pageRestored) return;
@@ -769,6 +785,39 @@ function handleSortChange(field: string) {
 
 const selectedServiceRow = ref<ServiceRow | null>(null);
 const showSidePanel = ref(false);
+
+// Exact name only, so a link for "api" never opens "checkout-api"; an instrumented service wins over an inferred twin.
+let preselectPending = !!props.initialService;
+// The first catalog load that started after the link; older loads may still answer for the previous stream or range.
+let preselectLoad = 1;
+function tryPreselect(): boolean {
+  const named = services.value.filter((row) => row.service_name === props.initialService);
+  const row = named.find((r) => r.is_real_service) ?? named[0];
+  if (!row) return false;
+  selectedServiceRow.value = row;
+  showSidePanel.value = true;
+  return true;
+}
+function settlePreselect(load: number): void {
+  if (!preselectPending) return;
+  tryPreselect();
+  if (load >= preselectLoad) preselectPending = false;
+}
+// A kept-alive catalog sees a later link only as new props; loaded rows preselect at once, the link's own load settles it.
+watch(
+  () => [props.initialService, props.serviceHandoff] as const,
+  ([service]) => {
+    if (!service) return;
+    if (transientFilter.value === null) persistedFilterText = filterText.value;
+    transientFilter.value = service;
+    filterText.value = service;
+    selectedServiceRow.value = null;
+    showSidePanel.value = false;
+    preselectPending = true;
+    preselectLoad = catalogLoad + 1;
+    if (!isLoading.value) tryPreselect();
+  },
+);
 
 const selectedServiceNode = computed(() =>
   selectedServiceRow.value
@@ -1087,6 +1136,7 @@ function formatLat(us: number): string {
 }
 
 function handleRowClick(row: ServiceRow) {
+  preselectPending = false;
   if (selectedServiceRow.value?.id === row.id) {
     showSidePanel.value = false;
     selectedServiceRow.value = null;
@@ -1097,6 +1147,7 @@ function handleRowClick(row: ServiceRow) {
 }
 
 function handleCloseSidePanel() {
+  preselectPending = false;
   showSidePanel.value = false;
   selectedServiceRow.value = null;
 }
@@ -1414,7 +1465,11 @@ async function loadServicesCatalog() {
     if (!selectedId) return;
     const refreshed = services.value.find((r) => r.id === selectedId);
     if (refreshed) selectedServiceRow.value = refreshed;
-    else handleCloseSidePanel();
+    else {
+      // Not the user's close, so a link's preselect still waits for its own load.
+      showSidePanel.value = false;
+      selectedServiceRow.value = null;
+    }
   };
 
   await fetchQueryDataWithHttpStream(
@@ -1486,6 +1541,7 @@ async function loadServicesCatalog() {
         // Rows from an earlier search (possibly another stream) would otherwise sit beside the error.
         services.value = [];
         syncSelectedRow();
+        settlePreselect(load);
         isLoading.value = false;
         isSearching.value = false;
       },
@@ -1494,6 +1550,7 @@ async function loadServicesCatalog() {
         // Publishing here also clears the previous search's rows when this one returned no batches.
         publish();
         syncSelectedRow();
+        settlePreselect(load);
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();
@@ -1501,6 +1558,7 @@ async function loadServicesCatalog() {
       reset: () => {
         if (load !== catalogLoad) return;
         services.value = [];
+        settlePreselect(load);
         isLoading.value = false;
         isSearching.value = false;
       },

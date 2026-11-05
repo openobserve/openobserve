@@ -26,9 +26,10 @@ export interface Props {
   center?: boolean;
   /**
    * Overrides the role derived from `variant`. Only for a bar that is part of
-   * the page's furniture rather than a notification.
+   * the page's furniture rather than a notification, or `presentation` where a
+   * live region already speaks the same sentence.
    */
-  role?: "status" | "alert" | "banner";
+  role?: "status" | "alert" | "banner" | "presentation";
   dataTest?: string;
   /**
    * Wrap the content instead of overflowing — preserves newlines/spaces and

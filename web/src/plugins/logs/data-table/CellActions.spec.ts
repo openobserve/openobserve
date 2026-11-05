@@ -13,9 +13,10 @@
 // limitations under the License.
 
 import { mount, config, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const { clipboardMock } = vi.hoisted(() => ({ clipboardMock: vi.fn() }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: clipboardMock }));
@@ -58,6 +59,17 @@ const mountComponent = (propsOverrides = {}) =>
     global: { stubs: globalStubs },
     props: { ...defaultProps, ...propsOverrides },
   });
+
+// These cases cover the legacy AI buttons, so a local VITE_ASSISTANT_V2 must not swap in the doors.
+beforeEach(() => {
+  window.__O2_ASSISTANT_V2__ = false;
+  resetAssistantV2ForTests();
+});
+
+afterEach(() => {
+  delete window.__O2_ASSISTANT_V2__;
+  resetAssistantV2ForTests();
+});
 
 describe("CellActions", () => {
   afterEach(() => {

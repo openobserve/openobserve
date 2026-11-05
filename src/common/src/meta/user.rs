@@ -461,6 +461,18 @@ pub struct RolesResponse {
 pub struct AuthTokens {
     pub access_token: String,
     pub refresh_token: String,
+    /// Names an SSO login across its refreshes; the server binds it to the cookie's tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login_id: Option<String>,
+}
+
+impl AuthTokens {
+    /// The `session <id>` the cookie holds, if any.
+    pub fn session_id(&self) -> Option<&str> {
+        self.access_token
+            .strip_prefix("session ")
+            .filter(|id| !id.is_empty())
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -779,10 +791,45 @@ mod tests {
         let tokens = AuthTokens {
             access_token: "access123".to_string(),
             refresh_token: "refresh123".to_string(),
+            login_id: None,
         };
 
         assert_eq!(tokens.access_token, "access123");
         assert_eq!(tokens.refresh_token, "refresh123");
+        assert_eq!(tokens.session_id(), None, "not a session login");
+        // Malformed session tokens name no session (they used to panic the logout handler).
+        for bad in ["session", "session ", "sessionX", "Session abc"] {
+            let tokens = AuthTokens {
+                access_token: bad.to_string(),
+                ..Default::default()
+            };
+            assert_eq!(tokens.session_id(), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_session_cookie_names_its_session_and_keeps_its_login_id() {
+        let mut tokens = AuthTokens {
+            access_token: "session s-1".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(tokens.session_id(), Some("s-1"));
+        tokens.login_id = Some("login-1".to_string());
+        let text = serde_json::to_string(&tokens).unwrap();
+        let read: AuthTokens = serde_json::from_str(&text).unwrap();
+        assert_eq!(read.login_id.as_deref(), Some("login-1"));
+        // A cookie from before `login_id` existed still reads.
+        let old: AuthTokens =
+            serde_json::from_str(r#"{"access_token":"session s-2","refresh_token":""}"#).unwrap();
+        assert_eq!(
+            (old.session_id(), old.login_id.as_deref()),
+            (Some("s-2"), None)
+        );
+        assert!(
+            !serde_json::to_string(&AuthTokens::default())
+                .unwrap()
+                .contains("login_id")
+        );
     }
 
     #[test]

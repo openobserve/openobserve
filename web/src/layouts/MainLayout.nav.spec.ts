@@ -25,6 +25,9 @@ import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
 import { toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
+import { GO_TO_PAGES, type GoToPage } from "@/composables/goto/types";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { inject, type ComputedRef } from "vue";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -177,10 +180,15 @@ describe("MainLayout — Product Analytics menu entry", () => {
   describe("license-gated entries", () => {
     // The license map only applies on an enterprise or cloud build, and CI runs with neither set.
     const edition = config.isEnterprise;
+    // The lock boundary wraps the legacy layout's page; a local `.env` may turn v2 on for the whole run.
     beforeEach(() => {
       config.isEnterprise = "true";
+      window.__O2_ASSISTANT_V2__ = false;
+      resetAssistantV2ForTests();
     });
     afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
       config.isEnterprise = edition;
       delete store.state.zoConfig.features;
       dismissAll();
@@ -434,5 +442,101 @@ describe("MainLayout — rail while the config loads", () => {
   it("shows the real rail when the config is already loaded", async () => {
     store.state.zoConfig.version = "v1";
     expect(await railLoading()).toBe(false);
+  });
+});
+
+describe("MainLayout — Go to pages", () => {
+  let wrapper: VueWrapper | undefined;
+  let pages: ComputedRef<GoToPage[]> | null = null;
+  const version = store.state.zoConfig.version;
+  const edition = config.isEnterprise;
+  const InjectingNavbar = defineComponent({
+    name: "ONavbar",
+    props: { linksList: { type: Array, default: () => [] }, loading: Boolean },
+    setup() {
+      pages = inject(GO_TO_PAGES, null);
+      return () => h("div");
+    },
+  });
+
+  const mountLayout = async () => {
+    wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: InjectingNavbar,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          GetStarted: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          "router-view": StubDiv,
+          HomeReturnBar: StubDiv,
+          GoToPalette: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    const menu = wrapper.findAllComponents(InjectingNavbar)[0].props("linksList") as NavItem[];
+    return { menu, pages: pages!.value };
+  };
+
+  beforeEach(() => {
+    store.state.zoConfig.version = "v1";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    pages = null;
+    store.state.zoConfig.version = version;
+    store.state.zoConfig.custom_hide_menus = "";
+    config.isEnterprise = edition;
+  });
+
+  it("lists the shown menu, in order, plus the Traces views", async () => {
+    config.isEnterprise = "true";
+    const { menu, pages } = await mountLayout();
+    const tracesAt = menu.findIndex((link) => link.name === "traces");
+    const expected = [
+      ...menu.slice(0, tracesAt + 1).map((link) => link.name),
+      "traces:spans",
+      "traces:traces",
+      "traces:service-graph",
+      "traces:services-catalog",
+      ...menu.slice(tracesAt + 1).map((link) => link.name),
+    ];
+    expect(pages.map((page) => page.id)).toEqual(expected);
+    const org = store.state.selectedOrganization?.identifier ?? "";
+    expect(pages.find((page) => page.id === "logs")).toMatchObject({
+      label: "Logs",
+      route: { path: "/logs", query: { org_identifier: org } },
+    });
+    expect(pages.find((page) => page.id === "traces:service-graph")).toMatchObject({
+      label: "Service Graph",
+      group: "Traces",
+      route: { name: "traces", query: { tab: "service-graph", org_identifier: org } },
+    });
+    expect(pages.find((page) => page.id === "alertList")?.group).toBe("Reliability");
+  });
+
+  it("drops what the menu hides, and the enterprise-only Service graph on OSS", async () => {
+    config.isEnterprise = "false";
+    store.state.zoConfig.custom_hide_menus = "logs";
+    const { pages } = await mountLayout();
+    const ids = pages.map((page) => page.id);
+    expect(ids).not.toContain("logs");
+    expect(ids).not.toContain("traces:service-graph");
+    expect(ids).toContain("traces:services-catalog");
   });
 });

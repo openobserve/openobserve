@@ -226,11 +226,90 @@ const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
   };
 };
 
+/** The assistant's link, primary and focus-ring roles the theme sync writes for a brand colour (PO B92, B100). */
+export const ASSISTANT_ROLE_TOKENS = [
+  "--color-assistant-link",
+  "--color-assistant-link-hover",
+  "--color-assistant-primary",
+  "--color-assistant-primary-hover",
+  "--color-assistant-primary-foreground",
+  "--color-assistant-focus-ring",
+] as const;
+
+const TEXT_AA = 4.5;
+
+const NON_TEXT_AA = 3;
+
+// The token sheets' values, for a document whose computed style cannot be read (unit tests, SSR).
+const SURFACE_FALLBACKS = {
+  light: {
+    base: "#ffffff",
+    panel: "#fafafa",
+    subtle: "#f5f5f5",
+    overlay: "#ffffff",
+    heading: "#262626",
+  },
+  dark: {
+    base: "#0d1117",
+    panel: "#181818",
+    subtle: "#2d2d2d",
+    overlay: "#202020",
+    heading: "#e5e5e5",
+  },
+} as const;
+
+const hexToken = (token: string, fallback: string): string => {
+  const value = cssToken(token, fallback);
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+};
+
+const firstShade = (
+  palette: Record<string, string>,
+  shades: readonly string[],
+  backgrounds: string[],
+  min: number,
+): string | undefined =>
+  shades.find((shade) => backgrounds.every((bg) => contrastRatio(palette[shade], bg) >= min));
+
+/** The assistant roles for one palette: links and the primary fill at 4.5:1, the focus ring at 3:1 on every assistant surface. */
+export const assistantRoleColors = (
+  palette: Record<string, string>,
+  mode: "light" | "dark",
+): Record<(typeof ASSISTANT_ROLE_TOKENS)[number], string> => {
+  const fallback = SURFACE_FALLBACKS[mode];
+  const base = hexToken("--color-surface-base", fallback.base);
+  const subtle = hexToken("--color-surface-subtle", fallback.subtle);
+  const textSurfaces = [base, hexToken("--color-surface-panel", fallback.panel), subtle];
+  const ringSurfaces = [
+    base,
+    subtle,
+    hexToken("--color-surface-overlay", fallback.overlay),
+    mode === "dark" ? palette["900"] : palette["50"],
+  ];
+  const linkShades = mode === "dark" ? ["400", "300", "200"] : ["700", "800", "900"];
+  const ringShades = mode === "dark" ? ["400", "300", "200"] : ["600", "700", "800", "900"];
+  const link = firstShade(palette, linkShades, textSurfaces, TEXT_AA) ?? linkShades.at(-1)!;
+  const hover = linkShades[linkShades.indexOf(link) + 1] ?? (mode === "dark" ? "100" : "950");
+  // Dark keeps the resting fill on hover, since a darker hover loses the label (PO B91).
+  const fill = mode === "dark" ? "600" : link;
+  const ring = firstShade(palette, ringShades, ringSurfaces, NON_TEXT_AA);
+  return {
+    "--color-assistant-link": palette[link],
+    "--color-assistant-link-hover": palette[hover],
+    "--color-assistant-primary": palette[fill],
+    "--color-assistant-primary-hover": palette[mode === "dark" ? fill : hover],
+    "--color-assistant-primary-foreground": pickReadableForeground(palette[fill]),
+    "--color-assistant-focus-ring": ring
+      ? palette[ring]
+      : hexToken("--color-text-heading", fallback.heading),
+  };
+};
+
 /**
  * Sync the O2 component-library design tokens (--color-primary-*)
  * with the current custom theme color so all O2 components pick it up.
  */
-const syncO2LibraryTokens = (themeColor: string): void => {
+const syncO2LibraryTokens = (themeColor: string, mode: "light" | "dark"): void => {
   const palette = generatePrimaryPalette(themeColor);
   const root = document.documentElement;
   for (const [shade, hex] of Object.entries(palette)) {
@@ -240,6 +319,9 @@ const syncO2LibraryTokens = (themeColor: string): void => {
   // resting background (the 600 shade) — see pickButtonForeground for why this
   // can't be hardcoded to white.
   root.style.setProperty("--color-button-primary-foreground", pickButtonForeground(palette["600"]));
+  for (const [token, hex] of Object.entries(assistantRoleColors(palette, mode))) {
+    root.style.setProperty(token, hex);
+  }
 };
 
 /**
@@ -271,8 +353,9 @@ export const applyThemeColors = (
       },
     );
     root.style.removeProperty("--color-button-primary-foreground");
+    ASSISTANT_ROLE_TOKENS.forEach((token) => root.style.removeProperty(token));
   } else {
-    syncO2LibraryTokens(themeColor);
+    syncO2LibraryTokens(themeColor, mode);
   }
 
   if (darkModeActive) {

@@ -45,9 +45,11 @@ const EDGE_BY_ENV: &str = "client, client_type, server, connection_type, agent_e
 const LABEL_AGENT_ENV: &str = "agent_env";
 /// Only the v4 writer sets `trace_stream`; a collector connector's same-named series lack it.
 pub(super) const V4_ONLY: &str = "trace_stream!=\"\"";
+/// The inverse of `V4_ONLY`: only series without a `trace_stream` label.
+pub(super) const COLLECTOR_ONLY: &str = "trace_stream=\"\"";
 pub(super) const QUANTILES: [f64; 3] = [0.5, 0.95, 0.99];
 /// The engine ignores `step` on an instant query; any positive value works.
-const INSTANT_STEP_MICROS: i64 = 300_000_000;
+pub(super) const INSTANT_STEP_MICROS: i64 = 300_000_000;
 /// Positions inside a `plan_queries` result; `assemble` reads by these.
 const IDX_REQUESTS: usize = 0;
 const IDX_FAILED: usize = 1;
@@ -149,7 +151,7 @@ impl ReadFilter {
     }
 
     /// Node, unresolved and processed series carry no `agent_env` label.
-    fn node_matcher(&self, v4_only: bool) -> Result<String, String> {
+    pub(super) fn node_matcher(&self, v4_only: bool) -> Result<String, String> {
         Ok(self.stream_matcher(v4_only)?.unwrap_or_default())
     }
 }
@@ -211,15 +213,7 @@ pub async fn instant(
     query: &str,
     at_micros: i64,
 ) -> Result<Vec<InstantValue>, anyhow::Error> {
-    match run_query(org, query, at_micros, at_micros, INSTANT_STEP_MICROS).await? {
-        Value::Vector(v) => Ok(v),
-        Value::Instant(i) => Ok(vec![i]),
-        Value::None => Ok(vec![]),
-        other => anyhow::bail!(
-            "service graph query returned {} instead of a vector: {query}",
-            other.get_type()
-        ),
-    }
+    Ok(instant_scoped(org, query, at_micros).await?.0)
 }
 
 /// Runs one range query over `[start, end]` evaluated every `step` microseconds.
@@ -230,15 +224,30 @@ pub async fn range(
     end: i64,
     step: i64,
 ) -> Result<Vec<RangeValue>, anyhow::Error> {
-    match run_query(org, query, start, end, step).await? {
-        Value::Matrix(m) => Ok(m),
-        Value::Range(r) => Ok(vec![r]),
-        Value::None => Ok(vec![]),
-        other => anyhow::bail!(
-            "service graph query returned {} instead of a matrix: {query}",
-            other.get_type()
-        ),
-    }
+    Ok(range_scoped(org, query, start, end, step).await?.0)
+}
+
+/// `instant` plus the engine's warnings, which mean the rows may be truncated.
+pub async fn instant_scoped(
+    org: &str,
+    query: &str,
+    at_micros: i64,
+) -> Result<(Vec<InstantValue>, Vec<String>), anyhow::Error> {
+    let (value, warnings) =
+        run_query_scoped(org, query, at_micros, at_micros, INSTANT_STEP_MICROS).await?;
+    Ok((vector_rows(value, query)?, warnings))
+}
+
+/// `range` plus the engine's warnings, which mean the rows may be truncated.
+pub async fn range_scoped(
+    org: &str,
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<(Vec<RangeValue>, Vec<String>), anyhow::Error> {
+    let (value, warnings) = run_query_scoped(org, query, start, end, step).await?;
+    Ok((matrix_rows(value, query)?, warnings))
 }
 
 /// Sum of a scalar-shaped result (`sum(...)`); no rows or NaN read as zero.
@@ -403,13 +412,37 @@ fn assemble(
     Ok((input, meta))
 }
 
-async fn run_query(
+pub(super) fn vector_rows(value: Value, query: &str) -> Result<Vec<InstantValue>, anyhow::Error> {
+    match value {
+        Value::Vector(v) => Ok(v),
+        Value::Instant(i) => Ok(vec![i]),
+        Value::None => Ok(vec![]),
+        other => anyhow::bail!(
+            "service graph query returned {} instead of a vector: {query}",
+            other.get_type()
+        ),
+    }
+}
+
+pub(super) fn matrix_rows(value: Value, query: &str) -> Result<Vec<RangeValue>, anyhow::Error> {
+    match value {
+        Value::Matrix(m) => Ok(m),
+        Value::Range(r) => Ok(vec![r]),
+        Value::None => Ok(vec![]),
+        other => anyhow::bail!(
+            "service graph query returned {} instead of a matrix: {query}",
+            other.get_type()
+        ),
+    }
+}
+
+pub(super) async fn run_query_scoped(
     org: &str,
     query: &str,
     start: i64,
     end: i64,
     step: i64,
-) -> Result<Value, anyhow::Error> {
+) -> Result<(Value, Vec<String>), anyhow::Error> {
     let req = promql_service::MetricsQueryRequest {
         query: query.to_string(),
         start,
@@ -431,11 +464,11 @@ async fn run_query(
     let trace_id = config::ider::generate_trace_id();
     let resp =
         promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-    Ok(resp.value)
+    Ok((resp.value, resp.warnings))
 }
 
 /// PromQL string-literal escaping; control characters other than newline are refused.
-fn escape_label_value(v: &str) -> Result<String, String> {
+pub(super) fn escape_label_value(v: &str) -> Result<String, String> {
     let mut out = String::with_capacity(v.len());
     for c in v.chars() {
         match c {
@@ -517,24 +550,42 @@ fn q_client_quantile(q: f64, edge_matcher: &str, by_env: bool, range_ms: i64) ->
     )
 }
 
-fn q_server_quantile(q: f64, node_matcher: &str, range_ms: i64) -> String {
+pub(super) fn q_server_quantile(q: f64, node_matcher: &str, range_ms: i64) -> String {
     format!(
         "histogram_quantile({q}, sum by (le, server) (rate({}[{range_ms}ms])))",
         selector(&format!("{M_SERVER_SECONDS}_bucket"), node_matcher)
     )
 }
 
-fn q_server_count(node_matcher: &str, range_ms: i64) -> String {
+pub(super) fn q_server_count(node_matcher: &str, range_ms: i64) -> String {
+    q_server_count_offset(node_matcher, range_ms, 0)
+}
+
+/// Each evaluation step reads the window ending `offset_ms` before it.
+pub(super) fn q_server_count_offset(node_matcher: &str, range_ms: i64, offset_ms: i64) -> String {
+    let offset = if offset_ms > 0 {
+        format!(" offset {offset_ms}ms")
+    } else {
+        String::new()
+    };
     format!(
-        "sum by (server, {LABEL_TRACE_STREAM}) (increase({}[{range_ms}ms]))",
+        "sum by (server, {LABEL_TRACE_STREAM}) (increase({}[{range_ms}ms]{offset}))",
         selector(&format!("{M_SERVER_SECONDS}_count"), node_matcher)
     )
 }
 
-fn q_server_failed(node_matcher: &str, range_ms: i64) -> String {
+pub(super) fn q_server_failed(node_matcher: &str, range_ms: i64) -> String {
     format!(
         "sum by (server) (increase({}[{range_ms}ms]))",
         selector(M_SERVER_FAILED_TOTAL, node_matcher)
+    )
+}
+
+/// A collector writes no node failure counter, only the edge one, so it is summed per server.
+pub(super) fn q_edge_failed_by_server(edge_matcher: &str, range_ms: i64) -> String {
+    format!(
+        "sum by (server) (increase({}[{range_ms}ms]))",
+        selector(M_REQUEST_FAILED_TOTAL, edge_matcher)
     )
 }
 
@@ -1618,6 +1669,18 @@ mod tests {
         .await;
         assert_eq!(v4.len(), 1);
         assert_eq!(v4[0].labels.get_value(LABEL_TRACE_STREAM), "default");
+    }
+
+    #[tokio::test]
+    async fn test_collector_only_matcher_through_engine_never_matches_a_v4_series() {
+        let series = [("v4-svc", Some("default")), ("collector-svc", None)];
+        let rows = engine_rows(
+            RequestTotalProvider::with_streams(&series),
+            &q_requests(COLLECTOR_ONLY, false, 60_000),
+        )
+        .await;
+        let clients: Vec<String> = rows.iter().map(|r| r.labels.get_value("client")).collect();
+        assert_eq!(clients, ["collector-svc"]);
     }
 
     #[test]

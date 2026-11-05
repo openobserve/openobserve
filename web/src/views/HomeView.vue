@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="activeHomeTab"
           align="left"
           reorderable
+          :class="{ invisible: !homePrefsReady }"
           data-test="home-tab-bar"
           @change="onTabChange"
           @reorder="onTabReorder"
@@ -158,8 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODrawer>
         </div>
 
+        <HomeViewSkeleton v-if="!homePrefsReady" />
         <FirstDataPanel
-          v-if="flagOn && isDataTab"
+          v-else-if="flagOn && isDataTab"
           v-slot="{ layout, statusLine }"
           signal="any"
           variant="compact"
@@ -185,15 +187,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="block"
               data-test="home-no-access-empty-state"
             />
-            <HomeNoDataState
-              v-else
-              :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
-              :alternatives-only="layout === 'card'"
-            >
-              <template v-if="layout === 'status'" #status>
-                <component :is="statusLine" />
+            <template v-else>
+              <template v-if="assistantV2 && activeHomeTab !== 'usage'">
+                <HomeNoDataContext />
+                <AssistantLauncher class="mb-4" data-test="home-no-data-launcher" />
               </template>
-            </HomeNoDataState>
+              <HomeNoDataState
+                :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+                :alternatives-only="layout === 'card'"
+              >
+                <template v-if="layout === 'status'" #status>
+                  <component :is="statusLine" />
+                </template>
+              </HomeNoDataState>
+            </template>
           </div>
           <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
           <div
@@ -201,7 +208,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab>
+              <template v-if="assistantV2" #top="{ pageRange, setPageRange }">
+                <AssistantLauncher
+                  layout="overview"
+                  :page-range="pageRange"
+                  @update:page-range="setPageRange"
+                />
+              </template>
+              <template v-if="assistantV2" #aside><AssistantLauncher layout="chats" /></template>
+            </OverviewTab>
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -216,7 +232,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab>
+              <template v-if="assistantV2" #top="{ pageRange, setPageRange }">
+                <AssistantLauncher
+                  layout="overview"
+                  :page-range="pageRange"
+                  @update:page-range="setPageRange"
+                />
+              </template>
+              <template v-if="assistantV2" #aside><AssistantLauncher layout="chats" /></template>
+            </OverviewTab>
           </div>
 
           <!-- Usage tab -->
@@ -243,10 +268,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  effectScope,
+  inject,
+  onScopeDispose,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
@@ -278,6 +314,76 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useHomeContextProvider } from "@/composables/contextProviders/homeContextProvider";
+import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
+
+// Past this the tabs show in their default order; a key that resolves later never reorders them.
+const HOME_PREFS_WAIT_MS = 1_500;
+
+/** Set by Back to Overview: this visit opens Overview whatever the saved tab, and the key is dropped. */
+const HOME_TAB_QUERY_KEY = "home_tab";
+
+/** What the assistant sees while the first-data layout replaces the Overview. */
+export const NO_DATA_SNAPSHOT: OverviewNowSnapshot = {
+  rows: [],
+  noData: true,
+  selectedKey: null,
+  window: { start: 0, end: 0 },
+  services: { available: false, partial: false, dataUntil: null, window: null, allRegions: false },
+};
+
+const HomeNoDataContext = defineComponent({
+  name: "HomeNoDataContext",
+  setup() {
+    useHomeContextProvider(() => NO_DATA_SNAPSHOT, useStore());
+    return () => null;
+  },
+});
+
+/** Home's v2 tab state under the signed-in user+org; `ready` holds the tabs back until it is applied once. */
+function useHomeTabPrefs(apply: (prefs: { order?: string[]; active?: string | null }) => void) {
+  const ready = ref(false);
+  const scope = effectScope();
+  let key: string | null = null;
+  const pending: { order?: string[]; active?: string }[] = [];
+  let writer: ((userOrgKey: string, delta: { order?: string[]; active?: string }) => void) | null =
+    null;
+  const fallback = setTimeout(() => (ready.value = true), HOME_PREFS_WAIT_MS);
+  const settle = () => {
+    clearTimeout(fallback);
+    ready.value = true;
+  };
+  onScopeDispose(() => {
+    clearTimeout(fallback);
+    scope.stop();
+  });
+  void import("@/composables/assistant").then(({ assistantStore, migrateHome, writeHome }) => {
+    if (!scope.active) return;
+    writer = writeHome;
+    scope.run(() =>
+      watch(
+        () => assistantStore.state.userOrgKey,
+        (userOrgKey) => {
+          if (!userOrgKey || userOrgKey === key) return;
+          const orgSwitch = key !== null;
+          key = userOrgKey;
+          if (!ready.value || orgSwitch) apply(migrateHome(userOrgKey));
+          settle();
+          pending.splice(0).forEach((delta) => writeHome(userOrgKey, delta));
+        },
+        { immediate: true },
+      ),
+    );
+  }, settle);
+  return {
+    ready,
+    save(delta: { order?: string[]; active?: string }) {
+      if (key && writer) writer(key, delta);
+      else pending.push(delta);
+    },
+  };
+}
 
 export default defineComponent({
   name: "PageHome",
@@ -285,12 +391,16 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { t } = useI18nTyped();
     const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+    // The v2 assistant replaces the AI tab with the Overview launcher; the legacy tabs stay byte-identical with it off.
+    const assistantV2 = isAssistantV2();
+    const forcedOverview = ref(assistantV2 && route.query[HOME_TAB_QUERY_KEY] === "overview");
 
     const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor, load } =
       useHomeDashboard(t);
@@ -313,7 +423,7 @@ export default defineComponent({
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && aiState.value !== "hidden") {
+      if (!assistantV2 && isEnterpriseOrCloud && aiState.value !== "hidden") {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
       // Always reachable — Incidents/Services inside render locked (not
@@ -400,6 +510,7 @@ export default defineComponent({
     }
 
     function loadTabOrder() {
+      if (assistantV2) return [...DEFAULT_TABS.value];
       try {
         const saved = localStorage.getItem(LS_TAB_ORDER_KEY);
         if (saved) {
@@ -441,7 +552,7 @@ export default defineComponent({
       return `dash:${pin.folderId}:${pin.dashboardId}`;
     }
 
-    const storedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
+    const storedActiveTab = assistantV2 ? null : localStorage.getItem(LS_ACTIVE_TAB_KEY);
     const savedActiveTab = storedActiveTab && pinTabFor(storedActiveTab);
     const isAvailableTab = (id: string) => DEFAULT_TABS.value.some((tb) => tb.id === id);
     const pinnedTabPending = ref(
@@ -450,37 +561,60 @@ export default defineComponent({
         !isLoadedFor(store.state.selectedOrganization?.identifier),
     );
     const activeHomeTab = ref(
-      savedActiveTab && (pinnedTabPending.value || isAvailableTab(savedActiveTab))
-        ? savedActiveTab
-        : tabOrder.value[0].id,
+      forcedOverview.value
+        ? "overview"
+        : savedActiveTab && (pinnedTabPending.value || isAvailableTab(savedActiveTab))
+          ? savedActiveTab
+          : tabOrder.value[0].id,
     );
-    if (pinnedTabPending.value) {
-      const stopHold = watch(
-        () => [
-          isAvailableTab(pinTabFor(activeHomeTab.value)),
-          isLoadedFor(store.state.selectedOrganization?.identifier),
-        ],
-        ([available, loaded]) => {
-          if (!available && !loaded) return;
-          pinnedTabPending.value = false;
-          activeHomeTab.value = available
-            ? pinTabFor(activeHomeTab.value)
-            : (tabOrder.value[0]?.id ?? "usage");
-          stopHold();
-        },
-      );
-    }
+    watch(
+      () => [
+        pinnedTabPending.value,
+        isAvailableTab(pinTabFor(activeHomeTab.value)),
+        isLoadedFor(store.state.selectedOrganization?.identifier),
+      ],
+      ([pending, available, loaded]) => {
+        if (!pending || (!available && !loaded)) return;
+        pinnedTabPending.value = false;
+        activeHomeTab.value = available
+          ? pinTabFor(activeHomeTab.value)
+          : (tabOrder.value[0]?.id ?? "usage");
+      },
+    );
 
-    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
-    // is the app's, so it is not saved as the user's tab.
+    // An org with no stream at all opens on Overview's setup state; that choice is the app's, not the user's tab.
     let skipSave = false;
     watch(activeHomeTab, (val) => {
       if (skipSave) {
         skipSave = false;
         return;
       }
-      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+      // A forced Overview is this visit only, so it never becomes the saved tab.
+      if (forcedOverview.value && val === "overview") return;
+      forcedOverview.value = false;
+      if (assistantV2) homePrefs.save({ active: val });
+      else localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
     });
+
+    // Back to Overview can land while Home is already mounted on another tab.
+    if (assistantV2) {
+      watch(
+        () => route.query[HOME_TAB_QUERY_KEY],
+        (value) => {
+          if (value === undefined) return;
+          if (value === "overview") {
+            forcedOverview.value = true;
+            pinnedTabPending.value = false;
+            activeHomeTab.value = "overview";
+          }
+          const query = { ...route.query };
+          delete query[HOME_TAB_QUERY_KEY];
+          void router.replace({ query }).catch(() => undefined);
+        },
+        { immediate: true },
+      );
+    }
+
     const { hasAnyStream, isFetching } = useOrgHasUserData(
       () => store.state.selectedOrganization?.identifier ?? "",
     );
@@ -549,8 +683,37 @@ export default defineComponent({
       order.splice(toIdx, 0, moved);
 
       tabOrder.value = order;
-      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
+      if (assistantV2) homePrefs.save({ order: order.map((t) => t.id) });
+      else localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
     }
+
+    // v2: tab state is per user+org in `o2.assistant.home:{userOrgKey}`, read once the key resolves (constraint 56).
+    const homePrefs = assistantV2
+      ? useHomeTabPrefs((prefs) => {
+          const ids = prefs.order ?? [];
+          if (ids.length) {
+            const ordered = ids
+              .map((id) => DEFAULT_TABS.value.find((tab) => tab.id === id))
+              .filter(Boolean) as { id: string; label: string }[];
+            DEFAULT_TABS.value.forEach((tab) => {
+              if (!ordered.find((o) => o.id === tab.id)) ordered.push(tab);
+            });
+            tabOrder.value = ordered;
+          }
+          const active = prefs.active;
+          if (forcedOverview.value) return;
+          if (active && isAvailableTab(active)) {
+            activeHomeTab.value = active;
+          } else if (
+            active?.startsWith("dash:") &&
+            !isLoadedFor(store.state.selectedOrganization?.identifier)
+          ) {
+            activeHomeTab.value = active;
+            pinnedTabPending.value = true;
+          }
+        })
+      : { ready: ref(true), save: () => undefined };
+    const homePrefsReady = homePrefs.ready;
 
     const homeChat = ref<any>(null);
     function onLoadChat(id: number) {
@@ -590,6 +753,8 @@ export default defineComponent({
     };
 
     return {
+      assistantV2,
+      homePrefsReady,
       t,
       store,
       config,
@@ -618,6 +783,10 @@ export default defineComponent({
     };
   },
   components: {
+    HomeNoDataContext,
+    AssistantLauncher: defineAsyncComponent(
+      () => import("@/components/ai-assistant/welcome/AssistantLauncher.vue"),
+    ),
     OverviewTab,
     UsageTab,
     O2AIChat,

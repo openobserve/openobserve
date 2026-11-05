@@ -35,11 +35,15 @@ const props = withDefaults(defineProps<TimeProps>(), {
 });
 
 const emit = defineEmits<TimeEmits>();
-defineSlots<TimeSlots>();
+const slots = defineSlots<TimeSlots>();
 const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+// The label's `for` names the field group, which a text input cannot take its name from.
+const labelledBy = computed(() =>
+  slots.label || props.label || slots.tooltip ? `${inputId.value}-label` : undefined,
+);
 
 // A typed time the field can't read stays on screen with this message until it is fixed.
 const typedError = ref<I18nText | null>(null);
@@ -343,6 +347,7 @@ const fieldClasses = computed(() => [
   <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
+      :id="`${inputId}-label`"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -398,6 +403,7 @@ const fieldClasses = computed(() => [
           :aria-describedby="hasMessage ? messageId : undefined"
           :placeholder="placeholder ?? raw('HH:MM')"
           :maxlength="withSeconds ? 8 : 5"
+          :aria-labelledby="labelledBy"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
           :class="[
@@ -417,6 +423,7 @@ const fieldClasses = computed(() => [
           :aria-invalid="hasError || undefined"
           :aria-describedby="hasMessage ? messageId : undefined"
           :step="withSeconds ? 1 : 60"
+          :aria-labelledby="labelledBy"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
           :class="[

@@ -333,6 +333,7 @@ function mountServicesCatalog(
   options: {
     storeOverrides?: Record<string, any>;
     stubs?: Record<string, any>;
+    props?: Record<string, any>;
   } = {},
 ) {
   const mockStore = options.storeOverrides
@@ -340,6 +341,7 @@ function mountServicesCatalog(
     : createMockStore();
 
   return mount(ServicesCatalog, {
+    props: options.props ?? {},
     global: {
       plugins: [i18n, mockStore],
       provide: {
@@ -3348,6 +3350,153 @@ describe("ServicesCatalog", () => {
       const saved: any = useListViewState("servicesCatalog", {});
       expect(saved.filterText).toBe("auth");
       expect(saved.sortBy).toBe("service_name");
+    });
+  });
+  describe("initial service", () => {
+    const feed = (rows: Record<string, unknown>[]) =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: rows } },
+        });
+        callbacks.complete(null, {});
+      });
+    const hit = (service_name: string, extra: Record<string, unknown> = {}) => ({
+      service_name,
+      total_requests: 10,
+      error_count: 0,
+      error_rate: 0,
+      ...extra,
+    });
+
+    it("filters to the service and opens its panel on the first load", async () => {
+      feed([hit("checkout-api", { _is_real_service: 1 }), hit("api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api" } });
+      await flushPromises();
+      expect(wrapper.vm.filterText).toBe("api");
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("api");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+    });
+
+    it("prefers the instrumented service over an inferred row of the same name", async () => {
+      feed([
+        hit("payments", { _infer_service_name: "payments", _infer_service_type: "external" }),
+        hit("payments", { _is_real_service: 1 }),
+      ]);
+      wrapper = mountServicesCatalog({ props: { initialService: "payments" } });
+      await flushPromises();
+      expect(wrapper.vm.selectedServiceRow?.is_real_service).toBe(1);
+    });
+
+    it("keeps the filtered list and opens nothing when no name matches exactly", async () => {
+      feed([hit("checkout-api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api" } });
+      await flushPromises();
+      expect(wrapper.vm.filterText).toBe("api");
+      expect(wrapper.vm.selectedServiceRow).toBeNull();
+      expect(wrapper.vm.showSidePanel).toBe(false);
+    });
+
+    it("applies a second link's service on a reused catalog and keeps the user's saved filter", async () => {
+      useListViewState("servicesCatalog", { filterText: "" }).filterText = "auth";
+      feed([hit("api", { _is_real_service: 1 }), hit("payments", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api", serviceHandoff: 1 } });
+      await flushPromises();
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("api");
+      await wrapper.setProps({ initialService: "payments", serviceHandoff: 2 });
+      await flushPromises();
+      expect(wrapper.vm.filterText).toBe("payments");
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("payments");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      const saved: any = useListViewState("servicesCatalog", {});
+      expect(saved.filterText).toBe("auth");
+    });
+
+    it("reopens the same service on a new link after the user closed it and edited the filter", async () => {
+      feed([hit("api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api", serviceHandoff: 1 } });
+      await flushPromises();
+      wrapper.vm.showSidePanel = false;
+      const input = wrapper.findComponent('[data-test="services-catalog-filter-input"]' as any);
+      input.vm.$emit("update:modelValue", "billing");
+      await flushPromises();
+      await wrapper.setProps({ serviceHandoff: 2 });
+      await flushPromises();
+      expect(wrapper.vm.filterText).toBe("api");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      const saved: any = useListViewState("servicesCatalog", {});
+      expect(saved.filterText).toBe("billing");
+    });
+
+    it("waits for the second link's own load when it also changes the stream", async () => {
+      mockGetStreams.mockResolvedValue({ list: [{ name: "default" }, { name: "production" }] });
+      feed([hit("api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api", serviceHandoff: 1 } });
+      await flushPromises();
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("api");
+      let pending: any = null;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        pending = callbacks;
+      });
+      await wrapper.setProps({ initialService: "payments", serviceHandoff: 2 });
+      wrapper.vm.streamFilter = "production";
+      await flushPromises();
+      expect(pending).not.toBeNull();
+      expect(wrapper.vm.showSidePanel).toBe(false);
+      pending.data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: [hit("payments", { _is_real_service: 1 })] } },
+      });
+      pending.complete(null, {});
+      await flushPromises();
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("payments");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+    });
+
+    it("keeps waiting when a load started before the link answers without the service", async () => {
+      mockGetStreams.mockResolvedValue({ list: [{ name: "default" }, { name: "production" }] });
+      feed([hit("api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api", serviceHandoff: 1 } });
+      await flushPromises();
+      const calls: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        calls.push(callbacks);
+      });
+      const answer = (callbacks: any, rows: Record<string, unknown>[]) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: rows } },
+        });
+        callbacks.complete(null, {});
+      };
+      wrapper.vm.streamFilter = "production";
+      await flushPromises();
+      await wrapper.setProps({ initialService: "payments", serviceHandoff: 2 });
+      answer(calls[0], [hit("api", { _is_real_service: 1 })]);
+      await flushPromises();
+      expect(wrapper.vm.showSidePanel).toBe(false);
+      wrapper.vm.streamFilter = "default";
+      await flushPromises();
+      answer(calls[1], [hit("payments", { _is_real_service: 1 })]);
+      await flushPromises();
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("payments");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+    });
+
+    it("persists the user's earlier filter while the link's service shows, and the user's edit after", async () => {
+      useListViewState("servicesCatalog", { filterText: "" }).filterText = "auth";
+      feed([hit("api", { _is_real_service: 1 })]);
+      wrapper = mountServicesCatalog({ props: { initialService: "api" } });
+      await flushPromises();
+      wrapper.vm.sortBy = "service_name";
+      await flushPromises();
+      const saved: any = useListViewState("servicesCatalog", {});
+      expect(saved.filterText).toBe("auth");
+      expect(saved.sortBy).toBe("service_name");
+      const input = wrapper.findComponent('[data-test="services-catalog-filter-input"]' as any);
+      input.vm.$emit("update:modelValue", "api");
+      await flushPromises();
+      expect(saved.filterText).toBe("api");
     });
   });
 });

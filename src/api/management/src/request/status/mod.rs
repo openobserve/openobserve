@@ -215,6 +215,8 @@ struct ConfigResponse<'a> {
     public_ai_chat_enabled: bool,
     /// Longest expiry, in days, a public AI chat link may have.
     public_ai_chat_max_expiry_days: u64,
+    /// AI chat shares accept `hide_attachments` (CT-B2); clients send it only when this is true.
+    ai_share_redact_attachments: bool,
     /// The caller is root or an admin of the URL org (may list and revoke every AI chat share).
     is_org_admin: bool,
     /// Days a soft-deleted org stays recoverable; `0` (every OSS build) means none.
@@ -231,6 +233,8 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
     incidents_rca_enabled: bool,
+    /// Incident analysis can run: incidents, RCA and AI are on and o2-ai has a target.
+    rca_enabled: bool,
     downtimes_enabled: bool,
     fleet_enabled: bool,
     alert_calibration_enabled: bool,
@@ -580,6 +584,15 @@ pub async fn zo_config(
             && o2cfg.incidents.rca_enabled
             && openobserve_core::alerts::incidents::rca_agent_available()
     );
+    let rca_enabled = enterprise_value!(
+        false,
+        rca_enabled_for(
+            incidents_enabled,
+            o2cfg.incidents.rca_enabled,
+            o2cfg.ai.enabled,
+            o2cfg.ai.has_agent_target()
+        )
+    );
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
@@ -754,6 +767,7 @@ pub async fn zo_config(
         ai_chat_persistence_enabled,
         public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
         public_ai_chat_max_expiry_days: cfg.public_ai_chat.expiry_limit_days(),
+        ai_share_redact_attachments: ai_chat_persistence_enabled,
         is_org_admin,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
@@ -767,6 +781,7 @@ pub async fn zo_config(
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
         incidents_rca_enabled,
+        rca_enabled,
         downtimes_enabled,
         fleet_enabled,
         alert_calibration_enabled,
@@ -883,6 +898,16 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
     .await
 }
 
+#[cfg(any(feature = "enterprise", test))]
+// The RCA trigger takes the agent client `init_agent_client` leaves unset while AI is off.
+fn rca_enabled_for(
+    incidents_enabled: bool,
+    rca_enabled: bool,
+    ai_enabled: bool,
+    has_agent_target: bool,
+) -> bool {
+    incidents_enabled && rca_enabled && ai_enabled && has_agent_target
+}
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
@@ -1512,11 +1537,17 @@ pub async fn redirect(
                 );
             }
 
+            let login_id = crate::request::ai::chats::bound_login_id(
+                &ider::uuid(),
+                &session_id,
+                &login_data.refresh_token,
+            );
             let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token: login_data.refresh_token,
+                login_id: Some(login_id),
             })
             .unwrap();
             let cfg = get_config();
@@ -1639,20 +1670,24 @@ pub async fn refresh_token_with_dex(
         target: None,
     };
 
-    let token = if let Some(cookie) = cookies.get("auth_tokens") {
+    let (token, login) = if let Some(cookie) = cookies.get("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
+        // Carried into the new cookie, so racing refreshes of one login still name the same login.
+        let live = match auth_tokens.session_id() {
+            Some(session_id) => openobserve_core::session::get_session(session_id)
+                .await
+                .is_some(),
+            None => false,
+        };
+        let login = crate::request::ai::chats::cookie_login(&auth_tokens, live);
 
         // remove old session id from cluster co-ordinator
-        let access_token = auth_tokens.access_token;
-        if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
-                access_token.strip_prefix("session ").unwrap(),
-            )
-            .await;
+        if let Some(session_id) = auth_tokens.session_id() {
+            openobserve_core::session::remove_session(session_id).await;
         }
 
-        auth_tokens.refresh_token
+        (auth_tokens.refresh_token, login)
     } else {
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
@@ -1741,12 +1776,15 @@ pub async fn refresh_token_with_dex(
                     session_id
                 );
             }
-
+            let login = login.unwrap_or_else(ider::uuid);
+            let login_id =
+                crate::request::ai::chats::bound_login_id(&login, &session_id, &refresh_token_str);
             let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token: refresh_token_str,
+                login_id: Some(login_id),
             })
             .unwrap();
             let conf = get_config();
@@ -1896,13 +1934,18 @@ pub async fn logout(
         let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
-        let access_token = auth_tokens.access_token;
-
-        if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
-                access_token.strip_prefix("session ").unwrap(),
-            )
-            .await;
+        // Only a live session signs its login out, so a stale or edited cookie stops nothing.
+        #[cfg(feature = "enterprise")]
+        if let Some(session_id) = auth_tokens.session_id()
+            && openobserve_core::session::get_session(session_id)
+                .await
+                .is_some()
+            && let Some(login) = crate::request::ai::chats::cookie_login(&auth_tokens, true)
+        {
+            o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(&login).await;
+        }
+        if let Some(session_id) = auth_tokens.session_id() {
+            openobserve_core::session::remove_session(session_id).await;
         }
     };
     let max_age_secs = db::password_policy::cookie_max_age_secs().await;
@@ -2218,6 +2261,15 @@ mod tests {
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
         reload_downtimes(false).await.unwrap();
         assert!(db::downtimes::all_cached().is_empty());
+    }
+
+    #[test]
+    fn rca_is_enabled_only_with_incidents_rca_ai_and_an_agent_target() {
+        let on: Vec<_> = (0..16u8)
+            .map(|bits| (bits & 1 != 0, bits & 2 != 0, bits & 4 != 0, bits & 8 != 0))
+            .filter(|&(incidents, rca, ai, target)| rca_enabled_for(incidents, rca, ai, target))
+            .collect();
+        assert_eq!(on, vec![(true, true, true, true)]);
     }
 
     #[test]

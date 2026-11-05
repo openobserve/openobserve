@@ -1,0 +1,7 @@
+{
+  "_source": "o2-ai src/server/turn_frames.py follow_ups_frame",
+  "frame": {
+    "type": "follow_ups",
+    "items": ["Why did checkout errors rise?", "Show the same chart for last week"]
+  }
+}
