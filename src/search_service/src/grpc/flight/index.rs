@@ -376,6 +376,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_optimizer_physical_plan_like_skips_fts_field_that_is_also_index_field() {
+        let settings = StreamSearchSettings {
+            index_fields: vec!["service".to_string()],
+            fts_fields: vec!["service".to_string(), "message".to_string()],
+            ..Default::default()
+        };
+        let sql = "SELECT count(*) FROM default WHERE service LIKE '%auth%'";
+        let start = BASE_TIME.timestamp_micros();
+        let (plan, index) =
+            plan_with_settings(sql, (start, start + 100), &settings, &index_on()).await;
+        assert_eq!(index.condition, None);
+        assert!(plan_text(&plan).contains("LIKE %auth%"));
+    }
+
+    #[tokio::test]
     async fn test_optimizer_physical_plan_late_fts_field_keeps_other_conditions() {
         let sql = "SELECT * FROM default WHERE service = 'auth' AND message LIKE '%timeout%'";
         let start = BASE_TIME.timestamp_micros() + 100;
