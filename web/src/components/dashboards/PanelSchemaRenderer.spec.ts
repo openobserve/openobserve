@@ -858,10 +858,30 @@ describe("PanelSchemaRenderer", () => {
         "svc=cart",
       );
       expect(item("view-traces").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
+      ).toBe(true);
       expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
-        true,
+        false,
       );
       expect(wrapper.vm.drilldownArray).toEqual([]);
+    });
+
+    it("shows the lock icon only when the item is license-locked", async () => {
+      const zoConfig = store.state.zoConfig as any;
+      const previous = zoConfig.features;
+      zoConfig.features = { traces: "locked" };
+      try {
+        await clickPoint();
+        expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
+          true,
+        );
+        expect(
+          wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
+        ).toBe(false);
+      } finally {
+        zoConfig.features = previous;
+      }
     });
 
     it("wraps a long detail line to at most two lines and shows the full text in a tooltip", async () => {
@@ -885,7 +905,7 @@ describe("PanelSchemaRenderer", () => {
       const ids = wrapper
         .findAll('[data-test="drilldown-menu"] [data-test^="drilldown-menu-item-"]')
         .map((el) => el.attributes("data-test"))
-        .filter((id) => !/-(detail|reason|lock)$/.test(id!));
+        .filter((id) => !/-(detail|reason|lock|unavailable)$/.test(id!));
       expect(ids).toEqual([
         "drilldown-menu-item-view-logs",
         "drilldown-menu-item-view-traces",

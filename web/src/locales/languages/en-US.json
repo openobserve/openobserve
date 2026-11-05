@@ -9955,7 +9955,7 @@
       "findingService": "Finding the service for this point…",
       "logsNeedLogsStream": "Logs open only for SQL charts on a logs stream",
       "noTraceCorrelation": "No trace correlation for this stream",
-      "noServiceField": "This chart has no service field to correlate"
+      "needsGroupBy": "Group this chart by a field such as service to find its traces"
     },
     "logExplorer": {
       "title": "Logs Explorer",

@@ -27,6 +27,8 @@ export interface FieldFilter {
 export interface PointExploreItem {
   state: "enabled" | "disabled" | "pending";
   detail: I18nText;
+  // Only a licence lock shows the lock icon; a chart that lacks data shows a neutral one.
+  locked?: boolean;
 }
 
 /** The slice a clicked point explores, in microseconds. */
@@ -71,7 +73,7 @@ export interface PointClick {
 }
 
 /** Why View logs or View traces cannot open for this chart. */
-export type ExploreBlock = "logsNeedLogsStream" | "noTraceCorrelation" | "noServiceField";
+export type ExploreBlock = "logsNeedLogsStream" | "noTraceCorrelation" | "needsGroupBy";
 
 export type LogsAvailability =
   | { kind: "enabled" }
@@ -221,7 +223,7 @@ export const tracesAvailability = (input: {
     return { kind: "blocked", reason: "noTraceCorrelation" };
   }
   if (input.isLocked("correlation")) return { kind: "locked", feature: "correlation" };
-  if (!input.hasGroupValues) return { kind: "blocked", reason: "noServiceField" };
+  if (!input.hasGroupValues) return { kind: "blocked", reason: "needsGroupBy" };
   return { kind: "correlate" };
 };
 

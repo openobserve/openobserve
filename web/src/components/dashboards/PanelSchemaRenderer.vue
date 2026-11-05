@@ -270,10 +270,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`drilldown-menu-item-${item.id}`"
             >
               <OIcon
+                v-if="item.locked"
                 size="xs"
                 class="text-icon-locked me-2"
-                :name="item.state === 'pending' ? 'hourglass-empty' : 'lock'"
+                name="lock"
                 :data-test="`drilldown-menu-item-${item.id}-lock`"
+              />
+              <OIcon
+                v-else
+                size="xs"
+                class="me-2"
+                :name="item.state === 'pending' ? 'hourglass-empty' : 'info-outline'"
+                :data-test="`drilldown-menu-item-${item.id}-unavailable`"
               />
               <span class="flex min-w-0 flex-col">
                 <span class="select-none">{{ item.label }}</span>

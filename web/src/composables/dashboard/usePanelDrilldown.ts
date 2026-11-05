@@ -836,15 +836,19 @@ export function usePanelDrilldown({
     detail: t(`panel.pointExplore.${reason}`),
   });
 
+  const lockedItem = (feature: string): PointExploreItem => ({
+    state: "disabled",
+    detail: licenseLocks.lockedReason(feature),
+    locked: true,
+  });
+
   const logsItem = (target: PointTarget): PointExploreItem => {
     const availability = logsAvailability({
       queryType: panelSchema.value?.queryType,
       streamType: target.streamType,
       isLocked: licenseLocks.isLocked,
     });
-    if (availability.kind === "locked") {
-      return { state: "disabled", detail: licenseLocks.lockedReason(availability.feature) };
-    }
+    if (availability.kind === "locked") return lockedItem(availability.feature);
     if (availability.kind === "blocked") return blockedItem(availability.reason);
     return { state: "enabled", detail: pointDetail(target) };
   };
@@ -860,9 +864,7 @@ export function usePanelDrilldown({
       correlationEnabled: correlationEnabled(),
       isLocked: licenseLocks.isLocked,
     });
-    if (availability.kind === "locked") {
-      return { state: "disabled", detail: licenseLocks.lockedReason(availability.feature) };
-    }
+    if (availability.kind === "locked") return lockedItem(availability.feature);
     if (availability.kind === "blocked") return blockedItem(availability.reason);
     if (availability.kind === "correlate") {
       return { state: "pending", detail: t("panel.pointExplore.findingService") };

@@ -425,14 +425,14 @@ describe("usePanelDrilldown point menu", () => {
       });
     });
 
-    it("enterprise: a chart with no group-by values has no service field to correlate", async () => {
+    it("enterprise: a chart with no group-by values asks for a group-by to correlate", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps({ fields: { breakdown: [] } });
       const api = usePanelDrilldown(deps as any);
       await api.onChartClick(lineClick);
 
       expect(api.pointExplore.value?.traces.detail).toBe(
-        "This chart has no service field to correlate",
+        "Group this chart by a field such as service to find its traces",
       );
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
     });

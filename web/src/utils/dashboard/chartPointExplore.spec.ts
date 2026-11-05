@@ -362,11 +362,11 @@ describe("tracesAvailability", () => {
     [{ streamType: "metrics" }, { kind: "correlate" }],
     [
       { streamType: "metrics", queryType: "promql", hasGroupValues: false },
-      { kind: "blocked", reason: "noServiceField" },
+      { kind: "blocked", reason: "needsGroupBy" },
     ],
     [
       { streamType: "logs", hasGroupValues: false },
-      { kind: "blocked", reason: "noServiceField" },
+      { kind: "blocked", reason: "needsGroupBy" },
     ],
     [
       { streamType: "logs", correlationEnabled: false },
