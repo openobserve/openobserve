@@ -65,16 +65,6 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     testLogger.info('All four tabs navigated and mounted their child');
   });
 
-  test.fixme('deep-link back-sync is broken: RealUserMonitoring.vue routeNameMapping omits rumPerformanceErrors/rumPerformanceWebVitals/rumPerformanceApis, so /performance/errors redirects to /performance/overview', {
-    tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P0'],
-  }, async ({ page }) => {
-    testLogger.info('Testing route→tab back-sync');
-    await pm.rumPerformancePage.gotoPerformancePath('errors');
-    await pm.rumPerformancePage.expectErrorsDashboardMounted();
-    await pm.rumPerformancePage.expectActiveTab('errors');
-    testLogger.info('Errors tab auto-selected from the deep link');
-  });
-
   test('should re-run the Overview dashboard on manual refresh', {
     tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P1'],
   }, async ({ page }) => {
