@@ -16,14 +16,14 @@
 use std::{net::IpAddr, sync::LazyLock as Lazy};
 
 use datafusion::{
-    arrow::{array::BooleanArray, datatypes::DataType},
+    arrow::datatypes::DataType,
     common::Result,
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
     },
 };
 
-use super::eval_strings;
+use super::eval_bools;
 
 pub const IS_PRIVATE_IP_UDF_NAME: &str = "is_private_ip";
 
@@ -58,7 +58,7 @@ impl ScalarUDFImpl for IsPrivateIpUdf {
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        eval_strings::<_, BooleanArray>(
+        eval_bools(
             &args.args[0],
             args.number_rows,
             IS_PRIVATE_IP_UDF_NAME,

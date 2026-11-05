@@ -23,31 +23,42 @@ use std::sync::Arc;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, AsArray, StringArrayType},
+        array::{AsArray, BooleanBuilder},
         datatypes::DataType,
     },
     common::{Result, ScalarValue, exec_err},
     logical_expr::ColumnarValue,
 };
 
-/// Applies `f` to every row of a string argument; a NULL row or a `None` from `f` gives NULL.
-pub(super) fn eval_strings<T, B>(
+/// Calls `f` with every row of a string argument, `None` for a NULL row.
+pub(super) fn for_each_row(
     arg: &ColumnarValue,
     number_rows: usize,
     name: &str,
-    f: impl FnMut(&str) -> Option<T>,
-) -> Result<ColumnarValue>
-where
-    B: Array + FromIterator<Option<T>> + 'static,
-{
+    mut f: impl FnMut(Option<&str>),
+) -> Result<()> {
     let array = arg.to_array(number_rows)?;
-    let out: B = match array.data_type() {
-        DataType::Utf8 => map_rows(array.as_string::<i32>(), f),
-        DataType::LargeUtf8 => map_rows(array.as_string::<i64>(), f),
-        DataType::Utf8View => map_rows(array.as_string_view(), f),
+    match array.data_type() {
+        DataType::Utf8 => array.as_string::<i32>().iter().for_each(&mut f),
+        DataType::LargeUtf8 => array.as_string::<i64>().iter().for_each(&mut f),
+        DataType::Utf8View => array.as_string_view().iter().for_each(&mut f),
         other => return exec_err!("{name} expects a string argument, got {other}"),
-    };
-    Ok(ColumnarValue::Array(Arc::new(out) as ArrayRef))
+    }
+    Ok(())
+}
+
+/// Maps every row of a string argument to a boolean; a NULL row or a `None` from `f` gives NULL.
+pub(super) fn eval_bools(
+    arg: &ColumnarValue,
+    number_rows: usize,
+    name: &str,
+    mut f: impl FnMut(&str) -> Option<bool>,
+) -> Result<ColumnarValue> {
+    let mut out = BooleanBuilder::with_capacity(number_rows);
+    for_each_row(arg, number_rows, name, |row| {
+        out.append_option(row.and_then(&mut f))
+    })?;
+    Ok(ColumnarValue::Array(Arc::new(out.finish())))
 }
 
 /// Value of a constant string argument, or `None` when it is a NULL literal.
@@ -80,14 +91,6 @@ pub(super) fn v4_mask(len: u8) -> u32 {
 pub(super) fn v6_mask(len: u8) -> u128 {
     // A shift by the full width overflows, and /0 means no network bits.
     u128::MAX.checked_shl(128 - u32::from(len)).unwrap_or(0)
-}
-
-fn map_rows<'a, S, T, B>(array: S, mut f: impl FnMut(&str) -> Option<T>) -> B
-where
-    S: StringArrayType<'a>,
-    B: FromIterator<Option<T>>,
-{
-    array.iter().map(|row| row.and_then(&mut f)).collect()
 }
 
 #[cfg(test)]

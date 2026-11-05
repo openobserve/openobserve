@@ -16,14 +16,14 @@
 use std::{net::Ipv6Addr, sync::LazyLock as Lazy};
 
 use datafusion::{
-    arrow::{array::BooleanArray, datatypes::DataType},
+    arrow::datatypes::DataType,
     common::Result,
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
     },
 };
 
-use super::eval_strings;
+use super::eval_bools;
 
 pub const IS_IPV6_UDF_NAME: &str = "is_ipv6";
 
@@ -57,7 +57,7 @@ impl ScalarUDFImpl for IsIpv6Udf {
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        eval_strings::<_, BooleanArray>(&args.args[0], args.number_rows, IS_IPV6_UDF_NAME, |s| {
+        eval_bools(&args.args[0], args.number_rows, IS_IPV6_UDF_NAME, |s| {
             Some(s.parse::<Ipv6Addr>().is_ok())
         })
     }

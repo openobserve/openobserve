@@ -16,14 +16,14 @@
 use std::{net::IpAddr, sync::LazyLock as Lazy};
 
 use datafusion::{
-    arrow::{array::BooleanArray, datatypes::DataType},
+    arrow::datatypes::DataType,
     common::{Result, ScalarValue, exec_err},
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
     },
 };
 
-use super::{constant_str, eval_strings, parse_prefix_len, v4_mask, v6_mask};
+use super::{constant_str, eval_bools, parse_prefix_len, v4_mask, v6_mask};
 
 pub const IP_CIDR_CONTAINS_UDF_NAME: &str = "ip_cidr_contains";
 
@@ -64,7 +64,7 @@ impl ScalarUDFImpl for IpCidrContainsUdf {
         let Some(cidr) = Cidr::parse(text) else {
             return exec_err!("{IP_CIDR_CONTAINS_UDF_NAME}: invalid CIDR '{text}'");
         };
-        eval_strings::<_, BooleanArray>(
+        eval_bools(
             &args.args[1],
             args.number_rows,
             IP_CIDR_CONTAINS_UDF_NAME,

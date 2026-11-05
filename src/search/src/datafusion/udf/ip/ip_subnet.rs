@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    fmt::Write,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    sync::LazyLock as Lazy,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use datafusion::{
-    arrow::{array::StringArray, datatypes::DataType},
+    arrow::{array::StringBuilder, datatypes::DataType},
     common::{Result, ScalarValue, exec_err},
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
@@ -27,7 +28,7 @@ use datafusion::{
     },
 };
 
-use super::{constant_str, eval_strings, parse_prefix_len, v4_mask, v6_mask};
+use super::{constant_str, for_each_row, parse_prefix_len, v4_mask, v6_mask};
 
 pub const IP_SUBNET_UDF_NAME: &str = "ip_subnet";
 
@@ -79,9 +80,7 @@ impl ScalarUDFImpl for IpSubnetUdf {
                 Some(mask) => mask,
             },
         };
-        eval_strings::<_, StringArray>(&args.args[0], args.number_rows, IP_SUBNET_UDF_NAME, |ip| {
-            subnet(ip.parse().ok()?, prefix, v6)
-        })
+        subnets(&args.args[0], args.number_rows, prefix, v6)
     }
 }
 
@@ -133,16 +132,32 @@ fn constant_mask(arg: &ColumnarValue, param: &str) -> Result<Option<Mask>> {
     }
 }
 
+/// Formats each row's network address straight into the output buffer, NULL where it has none.
+fn subnets(arg: &ColumnarValue, number_rows: usize, v4: Mask, v6: Mask) -> Result<ColumnarValue> {
+    let mut out = StringBuilder::with_capacity(number_rows, number_rows * 16);
+    for_each_row(arg, number_rows, IP_SUBNET_UDF_NAME, |row| {
+        match row.and_then(|ip| subnet(ip.parse().ok()?, v4, v6)) {
+            Some(net) => {
+                // Writing to an in-memory StringBuilder cannot fail.
+                write!(out, "{net}").expect("write to StringBuilder");
+                out.append_value("");
+            }
+            None => out.append_null(),
+        }
+    })?;
+    Ok(ColumnarValue::Array(Arc::new(out.finish())))
+}
+
 /// Network address of `ip`; IPv4 and `::ffff:`-mapped addresses use `v4`, other IPv6 uses `v6`.
-fn subnet(ip: IpAddr, v4: Mask, v6: Mask) -> Option<String> {
+fn subnet(ip: IpAddr, v4: Mask, v6: Mask) -> Option<IpAddr> {
     match ip {
-        IpAddr::V4(ip) => v4.apply_v4(ip).map(|net| net.to_string()),
+        IpAddr::V4(ip) => v4.apply_v4(ip).map(IpAddr::V4),
         // Same as ClickHouse cutIPv6, Doris cut_ipv6 and ES|QL IP_PREFIX for mapped addresses.
         IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
             Some(embedded) => v4
                 .apply_v4(embedded)
-                .map(|net| net.to_ipv6_mapped().to_string()),
-            None => v6.apply_v6(ip).map(|net| net.to_string()),
+                .map(|net| IpAddr::V6(net.to_ipv6_mapped())),
+            None => v6.apply_v6(ip).map(IpAddr::V6),
         },
     }
 }
