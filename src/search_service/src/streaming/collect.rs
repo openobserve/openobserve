@@ -199,6 +199,8 @@ fn fold_response(merged: &mut Option<Response>, mut results: Response, streaming
     }
     if acc.histogram_interval.is_none() {
         acc.histogram_interval = results.histogram_interval;
+        acc.histogram_origin = results.histogram_origin;
+        acc.histogram_offset = results.histogram_offset;
     }
 }
 
