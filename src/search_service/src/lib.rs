@@ -169,6 +169,7 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+    request.set_use_index(in_req.use_index);
     request.set_analyze_profile(in_req.query.analyze_profile);
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_chat_history_reader();

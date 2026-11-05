@@ -21,11 +21,18 @@ import { fetchHasUserStreams } from "./useSampleDataPresence";
 
 const STREAMS_URL = `${store.state.API_ENDPOINT}/api/:org/streams`;
 
+// the server flags the streams O2 writes itself with is_internal
+const serverInternal = (name: string) =>
+  ["usage", "triggers"].includes(name) || /^(_o2_|synthetics_)/.test(name);
+
 function mockLogs(names: string[]) {
   global.server.use(
     http.get(STREAMS_URL, ({ request }) => {
       const type = new URL(request.url).searchParams.get("type");
-      const list = type === "logs" ? names.map((name) => ({ name, stream_type: "logs" })) : [];
+      const list =
+        type === "logs"
+          ? names.map((name) => ({ name, stream_type: "logs", is_internal: serverInternal(name) }))
+          : [];
       return HttpResponse.json({ list });
     }),
   );

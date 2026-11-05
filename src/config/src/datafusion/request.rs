@@ -31,6 +31,7 @@ pub struct Request {
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
     pub use_cache: bool,
+    pub use_index: bool,
     pub overwrite_cache: bool,
     pub histogram_interval: i64,
     /// Issued by the AI Chat API's history reader, the only reader allowed on
@@ -58,6 +59,7 @@ impl Default for Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
+            use_index: true,
             overwrite_cache: false,
             histogram_interval: 0,
             chat_history_reader: false,
@@ -92,6 +94,7 @@ impl Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
+            use_index: true,
             overwrite_cache,
             histogram_interval,
             chat_history_reader: false,
@@ -114,6 +117,10 @@ impl Request {
 
     pub fn set_use_cache(&mut self, use_cache: bool) {
         self.use_cache = use_cache;
+    }
+
+    pub fn set_use_index(&mut self, use_index: bool) {
+        self.use_index = use_index;
     }
 
     pub fn set_analyze_profile(&mut self, analyze_profile: bool) {
@@ -142,6 +149,7 @@ impl From<FlightSearchRequest> for Request {
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
             use_cache: req.search_info.use_cache,
+            use_index: req.index_info.use_index,
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
@@ -216,7 +224,10 @@ mod tests {
                 histogram_interval: 60,
                 ..Default::default()
             },
-            index_info: IndexInfo::default(),
+            index_info: IndexInfo {
+                use_index: true,
+                ..Default::default()
+            },
             super_cluster_info: SuperClusterInfo {
                 user_id: Some("alice".to_string()),
                 work_group: Some("wg1".to_string()),
@@ -242,6 +253,15 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
+    }
+
+    #[test]
+    fn test_from_flight_request_maps_use_index() {
+        let mut flight = make_flight_request();
+        assert!(Request::from(flight.clone()).use_index);
+        flight.index_info.use_index = false;
+        assert!(!Request::from(flight).use_index);
+        assert!(Request::default().use_index);
     }
 
     #[test]

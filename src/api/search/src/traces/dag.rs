@@ -179,6 +179,7 @@ pub async fn get_trace_dag(
         search_type: None,
         search_event_context: None,
         use_cache: get_use_cache_from_request(&query),
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

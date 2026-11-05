@@ -45,7 +45,7 @@ const probeQuery = (client: QueryClient, org: string, type: string) => {
 };
 
 const userStreams = (list: ListedStream[] | undefined, type: string) =>
-  (list ?? []).filter((s) => isOwnedStream(s?.name ?? "", type));
+  (list ?? []).filter((s) => isOwnedStream(s, type));
 const hasRecords = (s: ListedStream) =>
   Number(s.stats?.doc_num ?? 0) > 0 || Number(s.stats?.doc_time_max ?? 0) > 0;
 const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean, org: string) => {

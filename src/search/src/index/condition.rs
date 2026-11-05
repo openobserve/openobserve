@@ -47,8 +47,11 @@ use super::physical::{
 };
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME, fuzzy_match_udf,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    STR_MATCH_UDF_NAME,
+    fulltext::{
+        fuzzy_match,
+        match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    },
 };
 
 // single condition
@@ -66,6 +69,8 @@ pub enum Condition {
     MatchAll(String),
     // term, distance
     FuzzyMatchAll(String, u8),
+    // `field LIKE '%value%'` on an FTS field, answered by `_all` as a superset
+    Like { field: String, value: String },
     All(),
     // n-ary so a long OR/AND chain does not recurse one level per term
     Or(Vec<Condition>),
@@ -99,6 +104,9 @@ impl Condition {
             }
             Condition::FuzzyMatchAll(value, distance) => {
                 format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
+            }
+            Condition::Like { field, value } => {
+                format!("{field} LIKE '%{value}%' ON {INDEX_FIELD_NAME_FOR_ALL}")
             }
             Condition::All() => "ALL".to_string(),
             Condition::Or(items) => format!("({})", Self::join_query(items, " OR ")),
@@ -305,6 +313,17 @@ impl Condition {
                 let term = Term::from_field_text(default_field, value);
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
+            Condition::Like { field, value } => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!("There's no FullTextSearch field for LIKE on {field}")
+                })?;
+                // `_all` terms are lowercased at ingest, so match them byte for byte
+                Box::new(ContainsQuery::new(
+                    &value.to_ascii_lowercase(),
+                    default_field,
+                    true,
+                )?)
+            }
             Condition::All() => Box::new(AllQuery {}),
             Condition::Or(items) => {
                 let queries = items
@@ -343,7 +362,7 @@ impl Condition {
                     fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
                 }
             }
-            Condition::FuzzyMatchAll(..) => {
+            Condition::FuzzyMatchAll(..) | Condition::Like { .. } => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
             Condition::Or(items) | Condition::And(items) => {
@@ -367,7 +386,8 @@ impl Condition {
             Condition::Equal(field, _)
             | Condition::NotEqual(field, _)
             | Condition::StrMatch(field, ..)
-            | Condition::In(field, ..) => {
+            | Condition::In(field, ..)
+            | Condition::Like { field, .. } => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) | Condition::FuzzyMatchAll(..) => {
@@ -456,7 +476,7 @@ impl Condition {
                 Ok(disjunction(expr_list))
             }
             Condition::FuzzyMatchAll(value, distance) => {
-                let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
+                let fuzzy_expr = Arc::new(fuzzy_match::FUZZY_MATCH_UDF.clone());
                 let term = if cfg.common.utf8_view_enabled {
                     Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {
@@ -496,6 +516,9 @@ impl Condition {
                 Ok(disjunction(expr_list))
             }
             Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
+            Condition::Like { field, .. } => Err(anyhow::anyhow!(
+                "LIKE on {field} stays in the plan's filter and has no physical expression"
+            )),
             Condition::Or(items) => {
                 let exprs = items
                     .iter()
@@ -524,7 +547,7 @@ impl Condition {
             Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::MatchAll(v) => is_alphanumeric(v),
-            Condition::FuzzyMatchAll(..) => false,
+            Condition::FuzzyMatchAll(..) | Condition::Like { .. } => false,
             Condition::All() => true,
             Condition::Or(items) | Condition::And(items) => {
                 items.iter().all(|c| c.can_remove_filter())
@@ -894,5 +917,105 @@ mod tests {
             true,
         )]);
         assert!(condition.to_physical_expr(&arrow_schema, &[]).is_ok());
+    }
+
+    fn like(field: &str, value: &str) -> Condition {
+        Condition::Like {
+            field: field.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    // `_all` holds the FTS field `message`
+    fn build_like_index() -> (tantivy::Index, Option<Field>) {
+        use config::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
+        use tantivy::schema::{TextFieldIndexing, TextOptions};
+
+        let mut builder = tantivy::schema::SchemaBuilder::new();
+        let all = builder.add_text_field(
+            INDEX_FIELD_NAME_FOR_ALL,
+            TextOptions::default().set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_index_option(IndexRecordOption::Basic)
+                    .set_tokenizer(O2_TOKENIZER),
+            ),
+        );
+        let service = builder.add_text_field("service", tantivy::schema::STRING);
+        let index = tantivy::Index::create_in_ram(builder.build());
+        index
+            .tokenizers()
+            .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
+        let mut writer: tantivy::IndexWriter = index.writer(15_000_000).unwrap();
+        for (message, svc) in [
+            ("GET /api ERROR timeout", "AuthService"),
+            ("connection refused: upstreamErrorCode=7", "billing"),
+            ("all good", "auth-gateway"),
+        ] {
+            writer
+                .add_document(tantivy::doc!(all => message, service => svc))
+                .unwrap();
+        }
+        writer.commit().unwrap();
+        (index, Some(all))
+    }
+
+    fn count_like(condition: &Condition) -> usize {
+        let (index, all) = build_like_index();
+        let query = condition.to_tantivy_query(&index.schema(), all).unwrap();
+        let searcher = index.reader().unwrap().searcher();
+        searcher.search(&query, &tantivy::collector::Count).unwrap()
+    }
+
+    #[test]
+    fn test_condition_like_to_query() {
+        assert_eq!(
+            like("message", "err").to_query(),
+            "message LIKE '%err%' ON _all"
+        );
+    }
+
+    #[test]
+    fn test_condition_like_searches_all_field() {
+        let condition = like("message", "Error");
+        assert!(!condition.can_remove_filter());
+        // `_all` is lowercased, so LIKE and ILIKE share one case-insensitive superset
+        assert_eq!(count_like(&condition), 2);
+        assert_eq!(count_like(&like("message", "refused")), 1);
+        assert_eq!(count_like(&like("message", "missing")), 0);
+        assert_eq!(
+            condition.need_all_term_fields(),
+            HashSet::from([INDEX_FIELD_NAME_FOR_ALL.to_string()])
+        );
+        assert_eq!(
+            condition.get_schema_fields(&["message".to_string(), "log".to_string()]),
+            HashSet::from(["message".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_condition_like_without_all_field_is_skipped() {
+        let (index, _) = build_like_index();
+        let condition = like("message", "error");
+        assert!(condition.to_tantivy_query(&index.schema(), None).is_err());
+
+        let index_condition = IndexCondition {
+            conditions: vec![
+                condition,
+                Condition::Equal("service".to_string(), "billing".to_string()),
+            ],
+        };
+        let (_, has_skipped) = index_condition
+            .to_tantivy_query("trace", index.schema(), None)
+            .unwrap();
+        assert!(has_skipped);
+    }
+
+    #[test]
+    fn test_condition_like_has_no_physical_expr() {
+        let schema = arrow_schema::Schema::empty();
+        let condition = like("message", "err");
+        assert!(condition.to_physical_expr(&schema, &[]).is_err());
+        let nested = Condition::Or(vec![condition]);
+        assert!(nested.to_physical_expr(&schema, &[]).is_err());
     }
 }

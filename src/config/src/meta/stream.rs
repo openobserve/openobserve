@@ -29,6 +29,7 @@ use crate::{
     utils::{
         hash::{Sum64, gxhash},
         json::{self, Value},
+        time::{day_micros, hour_micros},
     },
 };
 
@@ -138,8 +139,8 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    /// Types the compactor can merge across the hours of a closed day.
-    pub fn support_dynamic_merge(&self) -> bool {
+    /// Types whose days can be partitioned daily, see [`StreamPartitionTimeLevel`].
+    pub fn support_dynamic_partition(&self) -> bool {
         matches!(
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
@@ -728,6 +729,109 @@ impl std::fmt::Display for PartitionTimeLevel {
     }
 }
 
+/// From `since`, a UTC day start in microseconds, the stream's days are at `level`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PartitionTimeLevelChange {
+    pub since: i64,
+    pub level: PartitionTimeLevel,
+}
+
+/// A stream's partition level per day; a day's level never changes once the day has begun.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct StreamPartitionTimeLevel {
+    /// The stream's own classifier switch; unset follows `ZO_DYNAMIC_PARTITION_STREAM_TYPES`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dynamic: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<PartitionTimeLevelChange>,
+}
+
+impl StreamPartitionTimeLevel {
+    /// The level of the day holding `ts`; `None` before the first change.
+    pub fn level_at(&self, ts: i64) -> Option<PartitionTimeLevel> {
+        self.changes
+            .iter()
+            .rev()
+            .find(|change| change.since <= ts)
+            .map(|change| change.level)
+    }
+
+    /// The level the last change leads to, hourly without one; it may not have begun yet.
+    pub fn current_level(&self) -> PartitionTimeLevel {
+        self.changes
+            .last()
+            .map_or(PartitionTimeLevel::Hourly, |change| change.level)
+    }
+
+    /// Whether a day of the range from `start` up to `end` (exclusive) is daily.
+    pub fn touches_daily(&self, start: i64, end: i64) -> bool {
+        self.level_at(start) == Some(PartitionTimeLevel::Daily)
+            || self.changes.iter().any(|change| {
+                change.level == PartitionTimeLevel::Daily
+                    && change.since > start
+                    && change.since < end
+            })
+    }
+
+    /// Moves the stream to `level` from the next effect day; false when it is there already.
+    pub fn set_level(&mut self, level: PartitionTimeLevel, now: i64) -> bool {
+        let last_since = self.changes.last().map_or(0, |change| change.since);
+        let since = Self::effect_day(now).max(last_since);
+        if self.current_level() == level {
+            return false;
+        }
+        // the last change has not begun when it is that late, so replacing it rewrites no day
+        if since == last_since {
+            self.changes.pop();
+        }
+        if self.current_level() != level {
+            self.changes.push(PartitionTimeLevelChange { since, level });
+        }
+        true
+    }
+
+    /// Drops what describes only days before `cutoff`; true when something was dropped.
+    pub fn prune(&mut self, cutoff: i64) -> bool {
+        let before_cutoff = self
+            .changes
+            .partition_point(|change| change.since <= cutoff);
+        if before_cutoff <= 1 {
+            return false;
+        }
+        self.changes.drain(..before_cutoff - 1);
+        true
+    }
+
+    fn is_empty(&self) -> bool {
+        self.dynamic.is_none() && self.changes.is_empty()
+    }
+
+    /// Older versions stored a plain string under this key, which means nothing now.
+    fn from_value(value: Value) -> Self {
+        if !value.is_object() {
+            return Self::default();
+        }
+        json::from_value(value).unwrap_or_else(|e| {
+            log::warn!("invalid stream setting partition_time_level: {e}");
+            Self::default()
+        })
+    }
+
+    fn deserialize_lenient<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        Value::deserialize(de).map(Self::from_value)
+    }
+
+    /// Next UTC day, or the one after within an hour of midnight, so every node has the change.
+    fn effect_day(now: i64) -> i64 {
+        let next_day = now - now % day_micros(1) + day_micros(1);
+        if next_day - now < hour_micros(1) {
+            next_day + day_micros(1)
+        } else {
+            next_day
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSettingsWrapper<D> {
     #[serde(default)]
@@ -779,8 +883,12 @@ pub struct UpdateStreamSettings {
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
+    /// `hourly` or `daily`, accepted only while the stream's dynamic partition is off.
     #[serde(default)]
-    pub dynamic_merge: Option<bool>,
+    pub partition_time_level: Option<PartitionTimeLevel>,
+    /// Whether the classifier decides the level; a value equal to the env's follows the env.
+    #[serde(default)]
+    pub dynamic_partition: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
     #[serde(default)]
@@ -963,9 +1071,11 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default = "StreamSettings::default_approx_partition")]
     pub approx_partition: bool,
-    /// Per-stream override of `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; unset follows the type.
-    #[serde(default)]
-    pub dynamic_merge: Option<bool>,
+    #[serde(
+        default,
+        deserialize_with = "StreamPartitionTimeLevel::deserialize_lenient"
+    )]
+    pub partition_time_level: StreamPartitionTimeLevel,
     #[serde(default)]
     pub index_original_data: bool,
     #[serde(default)]
@@ -999,7 +1109,7 @@ impl Default for StreamSettings {
             max_query_range: 0,
             store_original_data: false,
             approx_partition: Self::default_approx_partition(),
-            dynamic_merge: None,
+            partition_time_level: StreamPartitionTimeLevel::default(),
             distinct_value_fields: Vec::new(),
             index_updated_at: 0,
             index_fields_updated_at: Default::default(),
@@ -1063,9 +1173,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
-        match self.dynamic_merge {
-            Some(dynamic_merge) => state.serialize_field("dynamic_merge", &dynamic_merge)?,
-            None => state.skip_field("dynamic_merge")?,
+        if self.partition_time_level.is_empty() {
+            state.skip_field("partition_time_level")?;
+        } else {
+            state.serialize_field("partition_time_level", &self.partition_time_level)?;
         }
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
         if !self.index_fields_updated_at.is_empty() {
@@ -1195,7 +1306,11 @@ impl From<&str> for StreamSettings {
             .and_then(Value::as_bool)
             .unwrap_or_else(Self::default_approx_partition);
 
-        let dynamic_merge = settings.get("dynamic_merge").and_then(Value::as_bool);
+        let partition_time_level = settings
+            .get("partition_time_level")
+            .cloned()
+            .map(StreamPartitionTimeLevel::from_value)
+            .unwrap_or_default();
 
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
@@ -1283,7 +1398,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
-            dynamic_merge,
+            partition_time_level,
             distinct_value_fields,
             index_updated_at,
             index_fields_updated_at,
@@ -1309,6 +1424,8 @@ impl MemorySize for StreamSettings {
             + self.defined_schema_fields.mem_size()
             + self.distinct_value_fields.mem_size()
             + self.extended_retention_days.mem_size()
+            + self.partition_time_level.changes.capacity()
+                * std::mem::size_of::<PartitionTimeLevelChange>()
             + self
                 .index_fields_updated_at
                 .iter()
@@ -2421,33 +2538,172 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_stream_settings_dynamic_merge_round_trip() {
-        // unset is not written, so old readers see no unknown key
-        let unset = json::to_string(&StreamSettings::default()).unwrap();
-        assert!(!unset.contains("dynamic_merge"));
-        assert_eq!(StreamSettings::from(unset.as_str()).dynamic_merge, None);
-        for value in [true, false] {
-            let settings = StreamSettings {
-                dynamic_merge: Some(value),
-                ..Default::default()
-            };
-            let text = json::to_string(&settings).unwrap();
-            assert_eq!(
-                StreamSettings::from(text.as_str()).dynamic_merge,
-                Some(value)
-            );
+    const LEVEL_DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+
+    fn level_change(day: i64, level: PartitionTimeLevel) -> PartitionTimeLevelChange {
+        PartitionTimeLevelChange {
+            since: LEVEL_DAY + day * day_micros(1),
+            level,
+        }
+    }
+
+    fn level_history(changes: &[(i64, PartitionTimeLevel)]) -> StreamPartitionTimeLevel {
+        StreamPartitionTimeLevel {
+            dynamic: None,
+            changes: changes.iter().map(|&(d, l)| level_change(d, l)).collect(),
         }
     }
 
     #[test]
-    fn test_update_stream_settings_dynamic_merge_null_is_unchanged() {
+    fn test_level_at_is_the_last_change_of_the_day() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        let history = level_history(&[(1, Daily), (3, Hourly)]);
+        for (ts, expected) in [
+            (LEVEL_DAY, None),
+            (LEVEL_DAY + day_micros(1) - 1, None),
+            (LEVEL_DAY + day_micros(1), Some(Daily)),
+            (LEVEL_DAY + day_micros(3) - 1, Some(Daily)),
+            (LEVEL_DAY + day_micros(3), Some(Hourly)),
+            (LEVEL_DAY + day_micros(30), Some(Hourly)),
+        ] {
+            assert_eq!(history.level_at(ts), expected, "{ts}");
+        }
+        assert_eq!(level_history(&[]).level_at(LEVEL_DAY), None);
+    }
+
+    #[test]
+    fn test_touches_daily_covers_every_day_of_the_range() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        let day = |d: i64| LEVEL_DAY + d * day_micros(1);
+        let history = level_history(&[(2, Daily), (4, Hourly)]);
+        assert!(!history.touches_daily(day(0), day(2)), "end is exclusive");
+        assert!(history.touches_daily(day(0), day(2) + 1), "reaches day 2");
+        assert!(
+            history.touches_daily(day(3) + 5, day(3) + 6),
+            "inside day 3"
+        );
+        assert!(!history.touches_daily(day(4), day(9)), "back to hourly");
+        // the daily stretch sits inside the range without either end touching it
+        assert!(history.touches_daily(day(1), day(5)));
+    }
+
+    #[test]
+    fn test_set_level_takes_effect_on_the_next_day() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        let at = |hour: i64| LEVEL_DAY + hour_micros(hour);
+        // the type's level is hourly: nothing to record
+        assert!(!level_history(&[]).set_level(Hourly, at(5)));
+
+        let mut history = level_history(&[]);
+        assert!(history.set_level(Daily, at(5)));
+        assert_eq!(history.changes, vec![level_change(1, Daily)]);
+        assert!(!history.set_level(Daily, at(6)), "already there");
+
+        // within the hour before midnight the effect slips a day; 23:00 sharp does not
+        let mut history = level_history(&[]);
+        assert!(history.set_level(Daily, at(23)));
+        assert_eq!(history.changes, vec![level_change(1, Daily)]);
+        let mut history = level_history(&[]);
+        assert!(history.set_level(Daily, at(23) + 1));
+        assert_eq!(history.changes, vec![level_change(2, Daily)]);
+
+        // a change that has not begun is replaced, a change that has begun stays
+        let mut history = level_history(&[(1, Daily)]);
+        assert!(history.set_level(Hourly, at(6)));
+        assert!(history.changes.is_empty(), "back at the type's level");
+        let mut history = level_history(&[(0, Daily), (1, Hourly)]);
+        assert!(history.set_level(Daily, at(6)));
+        assert_eq!(history.changes, vec![level_change(0, Daily)]);
+        let mut history = level_history(&[(1, Daily)]);
+        assert!(history.set_level(Hourly, at(24 + 6)));
+        assert_eq!(
+            history.changes,
+            vec![level_change(1, Daily), level_change(2, Hourly)]
+        );
+
+        // a node behind on the clock never writes a change out of order
+        let mut history = level_history(&[(0, Daily), (5, Hourly)]);
+        assert!(history.set_level(Daily, at(6)));
+        assert_eq!(history.changes, vec![level_change(0, Daily)]);
+    }
+
+    #[test]
+    fn test_prune_keeps_the_last_change_before_the_cutoff() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        let changes = [(1, Daily), (3, Hourly), (5, Daily)];
+        let day = |d: i64| LEVEL_DAY + d * day_micros(1);
+        for (cutoff, kept) in [
+            (day(0), 3),
+            (day(1), 3),
+            (day(3), 2),
+            (day(4), 2),
+            (day(5), 1),
+            (day(9), 1),
+        ] {
+            let mut history = level_history(&changes);
+            assert_eq!(history.prune(cutoff), kept < 3, "{cutoff}");
+            assert_eq!(history.changes.len(), kept, "{cutoff}");
+            // the level of every kept day is what it was
+            let full = level_history(&changes);
+            assert_eq!(history.level_at(cutoff), full.level_at(cutoff), "{cutoff}");
+        }
+        assert!(!level_history(&[]).prune(day(9)));
+    }
+
+    #[test]
+    fn test_stream_settings_partition_time_level_round_trip() {
+        let empty = json::to_string(&StreamSettings::default()).unwrap();
+        assert!(!empty.contains("partition_time_level"));
+        assert!(
+            StreamSettings::from(empty.as_str())
+                .partition_time_level
+                .is_empty()
+        );
+
+        let settings = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic: Some(false),
+                changes: vec![level_change(1, PartitionTimeLevel::Daily)],
+            },
+            ..Default::default()
+        };
+        let text = json::to_string(&settings).unwrap();
+        assert_eq!(
+            StreamSettings::from(text.as_str()).partition_time_level,
+            settings.partition_time_level
+        );
+    }
+
+    #[test]
+    fn test_stream_settings_ignores_a_partition_time_level_of_older_versions() {
+        for value in ["hourly", "daily", "unset"] {
+            let text = format!(r#"{{"partition_time_level": "{value}"}}"#);
+            let settings = StreamSettings::from(text.as_str());
+            assert!(settings.partition_time_level.is_empty(), "{value}");
+            let settings: StreamSettings = json::from_str(&text).unwrap();
+            assert!(settings.partition_time_level.is_empty(), "{value}");
+        }
+    }
+
+    #[test]
+    fn test_update_stream_settings_partition_time_level() {
         let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
-        assert_eq!(missing.dynamic_merge, None);
-        let null: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
-        assert_eq!(null.dynamic_merge, None);
-        let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
-        assert_eq!(set.dynamic_merge, Some(false));
+        assert_eq!(missing.partition_time_level, None);
+        let null: UpdateStreamSettings =
+            json::from_str(r#"{"partition_time_level": null}"#).unwrap();
+        assert_eq!(null.partition_time_level, None);
+        assert_eq!(missing.dynamic_partition, None);
+        let off: UpdateStreamSettings = json::from_str(r#"{"dynamic_partition": false}"#).unwrap();
+        assert_eq!(off.dynamic_partition, Some(false));
+        for (text, level) in [
+            ("hourly", PartitionTimeLevel::Hourly),
+            ("daily", PartitionTimeLevel::Daily),
+            ("unset", PartitionTimeLevel::Unset),
+        ] {
+            let set: UpdateStreamSettings =
+                json::from_str(&format!(r#"{{"partition_time_level": "{text}"}}"#)).unwrap();
+            assert_eq!(set.partition_time_level, Some(level));
+        }
     }
 
     #[test]

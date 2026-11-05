@@ -52,8 +52,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
-        get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
-        unwrap_stream_settings,
+        get_partition_time_level, get_stream_setting_dynamic_partition, unwrap_stream_created_at,
+        unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -195,7 +195,14 @@ pub fn stream_res(
         None
     };
 
-    let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    // what the UI needs is the switch in effect, a stream without its own value follows the env
+    if stream_type.support_dynamic_partition() {
+        settings.partition_time_level.dynamic = Some(get_stream_setting_dynamic_partition(
+            stream_type,
+            Some(&settings),
+        ));
+    }
 
     #[cfg(not(feature = "vectorscan"))]
     let pattern_associations = vec![];
@@ -326,6 +333,9 @@ pub async fn create_stream(
                 .collect::<Vec<_>>(),
         );
     }
+
+    // the level of a day is only ever written from the next day on, a body could rewrite the past
+    stream.settings.partition_time_level = Default::default();
 
     // create the stream settings
     let resp = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await?;
@@ -515,13 +525,14 @@ pub async fn update_stream_settings(
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
     }
-    if let Some(v) = new_settings.dynamic_merge {
-        if !stream_type.support_dynamic_merge() {
-            return Ok(MetaHttpResponse::bad_request(
-                "dynamic_merge is only supported for logs, metrics and traces streams",
-            ));
-        }
-        settings.dynamic_merge = Some(v);
+    if let Err(message) = apply_partition_level_settings(
+        stream_type,
+        &mut settings,
+        new_settings.dynamic_partition,
+        new_settings.partition_time_level,
+        now_micros(),
+    ) {
+        return Ok(MetaHttpResponse::bad_request(message));
     }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
@@ -991,10 +1002,11 @@ pub async fn delete_stream_data_by_time_range(
 
     // Convert the time range to RFC3339 format
     // we need check the date is hour or day, user can't delete data with minute and second
-    let partition_time_level = get_partition_time_level(stream_type);
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let needs_whole_days = delete_needs_whole_days(stream_type, settings.as_deref(), &time_range);
     let start_time = Utc.timestamp_nanos(time_range.start * 1000);
     let end_time = Utc.timestamp_nanos(time_range.end * 1000);
-    let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
+    let (start_time, end_time) = if needs_whole_days {
         if start_time.hour() != 0 || start_time.minute() != 0 || start_time.second() != 0 {
             return Err(infra::errors::Error::Message(
                 "Start time must be with zero hour, minute and second".to_string(),
@@ -1050,6 +1062,58 @@ pub async fn delete_stream_data_by_time_range(
         ended_at: 0,
     };
     db::compact::compactor_manual_jobs::add_job(job).await
+}
+
+/// Applies the dynamic partition switch, then a level set by hand; refused while the switch is on.
+fn apply_partition_level_settings(
+    stream_type: StreamType,
+    settings: &mut StreamSettings,
+    dynamic: Option<bool>,
+    level: Option<PartitionTimeLevel>,
+    now: i64,
+) -> Result<(), &'static str> {
+    // older clients send unset for a level they leave alone
+    let level = level.filter(|level| *level != PartitionTimeLevel::Unset);
+    if dynamic.is_none() && level.is_none() {
+        return Ok(());
+    }
+    if !stream_type.support_dynamic_partition() {
+        return Err(
+            "partition level settings are only supported for logs, metrics and traces streams",
+        );
+    }
+    // a value equal to the env's is no choice of its own: the stream keeps following the env
+    if let Some(dynamic) = dynamic {
+        let env_default = get_stream_setting_dynamic_partition(stream_type, None);
+        settings.partition_time_level.dynamic = (dynamic != env_default).then_some(dynamic);
+    }
+    let Some(level) = level else {
+        return Ok(());
+    };
+    // a client that sends back the level it read asks for nothing
+    if level == settings.partition_time_level.current_level() {
+        return Ok(());
+    }
+    if get_stream_setting_dynamic_partition(stream_type, Some(settings)) {
+        return Err("partition_time_level can only be set while dynamic_partition is off");
+    }
+    settings.partition_time_level.set_level(level, now);
+    Ok(())
+}
+
+/// A delete must cover whole days when a day of the range is stored by day.
+fn delete_needs_whole_days(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+    range: &TimeRange,
+) -> bool {
+    get_partition_time_level(stream_type) == PartitionTimeLevel::Daily
+        || (stream_type.support_dynamic_partition()
+            && settings.is_some_and(|settings| {
+                settings
+                    .partition_time_level
+                    .touches_daily(range.start, range.end)
+            }))
 }
 
 async fn transform_stats(
@@ -2022,6 +2086,48 @@ mod tests {
         infra::schema::remove_stream_settings(&key).await;
     }
 
+    #[test]
+    fn test_delete_needs_whole_days() {
+        use config::{
+            meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel},
+            utils::time::{day_micros, hour_micros},
+        };
+        const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let settings = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic: None,
+                changes: vec![PartitionTimeLevelChange {
+                    since: DAY,
+                    level: PartitionTimeLevel::Daily,
+                }],
+            },
+            ..Default::default()
+        };
+        let range = |start, end| TimeRange::new(start, end);
+        let needs =
+            |stream_type, settings, range| delete_needs_whole_days(stream_type, settings, &range);
+        let before = DAY - hour_micros(5);
+        let hour_of_the_day = range(DAY + hour_micros(1), DAY + hour_micros(2));
+        let logs = StreamType::Logs;
+        assert!(needs(logs, Some(&settings), hour_of_the_day.clone()));
+        assert!(needs(logs, Some(&settings), range(before, DAY + 1)));
+        assert!(
+            !needs(logs, Some(&settings), range(before, DAY)),
+            "ends where the daily day starts"
+        );
+        assert!(!needs(logs, None, hour_of_the_day.clone()));
+        assert!(!needs(
+            StreamType::Profiles,
+            Some(&settings),
+            hour_of_the_day
+        ));
+        assert!(needs(
+            StreamType::Filelist,
+            None,
+            range(DAY, DAY + day_micros(1))
+        ));
+    }
+
     async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
         let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
             .await
@@ -2055,6 +2161,130 @@ mod tests {
         let settings = settings_test_stream(name).await;
         assert!(settings.enable_distinct_fields);
         assert_eq!(settings.data_retention, 17);
+    }
+
+    #[test]
+    fn test_apply_partition_level_settings() {
+        use PartitionTimeLevel::{Daily, Hourly, Unset};
+        let apply = |own: Option<bool>, dynamic, level| {
+            let mut settings = StreamSettings::default();
+            settings.partition_time_level.dynamic = own;
+            let now = now_micros();
+            apply_partition_level_settings(StreamType::Logs, &mut settings, dynamic, level, now)
+                .map(|_| settings.partition_time_level)
+        };
+        // the switch alone leaves the level where it is
+        let on = apply(None, Some(true), None).unwrap();
+        assert_eq!(on.dynamic, Some(true));
+        assert!(on.changes.is_empty());
+        // by hand only while the switch is off, also when turned off in the same request
+        assert!(apply(Some(true), None, Some(Daily)).is_err());
+        assert!(apply(None, Some(true), Some(Daily)).is_err());
+        let off = apply(Some(false), None, Some(Daily)).unwrap();
+        assert_eq!(off.changes.len(), 1);
+        assert_eq!(off.changes[0].level, Daily);
+        assert!(off.changes[0].since > now_micros(), "takes effect later");
+        let both = apply(Some(true), Some(false), Some(Daily)).unwrap();
+        assert_eq!((both.dynamic, both.changes.len()), (None, 1));
+        // the env list is empty in tests: off matches it and clears the stream's own value
+        assert_eq!(apply(Some(true), Some(false), None).unwrap().dynamic, None);
+        assert_eq!(
+            apply(Some(false), Some(true), None).unwrap().dynamic,
+            Some(true)
+        );
+        // older clients resend unset or the level they read: nothing changes, nothing is refused
+        for own in [Some(false), Some(true)] {
+            for level in [Hourly, Unset] {
+                let same = apply(own, None, Some(level)).unwrap();
+                assert!(same.changes.is_empty(), "{own:?} {level}");
+            }
+        }
+
+        let mut settings = StreamSettings::default();
+        let refused = apply_partition_level_settings(
+            StreamType::Profiles,
+            &mut settings,
+            Some(true),
+            None,
+            0,
+        );
+        assert!(refused.is_err());
+        let unset = apply_partition_level_settings(
+            StreamType::Profiles,
+            &mut settings,
+            None,
+            Some(Unset),
+            0,
+        );
+        assert!(unset.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_partition_is_read_back_with_the_level_set_by_hand() {
+        let name = &format!("level_by_hand_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                dynamic_partition: Some(false),
+                partition_time_level: Some(PartitionTimeLevel::Daily),
+                ..Default::default()
+            },
+        )
+        .await;
+        let history = settings_test_stream(name).await.partition_time_level;
+        assert_eq!(history.dynamic, Some(false));
+        assert_eq!(history.changes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_partition_time_level_write_refuses_other_stream_types() {
+        let _ = infra::db::create_table().await;
+        let name = &format!("level_refused_{}", now_micros());
+        let stream = StreamCreate {
+            fields: Vec::new(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Profiles, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let update = UpdateStreamSettings {
+            partition_time_level: Some(PartitionTimeLevel::Daily),
+            ..Default::default()
+        };
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Profiles, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_create_stream_ignores_a_partition_time_level_in_the_body() {
+        use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
+        let _ = infra::db::create_table().await;
+        let name = &format!("level_in_create_{}", now_micros());
+        let stream = StreamCreate {
+            fields: Vec::new(),
+            settings: StreamSettings {
+                partition_time_level: StreamPartitionTimeLevel {
+                    dynamic: Some(true),
+                    changes: vec![PartitionTimeLevelChange {
+                        since: 1,
+                        level: PartitionTimeLevel::Daily,
+                    }],
+                },
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let history = settings_test_stream(name).await.partition_time_level;
+        assert!(history.changes.is_empty());
+        // the env list is empty in tests, so this is the stream without a value of its own
+        assert_eq!(history.dynamic, Some(false));
     }
 
     #[tokio::test]

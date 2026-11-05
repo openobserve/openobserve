@@ -33,11 +33,16 @@ const TYPES = USER_DATA_STREAM_TYPES.length;
 
 type Lists = Record<string, string[]>;
 
+// the server flags the streams O2 writes itself with is_internal
+const serverInternal = (name: string) =>
+  ["usage", "triggers"].includes(name) || /^(_o2_|synthetics_)/.test(name);
+
 // The list endpoint's shape: stats come from flushed files, so a stream with none yet reads zero.
 const listed = (name: string, type: string, docNum = 3) => ({
   name,
   storage_type: "s3",
   stream_type: type,
+  is_internal: serverInternal(name),
   stats: {
     created_at: 1_700_000_000_000_000,
     doc_time_min: docNum ? 1_700_000_000_000_000 : 0,

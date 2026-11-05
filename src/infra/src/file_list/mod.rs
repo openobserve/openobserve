@@ -21,9 +21,12 @@ use config::{
     meta::{
         meta_store::MetaStore,
         search::ScanStats,
-        stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+        stream::{
+            FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamPartitionTimeLevel,
+            StreamStats, StreamType,
+        },
     },
-    utils::time::second_micros,
+    utils::time::{hour_micros, second_micros},
 };
 
 use crate::{
@@ -903,17 +906,31 @@ fn stream_key_length_violation(
     })
 }
 
-/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
+/// The level bounding `max_ts` of a query ending at `time_end`, see [`day_max_ts_level`].
 pub async fn max_ts_bound_level(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    time_end: i64,
 ) -> PartitionTimeLevel {
     let level = query_retention_level(stream_type);
-    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_merge() {
+    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_partition() {
         return level;
     }
-    if crate::schema::get_dynamic_merge(org_id, stream_name, stream_type).await {
+    match crate::schema::get_settings(org_id, stream_name, stream_type).await {
+        Some(settings) => day_max_ts_level(&settings.partition_time_level, level, time_end),
+        None => level,
+    }
+}
+
+/// Daily when `time_end` is on or an hour from a daily day; earlier daily files end before it.
+fn day_max_ts_level(
+    history: &StreamPartitionTimeLevel,
+    level: PartitionTimeLevel,
+    time_end: i64,
+) -> PartitionTimeLevel {
+    let daily = Some(PartitionTimeLevel::Daily);
+    if history.level_at(time_end) == daily || history.level_at(time_end + hour_micros(1)) == daily {
         PartitionTimeLevel::Daily
     } else {
         level
@@ -1494,6 +1511,37 @@ mod tests {
         assert_eq!(
             query_retention_level(StreamType::EnrichmentTables),
             PartitionTimeLevel::Hourly
+        );
+    }
+
+    #[test]
+    fn test_day_max_ts_level_follows_the_day_of_the_end() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        use config::{meta::stream::PartitionTimeLevelChange, utils::time::day_micros};
+        const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let change = |since, level| PartitionTimeLevelChange { since, level };
+        // the stream is daily for the one day from DAY
+        let history = StreamPartitionTimeLevel {
+            dynamic: None,
+            changes: vec![change(DAY, Daily), change(DAY + day_micros(1), Hourly)],
+        };
+        for (time_end, expected) in [
+            (DAY - hour_micros(2), Hourly),
+            (DAY - hour_micros(1), Daily), // an hour from the daily day
+            (DAY + hour_micros(5), Daily),
+            (DAY + day_micros(1) - 1, Daily),
+            (DAY + day_micros(1), Hourly), // daily files of the day end before it
+            (DAY + day_micros(3), Hourly),
+        ] {
+            assert_eq!(
+                day_max_ts_level(&history, Hourly, time_end),
+                expected,
+                "{time_end}"
+            );
+        }
+        assert_eq!(
+            day_max_ts_level(&StreamPartitionTimeLevel::default(), Hourly, DAY),
+            Hourly
         );
     }
 

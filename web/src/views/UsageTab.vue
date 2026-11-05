@@ -497,6 +497,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
+import { summaryHasUserData } from "@/utils/internalStreams";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -656,8 +657,8 @@ const getSummary = (org_id: any) => {
     .then((data: any) => {
       const res = { data };
       if (
-        res.data.streams.num_streams == 0 &&
-        res.data.alerts.num_realtime == 0 &&
+        !summaryHasUserData(res.data) &&
+        res.data.alerts?.num_realtime == 0 &&
         res.data.alerts.num_scheduled == 0 &&
         res.data.pipelines?.num_realtime == 0 &&
         res.data.pipelines?.num_scheduled == 0 &&
