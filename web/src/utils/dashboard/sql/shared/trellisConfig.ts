@@ -18,6 +18,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatAxisTickValue } from "../../axisTickFormat";
 import { getTrellisGrid } from "../../calculateGridForSubPlot";
 import { deepCopy } from "@/utils/zincutils";
+import { chartAxisTextColor } from "@/utils/chartTheme";
 
 export interface TrellisDeps {
   options: any;
@@ -110,6 +111,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       }
 
       it.axisLabel = {
+        color: chartAxisTextColor(),
         formatter: function (value: any) {
           return formatAxisTickValue(
             value,
