@@ -1768,6 +1768,15 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
             {
                 log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
             }
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = crate::alerts::alert_calibration::dismissals::delete_for_alert(
+                org_id,
+                &alert_id_str,
+            )
+            .await
+            {
+                log::warn!("failed to delete alert calibration dismissals for {alert_id_str}: {e}");
+            }
             Ok(())
         }
         Err(e) => Err(e.into()),

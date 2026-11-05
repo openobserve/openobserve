@@ -50,26 +50,25 @@ pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Erro
         return Err(anyhow::anyhow!("org_id cannot contain '/' character"));
     }
 
-    let cache_key = mk_cache_key(org_id, key);
-
     infra::table::kv_store::set(org_id, key, &val).await?;
+    announce_put(org_id, key, val).await
+}
 
-    // Send to super cluster (if enabled)
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_put_event(org_id, key, val.clone()).await?;
-
-    // Publish event to coordinator for cluster cache synchronization
-    // NOTE: put_into_db_coordinator handles local vs cluster mode:
-    // - In local mode: stores actual value
-    // - In cluster mode: stores empty bytes (coordinator is just event bus)
-    // The actual KV data is stored in the kv_store table; watchers fetch from there.
-    let coord_key = format!("/kv/{}", cache_key);
-    if let Err(e) = put_into_db_coordinator(&coord_key, Bytes::new(), true, None).await {
-        log::error!("[KV] Failed to sync KV to coordinator: {coord_key} - {e}");
+/// Writes and replicates only while the stored value is `expected` (None: no row); false otherwise.
+pub async fn compare_and_set(
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    val: Bytes,
+) -> Result<bool, anyhow::Error> {
+    if org_id.contains('/') {
+        return Err(anyhow::anyhow!("org_id cannot contain '/' character"));
     }
-
-    KVS.insert(cache_key, val);
-    Ok(())
+    if !infra::table::kv_store::compare_and_set(org_id, key, expected, &val).await? {
+        return Ok(false);
+    }
+    announce_put(org_id, key, val).await?;
+    Ok(true)
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
@@ -89,6 +88,24 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// Deletes in this region only, and only while the row still holds `expected`.
+pub async fn compare_and_delete_in_region(
+    org_id: &str,
+    key: &str,
+    expected: &[u8],
+) -> Result<bool, anyhow::Error> {
+    if !infra::table::kv_store::compare_and_delete(org_id, key, expected).await? {
+        return Ok(false);
+    }
+    let cache_key = mk_cache_key(org_id, key);
+    KVS.remove(&cache_key);
+    let coord_key = format!("/kv/{cache_key}");
+    if let Err(e) = delete_from_db_coordinator(&coord_key, false, true, None).await {
+        log::error!("[KV] Failed to delete KV from coordinator: {coord_key} - {e}");
+    }
+    Ok(true)
 }
 
 pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
@@ -182,6 +199,27 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Empty => {}
         }
     }
+}
+
+async fn announce_put(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Error> {
+    let cache_key = mk_cache_key(org_id, key);
+
+    // Send to super cluster (if enabled)
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, key, val.clone()).await?;
+
+    // Publish event to coordinator for cluster cache synchronization
+    // NOTE: put_into_db_coordinator handles local vs cluster mode:
+    // - In local mode: stores actual value
+    // - In cluster mode: stores empty bytes (coordinator is just event bus)
+    // The actual KV data is stored in the kv_store table; watchers fetch from there.
+    let coord_key = format!("/kv/{}", cache_key);
+    if let Err(e) = put_into_db_coordinator(&coord_key, Bytes::new(), true, None).await {
+        log::error!("[KV] Failed to sync KV to coordinator: {coord_key} - {e}");
+    }
+
+    KVS.insert(cache_key, val);
+    Ok(())
 }
 
 /// Super cluster support for KV operations

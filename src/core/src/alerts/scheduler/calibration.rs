@@ -327,6 +327,13 @@ async fn analyse(
     }
     let written = write_digest_records(&trigger.org, &token, pass.records).await?;
     let window = (pass.window.start_micros, pass.window.end_micros);
+    // Best-effort: the next pass retries, and a deleted alert's dismissal hides nothing meanwhile.
+    if let Err(e) = crate::alerts::alert_calibration::dismissals::sweep(&trigger.org).await {
+        log::warn!(
+            "[alert_calibration] sweeping deleted alerts' dismissals for org={} failed: {e}",
+            trigger.org
+        );
+    }
     Ok((window, written == DigestWrite::Deferred))
 }
 

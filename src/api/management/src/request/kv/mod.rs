@@ -20,7 +20,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 #[cfg(feature = "enterprise")]
-use config::meta::autoobserve::{KV_PREFIX, is_reserved_kv_key};
+use config::meta::autoobserve::is_reserved_kv_key;
 use hashbrown::HashMap;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
@@ -46,6 +46,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
       ),
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
+        (status = 403, description = "Reserved key", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     ),
     extensions(
@@ -54,6 +55,10 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
     )
 )]
 pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    if is_reserved_kv_key(&key) {
+        return reserved_key_refused();
+    }
     match kv::get(&org_id, &key).await {
         Ok(value) => (
             StatusCode::OK,
@@ -195,7 +200,7 @@ pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
         ("prefix" = Option<String>, Query, description = "Key prefix"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 200, description = "Success; reserved keys are never listed", content_type = "application/json", body = inline(Vec<String>)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"})),
@@ -208,7 +213,7 @@ pub async fn list(
 ) -> Response {
     let prefix = query.get("prefix").map(|s| s.as_str()).unwrap_or("");
     match kv::list(&org_id, prefix).await {
-        Ok(keys) => MetaHttpResponse::json(keys),
+        Ok(keys) => MetaHttpResponse::json(listable(keys)),
         Err(err) => {
             log::error!("list KV keys: {prefix}, error: {err}");
             let keys: Vec<String> = Vec::new();
@@ -217,19 +222,31 @@ pub async fn list(
     }
 }
 
-/// Marks under the prefix gate alert investigations, so only the engine's own route may write them.
+/// The namespace holds investigation marks and owners' dismissals of hidden alerts (P4-Q2).
 #[cfg(feature = "enterprise")]
 fn reserved_key_refused() -> Response {
-    MetaHttpResponse::forbidden(format!(
-        "keys under `{KV_PREFIX}` are reserved for AutoObserve and cannot be written or deleted through /kv"
-    ))
+    MetaHttpResponse::forbidden(
+        "This key is reserved for alert analysis and cannot be read or changed here.",
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn listable(keys: Vec<String>) -> Vec<String> {
+    keys.into_iter()
+        .filter(|key| !is_reserved_kv_key(key))
+        .collect()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn listable(keys: Vec<String>) -> Vec<String> {
+    keys
 }
 
 #[cfg(test)]
 mod tests {
     use axum::{Router, body::Body, http::Request, routing};
     #[cfg(feature = "enterprise")]
-    use config::meta::autoobserve::marks::protected_key;
+    use config::meta::autoobserve::{dismissal_key, marks::protected_key};
     use infra::table::{entity::kv_store::Entity, kv_store};
     use sea_orm::{ConnectionTrait, Schema};
     use tower::ServiceExt;
@@ -248,10 +265,12 @@ mod tests {
     }
 
     fn app() -> Router {
-        Router::new().route(
-            "/{org_id}/kv/{key}",
-            routing::get(get).post(set).delete(delete),
-        )
+        Router::new()
+            .route(
+                "/{org_id}/kv/{key}",
+                routing::get(get).post(set).delete(delete),
+            )
+            .route("/{org_id}/kv", routing::get(list))
     }
 
     async fn send(method: &str, uri: &str, body: &str) -> (StatusCode, String) {
@@ -299,13 +318,33 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn a_reserved_key_can_still_be_read() {
+    async fn a_reserved_key_cannot_be_read_or_listed_through_kv() {
         let org = setup().await;
-        let key = protected_key("a1", "host=a");
-        kv_store::set(&org, &key, b"mark").await.unwrap();
-        let encoded = key.replace('/', "%2F");
-        let (status, body) = send("GET", &format!("/{org}/kv/{encoded}"), "").await;
-        assert_eq!((status, body.as_str()), (StatusCode::OK, "mark"));
+        let dismissal = dismissal_key("a1", "f1");
+        kv_store::set(&org, &dismissal, b"{\"note\":\"secret\"}")
+            .await
+            .unwrap();
+        kv_store::set(&org, &protected_key("a1", "host=a"), b"mark")
+            .await
+            .unwrap();
+        kv_store::set(&org, "cfg/x", b"v").await.unwrap();
+        for uri_key in [
+            "_o2_ao%2Fdismissal%2Fa1%2Ff1",
+            "%5Fo2_ao%2Fdismissal%2Fa1%2Ff1",
+        ] {
+            let (status, body) = send("GET", &format!("/{org}/kv/{uri_key}"), "").await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{uri_key}");
+            assert!(
+                body.contains("reserved") && !body.contains("secret"),
+                "{body}"
+            );
+        }
+        let (status, body) = send("GET", &format!("/{org}/kv"), "").await;
+        assert_eq!((status, body.as_str()), (StatusCode::OK, r#"["cfg/x"]"#));
+        let (status, body) = send("GET", &format!("/{org}/kv?prefix=_o2_ao%2F"), "").await;
+        assert_eq!((status, body.as_str()), (StatusCode::OK, "[]"));
+        let (status, body) = send("GET", &format!("/{org}/kv/cfg%2Fx"), "").await;
+        assert_eq!((status, body.as_str()), (StatusCode::OK, "v"));
     }
 
     #[tokio::test]

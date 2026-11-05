@@ -15,8 +15,10 @@
 
 pub mod marks;
 
-/// The AutoObserve engine's kv namespace; the generic `/kv` handler refuses writes under it.
+/// The AutoObserve engine's kv namespace; the generic `/kv` handler cannot read or write it.
 pub const KV_PREFIX: &str = "_o2_ao/";
+/// Grouped by alert, so deleting an alert lists one prefix (P4-D1).
+pub const DISMISSAL_PREFIX: &str = "_o2_ao/dismissal/";
 pub const KV_MARK_PREFIX: &str = "_o2_ao/mark/";
 pub const KV_SUGGESTION_PREFIX: &str = "_o2_ao/suggestion/";
 /// Every engine stream starts with this (ENT `autoobserve::names`), so it is the writer's scope.
@@ -41,6 +43,14 @@ pub fn suggestion_key(id: &str) -> String {
     format!("{KV_SUGGESTION_PREFIX}{id}")
 }
 
+pub fn dismissal_alert_prefix(alert_id: &str) -> String {
+    format!("{DISMISSAL_PREFIX}{alert_id}/")
+}
+
+pub fn dismissal_key(alert_id: &str, finding_id: &str) -> String {
+    format!("{}{finding_id}", dismissal_alert_prefix(alert_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -51,6 +61,15 @@ mod tests {
         assert!(is_reserved_kv_key(&marks::protected_key("a1", "g")));
         assert!(is_reserved_kv_key(&suggestion_key("s1")));
         assert_eq!(suggestion_key("s1"), "_o2_ao/suggestion/s1");
+    }
+
+    #[test]
+    fn dismissal_keys_are_reserved_and_grouped_by_alert() {
+        let key = dismissal_key("a1", "f1");
+        assert_eq!(key, "_o2_ao/dismissal/a1/f1");
+        assert!(is_reserved_kv_key(&key));
+        assert!(key.starts_with(&dismissal_alert_prefix("a1")));
+        assert!(!dismissal_key("a10", "f1").starts_with(&dismissal_alert_prefix("a1")));
     }
 
     #[test]
