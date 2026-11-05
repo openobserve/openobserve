@@ -15,7 +15,16 @@
 
 import { format as formatDate } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { Confidence, CoverageVerdict, DigestRecord, Quality, Severity, Tier } from "./digests";
+import {
+  arrayColumn,
+  type Confidence,
+  type CoverageVerdict,
+  type DigestRecord,
+  type Quality,
+  type Severity,
+  type Tier,
+} from "./digests";
+import { headroomSentence, parseHeadroom } from "./headroom";
 import { ERROR_CLASS_LABEL, isErrorClass, type EvidenceField, type EvidenceFormat } from "./rules";
 
 const MINUTES_PER_DAY = 1440;
@@ -142,9 +151,15 @@ export function resourceOptions(t: TranslateFn, record: DigestRecord): ResourceO
   if (record.pattern !== "resource_timeout" && record.pattern !== "resource_memory") return [];
   const period = positiveSecs(record[`${NOT_WORKING}period_secs`]);
   const frequency = positiveSecs(record[`${NOT_WORKING}frequency_secs`]);
+  // An unread schedule also writes neither column, which is unknown, not real-time (P7c-FU1).
+  const unknownSchedule = (arrayColumn(record.quality_reasons) ?? []).includes(
+    "schedule_unreadable",
+  );
   const span = (secs: number) => formatSeconds(t, secs);
   let windowCost: I18nText;
-  if (period === null) {
+  if (unknownSchedule) {
+    windowCost = t("alertCalibration.resourceCost.windowCron");
+  } else if (period === null) {
     windowCost = t("alertCalibration.resourceCost.windowRealTime");
   } else if (frequency === null) {
     windowCost = t("alertCalibration.resourceCost.windowCron");
@@ -169,7 +184,7 @@ export function resourceOptions(t: TranslateFn, record: DigestRecord): ResourceO
     },
   ];
   // A real-time alert has no schedule, so running it less often is not an option.
-  if (period !== null) {
+  if (period !== null || unknownSchedule) {
     options.push({
       key: "frequency",
       label: t("alertCalibration.resourceOption.frequency"),
@@ -262,6 +277,9 @@ const SKIP_SIGNAL_LABEL: Record<string, I18nKey> = {
 /** A detail this build cannot name points to Logs, never to its stored JSON; null when there is none. */
 export function skipDetailLabel(t: TranslateFn, detail: string | undefined): I18nText | null {
   if (!detail) return null;
+  const headroom = parseHeadroom(detail);
+  const near = headroom && headroomSentence(t, headroom, { form: "short" });
+  if (near) return near;
   let parsed: unknown = null;
   try {
     parsed = JSON.parse(detail);

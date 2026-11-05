@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import alertCalibration, {
   httpStatus,
+  isAbort,
   type AlertCalibrationConfig,
   type AlertCalibrationStatus,
   type UpdateAlertCalibrationConfig,
@@ -28,6 +29,17 @@ import {
   type DismissalView,
   type DismissBody,
 } from "@/components/alert_calibration/dismissals";
+import {
+  latestEmission,
+  type DigestRecord,
+  type RunRow,
+  type SkipRecord,
+} from "@/components/alert_calibration/digests";
+import { parseHeadroom, type Headroom } from "@/components/alert_calibration/headroom";
+
+/** Past the longest calibration window plus a missed run or two (P7c-S9). */
+const HEADROOM_LOOKBACK_DAYS = 35;
+const DAY_MICROS = 86_400_000_000;
 
 /** Every active dismissal the reader can see, up to the client's page cap. */
 export interface ActiveDismissals {
@@ -35,6 +47,14 @@ export interface ActiveDismissals {
   /** The full visible count, so it can exceed `items` once the cap is reached. */
   total: number;
   capped: boolean;
+}
+
+/** One alert's quiet note from the newest run, with what the card needs to date it. */
+export interface AlertHeadroom {
+  skip: SkipRecord;
+  headroom: Headroom;
+  runWindow: { start: number; end: number };
+  emittedAt: number;
 }
 
 /** `null` until the org's first save: the server answers 404 for an org with no config row. */
@@ -62,6 +82,55 @@ export const alertCalibrationStatusQuery = (org: string) =>
       } catch (error) {
         if (httpStatus(error) === 404) return null;
         throw error;
+      }
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Optional information, so every gap and error is `null` and a 403 records no access-boundary entry (P7b-D6). */
+export const alertHeadroomQuery = (org: string, alertId: string) =>
+  queryOptions({
+    queryKey: alertCalibrationKeys.headroom(org, alertId),
+    queryFn: async ({ signal }): Promise<AlertHeadroom | null> => {
+      const quiet = { silentForbidden: true };
+      try {
+        const now = Date.now() * 1000;
+        const [run] = await alertCalibration.readDigests<RunRow>(
+          org,
+          "",
+          { start_time: now - HEADROOM_LOOKBACK_DAYS * DAY_MICROS, end_time: now, size: 1 },
+          signal,
+          quiet,
+        );
+        if (!run) return null;
+        const records = await alertCalibration.readDigests<DigestRecord>(
+          org,
+          "/records",
+          {
+            window_start: run.window_start,
+            window_end: run.window_end,
+            kind: "skip",
+            rule_id: "silent",
+            alert_id: alertId,
+            size: 5,
+          },
+          signal,
+          quiet,
+        );
+        // A newer emission without this alert's skip must not fall back to an older emission's.
+        const emission = records.filter((r) => r._timestamp === run.emitted_at);
+        const skip = latestEmission(emission).skips.find((s) => s.alert_id === alertId);
+        const headroom = parseHeadroom(skip?.skip_detail);
+        if (!skip || !headroom) return null;
+        return {
+          skip,
+          headroom,
+          runWindow: { start: run.window_start, end: run.window_end },
+          emittedAt: skip._timestamp,
+        };
+      } catch (error) {
+        if (isAbort(error)) throw error;
+        return null;
       }
     },
     staleTime: NORMAL_STALE_TIME,

@@ -335,6 +335,26 @@ describe("a skip's reason", () => {
     expect(skipDetailLabel(gt, undefined)).toBeNull();
     expect(skipDetailLabel(gt, "")).toBeNull();
   });
+
+  it("the_skip_list_names_headroom_instead_of_logs", () => {
+    const headroom = (fields: Record<string, unknown>) =>
+      JSON.stringify({
+        headroom: { operator: ">=", level: "critical", lower_bound: false, valued: 720, ...fields },
+      });
+    expect(skipDetailLabel(gt, headroom({ value: 42, threshold: 100 }))).toBe(
+      "Highest value 42 of threshold 100",
+    );
+    expect(skipDetailLabel(gt, headroom({ value: 0, threshold: 1 }))).toBe(
+      "Highest value 0 of threshold 1",
+    );
+    expect(skipDetailLabel(gt, headroom({ value: 42, threshold: 80, level: "warning" }))).toBe(
+      "Highest value 42 of warning threshold 80",
+    );
+    expect(skipDetailLabel(gt, undefined)).toBeNull();
+    expect(skipDetailLabel(gt, headroom({ value: 1, threshold: 2, operator: "=" }))).toBe(
+      "More detail in Logs",
+    );
+  });
 });
 
 describe("a cluster finding's lag lists", () => {

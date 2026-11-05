@@ -105,6 +105,8 @@ pub struct RunWindow {
     /// `A`, `B` or `C`; a version-1 record has no tier.
     pub(super) tier: Option<String>,
     pub(super) pattern: Option<String>,
+    /// One alert's records; ASCII alphanumeric, and it never widens visibility.
+    pub(super) alert_id: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -250,7 +252,7 @@ pub async fn list_runs_for_alert(
     tag = "Alert Calibration",
     operation_id = "GetAlertCalibrationRunRecords",
     summary = "Get the records of one alert calibration run",
-    description = "Every record the run with this window wrote, newest emission first. `kind`, `rule_id`, `tier` and `pattern` narrow the records; a filter on a column no record has written yet returns nothing. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null. Such a caller also gets one run row per emission, ahead of its records, and that is all a `kind=run` read returns it.",
+    description = "Every record the run with this window wrote, newest emission first. `kind`, `rule_id`, `tier`, `pattern` and `alert_id` narrow the records, and `alert_id` must be ASCII alphanumeric; a filter on a column no record has written yet returns nothing. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null. Such a caller also gets one run row per emission, ahead of its records, and that is all a `kind=run` read returns it.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), RunWindow),
     responses(
@@ -526,6 +528,12 @@ pub(super) fn record_filters(
     }
     if let Some(pattern) = &run.pattern {
         filters.push(format!("pattern = {}", quote_sql_string(pattern)));
+    }
+    if let Some(alert_id) = &run.alert_id {
+        if alert_id.is_empty() || !alert_id.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err("alert_id must be an alert id".to_string());
+        }
+        filters.push(format!("alert_id = {}", quote_sql_string(alert_id)));
     }
     Ok(filters)
 }
@@ -1041,6 +1049,7 @@ mod tests {
             rule_id: None,
             tier: tier.map(str::to_string),
             pattern: None,
+            alert_id: None,
         }
     }
 
@@ -1077,6 +1086,41 @@ mod tests {
         })
         .unwrap();
         assert_eq!(quoted, ["rule_id = 'noise'", "pattern = 'it''s'"]);
+    }
+
+    // P7c test 21: an alert id is base62, so anything else is refused rather than quoted.
+    #[test]
+    fn records_filter_on_one_alert_id() {
+        let by_id = |id: &str| RunWindow {
+            alert_id: Some(id.to_string()),
+            ..window(Some("skip"), None)
+        };
+        assert_eq!(
+            record_filters_mixed(&by_id("Ab1")).unwrap(),
+            ["kind = 'skip'", "alert_id = 'Ab1'"]
+        );
+        for bad in ["a'1", "", "a 1", "a%1", "a_1", "\u{e9}1"] {
+            assert_eq!(
+                record_filters_mixed(&by_id(bad)),
+                Err("alert_id must be an alert id".to_string()),
+                "{bad}"
+            );
+            assert!(
+                record_queries(&by_id(bad), &mixed_schema()).is_err(),
+                "{bad}"
+            );
+        }
+        let plain = window(Some("skip"), None);
+        let (sql, ..) = record_queries(&plain, &mixed_schema()).unwrap();
+        assert_eq!(sql, records_sql(&plain, &["kind = 'skip'".to_string()]));
+        let (sql, ..) = record_queries(&by_id("Ab1"), &mixed_schema()).unwrap();
+        assert_eq!(
+            sql,
+            records_sql(
+                &plain,
+                &["kind = 'skip'".to_string(), "alert_id = 'Ab1'".to_string()]
+            )
+        );
     }
 
     // A clean or routine-skip run writes neither rule_id nor, in version 1, kind.

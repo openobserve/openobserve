@@ -841,6 +841,52 @@ describe("AlertCalibrationFindingCard", () => {
     ).toBe(false);
   });
 
+  it("an_unreadable_schedule_never_reads_as_real_time", () => {
+    const unreadable = mountCard(
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "failure",
+        severity: "Medium",
+        confidence: "High",
+        tier: "C",
+        alert_id: "a7",
+        alert_name: "app_timeout",
+        pattern: "resource_timeout",
+        advice: "reduce_query_time",
+        title: "app_timeout failed 96 of 315 evaluations: the query timed out",
+        actions: undefined,
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_schedulerhealth_affected_orgs: undefined,
+        evidence_schedulerhealth_skipped_windows: undefined,
+        evidence_schedulerhealth_late_ratio: undefined,
+        quality: "partial",
+        quality_reasons: JSON.stringify(["schedule_unreadable"]),
+        evidence_notworking_evaluation_errors: 96,
+        evidence_notworking_evaluations: 315,
+        evidence_notworking_error_class: "resource_timeout",
+        evidence_notworking_class_errors: 96,
+      }),
+    );
+    expect(
+      unreadable
+        .findAll('[data-test^="alert-calibration-finding-option-"]')
+        .map((option) => option.text()),
+    ).toEqual([
+      "Shorter query window: Each run checks less data, so data outside the shorter window is not checked.",
+      "Narrower filter: Data the filter leaves out is no longer checked.",
+      "Less frequent runs: A breach can wait longer before it is noticed. Keep the window at least as long as the gap between runs.",
+    ]);
+    expect(unreadable.text()).not.toContain("Real-time");
+    expect(unreadable.find('[data-test="alert-calibration-finding-quality"]').text()).toBe(
+      "Partial evidence",
+    );
+    expect(unreadable.find('[data-test="alert-calibration-finding-quality-reasons"]').text()).toBe(
+      "Reason: the alert's schedule could not be read",
+    );
+    expect(unreadable.text()).not.toContain("schedule_unreadable");
+  });
+
   it("renders the no-destination advice and candidate rows, and nothing extra for a plain record", () => {
     const review = { type: "review_alert", alert_id: "a1", focus: "settings" };
     const noDestination = (overrides: Partial<FindingRecord>) =>

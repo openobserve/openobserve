@@ -114,8 +114,13 @@ const alertCalibration = {
     read: DigestRead,
     params: Record<string, string | number>,
     signal?: AbortSignal,
+    options?: { silentForbidden?: boolean },
   ): Promise<T[]> => {
-    const res = await http().get<T[]>(`${base(org)}/digests${read}`, { params, signal });
+    const res = await http().get<T[]>(`${base(org)}/digests${read}`, {
+      params,
+      signal,
+      ...(options?.silentForbidden ? { silentForbidden: true } : {}),
+    });
     return res.data ?? [];
   },
   // The dismissal calls render their own refusal, so the access boundary records no 403 (P5a-D5).

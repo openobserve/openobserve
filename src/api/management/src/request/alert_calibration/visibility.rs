@@ -243,7 +243,8 @@ where
     let with_runs = matches!(run.kind.as_deref(), None | Some("run"))
         && run.rule_id.is_none()
         && run.tier.is_none()
-        && run.pattern.is_none();
+        && run.pattern.is_none()
+        && run.alert_id.is_none();
     Ok(emission_rows(&summaries, rows, with_runs, written))
 }
 
@@ -590,6 +591,7 @@ mod tests {
             && (!sql.contains("severity IS NOT NULL") || row.get("severity").is_some())
             && (!sql.contains("kind = 'skip'") || field("kind") == Some("skip"))
             && quoted_after(sql, "rule_id = ").is_none_or(|rule| field("rule_id") == Some(rule))
+            && quoted_after(sql, "alert_id = ").is_none_or(|id| field("alert_id") == Some(id))
             && quoted_after(sql, "str_match_ignore_case(alert_name, ").is_none_or(|name| {
                 field("alert_name").is_some_and(|n| n.eq_ignore_ascii_case(name))
             })
@@ -665,6 +667,7 @@ mod tests {
             rule_id: rule_id.map(str::to_string),
             tier: None,
             pattern: None,
+            alert_id: None,
         }
     }
 
@@ -982,6 +985,36 @@ mod tests {
             "{sql}"
         );
         assert!(!sql.contains("coverage_definition_checks"), "{sql}");
+    }
+
+    // P7c test 22: the id narrows the scoped read, and P3's clause still decides what is seen.
+    #[tokio::test]
+    async fn a_scoped_reader_gets_no_hidden_alert_by_id() {
+        let digest = Digest::new(vec![
+            skip(5, "a1"),
+            finding(5, "a0", "noise"),
+            skip(5, "a0"),
+        ]);
+        let by_id = |id: &str| RunWindow {
+            alert_id: Some(id.to_string()),
+            ..window(None, None)
+        };
+        let visibility = only(&["a0"]);
+        let hidden = records(&digest, &by_id("a1"), &visibility).await;
+        assert!(hidden.is_empty(), "{hidden:?}");
+        assert!(
+            digest
+                .searched()
+                .iter()
+                .any(|sql| sql.contains("AND alert_id = 'a1' AND alert_id IN ('a0')")),
+            "{:?}",
+            digest.searched()
+        );
+        let seen = records(&digest, &by_id("a0"), &visibility).await;
+        let mut kinds: Vec<&Value> = values(&seen, "kind");
+        kinds.sort_by_key(|kind| kind.to_string());
+        assert_eq!(kinds, [&json!("finding"), &json!("skip")]);
+        assert!(seen.iter().all(|row| row["alert_id"] == "a0"), "{seen:?}");
     }
 
     #[tokio::test]
