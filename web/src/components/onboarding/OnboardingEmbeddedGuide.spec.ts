@@ -176,6 +176,7 @@ const mountGuide = async (name: string) => {
 describe("OnboardingEmbeddedGuide", () => {
   afterEach(() => {
     store.state.organizationData.rumToken = { rum_token: "" };
+    store.state.organizationData.rumTokenForbidden = false;
     store.state.organizationData.organizationPasscode = "";
     statusShown.value = true;
     statusKey.value = "browser";
@@ -221,6 +222,19 @@ describe("OnboardingEmbeddedGuide", () => {
       page: "Onboarding",
     });
     expect(store.state.organizationData.rumToken.rum_token).toBe("rum-key");
+    expect(wrapper.find('[data-test="onboarding-embedded-guide-rum-token"]').exists()).toBe(false);
+  });
+
+  it("offers no Generate button to a user who may not read RUM tokens, as Data sources does", async () => {
+    global.server.use(
+      http.get(`${store.state.API_ENDPOINT}/api/:org/rumtoken`, () =>
+        HttpResponse.json({ message: "Unauthorized Access" }, { status: 403 }),
+      ),
+    );
+    const { wrapper } = await mountGuide("frontendMonitoring");
+    await flushPromises();
+    // The RUM page shows its no-permission banner for this flag.
+    expect(store.state.organizationData.rumTokenForbidden).toBe(true);
     expect(wrapper.find('[data-test="onboarding-embedded-guide-rum-token"]').exists()).toBe(false);
   });
 

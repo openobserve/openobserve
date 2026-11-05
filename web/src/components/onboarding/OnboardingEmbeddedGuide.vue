@@ -147,22 +147,31 @@ loadRouteLocation({ ...target, matched: [leaf] })
 const isRum = props.route === "frontendMonitoring";
 
 // The RUM guide shows its snippet only once the org has a RUM token, which the Data sources page
-// reads and offers to generate.
+// reads and offers to generate, or a no-permission banner when a 403 sets rumTokenForbidden.
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
+const rumForbidden = computed(() => !!store.state.organizationData?.rumTokenForbidden);
 const rumRead = ref(!isRum);
 if (isRum) {
   const asked = org.value;
+  // the store holds one token: a reply that lands after an org switch belongs to the old org
+  const current = () => store.state.selectedOrganization?.identifier === asked;
   void queryClient
-    .fetchQuery(rumTokensQuery(asked))
-    // the store holds one token: a reply that lands after an org switch belongs to the old org
+    .fetchQuery({ ...rumTokensQuery(asked), staleTime: 0 })
     .then((res: { data?: unknown }) => {
-      if (store.state.selectedOrganization?.identifier === asked)
-        void store.dispatch("setRUMToken", res.data);
+      if (!current()) return;
+      void store.dispatch("setRUMTokenForbidden", false);
+      void store.dispatch("setRUMToken", res.data);
     })
-    .catch(() => {})
+    .catch((e: { response?: { status?: number } }) => {
+      if (!current() || e?.response?.status !== 403) return;
+      void store.dispatch("setRUMTokenForbidden", true);
+      void store.dispatch("setRUMToken", { rum_token: "" });
+    })
     .finally(() => (rumRead.value = true));
 }
-const needsRumToken = computed(() => isRum && rumRead.value && !rumToken.value);
+const needsRumToken = computed(
+  () => isRum && rumRead.value && !rumToken.value && !rumForbidden.value,
+);
 const createRumToken = useMutation(() => createRumTokenMutation(org.value));
 const generateRumToken = () => {
   // The event the Data sources page sends for the same button; `page` says where it was clicked.
