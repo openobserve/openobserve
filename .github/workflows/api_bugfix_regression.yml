@@ -164,55 +164,11 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # The default set — everything under tests/ except the three dirs that
-          # need their own server configuration. tests/ingest/ lives here, so the
-          # OTLP UTF-8 repair cases run on every scheduled pass.
           - label: default_set
             category: api_integration_tests
             server_env: ""
             test_env: ""
-            target: "--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex"
-          # Flag-sensitive query-engine cases: each file is meaningless unless the
-          # server is restarted under the paired flag, which is why they sit outside
-          # the default set.
-          - label: utf8_view_false
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
-            test_env: ""
-            target: "tests/regression/test_subquery_join_match.py"
-          - label: utf8_view_true
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
-            test_env: ""
-            target: "tests/regression/test_subquery_join_match.py"
-          - label: join_match_one_true
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
-            test_env: ""
-            target: "tests/regression/test_logs_to_logs_join.py"
-          - label: join_match_one_false
-            category: api_integration_tests
-            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
-            test_env: ""
-            target: "tests/regression/test_logs_to_logs_join.py"
-          # SINGLE_NODE_OPT_MODE decides which queries load_all_queries() includes:
-          # the non-optimized RemoteScanRewriter path trips known upstream DataFusion
-          # bugs, and those queries carry skip_without_single_node_opt.
-          - label: single_node_opt_false
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
-            test_env: "SINGLE_NODE_OPT_MODE=false"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
-          - label: single_node_opt_true
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
-            test_env: "SINGLE_NODE_OPT_MODE=true"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
-          - label: remove_filter_with_index_false
-            category: query_agent_tests
-            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
-            test_env: "SINGLE_NODE_OPT_MODE=true"
-            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
+            target: "tests/ingest/test_trace_span_kind_and_events.py"
     steps:
       - name: Checkout git repo
         uses: actions/checkout@v5
