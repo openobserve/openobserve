@@ -345,6 +345,10 @@ export const defaultAnomalyConfig = () => ({
   alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
+  // Template override for anomaly messages; null uses each destination's template.
+  template: null as string | null,
+  // The server's 400 for the template override, shown under the picker until it changes.
+  template_error: null as string | null,
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -2102,6 +2106,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
+          // Always sent so clearing the picker clears the stored override.
+          template: c.template || null,
         },
       };
 
@@ -2119,9 +2125,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
+      const message: string = err?.response?.data?.message ?? "";
+      // The template binding rule names the template; the picker shows it inline too.
+      if (err?.response?.status === 400 && /template '[^']*'/.test(message)) {
+        c.template_error = message.replace(/^validation error: /, "");
+      }
       toast({
         variant: "error",
-        message: err?.response?.data?.message || t("alerts.messages.anomalyConfigSaveFailed"),
+        message: message ? raw(message) : t("alerts.messages.anomalyConfigSaveFailed"),
       });
     } finally {
       anomalySaving.value = false;

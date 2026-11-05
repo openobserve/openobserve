@@ -30,6 +30,11 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import type {
+  FirstEventResult,
+  FirstEventState,
+} from "@/composables/firstEvent/useFirstEventWatch";
+import CodingAgentDataHealth from "./CodingAgentDataHealth.vue";
 import { downloadEnvFile } from "@/components/ingestion/setupCard/envFile";
 import { getPath } from "@/utils/zincutils";
 import { safeHttpUrl } from "@/components/ingestion/setupCard/subs";
@@ -75,6 +80,29 @@ const onPromptCopy = () => statusBar.value?.start("copy");
 // The status bar's copy button re-copies through the prompt block, so the clipboard and toast match.
 const copyPrompt = () =>
   root.value?.querySelector<HTMLElement>('[data-test="ai-coding-agent-prompt-copy-btn"]')?.click();
+
+// An agent installs packages and edits code before its first request, so diagnosis waits far longer.
+const DIAGNOSIS_AFTER_MS = 15 * 60_000;
+// Clock skew and SDK batching can stamp a span a little before the watch started.
+const WINDOW_SLACK_MS = 60_000;
+
+// The first span arrived: check the AI data health of what the agent's run sent.
+const healthScope = ref<{ stream: string; startUs: number; agent?: string } | null>(null);
+const onDetected = (result: FirstEventResult) => {
+  const nowMs = Date.now();
+  const firstMs = result.firstRecordUs ? result.firstRecordUs / 1000 : nowMs;
+  const startMs = Math.min(statusBar.value?.startedAtMs ?? nowMs, firstMs) - WINDOW_SLACK_MS;
+  const agent = result.firstRecord?.gen_ai_agent_name;
+  healthScope.value = {
+    stream: result.streamName,
+    startUs: Math.floor(startMs * 1000),
+    agent: typeof agent === "string" && agent ? agent : undefined,
+  };
+};
+// A new stream name restarts the watch; the checks belong to the old one.
+const onState = (state: FirstEventState) => {
+  if (state !== "received") healthScope.value = null;
+};
 
 // Beyond the card's three keys: the stream the prompt names (the SDK reads this
 // name) and the web UI root (the skill appends /web/…), so its trace and fix
@@ -156,7 +184,20 @@ const downloadEnv = () =>
           :filter="detect.filter || undefined"
           :guide-name="guideName"
           :doc-url="docUrl ? safeHttpUrl(docUrl) : undefined"
+          :diagnosis-after-ms="DIAGNOSIS_AFTER_MS"
+          snippet-kind="prompt"
           @copy-command="copyPrompt"
+          @detected="onDetected"
+          @state="onState"
+        />
+        <CodingAgentDataHealth
+          v-if="healthScope"
+          :key="`${healthScope.stream}-${healthScope.startUs}`"
+          class="mt-3"
+          :org="subs.org"
+          :stream="healthScope.stream"
+          :start-us="healthScope.startUs"
+          :agent="healthScope.agent"
         />
       </OStep>
     </OStepper>

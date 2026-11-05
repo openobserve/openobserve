@@ -21,10 +21,9 @@
  *   - a genuinely unused destination still deletes, so proving nine tables clean
  *     never turns into over-blocking.
  *
- * Not covered here, deliberately: the synthetic-check consumer, the arm that
- * produced the original report. Synthetics is off in CI (neither workflow sets
- * `ZO_SYNTHETICS_ENABLED`) and its locations have no env-based seeding, so a check
- * cannot be created. Enabling it is a workflow change, not a spec change.
+ * The synthetic-check consumer, the arm that produced the original report, lives in
+ * `RegressionSet/Synthetics/synthetics-ent2691-destination-delete-guard.spec.js`: only
+ * the Synthetics-Regression shard starts the server with synthetics enabled.
  *
  * The pipeline consumer lives in `alerts-14796-destination-usage-ent.spec.js`: it is
  * only reachable from Settings -> Pipeline Destinations, a tab rendered when the build

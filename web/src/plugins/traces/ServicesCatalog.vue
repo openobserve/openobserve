@@ -568,6 +568,7 @@ import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useListViewState } from "@/composables/useListViewState";
+import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -606,7 +607,7 @@ const streamsLoaded = ref(false);
 interface ServiceRow {
   id: string;
   service_name: string;
-  status: "healthy" | "degraded" | "warning" | "critical";
+  status: ServiceHealthStatus;
   total_requests: number;
   error_count: number;
   error_rate: number;
@@ -772,6 +773,7 @@ const selectedServiceNode = computed(() =>
         name: selectedServiceRow.value.service_name,
         service_type: selectedServiceRow.value.infer_service_type,
         service_system: selectedServiceRow.value.infer_service_system,
+        error_rate: selectedServiceRow.value.error_rate,
       }
     : null,
 );
@@ -1071,13 +1073,6 @@ const sortedServices = computed(() => {
     return sortOrder.value === "desc" ? -result : result;
   });
 });
-
-function deriveStatus(errorRate: number): "healthy" | "degraded" | "warning" | "critical" {
-  if (errorRate > 10) return "critical";
-  if (errorRate > 5) return "warning";
-  if (errorRate > 1) return "degraded";
-  return "healthy";
-}
 
 function formatPercent(value: number): string {
   return value.toFixed(2) + "%";
@@ -1409,11 +1404,13 @@ async function loadServicesCatalog() {
         ),
     );
   };
-  const closePanelIfRowGone = () => {
+  // The side panel reads the selected row's numbers, so it follows the refreshed row or closes when the row is gone.
+  const syncSelectedRow = () => {
     const selectedId = selectedServiceRow.value?.id;
-    if (selectedId && !services.value.some((r) => r.id === selectedId)) {
-      handleCloseSidePanel();
-    }
+    if (!selectedId) return;
+    const refreshed = services.value.find((r) => r.id === selectedId);
+    if (refreshed) selectedServiceRow.value = refreshed;
+    else handleCloseSidePanel();
   };
 
   await fetchQueryDataWithHttpStream(
@@ -1464,7 +1461,7 @@ async function loadServicesCatalog() {
               p50_latency_ns: hit.p50_latency_ns ?? 0,
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
-              status: deriveStatus(hit.error_rate ?? 0),
+              status: serviceHealthFromErrorRate(hit.error_rate ?? 0),
               is_real_service: hit._is_real_service ?? 0,
               infer_service_name: inferredName,
               infer_service_system: inferredSystem,
@@ -1484,7 +1481,7 @@ async function loadServicesCatalog() {
         );
         // Rows from an earlier search (possibly another stream) would otherwise sit beside the error.
         services.value = [];
-        closePanelIfRowGone();
+        syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
       },
@@ -1492,7 +1489,7 @@ async function loadServicesCatalog() {
         if (load !== catalogLoad) return;
         // Publishing here also clears the previous search's rows when this one returned no batches.
         publish();
-        closePanelIfRowGone();
+        syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();

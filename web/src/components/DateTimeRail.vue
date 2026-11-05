@@ -16,31 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="date-time-rail flex flex-col py-1 outline-none"
+    class="date-time-rail flex min-h-full flex-col py-1 outline-none"
     tabindex="-1"
     data-test="date-time-rail"
   >
     <div
+      v-if="recent.length > 0 || !hasCalendar"
       role="group"
       :aria-label="t('common.timeRangeRecent')"
       class="flex flex-col"
       data-test="date-time-rail-recent-group"
     >
+      <div
+        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
+        data-test="date-time-rail-recent-header"
+      >
+        {{ t("common.timeRangeRecent") }}
+      </div>
       <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
       <div
         v-if="recent.length === 0"
-        class="text-text-secondary px-2 pb-1 text-xs"
+        class="text-text-secondary px-3 pb-1 text-xs"
         data-test="date-time-rail-recent-empty"
       >
         {{ t("common.timeRangeRecentEmpty") }}
       </div>
-      <div v-if="recent.length > 0" role="list" data-test="date-time-rail-recent-list">
+      <div v-else role="list" data-test="date-time-rail-recent-list">
         <div
           v-for="(item, index) in visibleRecent"
           :key="item.id"
           role="listitem"
           class="group relative px-1"
-          :class="index < visibleRecent.length - 1 ? 'border-border-default border-b' : ''"
+          :class="
+            index < visibleRecent.length - 1 ? 'border-border-default border-b border-dotted' : ''
+          "
         >
           <OTooltip
             side="right"
@@ -56,11 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-date-time-rail-recent
             :tabindex="tabindexFor(`recent-${item.id}`)"
             :data-test="`date-time-rail-recent-${item.id}`"
-            class="w-full justify-start! pe-7! font-normal tabular-nums aria-disabled:opacity-35"
+            class="w-full justify-start! gap-2 pe-8! font-normal tabular-nums aria-disabled:opacity-35"
             :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
             :disabled="item.disabled"
             focusable-unavailable
             :aria-pressed="item.selected"
+            :aria-label="rowName(item)"
             :aria-describedby="recentKeysHintId"
             :description-id="recentKeysHintId"
             @mouseenter="emit('hover')"
@@ -69,16 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
             @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
-            <OTruncatedText v-if="item.parts" :tooltip="false" class="min-w-0"
-              ><span>{{ item.parts.startDate }}</span
-              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
-                ` ${item.parts.startTime} - `
-              }}</span
-              ><span>{{ item.parts.endDate }}</span
-              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
-                ` ${item.parts.endTime}`
-              }}</span></OTruncatedText
-            >
+            <template v-if="item.compact">
+              <OTruncatedText :tooltip="false" class="min-w-0 flex-1 text-left">{{
+                item.compact.label
+              }}</OTruncatedText>
+              <span
+                class="text-2xs shrink-0 rounded-full px-2 font-normal"
+                :class="
+                  item.selected
+                    ? 'bg-button-primary-foreground/20'
+                    : 'bg-text-heading/7 text-text-secondary'
+                "
+                :data-test="`date-time-rail-recent-${item.id}-duration`"
+                >{{ item.compact.duration }}</span
+              >
+            </template>
             <OTruncatedText v-else :tooltip="false" class="min-w-0">{{
               item.label
             }}</OTruncatedText>
@@ -89,10 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="close"
             :data-test="`date-time-rail-recent-${item.id}-remove`"
             tabindex="-1"
-            :aria-label="t('common.timeRangeRemoveRecent', { range: item.label })"
+            :aria-label="t('common.timeRangeRemoveRecent', { range: rowName(item) })"
             @keydown.left.prevent="focusSibling($event, '[data-date-time-rail-recent]')"
-            class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-            :class="item.selected ? 'text-button-primary-foreground!' : ''"
+            class="absolute! end-1.5 top-1/2 -translate-y-1/2"
+            :class="
+              item.selected
+                ? 'text-button-primary-foreground/70! hover:text-button-primary-foreground! focus-visible:text-button-primary-foreground!'
+                : 'text-text-secondary! hover:text-text-heading! focus-visible:text-text-heading!'
+            "
             @click.stop="removeFocusedRecent(item.id, $event)"
           />
         </div>
@@ -119,17 +138,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       role="group"
       :aria-labelledby="calendarHeadingId"
       class="flex flex-col"
+      :class="recent.length > 0 ? 'border-border-default mt-2 border-t' : ''"
       data-test="date-time-rail-calendar-group"
     >
-      <div :id="calendarHeadingId" class="px-2 pt-3 pb-1 text-sm font-semibold">
+      <div
+        :id="calendarHeadingId"
+        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
+        data-test="date-time-rail-calendar-header"
+      >
         {{ t("common.timeRangeCalendar") }}
       </div>
-      <div
-        role="list"
-        class="grid grid-cols-2 gap-1.5 px-1"
-        data-test="date-time-rail-calendar-list"
-      >
-        <div v-for="item in calendar" :key="item.id" role="listitem" class="min-w-0">
+      <div role="list" class="flex flex-col px-1" data-test="date-time-rail-calendar-list">
+        <div
+          v-for="(item, index) in calendar"
+          :key="item.id"
+          role="listitem"
+          class="min-w-0"
+          :class="index < calendar.length - 1 ? 'border-border-default border-b' : ''"
+        >
           <OTooltip
             side="right"
             align="center"
@@ -144,11 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-date-time-rail-calendar
             :tabindex="tabindexFor(`calendar-${item.id}`)"
             :data-test="`date-time-rail-calendar-${item.id}`"
-            class="h-8! w-full font-bold! disabled:opacity-35"
+            class="w-full justify-between! gap-2 font-medium! disabled:opacity-35"
             :class="
               item.selected
                 ? 'bg-button-primary! text-button-primary-foreground!'
-                : 'bg-text-heading/7!'
+                : 'text-text-heading!'
             "
             :disabled="item.disabled"
             :aria-pressed="item.selected"
@@ -157,9 +183,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emit('select-calendar', item.id)"
           >
             <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
+            <span
+              v-if="item.hint"
+              class="shrink-0 text-xs font-normal italic"
+              :class="item.selected ? '' : 'text-text-secondary'"
+              :data-test="`date-time-rail-calendar-${item.id}-hint`"
+              >{{ item.hint }}</span
+            >
           </OButton>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="recent.length > 0 || hasCalendar"
+      class="text-text-secondary mt-auto px-3 pt-3 pb-2 text-xs italic max-sm:hidden"
+      data-test="date-time-rail-keys-hint"
+    >
+      {{ t("common.timeRangeRailKeysHint") }}
     </div>
   </div>
 </template>
@@ -216,6 +257,12 @@ const tabStop = computed(() =>
     ? activeKey.value
     : focusOrder.value[0],
 );
+
+const hasCalendar = computed(() => props.calendar !== null && props.calendar.length > 0);
+
+// The accessible name must contain the visible compact label.
+const rowName = (item: TimeRangeRailItem) =>
+  item.compact ? `${item.compact.label} (${item.label})` : item.label;
 
 const tabindexFor = (key: string) => (key === tabStop.value ? 0 : -1);
 

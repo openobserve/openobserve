@@ -244,6 +244,12 @@ impl<'a> SpanServiceScope<'a> {
 }
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    if let Some(value) = record_val.get_mut("gen_ai_prompt_version")
+        && let Some(num) = value.as_i64()
+    {
+        *value = json::Value::String(num.to_string());
+    }
+
     for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && value.as_i64().is_none()
@@ -2293,6 +2299,7 @@ mod tests {
             "gen_ai_usage_cost_cache_read_savings": "0.18",
             "gen_ai_usage_cost_net_cache_impact": "0.11",
             "gen_ai_usage_cost": false,
+            "gen_ai_prompt_version": 3,
             "unrelated": "value"
         })
         .as_object()
@@ -2382,6 +2389,10 @@ mod tests {
         assert_eq!(
             record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),
             Some(0.0)
+        );
+        assert_eq!(
+            record.get("gen_ai_prompt_version").and_then(|v| v.as_str()),
+            Some("3")
         );
         assert_eq!(
             record.get("unrelated").and_then(|v| v.as_str()),

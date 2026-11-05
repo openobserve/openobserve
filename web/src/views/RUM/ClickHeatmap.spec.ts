@@ -1090,13 +1090,17 @@ describe("ClickHeatmap", () => {
         step(n);
       });
     const scale = (1200 - 32) / 1440;
+    let noCanvas: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       // jsdom has no CSS.escape; browsers do.
       vi.stubGlobal("CSS", { escape: (v: string) => v.replace(/[^\w-]/g, (c) => `\\${c}`) });
+      // A 1440x6000 page makes every redraw recolour 8.6M mock-canvas pixels; these tests check geometry, not paint.
+      noCanvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     });
 
     afterEach(() => {
+      noCanvas.mockRestore();
       if (origWidth) Object.defineProperty(Element.prototype, "clientWidth", origWidth);
       if (origHeight) Object.defineProperty(Element.prototype, "clientHeight", origHeight);
       h.pageWidth = 0;

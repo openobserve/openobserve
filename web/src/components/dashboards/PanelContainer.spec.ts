@@ -22,6 +22,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
+import { b64DecodeUnicode } from "@/utils/formatters";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import {
@@ -51,6 +52,8 @@ const toastMock = vi.fn(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => toastMock(...args),
 }));
+
+const ensureDrilldownSchemaMock = vi.fn(async (..._args: unknown[]) => {});
 
 // ── ODialog stub ─────────────────────────────────────────────────────────────
 // Stub preserves slot content (so QueryInspector / ShowLegendsPopup mounting
@@ -252,10 +255,13 @@ describe("PanelContainer", () => {
             // (PanelSchemaRenderer.vue:1448-1480, exposed at :1802). Tests drive
             // it through setNoData() so the consumer reads the same contract the
             // real renderer publishes, not a shape invented by the stub.
-            data: () => ({ noData: "" }),
+            data: () => ({ noData: "", panelBaseWhere: "" }),
             methods: {
               setNoData(this: any, value: string) {
                 this.noData = value;
+              },
+              ensureDrilldownSchema(...args: unknown[]) {
+                return ensureDrilldownSchemaMock(...args);
               },
             },
           },
@@ -1287,6 +1293,140 @@ describe("PanelContainer", () => {
       await flushPromises();
 
       expect(windowOpenSpy).toHaveBeenCalled();
+    });
+
+    const goToLogs = async ({
+      sql,
+      stream = "slo_slices",
+      streamType = "logs",
+      baseWhere = "",
+      vrl = "",
+    }: {
+      sql: string;
+      stream?: string;
+      streamType?: string;
+      baseWhere?: string;
+      vrl?: string;
+    }) => {
+      vi.spyOn(window, "open").mockImplementation(() => null);
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [
+            {
+              query: sql,
+              fields: { stream, stream_type: streamType },
+              vrlFunctionQuery: vrl,
+            },
+          ],
+        },
+      });
+      await wrapper.vm.metaDataValue({
+        queries: [{ query: sql, startTime: 1672531200000, endTime: 1672617599000 }],
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      renderer.vm.panelBaseWhere = baseWhere;
+      await wrapper.vm.onLogPanel();
+      await flushPromises();
+      const { default: shortURL } = await import("@/services/short_url");
+      const url = new URL((shortURL.create as any).mock.calls.at(-1)[1]);
+      return {
+        query: b64DecodeUnicode(url.searchParams.get("query") ?? ""),
+        histogram: url.searchParams.get("show_histogram"),
+        params: url.searchParams,
+      };
+    };
+
+    const aggregateSql =
+      'SELECT slo_id as "x_axis_1", count(*) as "y_axis_1" FROM "slo_slices" WHERE rev = 1793591100 GROUP BY x_axis_1';
+
+    it("sends the panel's rows as SELECT * with its WHERE and turns the histogram on", async () => {
+      const { query, histogram, params } = await goToLogs({
+        sql: aggregateSql,
+        baseWhere: "rev = 1793591100",
+      });
+      expect(ensureDrilldownSchemaMock).toHaveBeenCalledWith(0, true);
+      expect(query).toBe(
+        'SELECT * FROM "slo_slices" WHERE rev = 1793591100 ORDER BY _timestamp DESC',
+      );
+      expect(histogram).toBe("true");
+      expect(params.get("sql_mode")).toBe("true");
+      expect(params.get("stream")).toBe("slo_slices");
+      expect(params.get("from")).toBe("1672531200000");
+      expect(params.get("to")).toBe("1672617599000");
+    });
+
+    it("sends SELECT * without WHERE for a panel without one", async () => {
+      const { query } = await goToLogs({
+        sql: 'SELECT count(*) as "y" FROM "slo_slices" GROUP BY slo_id',
+      });
+      expect(query).toBe('SELECT * FROM "slo_slices" ORDER BY _timestamp DESC');
+    });
+
+    it.each([
+      [
+        "a JOIN query",
+        "SELECT a.slo_id, count(*) FROM slo_slices a JOIN stream_b b ON a.id = b.id WHERE a.rev = 1 GROUP BY a.slo_id",
+      ],
+      ["an aliased table", "SELECT count(*) FROM slo_slices d WHERE d.rev = 1 GROUP BY d.slo_id"],
+      [
+        "a WITH query",
+        "WITH t AS (SELECT * FROM x) SELECT count(*) FROM slo_slices WHERE rev = 1 GROUP BY slo_id",
+      ],
+      [
+        "a UNION query",
+        "SELECT count(*) FROM slo_slices WHERE rev = 1 UNION SELECT count(*) FROM slo_slices WHERE rev = 2",
+      ],
+      [
+        "a FROM subquery",
+        "SELECT count(*) FROM (SELECT * FROM slo_slices WHERE rev = 1) t GROUP BY slo_id",
+      ],
+    ])("sends %s unchanged with the histogram off", async (_label, sql) => {
+      const { query, histogram } = await goToLogs({ sql, baseWhere: "rev = 1" });
+      expect(query).toBe(sql);
+      expect(histogram).toBe("false");
+    });
+
+    it("falls back to the whole query when the WHERE lookup returns empty", async () => {
+      const { query, histogram } = await goToLogs({ sql: aggregateSql, baseWhere: "" });
+      expect(query).toBe(aggregateSql);
+      expect(histogram).toBe("false");
+    });
+
+    it("falls back without a WHERE lookup for a non-logs stream", async () => {
+      const sql = "SELECT count(*) FROM traces_stream GROUP BY service_name";
+      const { query, histogram } = await goToLogs({
+        sql,
+        stream: "traces_stream",
+        streamType: "traces",
+      });
+      expect(ensureDrilldownSchemaMock).not.toHaveBeenCalled();
+      expect(query).toBe(sql);
+      expect(histogram).toBe("false");
+    });
+
+    it("converts a panel whose string values contain union / with", async () => {
+      const { query } = await goToLogs({
+        sql: "SELECT count(*) FROM slo_slices WHERE msg = 'union with x' GROUP BY slo_id",
+        baseWhere: "msg = 'union with x'",
+      });
+      expect(query).toBe(
+        "SELECT * FROM \"slo_slices\" WHERE msg = 'union with x' ORDER BY _timestamp DESC",
+      );
+    });
+
+    it("sends the whole query with its VRL function when the panel has one", async () => {
+      const vrl = ".y_axis_1 = .y_axis_1 * 2";
+      const { query, histogram, params } = await goToLogs({
+        sql: aggregateSql,
+        baseWhere: "rev = 1793591100",
+        vrl,
+      });
+      expect(ensureDrilldownSchemaMock).not.toHaveBeenCalled();
+      expect(query).toBe(aggregateSql);
+      expect(histogram).toBe("false");
+      expect(b64DecodeUnicode(params.get("functionContent") ?? "")).toBe(vrl);
+      expect(params.get("fn_editor")).toBe("true");
     });
 
     it("should handle missing query data gracefully", async () => {

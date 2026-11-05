@@ -27,7 +27,6 @@ use serde_json::{Value, json};
 
 use super::{
     DEFAULT_LINK_LABEL, clamp, dispatchable_url, markdown::escape_discord_markdown, safe_url,
-    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
@@ -37,13 +36,6 @@ const DESCRIPTION_MAX: usize = 4096;
 const FIELD_NAME_MAX: usize = 256;
 const FIELD_VALUE_MAX: usize = 1024;
 const MAX_FIELDS: usize = 25;
-
-/// Parse a `#RRGGBB` [`severity_color`] string into Discord's decimal color
-/// integer. Infallible: the hex strings are our own constants.
-fn severity_color_decimal(level: Option<config::meta::alerts::level::AlertLevel>) -> u32 {
-    let hex = severity_color(level).trim_start_matches('#');
-    u32::from_str_radix(hex, 16).unwrap_or(0)
-}
 
 /// Row data, formatted as one more embed field — mirrors how Slack/Teams/
 /// Email all surface `rows`/`row_lines` rather than silently dropping them.
@@ -148,7 +140,6 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut embed = json!({
         "title": clamp(&c.title, TITLE_MAX),
         "description": description,
-        "color": severity_color_decimal(c.severity),
         "fields": fields,
     });
     if let Some(url) = embed_url {
