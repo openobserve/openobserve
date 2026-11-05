@@ -23,13 +23,9 @@ import { licenseDeniedFeatures } from "@/utils/featureGate";
 /**
  * The org's catch-all team, read once and shared.
  *
- * Three components asked for it independently — the card that SETS it, the
- * ownership table that shows it as the last row, and the policy editor, which
- * warns when a ladder ends in `notify_default_team` and nobody is nominated.
- * Two of them render on the Routing screen at the same time, so the same tiny
- * request went out twice and the two copies could disagree the moment one was
- * written: nominating a catch-all left the warning in the drawer still saying
- * there was none, because nothing told it.
+ * The card that SETS it and the ownership table that shows it as the last row
+ * render on the Routing screen at the same time, so separate reads sent the same
+ * tiny request twice and the two copies could disagree the moment one was written.
  *
  * Sharing is now the query cache's job — org-rooted keys, one in-flight request
  * per key, and a purge on org switch, all of which this file used to hand-roll.
