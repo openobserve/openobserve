@@ -120,25 +120,39 @@ export const adminOrgsQuery = (org: string) =>
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
+// The token list re-reads before these resolve: callers copy it into the store
+// and re-arm row buttons that read the row's current state.
 export const createIngestionTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; description?: string; splunk_token?: boolean }) =>
       organizations.create_org_ingestion_token(org, data),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionTokenEnabledMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; enabled: boolean }) =>
       organizations.enable_disable_org_ingestion_token(org, vars.name, vars.enabled),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionSplunkTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; action: "generate" | "revoke" }) =>
       organizations.set_org_ingestion_splunk_token(org, vars.name, vars.action),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const resetPasscodeMutation = (org: string) =>
