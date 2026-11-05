@@ -168,7 +168,9 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_function_field: Option<String>,
     pub histogram_interval: String,
     pub schedule_interval: String,
+    /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: i64,
+    /// At most 3,000,000 histogram buckets; a stored row over the limit trains clamped to it.
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
     /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
@@ -243,6 +245,8 @@ where
     serde::Deserialize::deserialize(deserializer).map(Some)
 }
 
+/// A new `query_mode`, `filters`, `custom_sql`, `detection_function` or `histogram_interval`
+/// resets the model, and detection pauses until retraining ends; an unchanged value does not.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
@@ -254,7 +258,9 @@ pub struct UpdateAnomalyConfigRequest {
     pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
     pub schedule_interval: Option<String>,
+    /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: Option<i64>,
+    /// At most 3,000,000 histogram buckets; a stored row over the limit trains clamped to it.
     pub training_window_days: Option<i32>,
     /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
@@ -863,7 +869,8 @@ pub async fn check_update_config(
     Ok(())
 }
 
-/// Update an existing anomaly detection configuration
+/// Update an existing anomaly detection configuration; see [`UpdateAnomalyConfigRequest`] for
+/// the edits that reset the model.
 pub async fn update_config(
     org_id: &str,
     anomaly_id: &str,
@@ -2566,7 +2573,17 @@ fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
     let statements =
         sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
             .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
-    if !matches!(statements.as_slice(), [sqlparser::ast::Statement::Query(_)]) {
+    // visit_statements, because a Query can hold a DELETE behind WITH or in a subquery.
+    if !matches!(statements.as_slice(), [sqlparser::ast::Statement::Query(_)])
+        || sqlparser::ast::visit_statements(&statements, |statement| {
+            if matches!(statement, sqlparser::ast::Statement::Query(_)) {
+                ControlFlow::Continue(())
+            } else {
+                ControlFlow::Break(())
+            }
+        })
+        .is_break()
+    {
         anyhow::bail!("custom_sql must be exactly one SELECT statement");
     }
     // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
@@ -8381,6 +8398,9 @@ mod tests {
         fn only_one_select_statement_is_kept() {
             for sql in [
                 "DELETE FROM logs WHERE a = 1",
+                "WITH a AS (SELECT 1) DELETE FROM logs",
+                "WITH a AS (DELETE FROM logs RETURNING *) SELECT 1 FROM a",
+                "SELECT 1 FROM (DELETE FROM logs RETURNING *) t",
                 "DROP TABLE logs",
                 "UPDATE logs SET a = 1",
                 "INSERT INTO logs VALUES (1)",
