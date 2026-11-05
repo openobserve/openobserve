@@ -830,6 +830,57 @@ describe("recent searches: settled runs", () => {
     });
   });
 
+  describe("noResults", () => {
+    const settle = (
+      results: Record<string, unknown>,
+      error?: { code: number; message: string },
+    ) => {
+      const settled = vi.fn();
+      run().onRunSettled(settled);
+      const hits = hitsOf(dispatch("run").id);
+      run().bindPayload(hits);
+      fakeSearchObj.value.data.queryResults = results;
+      if (error) run().onPayloadError(hits, error);
+      else run().onPayloadComplete(hits);
+      return settled;
+    };
+
+    it("is true for a finished run with no hits and a zero total", () => {
+      expect(settle({ hits: [], total: 0 }).mock.calls[0][0].noResults).toBe(true);
+    });
+
+    it("is false when rows came back or the total is positive", () => {
+      expect(settle({ hits: [{ a: 1 }], total: 1 }).mock.calls[0][0].noResults).toBe(false);
+      expect(settle({ hits: [], total: 5 }).mock.calls[0][0].noResults).toBe(false);
+    });
+
+    it("is false when the result is not an array yet", () => {
+      expect(settle({}).mock.calls[0][0].noResults).toBe(false);
+    });
+
+    it("is false for a failed run", () => {
+      const call = settle({ hits: [], total: 0 }, { code: 1, message: "x" }).mock.calls[0][0];
+      expect(call.noResults).toBe(false);
+      expect(call.error).not.toBeNull();
+    });
+
+    it("still reports a partial run as partial, whatever its rows", () => {
+      const call = settle({ hits: [], total: 0, is_partial: true }).mock.calls[0][0];
+      expect(call.partial).toBe(true);
+    });
+
+    it("never reaches the report for a cancelled run, since completion checks it is current", () => {
+      const settled = vi.fn();
+      run().onRunSettled(settled);
+      const hits = hitsOf(dispatch("run").id);
+      run().bindPayload(hits);
+      expect(run().isPayloadCurrent(hits)).toBe(true);
+      run().engine.cancelGeneration(null, { cause: "user" });
+      expect(run().isPayloadCurrent(hits)).toBe(false);
+      expect(settled).not.toHaveBeenCalled();
+    });
+  });
+
   it("reports a failed search with its error", () => {
     const settled = vi.fn();
     run().onRunSettled(settled);

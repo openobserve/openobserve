@@ -80,9 +80,11 @@ export const isRecordedLogsRun = (
 export const logsRunResult = (run: {
   error: RunError | null;
   partial: boolean;
+  noResults?: boolean;
 }): RunResult | null => {
   if (run.error) return runResultFromError(run.error);
-  return run.partial ? { status: "ok", warning: "" } : { status: "ok" };
+  if (run.partial) return { status: "ok", warning: "" };
+  return run.noResults ? { status: "ok", noResults: true } : { status: "ok" };
 };
 
 /** The record for a settled Logs run, or null when there is no query text to keep. */

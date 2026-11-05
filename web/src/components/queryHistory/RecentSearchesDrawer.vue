@@ -23,6 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="recent-searches-drawer"
   >
     <template #header-left>
+      <OBadge
+        v-if="totalCount !== undefined"
+        variant="default-soft"
+        size="sm"
+        data-test="recent-searches-count"
+      >
+        {{ totalCount }}
+      </OBadge>
+    </template>
+    <template #header-right>
       <OButton
         variant="ghost"
         size="icon-xs"
@@ -34,76 +44,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div class="flex h-full min-h-0 flex-col">
-      <div class="border-border-default flex shrink-0 flex-col gap-2 border-b px-4 py-2">
-        <div class="flex items-center gap-2">
-          <OSearchInput
-            v-model="search"
-            size="sm"
-            clearable
-            :debounce="300"
-            :placeholder="t('recentSearches.searchPlaceholder')"
-            class="min-w-0 flex-1"
-            data-test="recent-searches-search"
-          />
-          <OToggleGroup v-model="scope" type="single" data-test="recent-searches-scope">
-            <OToggleGroupItem value="page" size="sm" data-test="recent-searches-scope-page">
-              {{ t(`recentSearches.page.${source}`) }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="all" size="sm" data-test="recent-searches-scope-all">
-              {{ t("recentSearches.allPages") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-        </div>
+      <div class="border-border-default flex shrink-0 flex-col gap-3 border-b px-4 py-3">
+        <OSearchInput
+          v-model="search"
+          clearable
+          :debounce="300"
+          :placeholder="t('recentSearches.searchPlaceholder')"
+          class="w-full"
+          data-test="recent-searches-search"
+        />
         <div class="flex flex-wrap items-center gap-2">
-          <OSelect
-            v-model="stream"
-            :options="streamOptions"
-            size="sm"
-            clearable
-            searchable
-            creatable
-            :placeholder="t('recentSearches.allStreams')"
-            class="w-44"
-            data-test="recent-searches-stream"
-          />
-          <OSelect
-            v-model="status"
-            :options="statusOptions"
-            size="sm"
-            class="w-32"
-            data-test="recent-searches-status"
-          />
-          <RecentSearchesDayPicker
-            ref="dayPickerRef"
-            v-model="ranOn"
-            :placeholder="t('recentSearches.datePlaceholder')"
-            :field-label="t('recentSearches.filterByDateRun')"
-            :zone="zone"
-            data-test="recent-searches-ran-on"
-          />
-          <OCheckbox
-            v-model="starredOnly"
-            size="sm"
-            :label="t('recentSearches.starredOnly')"
-            data-test="recent-searches-starred-only"
-          />
-          <OButton
-            v-if="filtered"
-            variant="ghost-primary"
-            size="xs"
-            icon-left="restart-alt"
-            class="ms-auto"
-            data-test="recent-searches-reset-filters"
-            @click="resetFilters"
+          <span
+            class="flex flex-wrap items-center gap-2"
+            role="group"
+            :aria-label="t('recentSearches.scopeGroup')"
+            data-test="recent-searches-scope"
           >
-            {{ t("recentSearches.reset") }}
-            <OTooltip :content="t('recentSearches.resetFilters')" />
-          </OButton>
+            <OBadge
+              v-for="option in scopeOptions"
+              :key="option.value"
+              clickable
+              :variant="scope === option.value ? 'primary-soft' : 'default-outline'"
+              :aria-pressed="scope === option.value"
+              :data-test="`recent-searches-scope-${option.value}`"
+              @click="scope = option.value"
+            >
+              {{ option.label }}
+            </OBadge>
+          </span>
+          <span class="bg-border-default mx-1 h-5 w-px" aria-hidden="true" />
+          <span
+            class="flex flex-wrap items-center gap-2"
+            role="group"
+            :aria-label="t('recentSearches.statusGroup')"
+            data-test="recent-searches-status"
+          >
+            <OBadge
+              v-for="option in statusOptions"
+              :key="option.value"
+              clickable
+              :variant="status === option.value ? 'primary-soft' : 'default-outline'"
+              :icon="option.icon"
+              :aria-pressed="status === option.value"
+              :data-test="`recent-searches-status-${option.value}`"
+              @click="status = option.value"
+            >
+              {{ option.label }}
+            </OBadge>
+          </span>
+          <span class="bg-border-default mx-1 h-5 w-px" aria-hidden="true" />
+          <OBadge
+            clickable
+            :variant="starredOnly ? 'primary-soft' : 'default-outline'"
+            icon="star-outline"
+            :aria-pressed="starredOnly"
+            data-test="recent-searches-status-starred"
+            @click="starredOnly = !starredOnly"
+          >
+            {{ t("recentSearches.statusStarred") }}
+          </OBadge>
         </div>
       </div>
 
       <div class="min-h-0 flex-1 overflow-auto" data-test="recent-searches-drawer-list">
-        <div v-if="history.isPending.value && open" class="flex flex-col gap-3 p-4">
+        <div v-if="(history.isPending.value || scanning) && open" class="flex flex-col gap-3 p-4">
           <OSkeleton v-for="n in 5" :key="n" type="text" />
         </div>
         <OEmptyState
@@ -127,169 +131,171 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <section v-for="group in groups" :key="group.dayMs" :data-test="`recent-searches-day`">
           <h3
-            class="bg-surface-panel text-text-secondary border-border-subtle sticky top-0 z-1 border-b px-4 py-1 text-xs font-semibold uppercase"
+            class="bg-surface-panel text-text-secondary border-border-subtle sticky top-0 z-1 border-b px-4 py-2 text-xs font-semibold tracking-wide uppercase"
+            data-test="recent-searches-day-header"
           >
-            {{ dayLabel(group) }}
+            {{ dayLabel(group) }} · {{ group.entries.length }}
           </h3>
           <div
             v-for="entry in group.entries"
             :key="entry.id"
-            class="border-border-subtle hover:bg-dropdown-item-hover-bg group flex cursor-pointer flex-col gap-1 border-b px-4 py-2"
+            class="border-border-subtle hover:bg-dropdown-item-hover-bg group flex cursor-pointer items-start gap-2 border-b px-4 py-3"
             :data-test="`recent-searches-drawer-row-${entry.id}`"
             @click="restore(entry, restoreTimeOf(entry), true)"
           >
-            <div class="flex min-w-0 items-center gap-2">
-              <OTag
-                v-if="scope === 'all'"
-                :label="t(`recentSearches.page.${entry.source}`)"
-                size="sm"
-                variant="primary-outline"
-                class="shrink-0"
-              />
-              <OTag
-                v-for="name in entry.streams.slice(0, 3)"
-                :key="name"
-                :label="raw(name)"
-                size="sm"
-                class="shrink-0"
-              />
-              <span v-if="entry.streams.length > 3" class="text-text-secondary text-xs">
-                +{{ entry.streams.length - 3 }}
-              </span>
-              <span class="ms-auto flex shrink-0 items-center gap-1">
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <OTruncatedText
+                :lines="2"
+                :tooltip="queryTooltip(entry)"
+                tooltip-class="whitespace-pre-wrap font-mono"
+                class="text-text-heading font-mono text-sm break-all"
+                data-test="recent-searches-drawer-query"
+              >
+                {{ entry.query }}
+              </OTruncatedText>
+              <OTruncatedText
+                v-if="functionOf(entry)"
+                :tooltip="raw(functionOf(entry))"
+                tooltip-class="whitespace-pre-wrap font-mono"
+                class="text-text-secondary font-mono text-xs"
+                data-test="recent-searches-drawer-function"
+              >
+                {{ t("recentSearches.functionLabel") }}: {{ functionOf(entry) }}
+              </OTruncatedText>
+              <OTruncatedText
+                v-if="entry.status === 'error' && entry.context.error"
+                :tooltip="raw(entry.context.error)"
+                class="text-status-error-text text-xs"
+                data-test="recent-searches-drawer-error"
+              >
+                {{ entry.context.error }}
+              </OTruncatedText>
+              <div class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <OTag
-                  v-if="entry.status === 'error'"
-                  :label="t('recentSearches.failed')"
-                  variant="error-soft"
+                  v-if="scope === 'all'"
+                  :label="t(`recentSearches.page.${entry.source}`)"
                   size="sm"
-                  data-test="recent-searches-failed-tag"
+                  variant="primary-outline"
+                  class="shrink-0"
                 />
+                <OTag
+                  v-for="name in entry.streams.slice(0, 3)"
+                  :key="name"
+                  :label="raw(name)"
+                  size="sm"
+                  class="shrink-0"
+                />
+                <span v-if="entry.streams.length > 3">+{{ entry.streams.length - 3 }}</span>
                 <span
-                  v-else-if="entry.context.warning !== undefined"
+                  class="flex items-center gap-1.5"
+                  :data-test="`recent-searches-status-label-${entry.id}`"
+                >
+                  <span
+                    class="size-2 rounded-full"
+                    :class="STATUS_DOT[entryStatus(entry)]"
+                    :data-test="`recent-searches-status-dot-${entryStatus(entry)}`"
+                  />
+                  <span data-test="recent-searches-failed-tag">{{ statusLabel(entry) }}</span>
+                </span>
+                <span
+                  v-if="entry.context.warning !== undefined"
                   class="bg-status-warning-text size-2 rounded-full"
                   data-test="recent-searches-drawer-warning"
                 >
                   <OTooltip :content="t('recentSearches.warning')" />
                 </span>
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  :icon-left="entry.starred ? 'star' : 'star-outline'"
-                  :class="entry.starred ? 'text-favorite' : ''"
-                  :aria-label="
-                    entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')
-                  "
-                  :data-test="`recent-searches-star-${entry.id}`"
-                  @click.stop="toggleStar(entry)"
-                >
-                  <OTooltip
-                    :content="entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')"
+                <span v-if="windowText(entry)" data-test="recent-searches-window">
+                  {{ windowText(entry) }}
+                </span>
+                <span data-test="recent-searches-span">{{ ranText(entry) }}</span>
+              </div>
+            </div>
+            <span class="flex shrink-0 items-center gap-0.5">
+              <OButton
+                variant="ghost-primary"
+                size="icon-sm"
+                icon-left="play-arrow"
+                :aria-label="t('recentSearches.rerunNow')"
+                :data-test="`recent-searches-rerun-now-${entry.id}`"
+                @click.stop="restore(entry, 'now', true)"
+              >
+                <OTooltip :content="t('recentSearches.rerunNow')" />
+              </OButton>
+              <OButton
+                v-if="entry.context.time || entry.context.time_range"
+                variant="ghost"
+                size="icon-sm"
+                icon-left="history"
+                :aria-label="t('recentSearches.rerunOriginal')"
+                :data-test="`recent-searches-rerun-original-${entry.id}`"
+                @click.stop="restore(entry, 'original', true)"
+              >
+                <OTooltip :content="t('recentSearches.rerunOriginal')" />
+              </OButton>
+              <span v-else class="inline-block size-8 shrink-0" aria-hidden="true" />
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                :icon-left="entry.starred ? 'star' : 'star-outline'"
+                :class="entry.starred ? 'text-favorite' : ''"
+                :aria-label="entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')"
+                :data-test="`recent-searches-star-${entry.id}`"
+                @click.stop="toggleStar(entry)"
+              >
+                <OTooltip
+                  :content="entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')"
+                />
+              </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="more-vert"
+                    :aria-label="t('common.more')"
+                    :data-test="`recent-searches-more-${entry.id}`"
+                    @click.stop
                   />
-                </OButton>
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="more-vert"
-                      :aria-label="t('common.more')"
-                      :data-test="`recent-searches-more-${entry.id}`"
-                      @click.stop
-                    />
-                  </template>
-                  <ODropdownItem
-                    icon-left="edit-note"
-                    :data-test="`recent-searches-load-${entry.id}`"
-                    @select="restore(entry, restoreTimeOf(entry), false)"
-                  >
-                    <span>{{ t("recentSearches.loadOnly") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="link"
-                    :data-test="`recent-searches-copy-link-${entry.id}`"
-                    @select="copyLink(entry)"
-                  >
-                    <span>{{ t("recentSearches.copyLink") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="content-copy"
-                    :data-test="`recent-searches-copy-query-${entry.id}`"
-                    @select="copyQuery(entry)"
-                  >
-                    <span>{{ t("recentSearches.copyQuery") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    v-if="functionOf(entry)"
-                    icon-left="content-copy"
-                    :data-test="`recent-searches-copy-function-${entry.id}`"
-                    @select="copyFunction(entry)"
-                  >
-                    <span>{{ t("recentSearches.copyFunction") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    variant="destructive"
-                    icon-left="delete"
-                    :data-test="`recent-searches-delete-${entry.id}`"
-                    @select="removeWithUndo(entry)"
-                  >
-                    <span>{{ t("common.delete") }}</span>
-                  </ODropdownItem>
-                </ODropdown>
-              </span>
-            </div>
-            <OTruncatedText
-              :lines="2"
-              :tooltip="queryTooltip(entry)"
-              tooltip-class="whitespace-pre-wrap font-mono"
-              class="text-text-heading font-mono text-xs break-all"
-              data-test="recent-searches-drawer-query"
-            >
-              {{ entry.query }}
-            </OTruncatedText>
-            <OTruncatedText
-              v-if="functionOf(entry)"
-              :tooltip="raw(functionOf(entry))"
-              tooltip-class="whitespace-pre-wrap font-mono"
-              class="text-text-secondary font-mono text-xs"
-              data-test="recent-searches-drawer-function"
-            >
-              {{ t("recentSearches.functionLabel") }}: {{ functionOf(entry) }}
-            </OTruncatedText>
-            <OTruncatedText
-              v-if="entry.status === 'error' && entry.context.error"
-              :tooltip="raw(entry.context.error)"
-              class="text-status-error-text text-xs"
-              data-test="recent-searches-drawer-error"
-            >
-              {{ entry.context.error }}
-            </OTruncatedText>
-            <div class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              <span v-if="windowText(entry)" data-test="recent-searches-window">
-                <OIcon name="schedule" size="xs" class="me-1 align-middle" />{{ windowText(entry) }}
-              </span>
-              <span data-test="recent-searches-span">{{ spanText(entry) }}</span>
-              <span class="ms-auto flex items-center gap-1">
-                <OButton
-                  variant="outline"
-                  size="xs"
-                  icon-left="play-arrow"
-                  :data-test="`recent-searches-rerun-now-${entry.id}`"
-                  @click.stop="restore(entry, 'now', true)"
+                </template>
+                <ODropdownItem
+                  icon-left="edit-note"
+                  :data-test="`recent-searches-load-${entry.id}`"
+                  @select="restore(entry, restoreTimeOf(entry), false)"
                 >
-                  {{ t("recentSearches.rerunNow") }}
-                </OButton>
-                <OButton
-                  v-if="entry.context.time || entry.context.time_range"
-                  variant="outline"
-                  size="xs"
-                  icon-left="history"
-                  :data-test="`recent-searches-rerun-original-${entry.id}`"
-                  @click.stop="restore(entry, 'original', true)"
+                  <span>{{ t("recentSearches.loadOnly") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="link"
+                  :data-test="`recent-searches-copy-link-${entry.id}`"
+                  @select="copyLink(entry)"
                 >
-                  {{ t("recentSearches.rerunOriginal") }}
-                </OButton>
-              </span>
-            </div>
+                  <span>{{ t("recentSearches.copyLink") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="content-copy"
+                  :data-test="`recent-searches-copy-query-${entry.id}`"
+                  @select="copyQuery(entry)"
+                >
+                  <span>{{ t("recentSearches.copyQuery") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="functionOf(entry)"
+                  icon-left="content-copy"
+                  :data-test="`recent-searches-copy-function-${entry.id}`"
+                  @select="copyFunction(entry)"
+                >
+                  <span>{{ t("recentSearches.copyFunction") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  variant="destructive"
+                  icon-left="delete"
+                  :data-test="`recent-searches-delete-${entry.id}`"
+                  @select="removeWithUndo(entry)"
+                >
+                  <span>{{ t("common.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
+            </span>
           </div>
         </section>
         <div v-if="history.hasNextPage.value" class="flex justify-center p-3">
@@ -307,18 +313,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <div class="flex w-full flex-col gap-1.5">
-        <div class="flex justify-end">
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            data-test="recent-searches-clear-btn"
-            @click="clearOpen = true"
-          >
-            {{ t("recentSearches.clear") }}
-          </OButton>
-        </div>
+      <div class="flex w-full items-center justify-between gap-2">
+        <span class="text-text-secondary text-xs italic" data-test="recent-searches-showing">
+          {{ footerText }}
+        </span>
+        <OButton
+          variant="ghost-destructive"
+          size="sm"
+          icon-left="delete"
+          data-test="recent-searches-clear-btn"
+          @click="clearOpen = true"
+        >
+          {{ t("recentSearches.clear") }}
+        </OButton>
       </div>
     </template>
   </ODrawer>
@@ -372,14 +379,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from "vue";
 import { useRouter } from "vue-router";
 import { DateTime } from "luxon";
 import { useInfiniteQuery, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
-import { queryHistoryCountQuery, queryHistoryQuery } from "@/services/query_history.queries";
+import {
+  queryHistoryCountQuery,
+  queryHistoryFilteredCountQuery,
+  queryHistoryQuery,
+} from "@/services/query_history.queries";
 import type {
   HistorySource,
   HistoryStatus,
@@ -388,7 +399,6 @@ import type {
 } from "@/services/query_history";
 import {
   absoluteLink,
-  dayBoundsUs,
   HISTORY_SOURCES,
   defaultRestoreTime,
   groupByDay,
@@ -404,23 +414,20 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import RecentSearchesDayPicker from "./RecentSearchesDayPicker.vue";
 import { useRecentEntryText } from "@/composables/queryHistory/useRecentEntryText";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const props = defineProps<{ source: HistorySource }>();
 
 const UNDO_DELETE_MS = 6000;
+const MAX_SCAN_PAGES = 10;
 
 const emit = defineEmits<{
   restore: [entry: QueryHistoryEntry, when: RestoreTime, run: boolean];
@@ -432,14 +439,19 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const { isMobile } = useBreakpoint();
 const { orgId, about: aboutText, star, remove, clear } = useRecentSearches();
-const { zone, windowText, spanText } = useRecentEntryText();
+const { zone, windowText, ranText } = useRecentEntryText();
+
+type StatusFilter = "any" | "ok" | "no_results" | "error";
+
+const STATUS_DOT = {
+  ok: "bg-status-success-text",
+  no_results: "bg-status-warning-text",
+  error: "bg-status-error-text",
+} as const;
 
 const search = ref("");
 const scope = ref<"page" | "all">("page");
-const stream = ref<string | null>(null);
-const status = ref<"all" | HistoryStatus>("all");
-const ranOn = ref<string | undefined>(undefined);
-const dayPickerRef = ref<InstanceType<typeof RecentSearchesDayPicker> | null>(null);
+const status = ref<StatusFilter>("any");
 const starredOnly = ref(false);
 const clearOpen = ref(false);
 const includeStarred = ref(false);
@@ -452,26 +464,19 @@ const sourceParam = computed(() =>
 const filters = computed<QueryHistoryListParams>(() => ({
   source: sourceParam.value,
   ...(search.value.trim() ? { q: search.value.trim() } : {}),
-  ...(stream.value ? { stream: stream.value } : {}),
-  ...(status.value !== "all" ? { status: status.value } : {}),
+  ...(status.value === "error" ? { status: "error" as const } : {}),
+  ...(["ok", "no_results"].includes(status.value) ? { status: "ok" as const } : {}),
   ...(starredOnly.value ? { starred: true } : {}),
-  ...(ranOn.value ? (dayBoundsUs(ranOn.value, zone.value) ?? {}) : {}),
 }));
 const filtered = computed(
-  () =>
-    !!search.value.trim() ||
-    !!stream.value ||
-    status.value !== "all" ||
-    starredOnly.value ||
-    !!ranOn.value,
+  () => !!search.value.trim() || status.value !== "any" || starredOnly.value,
 );
+// The backend stores only ok|error, so Success and No results are told apart on the loaded rows.
+const clientFiltered = computed(() => ["ok", "no_results"].includes(status.value));
 
 const resetFilters = () => {
   search.value = "";
-  stream.value = null;
-  status.value = "all";
-  ranOn.value = undefined;
-  dayPickerRef.value?.reset();
+  status.value = "any";
   starredOnly.value = false;
 };
 
@@ -482,32 +487,83 @@ const history = useInfiniteQuery(() =>
 );
 const hiddenIds = ref<Set<string>>(new Set());
 const pendingDeletes = new Map<string, { org: string; ids: Set<string>; dismiss: () => void }>();
+// The backend stores only ok|error, so "No results" is told apart here from the recorded context.
+const entryStatus = (entry: QueryHistoryEntry): "ok" | "no_results" | "error" => {
+  if (entry.status === "error") return "error";
+  return entry.context.no_results ? "no_results" : "ok";
+};
 const rows = computed(() =>
-  (history.data.value?.pages.flat() ?? []).filter((entry) => !hiddenIds.value.has(entry.id)),
+  (history.data.value?.pages.flat() ?? []).filter(
+    (entry) =>
+      !hiddenIds.value.has(entry.id) &&
+      (!["ok", "no_results"].includes(status.value) || entryStatus(entry) === status.value),
+  ),
 );
+// Keeps paging while a client-side chip hides every loaded row, so the empty state is never a false negative.
+const scanning = computed(
+  () =>
+    clientFiltered.value &&
+    !history.isError.value &&
+    !rows.value.length &&
+    !!history.hasNextPage.value &&
+    (history.data.value?.pages.length ?? 0) < MAX_SCAN_PAGES,
+);
+watchEffect(() => {
+  if (scanning.value && !history.isFetchingNextPage.value) history.fetchNextPage();
+});
 const groups = computed(() => groupByDay(rows.value, Date.now(), zone.value));
 
 const unstarredCount = useQuery(() =>
   Object.assign(queryHistoryCountQuery(orgId.value, sourceParam.value, false), {
-    enabled: clearOpen.value && !!orgId.value,
+    enabled: (open.value || clearOpen.value) && !!orgId.value,
   }),
 );
 const starredCount = useQuery(() =>
   Object.assign(queryHistoryCountQuery(orgId.value, sourceParam.value, true), {
-    enabled: clearOpen.value && !!orgId.value,
+    enabled: (open.value || clearOpen.value) && !!orgId.value,
   }),
 );
 
-const streamOptions = computed(() => {
-  const names = new Set(rows.value.flatMap((entry) => entry.streams));
-  if (stream.value) names.add(stream.value);
-  return [...names].sort().map((name) => ({ label: raw(name), value: name }));
+const totalCount = computed(() => {
+  const unstarred = unstarredCount.data.value;
+  const starred = starredCount.data.value;
+  return unstarred === undefined || starred === undefined ? undefined : unstarred + starred;
 });
-const statusOptions = computed(() => [
-  { label: t("recentSearches.statusAll"), value: "all" },
-  { label: t("recentSearches.statusOk"), value: "ok" },
-  { label: t("recentSearches.statusError"), value: "error" },
+
+// Success and No results cannot be counted by the server, so only the loaded rows are claimed.
+const filteredCount = useQuery(() =>
+  Object.assign(queryHistoryFilteredCountQuery(orgId.value, filters.value), {
+    enabled: open.value && !!orgId.value && filtered.value && !clientFiltered.value,
+  }),
+);
+const footerText = computed(() => {
+  if (clientFiltered.value) return t("recentSearches.showingLoaded", { shown: rows.value.length });
+  const total = filtered.value ? filteredCount.data.value : totalCount.value;
+  return t("recentSearches.showing", {
+    shown: rows.value.length,
+    total: total ?? rows.value.length,
+  });
+});
+
+const scopeOptions = computed(() => [
+  { value: "page" as const, label: t(`recentSearches.page.${props.source}`) },
+  { value: "all" as const, label: t("recentSearches.allPages") },
 ]);
+const statusOptions = computed(() => [
+  { value: "any" as const, label: t("recentSearches.statusAll"), icon: undefined },
+  { value: "ok" as const, label: t("recentSearches.statusOk"), icon: undefined },
+  { value: "no_results" as const, label: t("recentSearches.statusNoResults"), icon: undefined },
+  { value: "error" as const, label: t("recentSearches.statusError"), icon: undefined },
+]);
+
+const statusLabel = (entry: QueryHistoryEntry) =>
+  t(
+    {
+      ok: "recentSearches.statusOk",
+      no_results: "recentSearches.statusNoResults",
+      error: "recentSearches.statusError",
+    }[entryStatus(entry)],
+  );
 
 const toggleStar = (entry: QueryHistoryEntry) => star(entry.id, !entry.starred);
 
@@ -648,7 +704,8 @@ watch(clearOpen, (isOpen) => {
 });
 
 const show = (initialStatus: HistoryStatus | null = null) => {
-  status.value = initialStatus ?? "all";
+  status.value = initialStatus ?? "any";
+  starredOnly.value = false;
   open.value = true;
 };
 

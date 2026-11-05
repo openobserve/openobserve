@@ -68,6 +68,7 @@ export interface LogsRunSettled {
   startUs: number;
   endUs: number;
   partial: boolean;
+  noResults?: boolean;
   /** Null when the search finished. */
   error: RunError | null;
 }
@@ -430,6 +431,7 @@ function createLogsAutoRun() {
       startUs: window.startUs,
       endUs: window.endUs,
       partial: error === null && searchObj().data.queryResults?.is_partial === true,
+      noResults: error === null && hasNoHits(searchObj().data.queryResults),
       error,
     };
     runSettledListeners.forEach((listener) => {
@@ -644,6 +646,10 @@ function createLogsAutoRun() {
         : null,
   };
 }
+
+// A run that settled without writing any rows, as opposed to one whose result is still unknown.
+const hasNoHits = (results: { hits?: unknown; total?: unknown } | undefined): boolean =>
+  Array.isArray(results?.hits) && results.hits.length === 0 && !(Number(results?.total) > 0);
 
 export type LogsAutoRun = ReturnType<typeof createLogsAutoRun>;
 

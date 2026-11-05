@@ -526,7 +526,7 @@ let submittedFilter = "";
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
-const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
+const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
 const searchCancelled = ref(false);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
@@ -1056,6 +1056,8 @@ async function getQueryData(
             const requestState = tracesRequestState[searchTraceId];
             if (!requestState) return;
 
+            if (response.content?.results?.is_partial === true) requestState.isPartial = true;
+
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
@@ -1166,7 +1168,15 @@ async function getQueryData(
         },
         complete: (_payload: any) => {
           if (historyRun && tracesRequestState[searchTraceId]) {
-            recordRecent(buildTracesRecord({ ...historyRun, result: { status: "ok" } }));
+            const state = tracesRequestState[searchTraceId];
+            // A partial answer is not proof that nothing matched.
+            const noResults = state.hasWritten === false && state.isPartial !== true;
+            recordRecent(
+              buildTracesRecord({
+                ...historyRun,
+                result: noResults ? { status: "ok", noResults } : { status: "ok" },
+              }),
+            );
           }
           searchObj.loading = false;
           currentSearchTraceId = null;

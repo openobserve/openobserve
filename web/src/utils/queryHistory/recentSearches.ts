@@ -57,6 +57,7 @@ export interface RunResult {
   status: HistoryStatus;
   error?: string;
   warning?: string;
+  noResults?: boolean;
 }
 
 export interface RecentRow {
@@ -142,9 +143,12 @@ export const runResultFromError = (err: RunError): RunResult | null => {
   return { status: "ok", warning: message };
 };
 
-export const resultContext = (result: RunResult): Pick<HistoryContext, "error" | "warning"> => ({
+export const resultContext = (
+  result: RunResult,
+): Pick<HistoryContext, "error" | "warning" | "no_results"> => ({
   ...(result.error !== undefined ? { error: result.error } : {}),
   ...(result.warning !== undefined ? { warning: result.warning } : {}),
+  ...(result.noResults ? { no_results: true } : {}),
 });
 
 const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
