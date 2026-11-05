@@ -17,11 +17,22 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { orgUsersQuery } from "@/services/users.queries";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+/** A person as a picker row: the name to read, the email to tell two namesakes apart. */
+export type PersonOption = {
+  label: I18nText;
+  value: string;
+  subLabel?: I18nText;
+  subLabelInline?: boolean;
+  searchText: string;
+};
 
 /** A person's display name from the org's cached user list, or their email until it loads or when they have none. */
 export function useOrgUserNames() {
   const store = useStore();
-  const orgId = computed<string>(() => store.state.selectedOrganization.identifier);
+  // Optional chaining: components using this render inside specs that mount no store.
+  const orgId = computed<string>(() => store?.state?.selectedOrganization?.identifier ?? "");
   const users = useQuery(() =>
     Object.assign(orgUsersQuery(orgId.value), { enabled: !!orgId.value }),
   );
@@ -34,5 +45,27 @@ export function useOrgUserNames() {
     return name || email;
   }
 
-  return { nameOf };
+  const { t } = useI18nTyped();
+
+  /** Name and email in one line, for a tooltip; just the email when there is no name. */
+  function tooltipOf(email: string): I18nText {
+    const name = nameOf(email);
+    return name === email
+      ? raw(email)
+      : t("oncall.personNameWithEmail", { name: raw(name), email: raw(email) });
+  }
+
+  /** `inline` for multi-selects, whose stacked rows push the checkbox onto a line of its own. */
+  function optionOf(email: string, inline = false): PersonOption {
+    const name = nameOf(email);
+    return {
+      label: raw(name),
+      value: email,
+      subLabel: name === email ? undefined : raw(email),
+      subLabelInline: inline,
+      searchText: `${name} ${email}`.toLowerCase(),
+    };
+  }
+
+  return { nameOf, tooltipOf, optionOf };
 }

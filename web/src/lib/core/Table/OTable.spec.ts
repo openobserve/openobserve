@@ -1212,6 +1212,13 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
+    it("draws as many skeleton rows as skeletonRows asks for", () => {
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), loading: true, skeletonRows: 2 },
+      });
+      expect(wrapper.findAll('[data-test="o2-table-skeleton-body"] > tr')).toHaveLength(2);
+    });
+
     it("shows loading overlay when loading is true with existing rows", () => {
       wrapper = mount(OTable, {
         props: {
@@ -2535,6 +2542,30 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="o2-table-loading-banner"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Trailing body row ──────────────────────────────────────
+
+  describe("body-end slot", () => {
+    const END = '<tr data-test="end-row"><td colspan="9">Catch-all</td></tr>';
+
+    it("renders as the body's last row, above the pager", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+        slots: { "body-end": END },
+      });
+      const rows = wrapper.find('[data-test="o2-table-body"]').findAll("tr");
+      expect(rows[rows.length - 1].attributes("data-test")).toBe("end-row");
+      expect(wrapper.find('[data-test="o2-table-pagination-note"]').exists()).toBe(false);
+    });
+
+    it("paints in place of the empty state, as a row of its own", () => {
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns() },
+        slots: { "body-end": END },
+      });
+      expect(wrapper.find('[data-test="end-row"]').exists()).toBe(true);
     });
   });
 
