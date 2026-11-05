@@ -68,9 +68,11 @@ pub fn handle_histogram(
             .to_string()
     };
     let field = args.first().unwrap_or(&"_timestamp");
-    let timezone = args
-        .get(2)
-        .map_or_else(String::new, |value| format!(",'{value}'"));
+    // verbatim, because removing the quotes of `$$+05:30$$` would change its value
+    let timezone = captures
+        .get(1)
+        .and_then(|args| args.as_str().split(',').nth(2))
+        .map_or_else(String::new, |value| format!(",{}", value.trim()));
 
     *origin_sql = origin_sql.replace(
         captures.get(0).unwrap().as_str(),
@@ -365,6 +367,12 @@ mod tests {
         let mut sql = "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t".to_string();
         handle_histogram(&mut sql, (0, 0), 0);
         assert_eq!(sql, "SELECT histogram(_timestamp,'1 day','+05:30') FROM t");
+        let mut sql = "SELECT histogram(_timestamp, '1 day', $$+05:30$$) FROM t".to_string();
+        handle_histogram(&mut sql, (0, 0), 0);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp,'1 day',$$+05:30$$) FROM t"
+        );
         let mut sql = "SELECT histogram(_timestamp, '1 day', 'Asia/Kolkata') FROM t".to_string();
         handle_histogram(&mut sql, (0, 0), 3600);
         assert_eq!(

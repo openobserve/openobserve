@@ -110,6 +110,7 @@ pub async fn write_results_to_cache(
             clear_cache,
             is_histogram_non_ts_order,
             c_resp.ts_offset,
+            c_resp.limit,
         )
         .await;
         log::info!(

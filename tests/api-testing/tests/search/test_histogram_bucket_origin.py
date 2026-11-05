@@ -429,3 +429,23 @@ def test_a_limit_with_a_non_time_order_recounts_a_narrower_range(uneven_fixture,
     shorter_end = data.end - HOUR + 150_000_000
     assert _rows(data.search(sql, data.start, shorter_end)) == top_rows(shorter_end)
     assert _rows(data.search(sql, data.start, shorter_end, use_cache=True)) == top_rows(shorter_end)
+
+
+def test_a_filtered_write_does_not_hide_buckets_under_a_limit(uneven_fixture):
+    data = uneven_fixture
+    sql = (
+        "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS cnt "
+        f'FROM "{data.stream}" GROUP BY ts ORDER BY cnt DESC, ts DESC LIMIT 2'
+    )
+
+    def top_rows(end):
+        rows = _expected_rows(data.events, data.start, end, HOUR)
+        ranked = sorted(rows.items(), key=lambda row: (-row[1], -_micros(row[0])))
+        return dict(ranked[:2])
+
+    # The newest bucket is partial here, so a write would drop one of the 2 limited rows.
+    warm_end = data.end - HOUR // 2
+    assert _rows(data.search(sql, data.start, warm_end, use_cache=True)) == top_rows(warm_end)
+    time.sleep(2)
+    narrower_end = data.end - 2 * HOUR + 150_000_000
+    assert _rows(data.search(sql, data.start, narrower_end, use_cache=True)) == top_rows(narrower_end)

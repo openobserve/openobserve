@@ -535,6 +535,7 @@ pub async fn search(
             req.clear_cache,
             is_histogram_non_ts_order,
             c_resp.ts_offset,
+            c_resp.limit,
         )
         .await;
     }
@@ -1072,6 +1073,7 @@ pub async fn write_results(
     clear_cache: bool,
     is_histogram_non_ts_order: bool,
     ts_offset: i64,
+    limit: i64,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1137,6 +1139,7 @@ pub async fn write_results(
     if data_start_time - ts_offset < accept_start_time
         || data_end_time - ts_offset > accept_end_time
     {
+        let hits_before = res.hits.len();
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
@@ -1148,6 +1151,14 @@ pub async fn write_results(
                 true
             }
         });
+        if is_histogram_non_ts_order
+            && reached_limit_before_filter(hits_before, limit, res.hits.len())
+        {
+            log::info!(
+                "[trace_id {trace_id}] The limit hid buckets of this range, skipping caching"
+            );
+            return;
+        }
         res.total = res.hits.len();
         res.size = res.hits.len() as i64;
     }
@@ -1183,6 +1194,11 @@ pub async fn write_results(
             }
         }
     });
+}
+
+/// Fewer rows than the limit reads as "nothing hidden", so a filter must not create that state.
+fn reached_limit_before_filter(hits_before: usize, limit: i64, hits_after: usize) -> bool {
+    limit > 0 && hits_before as i64 >= limit && hits_after < hits_before
 }
 
 async fn is_range_already_cached(
@@ -1587,6 +1603,15 @@ mod tests {
         // a 1-day grid fits the same entry, so it counts as covering and gets healed
         assert!(!is_range_already_cached(&query_key, file_path, &new, DAY, 0).await);
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    #[test]
+    fn test_a_filtered_write_cannot_look_unlimited() {
+        assert!(reached_limit_before_filter(2, 2, 1));
+        assert!(!reached_limit_before_filter(2, 2, 2));
+        assert!(!reached_limit_before_filter(1, 2, 0));
+        assert!(!reached_limit_before_filter(5, 0, 1));
+        assert!(!reached_limit_before_filter(5, -1, 1));
     }
 
     #[test]
