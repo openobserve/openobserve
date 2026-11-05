@@ -34,6 +34,9 @@ vi.mock("@/composables/useIngestion", () => ({
       tls: false,
     },
     othersContent: `exporters:\n  otlphttp/openobserve:\n    endpoint: http://localhost:5080/api/test-org/\n    headers:\n      Authorization: Basic [BASIC_PASSCODE]\n      stream-name: [STREAM_NAME]`,
+    othersDocURLs: {
+      airbyte: "https://short.openobserve.ai/others/airbyte",
+    },
   })),
 }));
 
@@ -92,15 +95,33 @@ describe("Airbyte.vue Comprehensive Coverage", () => {
   };
 
   describe("Component Rendering Tests", () => {
-    it("links no docs page, since the docs have none for it", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find("a").exists()).toBe(false);
-    });
-
     it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
+    });
+
+    it("should render documentation link", () => {
+      wrapper = createWrapper();
+      const docLink = wrapper.find("a");
+      expect(docLink.exists()).toBe(true);
+      expect(docLink.attributes("target")).toBe("_blank");
+    });
+
+    it("should apply correct styling to documentation link", () => {
+      wrapper = createWrapper();
+      const docLink = wrapper.find("a");
+      expect(docLink.classes()).toContain("text-text-link");
+      expect(docLink.classes()).toContain("underline");
+    });
+
+    it("should render documentation text correctly", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find("a").exists()).toBe(true);
+      const text = wrapper.text();
+      expect(text).toContain("Click");
+      expect(text).toContain("here");
+      expect(text).toContain("to check further documentation");
     });
   });
 
@@ -148,10 +169,17 @@ describe("Airbyte.vue Comprehensive Coverage", () => {
       expect((wrapper.vm as any).content).toContain("airbyte");
     });
 
+    it("should define docURL as a string", () => {
+      wrapper = createWrapper();
+      expect(typeof (wrapper.vm as any).docURL).toBe("string");
+      expect((wrapper.vm as any).docURL).toBeDefined();
+    });
+
     it("should expose all required properties", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.content).toBeDefined();
+      expect(vm.docURL).toBeDefined();
     });
   });
 
@@ -189,6 +217,13 @@ describe("Airbyte.vue Comprehensive Coverage", () => {
       const content = wrapper.findComponent(CredentialCodeBlock).props("content");
       expect(content).not.toContain("[STREAM_NAME]");
       expect(content).toContain("airbyte");
+    });
+
+    it("should pass correct href to documentation link", () => {
+      wrapper = createWrapper();
+      const docLink = wrapper.find("a");
+      expect(docLink.attributes("href")).toBeDefined();
+      expect(docLink.attributes("href")).toBe("https://short.openobserve.ai/others/airbyte");
     });
   });
 
