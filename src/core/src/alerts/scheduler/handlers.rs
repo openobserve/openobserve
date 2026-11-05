@@ -5919,16 +5919,15 @@ async fn check_trigger_key(
         return Ok(TriggerKeyCheck::Current(pipeline));
     }
     // The cache on this node can be old, so only the database can call a trigger stale.
-    let pipeline = match infra::pipeline::get_by_id(&pipeline.id).await {
-        Ok(stored) => stored,
-        Err(e) => {
-            log::warn!(
-                "[SCHEDULER] trigger {} differs from its cached pipeline, and the read failed: {e}",
+    // A row that cannot be checked must not run: it could repeat what the current row writes.
+    let pipeline = infra::pipeline::get_by_id(&pipeline.id)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "trigger {} differs from its cached pipeline, and the read failed: {e}",
                 trigger.module_key
-            );
-            return Ok(TriggerKeyCheck::Current(pipeline));
-        }
-    };
+            )
+        })?;
     crate::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
     let full_key = pipeline.scheduler_module_key();
     if full_key.as_deref() == Some(trigger.module_key.as_str()) {

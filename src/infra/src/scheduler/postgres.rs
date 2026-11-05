@@ -119,7 +119,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
 /// Moves only a Waiting row: `$5` is Waiting, so a running job keeps its key until it ends.
 const RENAME_KEY_QUERY: &str = r#"UPDATE scheduled_jobs SET module_key = $1
-    WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5;"#;
+    WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5
+    RETURNING *;"#;
 
 /// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
 /// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
@@ -152,16 +153,15 @@ async fn rename_key_in(
     module: TriggerModule,
     key: &str,
     new_key: &str,
-) -> Result<bool> {
-    let result = sqlx::query(RENAME_KEY_QUERY)
+) -> Result<Option<Trigger>> {
+    Ok(sqlx::query_as::<_, Trigger>(RENAME_KEY_QUERY)
         .bind(new_key)
         .bind(org)
         .bind(module)
         .bind(key)
         .bind(TriggerStatus::Waiting)
-        .execute(pool)
-        .await?;
-    Ok(result.rows_affected() == 1)
+        .fetch_optional(pool)
+        .await?)
 }
 
 /// [`super::Scheduler::arm_slack_sync`] on `pool`.
@@ -773,7 +773,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         module: TriggerModule,
         key: &str,
         new_key: &str,
-    ) -> Result<bool> {
+    ) -> Result<Option<Trigger>> {
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -1143,6 +1143,7 @@ mod tests {
             rename_key_in(&self.0, ORG, module, key, new_key)
                 .await
                 .unwrap()
+                .is_some()
         }
 
         async fn row_at(&self, module: TriggerModule, key: &str) -> Option<Trigger> {

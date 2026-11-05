@@ -132,19 +132,22 @@ pub async fn rename_key(
     new_key: &str,
 ) -> Result<bool> {
     let renamed = infra_scheduler::rename_key(org, module.clone(), key, new_key).await?;
+    let moved = renamed.is_some();
 
-    // super cluster: the queue has no rename message
+    // super cluster: the queue has no rename message, and a replica may not show the moved row yet
     #[cfg(feature = "enterprise")]
-    if renamed && get_o2_config().super_cluster.enabled {
-        super_cluster::queue::scheduler_delete(org, module.clone(), key)
+    if get_o2_config().super_cluster.enabled
+        && let Some(row) = renamed
+    {
+        super_cluster::queue::scheduler_delete(org, module, key)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
-        super_cluster::queue::scheduler_push(infra_scheduler::get(org, module, new_key).await?)
+        super_cluster::queue::scheduler_push(row)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    Ok(renamed)
+    Ok(moved)
 }
 
 /// Returns the scheduled job associated with the given id in read-only fashion

@@ -7759,6 +7759,10 @@ mod tests {
                 "stale_cache",
                 Box::pin(e2e_stale_cache_deletes_nothing(window)),
             ),
+            (
+                "stale_unreadable",
+                Box::pin(e2e_stale_row_that_cannot_be_checked_writes_nothing(window)),
+            ),
             ("slash_name", Box::pin(e2e_slash_name_keeps_its_row(window))),
         ]
     }
@@ -7943,6 +7947,10 @@ mod tests {
 
     /// Runs the row the way a worker that claimed it does.
     async fn e2e_run_trigger(module_key: &str) {
+        e2e_try_run_trigger(module_key).await.unwrap();
+    }
+
+    async fn e2e_try_run_trigger(module_key: &str) -> Result<(), anyhow::Error> {
         let row = db::scheduler::get("e2e", TriggerModule::DerivedStream, module_key)
             .await
             .unwrap();
@@ -7965,9 +7973,7 @@ mod tests {
             next_run_at: now,
             ..row
         };
-        handle_triggers("e2e_pipeline_trigger", claimed)
-            .await
-            .unwrap();
+        handle_triggers("e2e_pipeline_trigger", claimed).await
     }
 
     /// Rows in the destination of pipeline `id`; a stream that was never written counts as none.
@@ -7988,10 +7994,12 @@ mod tests {
             Some(body.to_string()),
         )
         .await;
+        let body: json::Value = json::from_slice(&body).unwrap();
         if !status.is_success() {
+            // Any other failure must not pass as "wrote nothing".
+            assert_eq!(body["code"], 20002, "{status}: {body}");
             return 0;
         }
-        let body: json::Value = json::from_slice(&body).unwrap();
         body["hits"][0]["n"].as_i64().unwrap_or_default()
     }
 
@@ -8222,6 +8230,24 @@ mod tests {
         );
         assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
         e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_stale_row_that_cannot_be_checked_writes_nothing(window: i64) {
+        let id = "stale_unread_pl";
+        let (pipeline, row) = e2e_create_scheduled(id, "stale_unread_new", false).await;
+        let stale = e2e_push_stale_trigger(id, "stale_unread_old", window).await;
+        // The cache still holds the pipeline, and the database read now fails.
+        openobserve_core::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
+        infra::pipeline::delete(id).await.unwrap();
+
+        assert!(e2e_try_run_trigger(&stale).await.is_err());
+
+        assert_eq!(e2e_destination_rows(id).await, 0);
+        for key in [&stale, &row.module_key] {
+            db::scheduler::delete("e2e", TriggerModule::DerivedStream, key)
+                .await
+                .unwrap();
+        }
     }
 
     async fn e2e_slash_name_keeps_its_row(window: i64) {

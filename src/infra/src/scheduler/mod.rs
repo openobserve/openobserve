@@ -94,14 +94,14 @@ pub trait Scheduler: Sync + Send + 'static {
         module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>>;
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
-    /// Moves a Waiting job to `new_key` in one statement, keeping its data; false when no such job.
+    /// Moves a Waiting job to `new_key` in one statement, keeping its data; the moved row, if any.
     async fn rename_key(
         &self,
         org: &str,
         module: TriggerModule,
         key: &str,
         new_key: &str,
-    ) -> Result<bool>;
+    ) -> Result<Option<Trigger>>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     /// Deletes every job of the org, sending the events `delete` sends; returns `(module, key)`s.
@@ -379,14 +379,14 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
     CLIENT.get(org, module, key).await
 }
 
-/// Moves a Waiting job to `new_key`; false when no such job.
+/// Moves a Waiting job to `new_key`; the moved row, if any.
 #[inline]
 pub async fn rename_key(
     org: &str,
     module: TriggerModule,
     key: &str,
     new_key: &str,
-) -> Result<bool> {
+) -> Result<Option<Trigger>> {
     CLIENT.rename_key(org, module, key, new_key).await
 }
 
