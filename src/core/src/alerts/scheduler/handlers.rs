@@ -90,6 +90,14 @@ enum RetryOutcome {
     FinishOnce,
 }
 
+/// What a derived stream trigger's key says about the stored pipeline.
+enum TriggerKeyCheck {
+    Current(config::meta::pipeline::Pipeline),
+    /// The only trigger of a renamed pipeline: it runs, then moves to this full key.
+    MoveAfterRun(config::meta::pipeline::Pipeline, String),
+    Deleted,
+}
+
 /// Why a stored pipeline's scheduled source cannot run.
 #[derive(Debug)]
 enum Unrunnable {
@@ -5334,6 +5342,18 @@ async fn handle_derived_stream_triggers(
         }
     };
 
+    let (pipeline, move_to) = match check_trigger_key(&trigger, pipeline).await? {
+        TriggerKeyCheck::Current(pipeline) => (pipeline, None),
+        TriggerKeyCheck::MoveAfterRun(pipeline, full_key) => (pipeline, Some(full_key)),
+        TriggerKeyCheck::Deleted => {
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] deleted stale trigger {}",
+                trigger.module_key
+            );
+            return Ok(());
+        }
+    };
+
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
@@ -5942,7 +5962,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
+    if let Err(e) = write_derived_stream_run_end(new_trigger, move_to, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             pipeline.org,
@@ -5951,6 +5971,75 @@ async fn handle_derived_stream_triggers(
         );
     }
 
+    Ok(())
+}
+
+/// Compares full keys, because a parsed key holds only the first part of a name with a slash.
+async fn check_trigger_key(
+    trigger: &db::scheduler::Trigger,
+    pipeline: config::meta::pipeline::Pipeline,
+) -> Result<TriggerKeyCheck, anyhow::Error> {
+    if pipeline.scheduler_module_key().as_deref() == Some(trigger.module_key.as_str()) {
+        return Ok(TriggerKeyCheck::Current(pipeline));
+    }
+    // The cache can be old, and an unchecked row must not run: it could repeat the current row.
+    let pipeline = infra::pipeline::get_by_id(&pipeline.id)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "trigger {} differs from its cached pipeline, and the read failed: {e}",
+                trigger.module_key
+            )
+        })?;
+    crate::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
+    let full_key = pipeline.scheduler_module_key();
+    if full_key.as_deref() == Some(trigger.module_key.as_str()) {
+        return Ok(TriggerKeyCheck::Current(pipeline));
+    }
+    if let Some(full_key) = full_key
+        && pipeline.enabled
+        && !db::scheduler::exists(
+            &trigger.org,
+            db::scheduler::TriggerModule::DerivedStream,
+            &full_key,
+        )
+        .await
+    {
+        return Ok(TriggerKeyCheck::MoveAfterRun(pipeline, full_key));
+    }
+    db::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::DerivedStream,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(TriggerKeyCheck::Deleted)
+}
+
+async fn write_derived_stream_run_end(
+    new_trigger: db::scheduler::Trigger,
+    move_to: Option<String>,
+    trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    let Some(full_key) = move_to else {
+        db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+        return Ok(());
+    };
+    // The background path only queues the write, and rename_key would then still see Processing.
+    db::scheduler::update_trigger(new_trigger.clone(), false, trace_id).await?;
+    let moved = db::scheduler::rename_key(
+        &new_trigger.org,
+        new_trigger.module,
+        &new_trigger.module_key,
+        &full_key,
+    )
+    .await?;
+    if !moved {
+        log::warn!(
+            "[SCHEDULER] trigger {} did not move to {full_key}; its next run retries",
+            new_trigger.module_key
+        );
+    }
     Ok(())
 }
 
