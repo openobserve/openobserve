@@ -44,6 +44,14 @@ describe("license_server service", () => {
     (http as any).mockReturnValue(mockHttpInstance);
   });
 
+  it("Check key posts dry_run without tracking an update", async () => {
+    await licenseServer.check_license("preview-key");
+    expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/license?dry_run=true", {
+      key: "preview-key",
+    });
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
   describe("get_license", () => {
     it("should call GET /api/license", async () => {
       await licenseServer.get_license();

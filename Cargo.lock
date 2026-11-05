@@ -8139,6 +8139,7 @@ dependencies = [
  "reqwest 0.13.4",
  "sea-orm",
  "search",
+ "search_service",
  "serde",
  "serde_json",
  "snap",
