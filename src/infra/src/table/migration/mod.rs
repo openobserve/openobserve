@@ -254,7 +254,6 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
-mod m20261104_000001_add_alert_incident_title_template;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
@@ -264,6 +263,7 @@ mod m20261211_000001_add_templates_to_downtime_notifications;
 mod m20261212_000001_add_templates_to_oncall_response_events;
 mod m20261213_000001_retire_compiled_default_templates;
 mod m20261214_000001_templates_columns_to_text;
+mod m20261215_000001_add_alert_incident_title_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -370,7 +370,7 @@ pub(crate) async fn create_composite_alert_tables_for_test(
         .await?;
     manager
         .alter_table(
-            m20261104_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+            m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
         )
         .await?;
     Ok(())
@@ -396,7 +396,7 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .to_string(),
         backend
             .build(
-                &m20261104_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+                &m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
             )
             .to_string(),
     ];
@@ -839,7 +839,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
             Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
-            Box::new(m20261104_000001_add_alert_incident_title_template::Migration),
+            Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
         ]
     }
 }
@@ -958,7 +958,7 @@ mod tests {
         ),
         (143, "m20261213_000001_retire_compiled_default_templates"),
         (144, "m20261214_000001_templates_columns_to_text"),
-        (145, "m20261104_000001_add_alert_incident_title_template"),
+        (145, "m20261215_000001_add_alert_incident_title_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
