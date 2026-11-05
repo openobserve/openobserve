@@ -100,4 +100,13 @@ describe("LicenseFeatures", () => {
 
     expect(wrapper.emitted("request-access")).toHaveLength(1);
   });
+
+  it("keeps the list but drops the button with hideRequestAccess", async () => {
+    const wrapper = mountFeatures(["workflows"]);
+
+    await wrapper.setProps({ hideRequestAccess: true });
+
+    expect(find(wrapper, "request-access").exists()).toBe(false);
+    expect(items(wrapper, "missing")).toEqual(["Role-Based Access Control"]);
+  });
 });

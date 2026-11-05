@@ -16,11 +16,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  effectiveLimitGb,
   featureLockedPath,
   featureState,
   forbiddenState,
   licenseDeniedFeatures,
+  licenseKeyLosses,
+  licenseRequestUrl,
   menuState,
+  splitLicenseFeatures,
   streamTypeFeature,
   withLicenseFeature,
 } from "./featureGate";
@@ -133,5 +137,205 @@ describe("forbiddenState", () => {
     expect(forbiddenState(forbidden({ code: 403, message: "Unauthorized Access" }))).toBe(true);
     expect(forbiddenState({ response: { status: 500, data: {} } })).toBe(false);
     expect(forbiddenState(undefined)).toBe(false);
+  });
+});
+
+describe("licenseRequestUrl", () => {
+  const definition = {
+    features: {
+      ai_assistant: { gate: true },
+      oncall: { gate: true },
+      alerts: { gate: false },
+    },
+  };
+  const zoConfig = {
+    license_server_url: "https://license.example.com//",
+    version: "v0.70.0",
+    feature_revision: 1,
+    features: {},
+  };
+  const base = "http://localhost:3000";
+  const query = (url: string) => Object.fromEntries(new URL(url).searchParams);
+
+  it.each([
+    ["a list", ["oncall"], "oncall"],
+    ["all", ["all"], "ai_assistant,oncall"],
+    ["an empty list", [], ""],
+  ])("sends the unlocked keys of %s, as the split reports them", (_name, features, expected) => {
+    const license = { features, feature_definition: definition };
+    const url = licenseRequestUrl(zoConfig, { installation_id: "inst", license }, base);
+
+    expect(query(url)).toEqual({
+      base_url: base,
+      license_id: "inst",
+      o2_version: "v0.70.0",
+      feature_revision: "1",
+      features: expected,
+    });
+    expect(query(url).features).toBe(splitLicenseFeatures(license, {})?.unlocked.join(","));
+    expect(url.startsWith("https://license.example.com/user/request-license?")).toBe(true);
+  });
+
+  it.each([
+    ["no license", null],
+    ["a license without a list", { feature_definition: definition }],
+  ])("omits features for %s", (_name, license) => {
+    expect(query(licenseRequestUrl(zoConfig, { license }, base))).toEqual({
+      base_url: base,
+      license_id: "",
+      o2_version: "v0.70.0",
+      feature_revision: "1",
+    });
+  });
+
+  it("omits what the config does not report", () => {
+    const bare = { license_server_url: "https://license.example.com" };
+
+    expect(query(licenseRequestUrl(bare, {}, base))).toEqual({ base_url: base, license_id: "" });
+  });
+});
+
+describe("effectiveLimitGb", () => {
+  const limited = { limits: { Ingestion: { typ: "PerDayCount", value: 200 } } };
+  const unlimited = { limits: { Ingestion: { typ: "Unlimited", value: 0 } } };
+  // A serialized LicenseResponse; evaluated_at 0 carries the backend's synthesised decision.
+  const licenseResponse = (
+    license: object,
+    limit_today_gb: number | null,
+    evaluated_at: number,
+    expired: boolean,
+  ) => {
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 0,
+      allowed_days: 3,
+      limit_today_gb,
+      used_today_gb: 0,
+      waiver_ids_applied: [],
+    };
+    return {
+      key: "anonymised-key",
+      license,
+      installation_id: "inst_test",
+      expired,
+      ingestion_used: 0,
+      ingestion_exceeded: 0,
+      waivers: [],
+      decision,
+      base: decision,
+      evaluated_at,
+      env_key_active: false,
+      env_key_in_use: false,
+      can_update_license: true,
+    };
+  };
+
+  it.each([
+    ["an evaluated limit over the license's", limited, 50, 1, false, 50],
+    ["an evaluated Unlimited", unlimited, null, 1, false, null],
+    ["an expired key's evaluated limit", limited, 50, 1, true, 50],
+    ["the license's limit before evaluation", limited, null, 0, false, 200],
+    ["the license's Unlimited before evaluation", unlimited, null, 0, false, null],
+    ["the free limit when a license sets none", { limits: {} }, null, 0, false, 50],
+    ["the free limit for an expired key before evaluation", limited, null, 0, true, 50],
+    ["the free limit for an expired Unlimited before evaluation", unlimited, null, 0, true, 50],
+  ])("reads %s", (_name, license, limit, evaluatedAt, expired, expected) => {
+    expect(effectiveLimitGb(licenseResponse(license, limit, evaluatedAt, expired))).toBe(expected);
+  });
+});
+
+describe("licenseKeyLosses", () => {
+  const NOW = 2_000_000;
+  const definition = {
+    features: {
+      ai_assistant: { gate: true },
+      oncall: { gate: true },
+      workflows: { gate: true },
+      metering: { gate: true, plumbing: true },
+      alerts: { gate: false },
+    },
+  };
+  const per = (value: number) => ({ Ingestion: { typ: "PerDayCount", value } });
+  const key = (overrides: Record<string, unknown> = {}) => ({
+    features: ["ai_assistant", "oncall"],
+    feature_definition: definition,
+    limits: per(100),
+    expires_at: 3_000_000,
+    ...overrides,
+  });
+  const losses = (current: unknown, pasted: unknown, states = {}) =>
+    licenseKeyLosses(current as never, pasted as never, states, NOW);
+
+  it.each([
+    ["an identical key", key(), key()],
+    ["a renewal", key(), key({ expires_at: 4_000_000 })],
+    ["an upgrade", key(), key({ features: ["all"], limits: per(200) })],
+    ["more features on the same terms", key(), key({ features: ["ai_assistant", "oncall", "x"] })],
+    ["a first key", null, key()],
+    [
+      "a free key dropped from the list",
+      key({ features: ["ai_assistant", "alerts"] }),
+      key({ features: ["ai_assistant"] }),
+    ],
+    [
+      "a renewal of an expired key above the free limit",
+      key({ expires_at: 1_000_000, limits: per(200) }),
+      key({ limits: per(100) }),
+    ],
+  ])("finds nothing worse in %s", (_name, current, pasted) => {
+    expect(losses(current, pasted)).toBeNull();
+  });
+
+  it.each([
+    ["all", ["all"]],
+    ["an absent list", undefined],
+  ])("treats %s as every gated key, plumbing excluded", (_name, features) => {
+    const result = losses(key({ features }), key({ features: ["ai_assistant"] }));
+
+    expect(result?.lost).toEqual(["oncall", "workflows"]);
+  });
+
+  it("reads gates from the other key when one has no definition", () => {
+    const current = key({ features: ["all"], feature_definition: undefined });
+
+    expect(losses(current, key({ features: ["ai_assistant"] }))?.lost).toEqual([
+      "oncall",
+      "workflows",
+    ]);
+  });
+
+  it("counts a listed key as lost without any definition", () => {
+    const current = key({ feature_definition: undefined });
+    const pasted = key({ features: ["ai_assistant"], feature_definition: undefined });
+
+    expect(losses(current, pasted)?.lost).toEqual(["oncall"]);
+  });
+
+  it("reports a lower limit and Unlimited to a number", () => {
+    expect(losses(key(), key({ limits: per(50) }))?.limit).toEqual({ from: 100, to: 50 });
+    expect(
+      losses(key({ limits: { Ingestion: { typ: "Unlimited", value: 0 } } }), key())?.limit,
+    ).toEqual({ from: null, to: 100 });
+  });
+
+  it("judges a limit from the free one when the current key has expired", () => {
+    const current = key({ expires_at: 1_000_000, limits: per(200) });
+
+    expect(losses(current, key({ limits: per(30) }))?.limit).toEqual({ from: 50, to: 30 });
+  });
+
+  it("reports an earlier expiry", () => {
+    expect(losses(key(), key({ expires_at: 2_500_000 }))?.expiry).toEqual({
+      from: 3_000_000,
+      to: 2_500_000,
+    });
+  });
+
+  it("reports an expired paste by date alone, even as a first key", () => {
+    const pasted = key({ expires_at: 1_500_000, limits: per(10) });
+
+    expect(losses(null, pasted)).toEqual({ expiredAt: 1_500_000, lost: [] });
+    expect(losses(key(), pasted)).toEqual({ expiredAt: 1_500_000, lost: [] });
   });
 });

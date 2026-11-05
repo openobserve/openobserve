@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #free>{{ split.free.length }}</template>
       </i18n-t>
       <OButton
-        v-if="split.missing.length || split.addedLocked.length"
+        v-if="!hideRequestAccess && (split.missing.length || split.addedLocked.length)"
         variant="ghost-primary"
         size="xs"
         icon-right="arrow-forward"
@@ -156,7 +156,10 @@ import { splitLicenseFeatures, type LicenseFeatureSource } from "@/utils/feature
 type GroupId = "unlocked" | "missing" | "free" | "new";
 type FilterId = "all" | GroupId;
 
-const props = defineProps<{ license: LicenseFeatureSource | null | undefined }>();
+const props = defineProps<{
+  license: LicenseFeatureSource | null | undefined;
+  hideRequestAccess?: boolean;
+}>();
 
 const emit = defineEmits<{ (e: "request-access"): void }>();
 

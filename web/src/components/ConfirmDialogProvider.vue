@@ -33,6 +33,12 @@
         >
       </template>
     </i18n-t>
+    <div v-else-if="currentDialog.lines" class="flex flex-col gap-2">
+      <div>{{ currentDialog.message }}</div>
+      <ul :data-test="currentDialog.linesDataTest" class="flex list-disc flex-col gap-1.5 ps-5">
+        <li v-for="line in currentDialog.lines" :key="line">{{ line }}</li>
+      </ul>
+    </div>
     <div v-else class="text-center">{{ currentDialog.message }}</div>
   </ODialog>
 </template>

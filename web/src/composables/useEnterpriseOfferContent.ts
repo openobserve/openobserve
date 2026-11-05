@@ -22,6 +22,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { effectiveLimitGb } from "@/utils/featureGate";
 
 // Feature documentation links configuration
 const FEATURE_DOCS_BASE_URL = "https://o2.ws/";
@@ -99,6 +100,7 @@ export function useEnterpriseOfferContent(options?: { onBeforeNavigateAway?: () 
           license: {
             limits: {
               Ingestion: {
+                typ: "Unlimited",
                 value: 0,
               },
             },
@@ -167,7 +169,7 @@ export function useEnterpriseOfferContent(options?: { onBeforeNavigateAway?: () 
     // Enterprise with license
     if (isEnterprise && hasLicense) {
       // Calculate ingestion usage from license data
-      const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
+      const ingestionLimit = effectiveLimitGb(licenseData.value ?? {}) ?? 0;
       const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
       const badgeText =
         ingestionLimit > 0
