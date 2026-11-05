@@ -15,8 +15,6 @@
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
-    <p class="text-text-secondary text-xs">{{ t("oncall.deliveriesHint") }}</p>
-
     <OInnerLoading v-if="loading" showing />
 
     <OEmptyState
@@ -49,7 +47,12 @@
           <OTag :variant="row.delivered ? 'success-soft' : 'error-soft'" size="sm">
             {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
           </OTag>
-          <OUserCell v-if="row.recipient" :value="row.recipient" />
+          <OnCallPersonName
+            v-if="row.recipient"
+            class="text-text-body text-sm"
+            :email="row.recipient"
+            :data-test="`oncall-delivery-recipient-${group.run}-${index}`"
+          />
           <OTag v-if="row.channel" variant="default-soft" size="sm">
             {{ t(`oncall.channel_${row.channel}`) }}
           </OTag>
@@ -127,7 +130,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";

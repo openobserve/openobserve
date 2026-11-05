@@ -212,10 +212,11 @@ test.describe('On-call team staffing', {
     expect(primaryMembers.slice(0, seeded.length), 'the people already in the rotation keep their turns')
       .toEqual(seeded);
 
-    // Coverage recomputes on the same render — it is derived, not remembered.
-    const coverage = await pm.oncallTeamDetailPage.readMembersCoverage();
-    testLogger.info('TS-04.01 members coverage line', { coverage });
-    expect(coverage, 'the members tab states how many of the org are on this team').toMatch(/\d+/);
+    // The tab's count chip recomputes from the roster — derived, not remembered.
+    await expect.poll(
+      () => pm.oncallTeamDetailPage.readMembersTabCount(),
+      { timeout: 30000, intervals: [1000], message: 'the Members tab counts the joiner' },
+    ).toBe(members.length);
   });
 
   // ------------------------------------------------------------------ TS-04.02

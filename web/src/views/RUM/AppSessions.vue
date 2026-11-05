@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :aria-label="t('rum.heatmap.viewHeatmap')"
                       :disabled="heatmapOpening === row.session_id"
                       data-test="rum-app-sessions-view-heatmap-btn"
-                      @click.stop="openSessionHeatmap(row.session_id, row.start_time * 1000)"
+                      @click.stop="openSessionHeatmap(row.session_id, sessionStartUs(row))"
                     >
                       <OIcon name="grid-on" size="sm" />
                       <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
@@ -1098,6 +1098,7 @@ const getSessions = () => {
         sessionState.data.sessions[hit.session_id] = {
           session_id: hit.session_id,
           zo_sql_timestamp: hit.zo_sql_timestamp,
+          zo_sql_end_timestamp: hit.zo_sql_end_timestamp,
           timestamp: hit.zo_sql_timestamp,
           type: hit.type,
           source: hit.source,
@@ -1759,15 +1760,28 @@ const handleScrollEnd = () => {
   }
 };
 
+// Replay start/end are ms; sessions without replay only have the _rumdata us timestamps.
+const sessionStartUs = (row: any): number | undefined => {
+  const us = Number(row.start_time) * 1000 || Number(row.zo_sql_timestamp);
+  return us || undefined;
+};
+
+const sessionEndUs = (row: any): number | undefined => {
+  const us = Number(row.end_time) * 1000 || Number(row.zo_sql_end_timestamp);
+  return us || undefined;
+};
+
 const handleCellClick = (payload: any) => {
   if (payload.columnName !== "action_play") return;
   sessionState.data.selectedSession = sessionState.data.sessions[payload.row.session_id];
+  const start = sessionStartUs(payload.row);
+  const end = sessionEndUs(payload.row);
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.session_id },
     query: {
-      start_time: payload.row.start_time * 1000,
-      end_time: payload.row.end_time * 1000,
+      ...(start && { start_time: start }),
+      ...(end && { end_time: end }),
     },
   });
 };

@@ -62,7 +62,10 @@ const frequencyOptions: { label: I18nText; value: FrequencyPreset }[] = [
 function scheduleToPreset(s: BrowserCheckSchedule): FrequencyPreset {
   if (s.type === "cron") return "cron";
   if (s.isCustomFrequency) return "custom";
-  const mins = s.intervalUnit === "hours" ? (s.intervalValue ?? 1) * 60 : (s.intervalValue ?? 5);
+  const unit = s.intervalUnit ?? "minutes";
+  // Every preset is minutes or hours, so a 1-day interval must not read as "1min".
+  if (unit !== "minutes" && unit !== "hours") return "custom";
+  const mins = unit === "hours" ? (s.intervalValue ?? 1) * 60 : (s.intervalValue ?? 5);
   if (mins === 1) return "1min";
   if (mins === 5) return "5min";
   if (mins === 15) return "15min";

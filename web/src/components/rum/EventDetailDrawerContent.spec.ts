@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
+import searchService from "@/services/search";
 
 // ============================================================================
 // TEST DATA FACTORIES
@@ -1432,5 +1433,483 @@ describe("EventDetailDrawerContent", () => {
       expect(findByTestId(wrapper, "event-detail-drawer-stub").exists()).toBe(true);
       expect(wrapper.find(".row").exists()).toBe(true);
     });
+  });
+});
+
+// Failed requests in the session player.
+describe("EventDetailDrawerContent: failed_request", () => {
+  const failedEvent = (overrides: Record<string, any> = {}) => ({
+    type: "failed_request",
+    name: "403 GET https://api.example.com/data",
+    server_status: "",
+    server_lookup: "unknown",
+    ...overrides,
+  });
+
+  const failedRaw = (overrides: Record<string, any> = {}) => ({
+    type: "resource",
+    resource_id: "res-failed",
+    resource_type: "fetch",
+    resource_method: "get",
+    resource_status_code: 403,
+    resource_url: "https://api.example.com/data",
+    resource_duration: 150_000_000,
+    view_id: "view-1",
+    view_url: "https://app.example.com/page",
+    session_id: "session-456",
+    date: 1700000000000,
+    ...overrides,
+  });
+
+  let captured: { sql: string; start: number; end: number }[] = [];
+  let hits: any[] = [];
+
+  let searchSpy: any;
+
+  beforeEach(() => {
+    captured = [];
+    hits = [];
+    searchSpy = vi.spyOn(searchService, "search").mockImplementation((async (params: any) => {
+      const query = params?.query?.query;
+      captured.push({ sql: query?.sql, start: query?.start_time, end: query?.end_time });
+      return { data: { hits, total: hits.length } };
+    }) as any);
+  });
+
+  afterEach(() => {
+    searchSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  const mountFailed = async (event: any, rawEvent: any, expectedSearches = 0) => {
+    const wrapper = mountComponent({ props: { event, rawEvent } });
+    await flushPromises();
+    await vi.waitFor(() => expect(captured.length).toBeGreaterThanOrEqual(expectedSearches), {
+      timeout: 3000,
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  const rowText = (wrapper: any, key: string) =>
+    wrapper.find(`[data-test="failed-request-${key}"]`).text();
+
+  it("shows a 403 with the method, url, duration, size and where it came from", async () => {
+    const wrapper = await mountFailed(
+      failedEvent({ server_status: "403", server_lookup: "found" }),
+      failedRaw({
+        resource_size: 2048,
+        action_id: "act-1",
+        action_type: "click",
+        action_target_name: "Save",
+      }),
+    );
+
+    expect(findByTestId(wrapper, "failed-request-details").exists()).toBe(true);
+    expect(rowText(wrapper, "browser-status")).toContain("403");
+    expect(rowText(wrapper, "server-status")).toContain("403");
+    expect(rowText(wrapper, "method")).toContain("GET");
+    expect(rowText(wrapper, "url")).toContain("https://api.example.com/data");
+    expect(rowText(wrapper, "duration")).toContain("0.15");
+    expect(rowText(wrapper, "size")).toContain("2.0 KB");
+    expect(rowText(wrapper, "initiated-by")).toContain("click");
+    expect(rowText(wrapper, "initiated-by")).toContain("https://app.example.com/page");
+    expect(wrapper.find('[data-test="failed-request-timing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="failed-request-browser-status"]').text()).not.toContain(
+      "aborted",
+    );
+    wrapper.unmount();
+  });
+
+  it("reads the action_id list in Initiated by: the ids of a list, nothing for an empty one", async () => {
+    const listed = await mountFailed(failedEvent(), failedRaw({ action_id: '["act-1","act-2"]' }));
+    expect(rowText(listed, "initiated-by")).toContain("act-1, act-2");
+    expect(rowText(listed, "initiated-by")).not.toContain("[");
+    listed.unmount();
+
+    const empty = await mountFailed(failedEvent(), failedRaw({ action_id: "[]" }));
+    expect(rowText(empty, "initiated-by")).not.toContain("[]");
+    expect(rowText(empty, "initiated-by")).toContain("https://app.example.com/page");
+    empty.unmount();
+  });
+
+  it("shows status 0 as No response with the server status and the aborted flag", async () => {
+    const wrapper = await mountFailed(
+      failedEvent({
+        name: "No response \u00b7 500 GET x",
+        server_status: "500",
+        server_lookup: "found",
+      }),
+      failedRaw({
+        resource_status_code: 0,
+        context_aborted: "true",
+        resource_dns_duration: 2_000_000,
+        resource_connect: { duration: 5_000_000 },
+        resource_first_byte_duration: 40_000_000,
+      }),
+    );
+
+    expect(rowText(wrapper, "browser-status")).toContain("0 \u2014 No response");
+    expect(rowText(wrapper, "browser-status")).toContain("aborted by the app");
+    expect(rowText(wrapper, "server-status")).toContain("500");
+    expect(rowText(wrapper, "timing")).toContain("DNS");
+    expect(rowText(wrapper, "timing")).toContain("Connect");
+    expect(rowText(wrapper, "timing")).toContain("First byte");
+    expect(rowText(wrapper, "timing")).not.toContain("SSL");
+    wrapper.unmount();
+  });
+
+  it("says when no server span was found, with a muted hint, or the lookup is unknown", async () => {
+    const noSpan = await mountFailed(
+      failedEvent({ server_lookup: "no_server_span" }),
+      failedRaw({ resource_status_code: 0 }),
+    );
+    expect(rowText(noSpan, "server-status")).toContain("No server span found");
+    expect(rowText(noSpan, "server-status")).not.toContain("Not received");
+    const hint = noSpan.find('[data-test="failed-request-server-status-hint"]');
+    expect(hint.text()).toBe(
+      "A missing span can also mean sampling, ingest lag, an uninstrumented route or retention.",
+    );
+    expect(hint.classes()).toContain("text-text-secondary");
+    noSpan.unmount();
+
+    const noTrace = await mountFailed(
+      failedEvent({ server_lookup: "no_trace" }),
+      failedRaw({ resource_status_code: 0 }),
+    );
+    expect(rowText(noTrace, "server-status")).toContain("Unknown (no trace)");
+    expect(noTrace.find('[data-test="failed-request-server-status-hint"]').exists()).toBe(false);
+    noTrace.unmount();
+
+    const unknown = await mountFailed(failedEvent(), failedRaw({ resource_status_code: 0 }));
+    expect(rowText(unknown, "server-status")).toContain("Unknown");
+    expect(rowText(unknown, "server-status")).not.toContain("no trace");
+    expect(unknown.find('[data-test="failed-request-server-status-hint"]').exists()).toBe(false);
+    unknown.unmount();
+  });
+
+  it("shows the server span's service next to its status", async () => {
+    const withService = await mountFailed(
+      failedEvent({ server_status: "500", server_service: "copilot-be", server_lookup: "found" }),
+      failedRaw({ resource_status_code: 0 }),
+    );
+    expect(rowText(withService, "server-status")).toContain("500 (copilot-be)");
+    withService.unmount();
+
+    const without = await mountFailed(
+      failedEvent({ server_status: "500", server_service: "", server_lookup: "found" }),
+      failedRaw({ resource_status_code: 0 }),
+    );
+    expect(rowText(without, "server-status")).toContain("500");
+    expect(rowText(without, "server-status")).not.toContain("(");
+    without.unmount();
+  });
+
+  it("formats sizes in B, KB and MB", async () => {
+    const sizeOf = async (size: number) => {
+      const wrapper = await mountFailed(failedEvent(), failedRaw({ resource_size: size }));
+      const text = rowText(wrapper, "size");
+      wrapper.unmount();
+      return text;
+    };
+    expect(await sizeOf(512)).toContain("512 B");
+    expect(await sizeOf(2048)).toContain("2.0 KB");
+    expect(await sizeOf(3 * 1024 * 1024)).toContain("3.0 MB");
+  });
+
+  it("opens the trace from the View trace button", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const wrapper = await mountFailed(
+      failedEvent(),
+      failedRaw({ _oo_trace_id: "abc123", resource_status_code: 0 }),
+    );
+
+    await findByTestId(wrapper, "failed-request-view-trace-btn").trigger("click");
+    await flushPromises();
+
+    expect(mockResolveTraceLocation).toHaveBeenCalledWith(
+      "00000000000000000000000000abc123",
+      expect.any(Number),
+      expect.any(Number),
+    );
+    expect(open).toHaveBeenCalled();
+    open.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("has no View trace button when the row carries no trace id", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw());
+    expect(findByTestId(wrapper, "failed-request-view-trace-btn").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("lists the requests of the same view, around the failed one, when there is no action", async () => {
+    hits = [
+      failedRaw({ resource_id: "other", resource_url: "https://api.example.com/other" }),
+      failedRaw({ _oo_trace_id: "abc123" }),
+    ];
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ _oo_trace_id: "abc123" }), 1);
+    await findByTestId(wrapper, "event-detail-network-tab").trigger("click");
+    await flushPromises();
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toBe(
+      `select * from "_rumdata" where view_id='view-1' and session_id='session-456' and type='resource' and resource_type in ('fetch','xhr') order by _timestamp desc`,
+    );
+    expect(captured[0].start).toBe(1700000000000 * 1000 - 60_000_000);
+    expect(captured[0].end).toBe(1700000000000 * 1000 + 60_000_000);
+
+    const items = wrapper.findAll('[data-test="network-resource-item"]');
+    expect(items).toHaveLength(2);
+    expect(items.map((item: any) => item.attributes("data-highlighted"))).toEqual([
+      undefined,
+      "true",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("uses the action query when the failed request has an action_id", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ action_id: "act-1" }), 1);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toBe(
+      `select * from "_rumdata" where (action_id LIKE '%act-1%' or action_id='act-1') and session_id='session-456' order by _timestamp desc`,
+    );
+    expect(captured[0].start).toBe(1700000000000 * 1000 - 60_000_000);
+    expect(captured[0].end).toBe(1700000000000 * 1000 + 60_000_000);
+    wrapper.unmount();
+  });
+
+  it("reads a resource's action_id list, matching each action it holds", async () => {
+    const wrapper = await mountFailed(
+      failedEvent(),
+      failedRaw({ action_id: '["act-1","act-2"]' }),
+      1,
+    );
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toBe(
+      `select * from "_rumdata" where (action_id LIKE '%act-1%' or action_id='act-1' or action_id LIKE '%act-2%' or action_id='act-2') and session_id='session-456' order by _timestamp desc`,
+    );
+    wrapper.unmount();
+  });
+
+  it("uses the view query when the resource's action_id list is empty", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ action_id: "[]" }), 1);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toContain(`where view_id=`);
+    expect(captured[0].sql).not.toContain("action_id");
+    wrapper.unmount();
+  });
+
+  it("centres the windows on the server arrival time, not the device's date, for both queries", async () => {
+    // The device clock is ten minutes slow: the row's date is far from when it arrived.
+    const arrivalUs = 1700000600000 * 1000;
+    const slow = { date: 1700000000000, _timestamp: arrivalUs };
+
+    const byAction = await mountFailed(
+      failedEvent(),
+      failedRaw({ ...slow, action_id: "act-1" }),
+      1,
+    );
+    expect(captured[0].start).toBe(arrivalUs - 60_000_000);
+    expect(captured[0].end).toBe(arrivalUs + 60_000_000);
+    byAction.unmount();
+
+    captured = [];
+    const byView = await mountFailed(failedEvent(), failedRaw(slow), 1);
+    expect(captured[0].start).toBe(arrivalUs - 60_000_000);
+    expect(captured[0].end).toBe(arrivalUs + 60_000_000);
+    byView.unmount();
+  });
+
+  it("falls back to the device's date when the row has no arrival time", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ _timestamp: undefined }), 1);
+    expect(captured[0].start).toBe(1700000000000 * 1000 - 60_000_000);
+    wrapper.unmount();
+  });
+
+  it("keeps the action event's query as it was: LIKE or equals, five minutes after", async () => {
+    const wrapper = await mountFailed(
+      { type: "action", name: "click" },
+      { type: "action", action_id: "act-1", session_id: "session-456", date: 1700000000000 },
+      1,
+    );
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toBe(
+      `select * from "_rumdata" where (action_id LIKE '%act-1%' or action_id='act-1') order by _timestamp desc`,
+    );
+    expect(captured[0].start).toBe(1700000000000 * 1000);
+    expect(captured[0].end).toBe(1700000000000 * 1000 + 360_000_000);
+    wrapper.unmount();
+  });
+
+  describe("related requests race and clearing", () => {
+    // Each search waits for its own release, so a test can finish them in any order.
+    let pending: { sql: string; resolve: (hits: any[]) => void }[] = [];
+
+    beforeEach(() => {
+      pending = [];
+      searchSpy.mockImplementation(((params: any) => {
+        const sql = params?.query?.query?.sql as string;
+        return new Promise((resolve) => {
+          pending.push({
+            sql,
+            resolve: (rows: any[]) => resolve({ data: { hits: rows, total: rows.length } }),
+          });
+        });
+      }) as any);
+    });
+
+    const networkIds = (wrapper: any) =>
+      wrapper
+        .findAll('[data-test="network-resource-item"]')
+        .map((item: any) => item.text())
+        .join("|");
+
+    it("drops an earlier request's answer when it finishes after a later one", async () => {
+      const wrapper = mountComponent({
+        props: {
+          event: failedEvent(),
+          rawEvent: failedRaw({
+            resource_id: "A",
+            resource_url: "https://x.test/a",
+            view_id: "va",
+          }),
+        },
+      });
+      await flushPromises();
+      await wrapper.setProps({
+        event: failedEvent({ name: "B" }),
+        rawEvent: failedRaw({ resource_id: "B", resource_url: "https://x.test/b", view_id: "vb" }),
+      });
+      await flushPromises();
+      expect(pending.map((call) => call.sql.includes("view_id='va'"))).toEqual([true, false]);
+
+      pending[1].resolve([failedRaw({ resource_id: "B", resource_url: "https://x.test/b" })]);
+      await flushPromises();
+      pending[0].resolve([
+        failedRaw({ resource_id: "A", resource_url: "https://x.test/a" }),
+        failedRaw({ resource_id: "A2", resource_url: "https://x.test/a2" }),
+      ]);
+      await flushPromises();
+
+      await findByTestId(wrapper, "event-detail-network-tab").trigger("click");
+      await flushPromises();
+      const shown = networkIds(wrapper);
+      expect(shown).toContain("https://x.test/b");
+      expect(shown).not.toContain("https://x.test/a");
+      wrapper.unmount();
+    });
+
+    it("clears the related requests and the trace pick when the event changes to a type that fetches nothing", async () => {
+      const wrapper = mountComponent({
+        props: {
+          event: failedEvent(),
+          rawEvent: failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" }),
+        },
+      });
+      await flushPromises();
+      pending[0].resolve([failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" })]);
+      await flushPromises();
+      expect((wrapper.vm as any).relatedResources).toHaveLength(1);
+
+      await wrapper.setProps({
+        event: { type: "view", name: "view" },
+        rawEvent: { type: "view", view_id: "v9", session_id: "session-456", date: 1700000000000 },
+      });
+      await flushPromises();
+
+      expect(pending).toHaveLength(1);
+      expect((wrapper.vm as any).relatedResources).toEqual([]);
+      expect((wrapper.vm as any).selectedResourceWithTrace).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("drops the previous request's trace pick when the next fetch starts", async () => {
+      const wrapper = mountComponent({
+        props: {
+          event: failedEvent(),
+          rawEvent: failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" }),
+        },
+      });
+      await flushPromises();
+      pending[0].resolve([failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" })]);
+      await flushPromises();
+      expect((wrapper.vm as any).selectedResourceWithTrace).not.toBeNull();
+
+      await wrapper.setProps({
+        event: failedEvent({ name: "B" }),
+        rawEvent: failedRaw({ resource_id: "B", resource_url: "https://x.test/b", view_id: "vb" }),
+      });
+      await flushPromises();
+
+      // The second fetch is still pending, and the first one's pick is gone.
+      expect(pending).toHaveLength(2);
+      expect((wrapper.vm as any).selectedResourceWithTrace).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("leaves nothing of the previous event when the session id goes away", async () => {
+      const wrapper = mountComponent({
+        props: {
+          event: failedEvent(),
+          rawEvent: failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" }),
+        },
+      });
+      await flushPromises();
+      pending[0].resolve([failedRaw({ _oo_trace_id: "abc123", resource_url: "https://x.test/a" })]);
+      await flushPromises();
+      expect((wrapper.vm as any).relatedResources).toHaveLength(1);
+
+      await wrapper.setProps({
+        sessionId: "",
+        event: failedEvent({ name: "B" }),
+        rawEvent: failedRaw({ resource_id: "B", resource_url: "https://x.test/b" }),
+      });
+      await flushPromises();
+
+      expect(pending).toHaveLength(1);
+      expect((wrapper.vm as any).relatedResources).toEqual([]);
+      expect((wrapper.vm as any).selectedResourceWithTrace).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("ignores a late answer for an event that has since changed to a type that fetches nothing", async () => {
+      const wrapper = mountComponent({
+        props: { event: failedEvent(), rawEvent: failedRaw({ resource_url: "https://x.test/a" }) },
+      });
+      await flushPromises();
+      await wrapper.setProps({
+        event: { type: "view", name: "view" },
+        rawEvent: { type: "view", view_id: "v9", session_id: "session-456", date: 1700000000000 },
+      });
+      await flushPromises();
+      pending[0].resolve([failedRaw({ resource_url: "https://x.test/a" })]);
+      await flushPromises();
+
+      expect((wrapper.vm as any).relatedResources).toEqual([]);
+      wrapper.unmount();
+    });
+  });
+
+  it("adds the clicked request to the network list when the query misses it", async () => {
+    hits = [failedRaw({ resource_id: "other", resource_url: "https://api.example.com/other" })];
+    const wrapper = await mountFailed(failedEvent(), failedRaw(), 1);
+    await findByTestId(wrapper, "event-detail-network-tab").trigger("click");
+    await flushPromises();
+
+    const items = wrapper.findAll('[data-test="network-resource-item"]');
+    expect(items).toHaveLength(2);
+    expect(items[0].attributes("data-highlighted")).toBe("true");
+    wrapper.unmount();
+  });
+
+  it("fetches nothing for a failed request with neither an action nor a view", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ view_id: undefined }));
+    expect(captured).toHaveLength(0);
+    wrapper.unmount();
   });
 });

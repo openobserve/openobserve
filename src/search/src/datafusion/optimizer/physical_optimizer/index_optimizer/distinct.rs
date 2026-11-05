@@ -181,7 +181,7 @@ mod tests {
     use datafusion::{catalog::MemTable, prelude::SessionContext};
 
     use super::*;
-    use crate::datafusion::udf::str_match_udf;
+    use crate::datafusion::udf::fulltext::str_match;
 
     #[tokio::test]
     async fn test_is_simple_distinct() {
@@ -206,7 +206,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        ctx.register_udf(str_match::STR_MATCH_UDF.clone());
 
         // sql, can_optimizer, except_condition
         let cases = vec![
