@@ -3,12 +3,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  isLocalPrefsMigrated,
   judgeStream,
   loadSourcePrefs,
+  markLocalPrefsMigrated,
+  pendingIncludeMigrations,
   resolveSources,
   saveSourcePrefs,
+  sourcesFromSettings,
   staleStreams,
   streamKey,
+  streamsWithIncludeSetting,
   unsampledKey,
   suggestedSources,
   type SourcePrefs,
@@ -166,5 +171,78 @@ describe("source prefs storage", () => {
     expect(loadSourcePrefs("o1").include).toEqual(["x"]);
     localStorage.setItem("oo_sec_sources_o2", "{not json");
     expect(loadSourcePrefs("o2")).toEqual(prefs());
+  });
+});
+
+const sec = (over: Record<string, unknown> = {}) => ({
+  source_type: "entity",
+  pack_id: "entity",
+  pack_version: 1,
+  attached_at: 0,
+  pipeline_id: "p1",
+  pipeline_created: true,
+  included: true,
+  ...over,
+});
+
+describe("sourcesFromSettings (R13)", () => {
+  it("maps packed streams, keeps included-but-unmapped ones, and drops excluded or setting-less streams", () => {
+    const out = sourcesFromSettings([
+      { name: "mapped", settings: { security: sec() } },
+      { name: "included", settings: { security: sec({ pack_id: "", pack_version: 0 }) } },
+      {
+        name: "excluded",
+        settings: { security: sec({ pack_id: "", pack_version: 0, included: false }) },
+      },
+      { name: "plain" },
+    ]);
+    expect(out).toEqual([
+      {
+        name: "mapped",
+        state: "mapped",
+        label: "Mapped entity@1",
+        sourceType: "entity",
+        pack: { id: "entity", version: 1 },
+        included: true,
+      },
+      {
+        name: "included",
+        state: "included",
+        label: "",
+        sourceType: "entity",
+        pack: null,
+        included: true,
+      },
+    ]);
+  });
+
+  it("treats a mapped stream with included=false as a mapped source still", () => {
+    const out = sourcesFromSettings([
+      { name: "m", settings: { security: sec({ included: false }) } },
+    ]);
+    expect(out[0]).toMatchObject({ state: "mapped", included: false });
+  });
+});
+
+describe("localStorage migration (R15)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("moves include/exclude choices once, skipping streams that already have a setting", () => {
+    saveSourcePrefs("o1", prefs({ include: ["a", "b"], exclude: ["c"] }));
+    const already = streamsWithIncludeSetting([
+      { name: "b", settings: { security: sec({ included: false }) } },
+    ]);
+    expect(already.has("b")).toBe(true);
+
+    const pending = pendingIncludeMigrations("o1", already);
+    expect(pending).toEqual([
+      { name: "a", included: true },
+      { name: "c", included: false },
+    ]);
+
+    expect(isLocalPrefsMigrated("o1")).toBe(false);
+    markLocalPrefsMigrated("o1");
+    expect(isLocalPrefsMigrated("o1")).toBe(true);
+    expect(pendingIncludeMigrations("o1", already)).toEqual([]);
   });
 });

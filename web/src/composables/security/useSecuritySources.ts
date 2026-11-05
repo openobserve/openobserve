@@ -2,20 +2,28 @@
 
 import { computed, ref, shallowRef } from "vue";
 
+import ocsfPacks from "@/services/ocsfPacks";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
+import type { SecuritySetting } from "@/utils/security/ocsfPipeline";
 import { quoteIdent } from "@/utils/security/sql";
 import {
+  isLocalPrefsMigrated,
   judgeStream,
   loadSourcePrefs,
+  markLocalPrefsMigrated,
+  pendingIncludeMigrations,
   resolveSources,
   saveSourcePrefs,
+  sourcesFromSettings,
   staleStreams,
   streamKey,
+  streamsWithIncludeSetting,
   suggestedSources,
   unsampledKey,
   type CachedVerdict,
   type SourcePrefs,
+  type StreamWithSecurity,
 } from "@/utils/security/sourceSelection";
 import { loadTaggedStreams, saveTaggedStreams } from "@/utils/security/streams";
 
@@ -87,9 +95,28 @@ export function useSecuritySources() {
   const error = ref("");
 
   const names = computed(() => streams.value.map((s) => s.name));
-  const sources = computed(() => resolveSources(names.value, prefs.value));
-  const sourceNames = computed(() => sources.value.map((s) => s.name));
-  const suggestions = computed(() => suggestedSources(names.value, prefs.value));
+  const asSecurityStreams = (): StreamWithSecurity[] =>
+    streams.value.map((s) => ({ name: s.name, settings: (s as StreamWithSecurity).settings }));
+  const settingSources = computed(() => sourcesFromSettings(asSecurityStreams()));
+  const settingNames = computed(
+    () =>
+      new Set(
+        asSecurityStreams()
+          .filter((s) => s.settings?.security)
+          .map((s) => s.name),
+      ),
+  );
+  // Streams carrying a setting are governed by it, not by the local classification (R13).
+  const legacyNames = computed(() => names.value.filter((n) => !settingNames.value.has(n)));
+  const sources = computed(() => resolveSources(legacyNames.value, prefs.value));
+  // An excluded setting (included === false) is not a source, even when a pack is mapped (F11).
+  const sourceNames = computed(() => [
+    ...new Set([
+      ...settingSources.value.filter((s) => s.included).map((s) => s.name),
+      ...sources.value.map((s) => s.name),
+    ]),
+  ]);
+  const suggestions = computed(() => suggestedSources(legacyNames.value, prefs.value));
 
   /** Saves the user's choices, keeping verdicts another page's classification pass stored meanwhile. */
   function persist() {
@@ -190,9 +217,46 @@ export function useSecuritySources() {
     persist();
   }
 
+  /** Moves local include/exclude choices into stream settings once, for a user who can write them (R15). */
+  async function migrateIncludes(canWrite: boolean) {
+    const org = orgId.value;
+    if (!canWrite || !org || isLocalPrefsMigrated(org)) return;
+    // A failed stream load leaves streams empty; marking migrated now would silently drop every choice (F6).
+    if (error.value || !streams.value.length) return;
+    const live = new Set(names.value);
+    const byName = new Map(asSecurityStreams().map((s) => [s.name, s.settings?.security]));
+    const pending = pendingIncludeMigrations(org, streamsWithIncludeSetting(asSecurityStreams()));
+    for (const item of pending) {
+      // A local choice for a stream the loaded list does not contain can never succeed; skip it.
+      if (!live.has(item.name)) continue;
+      const current = byName.get(item.name);
+      const setting: SecuritySetting = current
+        ? { ...current, included: item.included }
+        : {
+            source_type: "",
+            pack_id: "",
+            pack_version: 0,
+            attached_at: 0,
+            pipeline_id: "",
+            pipeline_created: false,
+            included: item.included,
+          };
+      try {
+        await ocsfPacks.saveSetting(org, item.name, setting);
+      } catch (e: any) {
+        const status = e?.response?.status;
+        // Only a permanent 400/404 is skipped; anything else aborts unmarked so the choices retry next load.
+        if (status === 400 || status === 404) continue;
+        return;
+      }
+    }
+    markLocalPrefsMigrated(org);
+  }
+
   return {
     streams,
     sources,
+    settingSources,
     sourceNames,
     suggestions,
     loading,
@@ -202,5 +266,6 @@ export function useSecuritySources() {
     include,
     exclude,
     dismiss,
+    migrateIncludes,
   };
 }

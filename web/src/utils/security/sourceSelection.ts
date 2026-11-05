@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { bestMatch, readPath, type Classification } from "./classify";
+import type { SecuritySetting } from "./ocsfPipeline";
 import { SECURITY_STREAM_RE, loadTaggedStreams } from "./streams";
 
 export type SourceDecision = "auto" | "suggested" | "ignored";
@@ -38,7 +39,31 @@ export interface SourceEntry {
   verdict: StreamVerdict | null;
 }
 
+export interface StreamWithSecurity {
+  name: string;
+  settings?: { security?: SecuritySetting | null } | null;
+  [key: string]: unknown;
+}
+
+export type SettingSourceState = "mapped" | "included";
+
+export interface SettingSource {
+  name: string;
+  state: SettingSourceState;
+  label: string;
+  sourceType: string;
+  pack: { id: string; version: number } | null;
+  included: boolean;
+}
+
+export interface IncludeMigration {
+  name: string;
+  included: boolean;
+}
+
 const prefsKey = (orgId: string) => `oo_sec_sources_${orgId}`;
+
+const migratedKey = (orgId: string) => `oo_sec_migrated_${orgId}`;
 
 const emptyPrefs = (): SourcePrefs => ({ include: [], exclude: [], dismissed: [], classified: {} });
 
@@ -175,4 +200,73 @@ export function staleStreams(
     })
     .sort((a, b) => Number(b.stats?.doc_num ?? 0) - Number(a.stats?.doc_num ?? 0))
     .map((s) => s.name);
+}
+
+/** The setting is the source of truth (SDD §6.1 precedence 1): mapped packs and included-but-unmapped streams. */
+export function sourcesFromSettings(streams: StreamWithSecurity[]): SettingSource[] {
+  const out: SettingSource[] = [];
+  for (const stream of streams) {
+    const security = stream.settings?.security;
+    if (!security) continue;
+    const included = security.included !== false;
+    if (security.pack_id) {
+      out.push({
+        name: stream.name,
+        state: "mapped",
+        label: `Mapped ${security.pack_id}@${security.pack_version}`,
+        sourceType: security.source_type,
+        pack: { id: security.pack_id, version: security.pack_version },
+        included,
+      });
+    } else if (security.included === true) {
+      out.push({
+        name: stream.name,
+        state: "included",
+        label: "",
+        sourceType: security.source_type,
+        pack: null,
+        included: true,
+      });
+    }
+  }
+  return out;
+}
+
+/** Streams that already carry an include/exclude decision in their setting, so migration skips them. */
+export function streamsWithIncludeSetting(streams: StreamWithSecurity[]): Set<string> {
+  const names = new Set<string>();
+  for (const stream of streams) {
+    const included = stream.settings?.security?.included;
+    if (included === true || included === false) names.add(stream.name);
+  }
+  return names;
+}
+
+export function isLocalPrefsMigrated(orgId: string): boolean {
+  try {
+    return localStorage.getItem(migratedKey(orgId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markLocalPrefsMigrated(orgId: string) {
+  try {
+    localStorage.setItem(migratedKey(orgId), "1");
+  } catch {
+    /* private mode / quota — migration simply reruns next load */
+  }
+}
+
+/** One-time move of local include/exclude choices into each stream's setting (SDD §2.5 / R15). */
+export function pendingIncludeMigrations(
+  orgId: string,
+  alreadySet: Set<string>,
+): IncludeMigration[] {
+  if (isLocalPrefsMigrated(orgId)) return [];
+  const prefs = loadSourcePrefs(orgId);
+  const out: IncludeMigration[] = [];
+  for (const name of prefs.include) if (!alreadySet.has(name)) out.push({ name, included: true });
+  for (const name of prefs.exclude) if (!alreadySet.has(name)) out.push({ name, included: false });
+  return out;
 }
