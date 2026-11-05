@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
@@ -32,6 +32,20 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => viewport.mobile),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !viewport.mobile),
+      mdUp: computed(() => !viewport.mobile),
+      lgUp: computed(() => !viewport.mobile),
+    }),
+  };
+});
 
 const data = vi.hoisted(() => ({
   sample: true,
@@ -105,7 +119,7 @@ describe("SampleDataHeaderChip", () => {
   let wrapper: VueWrapper;
 
   let store: ReturnType<typeof createStore<any>>;
-  const mountChip = (sampleDataFlow = true, version = "v0.0.0") => {
+  const mountChip = (sampleDataFlow = true, version = "v0.0.0", realMenu = false) => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: ORG },
@@ -116,12 +130,14 @@ describe("SampleDataHeaderChip", () => {
     wrapper = mount(SampleDataHeaderChip, {
       global: {
         plugins: [i18n, store],
-        stubs: {
-          ODropdown: SlotStub,
-          ODropdownItem: ItemStub,
-          ODropdownSeparator: true,
-          ConfirmDialog: ConfirmStub,
-        },
+        stubs: realMenu
+          ? { ConfirmDialog: ConfirmStub }
+          : {
+              ODropdown: SlotStub,
+              ODropdownItem: ItemStub,
+              ODropdownSeparator: true,
+              ConfirmDialog: ConfirmStub,
+            },
       },
     });
   };
@@ -186,6 +202,28 @@ describe("SampleDataHeaderChip", () => {
       mountChip();
       expect(tryBtn().exists()).toBe(false);
       expect(items()).toEqual([]);
+    });
+  });
+
+  describe("on a phone", () => {
+    beforeEach(() => (viewport.mobile = true));
+    afterEach(() => {
+      viewport.mobile = false;
+      wrapper.unmount();
+    });
+
+    it("shows an icon-only button with a name, and it opens the same menu", async () => {
+      mountChip(true, "v0.0.0", true);
+      const btn = wrapper.find('[data-test="header-sample-data-btn"]');
+      expect(btn.attributes("aria-label")).toBe("Sample Data");
+      expect(btn.text()).toBe("");
+      expect(btn.classes()).not.toContain("max-md:hidden");
+      await btn.trigger("click");
+      await flushPromises();
+      const labels = [...document.body.querySelectorAll('[role="menuitem"]')].map((el) =>
+        el.textContent?.trim(),
+      );
+      expect(labels).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
     });
   });
 

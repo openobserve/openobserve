@@ -17,10 +17,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODropdown v-if="shown" v-bind="$attrs" side="bottom" align="end">
     <template #trigger>
+      <!-- a phone header hides labelled buttons, so the menu keeps an icon-only trigger there -->
       <OButton
+        v-if="isMobile"
+        variant="ghost"
+        size="icon-toolbar"
+        class="text-ingest-accent-purple!"
+        :aria-label="t('sampleData.header.label')"
+        data-test="header-sample-data-btn"
+      >
+        <OIcon name="science" size="sm" class="size-5!" />
+      </OButton>
+      <OButton
+        v-else
         variant="outline"
         size="xs"
-        class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple! max-md:hidden"
+        class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple!"
         data-test="header-sample-data-btn"
       >
         <template #icon-left>
@@ -99,6 +111,7 @@ import {
 } from "@/composables/sampleData/useSampleDataSession";
 import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import { sampleDataFlowOn } from "@/utils/firstRunFlow";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 // the menu and its confirm dialog are siblings, so the header's class goes to the menu
 defineOptions({ inheritAttrs: false });
@@ -107,6 +120,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const session = useSampleDataSession();
+const { isMobile } = useBreakpoint();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const presence = useSampleDataPresence(org);
