@@ -67,6 +67,9 @@ export class OnCallResponseDetailPage {
       snoozeButton: '[data-test="oncall-response-snooze-btn"]',
       escalateButton: '[data-test="oncall-response-escalate-btn"]',
       handoffButton: '[data-test="oncall-response-handoff-btn"]',
+      // Below a 96rem viewport the secondary verbs fold into this ⋯ menu, each item suffixed `-menu`.
+      moreButton: '[data-test="oncall-response-more-btn"]',
+      handoffMenuItem: '[data-test="oncall-response-handoff-btn-menu"]',
       promoteButton: '[data-test="oncall-response-promote-btn"]',
       resolveButton: '[data-test="oncall-response-resolve-btn"]',
       confirmRecoveryButton: '[data-test="oncall-response-confirm-recovery-btn"]',
@@ -121,7 +124,7 @@ export class OnCallResponseDetailPage {
   }
 
   // Built rather than stored — these carry a duration or a ledger run/index.
-  snoozeOption(minutes) { return `[data-test="oncall-response-snooze-${minutes}"]`; }
+  snoozeOption(minutes, inMenu = false) { return `[data-test="oncall-response-snooze-${minutes}${inMenu ? '-menu' : ''}"]`; }
   deliveryRow(run, index) { return `[data-test="oncall-delivery-row-${run}-${index}"]`; }
 
   /** On the Causes tab: what this rule turned out to be on a previous page. */
@@ -175,24 +178,37 @@ export class OnCallResponseDetailPage {
     }
   }
 
-  /** Opens the ODropdown and picks a duration. The items do not exist until it opens. */
+  /**
+   * Open whichever surface carries the secondary verbs: the inline button on a wide header, else the ⋯ menu.
+   * @returns {Promise<boolean>} true when the verbs are in the ⋯ menu.
+   */
+  async _openVerbSurface(inlineSelector) {
+    const inline = this.page.locator(inlineSelector);
+    const more = this.page.locator(this.locators.moreButton);
+    await expect(inline.or(more).first()).toBeVisible({ timeout: 45000 });
+    const inMenu = !(await inline.isVisible());
+    await (inMenu ? more : inline).click();
+    return inMenu;
+  }
+
+  /** Opens the snooze menu and picks a duration. The items do not exist until it opens. */
   async snoozeFor(minutes) {
-    await this.page.locator(this.locators.snoozeButton).click();
-    const option = this.page.locator(this.snoozeOption(minutes));
+    const inMenu = await this._openVerbSurface(this.locators.snoozeButton);
+    const option = this.page.locator(this.snoozeOption(minutes, inMenu));
     await expect(option).toBeVisible({ timeout: 20000 });
     await option.click();
   }
 
   /** The offered durations, read off the open menu rather than assumed. */
   async readSnoozeOptions() {
-    await this.page.locator(this.locators.snoozeButton).click();
-    const items = this.page.locator('[data-test^="oncall-response-snooze-"]');
+    await this._openVerbSurface(this.locators.snoozeButton);
+    const items = this.page.locator('[data-test^="oncall-response-snooze-"]:not([data-test="oncall-response-snooze-btn"])');
     await expect(items.first()).toBeVisible({ timeout: 20000 });
     const count = await items.count();
     const minutes = [];
     for (let i = 0; i < count; i++) {
       const attr = await items.nth(i).getAttribute('data-test');
-      const m = /oncall-response-snooze-(\d+)$/.exec(attr ?? '');
+      const m = /^oncall-response-snooze-(\d+)(?:-menu)?$/.exec(attr ?? '');
       if (m) minutes.push(Number(m[1]));
     }
     await this.page.keyboard.press('Escape');
@@ -251,7 +267,9 @@ export class OnCallResponseDetailPage {
   }
 
   async openHandoffDrawer() {
-    await this.page.locator(this.locators.handoffButton).click();
+    if (await this._openVerbSurface(this.locators.handoffButton)) {
+      await this.page.locator(this.locators.handoffMenuItem).click();
+    }
     await expect(this.page.locator(this.locators.handoffDrawer)).toBeVisible({ timeout: 20000 });
   }
 

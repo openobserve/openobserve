@@ -235,7 +235,7 @@ test.describe('On-call routing rules', {
   test('§11.4 the team routing tab notes the overlap on the row itself', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const { broad, narrow } = await seedOverlappingRules(page, testInfo);
+    const { broad, narrow, broadTeam, narrowTeam } = await seedOverlappingRules(page, testInfo);
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
     // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
@@ -262,7 +262,9 @@ test.describe('On-call routing rules', {
     const note = await pm.oncallRoutingPage.readRuleNote(ruleId);
     testLogger.info('§11.4 team-tab overlap note', { ruleId, note });
     expect(note ?? '', 'a rule that cannot bite gets a line of its own').not.toBe('');
-    expect(note, 'the note is about specificity, not about traffic').toMatch(/overlap/i);
+    const claimant = owningTeamId === broadTeam.id ? narrowTeam : broadTeam;
+    expect(note, 'the note is about specificity, not about traffic: it names the team whose rule takes the pages')
+      .toBe(`Also claimed by ${claimant.name}`);
   });
 
   // ------------------------------------------------- Tier 1 (TS-12, TS-13, TS-14)
@@ -439,7 +441,7 @@ test.describe('On-call routing rules', {
     await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
 
     // Rows are sorted by field, so row 0 is namespace.
-    await pm.oncallRoutingPage.changeConditionField(0, 'region');
+    await pm.oncallRoutingPage.changeConditionField(0, 'region', 'Region');
     await pm.oncallRoutingPage.expectConditionNeedsValue(0);
 
     await pm.oncallRoutingPage.removeCondition(0);
