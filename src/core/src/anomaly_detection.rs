@@ -27,7 +27,6 @@ use anyhow::Result;
 use chrono::Utc;
 use config::{
     meta::{
-        destinations::{DestinationType, Module},
         folder::{DEFAULT_FOLDER, FolderType},
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
@@ -45,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
-use crate::{alerts::destinations, common::meta::authz::Authz};
+use crate::common::meta::authz::Authz;
 
 /// G4. Words that name an error subset rather than a population, matched as whole tokens so
 /// an unrelated stream cannot be caught by a substring.
@@ -206,6 +205,9 @@ pub struct CreateAnomalyConfigRequest {
     pub alert_enabled: Option<bool>,
     #[serde(default)]
     pub alert_destinations: Vec<String>,
+    /// Template override for this config's messages; absent, null or "" uses the destination's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
@@ -317,6 +319,14 @@ pub struct UpdateAnomalyConfigRequest {
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
+    /// Absent leaves the stored override; null or "" clears it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
@@ -643,6 +653,7 @@ pub async fn create_config(
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
     let normalized_tags = checked_create_body(&mut req)?;
+    let template = checked_template(org_id, req.template.as_deref()).await?;
 
     let db = get_orm_client_rw().await;
 
@@ -717,6 +728,7 @@ pub async fn create_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        template,
         detection_lease_us: None,
         last_updated: now_us,
         // NOT NULL legacy column; `band_grouping` is what training reports now.
@@ -820,6 +832,7 @@ pub async fn create_config(
 pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
     let mut req = req.clone();
     checked_create_body(&mut req)?;
+    checked_template(org_id, req.template.as_deref()).await?;
     folder_pk(org_id, create_folder_name(&req))
         .await
         .map(|_| ())
@@ -834,6 +847,9 @@ pub async fn check_update_config(
     let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
     let mut req = req.clone();
     checked_update_body(&mut req, &existing)?;
+    if let Some(template) = &req.template {
+        checked_template(org_id, template.as_deref()).await?;
+    }
     if let Some(folder) = req.folder_id.as_deref() {
         folder_pk(org_id, folder).await?;
     }
@@ -998,6 +1014,9 @@ pub async fn update_config(
     }
     if let Some(alert_enabled) = req.alert_enabled {
         active_model.alert_enabled = Set(alert_enabled);
+    }
+    if let Some(template) = &req.template {
+        active_model.template = Set(checked_template(org_id, template.as_deref()).await?);
     }
     if let Some(destinations) = req.alert_destinations {
         active_model.alert_destinations = Set(Some(
@@ -1283,6 +1302,7 @@ pub async fn clone_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        template: src.template.clone(),
         detection_lease_us: None,
         last_updated: now_us,
         created_at: now_us,
@@ -2011,6 +2031,21 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
         return e;
     }
     anyhow::anyhow!("validation error: {e}")
+}
+
+/// A template override must name a user template that applies to anomaly; "" means none.
+async fn checked_template(org_id: &str, name: Option<&str>) -> Result<Option<String>> {
+    let Some(name) = name.map(str::trim).filter(|n| !n.is_empty()) else {
+        return Ok(None);
+    };
+    crate::alerts::templates::check_binding(
+        org_id,
+        name,
+        config::meta::alerts::notification_kind::NotificationKind::Anomaly,
+    )
+    .await
+    .map_err(|e| validation_error(anyhow::anyhow!(e)))?;
+    Ok(Some(name.to_string()))
 }
 
 /// Normalizes and validates a create body; returns its normalized tags.
@@ -3309,18 +3344,102 @@ fn fmt_alert_us(us: i64) -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Deep link to the config's detail page (`alerts/anomaly/edit/:anomaly_id`), where the
+/// Deep link to the detector's detail page (`alerts/detail/:id`, anomaly tab), where the
 /// operator sees the score timeline and threshold behind this alert.
 #[cfg(feature = "enterprise")]
 fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
     let cfg = config::get_config();
     format!(
-        "{}{}/web/alerts/anomaly/edit/{}?org_identifier={}",
+        "{}{}/web/alerts/detail/{}?org_identifier={}&tab=anomalyDetection",
         cfg.common.web_url.trim_end_matches('/'),
         cfg.common.base_uri,
         anomaly_id,
         org_id
     )
+}
+
+/// Lets the reader check the anomaly against the raw data around its window.
+#[cfg(feature = "enterprise")]
+fn anomaly_explore_link(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> (String, String) {
+    use config::utils::base64::encode_url;
+    // Keeps the whole link under common URL length limits of browsers and chat clients.
+    const MAX_QUERY_LEN: usize = 4000;
+    let none = || (String::new(), String::new());
+    let Some(target) = actx.explore.as_ref() else {
+        return none();
+    };
+    if actx.window_start_us == 0
+        || actx.window_end_us == 0
+        || actx.window_end_us <= actx.window_start_us
+    {
+        return none();
+    }
+    let cfg = config::get_config();
+    let base = format!(
+        "{}{}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri
+    );
+    let Ok(mut url) = url::Url::parse(&base) else {
+        return none();
+    };
+    let traces = actx.stream_type == "traces";
+    let page = if traces { "/web/traces" } else { "/web/logs" };
+    let path = format!("{}{page}", url.path().trim_end_matches('/'));
+    url.set_path(&path);
+
+    // The traces page takes a filter expression, the logs page a full SQL statement.
+    let query = target.filter.as_deref().filter(|f| !f.is_empty()).map(|f| {
+        if traces {
+            encode_url(f)
+        } else {
+            let stream = format!("\"{}\"", target.stream.replace('"', "\"\""));
+            encode_url(&format!("SELECT * FROM {stream} WHERE {f}"))
+        }
+    });
+    let (query, too_long) = match query {
+        Some(q) if q.len() > MAX_QUERY_LEN => (None, true),
+        q => (q, false),
+    };
+    let from = target.start_us.to_string();
+    let to = actx.window_end_us.to_string();
+    {
+        let mut pairs = url.query_pairs_mut();
+        if traces {
+            pairs
+                .append_pair("stream", &target.stream)
+                .append_pair("from", &from)
+                .append_pair("to", &to)
+                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("tab", "spans")
+                .append_pair("show_histogram", "true");
+            if let Some(q) = &query {
+                pairs.append_pair("query", q);
+            }
+        } else {
+            pairs
+                .append_pair("stream_type", &actx.stream_type)
+                .append_pair("stream", &target.stream)
+                .append_pair("stream_value", &target.stream)
+                .append_pair("from", &from)
+                .append_pair("to", &to)
+                .append_pair("sql_mode", "true");
+            if let Some(q) = &query {
+                pairs.append_pair("query", q);
+            }
+            pairs
+                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("show_histogram", "true");
+        }
+    }
+    let label = if target.filter_dropped || too_long {
+        "View stream around the window (detector filter not applied)"
+    } else {
+        "View data around the window"
+    };
+    (url.to_string(), label.to_string())
 }
 
 /// One honestly-labeled message per alert kind: a score-space deviation, a value-space
@@ -3330,13 +3449,32 @@ fn anomaly_alert_message(
     ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
     link: &str,
 ) -> String {
+    let body = anomaly_alert_body(ctx);
+    let verb = if ctx.kind
+        == o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind::Recovery
+    {
+        "Anomaly recovered"
+    } else {
+        "Anomaly detected"
+    };
+    format!(
+        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
+        ctx.stream_name, ctx.config_name
+    )
+}
+
+/// The kind specific middle of the message, which a template reads as `{alert_description}`.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_body(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
     let window = format!(
         "{}\u{2013}{}",
         fmt_alert_us(ctx.window_start_us),
         fmt_alert_us(ctx.window_end_us)
     );
-    let body = match ctx.kind {
+    match ctx.kind {
         AnomalyAlertKind::Absence => format!(
             "no data received in window {window}, although the stream's learned schedule \
              expected data"
@@ -3355,16 +3493,7 @@ fn anomaly_alert_message(
             format!("a full detection run found no anomalies in window {window}")
         }
         AnomalyAlertKind::Value => value_anomaly_body(ctx, &window),
-    };
-    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
-        "Anomaly recovered"
-    } else {
-        "Anomaly detected"
-    };
-    format!(
-        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
-        ctx.stream_name, ctx.config_name
-    )
+    }
 }
 
 /// The numeric section for a scored value anomaly, degrading field by field so a cold
@@ -3482,120 +3611,177 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
     .map(|downtime| downtime.id)
 }
 
-/// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
-/// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
-/// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
-/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
-/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
-/// nobody actually received, and the history row can name the rejection.
+/// `Ok(false)` for a skip that never delivers; a non 2xx answer is a `DestinationRejected`.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
-    ctx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
-    let anomaly_id = ctx.anomaly_id.clone();
-    let dest = match destinations::get(&ctx.org_id, &destination_id).await {
-        Ok(d) => d,
-        Err(e) => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{}' not found: {}",
-                anomaly_id,
-                destination_id,
-                e
-            );
-            return Ok(false);
+    use crate::alerts::notifications::notify::{NotifyError, SkipReason, notify};
+    let org_id = actx.org_id.clone();
+    let explicit =
+        crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
+            .await;
+    let mut ctx = anomaly_notification_context(&actx);
+    match notify(&org_id, &destination_id, &explicit, None, &mut ctx).await {
+        Ok(_) => Ok(true),
+        Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)) => Ok(false),
+        Err(NotifyError::Skipped(_)) => Ok(true),
+        Err(e @ (NotifyError::DestinationNotFound(_) | NotifyError::NotAlertDestination(_))) => {
+            log::warn!("[anomaly_detection {}] {e}", actx.anomaly_id);
+            Ok(false)
         }
-    };
-
-    let endpoint = match &dest.module {
-        Module::Alert {
-            destination_type: DestinationType::Http(ep),
-            ..
-        } => ep.clone(),
-        _ => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{}' is not an HTTP destination — skipping",
-                anomaly_id,
-                destination_id
-            );
-            return Ok(false);
-        }
-    };
-    if crate::alerts::notifications::jira::is_jira(&endpoint) {
-        return Err(anyhow::anyhow!(
-            crate::alerts::notifications::jira::UNSUPPORTED_SENDER
-        ));
-    }
-
-    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
-    let message = anomaly_alert_message(&ctx, &link);
-    // Slack-compatible shape: `text` renders in Slack, other receivers read the fields.
-    let payload = anomaly_alert_payload(&ctx, &message, &link);
-
-    // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_destination_client` so redirects + connect-time resolution
-    // are re-validated.
-    if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
-            &endpoint.url,
-        )
-        .await
-    {
-        return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
-    }
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
-    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
-
-    let mut req = client.post(&endpoint.url);
-
-    if let Some(headers) = &endpoint.headers {
-        for (key, value) in headers.iter() {
-            if !key.is_empty() && !value.is_empty() {
-                req = req.header(key, value);
-            }
-        }
-    }
-
-    let resp = req
-        .header("Content-Type", "application/json")
-        .body(payload.to_string())
-        .send()
-        .await?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        log::warn!(
-            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
-            anomaly_id,
-            destination_id,
-            status,
-            body
-        );
-        // The body lands in the alert-history error column, so a long HTML error page is cut.
-        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
-        return Err(
+        Err(NotifyError::Rejected { status, body }) => Err(
             o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
-                status: status.as_u16(),
-                body,
+                status,
+                // The body lands in the run history error column, so a long page is cut.
+                body: body.chars().take(REJECTION_BODY_MAX_CHARS).collect(),
             }
             .into(),
-        );
+        ),
+        Err(e) => Err(e.into()),
     }
+}
 
-    log::info!(
-        "[anomaly_detection {}] alert sent to '{}': status={}",
-        anomaly_id,
-        destination_id,
-        status
-    );
+/// The shared path's context for one anomaly message (Backend section 6 field mapping).
+#[cfg(feature = "enterprise")]
+fn anomaly_notification_context(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    };
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
 
-    Ok(true)
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED,
+    };
+
+    let link = anomaly_detail_link(&actx.org_id, &actx.anomaly_id);
+    let recovery = actx.kind == AnomalyAlertKind::Recovery;
+    let (level, level_str) = match actx.kind {
+        AnomalyAlertKind::Value => (AlertLevel::Critical, "critical"),
+        AnomalyAlertKind::PartialDrop => (AlertLevel::Warning, "warning"),
+        AnomalyAlertKind::Absence => (AlertLevel::NoData, "no_data"),
+        AnomalyAlertKind::Recovery => (AlertLevel::Ok, "ok"),
+    };
+    let event = if recovery {
+        NotificationEvent::Resolved
+    } else {
+        actx.event
+    };
+    let legacy_ctx = actx.clone();
+    let legacy_link = link.clone();
+    let now = now_micros();
+    NotificationContext {
+        org_name: actx.org_id.clone(),
+        stream_type: actx.stream_type.clone(),
+        stream_name: actx.stream_name.clone(),
+        alert_name: actx.config_name.clone(),
+        alert_agg_value: actx
+            .worst_actual_value
+            .map(|v| format!("{v:.2}"))
+            .unwrap_or_default(),
+        alert_level: level_str.to_string(),
+        alert_status: if recovery {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: Some(actx.anomaly_id.clone()),
+        alert_start_time: fmt_local_us(actx.window_start_us),
+        alert_end_time: fmt_local_us(actx.window_end_us),
+        alert_start_time_millis: (actx.window_start_us / 1000).to_string(),
+        alert_end_time_millis: (actx.window_end_us / 1000).to_string(),
+        alert_url: link.clone(),
+        alert_trigger_time: now,
+        alert_trigger_time_str: fmt_local_us(now),
+        alert_description: anomaly_alert_body(actx),
+        context_attributes: anomaly_attributes(actx, &link),
+        level: Some(level),
+        kind: NotificationKind::Anomaly,
+        event,
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || {
+            let message = anomaly_alert_message(&legacy_ctx, &legacy_link);
+            anomaly_alert_payload(&legacy_ctx, &message, &legacy_link)
+        })),
+        // A detector name is free text, so a Custom email escapes it as the other kinds do.
+        render_hints: crate::alerts::notifications::context::RenderHints {
+            escape_email_attributes: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+/// The anomaly variables, formatted as `value_anomaly_body` formats them.
+#[cfg(feature = "enterprise")]
+fn anomaly_attributes(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    link: &str,
+) -> Vec<(String, String)> {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let two = |v: Option<f64>| v.map(|v| format!("{v:.2}")).unwrap_or_default();
+    let kind = serde_json::to_value(actx.kind)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default();
+    let deviation_kind = match actx.kind {
+        AnomalyAlertKind::Value => "score_over_threshold",
+        AnomalyAlertKind::PartialDrop => "value_below_expected",
+        _ => "",
+    };
+    let (explore_url, explore_label) = anomaly_explore_link(actx);
+    [
+        ("anomaly_id", actx.anomaly_id.clone()),
+        ("anomaly_name", actx.config_name.clone()),
+        ("anomaly_kind", kind),
+        ("anomaly_count", actx.anomaly_count.to_string()),
+        (
+            "max_deviation_percent",
+            actx.max_deviation_percent
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_default(),
+        ),
+        ("deviation_kind", deviation_kind.to_string()),
+        ("worst_actual_value", two(actx.worst_actual_value)),
+        ("worst_expected", two(actx.worst_expected)),
+        ("score", two(actx.score)),
+        ("threshold", two(actx.threshold)),
+        ("anomaly_score", score_line(actx.score, actx.threshold)),
+        ("window_start", fmt_alert_us(actx.window_start_us)),
+        ("window_end", fmt_alert_us(actx.window_end_us)),
+        ("anomaly_url", link.to_string()),
+        ("anomaly_explore_url", explore_url),
+        ("anomaly_explore_label", explore_label),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
+}
+
+/// `0.91 vs 0.80`, or the score alone when the config has no threshold.
+#[cfg(feature = "enterprise")]
+fn score_line(score: Option<f64>, threshold: Option<f64>) -> String {
+    match (score, threshold) {
+        (Some(s), Some(t)) => format!("{s:.2} vs {t:.2}"),
+        (Some(s), None) => format!("{s:.2}"),
+        _ => String::new(),
+    }
+}
+
+/// The alert convention for the standard time fields: server local time with no suffix.
+#[cfg(feature = "enterprise")]
+pub(crate) fn fmt_local_us(us: i64) -> String {
+    use chrono::TimeZone;
+    chrono::Local
+        .timestamp_micros(us)
+        .single()
+        .map(|t| t.format("%Y-%m-%dT%H:%M:%S").to_string())
+        .unwrap_or_else(|| "N/A".to_string())
 }
 
 #[cfg(test)]
@@ -3779,6 +3965,7 @@ mod tests {
             owner: None,
             priority: None,
             tags: vec![],
+            template: None,
         }
     }
 
@@ -4857,6 +5044,244 @@ mod tests {
         }
     }
 
+    /// Template bindings checked against a migrated store in a child process of their own.
+    mod template_binding {
+        use config::meta::{
+            alerts::notification_kind::NotificationKind::{self, *},
+            destinations::{Template, TemplateKind},
+        };
+        use db::alerts::templates::TemplateError;
+
+        use crate::{alerts::templates as svc, ssrf_test_support::isolated};
+
+        fn run<F: std::future::Future<Output = ()>>(path: &str, task: impl FnOnce() -> F) {
+            let name = path.rsplit("::").next().unwrap_or(path);
+            let dir = std::env::temp_dir()
+                .join(format!("o2-template-binding-{name}-{}", std::process::id()));
+            let dir = format!("{}/", dir.display());
+            isolated(path, &[("ZO_DATA_DIR", dir.as_str())], task);
+        }
+
+        async fn store() {
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+        }
+
+        fn content(org: &str, name: &str, applies_to: Vec<NotificationKind>) -> Template {
+            Template {
+                org_id: org.to_string(),
+                name: name.to_string(),
+                body: serde_json::to_string(
+                    &crate::alerts::notifications::default_template::compiled_default_content(),
+                )
+                .unwrap(),
+                kind: TemplateKind::Content,
+                applies_to,
+                ..Default::default()
+            }
+        }
+
+        async fn bind_anomaly(org: &str, config: &str, template: &str) {
+            let mut model = super::update_interval_validation::stored_config();
+            model.anomaly_id = config::ider::uuid();
+            model.org_id = org.to_string();
+            model.name = config.to_string();
+            model.template = Some(template.to_string());
+            let (folder, _) = infra::table::folders::put(
+                org,
+                None,
+                config::meta::folder::Folder {
+                    folder_id: format!("f-{}", model.anomaly_id),
+                    name: format!("f-{}", model.anomaly_id),
+                    description: String::new(),
+                    icon: None,
+                },
+                config::meta::folder::FolderType::Alerts,
+            )
+            .await
+            .unwrap();
+            model.folder_id = folder.to_string();
+            infra::table::anomaly_detection::config::create(
+                infra::db::get_orm_client_rw().await,
+                model,
+            )
+            .await
+            .unwrap();
+        }
+
+        #[test]
+        fn narrowing_a_template_an_anomaly_config_names_is_refused_and_leaves_the_row() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::narrowing_a_template_an_anomaly_config_names_is_refused_and_leaves_the_row"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "ops-card", vec![]))
+                        .await
+                        .unwrap();
+                    bind_anomaly("acme", "error rate on web-logs", "ops-card").await;
+
+                    let err = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        Some(TemplateKind::Content),
+                        Some(vec![Incident]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap_err();
+                    assert_eq!(
+                        err.to_string(),
+                        "template is used for anomaly by: anomaly config 'error rate on web-logs'; \
+                         remove the binding first"
+                    );
+                    let stored = infra::table::templates::get("acme", "ops-card")
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert!(stored.applies_to.is_empty());
+
+                    // Keeping anomaly in the list narrows nothing the config uses.
+                    let saved = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        Some(TemplateKind::Content),
+                        Some(vec![Anomaly, Incident]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(saved.applies_to, vec![Anomaly, Incident]);
+                    // An update that omits applies_to keeps the stored list.
+                    let kept = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        None,
+                        None,
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(kept.applies_to, vec![Anomaly, Incident]);
+                },
+            );
+        }
+
+        #[test]
+        fn an_override_must_be_a_user_template_that_applies_to_anomaly() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::an_override_must_be_a_user_template_that_applies_to_anomaly"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "incident-only", vec![Incident]))
+                        .await
+                        .unwrap();
+                    db::alerts::templates::set(content("acme", "ops-card", vec![Anomaly]))
+                        .await
+                        .unwrap();
+                    infra::table::templates::put(content(
+                        config::DEFAULT_ORG,
+                        "prebuilt_default",
+                        vec![],
+                    ))
+                    .await
+                    .unwrap();
+
+                    let err = |name: &'static str| async move {
+                        super::super::checked_template("acme", Some(name))
+                            .await
+                            .unwrap_err()
+                            .to_string()
+                    };
+                    assert_eq!(
+                        err("incident-only").await,
+                        "validation error: template 'incident-only' does not apply to anomaly"
+                    );
+                    assert_eq!(
+                        err("prebuilt_default").await,
+                        "validation error: template 'prebuilt_default' is reserved"
+                    );
+                    assert_eq!(
+                        err("gone").await,
+                        "validation error: template 'gone' does not exist"
+                    );
+                    assert_eq!(
+                        super::super::checked_template("acme", Some("ops-card"))
+                            .await
+                            .unwrap()
+                            .as_deref(),
+                        Some("ops-card")
+                    );
+                    // "" and null clear the override.
+                    assert_eq!(
+                        super::super::checked_template("acme", Some(" "))
+                            .await
+                            .unwrap(),
+                        None
+                    );
+                },
+            );
+        }
+
+        #[test]
+        fn used_by_counts_bindings_and_a_bound_template_cannot_be_deleted() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::used_by_counts_bindings_and_a_bound_template_cannot_be_deleted"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "ops-card", vec![]))
+                        .await
+                        .unwrap();
+                    bind_anomaly("acme", "error rate on web-logs", "ops-card").await;
+
+                    let used = svc::used_by("acme", "ops-card").await.unwrap();
+                    assert_eq!(used.anomaly, 1);
+                    assert_eq!(used.destinations, 0);
+
+                    // Narrowing away anomaly is refused because an anomaly config names it.
+                    let err = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        None,
+                        Some(vec![Incident]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap_err();
+                    assert!(
+                        matches!(&err, TemplateError::InUseForKind { kind, by } if kind == "anomaly" && by.contains("anomaly config 'error rate on web-logs'")),
+                        "{err}"
+                    );
+
+                    let err = svc::delete("acme", "ops-card", false).await.unwrap_err();
+                    assert!(
+                        matches!(&err, TemplateError::DeleteWithBinding(by)
+                            if by.contains("anomaly config 'error rate on web-logs'")),
+                        "{err}"
+                    );
+                    assert!(
+                        infra::table::templates::get("acme", "ops-card")
+                            .await
+                            .unwrap()
+                            .is_some()
+                    );
+                },
+            );
+        }
+    }
+
     // ── P0.4: partial updates validate the MERGED row, not just the payload ──
 
     mod update_interval_validation {
@@ -4914,6 +5339,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                template: None,
                 detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,
@@ -5611,6 +6037,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                template: None,
                 detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,
@@ -6652,7 +7079,8 @@ mod tests {
 
         use super::super::{anomaly_alert_message, anomaly_alert_payload};
 
-        const LINK: &str = "https://o2.example/web/alerts/anomaly/edit/id1?org_identifier=org";
+        const LINK: &str =
+            "https://o2.example/web/alerts/detail/id1?org_identifier=org&tab=anomalyDetection";
 
         fn ctx(kind: AnomalyAlertKind) -> AnomalyAlertContext {
             AnomalyAlertContext {
@@ -6670,7 +7098,122 @@ mod tests {
                 // 2024-01-01T00:00:00Z .. +1h, so the window text is deterministic.
                 window_start_us: 1_704_067_200_000_000,
                 window_end_us: 1_704_070_800_000_000,
+                template: None,
+                stream_type: "logs".to_string(),
+                event: Default::default(),
+                explore: None,
             }
+        }
+
+        fn resolved_for(
+            dest_type: config::meta::destinations::DestinationType,
+        ) -> crate::alerts::notifications::notify::Resolved {
+            use crate::alerts::notifications::org_default::{
+                EffectiveTemplate, TemplateSource, compiled_fallback,
+            };
+            crate::alerts::notifications::notify::Resolved {
+                destination: Default::default(),
+                channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+                destination_type: dest_type,
+                effective: EffectiveTemplate {
+                    template: compiled_fallback("org"),
+                    source: TemplateSource::Compiled,
+                    skipped: vec![],
+                },
+            }
+        }
+
+        fn http(
+            destination_type: &str,
+            payload_format: Option<&str>,
+        ) -> config::meta::destinations::DestinationType {
+            let mut endpoint = config::meta::destinations::Endpoint {
+                destination_type: Some(destination_type.to_string()).filter(|t| !t.is_empty()),
+                url: "https://hooks.example/x".into(),
+                ..Default::default()
+            };
+            if let Some(f) = payload_format {
+                endpoint.metadata.insert("payload_format".into(), f.into());
+            }
+            config::meta::destinations::DestinationType::Http(endpoint)
+        }
+
+        #[test]
+        fn the_context_is_keyed_by_the_anomaly_id_and_the_recovery_resolves() {
+            use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(firing.kind, NotificationKind::Anomaly);
+            assert_eq!(firing.event, NotificationEvent::Firing);
+            assert_eq!(firing.episode_id.as_deref(), Some("id1"));
+            assert_eq!(firing.alert_status, "firing");
+            assert_eq!(
+                firing.alert_description,
+                super::super::anomaly_alert_body(&ctx(AnomalyAlertKind::Value))
+            );
+            let recovery =
+                super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Recovery));
+            assert_eq!(recovery.event, NotificationEvent::Resolved);
+            assert_eq!(recovery.episode_id.as_deref(), Some("id1"));
+            assert_eq!(recovery.alert_status, "resolved");
+        }
+
+        #[test]
+        fn a_generic_webhook_keeps_todays_json_until_a_template_or_payload_format_applies() {
+            use crate::alerts::notifications::notify::{Route, route};
+            let c = ctx(AnomalyAlertKind::Value);
+            let n = super::super::anomaly_notification_context(&c);
+            let link = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
+            let Route::Legacy(body) = route(&resolved_for(http("", None)), &n).unwrap() else {
+                panic!("expected the legacy body");
+            };
+            assert_eq!(body["text"], anomaly_alert_message(&c, &link));
+            assert_eq!(body["alert_type"], "anomaly_detection");
+            assert_eq!(
+                route(&resolved_for(http("", Some("rendered"))), &n).unwrap(),
+                Route::Render
+            );
+            assert_eq!(
+                route(&resolved_for(http("slack", None)), &n).unwrap(),
+                Route::Render
+            );
+        }
+
+        #[test]
+        fn platforms_get_a_keyed_trigger_and_one_resolve_on_recovery() {
+            use crate::alerts::notifications::{
+                notify::{Route, route},
+                platform::Platform,
+            };
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(
+                route(&resolved_for(http("pagerduty", None)), &firing).unwrap(),
+                Route::Render
+            );
+            let recovery =
+                super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Recovery));
+            for (name, platform) in [
+                ("pagerduty", Platform::PagerDuty),
+                ("opsgenie", Platform::Opsgenie),
+                ("servicenow", Platform::ServiceNow),
+            ] {
+                assert_eq!(
+                    route(&resolved_for(http(name, None)), &recovery).unwrap(),
+                    Route::PlatformResolve(platform)
+                );
+            }
+        }
+
+        #[test]
+        fn a_pagerduty_trigger_carries_the_anomaly_id_as_dedup_key() {
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            let dest = http("pagerduty", None);
+            let body = crate::alerts::notifications::send::stamp_platform_key(
+                &dest,
+                &firing,
+                r#"{"event_action":"trigger","payload":{}}"#.to_string(),
+            );
+            let body: serde_json::Value = serde_json::from_str(&body).unwrap();
+            assert_eq!(body["dedup_key"], "id1");
         }
 
         #[test]
@@ -6787,6 +7330,196 @@ mod tests {
             let p = anomaly_alert_payload(&c, "m", LINK);
             assert_eq!(p["max_deviation_percent"], 52.4);
             assert_eq!(p["worst_actual_value"], 612.0);
+        }
+
+        fn explore_ctx(
+            stream_type: &str,
+            filter: Option<&str>,
+            filter_dropped: bool,
+        ) -> AnomalyAlertContext {
+            use o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget;
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.stream_type = stream_type.to_string();
+            c.explore = Some(ExploreTarget {
+                stream: "app_logs".to_string(),
+                filter: filter.map(str::to_string),
+                filter_dropped,
+                start_us: 1_704_063_600_000_000,
+            });
+            c
+        }
+
+        fn pairs(url: &str) -> (url::Url, Vec<(String, String)>) {
+            let u = url::Url::parse(url).expect("explore url parses");
+            let p = u
+                .query_pairs()
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect();
+            (u, p)
+        }
+
+        fn get<'a>(p: &'a [(String, String)], key: &str) -> Option<&'a str> {
+            p.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        }
+
+        fn decoded_query(p: &[(String, String)]) -> String {
+            config::utils::base64::decode_url(get(p, "query").expect("query pair")).unwrap()
+        }
+
+        const FILTERED: &str = "View data around the window";
+        const UNFILTERED: &str = "View stream around the window (detector filter not applied)";
+
+        #[test]
+        fn the_logs_explore_link_carries_the_window_and_the_filter_as_sql() {
+            let c = explore_ctx("logs", Some("status >= 500"), false);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/logs"), "{url}");
+            assert_eq!(get(&p, "stream_type"), Some("logs"));
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "stream_value"), Some("app_logs"));
+            assert_eq!(get(&p, "from"), Some("1704063600000000"));
+            assert_eq!(get(&p, "to"), Some("1704070800000000"));
+            assert_eq!(get(&p, "sql_mode"), Some("true"));
+            assert_eq!(get(&p, "org_identifier"), Some("org"));
+            assert_eq!(get(&p, "show_histogram"), Some("true"));
+            assert_eq!(
+                decoded_query(&p),
+                r#"SELECT * FROM "app_logs" WHERE status >= 500"#
+            );
+            assert_eq!(label, FILTERED);
+            let keys: Vec<&str> = p.iter().map(|(k, _)| k.as_str()).collect();
+            assert_eq!(
+                keys,
+                [
+                    "stream_type",
+                    "stream",
+                    "stream_value",
+                    "from",
+                    "to",
+                    "sql_mode",
+                    "query",
+                    "org_identifier",
+                    "show_histogram"
+                ]
+            );
+        }
+
+        #[test]
+        fn a_metrics_detector_links_to_the_logs_page_with_its_stream_type() {
+            let c = explore_ctx("metrics", Some("job = 'api'"), false);
+            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/logs"), "{url}");
+            assert_eq!(get(&p, "stream_type"), Some("metrics"));
+        }
+
+        #[test]
+        fn the_traces_explore_link_carries_the_filter_expression_only() {
+            let c = explore_ctx("traces", Some("service_name = 'api'"), false);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/traces"), "{url}");
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "from"), Some("1704063600000000"));
+            assert_eq!(get(&p, "to"), Some("1704070800000000"));
+            assert_eq!(get(&p, "org_identifier"), Some("org"));
+            assert_eq!(get(&p, "tab"), Some("spans"));
+            assert_eq!(get(&p, "show_histogram"), Some("true"));
+            assert_eq!(get(&p, "stream_type"), None);
+            assert_eq!(decoded_query(&p), "service_name = 'api'");
+            assert_eq!(label, FILTERED);
+        }
+
+        #[test]
+        fn a_detector_without_a_filter_links_without_a_query() {
+            let (url, label) =
+                super::super::anomaly_explore_link(&explore_ctx("logs", None, false));
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "sql_mode"), Some("true"));
+            assert_eq!(label, FILTERED);
+        }
+
+        #[test]
+        fn a_dropped_filter_gets_the_unfiltered_label() {
+            let (url, label) = super::super::anomaly_explore_link(&explore_ctx("logs", None, true));
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(label, UNFILTERED);
+        }
+
+        #[test]
+        fn no_window_or_no_target_gives_no_link() {
+            let empty = (String::new(), String::new());
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_start_us = 0;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_end_us = 0;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_end_us = c.window_start_us;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            c.window_end_us = c.window_start_us - 1;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.explore = None;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+        }
+
+        #[test]
+        fn an_over_long_filter_is_dropped_and_labeled() {
+            let long = "x".repeat(5000);
+            for stream_type in ["logs", "traces"] {
+                let c = explore_ctx(stream_type, Some(&long), false);
+                let (url, label) = super::super::anomaly_explore_link(&c);
+                let (_, p) = pairs(&url);
+                assert_eq!(get(&p, "query"), None, "{stream_type}");
+                assert_eq!(label, UNFILTERED, "{stream_type}");
+            }
+        }
+
+        #[test]
+        fn odd_stream_and_org_names_round_trip_and_the_stream_is_quoted() {
+            let odd = r#"my "odd" stream & #1 é"#;
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.org_id = "a&b".to_string();
+            c.explore.as_mut().unwrap().stream = odd.to_string();
+            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.fragment().is_none(), "{url}");
+            assert_eq!(get(&p, "stream"), Some(odd));
+            assert_eq!(get(&p, "stream_value"), Some(odd));
+            assert_eq!(get(&p, "org_identifier"), Some("a&b"));
+            assert_eq!(
+                decoded_query(&p),
+                r#"SELECT * FROM "my ""odd"" stream & #1 é" WHERE a = 1"#
+            );
+        }
+
+        #[test]
+        fn the_context_exposes_the_explore_link_and_keeps_the_detail_link_as_alert_url() {
+            let c = explore_ctx("logs", Some("a = 1"), false);
+            let n = super::super::anomaly_notification_context(&c);
+            let detail = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
+            assert_eq!(n.alert_url, detail);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            assert_eq!(attr_of(&n, "anomaly_url"), Some(detail));
+            assert_eq!(attr_of(&n, "anomaly_explore_url"), Some(url));
+            assert_eq!(attr_of(&n, "anomaly_explore_label"), Some(label));
+            let bare = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(attr_of(&bare, "anomaly_explore_url"), Some(String::new()));
+        }
+
+        fn attr_of(
+            n: &crate::alerts::notifications::NotificationContext,
+            k: &str,
+        ) -> Option<String> {
+            n.context_attributes
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.clone())
         }
     }
 

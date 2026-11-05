@@ -191,6 +191,10 @@ pub struct SetPolicyRequest {
     /// Absent leaves it unchanged, so editing rungs cannot silently un-configure L0.
     #[serde(default)]
     pub l0: Option<config::meta::oncall::L0Policy>,
+    /// Template override for on-call messages; absent leaves it, null or "" clears it.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1715,12 +1719,29 @@ pub async fn set_policy(
                 other => internal_error("set_policy node versions", &other),
             };
         }
+        // Checked before any write, written after the policy, so a refused policy leaves no half.
+        let template = body
+            .template
+            .clone()
+            .map(|t| t.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()));
+        if let Some(Some(name)) = template.as_ref()
+            && let Err(e) = openobserve_core::alerts::templates::check_binding(
+                &org_id,
+                name,
+                config::meta::alerts::notification_kind::NotificationKind::OnCall,
+            )
+            .await
+        {
+            return MetaHttpResponse::bad_request(e.as_str());
+        }
+        // One write and one replication carry the rungs and the template together.
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
             body.rungs,
             body.destinations,
             body.l0,
+            template,
         )
         .await
         {
@@ -7313,6 +7334,7 @@ mod tests {
             }],
             destinations: None,
             l0: None,
+            template: None,
         };
         let response = set_policy(
             Path(("acme".to_string(), "t_dm8".to_string())),

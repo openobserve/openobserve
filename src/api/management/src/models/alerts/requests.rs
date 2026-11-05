@@ -176,6 +176,9 @@ pub struct AnomalyAlertFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_window_recover_pct: Option<f64>,
     pub alert_enabled: Option<bool>,
+    /// Template override for anomaly messages; absent, null or "" uses the destination's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
 }
 
 /// HTTP request body for `UpdateAlert` endpoint.
@@ -415,6 +418,14 @@ pub struct UpdateAnomalyAlertFields {
     #[schema(value_type = Option<f64>)]
     pub alert_window_recover_pct: Option<Option<f64>>,
     pub alert_enabled: Option<bool>,
+    /// Absent leaves the stored template override; `null` or "" clears it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
     pub enabled: Option<bool>,
     /// Moves the config to this folder. Naming a folder you cannot write to
     /// returns 403; omit it to leave the config where it is.

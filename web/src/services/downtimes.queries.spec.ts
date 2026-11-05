@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import downtimes from "./downtimes";
-import type { DowntimeListItem } from "./downtimes";
-import { downtimesListQuery, downtimesLookupQuery } from "./downtimes.queries";
+import type { DowntimeDetail, DowntimeListItem } from "./downtimes";
+import {
+  downtimesListQuery,
+  downtimesLookupQuery,
+  sendDowntimeTestMutation,
+} from "./downtimes.queries";
 
-vi.mock("./downtimes", () => ({ default: { list: vi.fn() } }));
+vi.mock("./downtimes", () => ({ default: { list: vi.fn(), test: vi.fn() } }));
 
 const COUNTS = { active: 1, scheduled: 2, recurring: 3, ended: 4, cancelled: 5, ended_early: 6 };
 const items = (n: number) =>
@@ -44,5 +48,36 @@ describe("the downtime list queries", () => {
   it("do not flag a response that holds the whole org", async () => {
     expect((await run(downtimesListQuery, 500, 500)).truncated).toBe(false);
     expect((await run(downtimesListQuery, 3, 3)).truncated).toBe(false);
+  });
+});
+
+describe("the downtime test send", () => {
+  const downtime = { id: "dt-1", folder_id: "f1" } as unknown as DowntimeDetail;
+  const send = (names: string[]) =>
+    (sendDowntimeTestMutation("acme").mutationFn as (v: unknown) => Promise<any>)({
+      downtime,
+      destinations: names.map((name) => ({ name })),
+      url: "https://o2",
+    });
+
+  beforeEach(() => {
+    vi.mocked(downtimes.test).mockReset();
+  });
+
+  it("asks the server to send through the live path and returns its results", async () => {
+    const results = [
+      { destination: "hook", ok: true },
+      { destination: "pd", ok: false, unsupported: true, error: "platform_not_for_kind" },
+    ];
+    vi.mocked(downtimes.test).mockResolvedValue({ data: results } as never);
+    expect(await send(["hook", "pd"])).toEqual(results);
+    expect(downtimes.test).toHaveBeenCalledWith("acme", "dt-1", ["hook", "pd"], "f1");
+  });
+
+  it("marks every destination failed when the request fails", async () => {
+    vi.mocked(downtimes.test).mockImplementation(async () => {
+      throw { response: { data: { message: "boom" } } };
+    });
+    expect(await send(["hook"])).toEqual([{ destination: "hook", ok: false, error: "boom" }]);
   });
 });

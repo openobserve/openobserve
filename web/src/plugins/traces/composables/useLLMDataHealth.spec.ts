@@ -38,6 +38,34 @@ beforeEach(() => {
   getDataHealth.mockReset();
 });
 
+describe("useLLMDataHealth — samples in the load", () => {
+  it("a load that asks for samples gets them in the same request", async () => {
+    const h = useLLMDataHealth();
+    getDataHealth.mockResolvedValueOnce(response(["t1"]));
+    await h.fetchHealth("org", { ...params, include_samples: true });
+    expect(getDataHealth).toHaveBeenCalledTimes(1);
+    expect(getDataHealth.mock.calls[0][1].include_samples).toBe(true);
+    expect(h.samples.value).toEqual({ missing_session_id: ["t1"], zero_duration_spans: [] });
+  });
+});
+
+describe("useLLMDataHealth — errors", () => {
+  it("marks a 404 as a server without the endpoint, and any other failure as an error only", async () => {
+    const h = useLLMDataHealth();
+    getDataHealth.mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 } });
+    await h.fetchHealth("org", params);
+    expect([h.error.value, h.unsupported.value]).toEqual([true, true]);
+
+    getDataHealth.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500 } });
+    await h.fetchHealth("org", params);
+    expect([h.error.value, h.unsupported.value]).toEqual([true, false]);
+
+    getDataHealth.mockResolvedValueOnce(response());
+    await h.fetchHealth("org", params);
+    expect([h.error.value, h.unsupported.value]).toEqual([false, false]);
+  });
+});
+
 describe("useLLMDataHealth — samples", () => {
   it("the default load asks for no samples; the drawer's request asks once", async () => {
     const h = useLLMDataHealth();

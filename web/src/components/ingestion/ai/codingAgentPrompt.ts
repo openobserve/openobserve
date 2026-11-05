@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The openobserve-instrument skill, served from the openobserve repo so any
- * coding agent can fetch and follow it without installing a plugin.
- */
+/** Served from the npm CDN (source: o2-ai `skills/coding-agent/`) so any coding agent can fetch it without a plugin. */
 export const INSTRUMENT_SKILL_URL =
-  "https://raw.githubusercontent.com/openobserve/openobserve/main/skills/openobserve-instrument/SKILL.md";
+  "https://cdn.jsdelivr.net/npm/@openobserve/skills@1/skills/openobserve-instrument/SKILL.md";
 
 /** `?tab=` value that opens an AI integration on its "With a coding agent" tab. */
 export const CODING_AGENT_TAB = "agent";
@@ -37,6 +34,6 @@ export function buildCodingAgentPrompt(org: string, stream: string): string {
   return (
     `Instrument this app for OpenObserve with the openobserve-instrument skill (${INSTRUMENT_SKILL_URL}).\n` +
     `Use the .env in the project root, org ${org}, stream ${stream}.\n` +
-    `Run one sample request, then check the data.`
+    `Run one sample request, then tell me to check this OpenObserve page.`
   );
 }

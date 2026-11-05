@@ -286,6 +286,7 @@ async fn warn_about(
                 // No alert behind this one, so no runbook to follow.
                 runbook_url: None,
                 investigation: vec![],
+                stage: o2_enterprise::enterprise::oncall::sender::OnCallStage::CoverageGap,
             },
             recipient: recipient.clone(),
             channel: config::meta::oncall::Channel::Email,
