@@ -412,6 +412,44 @@ describe("AppSessions.vue", () => {
       });
     });
 
+    it("falls back to the _rumdata timestamps for a session without replay", () => {
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.handleCellClick({
+        columnName: "action_play",
+        row: {
+          session_id: "session-no-replay",
+          zo_sql_timestamp: 1672531000000000,
+          zo_sql_end_timestamp: 1672531300000000,
+        },
+      });
+
+      const query = pushSpy.mock.calls.at(-1)![0].query;
+      expect(query).toEqual({ start_time: 1672531000000000, end_time: 1672531300000000 });
+    });
+
+    it("never pushes NaN when a session has no usable time at all", () => {
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.handleCellClick({
+        columnName: "action_play",
+        row: { session_id: "session-bare" },
+      });
+
+      const query = pushSpy.mock.calls.at(-1)![0].query;
+      expect(query).toEqual({});
+    });
+
+    it("computes the heatmap start from the _rumdata timestamp when there is no replay start", () => {
+      expect(wrapper.vm.sessionStartUs({ zo_sql_timestamp: 1672531000000000 })).toBe(
+        1672531000000000,
+      );
+      expect(wrapper.vm.sessionStartUs({ start_time: 1672531000, zo_sql_timestamp: 5 })).toBe(
+        1672531000000,
+      );
+      expect(wrapper.vm.sessionStartUs({})).toBeUndefined();
+    });
+
     it("should handle scroll end events for pagination", () => {
       // handleScrollEnd increments currentPage when sessions are fully fetched
       wrapper.vm.handleScrollEnd();
@@ -1158,7 +1196,20 @@ describe("AppSessions.vue", () => {
       expect(push).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "productAnalyticsHeatmaps",
-          query: expect.objectContaining({ app: "web", page_url: "/home" }),
+          query: expect.objectContaining({ app: "web", page_url: "/home", from: "1000000" }),
+        }),
+      );
+
+      push.mockClear();
+      wrapper.vm.rows = [
+        { session_id: "session-2", zo_sql_timestamp: 2_000_000, has_replay: true },
+      ];
+      await nextTick();
+      await wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]').trigger("click");
+      await flushPromises();
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ from: "2000000" }),
         }),
       );
 
@@ -1235,6 +1286,33 @@ describe("AppSessions.vue", () => {
       const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("roku");
+    });
+
+    it("copies zo_sql_end_timestamp from the _rumdata hit into the session row", async () => {
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        const sql = params?.query?.query?.sql ?? "";
+        if (sql.includes("GROUP BY session_id") && sql.includes("zo_sql_timestamp")) {
+          return {
+            data: {
+              hits: [
+                {
+                  session_id: "s-end",
+                  zo_sql_timestamp: 1672531200000000,
+                  zo_sql_end_timestamp: 1672531260000000,
+                  error_count: 0,
+                },
+              ],
+            },
+          };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+
+      const row = wrapper.vm.rows.find((r: any) => r.session_id === "s-end");
+      expect(row.zo_sql_end_timestamp).toBe(1672531260000000);
     });
 
     it("includes min(source) as source in the main _rumdata search query", async () => {

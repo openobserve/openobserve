@@ -838,11 +838,15 @@ async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> 
     );
     const hit = res?.data?.hits?.[0];
     if (!hit || hit.start_time === null || hit.start_time === undefined) return "missing";
+    const stored = sessionState.data.selectedSession;
+    const existingSpent =
+      stored?.session_id === String(getSessionId.value) ? Number(stored?.time_spent) : 0;
     sessionState.data.selectedSession = {
       ...sessionState.data.selectedSession,
       session_id: String(getSessionId.value),
       start_time: Number(hit.start_time),
       end_time: Number(hit.end_time),
+      time_spent: existingSpent > 0 ? existingSpent : Number(hit.end_time) - Number(hit.start_time),
       user_email: hit.user_email,
       source: hit.source,
       replay_start: null,

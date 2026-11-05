@@ -20,6 +20,9 @@ import { createRouter, createWebHistory } from "vue-router";
 
 // --- Module-level mocks (hoisted by Vitest before any import) ---
 
+// Extra fields a Sessions-list click-through leaves on the selected session.
+const seededSession = vi.hoisted(() => ({ extra: {} as Record<string, unknown> }));
+
 // Reactive like the real store, so computeds over the selected session follow getSession().
 vi.mock("@/composables/useSessionReplay", async () => {
   const { reactive } = await import("vue");
@@ -37,6 +40,7 @@ vi.mock("@/composables/useSessionReplay", async () => {
             city: "San Francisco",
             country: "US",
             session_id: "session-abc",
+            ...seededSession.extra,
           },
         },
       }),
@@ -3979,6 +3983,34 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     const events = seen.find((q) => q.includes('from "_rumdata"') && q.includes("type='view'"));
     expect(events).toContain("order by date asc");
     wrapper.unmount();
+  });
+
+  it("shows the session duration after a reload, when the store holds no row to copy it from", async () => {
+    const wrapper = await mountEventsOnly();
+    expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+    wrapper.unmount();
+  });
+
+  it("keeps the duration of the Sessions list row on a click-through instead of recomputing it", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-events" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("2m 3s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
+  });
+
+  it("ignores the duration of a different session left in the store by another entry point", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-other" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
   });
 
   it("hands the Traces tab the route window padded by a day, not the device-clock bounds", async () => {
