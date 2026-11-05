@@ -282,13 +282,28 @@ describe("loadSampleData", () => {
     ]);
   });
 
-  it("stops at the first refusal, since every later step would be refused too", async () => {
+  it("marks only the refused optional step failed and goes on loading", async () => {
+    const refused = { response: { status: 403 } };
+    vi.mocked(templateService.create).mockRejectedValueOnce(refused);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await loadSampleData("acme", 5, () => {});
+    warn.mockRestore();
+    expect(result.failedSteps).toEqual(["alerts"]);
+    expect(mocks.sampleData.ingestLogs).toHaveBeenCalled();
+    expect(mocks.sampleData.putState).toHaveBeenCalled();
+  });
+
+  it("fails the load with the refusal when the ingest itself is refused", async () => {
     const refused = { response: { status: 403 } };
     vi.mocked(jsTransformService.create).mockRejectedValueOnce(refused);
+    vi.mocked(pipelineService.createPipeline).mockRejectedValueOnce(refused);
+    mocks.sampleData.ingestLogs.mockRejectedValueOnce(refused).mockRejectedValueOnce(refused);
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(refused);
+    mocks.sampleData.ingestTraces.mockRejectedValueOnce(refused);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(refused);
-    expect(jsTransformService.create).toHaveBeenCalledTimes(1);
-    expect(pipelineService.createPipeline).not.toHaveBeenCalled();
-    expect(mocks.sampleData.ingestLogs).not.toHaveBeenCalled();
+    warn.mockRestore();
+    expect(mocks.silent).toBe(0);
   });
 
   it("starts every asset request with the silent-403 option", async () => {

@@ -376,8 +376,6 @@ export const loadSampleData = async (
     try {
       await fn();
     } catch (e: any) {
-      // without write access every later step is refused too
-      if (e?.response?.status === 403) throw e;
       console.warn(`Sample data step "${step}" failed`, e);
       failedSteps.push(step);
       failed = true;
