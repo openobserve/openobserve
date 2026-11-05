@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeHtml } from "@/utils/html";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { calculateNiceTickValues, calculateWidthText } from "./chartDimensionUtils";
 import { absValue, createSeriesOverrideLookup, type SeriesOverrideLookup } from "./seriesOverrides";
 import { sortTooltipParams } from "./tooltipSort";
@@ -444,7 +444,12 @@ const applyValueAxisLabel = (options: any, panelSchema: any) => {
   const hadName = !!axis.name;
   axis.name = label;
   axis.nameLocation = "middle";
-  axis.nameTextStyle = { fontWeight: "bold", fontSize: 14, ...axis.nameTextStyle };
+  axis.nameTextStyle = {
+    color: chartAxisTextColor(),
+    fontWeight: "bold",
+    fontSize: 14,
+    ...axis.nameTextStyle,
+  };
   const grid = options.grid;
   const canMoveGrid = grid && !Array.isArray(grid) && !isSet(config.axis_width);
   if (horizontal) {

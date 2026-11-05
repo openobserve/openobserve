@@ -282,6 +282,34 @@ pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Hands a running job back to the queue; its finished partitions stay for the next claim.
+pub async fn set_job_pending(job_id: &str) -> Result<(), errors::Error> {
+    let operator = SetOperator {
+        filter: vec![
+            Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
+            Filter::new(MetaColumn::Status, OperatorType::Equal, Value::i64(1)),
+        ],
+        update: vec![
+            (MetaColumn::Status, Value::i64(0)),
+            (MetaColumn::UpdatedAt, Value::i64(now_micros())),
+        ],
+    };
+
+    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+
+    // super cluster, set the job's status
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
+            })?;
+    }
+
+    Ok(())
+}
+
 pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
     let operator = SetOperator {
         filter: vec![

@@ -1133,6 +1133,7 @@ describe("ClickHeatmap", () => {
       wrapper.unmount();
     });
 
+    // Takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
     it("refits and redraws after entering and leaving full screen", async () => {
       const { wrapper } = await mountGeo();
       const stage = wrapper.find('[data-test="rum-heatmap-stage"]').element as HTMLElement;
@@ -1159,7 +1160,7 @@ describe("ClickHeatmap", () => {
       expect(scroller.scrollTop).toBe(0);
       expect(wrapper.find('[data-test="rum-heatmap-canvas"]').exists()).toBe(true);
       wrapper.unmount();
-    });
+    }, 20000);
 
     const hitMove = async (w: any, x: number, y: number) => {
       const layer = w.find('[data-test="rum-heatmap-hit-layer"]');

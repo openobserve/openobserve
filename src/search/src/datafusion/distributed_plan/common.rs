@@ -22,8 +22,9 @@ use datafusion::{
     common::Result, execution::SendableRecordBatchStream,
     physical_plan::stream::RecordBatchStreamAdapter,
 };
-use flight::common::Metrics;
 use parking_lot::Mutex;
+
+use super::profile::NodeProfileRecorder;
 
 #[derive(Debug)]
 pub struct QueryContext {
@@ -33,13 +34,13 @@ pub struct QueryContext {
     pub is_querier: bool,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
-    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub peak_memory: Arc<AtomicUsize>,
     pub start: std::time::Instant,
     pub num_rows: usize,
     pub req_id: u64,
     pub req_last_time: std::time::Instant,
     pub print_key_event: bool,
+    pub node_profile: NodeProfileRecorder,
 }
 
 impl QueryContext {
@@ -50,7 +51,6 @@ impl QueryContext {
             is_querier: false,
             scan_stats: Arc::new(Mutex::new(ScanStats::new())),
             partial_err: Arc::new(Mutex::new(String::new())),
-            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
             peak_memory: Arc::new(AtomicUsize::new(0)),
             trace_id: String::new(),
             start: std::time::Instant::now(),
@@ -58,6 +58,7 @@ impl QueryContext {
             req_id: 0,
             req_last_time: std::time::Instant::now(),
             print_key_event: config::get_config().common.print_key_event,
+            node_profile: NodeProfileRecorder::default(),
         }
     }
 
@@ -86,11 +87,6 @@ impl QueryContext {
         self
     }
 
-    pub fn with_cluster_metrics(mut self, metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
-        self.cluster_metrics = metrics;
-        self
-    }
-
     pub fn with_start_time(mut self, start: std::time::Instant) -> Self {
         self.start = start;
         self
@@ -98,6 +94,11 @@ impl QueryContext {
 
     pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
         self.peak_memory = peak_memory;
+        self
+    }
+
+    pub fn with_node_profile(mut self, node_profile: NodeProfileRecorder) -> Self {
+        self.node_profile = node_profile;
         self
     }
 }

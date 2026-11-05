@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <header
             class="border-border-default flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1.5 text-sm"
           >
-            <span class="font-semibold">{{ t("profiles.timeSeriesTitle") }}</span>
+            <span class="font-semibold">{{ timeSeriesTitle }}</span>
             <div
               v-if="seriesLines.length > 1"
               class="flex min-w-0 flex-wrap items-center gap-1"
@@ -700,6 +700,7 @@ import profilesService, {
   type ProfilesQueryBody,
   type ProfilesSeriesPoint,
   type ProfilesSeriesResponse,
+  type ProfileTypeMeta,
   type ProfilesTreeNode,
 } from "@/services/profiles";
 import { cssToken } from "@/utils/theme";
@@ -857,7 +858,7 @@ const focusInFlameGraph = async (path: string) => {
 
 const metaResponse = ref<{
   services: string[];
-  profile_types: Array<{ type: string; unit: string }>;
+  profile_types: ProfileTypeMeta[];
   label_names: string[];
 } | null>(null);
 const seriesResponse = ref<ProfilesSeriesResponse | null>(null);
@@ -919,7 +920,7 @@ const serviceOptions = computed<SelectOption[]>(() =>
 );
 const profileTypeOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.profile_types ?? []).map((item) => ({
-    label: raw(`${item.type} (${seriesUnitLabel(item.type, item.unit)})`),
+    label: profileTypeLabel(item),
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
@@ -929,7 +930,7 @@ const profileTypeSelectOptions = computed<SelectOption[]>(() => {
   const options = profileTypeOptions.value;
   if (!selected || options.some((option) => option.value === selected)) return options;
   const [type, unit = ""] = selected.split("\u0000");
-  return [...options, { label: raw(`${type} (${seriesUnitLabel(type, unit)})`), value: selected }];
+  return [...options, { label: profileTypeLabel({ type, unit }), value: selected }];
 });
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
@@ -974,9 +975,10 @@ const currentUnit = computed(
 const currentType = computed(
   () => currentProfileType.value?.type || seriesResponse.value?.profile_type || "",
 );
-const isCpuMetric = computed(
-  () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
-);
+const isNanosecondsUnit = (unit: string) => /^(nanoseconds?|ns|nanos)$/i.test(unit);
+const isCpuTime = (profileType: string, unit: string) =>
+  profileType.toLowerCase() === "cpu" && isNanosecondsUnit(unit);
+const isCpuMetric = computed(() => isCpuTime(currentType.value, currentUnit.value));
 
 // Token values change with the theme, so they are re-read whenever it switches.
 const seriesColors = computed(() => {
@@ -1258,12 +1260,26 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
-  if (profileType.toLowerCase() === "cpu" && /nano/i.test(unit)) return "cores";
+  if (isCpuTime(profileType, unit)) return "cores";
   if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
 };
+
+const profileTypeLabel = (profileType: ProfileTypeMeta) => {
+  const { type, unit } = profileType;
+  if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
+  if (type === "samples" && unit === "count")
+    return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
+  return raw(`${type} (${seriesUnitLabel(type, unit)})`);
+};
+
+const timeSeriesTitle = computed(() =>
+  isCpuMetric.value
+    ? t("profiles.cpuUsage", { cpu: raw("CPU"), unit: raw("cores") })
+    : t("profiles.timeSeriesTitle"),
+);
 
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");

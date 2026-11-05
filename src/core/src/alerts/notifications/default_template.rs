@@ -13,98 +13,116 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Terminal fallback content template (design §4.4).
+//! The one compiled default every kind falls back to (amendment A, D3).
 //!
-//! `compiled_default_content` is embedded as literal Rust source rather than a
-//! database row so resolution can never dead-end: a fresh org, a dangling
-//! `default_alert_template` pointer, or a seeding race that hasn't run yet
-//! all still resolve to *something* sensible, with no DB read on this branch
-//! at all. `o2_default_content` is the seeded DB copy of the same content —
-//! what most orgs actually read via their `default_alert_template` pointer —
-//! kept byte-identical to this function by test.
+//! It is literal Rust rather than a database row, so resolution never dead-ends on a fresh
+//! org or a seeding race. `prebuilt_default` is its seeded read only copy, kept identical by test.
+//! A field whose variables are blank for a kind hides, so each kind shows only its own facts.
 
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::{ChartSpec, ContentField, ContentSpec, RowsSpec},
+        alerts::content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
 use db::alerts::templates::TemplateError;
 
-/// Reserved name for the compiled-in default content template's seeded DB
-/// copy. Joins the `prebuilt_*` reserved-name set — see
-/// `is_reserved_template_name`.
-pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = "o2_default_content";
+/// Reserved name of the compiled default's seeded copy.
+pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = infra::table::templates::DEFAULT_TEMPLATE_NAME;
 
-/// Terminal fallback — same content as the shipped seed. Infallible by
-/// construction (asserted by test), so resolution can never dead-end (§4.4).
+/// The field superset in the amendment's order; Slack shows at most ten, and no kind fills more.
+const FIELDS: [(&str, &str); 17] = [
+    ("Level", "{alert_level_label}"),
+    ("Event", "{notification_event_label}"),
+    ("Stream", "{stream_name}"),
+    ("Threshold", "{alert_operator} {alert_threshold}"),
+    ("Value", "{alert_agg_value}"),
+    ("Score", "{anomaly_score}"),
+    ("Check", "{check_name} ({check_type})"),
+    ("Target", "{check_target}"),
+    ("Status", "{check_status_label}"),
+    ("Locations", "{check_locations_line}"),
+    ("Environments", "{check_environments}"),
+    ("Error", "{check_error}"),
+    ("Window", "{downtime_window}"),
+    ("Muted", "{downtime_targets}"),
+    ("Team", "{oncall_team}"),
+    ("Reason", "{oncall_reason}"),
+    ("Time", "{alert_trigger_time_utc}"),
+];
+
+/// Terminal fallback, infallible by construction (asserted by test).
 pub fn compiled_default_content() -> ContentSpec {
     ContentSpec {
-        title: "[{alert_level}] {alert_name} on {stream_name}".into(),
+        title: "{status_dot} {alert_name} {alert_status}".into(),
         title_overrides: Default::default(),
-        body: "**{alert_name}** is {alert_status} for stream **{stream_name}**.\n\n{alert_description}".into(),
-        fields: vec![
-            ContentField {
-                label: "Threshold".into(),
-                value: "{alert_operator} {alert_threshold}".into(),
+        body: "{alert_description}".into(),
+        fields: FIELDS
+            .iter()
+            .map(|(label, value)| ContentField {
+                label: (*label).into(),
+                value: (*value).into(),
                 show_when: None,
-            },
-            ContentField {
-                label: "Value".into(),
-                value: "{alert_agg_value}".into(),
-                show_when: None,
-            },
-            ContentField {
-                label: "Triggered".into(),
-                value: "{alert_trigger_time_str}".into(),
-                show_when: None,
-            },
-        ],
+            })
+            .collect(),
         rows: RowsSpec {
             enabled: true,
             max: 5,
             columns: None,
             format: None,
         },
-        // The alert-URL link is auto-appended by resolve_content.
-        links: vec![],
+        // resolve_content appends View in OpenObserve to alert_url; the explore link is anomaly's
+        // own.
+        links: vec![ContentLink {
+            label: "{anomaly_explore_label}".into(),
+            url: "{anomaly_explore_url}".into(),
+            show_when: None,
+        }],
         chart: ChartSpec { enabled: false },
     }
 }
 
-/// True for template names the system reserves and manages: the
-/// `prebuilt_*` family, plus `o2_default_content`. Users can never
-/// create/update/delete these (root-only, same enforcement path as
-/// prebuilt).
+/// The `prebuilt_*` family, `prebuilt_default`, `o2_default` and its prefix, and the retired names.
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
-        || name == DEFAULT_CONTENT_TEMPLATE_NAME
-        || crate::alerts::templates::is_downtime_template_name(name)
+        || infra::table::templates::is_reserved_default_name(name)
+        || infra::table::templates::RETIRED_DEFAULT_NAMES.contains(&name)
 }
 
-/// Create-if-missing (and overwrite under the same `should_apply_prebuilt`
-/// rule as the prebuilt loop) the seeded DB copy of the compiled default in
-/// DEFAULT_ORG. Called from `ensure_system_templates`, inside the same
-/// dist_lock + revision gate, after the prebuilt loop.
+/// Seed the read only DEFAULT_ORG copy of the compiled default under `should_apply_prebuilt`.
 pub(crate) async fn ensure_default_content_template(
     shipped_rev: u32,
     applied_rev: u32,
 ) -> Result<(), anyhow::Error> {
-    let spec = compiled_default_content();
-    let body = serde_json::to_string(&spec)?;
+    ensure_compiled_row(
+        DEFAULT_CONTENT_TEMPLATE_NAME,
+        &compiled_default_content(),
+        shipped_rev,
+        applied_rev,
+    )
+    .await
+}
 
+async fn ensure_compiled_row(
+    name: &str,
+    spec: &ContentSpec,
+    shipped_rev: u32,
+    applied_rev: u32,
+) -> Result<(), anyhow::Error> {
+    let body = serde_json::to_string(spec)?;
     let mut template = Template {
         id: None,
         org_id: DEFAULT_ORG.to_string(),
-        name: DEFAULT_CONTENT_TEMPLATE_NAME.to_string(),
+        name: name.to_string(),
         is_default: false,
         template_type: TemplateType::Http,
         body: body.clone(),
         kind: TemplateKind::Content,
+        applies_to: Vec::new(),
     };
 
-    match db::alerts::templates::get(DEFAULT_ORG, DEFAULT_CONTENT_TEMPLATE_NAME).await {
+    match db::alerts::templates::get(DEFAULT_ORG, name).await {
         Ok(existing) => {
             let drifted = existing.body != body || existing.template_type != TemplateType::Http;
             if super::super::templates::should_apply_prebuilt(shipped_rev, applied_rev, drifted)
@@ -112,20 +130,16 @@ pub(crate) async fn ensure_default_content_template(
             {
                 template.id = existing.id;
                 db::alerts::templates::set(template).await?;
-                log::info!(
-                    "[TEMPLATES] Updated system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}"
-                );
+                log::info!("[TEMPLATES] Updated system template '{name}' in {DEFAULT_ORG}");
             }
         }
         Err(TemplateError::NotFound) => {
             db::alerts::templates::set(template).await?;
-            log::info!(
-                "[TEMPLATES] Created system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}"
-            );
+            log::info!("[TEMPLATES] Created system template '{name}' in {DEFAULT_ORG}");
         }
         Err(e) => {
             log::error!(
-                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}: {e}"
+                "[TEMPLATES] Error checking system template '{name}' in {DEFAULT_ORG}: {e}"
             );
         }
     }
@@ -135,21 +149,19 @@ pub(crate) async fn ensure_default_content_template(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::level::AlertLevel;
+    use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
 
     use super::*;
     use crate::alerts::notifications::{
-        format::ChannelFormat, preview::synthetic_context, render::render, resolve::resolve_content,
+        examples::example_context, format::ChannelFormat, preview::synthetic_context,
+        render::render, resolve::resolve_content,
     };
 
     #[test]
     fn compiled_default_parses_and_renders_everywhere() {
         let spec = compiled_default_content();
-        assert!(!spec.title.is_empty());
         let ctx = synthetic_context(None);
-        // Every channel format must render the compiled-in default without
-        // error — this is the terminal fallback (see module doc comment),
-        // so it can never be the thing that dead-ends a notification.
+        // The terminal fallback can never be the thing that dead-ends a notification.
         for f in [
             ChannelFormat::Slack,
             ChannelFormat::TeamsAdaptiveCard,
@@ -187,9 +199,117 @@ mod tests {
     }
 
     #[test]
-    fn o2_default_content_is_reserved() {
-        assert!(is_reserved_template_name("o2_default_content"));
-        assert!(is_reserved_template_name("prebuilt_slack"));
+    fn each_kind_shows_only_its_own_fields_under_ten() {
+        let labels = |kind: NotificationKind| -> Vec<String> {
+            let ctx = example_context(kind, false);
+            let content = resolve_content(&compiled_default_content(), &ctx, "slack");
+            assert!(content.unknown_variables.is_empty(), "{kind:?}");
+            content.fields.into_iter().map(|(label, _)| label).collect()
+        };
+        use NotificationKind::*;
+        let want: [(NotificationKind, &[&str]); 6] = [
+            (
+                Alert,
+                &["Level", "Event", "Stream", "Threshold", "Value", "Time"],
+            ),
+            (
+                Incident,
+                &["Level", "Event", "Stream", "Threshold", "Value", "Time"],
+            ),
+            (
+                Anomaly,
+                &["Level", "Event", "Stream", "Value", "Score", "Time"],
+            ),
+            (
+                Synthetics,
+                &[
+                    "Event",
+                    "Check",
+                    "Target",
+                    "Status",
+                    "Locations",
+                    "Environments",
+                    "Error",
+                    "Time",
+                ],
+            ),
+            (Downtime, &["Event", "Window", "Muted", "Time"]),
+            (OnCall, &["Level", "Event", "Team", "Reason", "Time"]),
+        ];
+        for (kind, fields) in want {
+            assert_eq!(labels(kind), fields, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn the_default_and_the_retired_names_are_reserved() {
+        for name in [
+            "prebuilt_default",
+            "o2_default",
+            "o2_default_content",
+            "o2_default_anomaly",
+            "o2_default_x",
+            "prebuilt_downtime",
+            "prebuilt_downtime_email",
+            "prebuilt_slack",
+        ] {
+            assert!(is_reserved_template_name(name), "{name}");
+        }
+        assert!(!is_reserved_template_name("user_o2_default_anomaly"));
+        assert!(!is_reserved_template_name("o2_defaults"));
         assert!(!is_reserved_template_name("my_template"));
+    }
+
+    #[test]
+    fn only_an_anomaly_with_a_link_renders_the_explore_link() {
+        let explore = |ctx: &crate::alerts::notifications::NotificationContext| {
+            resolve_content(&compiled_default_content(), ctx, "slack")
+                .links
+                .into_iter()
+                .filter(|(label, _)| !label.is_empty())
+                .collect::<Vec<_>>()
+        };
+        // The alert link the renderer appends has an empty label; nothing else may appear.
+        assert!(explore(&synthetic_context(Some(AlertLevel::Critical))).is_empty());
+        for kind in [
+            NotificationKind::Incident,
+            NotificationKind::Synthetics,
+            NotificationKind::Downtime,
+            NotificationKind::OnCall,
+        ] {
+            assert!(
+                explore(&example_context(kind, false)).is_empty(),
+                "{kind:?}"
+            );
+        }
+        let anomaly = example_context(NotificationKind::Anomaly, false);
+        let links = explore(&anomaly);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].0, "View data around the window");
+        assert!(links[0].1.contains("/web/logs?"));
+
+        let mut no_link = anomaly.clone();
+        for (k, v) in no_link.context_attributes.iter_mut() {
+            if k.starts_with("anomaly_explore_") {
+                v.clear();
+            }
+        }
+        assert!(explore(&no_link).is_empty());
+    }
+
+    #[test]
+    fn an_alert_link_with_a_blank_common_variable_is_kept_as_before() {
+        let mut ctx = synthetic_context(Some(AlertLevel::Critical));
+        ctx.alert_description = String::new();
+        let spec = ContentSpec {
+            links: vec![ContentLink {
+                label: "Docs".into(),
+                url: "{alert_description}".into(),
+                show_when: None,
+            }],
+            ..compiled_default_content()
+        };
+        let links = resolve_content(&spec, &ctx, "slack").links;
+        assert!(links.iter().any(|(label, _)| label == "Docs"));
     }
 }

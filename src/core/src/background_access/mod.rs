@@ -710,7 +710,7 @@ pub async fn stored_slo_sources(
         .map(|slo| slo_sources(&slo)))
 }
 
-/// Off or lifted RBAC skips every save-time check, so no source is ever loaded for it.
+/// Off RBAC skips every save-time check, so no source is ever loaded for it.
 #[cfg(feature = "enterprise")]
 pub async fn rbac_enforced() -> bool {
     crate::authz::active_checker().enforces_rbac().await

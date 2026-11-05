@@ -16,7 +16,13 @@
 import { gt } from "@/types/i18n";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { format as echartsFormat } from "echarts/core";
-import { CHART_SELECTION_FILL, chartBg, chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
+import {
+  CHART_SELECTION_FILL,
+  chartAxisTextColor,
+  chartBg,
+  chartColor,
+  dataZoomBrushStyle,
+} from "@/utils/chartTheme";
 import { colorLuminance } from "./chartLabelContrast";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber, durationFormatter } from "@/utils/formatters";
@@ -1176,7 +1182,7 @@ export const convertStateTimelineData = (
       type: "time",
       min: range.start !== undefined ? zoned(range.start) : undefined,
       max: range.end !== undefined ? zoned(range.end) : undefined,
-      axisLabel: { hideOverlap: true },
+      axisLabel: { hideOverlap: true, color: chartAxisTextColor() },
       splitLine: {
         show: config.show_gridlines !== false,
         lineStyle: getGridLineStyle(store?.state?.theme),
@@ -1202,7 +1208,7 @@ export const convertStateTimelineData = (
           formatter: (name: string) => displayNames.get(name) ?? name,
           width: labelWidth,
           overflow: "truncate",
-          color: chartColor("--color-text-secondary"),
+          color: chartAxisTextColor(),
         },
       },
       { type: "value", show: false, min: 0, max: 1 },

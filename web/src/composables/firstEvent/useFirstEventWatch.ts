@@ -78,6 +78,8 @@ export interface FirstEventWatchOptions {
   match?: Ref<"exact" | "keyword" | undefined>;
   /** Off for the pill display, which names no cause: no rejections read without a Troubleshoot. */
   autoDiagnosis?: Ref<boolean>;
+  /** Elapsed time without data before the first automatic rejections read; FIRST_EVENT_BUDGET.diagnosisAtMs when unset. */
+  diagnosisAtMs?: Ref<number | undefined>;
 }
 
 interface StreamRow {
@@ -725,7 +727,9 @@ export function useFirstEventWatch(
   };
 
   const rejectionsDue = (): boolean => {
-    if (lastRejectionsReadMs === undefined) return elapsedMs() >= FIRST_EVENT_BUDGET.diagnosisAtMs;
+    if (lastRejectionsReadMs === undefined) {
+      return elapsedMs() >= (options.diagnosisAtMs?.value ?? FIRST_EVENT_BUDGET.diagnosisAtMs);
+    }
     return nowMs() - lastRejectionsReadMs >= FIRST_EVENT_BUDGET.rejectionsEveryMs;
   };
 

@@ -151,8 +151,10 @@ zstd.workspace = true
 [dev-dependencies]
 infra = { workspace = true, features = ["test-utils"] }
 tokio = { workspace = true, features = ["test-util"] }
+o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
+tower.workspace = true
 
 [[bench]]
 name = "db_enrich"

@@ -118,9 +118,7 @@ impl std::fmt::Display for RenderError {
 
 impl std::error::Error for RenderError {}
 
-/// Severity presentation colors — design §4.2.1. These are hex strings usable
-/// directly as a Slack attachment color, a MessageCard `themeColor` (minus the
-/// `#`), and an email stripe.
+/// The preview's severity swatch (design §4.2.1); rendered messages carry the status dot instead.
 pub fn severity_color(level: Option<AlertLevel>) -> &'static str {
     match level {
         Some(AlertLevel::Critical) => "#E01E5A",
@@ -130,23 +128,6 @@ pub fn severity_color(level: Option<AlertLevel>) -> &'static str {
         // Single-level alert: no severity axis, so a brand-neutral blue rather
         // than implying a level the alert does not have.
         None => "#4A90D9",
-    }
-}
-
-/// Human-readable severity label, uppercase, for surfaces that display
-/// severity as a colored badge/pill next to a color swatch rather than the
-/// color alone (design §4.2.1's color mapping does not by itself
-/// communicate the level — a thin color stripe is easy to miss, especially
-/// on mobile or in an email preview pane; see `email.rs render_email`).
-/// `None` for a single-level alert renders no badge at all rather than a
-/// misleading "OK"/"UNKNOWN" — see [`severity_color`]'s same rule.
-pub fn severity_label(level: Option<AlertLevel>) -> Option<&'static str> {
-    match level {
-        Some(AlertLevel::Critical) => Some("CRITICAL"),
-        Some(AlertLevel::Warning) => Some("WARNING"),
-        Some(AlertLevel::NoData) => Some("NO DATA"),
-        Some(AlertLevel::Ok) => Some("RECOVERED"),
-        None => None,
     }
 }
 
@@ -342,6 +323,14 @@ pub fn render(
 
 #[cfg(test)]
 mod tests {
+    /// The first top-level Slack block of `kind`, or null.
+    fn slack_block<'a>(v: &'a serde_json::Value, kind: &str) -> &'a serde_json::Value {
+        v["blocks"]
+            .as_array()
+            .and_then(|b| b.iter().find(|b| b["type"] == kind))
+            .unwrap_or(&serde_json::Value::Null)
+    }
+
     use std::collections::BTreeMap;
 
     use config::meta::alerts::level::AlertLevel;
@@ -395,6 +384,7 @@ mod tests {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 
@@ -450,26 +440,22 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
 
         // mrkdwn safety: `&`/`<`/`>` entity-encoded in every mrkdwn text run.
-        let fields = &v["attachments"][0]["blocks"][2]["fields"];
+        let fields = &v["blocks"][2]["fields"];
         assert_eq!(fields[0]["text"], "*host*\nweb-1 &amp; web-2");
-        let section = v["attachments"][0]["blocks"][1]["text"]["text"]
-            .as_str()
-            .unwrap();
+        let section = v["blocks"][1]["text"]["text"].as_str().unwrap();
         assert!(section.contains("&lt;script&gt;"));
         assert!(!section.contains("<script>"));
         // The title is a bold mrkdwn LINK to the alert (Datadog-style,
         // user-picked in a live A/B) — the label IS mrkdwn, so `&`/`<`/`>`
         // are entity-encoded, unlike the plain_text header fallback.
         assert_eq!(
-            v["attachments"][0]["blocks"][0]["text"]["text"],
+            v["blocks"][0]["text"]["text"],
             r#"*<https://o2.example/short/abc|CPU "high" &amp; &lt;fire&gt; on web-1>*"#
         );
-        // Empty link label gets the renderer default; buttons live in the
-        // second (tail) attachment.
-        let buttons = &v["attachments"][1]["blocks"][0];
+        // Empty link label gets the renderer default; no attachment carries a color stripe.
+        let buttons = slack_block(&v, "actions");
         assert_eq!(buttons["elements"][1]["text"]["text"], DEFAULT_LINK_LABEL);
-        // Severity stripe.
-        assert_eq!(v["attachments"][0]["color"], "#E01E5A");
+        assert!(v.get("attachments").is_none(), "{v}");
 
         assert_eq!(
             v,
@@ -483,7 +469,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         let content = &v["attachments"][0]["content"];
         assert_eq!(content["version"], "1.4");
-        assert_eq!(content["body"][0]["color"], "attention"); // critical
+        assert!(content["body"][0].get("color").is_none());
         // Adaptive Card TextBlocks are not HTML — the script tag survives as
         // INERT text (never rendered as markup by the card host), and the
         // markdown emphasis markers are gone.
@@ -505,7 +491,7 @@ mod tests {
         let body = http_body(ChannelFormat::TeamsMessageCard);
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(v["@type"], "MessageCard");
-        assert_eq!(v["themeColor"], "E01E5A"); // critical, no leading '#'
+        assert!(v.get("themeColor").is_none());
         // MessageCard text IS rendered as markup → must be entity-encoded.
         let text = v["sections"][0]["text"].as_str().unwrap();
         assert!(!text.contains("<script>"));
@@ -580,7 +566,7 @@ mod tests {
         // mrkdwn), so the hostile `<script>` text survives as inert markdown
         // source rather than being interpreted as HTML.
         assert!(embed["description"].as_str().unwrap().contains("<script>"));
-        assert_eq!(embed["color"], 0xE01E5A);
+        assert!(embed.get("color").is_none());
         // The FIRST link becomes the embed's clickable title link (a Discord
         // embed has one), whatever it is — here that's the author-added
         // "Runbook" link, since it precedes the alert URL in `hostile_content`.
@@ -697,7 +683,7 @@ mod tests {
 
         // Human-facing formats: the SAME content gets the display default.
         let slack = slack::render_slack(&content, &fixture_ctx());
-        let actions = &slack["attachments"][1]["blocks"][0];
+        let actions = slack_block(&slack, "actions");
         assert_eq!(actions["elements"][1]["text"]["text"], DEFAULT_LINK_LABEL);
 
         let card = teams::render_teams_adaptive_card(&content, &fixture_ctx());
@@ -723,42 +709,6 @@ mod tests {
         assert_eq!(severity_color(Some(AlertLevel::NoData)), "#9AA0A6");
         assert_eq!(severity_color(Some(AlertLevel::Ok)), "#2EB67D");
         assert_eq!(severity_color(None), "#4A90D9");
-    }
-
-    #[test]
-    fn severity_label_table() {
-        assert_eq!(severity_label(Some(AlertLevel::Critical)), Some("CRITICAL"));
-        assert_eq!(severity_label(Some(AlertLevel::Warning)), Some("WARNING"));
-        assert_eq!(severity_label(Some(AlertLevel::NoData)), Some("NO DATA"));
-        assert_eq!(severity_label(Some(AlertLevel::Ok)), Some("RECOVERED"));
-        // Single-level alert: no badge at all, not a misleading label.
-        assert_eq!(severity_label(None), None);
-    }
-
-    /// Color alone is insufficient — live user feedback: a 4px stripe is easy
-    /// to miss, especially in an email preview pane. Every severity-bearing
-    /// notification must carry the label as TEXT somewhere, not just a color.
-    #[test]
-    fn severity_communicated_via_text_not_color_alone() {
-        let mut c = hostile_content();
-        c.severity = Some(AlertLevel::Warning);
-
-        let (_, html, text) = email::render_email(&c, &fixture_ctx());
-        assert!(html.contains("WARNING"), "{html}");
-        assert!(text.starts_with("[WARNING] "), "{text}");
-    }
-
-    /// A single-level alert (`severity: None`) must show no badge — there is
-    /// no level to report, and a fallback label ("OK"/"UNKNOWN") would imply
-    /// one that was never computed.
-    #[test]
-    fn single_level_alert_shows_no_severity_badge() {
-        let mut c = hostile_content();
-        c.severity = None;
-
-        let (_, html, text) = email::render_email(&c, &fixture_ctx());
-        assert!(!html.contains("CRITICAL"), "{html}");
-        assert!(!text.starts_with('['), "{text}");
     }
 
     #[test]
@@ -818,54 +768,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn empty_severity_uses_brand_neutral_stripe() {
-        let mut c = hostile_content();
-        c.severity = None;
-        let v = slack::render_slack(&c, &fixture_ctx());
-        assert_eq!(v["attachments"][0]["color"], "#4A90D9");
-    }
-
-    /// The user-picked "full stripe" split (live A/B on a real channel):
-    /// content in attachment[0], buttons + chart in attachment[1], BOTH
-    /// carrying the severity color so the stripe runs beside everything.
-    /// Split in two because Slack folds any single tall attachment behind
-    /// "Show more" — live-observed hiding first the buttons, then the chart
-    /// — while two short halves each stay under the fold threshold. No
-    /// top-level `blocks` at all.
-    #[test]
-    fn content_and_tail_split_across_two_striped_attachments() {
-        let v = slack::render_slack(&hostile_content(), &fixture_ctx());
-        assert!(
-            v.get("blocks").is_none(),
-            "no top-level blocks — the stripe only spans attachment content"
-        );
-        let attachments = v["attachments"].as_array().unwrap();
-        assert_eq!(attachments.len(), 2);
-        assert_eq!(
-            attachments[0]["color"], attachments[1]["color"],
-            "both halves carry the same severity color for a continuous stripe"
-        );
-        // Content half: linked title first (fixture ctx has an alert URL).
-        let content = attachments[0]["blocks"].as_array().unwrap();
-        assert_eq!(content[0]["type"], "section");
-        // Tail half: just the actions (fixture ctx has no chart URL).
-        let tail = attachments[1]["blocks"].as_array().unwrap();
-        assert_eq!(tail.len(), 1);
-        assert_eq!(tail[0]["type"], "actions");
-    }
-
-    /// No links and no chart → the tail attachment is OMITTED entirely:
-    /// live-verified that an attachment with `color` and empty `blocks`
-    /// renders nothing, so emitting it would be dead weight in the payload.
-    #[test]
-    fn empty_tail_attachment_is_omitted() {
-        let mut c = hostile_content();
-        c.links.clear();
-        let v = slack::render_slack(&c, &fixture_ctx());
-        assert_eq!(v["attachments"].as_array().unwrap().len(), 1);
-    }
-
     /// Live-verified against a real Slack webhook: a field value beginning
     /// with `>` (raw or `&gt;`-entity-encoded) is parsed as blockquote
     /// syntax and Slack consumes the `>`/`&gt;` as structure — e.g. a
@@ -878,7 +780,7 @@ mod tests {
         let mut c = hostile_content();
         c.fields = vec![("Threshold".into(), ">= 5".into())];
         let v = slack::render_slack(&c, &fixture_ctx());
-        let blocks = v["attachments"][0]["blocks"].as_array().unwrap();
+        let blocks = v["blocks"].as_array().unwrap();
         let fields_block = blocks
             .iter()
             .find(|b| b["fields"].is_array())
@@ -907,9 +809,7 @@ mod tests {
         let mut c = hostile_content();
         c.row_lines = Some(vec!["web-1 & 92.5".into()]);
         let v = slack::render_slack(&c, &fixture_ctx());
-        let text = v["attachments"][0]["blocks"][3]["text"]["text"]
-            .as_str()
-            .unwrap();
+        let text = v["blocks"][3]["text"]["text"].as_str().unwrap();
         assert_eq!(text, "web-1 &amp; 92.5");
     }
 
@@ -970,7 +870,7 @@ mod tests {
 
             // Strict transports: the hostile link is gone, the good one stays.
             let slack = slack::render_slack(&c, &fixture_ctx());
-            let elements = &slack["attachments"][1]["blocks"][0]["elements"];
+            let elements = &slack_block(&slack, "actions")["elements"];
             assert_eq!(
                 elements.as_array().map(Vec::len),
                 Some(1),
@@ -1160,7 +1060,7 @@ mod tests {
         ];
 
         let slack = slack::render_slack(&c, &fixture_ctx());
-        let elements = slack["attachments"][1]["blocks"][0]["elements"]
+        let elements = slack_block(&slack, "actions")["elements"]
             .as_array()
             .expect("slack actions block");
         // The hostile link is gone; the two legitimate ones survive.
@@ -1214,15 +1114,11 @@ mod tests {
         c.links = vec![("".into(), ctx.alert_url.clone())];
 
         let slack = slack::render_slack(&c, &ctx);
-        // Only the content attachment remains: no buttons, no chart.
-        for att in slack["attachments"].as_array().expect("attachments") {
-            for block in att["blocks"].as_array().expect("blocks") {
-                assert_ne!(
-                    block["type"], "actions",
-                    "slack emitted an actions block built from a relative url: {slack:#?}"
-                );
-            }
-        }
+        // Only the content blocks remain: no buttons, no chart.
+        assert!(
+            slack_block(&slack, "actions").is_null(),
+            "slack emitted an actions block built from a relative url: {slack:#?}"
+        );
 
         let card = teams::render_teams_adaptive_card(&c, &ctx);
         assert!(
@@ -1307,7 +1203,7 @@ mod tests {
             .map(|i| (format!("link{i}"), format!("https://example/{i}")))
             .collect();
         let v = slack::render_slack(&c, &fixture_ctx());
-        let actions = &v["attachments"][1]["blocks"][0];
+        let actions = slack_block(&v, "actions");
         let elements = actions["elements"].as_array().unwrap();
         assert_eq!(elements.len(), 5, "Block Kit caps actions elements at 5");
         // Links 5..8 are silently dropped.
@@ -1319,9 +1215,7 @@ mod tests {
         let v2 = slack::render_slack(&c2, &fixture_ctx());
         // Linked-title path: the 150-char clamp applies to the link LABEL,
         // between the `|` and the closing `>`.
-        let title = v2["attachments"][0]["blocks"][0]["text"]["text"]
-            .as_str()
-            .unwrap();
+        let title = v2["blocks"][0]["text"]["text"].as_str().unwrap();
         let label = title.split_once('|').unwrap().1.strip_suffix(">*").unwrap();
         assert_eq!(label.chars().count(), 150);
         assert!(label.ends_with('…'));
@@ -1330,13 +1224,7 @@ mod tests {
         let mut c3 = hostile_content();
         c3.fields = (0..14).map(|i| (format!("f{i}"), i.to_string())).collect();
         let v3 = slack::render_slack(&c3, &fixture_ctx());
-        assert_eq!(
-            v3["attachments"][0]["blocks"][2]["fields"]
-                .as_array()
-                .unwrap()
-                .len(),
-            10
-        );
+        assert_eq!(v3["blocks"][2]["fields"].as_array().unwrap().len(), 10);
     }
 
     /// The default "View in OpenObserve" link (empty label, appended last by
@@ -1352,7 +1240,7 @@ mod tests {
         c.links
             .push((String::new(), "https://o2.example/short/abc".into()));
         let v = slack::render_slack(&c, &fixture_ctx());
-        let actions = &v["attachments"][1]["blocks"][0];
+        let actions = slack_block(&v, "actions");
         let elements = actions["elements"].as_array().unwrap();
         assert_eq!(elements.len(), 5);
         // Authors capped at 4; the default fills the reserved 5th slot.
@@ -1364,41 +1252,21 @@ mod tests {
         assert!(elements[0].get("style").is_none());
     }
 
-    /// With a chart URL present, the tail attachment holds actions BEFORE
-    /// the image: if Slack's fold ever engages on that half, it must clip
-    /// the chart's bottom edge, never the "View in OpenObserve" button
-    /// (live-observed hidden when the buttons trailed the image).
+    /// The actions come before the chart, so a clipped message never loses the main button.
     #[test]
     fn slack_buttons_render_above_chart_image() {
         let mut ctx = fixture_ctx();
         ctx.chart_url =
             Some("https://o2.example/api/v2/default/alerts/charts/render?d=x&s=y".into());
         let v = slack::render_slack(&hostile_content(), &ctx);
-        let tail = v["attachments"][1]["blocks"].as_array().unwrap();
-        assert_eq!(tail.len(), 2);
+        let blocks = v["blocks"].as_array().unwrap();
+        let tail = &blocks[blocks.len() - 2..];
         assert_eq!(tail[0]["type"], "actions");
         assert_eq!(tail[1]["type"], "image");
         assert_eq!(
             tail[0]["elements"].as_array().unwrap().last().unwrap()["style"],
             "primary"
         );
-    }
-
-    #[test]
-    fn adaptive_card_severity_colors() {
-        let colors = |level| {
-            let mut c = hostile_content();
-            c.severity = level;
-            teams::render_teams_adaptive_card(&c, &fixture_ctx())["attachments"][0]["content"]["body"][0]["color"]
-                .as_str()
-                .unwrap()
-                .to_string()
-        };
-        assert_eq!(colors(Some(AlertLevel::Critical)), "attention");
-        assert_eq!(colors(Some(AlertLevel::Warning)), "warning");
-        assert_eq!(colors(Some(AlertLevel::Ok)), "good");
-        assert_eq!(colors(Some(AlertLevel::NoData)), "default");
-        assert_eq!(colors(None), "default");
     }
 
     /// The reported markdown-injection bug, end to end, on EVERY channel.
@@ -1432,9 +1300,7 @@ mod tests {
         // carry `&gt;=` and no blockquote marker.
         let slack = resolve_content(&spec, &ctx, "slack");
         let v = slack::render_slack(&slack, &fixture_ctx());
-        let section = v["attachments"][0]["blocks"][1]["text"]["text"]
-            .as_str()
-            .unwrap();
+        let section = v["blocks"][1]["text"]["text"].as_str().unwrap();
         assert_eq!(section, "• &gt;=");
 
         // Teams Adaptive Card — inert plaintext, so the `>` stays literal.

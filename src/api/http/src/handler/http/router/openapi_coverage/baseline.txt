@@ -510,8 +510,6 @@ oss route POST /api/{org_id}/search_jobs/{job_id}/cancel
 oss route GET /api/{org_id}/search_jobs/{job_id}/result
 oss route POST /api/{org_id}/search_jobs/{job_id}/retry
 oss route GET /api/{org_id}/service_streams
-oss route GET /api/{org_id}/service_streams/_analytics
-oss route POST /api/{org_id}/service_streams/_correlate
 oss route GET /api/{org_id}/service_streams/config/identity
 oss route PUT /api/{org_id}/service_streams/config/identity
 oss route GET /api/{org_id}/settings/gen_ai/agent_mapping

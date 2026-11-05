@@ -1,4 +1,4 @@
-import type { I18nKey, TranslateFn } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
@@ -1303,21 +1303,34 @@ const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) 
   }
 };
 
+/** The save-time range error for one ranged panel setting, or "" when it is unset or in range; config fields show it inline. */
+export const panelConfigRangeError = (t: TranslateFn, panel: any, key: string): I18nText => {
+  const entry = PANEL_TYPE_RANGE_KEYS.find(([rangeKey]) => rangeKey === key);
+  if (!entry) return raw("");
+  const [, label, types, min, max, exclusive] = entry;
+  if (!types.includes(panel?.type) || !isSetValue(panel?.config?.[key])) return raw("");
+  // A set bucket size replaces the bucket count, and the count field is disabled meanwhile.
+  if (key === "distribution_bucket_count" && isSetValue(panel.config.distribution_bucket_size)) {
+    return raw("");
+  }
+  const value = asFiniteNumber(panel.config[key]);
+  const tooLow = value === null || (exclusive ? value <= min : value < min);
+  if (!tooLow && (value as number) <= max) return raw("");
+  if (exclusive && !Number.isFinite(max)) {
+    return t("dashboard.utils.configValueAbove", { setting: t(label), min: String(min) });
+  }
+  return t("dashboard.utils.configValueOutOfRange", {
+    setting: t(label),
+    min: exclusive ? `> ${min}` : String(min),
+    max: Number.isFinite(max) ? String(max) : "∞",
+  });
+};
+
 const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
   const config = panel.config;
-  for (const [key, label, types, min, max, exclusive] of PANEL_TYPE_RANGE_KEYS) {
-    if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
-    const value = asFiniteNumber(config[key]);
-    const tooLow = value === null || (exclusive ? value <= min : value < min);
-    if (tooLow || (value as number) > max) {
-      errors.push(
-        t("dashboard.utils.configValueOutOfRange", {
-          setting: t(label),
-          min: exclusive ? `> ${min}` : String(min),
-          max: Number.isFinite(max) ? String(max) : "∞",
-        }),
-      );
-    }
+  for (const [key] of PANEL_TYPE_RANGE_KEYS) {
+    const error = panelConfigRangeError(t, panel, key);
+    if (error) errors.push(error);
   }
   if (panel.type === "gauge" && isSetValue(config.gauge_neutral)) {
     if (asFiniteNumber(config.gauge_neutral) === null) {
