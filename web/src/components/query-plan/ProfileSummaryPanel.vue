@@ -319,11 +319,14 @@ const nodeRoles = computed(() => {
   const c = props.summary.nodeCounts;
   // all-in-one nodes hold both roles, so a role split would double count them
   if (c.queriers + c.ingesters !== c.total) return null;
+  // non-breaking spaces keep each count with its word, so a wrapped line breaks at the dot
   return raw(
     [
       t("search.queryProfile.queriersCount", { count: c.queriers }, c.queriers),
       t("search.queryProfile.ingestersCount", { count: c.ingesters }, c.ingesters),
-    ].join(" · "),
+    ]
+      .map((part) => part.replace(/ /g, "\u00a0"))
+      .join(" · "),
   );
 });
 

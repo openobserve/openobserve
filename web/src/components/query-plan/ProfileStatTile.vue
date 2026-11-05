@@ -22,13 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
       >{{ value }}</OTruncatedText
     >
-    <OTruncatedText
-      v-for="(line, i) in lines"
-      :key="i"
-      as="div"
-      class="text-text-secondary text-2xs"
-      >{{ line }}</OTruncatedText
-    >
+    <div v-for="(line, i) in lines" :key="i" class="text-text-secondary text-2xs break-words">
+      {{ line }}
+    </div>
   </div>
 </template>
 
