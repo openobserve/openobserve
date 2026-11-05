@@ -29,7 +29,10 @@ use proto::cluster_rpc;
 use crate::{
     cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
     partition::aggregate::is_streaming_aggregate,
-    sql::{Sql, histogram::histogram_offset_micros},
+    sql::{
+        Sql,
+        histogram::{has_calendar_histogram_interval, histogram_offset_micros},
+    },
 };
 
 /// SQL-derived context for a search partition request.
@@ -75,6 +78,7 @@ impl PartitionSqlContext {
         });
 
         let use_single_partition = is_explain
+            || has_calendar_histogram_interval(&req.sql)
             || ((ts_column.is_none() || apply_over_hits)
                 && !(req.streaming_output && is_streaming_agg));
 

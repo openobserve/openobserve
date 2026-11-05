@@ -64,7 +64,12 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::RE_SELECT_FROM,
+    sql::{
+        RE_SELECT_FROM,
+        histogram::{
+            has_calendar_histogram_interval, histogram_offset_micros, pin_histogram_timezone,
+        },
+    },
 };
 
 pub mod cacher;
@@ -564,12 +569,14 @@ pub async fn prepare_cache_response(
     use_cache: bool,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
     // the cache key and every delta below must use the offset of the request end
-    crate::sql::histogram::pin_histogram_timezone(
+    pin_histogram_timezone(
         &mut req.query.sql,
         &mut req.query.timezone,
         req.query.end_time,
     );
     let mut origin_sql = req.query.sql.clone();
+    // a whole-bucket check needs a fixed width, which a calendar bucket does not have
+    let use_cache = use_cache && !has_calendar_histogram_interval(&origin_sql);
     let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
         // result cache doesn't support multiple stream names
@@ -645,7 +652,7 @@ pub async fn prepare_cache_response(
     }
     // a request timezone is not in the SQL, and an hourly grid cannot tell two offsets apart
     let ts_offset = if is_complex_query && sql.histogram_interval.is_some() {
-        crate::sql::histogram::histogram_offset_micros(
+        histogram_offset_micros(
             &origin_sql,
             req.query.timezone.as_deref(),
             req.query.end_time,
