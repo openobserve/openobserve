@@ -215,6 +215,9 @@ pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     (new_ts, ts > 0 && new_ts == ts)
 }
 
+/// The shortest anomaly detection schedule; a stored row below it runs at this cadence.
+pub const MIN_ANOMALY_SCHEDULE_SECONDS: i64 = 60;
+
 /// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
 pub fn parse_interval(interval: &str) -> Result<i64, anyhow::Error> {
     let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {

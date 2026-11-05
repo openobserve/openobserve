@@ -2176,7 +2176,8 @@ fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOut
     trigger.data = td.to_json_string();
 }
 
-/// Parse a stored schedule into microseconds; an unusable one keeps the 5 minute default.
+/// Parse a stored schedule into microseconds, at the floor or above; an unusable one keeps the
+/// 5 minute default.
 fn parse_detection_interval_to_micros(interval: &str) -> i64 {
     const DEFAULT_MICROS: i64 = 5 * 60 * 1_000_000;
     let s = interval.trim();
@@ -2187,6 +2188,7 @@ fn parse_detection_interval_to_micros(interval: &str) -> i64 {
     };
     match secs
         .filter(|secs| *secs > 0)
+        .map(|secs| secs.max(config::utils::time::MIN_ANOMALY_SCHEDULE_SECONDS))
         .and_then(|secs| secs.checked_mul(1_000_000))
     {
         Some(micros) => micros,
@@ -8532,8 +8534,14 @@ mod tests {
     #[test]
     fn test_parse_detection_interval_days_and_seconds_keep_what_the_user_saved() {
         assert_eq!(parse_detection_interval_to_micros("1d"), 86_400 * 1_000_000);
-        assert_eq!(parse_detection_interval_to_micros("30s"), 30 * 1_000_000);
         assert_eq!(parse_detection_interval_to_micros("90s"), 90 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_below_the_floor_runs_at_the_floor() {
+        assert_eq!(parse_detection_interval_to_micros("30s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1m"), 60 * 1_000_000);
     }
 
     #[test]

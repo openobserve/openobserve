@@ -31,7 +31,7 @@ use config::{
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
     },
-    utils::time::{now_micros, parse_interval},
+    utils::time::{MIN_ANOMALY_SCHEDULE_SECONDS, now_micros, parse_interval},
 };
 use db::authz::{remove_ownership, set_ownership};
 use infra::{
@@ -167,6 +167,7 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_function: String,
     pub detection_function_field: Option<String>,
     pub histogram_interval: String,
+    /// At least 1 minute; a stored row below it runs every minute.
     pub schedule_interval: String,
     /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: i64,
@@ -257,6 +258,7 @@ pub struct UpdateAnomalyConfigRequest {
     pub detection_function: Option<String>,
     pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
+    /// At least 1 minute; a stored row below it runs every minute.
     pub schedule_interval: Option<String>,
     /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: Option<i64>,
@@ -2304,6 +2306,13 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
     }
 
     validate_origin_aligned_interval(histogram_interval, histogram_secs)?;
+
+    if schedule_secs < MIN_ANOMALY_SCHEDULE_SECONDS {
+        anyhow::bail!(
+            "schedule_interval ({schedule_interval}) must be at least \
+             {MIN_ANOMALY_SCHEDULE_SECONDS} seconds"
+        );
+    }
 
     // A short schedule scores a partial bucket against a full-bucket baseline, forever.
     if schedule_secs < histogram_secs {
@@ -4444,6 +4453,17 @@ mod tests {
         let mut req = make_valid_filters_req();
         req.histogram_interval = "10x".to_string();
         assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_schedule_floor() {
+        let mut req = make_valid_filters_req();
+        req.histogram_interval = "1s".to_string();
+        req.schedule_interval = "59s".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("at least 60 seconds"), "{err}");
+        req.schedule_interval = "1m".to_string();
+        assert!(validate_config_request(&req).is_ok());
     }
 
     #[test]
@@ -8148,6 +8168,23 @@ mod tests {
             assert!(checked_update_body(&mut req, &stored).is_err());
             let mut req = update_body(serde_json::json!({ "detection_window_seconds": 3600 }));
             assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+
+        #[test]
+        fn a_row_below_the_schedule_floor_stays_editable_until_its_schedule_changes() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "10s".to_string(),
+                schedule_interval: "30s".to_string(),
+                ..stored_config()
+            };
+            let req = update_body(serde_json::json!({ "name": "renamed" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
+            let req = update_body(serde_json::json!({ "schedule_interval": "30s" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
+            let req = update_body(serde_json::json!({ "schedule_interval": "40s" }));
+            assert!(validated_intervals(&req, &stored).is_err());
+            let req = update_body(serde_json::json!({ "schedule_interval": "1m" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
         }
 
         #[test]

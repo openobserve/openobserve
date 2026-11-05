@@ -99,6 +99,8 @@ const INTERVAL_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d:
 
 /** The server's MAX_DETECTION_WINDOW_BUCKETS; the two rules must reject the same windows. */
 const MAX_DETECTION_WINDOW_BUCKETS = 100_000;
+/** The server's MIN_ANOMALY_SCHEDULE_SECONDS; the two rules must reject the same schedules. */
+const MIN_SCHEDULE_SECONDS = 60;
 
 /** Seconds for one interval value + unit pair; null when either part is not a positive s/m/h/d interval. */
 export const anomalyIntervalSeconds = (value: number, unit: string): number | null => {
@@ -276,6 +278,22 @@ export const createAnomalyDetectionConfigSchema = (
     const windowUntouched =
       stored !== null &&
       sameInterval(stored.window, value.detection_window_value, value.detection_window_unit);
+    // The server judges this only when the schedule or the resolution changes.
+    if (stored === null || !histogramUntouched || !scheduleUntouched) {
+      const scheduleSecs = anomalyIntervalSeconds(
+        value.schedule_interval_value,
+        value.schedule_interval_unit,
+      );
+      if (scheduleSecs !== null && scheduleSecs < MIN_SCHEDULE_SECONDS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["schedule_interval_value"],
+          message: t("alerts.anomaly.scheduleIntervalFloor", {
+            min: formatAnomalySeconds(MIN_SCHEDULE_SECONDS),
+          }),
+        });
+      }
+    }
     // D4 grandfathering: an untouched stored triple round-trips verbatim, so the floor judges only edits.
     const grandfathered =
       stored !== null && histogramUntouched && scheduleUntouched && windowUntouched;

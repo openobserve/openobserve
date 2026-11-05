@@ -1252,6 +1252,23 @@ describe("AnomalyDetectionConfig", () => {
       expect(getForm(wrapper).state.isValid).toBe(false);
     });
 
+    it("refuses a schedule under one minute and accepts one minute", async () => {
+      const shape = {
+        schedule_interval_unit: "s",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 1,
+        detection_window_unit: "h",
+      };
+      wrapper = await submitted({ ...shape, schedule_interval_value: 59 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toContain("1m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, schedule_interval_value: 60 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBeUndefined();
+    });
+
     it("refuses a window over the server's 100,000 bucket limit and names the longest one", async () => {
       wrapper = await submitted({
         schedule_interval_value: 1,
