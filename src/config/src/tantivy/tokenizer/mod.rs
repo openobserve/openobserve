@@ -27,11 +27,7 @@ const MIN_TOKEN_LENGTH: usize = 2;
 const MAX_TOKEN_LENGTH: usize = 64;
 
 pub fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
-    let cfg = get_config();
-    let min_token_length =
-        std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH);
-    let max_token_length =
-        std::cmp::max(cfg.limit.inverted_index_max_token_length, MAX_TOKEN_LENGTH);
+    let (min_token_length, max_token_length) = o2_token_length_limits();
     tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::new(collect_type))
         .filter(RemoveShortFilter::limit(min_token_length))
         .filter(tantivy::tokenizer::RemoveLongFilter::limit(
@@ -39,6 +35,15 @@ pub fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
         ))
         .filter(tantivy::tokenizer::LowerCaser)
         .build()
+}
+
+/// Token byte-length filter bounds: a token is indexed only when `min <= len < max`.
+pub fn o2_token_length_limits() -> (usize, usize) {
+    let cfg = get_config();
+    (
+        std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH),
+        std::cmp::max(cfg.limit.inverted_index_max_token_length, MAX_TOKEN_LENGTH),
+    )
 }
 
 pub fn o2_collect_search_tokens(text: &str) -> Vec<String> {
