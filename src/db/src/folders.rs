@@ -1047,6 +1047,19 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn create_and_rename_refuse_the_default_name_before_writing() {
+        let folder = |name: &str| Folder {
+            folder_id: String::new(),
+            name: name.to_string(),
+            ..Default::default()
+        };
+        let created = save_folder("o1", folder(" default "), FolderType::Alerts, false).await;
+        assert!(matches!(created, Err(FolderError::FolderNameAlreadyExists)));
+        let renamed = update_folder("o1", "abc", FolderType::Alerts, folder("default")).await;
+        assert!(matches!(renamed, Err(FolderError::FolderNameAlreadyExists)));
+    }
+
     #[test]
     fn infra_error_display_keeps_the_cause() {
         let err = FolderError::InfraError(infra::errors::Error::Message(
