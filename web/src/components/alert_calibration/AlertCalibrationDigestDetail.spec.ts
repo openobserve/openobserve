@@ -327,6 +327,30 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
   });
 });
 
+describe("AlertCalibrationDigestDetail load failure", () => {
+  beforeEach(() => {
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+    };
+  });
+
+  it("a failed records read shows the plain error copy, never the server's words", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValueOnce(
+      Object.assign(new Error("Request failed with status code 500"), {
+        response: { status: 500, data: "internal" },
+      }),
+    );
+    const wrapper = await mountDetail([]);
+    const error = wrapper.find('[data-test="alert-calibration-digest-error"]');
+    expect(error.text()).toContain("Digest unavailable");
+    expect(error.text()).toContain("This run couldn't be loaded. Try again in a moment.");
+    expect(wrapper.text()).not.toContain("internal");
+    wrapper.unmount();
+  });
+});
+
 describe("AlertCalibrationDigestDetail dismissed tile", () => {
   beforeEach(() => {
     store.state.zoConfig = {

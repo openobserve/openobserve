@@ -33,11 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         data-test="alert-calibration-settings-load-error"
       >
-        {{
-          t("alertCalibration.settings.loadFailed", {
-            message: loadErrorMessage(configQuery.error.value),
-          })
-        }}
+        {{ readErrorCopy(t, configQuery.error.value, "settings") }}
         <template #actions>
           <OButton variant="outline" size="sm" @click="reload">{{
             t("alertCalibration.retry")
@@ -97,8 +93,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useOrgId } from "@/composables/query";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { errorMessage } from "@/services/alert_calibration";
+import { useI18nTyped } from "@/types/i18n";
+import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
@@ -114,8 +110,6 @@ const orgId = useOrgId();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 const { pending, runNow } = useRequestAlertCalibrationRun();
-
-const loadErrorMessage = (error: unknown) => raw(errorMessage(error));
 
 const reload = () => void configQuery.refetch();
 

@@ -168,6 +168,11 @@ const config = (enabled: boolean) => ({
   },
 });
 
+const serverError = (status: number, data: unknown) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data },
+  });
+
 const mountPage = async (query: Record<string, string> = {}) => {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -381,6 +386,19 @@ describe("AlertCalibrationDashboard", () => {
       .trigger("click");
     await flushPromises();
     expect(wrapper.router.currentRoute.value.name).toBe("alertCalibrationSettings");
+    wrapper.unmount();
+  });
+
+  it("a failed runs read shows the plain error copy, never the server's words", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
+    const wrapper = await mountPage();
+    const board = wrapper.find('[data-test="alert-calibration-dashboard-no-board"]');
+    expect(board.text()).toContain("Runs unavailable");
+    expect(board.text()).toContain(
+      "Alert calibration runs couldn't be loaded. Try again in a moment.",
+    );
+    expect(board.text()).toContain("Retry");
+    expect(wrapper.text()).not.toContain("internal");
     wrapper.unmount();
   });
 
