@@ -1111,6 +1111,67 @@ fn transition_from_model(m: alert_state_transitions::Model) -> Option<StateTrans
     })
 }
 
+/// Ranked per alert in `[from, to]`, ascending; `newest_first` picks which rows a cut keeps.
+async fn ranked_transitions_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+    newest_first: bool,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    use alert_state_transitions::Column;
+    use sea_orm::sea_query::{Alias, Asterisk, Expr, Func, Order, Query, WindowStatement};
+
+    let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
+        std::collections::HashMap::new();
+    if alert_ids.is_empty() {
+        return Ok(grouped);
+    }
+    // Ranked per alert, so one flapping alert cannot use up the other alerts' share of the rows.
+    let rank = Alias::new("lane_rank");
+    let rank_order = if newest_first {
+        Order::Desc
+    } else {
+        Order::Asc
+    };
+    let lane = WindowStatement::partition_by(Column::AlertId)
+        .order_by(Column::At, rank_order.clone())
+        .order_by(Column::Id, rank_order)
+        .to_owned();
+    let mut ranked = Query::select();
+    ranked
+        .column(Asterisk)
+        .expr_window_as(Func::cust(Alias::new("ROW_NUMBER")), lane, rank.clone())
+        .from(alert_state_transitions::Entity)
+        .and_where(Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .and_where(Column::At.gte(from))
+        .and_where(Column::At.lte(to));
+    if let Some(key) = group_key {
+        ranked.and_where(Column::GroupKey.eq(key));
+    }
+    let query = Query::select()
+        .column(Asterisk)
+        .from_subquery(ranked, Alias::new("ranked"))
+        .and_where(Expr::col(rank).lte(per_alert_limit))
+        .order_by(Column::AlertId, Order::Asc)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let statement = conn.get_database_backend().build(&query);
+    let rows = alert_state_transitions::Model::find_by_statement(statement)
+        .all(conn)
+        .await?;
+    for transition in rows.into_iter().filter_map(transition_from_model) {
+        grouped
+            .entry(transition.alert_id.clone())
+            .or_default()
+            .push(transition);
+    }
+    Ok(grouped)
+}
+
 /// Transitions for one alert, newest first.
 pub async fn list_transitions(
     alert_id: &str,
@@ -1209,50 +1270,39 @@ pub async fn list_transitions_between_many_with<C: sea_orm::ConnectionTrait>(
     to: i64,
     per_alert_limit: u64,
 ) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
-    use alert_state_transitions::Column;
-    use sea_orm::sea_query::{Alias, Asterisk, Expr, Func, Order, Query, WindowStatement};
+    ranked_transitions_with(conn, alert_ids, group_key, from, to, per_alert_limit, false).await
+}
 
-    let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
-        std::collections::HashMap::new();
-    if alert_ids.is_empty() {
-        return Ok(grouped);
-    }
-    // Ranked per alert, so one flapping alert cannot use up the other alerts' share of the rows.
-    let rank = Alias::new("lane_rank");
-    let lane = WindowStatement::partition_by(Column::AlertId)
-        .order_by(Column::At, Order::Asc)
-        .order_by(Column::Id, Order::Asc)
-        .to_owned();
-    let mut ranked = Query::select();
-    ranked
-        .column(Asterisk)
-        .expr_window_as(Func::cust(Alias::new("ROW_NUMBER")), lane, rank.clone())
-        .from(alert_state_transitions::Entity)
-        .and_where(Column::AlertId.is_in(alert_ids.iter().cloned()))
-        .and_where(Column::At.gte(from))
-        .and_where(Column::At.lte(to));
-    if let Some(key) = group_key {
-        ranked.and_where(Column::GroupKey.eq(key));
-    }
-    let query = Query::select()
-        .column(Asterisk)
-        .from_subquery(ranked, Alias::new("ranked"))
-        .and_where(Expr::col(rank).lte(per_alert_limit))
-        .order_by(Column::AlertId, Order::Asc)
-        .order_by(Column::At, Order::Asc)
-        .order_by(Column::Id, Order::Asc)
-        .to_owned();
-    let statement = conn.get_database_backend().build(&query);
-    let rows = alert_state_transitions::Model::find_by_statement(statement)
-        .all(conn)
-        .await?;
-    for transition in rows.into_iter().filter_map(transition_from_model) {
-        grouped
-            .entry(transition.alert_id.clone())
-            .or_default()
-            .push(transition);
-    }
-    Ok(grouped)
+/// The newest rows per alert, oldest first: a cut keeps those nearest the current definition.
+pub async fn list_newest_transitions_between_many(
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_newest_transitions_between_many_with(
+        client,
+        alert_ids,
+        group_key,
+        from,
+        to,
+        per_alert_limit,
+    )
+    .await
+}
+
+/// [`list_newest_transitions_between_many`] against a caller-supplied connection.
+pub async fn list_newest_transitions_between_many_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    ranked_transitions_with(conn, alert_ids, group_key, from, to, per_alert_limit, true).await
 }
 
 /// Remove all state for an alert. Called when the alert itself is deleted —
@@ -2483,6 +2533,47 @@ mod tests {
         let ats = |id: &str| lanes[id].iter().map(|t| t.at).collect::<Vec<_>>();
         assert_eq!(ats("noisy"), [5, 6, 7]);
         assert_eq!(ats("quiet"), [20, 21]);
+    }
+
+    #[tokio::test]
+    async fn the_newest_transitions_are_kept_per_alert_and_returned_oldest_first() {
+        for b in backends().await {
+            for at in 1..=10 {
+                insert_transition(&b.conn, "noisy", "g", at).await;
+            }
+            insert_transition(&b.conn, "quiet", "g", 200).await;
+            insert_transition(&b.conn, "quiet", "other", 22).await;
+            insert_transition(&b.conn, "quiet", "g", 20).await;
+            insert_transition(&b.conn, "quiet", "g", 21).await;
+            let ids = ["noisy".to_string(), "quiet".to_string()];
+            let lanes =
+                list_newest_transitions_between_many_with(&b.conn, &ids, Some("g"), 5, 100, 3)
+                    .await
+                    .unwrap();
+            let ats = |id: &str| lanes[id].iter().map(|t| t.at).collect::<Vec<_>>();
+            assert_eq!(ats("noisy"), [8, 9, 10], "{}", b.name);
+            assert_eq!(ats("quiet"), [20, 21], "{}", b.name);
+            b.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_newest_read_without_a_group_key_reads_every_lane() {
+        for b in backends().await {
+            insert_transition(&b.conn, "a1", ROLLUP_GROUP_KEY, 10).await;
+            insert_transition(&b.conn, "a1", "g1", 11).await;
+            insert_transition(&b.conn, "a1", "g2", 12).await;
+            let ids = ["a1".to_string()];
+            let lanes = list_newest_transitions_between_many_with(&b.conn, &ids, None, 0, 100, 2)
+                .await
+                .unwrap();
+            let rows: Vec<_> = lanes["a1"]
+                .iter()
+                .map(|t| (t.group_key.as_str(), t.at))
+                .collect();
+            assert_eq!(rows, [("g1", 11), ("g2", 12)], "{}", b.name);
+            b.done().await;
+        }
     }
 
     // ── Per-group recovery episodes (openobserve#15178) ─────────────────────
