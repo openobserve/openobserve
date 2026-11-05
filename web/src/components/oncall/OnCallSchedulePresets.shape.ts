@@ -204,6 +204,15 @@ export function layersOf(
   }
 }
 
+/** `count` back-to-back windows covering the day, on half-hour edges, the last ending at 24:00. [pure] */
+export function splitDay(count: number): Array<[number, number]> {
+  const step = Math.round(MINUTES_PER_DAY / count / 30) * 30;
+  return Array.from({ length: count }, (_, index) => [
+    index * step,
+    index === count - 1 ? MINUTES_PER_DAY : (index + 1) * step,
+  ]);
+}
+
 // ── Resolving the week ────────────────────────────────────────────────────────
 
 function holdsHour(restriction: Restriction, day: number, hour: number): boolean {

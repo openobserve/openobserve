@@ -123,7 +123,7 @@ const surfaceClasses = computed(() => [
       v-if="$slots.label || props.label"
       :class="[
         'o-input-label text-compact leading-tight select-none',
-        props.variant === 'card' ? 'flex-1' : '',
+        props.variant === 'card' ? 'min-w-0 flex-1' : '',
         isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',

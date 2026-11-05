@@ -13,8 +13,8 @@ export interface RefreshButtonProps {
   dataTest?: string;
   /** Registry id, so the tooltip shows the page's refresh shortcut. */
   shortcutId?: string;
-  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill, so the pill need not clip it. */
-  size?: "toolbar" | "inset";
+  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill; `header` gives the inline button the height of `sm` header buttons. */
+  size?: "toolbar" | "inset" | "header";
 }
 
 export interface RefreshButtonEmits {

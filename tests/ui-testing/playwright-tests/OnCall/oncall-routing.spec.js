@@ -235,7 +235,7 @@ test.describe('On-call routing rules', {
   test('§11.4 the team routing tab notes the overlap on the row itself', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const { broad, narrow } = await seedOverlappingRules(page, testInfo);
+    const { broad, narrow, broadTeam, narrowTeam } = await seedOverlappingRules(page, testInfo);
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
     // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
@@ -262,7 +262,9 @@ test.describe('On-call routing rules', {
     const note = await pm.oncallRoutingPage.readRuleNote(ruleId);
     testLogger.info('§11.4 team-tab overlap note', { ruleId, note });
     expect(note ?? '', 'a rule that cannot bite gets a line of its own').not.toBe('');
-    expect(note, 'the note is about specificity, not about traffic').toMatch(/overlap/i);
+    const claimant = owningTeamId === broadTeam.id ? narrowTeam : broadTeam;
+    expect(note, 'the note is about specificity, not about traffic: it names the team whose rule takes the pages')
+      .toBe(`Also claimed by ${claimant.name}`);
   });
 
   // ------------------------------------------------- Tier 1 (TS-12, TS-13, TS-14)
@@ -306,10 +308,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.selectTab('rules');
     await pm.oncallRoutingPage.openRuleEditor();
     await pm.oncallRoutingPage.chooseRuleTeam(f.team.id, f.team.name);
-    // The editor opens on the scope picker, which offers claims built from
-    // dimensions the org has already seen; a freshly-seeded service is not one,
-    // so the rule is written on the dimension builder behind it.
-    await pm.oncallRoutingPage.useAdvancedRuleScope();
+    // A freshly-seeded service is not a known value yet, so it is typed into the row's value picker.
     await pm.oncallRoutingPage.addCondition('service', f.service);
     await pm.oncallRoutingPage.saveRule();
 
@@ -449,6 +448,40 @@ test.describe('On-call routing rules', {
     ).toBeVisible({ timeout: 30000 });
   });
 
+  test('an edited rule never loses a condition whose value was emptied', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
+    const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_edit`) });
+    const rule = await createOwnershipRule(page, {
+      teamId: team.id,
+      dimensions: { namespace: `${service}_ns`, service },
+    });
+    // A second rule guarantees `region` is offered as a field whatever discovery has seen.
+    await createOwnershipRule(page, { teamId: team.id, dimensions: { region: `${service}_eu` } });
+
+    await pm.oncallRoutingPage.goto(ORG);
+    await pm.oncallRoutingPage.expectAvailable();
+    await pm.oncallRoutingPage.selectTab('rules');
+    await pm.oncallRoutingPage.openRuleEditorFor(rule.id);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+
+    // Rows are sorted by field, so row 0 is namespace.
+    await pm.oncallRoutingPage.changeConditionField(0, 'region', 'Region');
+    await pm.oncallRoutingPage.expectConditionNeedsValue(0);
+
+    await pm.oncallRoutingPage.removeCondition(0);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+    await pm.oncallRoutingPage.saveRule();
+
+    // The removed row took namespace with it; the emptied region must not ride along as "".
+    await expect.poll(
+      async () => (await listOwnershipRules(page, team.id))
+        .find((one) => (one.id ?? one.rule_id) === rule.id)?.dimensions,
+      { timeout: 60000, intervals: [1000], message: 'the edited rule never saved as service alone' },
+    ).toEqual({ service });
+  });
+
   /**
    * TS-12.04 — a rule's health and hit count are real, and say which.
    *
@@ -511,11 +544,7 @@ test.describe('On-call routing rules', {
 
     // The screen has to show it, not just the API.
     //
-    // The ORG routing screen draws `OnCallOwnershipRules` (the stats table,
-    // keyed `oncall-rule-team-{id}`). `oncall-routing-row-{id}` belongs to
-    // `OnCallRoutingList`, which only the TEAM's own routing tab renders — so
-    // asking for it here was asking the wrong component for a row it never
-    // draws, on a screen that was otherwise fine.
+    // The org page and the team tab draw the same list, keyed `oncall-rule-team-{id}`.
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectOrgRuleRowVisible(rule.id);
