@@ -27,7 +27,8 @@ import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
-import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStreams";
+import { USER_DATA_STREAM_TYPES } from "@/utils/internalStreams";
+import { isOwnedStream } from "@/composables/sampleData/useSampleDataPresence";
 
 type ListedStream = { name?: string; stats?: { doc_num?: number; doc_time_max?: number } };
 
@@ -44,9 +45,7 @@ const probeQuery = (client: QueryClient, org: string, type: string) => {
 };
 
 const userStreams = (list: ListedStream[] | undefined, type: string) =>
-  (list ?? []).filter(
-    (s) => isUserDataStream(s?.name ?? "", type) && !(s?.name ?? "").startsWith("synthetics_"),
-  );
+  (list ?? []).filter((s) => isOwnedStream(s?.name ?? "", type));
 const hasRecords = (s: ListedStream) =>
   Number(s.stats?.doc_num ?? 0) > 0 || Number(s.stats?.doc_time_max ?? 0) > 0;
 const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean, org: string) => {

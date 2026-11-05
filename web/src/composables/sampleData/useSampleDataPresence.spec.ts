@@ -41,6 +41,11 @@ describe("fetchHasUserStreams", () => {
     expect(await fetchHasUserStreams("default")).toBe(false);
   });
 
+  it("does not count a synthetic-check result as the user's data", async () => {
+    mockLogs(["synthetics_results"]);
+    expect(await fetchHasUserStreams("default")).toBe(false);
+  });
+
   it("is true when the org has a user logs stream", async () => {
     mockLogs(["triggers", "app_logs"]);
     expect(await fetchHasUserStreams("default")).toBe(true);

@@ -17,15 +17,17 @@ import { computed, type Ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
-import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
+import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStreams";
 import { isSampleStreamName } from "@/utils/sampleData/catalog";
 
 type StreamRow = { name?: string; stream_type?: string };
 
+/** A stream the user or the sample load made: not written by O2 itself, and not a synthetic-check result. */
+export const isOwnedStream = (name: string, type: string) =>
+  isUserDataStream(name, type) && !name.startsWith("synthetics_");
+
 const userStreamNames = (list: StreamRow[] | undefined, type: string) =>
-  userDataStreams(
-    (list ?? []).map((s) => ({ name: s?.name ?? "", stream_type: s?.stream_type ?? type })),
-  ).map((s) => s.name);
+  (list ?? []).map((s) => s?.name ?? "").filter((name) => isOwnedStream(name, type));
 
 /** True when the org has any logs, metrics or traces stream that O2 does not write itself. */
 export const fetchHasUserStreams = async (org: string): Promise<boolean> => {
