@@ -37,23 +37,27 @@ export const alertsListQuery = (
   folderId: string,
   query?: string,
   alertType?: string,
+  options?: { silentForbidden?: boolean },
 ) =>
   queryOptions({
     queryKey: alertKeys.list(org, folderId, query, alertType),
-    queryFn: async (): Promise<any[]> =>
-      (
-        await alerts.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          org,
-          folderId,
-          query ?? "",
-          alertType ?? "",
-        )
-      ).data?.list ?? [],
+    queryFn: async (): Promise<any[]> => {
+      const args = [
+        1,
+        1000,
+        "name",
+        false,
+        "",
+        org,
+        folderId,
+        query ?? "",
+        alertType ?? "",
+      ] as const;
+      const res = await (options
+        ? alerts.listByFolderId(...args, undefined, options)
+        : alerts.listByFolderId(...args));
+      return res.data?.list ?? [];
+    },
     staleTime: LIVE_STALE_TIME,
   });
 

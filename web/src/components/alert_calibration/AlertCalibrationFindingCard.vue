@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="action.run"
             :variant="action.type === 'apply_suggestion' ? 'primary' : 'outline'"
             size="xs"
+            :loading="action.pending"
             :data-test="`alert-calibration-finding-action-${action.type}-button`"
             @click="action.run"
           >
@@ -192,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -205,7 +206,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
-import { CALIBRATION_PREFILL } from "@/utils/alerts/alertEditHandoff";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
   adviceOf,
@@ -236,6 +236,7 @@ import {
   TIER_LABEL,
 } from "./format";
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
+import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
 import {
   applyCopy,
   applySuggestionsOf,
@@ -322,6 +323,8 @@ interface ActionRow {
   description?: I18nText;
   /** Set for an action that opens the editor; the rest stay labels until their target page exists. */
   run?: () => void;
+  /** The editor link is waiting for the alert's folder. */
+  pending?: boolean;
 }
 
 const applyAction = ref<ApplySuggestion | null>(null);
@@ -332,14 +335,22 @@ const openApply = (action: ApplySuggestion) => {
   applyOpen.value = true;
 };
 
+const reviewPending = ref<string | null>(null);
+let unmounted = false;
+onBeforeUnmount(() => {
+  unmounted = true;
+});
+
 /** The same tab, so the editor's Cancel comes back to this finding (P6-D10). */
-const openReview = (action: ReviewAlertAction) => {
+const openReview = async (key: string, action: ReviewAlertAction) => {
+  if (reviewPending.value) return;
+  reviewPending.value = key;
+  // Looked up on click, not per card: a digest page can hold many cards.
+  const folder = await alertFolderOf(orgId.value, action.alert_id, props.finding.alert_name);
+  reviewPending.value = null;
+  if (unmounted) return;
   writeAlertEditHandoff(toEditHandoff(action, props.finding));
-  void router.push({
-    name: "editAlert",
-    params: { alert_id: action.alert_id },
-    query: { org_identifier: orgId.value, prefill: CALIBRATION_PREFILL },
-  });
+  void router.push(editAlertRoute(orgId.value, action.alert_id, folder));
 };
 
 /** A v2 record carries typed actions only; its `actions` column is never read. Apply comes first. */
@@ -354,7 +365,8 @@ const insightActions = (): ActionRow[] => [
     key: `${index}`,
     type: action.type,
     label: t(insightActionLabel(action)),
-    run: action.type === "review_alert" ? () => openReview(action) : undefined,
+    run: action.type === "review_alert" ? () => void openReview(`${index}`, action) : undefined,
+    pending: reviewPending.value === `${index}`,
   })),
 ];
 

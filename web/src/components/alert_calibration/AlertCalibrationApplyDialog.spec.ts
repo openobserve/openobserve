@@ -16,11 +16,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
-import { h } from "vue";
+import { h, nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import { byTest } from "@/test/unit/helpers/draftDom";
 import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
 import type { ApplySuggestion } from "./applySuggestion";
@@ -29,7 +30,7 @@ import type { FindingRecord } from "./digests";
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: { get_by_alert_id: vi.fn(), update_by_alert_id: vi.fn() },
+    default: { get_by_alert_id: vi.fn(), update_by_alert_id: vi.fn(), listByFolderId: vi.fn() },
   });
 });
 
@@ -66,6 +67,9 @@ const liveAlert = (overrides: Record<string, unknown> = {}) => ({
   destinations: ["ops-pager"],
   ...overrides,
 });
+
+const OPS_LIST = { data: { list: [{ alert_id: "a1", name: "ops_cpu", folder_id: "ops" }] } };
+const listByFolderId = vi.mocked(alertsService.listByFolderId);
 
 const httpError = (status: number) =>
   Object.assign(new Error(`HTTP ${status}`), { response: { status } });
@@ -106,7 +110,10 @@ const dialogText = () => byTest("alert-calibration-apply-dialog")?.textContent ?
 describe("AlertCalibrationApplyDialog", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    queryClient.clear();
     vi.mocked(alertsService.get_by_alert_id).mockReset();
+    listByFolderId.mockReset();
+    listByFolderId.mockResolvedValue(OPS_LIST as never);
   });
 
   afterEach(() => {
@@ -161,8 +168,190 @@ describe("AlertCalibrationApplyDialog", () => {
     expect(router.push).toHaveBeenCalledWith({
       name: "editAlert",
       params: { alert_id: "a1" },
-      query: { org_identifier: "default", prefill: "calibration" },
+      query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
     });
+  });
+
+  it("Continue passes the alert's folder without waiting", async () => {
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+    await mountDialog();
+    expect(listByFolderId).toHaveBeenCalledTimes(1);
+    expect(listByFolderId.mock.calls[0].slice(5, 8)).toEqual(["default", "", "ops_cpu"]);
+
+    inDialog("alert-calibration-apply-continue")!.click();
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
+      }),
+    );
+    expect(listByFolderId).toHaveBeenCalledTimes(1);
+  });
+
+  it("a Continue before the folder is known shows the button busy, then opens the editor", async () => {
+    let resolve!: (value: unknown) => void;
+    listByFolderId.mockReturnValue(new Promise((r) => (resolve = r)) as never);
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+    await mountDialog();
+
+    inDialog("alert-calibration-apply-continue")!.click();
+    await nextTick();
+    expect(inDialog("alert-calibration-apply-continue")?.getAttribute("aria-busy")).toBe("true");
+    inDialog("alert-calibration-apply-continue")!.click();
+    expect(router.push).not.toHaveBeenCalled();
+
+    resolve(OPS_LIST);
+    await flushPromises();
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
+      }),
+    );
+  });
+
+  it("Cancel while the folder is still loading opens nothing", async () => {
+    let resolve!: (value: unknown) => void;
+    listByFolderId.mockReturnValue(new Promise((r) => (resolve = r)) as never);
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+    await mountDialog();
+
+    inDialog("alert-calibration-apply-continue")!.click();
+    inDialog("o-dialog-secondary-btn")!.click();
+    resolve(OPS_LIST);
+    await flushPromises();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+  });
+
+  describe("a prompt closed while its folder lookup is pending", () => {
+    const closeBy: Record<string, () => Promise<void>> = {
+      "the close button": async () => inDialog("o-dialog-close-btn")!.click(),
+      Escape: async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      },
+      "the parent (an outside click)": async () => {
+        await wrapper!.setProps({ open: false });
+      },
+    };
+    const settle: Record<string, (answer: Deferred) => void> = {
+      found: (answer) => answer.resolve(OPS_LIST),
+      refused: (answer) => answer.reject(httpError(403)),
+    };
+
+    interface Deferred {
+      resolve: (value: unknown) => void;
+      reject: (error: unknown) => void;
+    }
+
+    const pendingLookup = (): Deferred => {
+      const answer = {} as Deferred;
+      listByFolderId.mockReturnValue(
+        new Promise((resolve, reject) => Object.assign(answer, { resolve, reject })) as never,
+      );
+      return answer;
+    };
+
+    // The busy primary disables Cancel, so Cancel can only land in the same tick as the click.
+    const closeAndReopen = async (close: (() => Promise<void>) | "Cancel", button: string) => {
+      inDialog(button)!.click();
+      if (close === "Cancel") inDialog("o-dialog-secondary-btn")!.click();
+      else {
+        await nextTick();
+        expect(inDialog(button)?.getAttribute("aria-busy")).toBe("true");
+        await close();
+      }
+      await flushPromises();
+      expect(wrapper!.props("open")).toBe(false);
+      await wrapper!.setProps({ open: true });
+      await flushPromises();
+    };
+
+    const expectNothingOpened = () => {
+      expect(router.push).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+      expect(wrapper!.props("open")).toBe(true);
+      expect(byTest("alert-calibration-apply-dialog")).not.toBeNull();
+    };
+
+    for (const [route, close] of [...Object.entries(closeBy), ["Cancel", "Cancel"] as const]) {
+      for (const [outcome, answerWith] of Object.entries(settle)) {
+        it(`closed by ${route}, then reopened, opens nothing when the lookup is ${outcome}`, async () => {
+          const answer = pendingLookup();
+          vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+            data: liveAlert(),
+          } as never);
+          await mountDialog();
+          await closeAndReopen(close, "alert-calibration-apply-continue");
+
+          answerWith(answer);
+          await flushPromises();
+          expectNothingOpened();
+          expect(
+            inDialog("alert-calibration-apply-continue")?.getAttribute("aria-busy"),
+          ).toBeNull();
+        });
+      }
+    }
+
+    it("the reopened prompt's own Continue still opens the editor once", async () => {
+      const answer = pendingLookup();
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+      await mountDialog();
+      await closeAndReopen(closeBy["the close button"], "alert-calibration-apply-continue");
+
+      inDialog("alert-calibration-apply-continue")!.click();
+      answer.resolve(OPS_LIST);
+      await flushPromises();
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
+        }),
+      );
+      expect(JSON.parse(sessionStorage.getItem(ALERT_PREFILL_KEY)!)).toHaveProperty("patch");
+    });
+
+    it.each(Object.entries(settle))(
+      "a stale alert's Review, closed and reopened, opens nothing when the lookup is %s",
+      async (_, answerWith) => {
+        const answer = pendingLookup();
+        vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+          data: liveAlert({ pending_period_sec: 300 }),
+        } as never);
+        await mountDialog();
+        await closeAndReopen(closeBy["the close button"], "alert-calibration-apply-review");
+
+        answerWith(answer);
+        await flushPromises();
+        expectNothingOpened();
+      },
+    );
+  });
+
+  it("an unknown folder leaves the link as it is today", async () => {
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+    for (const answer of [
+      () => listByFolderId.mockRejectedValue(httpError(403)),
+      () =>
+        listByFolderId.mockResolvedValue({
+          data: { list: [{ alert_id: "a2", name: "ops_cpu", folder_id: "pay" }] },
+        } as never),
+    ]) {
+      queryClient.clear();
+      answer();
+      await mountDialog();
+      inDialog("alert-calibration-apply-continue")!.click();
+      await flushPromises();
+      expect(vi.mocked(router.push).mock.calls[0][0]).toStrictEqual({
+        name: "editAlert",
+        params: { alert_id: "a1" },
+        query: { org_identifier: "default", prefill: "calibration" },
+      });
+      wrapper!.unmount();
+    }
   });
 
   it("a live value that moved withholds Continue", async () => {

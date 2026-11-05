@@ -13,15 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { h } from "vue";
+import { h, nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { listByFolderId: vi.fn() } });
+});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import { queryClient } from "@/composables/query/queryClient";
+import alertsService from "@/services/alerts";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import type { FindingRecord } from "./digests";
+
+const listByFolderId = vi.mocked(alertsService.listByFolderId);
+const OPS_LIST = { data: { list: [{ alert_id: "a1", name: "ops_quiet", folder_id: "ops" }] } };
 
 const finding = (overrides: Partial<FindingRecord> = {}): FindingRecord => ({
   _timestamp: 1,
@@ -63,6 +76,12 @@ const mountCard = (record: FindingRecord) =>
   });
 
 describe("AlertCalibrationFindingCard", () => {
+  beforeEach(() => {
+    queryClient.clear();
+    listByFolderId.mockReset();
+    listByFolderId.mockResolvedValue(OPS_LIST as never);
+  });
+
   it("lists a cluster finding's worst orgs in place of a single alert", () => {
     const wrapper = mountCard(finding());
     const rows = wrapper.findAll('[data-test="alert-calibration-finding-lag-row"]');
@@ -255,7 +274,7 @@ describe("AlertCalibrationFindingCard", () => {
     expect(push).toHaveBeenCalledWith({
       name: "editAlert",
       params: { alert_id: "a1" },
-      query: { org_identifier: "default", prefill: "calibration" },
+      query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
     });
 
     await rows[0].get("button").trigger("click");
@@ -270,6 +289,98 @@ describe("AlertCalibrationFindingCard", () => {
     expect(
       v1.find('[data-test="alert-calibration-finding-action-ScaleAlertScheduler"] button').exists(),
     ).toBe(false);
+  });
+
+  describe("Review's folder", () => {
+    const mountReview = async () => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", component: { render: () => h("div") } },
+          {
+            path: "/alerts/edit/:alert_id",
+            name: "editAlert",
+            component: { render: () => h("div") },
+          },
+        ],
+      });
+      await router.push("/");
+      const push = vi.spyOn(router, "push");
+      const wrapper = mount(AlertCalibrationFindingCard, {
+        props: {
+          finding: finding({
+            schema_version: 2,
+            kind: "finding",
+            rule_id: "noise",
+            alert_id: "a1",
+            alert_name: "ops_quiet",
+            finding_id: "f1",
+            actions: undefined,
+            insight_actions: JSON.stringify([
+              { type: "review_alert", alert_id: "a1", focus: "query" },
+            ]),
+          }),
+        },
+        attachTo: document.body,
+        global: { plugins: [store, router, withQueryClient()] },
+      });
+      const button = wrapper.get(
+        '[data-test="alert-calibration-finding-action-review_alert-button"]',
+      );
+      return { wrapper, push, button };
+    };
+
+    it("Review opens the alert in its own folder", async () => {
+      let resolve!: (value: unknown) => void;
+      listByFolderId.mockReturnValue(new Promise((r) => (resolve = r)) as never);
+      const { wrapper, push, button } = await mountReview();
+
+      await button.trigger("click");
+      await nextTick();
+      expect(button.attributes("aria-busy")).toBe("true");
+      await button.trigger("click");
+      expect(push).not.toHaveBeenCalled();
+
+      resolve(OPS_LIST);
+      await flushPromises();
+      expect(listByFolderId).toHaveBeenCalledTimes(1);
+      expect(listByFolderId.mock.calls[0].slice(5, 8)).toEqual(["default", "", "ops_quiet"]);
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith({
+        name: "editAlert",
+        params: { alert_id: "a1" },
+        query: { org_identifier: "default", prefill: "calibration", folder: "ops" },
+      });
+      expect(button.attributes("aria-busy")).toBeUndefined();
+      wrapper.unmount();
+    });
+
+    it("an unknown folder leaves the link as it is today", async () => {
+      for (const answer of [
+        () =>
+          listByFolderId.mockRejectedValue(
+            Object.assign(new Error("HTTP 403"), { response: { status: 403 } }),
+          ),
+        () =>
+          listByFolderId.mockResolvedValue({
+            data: { list: [{ alert_id: "a2", name: "ops_quiet", folder_id: "pay" }] },
+          } as never),
+      ]) {
+        queryClient.clear();
+        answer();
+        const { wrapper, push, button } = await mountReview();
+        await button.trigger("click");
+        await flushPromises();
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(push.mock.calls[0][0]).toStrictEqual({
+          name: "editAlert",
+          params: { alert_id: "a1" },
+          query: { org_identifier: "default", prefill: "calibration" },
+        });
+        wrapper.unmount();
+      }
+      expect(toast).not.toHaveBeenCalled();
+    });
   });
 
   it("names why the evidence is degraded under the quality badge, and nothing when usable", () => {
