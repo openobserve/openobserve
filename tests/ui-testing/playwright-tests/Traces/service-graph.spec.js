@@ -16,7 +16,7 @@ const {
 } = require('../utils/service-graph-ingestion.js');
 
 const EMPTY_TOPOLOGY_MESSAGE =
-  'Service graph topology is still empty 4 minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).';
+  'Service graph topology is still empty 10 minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).';
 
 test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
@@ -25,9 +25,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   let topologyEmpty = false;
 
   test.beforeAll(async ({ browser }, testInfo) => {
-    // 4-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
-    test.setTimeout(600000); // 10 minutes for beforeAll
-    // Every retry starts a new worker; this marker stops each one from repeating a 4-minute wait for a graph that never fills.
+    // 10-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
+    test.setTimeout(900000);
+    // Every retry starts a new worker; this marker stops each one from repeating a 10-minute wait for a graph that never fills.
     const emptyTopologyMarker = path.join(testInfo.project.outputDir, 'service-graph-empty-topology.marker');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
@@ -53,11 +53,10 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       await ingestTraces(page, allTraces, { delayMs: 50 });
       testLogger.info('Trace ingestion complete');
 
-      // Wait for the service graph daemon to process (runs every ~30s)
-      // Increased to 4 minutes to allow 6-8 daemon cycles for full topology processing
+      // The rollup only reads windows older than ZO_CACHE_DELAY_SECS (default 300), so edges can lag ingestion by minutes.
       testLogger.info('Waiting for service graph daemon to process data...');
       const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 240000,  // 4 minutes (was 2 min) - allows more daemon cycles
+        maxWaitMs: 600000,
         pollIntervalMs: 10000,
         expectedMinEdges: 10,
       });
