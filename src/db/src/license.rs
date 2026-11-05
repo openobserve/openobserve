@@ -21,6 +21,10 @@ use crate::get_coordinator;
 
 pub const LICENSE_KEY_PREFIX: &str = "/license/";
 
+fn should_refresh_usage(event: &Event, node_id: &str) -> bool {
+    matches!(event, Event::Put(event) if event.value.as_ref().is_none_or(|v| v.as_ref() != node_id.as_bytes()))
+}
+
 pub async fn update() -> Result<(), anyhow::Error> {
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -67,6 +71,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     }
 }
 
+pub async fn watch_usage() -> Result<(), anyhow::Error> {
+    let coordinator = get_coordinator().await;
+    let mut events = coordinator.watch("/license_usage/").await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    while let Some(event) = events.recv().await {
+        if should_refresh_usage(&event, &config::cluster::LOCAL_NODE.uuid) {
+            o2_enterprise::enterprise::license::refresh_usage();
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +95,17 @@ mod tests {
     #[test]
     fn test_license_key_prefix_starts_with_slash() {
         assert!(LICENSE_KEY_PREFIX.starts_with('/'));
+    }
+
+    #[test]
+    fn holder_notifications_refresh_followers_without_waking_the_holder() {
+        let event = Event::Put(infra::db::EventData {
+            key: "/license_usage/".into(),
+            value: Some(bytes::Bytes::from_static(b"holder")),
+            start_dt: None,
+        });
+        assert!(!should_refresh_usage(&event, "holder"));
+        assert!(should_refresh_usage(&event, "follower"));
+        assert!(!should_refresh_usage(&Event::Empty, "follower"));
     }
 }

@@ -1267,6 +1267,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::keys::delete_bulk,
     openobserve_api_management::request::license::get_license_info,
     openobserve_api_management::request::license::refresh_license_limits,
+    openobserve_api_management::request::license::rotate_license_key,
     openobserve_api_management::request::license::store_license,
     openobserve_api_management::request::oncall::acknowledge_response,
     openobserve_api_management::request::oncall::add_member,
@@ -1681,7 +1682,10 @@ mod tests {
     const ROUTER_SOURCE: &str = include_str!("mod.rs");
 
     #[cfg(feature = "enterprise")]
-    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+    const SERVICE_ROUTES_SIGNATURE: &str = "fn service_route_table(";
+
+    #[cfg(feature = "enterprise")]
+    const SEARCH_ROUTES_SIGNATURE: &str = "fn search_routes_with(";
 
     #[cfg(feature = "enterprise")]
     const HTTP_METHODS: &[&str] = &[
@@ -1909,13 +1913,18 @@ mod tests {
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
+        router_fn_body(SERVICE_ROUTES_SIGNATURE)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn router_fn_body(signature: &str) -> &'static str {
         let start = ROUTER_SOURCE
-            .find(SERVICE_ROUTES_SIGNATURE)
-            .expect("the router must define service_routes()");
-        let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
+            .find(signature)
+            .unwrap_or_else(|| panic!("the router must define {signature}"));
+        let after_signature = &ROUTER_SOURCE[start + signature.len()..];
         let end = after_signature
             .find("\n}\n")
-            .expect("service_routes() must end at a column-0 close brace");
+            .unwrap_or_else(|| panic!("{signature} must end at a column-0 close brace"));
         &after_signature[..end]
     }
 
@@ -2014,7 +2023,13 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
-        let live = normalize(&strip_comments(service_routes_body()));
+        // The licence-gated search routes are a separate group that service_routes() merges in.
+        let routes = [
+            service_routes_body(),
+            router_fn_body(SEARCH_ROUTES_SIGNATURE),
+        ]
+        .concat();
+        let live = normalize(&strip_comments(&routes));
         let mut routes = BTreeSet::new();
         for call in live.split(".route(").skip(1) {
             let Some(arguments) = balanced_arguments(call) else {
