@@ -20,6 +20,7 @@ pub mod array;
 pub mod cipher_udf;
 pub mod fold_native_frames_udf;
 pub mod fulltext;
+pub mod ip;
 pub mod regex;
 pub mod spath_udf;
 pub mod time;
@@ -42,7 +43,7 @@ pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 /// The name of the regex_matches UDF given to DataFusion.
 pub const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 16] = [
     ZoFunction {
         name: "match_all",
         text: "match_all('v')",
@@ -86,6 +87,26 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
     ZoFunction {
         name: time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF_NAME,
         text: "cast_to_timestamp('pattern')",
+    },
+    ZoFunction {
+        name: ip::ip_cidr_contains::IP_CIDR_CONTAINS_UDF_NAME,
+        text: "ip_cidr_contains('10.0.0.0/8', field)",
+    },
+    ZoFunction {
+        name: ip::ip_subnet::IP_SUBNET_UDF_NAME,
+        text: "ip_subnet(field, '/24', '/64')",
+    },
+    ZoFunction {
+        name: ip::is_ipv4::IS_IPV4_UDF_NAME,
+        text: "is_ipv4(field)",
+    },
+    ZoFunction {
+        name: ip::is_ipv6::IS_IPV6_UDF_NAME,
+        text: "is_ipv6(field)",
+    },
+    ZoFunction {
+        name: ip::is_private_ip::IS_PRIVATE_IP_UDF_NAME,
+        text: "is_private_ip(field)",
     },
 ];
 

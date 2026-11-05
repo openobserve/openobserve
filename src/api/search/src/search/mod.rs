@@ -1307,7 +1307,7 @@ fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> O
 
 /// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
-async fn check_sql_stream_permissions(
+pub(crate) async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,
