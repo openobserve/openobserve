@@ -92,6 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ mine?.on_call_now ? t("oncall.mineDutyOn") : t("oncall.mineDutyOff") }}
             </OTag>
+            <OText variant="meta" class="ms-auto" data-test="oncall-mine-zone">
+              {{ t("oncall.timesInZone", { zone: raw(store.state.timezone) }) }}
+            </OText>
           </div>
 
           <OEmptyState

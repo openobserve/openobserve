@@ -1337,7 +1337,7 @@ async function onShiftAction(action: ShiftAction, segment: ResolvedSegment) {
     gap: action === "cover" ? fromNow(span) : null,
     rotation: segment.rotation_id,
     mode: action === "swap" ? "swap" : "cover",
-    swapFrom: action === "swap" ? { rotationId: segment.rotation_id, at: span.from } : null,
+    swapFrom: { rotationId: segment.rotation_id, at: span.from },
     holder: who || null,
   });
 }

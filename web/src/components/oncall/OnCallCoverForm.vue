@@ -374,6 +374,11 @@ watch(
   },
 );
 
+// Opened from a shift, switching to Swap keeps that shift as the one being traded.
+watch(mode, (next) => {
+  if (next === "swap" && !swapA.value) swapA.value = swapFromKey();
+});
+
 const { nameOf, optionOf } = useOrgUserNames();
 
 const memberOptions = computed(() => props.members.map((member) => optionOf(member.user_email)));

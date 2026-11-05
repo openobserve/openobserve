@@ -339,6 +339,13 @@ describe("OnCallMine", () => {
     expect(data.end_at).toBeGreaterThan(data.start_at);
   });
 
+  /// Shift times are on the reader's clock, which the team pages do not use, so the card names it.
+  it("says which zone the shift times are in", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-mine-zone"]').text()).toBe("Times in UTC");
+  });
+
   it("offers Clear away only while the reader has an absence", async () => {
     const wrapper = render();
     await flushPromises();

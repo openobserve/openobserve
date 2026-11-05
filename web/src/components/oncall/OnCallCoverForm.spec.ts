@@ -378,6 +378,25 @@ describe("OnCallCoverForm — a pre-selected person", () => {
 });
 
 describe("OnCallCoverForm — swapping", () => {
+  /// Opened as a cover from a shift bar, the Swap tab still knows which shift was clicked.
+  it("keeps the clicked shift when switching from cover to swap", async () => {
+    const wrapper = mount(OnCallCoverForm, {
+      props: {
+        open: false,
+        members: [],
+        timezone: "UTC",
+        shifts: SHIFTS,
+        swapFrom: { rotationId: "rot_primary", at: FROM + MICROS_PER_WEEK },
+      },
+      global: { plugins: [i18n], stubs },
+    });
+    await wrapper.setProps({ open: true });
+    await intoSwapMode(wrapper);
+
+    const first = wrapper.findAllComponents({ name: "OSelect" })[0];
+    expect(first.props("modelValue")).toBe(first.props("options")[1].value);
+  });
+
   /// F6: two people trading weeks is ONE errand. Expressed as two covers it is
   /// two dialogs, two date ranges, and a chance to get the second one backwards.
   it("writes one cover each way, each naming the other person", async () => {
