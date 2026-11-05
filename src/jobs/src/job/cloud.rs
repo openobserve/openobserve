@@ -33,7 +33,15 @@ use db::{
 };
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
-use o2_enterprise::enterprise::cloud::billings::{MeteringDetail, MeteringProvider};
+use o2_enterprise::enterprise::cloud::{
+    billings::{CustomerBilling, MeteringDetail, MeteringProvider},
+    contracts::{
+        self,
+        reconcile::{reconcile, reconcile_changed},
+        sync::{last_success, sync_cluster},
+    },
+    org_contracts_synced,
+};
 use openobserve_core::org_domain_ownership;
 use stream::get_streams;
 
@@ -52,6 +60,15 @@ const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
 
 /// Interval for external contract expiry checks (1 hour).
 const EXTERNAL_CONTRACT_CHECK_INTERVAL: u64 = 3600;
+
+/// Picks the one node that syncs contracts and runs the expiry job; never released after a pass.
+const CONTRACT_LIFECYCLE_LOCK: &str = "/cloud/contract_lifecycle";
+
+/// How often a node checks whether it should sync contracts, so failover is noticed soon.
+const CONTRACT_SYNC_TICK: u64 = 60;
+
+/// Stored contracts are kept this long after they end or are revoked, above the fetch's 60 days.
+const CONTRACT_RETENTION_DAYS: i64 = 90;
 
 const ORG_DOMAIN_OWNERSHIP_CHECK_INTERVAL: u64 = 300;
 
@@ -102,6 +119,17 @@ pub fn start() {
     tokio::spawn(async move { run_org_expiry_daily().await });
     tokio::spawn(async move { run_ai_quota_check().await });
     tokio::spawn(async move { run_external_contract_expiry_check().await });
+    if contracts::sync_active() {
+        tokio::spawn(async move { run_contract_sync().await });
+    } else {
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+        if cfg.cloud.contract_sync_enabled {
+            log::error!(
+                "[CONTRACTS] contract sync is on but not active, missing: {:?}",
+                contracts::missing_sync_config(&cfg.cloud)
+            );
+        }
+    }
     tokio::spawn(async move { run_org_domain_ownership_validation().await });
     tokio::spawn(async move { run_budget_warning_emails().await });
 }
@@ -506,6 +534,76 @@ async fn run_org_expiry_daily() {
     }
 }
 
+async fn is_contract_lifecycle_holder() -> bool {
+    match super::get_nats_lock(CONTRACT_LIFECYCLE_LOCK.to_string()).await {
+        Ok(node) => node == config::cluster::LOCAL_NODE.uuid,
+        Err(e) => {
+            log::error!("[CONTRACTS] checking the lifecycle lock failed: {e}");
+            false
+        }
+    }
+}
+
+async fn run_contract_sync() {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    let sync_interval = cfg.cloud.contract_sync_interval_sec as i64 * 1_000_000;
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(CONTRACT_SYNC_TICK));
+    let mut was_holder = false;
+    let mut last_housekeeping = None;
+    loop {
+        interval.tick().await;
+        if !is_contract_lifecycle_holder().await {
+            was_holder = false;
+            continue;
+        }
+        let last = match last_success().await {
+            Ok(last) => last,
+            Err(e) => {
+                log::error!("[CONTRACTS] reading the last sync time failed: {e}");
+                continue;
+            }
+        };
+        let now = now_micros();
+        if contract_sync_due(was_holder, last, now, sync_interval) {
+            sync_contracts().await;
+        }
+        was_holder = true;
+        if last_housekeeping.is_none_or(|at| now - at >= hour_micros(24)) {
+            delete_old_contracts(now).await;
+            last_housekeeping = Some(now);
+        }
+    }
+}
+
+/// A new holder always syncs, which covers startup and failover.
+fn contract_sync_due(was_holder: bool, last_success: Option<i64>, now: i64, interval: i64) -> bool {
+    !was_holder || last_success.is_none_or(|last| now - last >= interval)
+}
+
+async fn sync_contracts() {
+    let report = match sync_cluster().await {
+        Ok(report) => report,
+        Err(e) => {
+            log::warn!("[CONTRACTS] sync failed: {e}");
+            return;
+        }
+    };
+    log::info!("[CONTRACTS] sync finished: {report:?}");
+    for org_id in &report.changed_orgs {
+        if let Err(e) = reconcile_changed(org_id, now_micros()).await {
+            log::error!("[CONTRACTS] reconcile failed for org {org_id}: {e}");
+        }
+    }
+}
+
+async fn delete_old_contracts(now: i64) {
+    let cutoff = now - CONTRACT_RETENTION_DAYS * hour_micros(24);
+    match org_contracts_synced::delete_ended_before(cutoff).await {
+        Ok(deleted) => log::info!("[CONTRACTS] deleted {deleted} old stored contracts"),
+        Err(e) => log::error!("[CONTRACTS] deleting old stored contracts failed: {e}"),
+    }
+}
+
 async fn run_external_contract_expiry_check() {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
         EXTERNAL_CONTRACT_CHECK_INTERVAL,
@@ -513,13 +611,13 @@ async fn run_external_contract_expiry_check() {
     interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
-        check_external_contract_expiry().await;
+        if is_contract_lifecycle_holder().await {
+            check_external_contract_expiry().await;
+        }
     }
 }
 
 async fn check_external_contract_expiry() {
-    use o2_enterprise::enterprise::cloud::billings::MeteringProvider;
-
     let billings = match o2_enterprise::enterprise::cloud::list_customer_billings().await {
         Ok(cbs) => cbs,
         Err(e) => {
@@ -528,114 +626,176 @@ async fn check_external_contract_expiry() {
         }
     };
 
-    let now = chrono::Utc::now().timestamp_micros();
-    let day_micros = hour_micros(24);
+    let sync_active = contracts::sync_active();
+    let now = now_micros();
+    let mut reconciled = HashSet::new();
 
     for cb in billings {
         if !matches!(cb.provider, MeteringProvider::NoOp) {
             continue;
         }
-
-        let Some(end_date) = cb.end_date else {
-            continue;
-        };
-
         let org_id = &cb.org_id;
 
-        // Check if contract has expired
-        if end_date <= now {
+        // an unknown answer must not delete a row that may belong to a stored contract
+        let stored_row = match is_stored_contract_row(&cb, sync_active).await {
+            Ok(stored_row) => stored_row,
+            Err(e) => {
+                log::error!("[EXT_CONTRACT] Failed to look up the contract of org {org_id}: {e}");
+                continue;
+            }
+        };
+
+        if let Some(end_date) = cb.end_date {
+            match contract_row_action(end_date, now, stored_row) {
+                ContractRowAction::DeleteExpired => {
+                    delete_expired_contract_row(org_id).await;
+                    continue;
+                }
+                ContractRowAction::LeaveToReconcile => {}
+                ContractRowAction::Warn { days_remaining } => {
+                    send_contract_expiry_warning(&cb, days_remaining).await;
+                }
+            }
+        }
+
+        if sync_active {
+            reconcile_on_expiry_pass(org_id, now).await;
+            reconciled.insert(org_id.clone());
+        }
+    }
+
+    if !sync_active {
+        return;
+    }
+    // orgs with no row yet: nothing else notices a contract reaching its start
+    match org_contracts_synced::list_org_ids().await {
+        Ok(orgs) => {
+            for org_id in orgs.iter().filter(|org| !reconciled.contains(*org)) {
+                reconcile_on_expiry_pass(org_id, now).await;
+            }
+        }
+        Err(e) => log::error!("[CONTRACTS] listing orgs with stored contracts failed: {e}"),
+    }
+}
+
+async fn reconcile_on_expiry_pass(org_id: &str, now: i64) {
+    if let Err(e) = reconcile(org_id, now).await {
+        log::error!("[CONTRACTS] reconcile failed for org {org_id}: {e}");
+    }
+}
+
+async fn is_stored_contract_row(
+    cb: &CustomerBilling,
+    sync_active: bool,
+) -> Result<bool, infra::errors::Error> {
+    let Some(contract_id) = cb.subscription_id.as_deref().filter(|_| sync_active) else {
+        return Ok(false);
+    };
+    Ok(org_contracts_synced::get(contract_id).await?.is_some())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ContractRowAction {
+    DeleteExpired,
+    LeaveToReconcile,
+    Warn { days_remaining: i64 },
+}
+
+/// Reconcile removes stored-contract rows itself, so a back-to-back renewal isn't dropped first.
+fn contract_row_action(end_date: i64, now: i64, stored_row: bool) -> ContractRowAction {
+    if end_date > now {
+        ContractRowAction::Warn {
+            days_remaining: (end_date - now) / hour_micros(24),
+        }
+    } else if stored_row {
+        ContractRowAction::LeaveToReconcile
+    } else {
+        ContractRowAction::DeleteExpired
+    }
+}
+
+async fn delete_expired_contract_row(org_id: &str) {
+    log::info!("[EXT_CONTRACT] External contract expired for org {org_id}, reverting to Free tier");
+
+    // try cancelling subscription of member orgs
+    if let Err(e) =
+        o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(org_id).await
+    {
+        log::error!(
+            "[EXT_CONTRACT] Failed to delete members of expired billing for org {org_id}: {e}",
+        );
+        return;
+    }
+
+    if let Err(e) =
+        o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(org_id).await
+    {
+        log::error!("[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}");
+    }
+}
+
+async fn send_contract_expiry_warning(cb: &CustomerBilling, days_remaining: i64) {
+    let org_id = &cb.org_id;
+
+    let stage = match find_pending_expiry_stage(days_remaining, cb.expiry_notified_stage) {
+        Some(s) => s,
+        None => return,
+    };
+
+    // Send warning email to org admin
+    let admin = match get_admin(org_id).await {
+        Ok(u) => u,
+        Err(e) => {
+            log::error!("[EXT_CONTRACT] Failed to get admin for org={org_id}: {e}");
+            return;
+        }
+    };
+
+    let org_name = match infra::table::organizations::get(org_id).await {
+        Ok(record) => record.org_name,
+        Err(_) => String::new(),
+    };
+
+    let (subject, body) = build_external_contract_expiry_email(org_id, &org_name, days_remaining);
+
+    let email = Email {
+        recipients: vec![admin.email.clone()],
+    };
+
+    match openobserve_core::alerts::alert::send_email_notification(
+        &subject,
+        &email,
+        Some(body.clone()),
+        body,
+    )
+    .await
+    {
+        Ok(_) => {
             log::info!(
-                "[EXT_CONTRACT] External contract expired for org {org_id}, reverting to Free tier"
+                "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",
+                admin.email
             );
-
-            // try cancelling subscription of member orgs
-            if let Err(e) =
-                o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(org_id)
-                    .await
-            {
-                log::error!(
-                    "[EXT_CONTRACT] Failed to delete members of expired billing for org {org_id}: {e}",
-                );
-                continue;
-            }
-
-            if let Err(e) =
-                o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(org_id).await
-            {
-                log::error!(
-                    "[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}"
-                );
-            }
-            continue;
         }
-
-        // Check if we need to send expiry warnings
-        let days_remaining = (end_date - now) / day_micros;
-
-        let stage = match find_pending_expiry_stage(days_remaining, cb.expiry_notified_stage) {
-            Some(s) => s,
-            None => continue,
-        };
-
-        // Send warning email to org admin
-        let admin = match get_admin(org_id).await {
-            Ok(u) => u,
-            Err(e) => {
-                log::error!("[EXT_CONTRACT] Failed to get admin for org={org_id}: {e}");
-                continue;
-            }
-        };
-
-        let org_name = match infra::table::organizations::get(org_id).await {
-            Ok(record) => record.org_name,
-            Err(_) => String::new(),
-        };
-
-        let (subject, body) =
-            build_external_contract_expiry_email(org_id, &org_name, days_remaining);
-
-        let email = Email {
-            recipients: vec![admin.email.clone()],
-        };
-
-        match openobserve_core::alerts::alert::send_email_notification(
-            &subject,
-            &email,
-            Some(body.clone()),
-            body,
-        )
-        .await
-        {
-            Ok(_) => {
-                log::info!(
-                    "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",
-                    admin.email
-                );
-            }
-            Err(e) => {
-                log::error!(
-                    "[EXT_CONTRACT] Failed to send expiry warning email for org={org_id}: {e}"
-                );
-                continue;
-            }
+        Err(e) => {
+            log::error!("[EXT_CONTRACT] Failed to send expiry warning email for org={org_id}: {e}");
+            return;
         }
+    }
 
-        // Report to segment proxy for contract expiry tracking
-        report_to_segment(
-            "OpenObserve - Contract expiry reminder",
-            org_id,
-            &format!("{days_remaining} days"),
-        )
-        .await;
+    // Report to segment proxy for contract expiry tracking
+    report_to_segment(
+        "OpenObserve - Contract expiry reminder",
+        org_id,
+        &format!("{days_remaining} days"),
+    )
+    .await;
 
-        // Advance the stored stage so we don't resend.
-        let mut updated_billing = cb.clone();
-        updated_billing.expiry_notified_stage = Some(stage);
-        if let Err(e) =
-            o2_enterprise::enterprise::cloud::update_customer_billing(updated_billing).await
-        {
-            log::error!("[EXT_CONTRACT] Failed to update expiry stage for org={org_id}: {e}");
-        }
+    // Advance the stored stage so we don't resend.
+    let mut updated_billing = cb.clone();
+    updated_billing.expiry_notified_stage = Some(stage);
+    if let Err(e) = o2_enterprise::enterprise::cloud::update_customer_billing(updated_billing).await
+    {
+        log::error!("[EXT_CONTRACT] Failed to update expiry stage for org={org_id}: {e}");
     }
 }
 
@@ -1026,6 +1186,60 @@ mod tests {
     use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage;
 
     use super::*;
+
+    const DAY: i64 = 86_400_000_000;
+    const NOW: i64 = 1_793_491_200_000_000;
+
+    #[test]
+    fn test_contract_sync_due_for_a_new_holder_whatever_the_last_sync() {
+        assert!(contract_sync_due(false, None, NOW, DAY));
+        assert!(contract_sync_due(false, Some(NOW - 1), NOW, DAY));
+    }
+
+    #[test]
+    fn test_contract_sync_due_only_after_the_interval_for_a_holder() {
+        assert!(!contract_sync_due(true, Some(NOW - 1), NOW, DAY));
+        assert!(!contract_sync_due(true, Some(NOW - DAY + 1), NOW, DAY));
+        assert!(contract_sync_due(true, Some(NOW - DAY), NOW, DAY));
+        assert!(contract_sync_due(true, None, NOW, DAY));
+    }
+
+    #[test]
+    fn test_contract_row_action_deletes_only_an_expired_legacy_row() {
+        assert_eq!(
+            contract_row_action(NOW, NOW, false),
+            ContractRowAction::DeleteExpired
+        );
+        assert_eq!(
+            contract_row_action(NOW - DAY, NOW, false),
+            ContractRowAction::DeleteExpired
+        );
+        assert_eq!(
+            contract_row_action(NOW, NOW, true),
+            ContractRowAction::LeaveToReconcile
+        );
+    }
+
+    #[test]
+    fn test_contract_row_action_warns_either_kind_of_row_before_its_end() {
+        for stored_row in [false, true] {
+            assert_eq!(
+                contract_row_action(NOW + 7 * DAY, NOW, stored_row),
+                ContractRowAction::Warn { days_remaining: 7 }
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_warning_while_a_back_to_back_renewal_extends_the_end() {
+        // reconcile sets end_date to the chain end, so a term ending tomorrow reads as a year away
+        let chain_end = NOW + 366 * DAY;
+        let ContractRowAction::Warn { days_remaining } = contract_row_action(chain_end, NOW, true)
+        else {
+            panic!("expected a warning check");
+        };
+        assert_eq!(find_pending_expiry_stage(days_remaining, None), None);
+    }
 
     #[test]
     fn test_html_escape_basic_chars() {
