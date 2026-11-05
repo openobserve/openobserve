@@ -29871,7 +29871,7 @@
       "action": "Akcja",
       "target": "Cel",
       "auditDisabled": "Dziennik audytu wymaga O2_AUDIT_ENABLED=true na serwerze",
-      "auditDelayHint": "Brak wpisów. Serwer publikuje rekordy audytu partiami, domyślnie co 10 minut (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "Brak wpisów w ciągu ostatnich 24 godzin. Wybierz dłuższy okres lub sprawdź później: serwer publikuje rekordy audytu w partiach, domyślnie co 10 minut (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Domyślne ustawienia flot",
       "fleetDefaultsDesc": "Każda flota używa tych wartości, chyba że ustawi własne w swoich ustawieniach",
       "gateObserve": "Obserwacja bramki (sekundy)",

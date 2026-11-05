@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
     <template v-else>
       <div data-test="rum-analytics-kpi-strip">
-        <OStatStrip :items="kpis" :loading="!summary" />
+        <OStatStrip :items="kpis" :loading="kpisLoading" />
       </div>
       <div
         v-if="kpiFootnote"
@@ -558,6 +558,13 @@ const filterRows = (rows: RankedRow[]) =>
 
 const pageRows = computed(() => filterRows(allPageRows.value));
 const clickRows = computed(() => filterRows(allClickRows.value));
+const panelPending = (p: { status: string }) => p.status !== "ok";
+// Counts of 0 would read as real results before the lists they count have answered.
+const countsPending = computed(
+  () =>
+    panelPending(view.value === "all" ? pagesPanel.value : entryPanel.value) ||
+    panelPending(clicksPanel.value),
+);
 const counts = computed(() =>
   chipCounts([allPageRows.value, allClickRows.value], prevHasData.value),
 );
@@ -605,6 +612,9 @@ const partialTooltip = computed(() =>
   pa.usersUnit.value.partial ? pa.usersUnit.value.label : undefined,
 );
 
+// The summary lands before the identity (which also waits on the facet searches), so both gate the tiles.
+const kpisLoading = computed(() => !summary.value || !pa.identity.value);
+
 const kpis = computed<StatItem[]>(() => {
   const s = summary.value;
   const id = pa.identity.value;
@@ -635,9 +645,11 @@ const kpis = computed<StatItem[]>(() => {
           ? unit.label
           : t("rum.analytics.kpi.users"),
       value: id?.field ? addCommasToNumber(id.users) : "—",
-      sub: id?.field
-        ? raw(id.field)
-        : (identityGapMessage(id, true) ?? t("rum.analytics.kpi.noIdentity")),
+      sub: !id
+        ? undefined
+        : id.field
+          ? raw(id.field)
+          : (identityGapMessage(id, true) ?? t("rum.analytics.kpi.noIdentity")),
       subIcon: unit.partial ? "info-outline" : undefined,
       subTooltip:
         unit.partial && id?.field
@@ -884,7 +896,7 @@ const run = async (force = false) => {
 };
 
 const chipLabel = (label: I18nText, count: number) =>
-  t("rum.analytics.chips.withCount", { label, count });
+  countsPending.value ? label : t("rum.analytics.chips.withCount", { label, count });
 
 const onChip = (v: unknown) => {
   if (v) chip.value = v as ChipFilter;

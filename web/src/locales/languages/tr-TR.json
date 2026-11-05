@@ -29871,7 +29871,7 @@
       "action": "Eylem",
       "target": "Hedef",
       "auditDisabled": "Denetim izi için sunucuda O2_AUDIT_ENABLED=true gerekir",
-      "auditDelayHint": "Henüz kayıt yok. Sunucu denetim kayıtlarını toplu olarak yayımlar; varsayılan olarak her 10 dakikada bir (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "Son 24 saatte kayıt yok. Daha uzun bir dönem seçin veya biraz sonra tekrar kontrol edin: sunucu denetim kayıtlarını toplu halde, varsayılan olarak her 10 dakikada bir yayımlar (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Filo varsayılanları",
       "fleetDefaultsDesc": "Her filo, kendi ayarlarında belirlemediği sürece bu değerleri kullanır",
       "gateObserve": "Kapı gözlemi (saniye)",

@@ -29871,7 +29871,7 @@
       "action": "操作",
       "target": "对象",
       "auditDisabled": "审计跟踪需要在服务器上设置 O2_AUDIT_ENABLED=true",
-      "auditDelayHint": "暂无记录。服务器按批发布审计记录,默认每 10 分钟一次(O2_AUDIT_PUBLISH_INTERVAL)。",
+      "auditDelayHint": "过去 24 小时内没有条目。请选择更长的时间段，或稍后再查看：服务器会分批发布审计记录，默认每 10 分钟发布一次（O2_AUDIT_PUBLISH_INTERVAL）。",
       "fleetDefaults": "机群默认值",
       "fleetDefaultsDesc": "除非在自身设置中另行指定，否则每个机群都使用这些值",
       "gateObserve": "关卡观察时间（秒）",
