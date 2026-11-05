@@ -30510,7 +30510,7 @@
         "startTour": "Start the Guided Tour",
         "ownWay": "Explore on My Own"
       },
-      "errorBody": "Something went wrong while loading. Try again: anything already created is reused, not duplicated."
+      "errorBody": "Something went wrong while loading. Try again: dashboards and alerts that already exist are reused, not duplicated."
     },
     "tour": {
       "label": "Guided tour",

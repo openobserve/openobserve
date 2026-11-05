@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -453,5 +453,49 @@ describe("removeSampleData", () => {
     expect(jsTransformService.delete).toHaveBeenCalledTimes(SAMPLE_FUNCTIONS.length);
     expect(mocks.streamDelete).toHaveBeenCalled();
     expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
+  });
+});
+
+describe("loadSampleData ingest retries", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("retries a batch after a network error, waiting 1 s and then 3 s", async () => {
+    mocks.sampleData.ingestMetrics
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockRejectedValueOnce({ response: { status: 503 } });
+    const done = loadSampleData("acme", 5, () => {});
+    await vi.advanceTimersByTimeAsync(999);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await done).counts.metrics).toBe(1);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after two retries", async () => {
+    const down = { response: { status: 502 } };
+    mocks.sampleData.ingestMetrics.mockRejectedValue(down);
+    try {
+      const done = expect(loadSampleData("acme", 5, () => {})).rejects.toBe(down);
+      await vi.advanceTimersByTimeAsync(4000);
+      await done;
+      expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(3);
+    } finally {
+      mocks.sampleData.ingestMetrics.mockImplementation(async (_o, rows) => accepted(rows));
+    }
+  });
+
+  it("does not retry a refused request", async () => {
+    const bad = { response: { status: 400 } };
+    mocks.sampleData.ingestMetrics.mockRejectedValueOnce(bad);
+    await expect(loadSampleData("acme", 5, () => {})).rejects.toBe(bad);
+    expect(mocks.sampleData.ingestMetrics).toHaveBeenCalledTimes(1);
   });
 });

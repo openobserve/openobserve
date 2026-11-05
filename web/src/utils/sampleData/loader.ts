@@ -159,6 +159,22 @@ const tracesOutcome = (res: any, sent: number): IngestOutcome => {
 // in the order ingestTelemetry sends them; the alert and both log chapters query only app logs
 const SIGNALS = ["app logs", "access logs", "metrics", "spans"] as const;
 
+const RETRY_DELAYS_MS = [1000, 3000];
+
+// only a dropped connection or a server fault is worth sending again; a 4xx would fail the same way
+const withRetry = async <T>(send: () => Promise<T>): Promise<T> => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await send();
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const transient = !e?.response || status >= 500;
+      if (!transient || attempt >= RETRY_DELAYS_MS.length) throw e;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+};
+
 const ingestTelemetry = async (
   org: string,
   hours: number,
@@ -176,19 +192,19 @@ const ingestTelemetry = async (
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
     const outcomes: IngestOutcome[] = await Promise.all([
-      sampleDataService
-        .ingestLogs(org, SAMPLE_STREAMS.appLogs, batch.appLogs)
-        .then((res) => jsonOutcome(res, batch.appLogs.length)),
-      sampleDataService
-        .ingestLogs(org, SAMPLE_STREAMS.accessLogs, batch.accessLogs)
-        .then((res) => jsonOutcome(res, batch.accessLogs.length)),
-      sampleDataService
-        .ingestMetrics(org, batch.metrics)
-        .then((res) => jsonOutcome(res, batch.metrics.length)),
+      withRetry(() =>
+        sampleDataService.ingestLogs(org, SAMPLE_STREAMS.appLogs, batch.appLogs),
+      ).then((res) => jsonOutcome(res, batch.appLogs.length)),
+      withRetry(() =>
+        sampleDataService.ingestLogs(org, SAMPLE_STREAMS.accessLogs, batch.accessLogs),
+      ).then((res) => jsonOutcome(res, batch.accessLogs.length)),
+      withRetry(() => sampleDataService.ingestMetrics(org, batch.metrics)).then((res) =>
+        jsonOutcome(res, batch.metrics.length),
+      ),
       batch.spanCount
-        ? sampleDataService
-            .ingestTraces(org, SAMPLE_STREAMS.traces, batch.traces)
-            .then((res) => tracesOutcome(res, batch.spanCount))
+        ? withRetry(() =>
+            sampleDataService.ingestTraces(org, SAMPLE_STREAMS.traces, batch.traces),
+          ).then((res) => tracesOutcome(res, batch.spanCount))
         : { accepted: 0 },
     ]);
     const [app, access, metrics, traces] = outcomes;
