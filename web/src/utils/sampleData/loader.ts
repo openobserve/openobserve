@@ -153,6 +153,9 @@ const tracesOutcome = (res: any, sent: number): IngestOutcome => {
   };
 };
 
+// in the order ingestTelemetry sends them; the alert and both log chapters query only app logs
+const SIGNALS = ["app logs", "access logs", "metrics", "spans"] as const;
+
 const ingestTelemetry = async (
   org: string,
   hours: number,
@@ -162,8 +165,11 @@ const ingestTelemetry = async (
   const range: SampleWindow = { startUs: endUs - hours * HOUR_US, endUs };
   const gen = createSampleGenerator(range);
   const counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
-  const sent: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
-  const errors: Partial<Record<keyof SampleCounts, string>> = {};
+  const signals = SIGNALS.map(() => ({
+    sent: 0,
+    accepted: 0,
+    error: undefined as string | undefined,
+  }));
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
     const outcomes: IngestOutcome[] = await Promise.all([
@@ -186,18 +192,25 @@ const ingestTelemetry = async (
     counts.logs += app.accepted + access.accepted;
     counts.spans += traces.accepted;
     counts.metrics += metrics.accepted;
-    sent.logs += batch.appLogs.length + batch.accessLogs.length;
-    sent.spans += batch.spanCount;
-    sent.metrics += batch.metrics.length;
-    errors.logs ??= app.error ?? access.error;
-    errors.spans ??= traces.error;
-    errors.metrics ??= metrics.error;
+    const sent = [
+      batch.appLogs.length,
+      batch.accessLogs.length,
+      batch.metrics.length,
+      batch.spanCount,
+    ];
+    outcomes.forEach((o, k) => {
+      signals[k].sent += sent[k];
+      signals[k].accepted += o.accepted;
+      signals[k].error ??= o.error;
+    });
     report((i + 1) / gen.chunkCount, { ...counts }, feedOf(batch.appLogs));
   }
   // the tour has a chapter per signal, so one that kept nothing fails the load
-  const empty = (["logs", "spans", "metrics"] as const).find((s) => sent[s] && !counts[s]);
-  if (empty) {
-    throw new Error(errors[empty] || `The server did not accept any sample ${empty}`);
+  const empty = signals.findIndex((s) => s.sent && !s.accepted);
+  if (empty >= 0) {
+    throw new Error(
+      signals[empty].error || `The server did not accept any sample ${SIGNALS[empty]}`,
+    );
   }
   return { counts, window: range };
 };

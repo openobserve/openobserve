@@ -29,6 +29,7 @@ import {
   SAMPLE_FOLDER_NAME,
   SAMPLE_FUNCTIONS,
   SAMPLE_PIPELINE,
+  SAMPLE_STREAMS,
 } from "./catalog";
 import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
 
@@ -130,8 +131,9 @@ describe("loadSampleData", () => {
   });
 
   it("counts the records the server accepted, not the ones it was sent", async () => {
-    mocks.sampleData.ingestLogs.mockResolvedValueOnce({
-      data: { code: 200, status: [{ name: "s", successful: 0, failed: 1, error: "Too old data" }] },
+    // the app logs go first, then the access logs
+    mocks.sampleData.ingestLogs.mockResolvedValueOnce(accepted([{}])).mockResolvedValueOnce({
+      data: { code: 200, status: [{ name: "s", successful: 1, failed: 1, error: "Too old data" }] },
     });
     mocks.sampleData.ingestTraces.mockResolvedValueOnce({
       data: { partialSuccess: { rejectedSpans: "2", errorMessage: "Too old data" } },
@@ -184,6 +186,22 @@ describe("loadSampleData", () => {
     await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(
       "The server did not accept any sample metrics",
     );
+  });
+
+  it("fails when the server kept none of the app logs, even though it kept the access logs", async () => {
+    mocks.sampleData.ingestLogs.mockImplementation(async (_o, stream, rows) =>
+      stream === SAMPLE_STREAMS.appLogs
+        ? { data: { code: 200, status: [{ name: stream, successful: 0, failed: rows.length }] } }
+        : accepted(rows),
+    );
+    try {
+      await expect(loadSampleData("acme", 5, () => {})).rejects.toThrow(
+        "The server did not accept any sample app logs",
+      );
+      expect(mocks.sampleData.putState).not.toHaveBeenCalled();
+    } finally {
+      mocks.sampleData.ingestLogs.mockImplementation(async (_o, _s, rows) => accepted(rows));
+    }
   });
 
   it("keeps the oldest record minutes inside a one-hour ingest window", async () => {
