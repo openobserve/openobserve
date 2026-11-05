@@ -141,10 +141,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
-import { FIRST_SOURCE_OPTIONS, type FirstSourceId } from "./firstSourceOptions";
+import { FIRST_SOURCE_OPTIONS, type FirstSourceId } from "@/components/login/firstSourceOptions";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
-import SampleLivePreview from "@/components/sampleData/SampleLivePreview.vue";
+import SampleLivePreview from "./SampleLivePreview.vue";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const emit = defineEmits<{ pick: [id: FirstSourceId]; sample: []; skip: []; browse: [] }>();

@@ -172,7 +172,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import WelcomeChoices from "@/components/login/WelcomeChoices.vue";
+import WelcomeChoices from "./WelcomeChoices.vue";
 import {
   firstSourceOption,
   writeFirstSource,
