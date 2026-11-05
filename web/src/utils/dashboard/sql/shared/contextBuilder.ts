@@ -40,6 +40,8 @@ import {
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
+import { addHeatmapWarning } from "../../heatmapDefaults";
+import { gt } from "@/types/i18n";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
@@ -178,6 +180,8 @@ export function buildSQLContext(
     breakDownKeys,
     noValueConfigOption,
     loading,
+    (rowCount) =>
+      addHeatmapWarning(extras, gt("dashboard.utils.sharedTimestampRows", { count: rowCount })),
   );
 
   // get the axis data using key

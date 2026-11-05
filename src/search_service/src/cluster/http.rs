@@ -233,6 +233,13 @@ pub async fn search(
 
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
+    if sql.histogram_interval.is_some() {
+        result.set_histogram_buckets(crate::sql::histogram::histogram_offset_micros(
+            &sql.sql,
+            sql.timezone.as_deref(),
+            sql.time_range.1,
+        ));
+    }
     result.set_partial(is_partial, partial_err);
     result.set_took(took_time);
     result.set_wait_in_queue(took_wait);

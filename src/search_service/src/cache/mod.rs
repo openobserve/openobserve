@@ -412,6 +412,9 @@ pub async fn search(
     {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
+    if res.histogram_interval.is_some() && res.histogram_origin.is_none() {
+        res.set_histogram_buckets(c_resp.ts_offset);
+    }
 
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
@@ -808,6 +811,8 @@ pub fn merge_response(
             }
             resp.hits.extend(res.hits);
             resp.histogram_interval = res.histogram_interval;
+            resp.histogram_origin = res.histogram_origin;
+            resp.histogram_offset = res.histogram_offset;
             fn_error.extend(res.function_error);
         }
         resp.took = cache_took;
@@ -828,6 +833,8 @@ pub fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
+            cache_response.histogram_origin = res.histogram_origin;
+            cache_response.histogram_offset = res.histogram_offset;
             fn_error.extend(res.function_error);
         }
         cache_response.function_error = fn_error;
@@ -859,6 +866,8 @@ pub fn merge_response(
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
+        cache_response.histogram_origin = res.histogram_origin;
+        cache_response.histogram_offset = res.histogram_offset;
 
         search_hits_len += res.total;
 

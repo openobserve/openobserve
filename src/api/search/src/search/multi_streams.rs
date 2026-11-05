@@ -433,6 +433,8 @@ pub async fn search_multi(
                 }
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
                     multi_res.histogram_interval = res.histogram_interval;
+                    multi_res.histogram_origin = res.histogram_origin;
+                    multi_res.histogram_offset = res.histogram_offset;
                 }
             }
             Err(err) => {

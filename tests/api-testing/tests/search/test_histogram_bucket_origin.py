@@ -261,3 +261,15 @@ def test_a_named_zone_uses_one_offset_for_the_whole_request(fixture):
     expected = _expected_rows(fixture.events, fixture.start, fixture.end, interval, offset)
     assert _rows(fixture.search(sql, fixture.start, fixture.end, use_cache=True)) == expected
     assert _rows(fixture.search_stream(sql, fixture.start, fixture.end)) == expected
+
+
+@pytest.mark.parametrize("use_cache", [False, True], ids=["cache_off", "cache_on"])
+def test_a_response_states_its_bucket_definition(fixture, use_cache):
+    sql = _sql(fixture.stream, 1, True, "+05:30")
+    first_edge, last_edge = fixture.whole_buckets(DAY)
+    for _ in range(2):
+        body = fixture.search(sql, first_edge, last_edge, use_cache=use_cache)
+        assert body["histogram_origin"] == 978_307_200
+        assert body["histogram_offset"] == 19_800
+        results = fixture.search_stream(sql, first_edge, last_edge, use_cache=use_cache)
+        assert results["histogram_offset"] == 19_800

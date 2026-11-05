@@ -22,6 +22,9 @@ import { detectChunkingDirection } from "./chunkingDirection";
 
 const formatUtc = (date: Date) => format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
 
+// Older cached responses have no bucket definition, and they all use the UTC 2001 grid.
+const DEFAULT_ORIGIN_SECS = Date.UTC(2001, 0, 1) / 1000;
+
 /**
  * Fills in missing time-series data points between the start and end time
  * based on the histogram interval, inserting null/no-value entries where data
@@ -37,6 +40,8 @@ const formatUtc = (date: Date) => format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T
  * @param {string[]} zAxisKeys - Array of z-axis key aliases.
  * @param {string[]} breakDownKeys - Array of breakdown key aliases.
  * @param {any} noValueConfigOption - The value to use for missing data points.
+ * @param {any} loading - Whether chunks are still arriving.
+ * @param {Function} onSharedTimestamps - Receives how many rows share a slot with another row.
  * @returns {any[]} - The data array with gaps filled in.
  */
 export const fillMissingValues = (
@@ -50,6 +55,7 @@ export const fillMissingValues = (
   breakDownKeys: string[],
   noValueConfigOption: any,
   loading?: any,
+  onSharedTimestamps?: (rowCount: number) => void,
 ): any[] => {
   // Get the interval in minutes
   const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
@@ -64,10 +70,14 @@ export const fillMissingValues = (
 
   // Extract and process metaDataStartTime
   const metaDataStartTime = metadata?.queries[0]?.startTime?.toString() ?? 0;
-  const startTime = new Date(parseInt(metaDataStartTime) / 1000);
+  const originSecs = resultMetaData?.[0]?.histogram_origin ?? DEFAULT_ORIGIN_SECS;
+  const offsetMillis = (resultMetaData?.[0]?.histogram_offset ?? 0) * 1000;
+  // Labels carry the timezone shift, so slots are built in the same shifted time.
+  const toLabelTime = (micros: number) => new Date(micros / 1000 + offsetMillis);
+  const startTime = toLabelTime(parseInt(metaDataStartTime));
 
   // Calculate the binnedDate
-  const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
+  const origin = new Date(originSecs * 1000);
   const binnedDate = dateBin(interval, startTime, origin);
 
   // Identify the time-based key
@@ -108,7 +118,7 @@ export const fillMissingValues = (
 
   // Use metadata endTime for the user's selected end time.
   const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
-  const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+  const endTime = toLabelTime(parseInt(metaDataEndTime));
   const formattedUserEnd = formatUtc(endTime);
 
   // Detect chunking direction from first resultMetaData entry.
@@ -132,13 +142,13 @@ export const fillMissingValues = (
     binnedFillStart = binnedDate;
     const lastChunkEndTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.end_time ?? 0;
-    const fillEndTime = lastChunkEndTime ? new Date(lastChunkEndTime / 1000) : endTime;
+    const fillEndTime = lastChunkEndTime ? toLabelTime(lastChunkEndTime) : endTime;
     endTimeForFill = formatUtc(fillEndTime);
   } else {
     // RTL streaming: fill from earliest chunk's start to user's end
     const resultMetaStartTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
-    const fillStartTime = resultMetaStartTime ? new Date(resultMetaStartTime / 1000) : binnedDate;
+    const fillStartTime = resultMetaStartTime ? toLabelTime(resultMetaStartTime) : binnedDate;
     binnedFillStart = dateBin(interval, fillStartTime, origin);
     endTimeForFill = formattedUserEnd;
   }
@@ -150,11 +160,13 @@ export const fillMissingValues = (
   const searchDataMap = new Map();
   let actualMinTime: string | null = null;
   let actualMaxTime: string | null = null;
+  let sharedRowCount = 0;
   // for-of (not forEach) so the compiler tracks actualMin/MaxTime assignments
   // in this scope and keeps their declared string|null type at reads below.
   for (const d of processedData ?? []) {
     const timeVal = `${getDataValue(d, timeKey)}`;
     const key = hasBreakdown ? `${timeVal}-${getDataValue(d, uniqueKey)}` : timeVal;
+    if (searchDataMap.has(key)) sharedRowCount++;
     searchDataMap.set(key, d);
     if (actualMinTime === null || timeVal < actualMinTime) actualMinTime = timeVal;
     if (actualMaxTime === null || timeVal > actualMaxTime) actualMaxTime = timeVal;
@@ -176,6 +188,9 @@ export const fillMissingValues = (
     }
   }
 
+  // A chart keeps one row per slot, so a second row on a slot means the bar is not the full value.
+  if (sharedRowCount > 0) onSharedTimestamps?.(sharedRowCount);
+
   const filledData: any = [];
 
   // Fill slot-by-slot in chronological order, only between actual data points.
@@ -188,6 +203,7 @@ export const fillMissingValues = (
       const currentData = searchDataMap.get(key);
       if (currentData) {
         filledData.push(currentData);
+        searchDataMap.delete(key);
       } else {
         const nullEntry: any = { [timeKey]: currentFormattedTime };
         keys.forEach((key) => {
@@ -201,6 +217,7 @@ export const fillMissingValues = (
         const currentData = searchDataMap.get(key);
         if (currentData) {
           filledData.push(currentData);
+          searchDataMap.delete(key);
         } else {
           const nullEntry: any = {
             [timeKey]: currentFormattedTime,
@@ -218,6 +235,14 @@ export const fillMissingValues = (
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
     currentFormattedTime = formatUtc(currentTime);
+  }
+
+  // A row off every slot must still reach the chart, or real data disappears without a trace.
+  if (searchDataMap.size > 0) {
+    filledData.push(...searchDataMap.values());
+    filledData.sort((a: any, b: any) =>
+      `${getDataValue(a, timeKey)}`.localeCompare(`${getDataValue(b, timeKey)}`),
+    );
   }
 
   return filledData;

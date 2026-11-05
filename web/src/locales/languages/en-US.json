@@ -9788,6 +9788,7 @@
       "invalidVariableDependency": "Invalid dependency: {child} cannot depend on {parent}",
       "nestedArgPath": "{field} → Arg {index}",
       "seriesLimitWarningCounts": "Showing {shown} of {total} series to keep the chart fast",
+      "sharedTimestampRows": "{count} rows share a time bucket with another row, so this chart shows only one of them",
       "heatmapRowsCapped": "Showing {shown} of {total} rows to stay within the heatmap cell limit",
       "heatmapColumnsCapped": "Showing the last {shownColumns} of {totalColumns} columns and {shownRows} of {totalRows} rows to stay within the heatmap cell limit",
       "heatmapDuplicateCells": "Duplicate (x, y) rows found: {count}; each affected cell shows the first row's value",

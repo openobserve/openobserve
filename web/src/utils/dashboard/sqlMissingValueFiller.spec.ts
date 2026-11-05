@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { fillMissingValues } from "./sqlMissingValueFiller";
+import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 
 // Mock date-fns-tz: toZonedTime shifts the date so its local representation
 // equals the requested timezone. For "UTC", local getHours() = UTC hours.
@@ -240,8 +241,10 @@ describe("fillMissingValues", () => {
       null,
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: null });
+    // the row on no slot stays, ahead of the empty slot
+    expect(result).toHaveLength(2);
+    expect(result[0].ts).toBe("2024-01-15T09:00:00");
+    expect(result[1]).toMatchObject({ ts: "2024-01-15T10:00:00", value: null });
   });
 
   it("uses the noValueConfigOption value when inserting null entries (no breakdown)", () => {
@@ -258,8 +261,10 @@ describe("fillMissingValues", () => {
       0,
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 0 });
+    // the row on no slot stays, ahead of the empty slot
+    expect(result).toHaveLength(2);
+    expect(result[0].ts).toBe("2024-01-15T09:00:00");
+    expect(result[1]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 0 });
   });
 
   // -------------------------------------------------------------------------
@@ -308,8 +313,10 @@ describe("fillMissingValues", () => {
       null,
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    // the row on no slot stays, ahead of the empty slot
+    expect(result).toHaveLength(2);
+    expect(result[0].ts).toBe("2024-01-15T09:00:00");
+    expect(result[1]).toMatchObject({
       ts: "2024-01-15T10:00:00",
       service: "backend",
       value: null,
@@ -696,8 +703,10 @@ describe("fillMissingValues", () => {
       0,
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    // the row on no slot stays, ahead of the empty slot
+    expect(result).toHaveLength(2);
+    expect(result[0].ts).toBe("2024-01-15T09:00:00");
+    expect(result[1]).toMatchObject({
       ts: "2024-01-15T10:00:00",
       v1: 0,
       v2: 0,
@@ -718,8 +727,10 @@ describe("fillMissingValues", () => {
       null,
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    // the row on no slot stays, ahead of the empty slot
+    expect(result).toHaveLength(2);
+    expect(result[0].ts).toBe("2024-01-15T09:00:00");
+    expect(result[1]).toMatchObject({
       ts: "2024-01-15T10:00:00",
       y: null,
       z: null,
@@ -807,5 +818,153 @@ describe("fillMissingValues", () => {
     const catB = result.find((r: any) => r.category === "b");
     expect(catA).toBeDefined();
     expect(catB).toBeDefined();
+  });
+
+  describe("bucket definition from the response", () => {
+    beforeEach(() => {
+      // these cases assert real slot positions, so they need the real bin arithmetic
+      vi.mocked(dateBin).mockImplementation((interval: number, date: Date, origin: Date) => {
+        const seconds = (date.getTime() - origin.getTime()) / 1000;
+        return new Date(date.getTime() - (seconds % interval) * 1000);
+      });
+    });
+
+    afterEach(() => {
+      vi.mocked(dateBin).mockImplementation((_interval: number, date: Date) => date);
+    });
+
+    const run = (rows: any[], meta: any, start: string, end: string, onShared?: any) =>
+      fillMissingValues(
+        rows,
+        makePanelSchema("bar"),
+        [meta],
+        {
+          queries: [
+            {
+              startTime: new Date(start).getTime() * 1000,
+              endTime: new Date(end).getTime() * 1000,
+            },
+          ],
+        },
+        ["ts"],
+        ["cnt"],
+        [],
+        [],
+        null,
+        false,
+        onShared,
+      );
+
+    it("builds 30-day slots on the 2001 grid by default", () => {
+      const rows = [{ ts: "2026-10-17T00:00:00", cnt: 462 }];
+      const result = run(
+        rows,
+        { histogram_interval: 2_592_000 },
+        "2026-09-20T00:00:00Z",
+        "2026-11-20T00:00:00Z",
+      );
+      expect(result.map((r: any) => r.ts)).toEqual([
+        "2026-09-17T00:00:00",
+        "2026-10-17T00:00:00",
+        "2026-11-16T00:00:00",
+      ]);
+      expect(result[1].cnt).toBe(462);
+    });
+
+    it("uses the origin and offset that the response states", () => {
+      const rows = [{ ts: "2026-11-02T00:00:00", cnt: 7 }];
+      const result = run(
+        rows,
+        { histogram_interval: 86_400, histogram_origin: 978_307_200, histogram_offset: 19_800 },
+        "2026-11-01T20:00:00Z",
+        "2026-11-03T20:00:00Z",
+      );
+      expect(result.map((r: any) => r.ts)).toEqual([
+        "2026-11-02T00:00:00",
+        "2026-11-03T00:00:00",
+        "2026-11-04T00:00:00",
+      ]);
+      expect(result[0].cnt).toBe(7);
+    });
+  });
+
+  describe("rows that a slot cannot hold", () => {
+    beforeEach(() => {
+      // these cases assert real slot positions, so they need the real bin arithmetic
+      vi.mocked(dateBin).mockImplementation((interval: number, date: Date, origin: Date) => {
+        const seconds = (date.getTime() - origin.getTime()) / 1000;
+        return new Date(date.getTime() - (seconds % interval) * 1000);
+      });
+    });
+
+    afterEach(() => {
+      vi.mocked(dateBin).mockImplementation((_interval: number, date: Date) => date);
+    });
+
+    const run = (rows: any[], onShared?: any, xKeys = ["ts"], breakdown: string[] = []) =>
+      fillMissingValues(
+        rows,
+        makePanelSchema("bar"),
+        [{ histogram_interval: 2_592_000 }],
+        {
+          queries: [
+            {
+              startTime: new Date("2026-09-20T00:00:00Z").getTime() * 1000,
+              endTime: new Date("2026-11-20T00:00:00Z").getTime() * 1000,
+            },
+          ],
+        },
+        xKeys,
+        ["cnt"],
+        [],
+        breakdown,
+        null,
+        false,
+        onShared,
+      );
+
+    it("keeps a row that matches no slot, in time order", () => {
+      // a 1970-grid label from an older server
+      const rows = [{ ts: "2026-10-04T00:00:00", cnt: 720 }];
+      const result = run(rows);
+      expect(result.map((r: any) => [r.ts, r.cnt])).toEqual([
+        ["2026-09-17T00:00:00", null],
+        ["2026-10-04T00:00:00", 720],
+        ["2026-10-17T00:00:00", null],
+        ["2026-11-16T00:00:00", null],
+      ]);
+    });
+
+    it("keeps an unmatched row of a breakdown series", () => {
+      const rows = [
+        { ts: "2026-10-04T00:00:00", level: "info", cnt: 3 },
+        { ts: "2026-10-17T00:00:00", level: "info", cnt: 4 },
+      ];
+      const result = run(rows, undefined, ["ts"], ["level"]);
+      const values = result.filter((r: any) => r.cnt !== null).map((r: any) => r.cnt);
+      expect(values).toEqual([3, 4]);
+    });
+
+    it("reports rows that share a timestamp and does not sum them", () => {
+      const onShared = vi.fn();
+      const rows = [
+        { ts: "2026-10-17T00:00:00", cnt: 408 },
+        { ts: "2026-10-17T00:00:00", cnt: 54 },
+      ];
+      const result = run(rows, onShared);
+      expect(onShared).toHaveBeenCalledWith(1);
+      const slot = result.find((r: any) => r.ts === "2026-10-17T00:00:00");
+      expect(slot.cnt).toBe(54);
+    });
+
+    it("does not report rows with distinct breakdown values", () => {
+      const onShared = vi.fn();
+      const rows = [
+        { ts: "2026-10-17T00:00:00", level: "info", cnt: 1 },
+        { ts: "2026-10-17T00:00:00", level: "error", cnt: 2 },
+      ];
+      run(rows, onShared, ["ts"], ["level"]);
+      expect(onShared).not.toHaveBeenCalled();
+    });
   });
 });

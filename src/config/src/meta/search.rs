@@ -310,6 +310,12 @@ pub struct Response {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub histogram_interval: Option<i64>, // seconds, for histogram
+    /// The first `histogram()` edge, in Unix seconds; a chart builds its slots from it.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub histogram_origin: Option<i64>,
+    /// The offset east of UTC that `histogram()` labels carry, in seconds.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub histogram_offset: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_start_time: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -523,6 +529,8 @@ impl Response {
             function_error: Vec::new(),
             is_partial: false,
             histogram_interval: None,
+            histogram_origin: None,
+            histogram_offset: None,
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
@@ -624,6 +632,11 @@ impl Response {
 
     pub fn set_histogram_interval(&mut self, val: Option<i64>) {
         self.histogram_interval = val;
+    }
+
+    pub fn set_histogram_buckets(&mut self, offset_micros: i64) {
+        self.histogram_origin = Some(super::histogram_origin::DATE_BIN_ORIGIN_SECS);
+        self.histogram_offset = Some(offset_micros / 1_000_000);
     }
 
     pub fn set_work_group(&mut self, val: Option<String>) {
@@ -2281,6 +2294,10 @@ mod tests {
         response.set_partial(false, "Another warning".to_string());
         assert!(!response.is_partial);
         assert_eq!(response.function_error.len(), 2);
+
+        response.set_histogram_buckets(-28_800_000_000);
+        assert_eq!(response.histogram_origin, Some(978_307_200));
+        assert_eq!(response.histogram_offset, Some(-28_800));
 
         response.set_histogram_interval(Some(3600));
         assert_eq!(response.histogram_interval, Some(3600));
