@@ -237,6 +237,33 @@ describe("SampleDataWelcome finish", () => {
     expect(session.welcomeDeciding.value).toBe(false);
   });
 
+  it("drops a late answer for an org the user has left", async () => {
+    let answer!: (hasData: boolean) => void;
+    vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+    const mounting = mountAtHome();
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "empty-org", label: "Empty" };
+    await flush();
+    answer(true);
+    await mounting;
+    await flush();
+    expect(session.welcomeOpen.value).toBe(true);
+    expect(localStorage.getItem("isFirstTimeLogin")).not.toBeNull();
+  });
+
+  it("stays closed when the flow is switched off during its stream check", async () => {
+    let answer!: (hasData: boolean) => void;
+    vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+    const mounting = mountAtHome();
+    await flushPromises();
+    store.state.zoConfig = { version: "v0.0.0", sample_data_onboarding_enabled: false };
+    await flush();
+    answer(false);
+    await mounting;
+    await flush();
+    expect(session.welcomeOpen.value).toBe(false);
+  });
+
   it("stays closed when the deployment runs another first-run flow", async () => {
     await mountAtHome({});
     expect(session.welcomeOpen.value).toBe(false);

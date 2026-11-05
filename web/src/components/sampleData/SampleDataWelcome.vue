@@ -315,8 +315,14 @@ const browseAll = () => {
 // the switches come only with the full org config; the bootstrap /config has no version
 const flowOn = () => !!store.state.zoConfig?.version && sampleDataFlowOn(store.state.zoConfig);
 
+let greetToken = 0;
+
 const maybeGreet = async () => {
+  const token = ++greetToken;
   const id = org.value;
+  // a newer check, an org switch, leaving Home or a switch-off makes an answer stale
+  const stale = () =>
+    token !== greetToken || id !== org.value || route.name !== "home" || !flowOn();
   if (store.state.kioskMode || !flowOn()) return;
   // a tour left open in another org is hidden here, so only this org's tour holds the welcome back
   if (!id || route.name !== "home" || session.welcomeSeen(id) || session.tour.value?.org === id) {
@@ -326,6 +332,7 @@ const maybeGreet = async () => {
   session.welcomeDeciding.value = true;
   try {
     const hasData = await fetchHasUserStreams(id);
+    if (stale()) return;
     // the Slack invite day-2 clock starts on the first Home visit, data or not
     if (config.isCloud === "true") {
       markSlackInviteOffered(store.state.userInfo?.email ?? "anonymous");
@@ -335,7 +342,6 @@ const maybeGreet = async () => {
       localStorage.removeItem("isFirstTimeLogin");
       return;
     }
-    if (id !== org.value || route.name !== "home") return;
     session.openWelcome();
   } catch {
     // an org whose streams cannot be read gets no welcome
