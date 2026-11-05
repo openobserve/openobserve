@@ -93,12 +93,13 @@ fn refuse_cross_org_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
 }
 
 /// Without enterprise there is no remote writer, so a remote node would drop every record.
-fn refuse_remote_node(pipeline: &Pipeline, enterprise: bool) -> Result<(), PipelineError> {
+#[cfg(not(feature = "enterprise"))]
+fn refuse_remote_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
     let has_remote = pipeline
         .nodes
         .iter()
         .any(|node| matches!(node.data, NodeData::RemoteStream(_)));
-    if has_remote && !enterprise {
+    if has_remote {
         return Err(PipelineError::InvalidPipeline(
             "Remote destinations are not supported in the open source version".to_string(),
         ));
@@ -320,7 +321,8 @@ pub async fn save_pipeline_checked(
         return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
     refuse_cross_org_node(&pipeline)?;
-    refuse_remote_node(&pipeline, cfg!(feature = "enterprise"))?;
+    #[cfg(not(feature = "enterprise"))]
+    refuse_remote_node(&pipeline)?;
 
     // Runs after validate(), which rebuilds source from the first node: checking
     // pipeline.source before that compares a value which is never persisted.
@@ -426,7 +428,8 @@ pub async fn update_pipeline_checked(
         .validate()
         .map_err(|e| PipelineError::InvalidPipeline(e.to_string()))?;
     refuse_cross_org_node(&pipeline)?;
-    refuse_remote_node(&pipeline, cfg!(feature = "enterprise"))?;
+    #[cfg(not(feature = "enterprise"))]
+    refuse_remote_node(&pipeline)?;
 
     // validate no JavaScript functions in pipeline
     validate_no_javascript_functions(&pipeline).await?;
@@ -565,7 +568,8 @@ pub async fn enable_pipeline(
     };
     if enable {
         refuse_cross_org_node(&pipeline)?;
-        refuse_remote_node(&pipeline, cfg!(feature = "enterprise"))?;
+        #[cfg(not(feature = "enterprise"))]
+        refuse_remote_node(&pipeline)?;
     }
 
     pipeline.enabled = enable;
@@ -696,7 +700,7 @@ mod tests {
             Pipeline, PipelineKind,
             components::{DerivedStream, NodeData, PipelineSource},
         },
-        stream::{RemoteStreamParams, StreamParams},
+        stream::StreamParams,
     };
 
     use super::is_user_pipeline_visible;
@@ -957,7 +961,10 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
     fn remote_pipeline(id: &str, org: &str) -> Pipeline {
+        use config::meta::stream::RemoteStreamParams;
+
         let mut pipeline = scheduled_pipeline(id, org, "", "");
         pipeline.nodes[1].data = NodeData::RemoteStream(RemoteStreamParams {
             org_id: org.to_string().into(),
@@ -966,24 +973,13 @@ mod tests {
         pipeline
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
-    fn a_remote_node_is_refused_only_without_enterprise() {
+    fn only_a_pipeline_with_a_remote_node_is_refused() {
         let local = scheduled_pipeline("local_pl", "a", "", "");
+        assert!(super::refuse_remote_node(&local).is_ok());
         let remote = remote_pipeline("remote_pl", "a");
-        for (pipeline, enterprise, refused) in [
-            (&local, false, false),
-            (&local, true, false),
-            (&remote, false, true),
-            (&remote, true, false),
-        ] {
-            let result = super::refuse_remote_node(pipeline, enterprise);
-            assert_eq!(
-                result.is_err(),
-                refused,
-                "{} enterprise={enterprise}",
-                pipeline.id
-            );
-        }
+        assert!(super::refuse_remote_node(&remote).is_err());
     }
 
     #[cfg(not(feature = "enterprise"))]

@@ -415,7 +415,7 @@ pub async fn save_destination(
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
     if !is_alert && !cfg!(feature = "enterprise") {
-        return MetaHttpResponse::forbidden("Not Supported");
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
 
     let dest = match dest.into(org_id, is_alert) {
@@ -472,7 +472,7 @@ pub async fn update_destination(
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
     if !is_alert && !cfg!(feature = "enterprise") {
-        return MetaHttpResponse::forbidden("Not Supported");
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
 
     let dest = match dest.into(org_id, is_alert) {
@@ -1300,16 +1300,24 @@ mod tests {
         };
         let path = || Path("default".to_string());
         let named = || Path(("default".to_string(), "d".to_string()));
+        let refusal = async |resp: axum::response::Response| {
+            let status = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let says_oss = String::from_utf8_lossy(&body).contains("open source version");
+            (status, says_oss)
+        };
         for (module, expected) in [
-            ("pipeline", StatusCode::FORBIDDEN),
-            ("alert", StatusCode::BAD_REQUEST),
+            ("pipeline", (StatusCode::FORBIDDEN, true)),
+            ("alert", (StatusCode::BAD_REQUEST, false)),
         ] {
             let (query, user, dest) = args(module);
-            let saved = save_destination(path(), query, user, dest).await;
-            assert_eq!(saved.status(), expected, "save module={module}");
+            let saved = refusal(save_destination(path(), query, user, dest).await).await;
+            assert_eq!(saved, expected, "save module={module}");
             let (query, user, dest) = args(module);
-            let updated = update_destination(named(), query, user, dest).await;
-            assert_eq!(updated.status(), expected, "update module={module}");
+            let updated = refusal(update_destination(named(), query, user, dest).await).await;
+            assert_eq!(updated, expected, "update module={module}");
         }
     }
 }

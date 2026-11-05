@@ -254,7 +254,7 @@ pub async fn create(
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
     if !cfg!(feature = "enterprise") {
-        return MetaHttpResponse::forbidden("Not Supported");
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
@@ -345,7 +345,7 @@ pub async fn update(
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
     if !cfg!(feature = "enterprise") {
-        return MetaHttpResponse::forbidden("Not Supported");
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
@@ -620,7 +620,7 @@ pub async fn refresh_built_in(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     if !cfg!(feature = "enterprise") {
-        return MetaHttpResponse::forbidden("Not Supported");
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
@@ -1842,6 +1842,13 @@ mod tests {
             ("refresh_built_in", refresh_built_in(org()).await),
         ] {
             assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{op}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&body).contains("open source version"),
+                "{op}"
+            );
         }
     }
 }
