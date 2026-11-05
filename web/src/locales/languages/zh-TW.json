@@ -29481,7 +29481,7 @@
       "action": "動作",
       "target": "目標",
       "auditDisabled": "稽核軌跡需要在伺服器上設定 O2_AUDIT_ENABLED=true",
-      "auditDelayHint": "尚無記錄。伺服器按批次發布稽核記錄,預設每 10 分鐘一次(O2_AUDIT_PUBLISH_INTERVAL)。",
+      "auditDelayHint": "過去 24 小時內沒有項目。請選擇更長的期間，或稍後再回來查看：伺服器會批次發布稽核記錄，預設每 10 分鐘一次（O2_AUDIT_PUBLISH_INTERVAL）。",
       "fleetDefaults": "機群預設值",
       "fleetDefaultsDesc": "除非機群在其設定中自行設定，否則每個機群都使用這些值",
       "gateObserve": "關卡觀察時間（秒）",

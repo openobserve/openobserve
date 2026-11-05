@@ -29486,7 +29486,7 @@
       "action": "작업",
       "target": "대상",
       "auditDisabled": "감사 추적을 사용하려면 서버에 O2_AUDIT_ENABLED=true가 필요합니다",
-      "auditDelayHint": "아직 기록이 없습니다. 서버는 감사 기록을 묶어서 발행하며 기본값은 10분마다입니다(O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "지난 24시간 동안 항목이 없습니다. 더 긴 기간을 선택하거나 잠시 후 다시 확인하세요: 서버는 기본적으로 10분마다 감사 기록을 일괄 게시합니다(O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "플릿 기본값",
       "fleetDefaultsDesc": "각 플릿은 자체 설정에서 따로 지정하지 않는 한 이 값을 사용합니다",
       "gateObserve": "게이트 관찰 시간 (초)",

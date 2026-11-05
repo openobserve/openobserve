@@ -29486,7 +29486,7 @@
       "action": "Acción",
       "target": "Destino",
       "auditDisabled": "El registro de auditoría requiere O2_AUDIT_ENABLED=true en el servidor",
-      "auditDelayHint": "Aún no hay entradas. El servidor publica los registros de auditoría por lotes, cada 10 minutos de forma predeterminada (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "No hay entradas en las últimas 24 horas. Elige un período más largo o vuelve a comprobarlo pronto: el servidor publica los registros de auditoría por lotes, cada 10 minutos de forma predeterminada (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Valores predeterminados de las flotas",
       "fleetDefaultsDesc": "Todas las flotas usan estos valores, a menos que definan los suyos en sus ajustes",
       "gateObserve": "Observación del control (segundos)",

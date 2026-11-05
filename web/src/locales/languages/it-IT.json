@@ -29486,7 +29486,7 @@
       "action": "Azione",
       "target": "Destinazione",
       "auditDisabled": "Il registro di audit richiede O2_AUDIT_ENABLED=true sul server",
-      "auditDelayHint": "Ancora nessuna voce. Il server pubblica i record di audit a lotti, ogni 10 minuti per impostazione predefinita (O2_AUDIT_PUBLISH_INTERVAL).",
+      "auditDelayHint": "Nessuna voce nelle ultime 24 ore. Scegli un periodo più lungo oppure ricontrolla a breve: il server pubblica i record di audit in batch, ogni 10 minuti per impostazione predefinita (O2_AUDIT_PUBLISH_INTERVAL).",
       "fleetDefaults": "Valori predefiniti dei fleet",
       "fleetDefaultsDesc": "Ogni fleet usa questi valori a meno che non imposti i propri nelle sue impostazioni",
       "gateObserve": "Osservazione della soglia (secondi)",
