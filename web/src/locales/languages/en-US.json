@@ -9945,6 +9945,18 @@
     "showChart": "Show chart",
     "dataViewEmpty": "No rows returned",
     "dataViewCapped": "Showing the first {shown} of {total} rows",
+    "pointExplore": {
+      "viewLogs": "View logs at this time",
+      "viewTraces": "View traces at this time",
+      "slice": "{start}–{end}",
+      "wholeRange": "Whole range {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "tracesForService": "Traces for service {service} · {slice}",
+      "findingService": "Finding the service for this point…",
+      "logsNeedLogsStream": "Logs open only for SQL charts on a logs stream",
+      "noTraceCorrelation": "No trace correlation for this stream",
+      "noServiceField": "This chart has no service field to correlate"
+    },
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",
@@ -9962,6 +9974,15 @@
       "of": "of",
       "sqlEditorLabel": "SQL Query",
       "resetSql": "Reset",
+      "applied": {
+        "label": "Applied",
+        "time": "time",
+        "clickedBucket": "clicked bucket",
+        "panelRange": "panel range",
+        "timeWithNote": "{range} ({note})",
+        "panelFilter": "panel filter",
+        "empty": "(empty)"
+      },
       "detail": {
         "drawerTitle": "Event Detail",
         "details": "Details",
