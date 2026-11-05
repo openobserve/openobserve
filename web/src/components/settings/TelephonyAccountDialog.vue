@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('telephony.connectTitle', { provider: PROVIDER })
         : t('telephony.updateTitle', { provider: PROVIDER })
     "
-    :sub-title="t('telephony.dialogSubtitle')"
     :form-id="FORM_ID"
     :primary-button-label="primaryLabel"
     :secondary-button-label="t('common.cancel')"
@@ -135,7 +134,7 @@ const tokenHelp = computed<I18nText | undefined>(() => {
 const submitting = form.useStore((s) => s.isSubmitting);
 const primaryLabel = computed<I18nText>(() => {
   if (submitting.value) return t("telephony.checking", { provider: PROVIDER });
-  return props.mode === "connect" ? t("telephony.connect") : t("telephony.update");
+  return t("common.save");
 });
 
 function failureText(err: unknown): I18nText {

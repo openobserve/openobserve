@@ -43,6 +43,13 @@ async function orgConfig(request, org) {
   return ok(request, 'get', `/api/${org}/config`);
 }
 
+/** The name the UI shows for a user: first and last name from the org's user list, or the email when they have none. */
+async function displayName(request, org, email) {
+  const body = await ok(request, 'get', `/api/${org}/users`);
+  const user = (body?.data ?? []).find((u) => u.email.toLowerCase() === email.toLowerCase());
+  return [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() || email;
+}
+
 async function listInstallations(request, org) {
   return ok(request, 'get', `/api/${org}/slack/installations`);
 }
@@ -226,6 +233,7 @@ module.exports = {
   ok,
   createOrg,
   orgConfig,
+  displayName,
   listInstallations,
   prerequisites,
   createPendingInstall,

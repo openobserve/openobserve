@@ -25,7 +25,7 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "loading"],
+    props: ["data", "columns", "loading", "pagination"],
     template: `<div>
       <div v-if="loading" data-test="skeleton" />
       <div v-else-if="!data.length"><slot name="empty" /></div>
@@ -79,6 +79,9 @@ describe("OnCallFiringHistory", () => {
   it("explains an empty history rather than showing a bare frame", () => {
     const wrapper = render([]);
     expect(wrapper.find('[data-test="oncall-firing-history-empty"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("No earlier firings");
+    // No column headers or pager over nothing: the empty state stands alone.
+    expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(false);
   });
 
   /// Before `loading` existed, an in-flight fetch and a genuinely first-ever

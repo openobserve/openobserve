@@ -20,16 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard v-if="loading || report" variant="glass" data-test="oncall-report-card">
-    <OCardSection role="header" dense class="flex-wrap">
+  <section v-if="loading || report" class="flex flex-col gap-2" data-test="oncall-report-card">
+    <div class="flex flex-wrap items-baseline gap-x-2">
       <OText variant="card-title">{{ t("oncall.reportTitle") }}</OText>
       <span v-if="report" class="text-text-secondary text-xs">
         <template v-if="report.model">{{ raw(report.model) }} · </template>
         <OTimeCell :value="report.generated_at" unit="us" />
       </span>
-    </OCardSection>
+    </div>
 
-    <OCardSection role="body" dense>
+    <div>
       <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-report-loading">
         <OSkeleton type="text" class="h-4 w-1/2" />
         <OSkeleton type="text" class="h-4 w-5/6" />
@@ -38,15 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- eslint-disable-next-line vue/no-v-html -- sanitized by renderRcaReport -->
       <div v-else class="report-body text-text-body text-sm" v-html="rendered"></div>
-    </OCardSection>
-  </OCard>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
