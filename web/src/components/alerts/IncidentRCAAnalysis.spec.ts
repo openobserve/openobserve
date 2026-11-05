@@ -26,6 +26,7 @@ vi.mock("@/services/incidents", () => ({
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import awsConfig from "@/aws-exports";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
@@ -163,6 +164,7 @@ describe("IncidentRCAAnalysis", () => {
     };
     writeText.mockReset().mockResolvedValue(undefined);
     steerRca.mockReset().mockResolvedValue({ data: { run_state: "running" } } as never);
+    store.state.zoConfig.incidents_rca_enabled = true;
   });
 
   afterEach(() => {
@@ -170,6 +172,136 @@ describe("IncidentRCAAnalysis", () => {
     toastMock.mockClear();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  describe("no new run can start", () => {
+    const LOCK = "Locked: needs AI Assistant";
+    const failedRun = (overrides: Record<string, unknown> = {}) => ({
+      rca: rcaSummary({
+        state: "failed",
+        current_run: rcaRun({ state: "failed", ended_at: RCA_T0 + sec(180) }),
+      }),
+      error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
+      history: [rcaRunItem({ run_id: "run-2", state: "failed" })],
+      threadRunId: "run-2",
+      resumeRunId: "run-2",
+      ...overrides,
+    });
+    const reasonOf = (id: string) =>
+      wrapper
+        .findAllComponents(OTooltip)
+        .find((tooltip) => tooltip.find(`[data-test="${id}"]`).exists())
+        ?.props("content");
+
+    beforeEach(() => {
+      store.state.zoConfig.incidents_rca_enabled = false;
+      store.state.zoConfig.features = { ai_assistant: "locked" };
+      store.state.zoConfig.feature_names = { ai_assistant: "AI Assistant" };
+    });
+
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+      delete store.state.zoConfig.feature_names;
+    });
+
+    it("Analyze is disabled with the lock reason and no credit line", async () => {
+      wrapper = mountPanel({ rca: null, analyzeCreditCost: 5 });
+      const button = byTest(wrapper, "trigger-rca-btn");
+
+      expect(button.attributes("disabled")).toBeDefined();
+      expect(button.find(".lock-chip").exists()).toBe(true);
+      expect(reasonOf("trigger-rca-btn")).toBe(LOCK);
+      expect(byTest(wrapper, "rca-credit-cost").exists()).toBe(false);
+      await button.trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toBeUndefined();
+    });
+
+    it("AI switched off by the operator says RCA disabled", () => {
+      store.state.zoConfig.features = { ai_assistant: "hidden" };
+      wrapper = mountPanel({ rca: null });
+
+      expect(byTest(wrapper, "trigger-rca-btn").attributes("disabled")).toBeDefined();
+      expect(reasonOf("trigger-rca-btn")).toBe("RCA disabled");
+    });
+
+    it("the flag decides, whatever the license key says", () => {
+      store.state.zoConfig.features = { ai_assistant: "enabled" };
+      wrapper = mountPanel({ rca: null });
+
+      expect(byTest(wrapper, "trigger-rca-btn").attributes("disabled")).toBeDefined();
+      expect(reasonOf("trigger-rca-btn")).toBe("RCA disabled");
+    });
+
+    it("a past run stays readable while Re-analyze locks", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+      const button = byTest(wrapper, "rca-reanalyze-btn");
+
+      expect(button.attributes("disabled")).toBeDefined();
+      expect(button.find(".lock-chip").exists()).toBe(true);
+      expect(reasonOf("rca-reanalyze-btn")).toBe(LOCK);
+      await button.trigger("click");
+      expect(byTest(wrapper, "rca-guidance-dialog").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(byTest(wrapper, "rca-copy-btn").exists()).toBe(true);
+    });
+
+    it.each([
+      ["with no earlier report", {}],
+      ["with an earlier report", { reportRun: rcaRunItem(), reportText: REPORT }],
+    ])("a failed run %s: Retry locks and Resume goes", async (_name, overrides) => {
+      wrapper = mountPanel(failedRun(overrides));
+      await flushPromises();
+      const button = byTest(wrapper, "rca-retry-btn");
+
+      expect(button.attributes("disabled")).toBeDefined();
+      expect(button.find(".lock-chip").exists()).toBe(true);
+      expect(reasonOf("rca-retry-btn")).toBe(LOCK);
+      expect(byTest(wrapper, "rca-retry-build").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      await button.trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toBeUndefined();
+    });
+
+    it("the thread says the run is final and a resume_run blind spot has no button", async () => {
+      answers.runSummary = rcaRunSummary({
+        run_id: "run-2",
+        blind_spots: [rcaBlindSpot({ fix: "resume_run" })],
+      });
+      wrapper = mountPanel(failedRun());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-final-note").text()).not.toContain("Resume");
+      expect(wrapper.find('[data-fix="resume_run"]').exists()).toBe(false);
+    });
+
+    it("a live run keeps Cancel and the steer box", async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancel-btn").attributes("disabled")).toBeUndefined();
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
+    });
+
+    it("a message the run did not take offers no new run", async () => {
+      store.state.zoConfig.incidents_rca_enabled = true;
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+      steerRca.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 409, data: { error_code: "run_closing" } },
+      });
+      await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("PR #812 at 14:02");
+      await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
+      await flushPromises();
+      expect(byTest(wrapper, "rca-thread-refusal-reanalyze").exists()).toBe(true);
+
+      store.state.zoConfig.incidents_rca_enabled = false;
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 at 14:02");
+      expect(byTest(wrapper, "rca-thread-refusal-reanalyze").exists()).toBe(false);
+    });
   });
 
   describe("TH40 K: no run", () => {

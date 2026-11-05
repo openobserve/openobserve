@@ -241,6 +241,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.state.zoConfig.incidents_rca_enabled = true;
 
     // Reset store state
     store.state.selectedOrganization = {
@@ -1511,6 +1512,20 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(mockConfirm).toHaveBeenCalled();
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
       expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("skips the re-run prompt when no new run can start", async () => {
+      store.state.zoConfig.incidents_rca_enabled = false;
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(wrapper.vm.editableSeverity).toBe("P2");
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(incidentsService.triggerRca).not.toHaveBeenCalled();
     });
 
     it("does not call updateIncident when no incidentDetails", async () => {

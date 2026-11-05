@@ -479,6 +479,7 @@ pub struct TriggerRcaQuery {
         (status = 202, description = "Analysis started", content_type = "application/json", body = RcaStartedResponse),
         (status = 400, description = "RCA not enabled, an analysis is already in progress, an invalid body (`error_code: invalid_body`, also for unknown fields) or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
+        (status = 403, description = "AI Assistant is not included in the license (`code: 40001`, `error_detail: ai_assistant`)", content_type = "application/json", body = Object),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
@@ -495,8 +496,13 @@ pub async fn trigger_incident_rca(
     Query(query): Query<TriggerRcaQuery>,
     body: axum::body::Bytes,
 ) -> Response {
-    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
-    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+    use config::meta::{
+        alerts::rca_runs::{RunMode, RunTrigger},
+        feature::Feature,
+    };
+    use o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config, license::check_features,
+    };
     use openobserve_core::alerts::rca_runs;
 
     // The body is optional; when present it is `{guidance}`.
@@ -528,6 +534,12 @@ pub async fn trigger_incident_rca(
     // Check if RCA is enabled
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
+    }
+
+    if let Some(denied) =
+        ai_license_denial(o2_cfg.ai.enabled, check_features(&[Feature::AiAssistant]))
+    {
+        return denied;
     }
 
     if !openobserve_core::alerts::incidents::rca_agent_available() {
@@ -1048,6 +1060,25 @@ pub struct SteerRequestBody {
     pub hypothesis_id: Option<String>,
 }
 
+/// The answer for AI switched on but not licensed; AI switched off keeps the agent's 503.
+#[cfg(feature = "enterprise")]
+fn ai_license_denial(ai_enabled: bool, ai_entitled: bool) -> Option<Response> {
+    use axum::response::IntoResponse;
+
+    if !ai_enabled || ai_entitled {
+        return None;
+    }
+    let feature: &str = config::meta::feature::Feature::AiAssistant.into();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.to_string());
+    Some(
+        (
+            axum::http::StatusCode::FORBIDDEN,
+            Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
+}
+
 /// `{code, message, error_code[, retry_after_secs]}`, the RCA routes' error body.
 #[cfg(feature = "enterprise")]
 fn rca_error_response(
@@ -1265,6 +1296,7 @@ async fn incident_run(
         (status = 202, description = "Resumed run started", content_type = "application/json", body = RcaResumedResponse),
         (status = 400, description = "RCA not enabled", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
+        (status = 403, description = "AI Assistant is not included in the license (`code: 40001`, `error_detail: ai_assistant`)", content_type = "application/json", body = Object),
         (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
         (status = 409, description = "`error_code`: `not_resumable`, `nothing_to_resume` or `run_in_flight`", content_type = "application/json", body = Object),
         (status = 410, description = "`error_code: transcript_expired`: the earlier run's transcript is gone", content_type = "application/json", body = Object),
@@ -1307,12 +1339,20 @@ async fn resume_run(
     user_email: UserEmail,
 ) -> Response {
     use axum::http::StatusCode;
-    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+    use config::meta::feature::Feature;
+    use o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config, license::check_features,
+    };
     use openobserve_core::alerts::rca_resume;
 
     let o2_cfg = get_o2_config();
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
+    }
+    if let Some(denied) =
+        ai_license_denial(o2_cfg.ai.enabled, check_features(&[Feature::AiAssistant]))
+    {
+        return denied;
     }
     if !openobserve_core::alerts::incidents::rca_agent_available() {
         return rca_error_response(
@@ -2624,6 +2664,23 @@ mod tests {
             .await
             .unwrap();
         (status, serde_json::from_slice(&body).unwrap())
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_ai_on_but_unlicensed_is_a_403_naming_the_feature() {
+        let (status, body) = status_and_body(ai_license_denial(true, false).unwrap()).await;
+        assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+        assert_eq!(body["code"], 40001);
+        assert_eq!(body["error_detail"], "ai_assistant");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_ai_off_or_licensed_is_not_a_license_denial() {
+        assert!(ai_license_denial(false, false).is_none());
+        assert!(ai_license_denial(false, true).is_none());
+        assert!(ai_license_denial(true, true).is_none());
     }
 
     #[cfg(feature = "enterprise")]
