@@ -29,6 +29,8 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 
+use crate::datafusion::udf::stringify_json_value;
+
 /// The name of the arrjoin UDF given to DataFusion.
 pub const ARR_JOIN_UDF_NAME: &str = "arrjoin";
 
@@ -74,7 +76,7 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
                     .and_then(|arr_field1| {
                         if let json::Value::Array(field1) = arr_field1 {
                             let join_arrs: Vec<String> =
-                                field1.iter().map(super::stringify_json_value).collect();
+                                field1.iter().map(stringify_json_value).collect();
                             Some(join_arrs.join(delim))
                         } else {
                             None

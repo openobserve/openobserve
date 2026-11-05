@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="index ? '-ms-1.5' : ''"
             class="ring-surface-base rounded-full ring-2"
           >
-            <OAvatar :value="email" size="sm" />
+            <OAvatar :value="email" :name="nameOf(email)" size="sm" />
           </span>
         </span>
         <OTruncatedText class="text-sm">{{ summary }}</OTruncatedText>
@@ -63,6 +63,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 const props = withDefaults(
   defineProps<{
@@ -91,10 +92,12 @@ const { t } = useI18nTyped();
 
 const faces = computed(() => model.value.slice(0, 3));
 
-/// The part of the address a person answers to. The picker's job here is
-/// recognition at a glance, and nobody scans a domain.
+const { nameOf } = useOrgUserNames();
+
+/// The name a person answers to; the local part of the address when they have none, because nobody scans a domain.
 function shortName(email: string): string {
-  return email.split("@")[0] ?? email;
+  const name = nameOf(email);
+  return name === email ? (email.split("@")[0] ?? email) : name;
 }
 
 const summary = computed<I18nText>(() => {

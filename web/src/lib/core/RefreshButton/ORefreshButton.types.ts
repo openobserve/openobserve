@@ -17,8 +17,8 @@ export interface RefreshButtonProps {
   shortcutId?: string;
   /** Replaces the last-refreshed time in the tooltip, for data that carries its own as-of time. */
   tooltip?: I18nText;
-  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill, so the pill need not clip it. */
-  size?: "toolbar" | "inset";
+  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill; `header` gives the inline button the height of `sm` header buttons. */
+  size?: "toolbar" | "inset" | "header";
 }
 
 export interface RefreshButtonEmits {

@@ -28,7 +28,7 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 
-use super::arrsort_udf::json_total_cmp;
+use super::arrsort::json_total_cmp;
 
 /// The name of the arr_descending UDF given to DataFusion.
 pub const ARR_DESCENDING_UDF_NAME: &str = "arr_descending";

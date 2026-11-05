@@ -369,7 +369,7 @@ mod tests {
     use super::{RewriteCipherCall, RewriteCipherKey};
     use crate::datafusion::udf::{
         cipher_udf::{DECRYPT_SLOW_UDF, DECRYPT_UDF, ENCRYPT_UDF},
-        match_all_udf::MATCH_ALL_UDF,
+        fulltext::match_all::MATCH_ALL_UDF,
     };
 
     #[tokio::test]

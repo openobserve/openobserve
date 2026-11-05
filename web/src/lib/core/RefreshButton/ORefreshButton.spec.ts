@@ -200,6 +200,13 @@ describe("ORefreshButton", () => {
       expect(wrapper.find("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
     });
 
+    it("is 32px by default and 34px at the header size", () => {
+      expect(inline().find("button").classes()).toContain("h-8!");
+      const header = inline({ size: "header" }).find("button");
+      expect(header.classes()).toContain("h-8.5!");
+      expect(header.classes()).not.toContain("h-8!");
+    });
+
     it("forwards dataTest onto the button", () => {
       const wrapper = inline({ dataTest: "pipeline-list-refresh-btn" });
       expect(wrapper.find('[data-test="pipeline-list-refresh-btn"]').exists()).toBe(true);
