@@ -718,6 +718,7 @@ describe("OnCallResponses", () => {
 
     /// Past the route's cap the list says so rather than leaving a blank cell that reads as "nothing has fired".
     it("caps how many ladders it loads, and says that it did", async () => {
+      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
       const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
       );
@@ -728,7 +729,7 @@ describe("OnCallResponses", () => {
       expect(asked).toHaveLength(200);
       expect(asked).not.toContain("resp_200");
       expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
-    });
+    }, 20000);
 
     /// Rows the server left out have no progress: the record's own step, or no claim, never "Not paged yet".
     it("says what it can for rows without an answer, without claiming they were not paged", async () => {
@@ -1679,6 +1680,7 @@ describe("OnCallResponses", () => {
     });
 
     it("splits row teams past the route's cap across context reads, asking for the viewer's once", async () => {
+      // Mounting 205 rows takes over 2s on a fast CI runner and can pass the 5s default on a slow one.
       answerTeams((id) => ({ ...emptyTeam, on_call: [position(`${id}@o2.ai`)] }));
       const many = Array.from({ length: 205 }, (_, i) =>
         page({ id: `resp_${i}`, team_id: `team_${i}` }, `al_${i}`),
@@ -1691,7 +1693,7 @@ describe("OnCallResponses", () => {
         [5, false],
       ]);
       expect(shownOnCall(wrapper)).toContain("team_204@o2.ai");
-    });
+    }, 20000);
 
     it("shows the on-call cell from the context answer", async () => {
       answerTeams(() => ({ ...emptyTeam, on_call: [position("ana@o2.ai")] }));
