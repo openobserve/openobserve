@@ -567,7 +567,7 @@ describe("useCorrelatedTracesStream", () => {
       const controller = new AbortController();
       const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
-      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, controller.signal);
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, undefined, controller.signal);
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
       controller.abort();
 
@@ -575,6 +575,22 @@ describe("useCorrelatedTracesStream", () => {
       expect(mockCancelStream).toHaveBeenCalledTimes(2);
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
       expect(mockCommit).not.toHaveBeenCalled();
+    });
+
+    it("an aborted resolve reports a failed outcome, not a clean miss", async () => {
+      const ids = Array.from({ length: 450 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      const controller = new AbortController();
+      const outcome = { failed: false, streams: [] as string[] };
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, outcome, controller.signal);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
+      controller.abort();
+
+      await expect(pending).resolves.toEqual({});
+      expect(outcome.failed).toBe(true);
     });
 
     it("a transient failure probes and does NOT latch the endpoint off", async () => {

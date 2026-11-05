@@ -455,7 +455,14 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
 
       const known: string[] = cache().knownStreams.filter((s: string) => allStreams.includes(s));
       const step1Streams = known.length ? known : allStreams;
-      const step1 = await probeInChunks(step1Streams, pending, startTimeUs, endTimeUs, outcome, signal);
+      const step1 = await probeInChunks(
+        step1Streams,
+        pending,
+        startTimeUs,
+        endTimeUs,
+        outcome,
+        signal,
+      );
       if (stopped()) return result;
       for (const [id, stream] of Object.entries(step1)) {
         result[id] = { stream };
@@ -466,7 +473,14 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       const unresolved = pending.filter((id) => !(id in result));
       const unprobed = allStreams.filter((s) => !step1Streams.includes(s));
       if (unresolved.length && unprobed.length) {
-        const step2 = await probeInChunks(unprobed, unresolved, startTimeUs, endTimeUs, outcome, signal);
+        const step2 = await probeInChunks(
+          unprobed,
+          unresolved,
+          startTimeUs,
+          endTimeUs,
+          outcome,
+          signal,
+        );
         if (stopped()) return result;
         for (const [id, stream] of Object.entries(step2)) {
           result[id] = { stream };

@@ -301,6 +301,7 @@ import {
   type TraceTimeRange,
 } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { chunkItems, mapWithConcurrency } from "@/utils/rum/batching";
+import { SERVER_STATUS_COLUMNS } from "@/utils/rum/serverStatus";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -365,9 +366,6 @@ const sessionTracesIncomplete = ref(false);
 const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
 const traceSearch = ref("");
-
-// A server span's HTTP status columns, newer semantic conventions first.
-const SERVER_STATUS_COLUMNS = ["http_response_status_code", "http_status_code"];
 
 // A request whose end-to-end duration reaches this counts as slow.
 const SLOW_TRACE_MS = 1000;
@@ -1082,7 +1080,10 @@ async function fetchTraces() {
           .map((view) => {
             const meta = metadata[view.traceId];
             if (!meta) return view;
-            return { ...view, metadata: { ...meta, e2eDuration: traceDurationMs(view.rumDate, meta) } };
+            return {
+              ...view,
+              metadata: { ...meta, e2eDuration: traceDurationMs(view.rumDate, meta) },
+            };
           })
           .sort((a, b) => traceSortKey(a) - traceSortKey(b));
 

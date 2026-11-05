@@ -933,11 +933,12 @@ describe("PlayerTracesTab", () => {
         expect(row.text()).not.toContain("0us");
       });
 
-      it("falls back to the trace's own duration (µs) without a browser timing", async () => {
+      it("falls back to the trace's span length without a browser timing when the clocks disagree", async () => {
         wrapper.unmount();
+        // No resource_duration, and the device's date is after the trace end: the span's own 523 ms.
         setupSuccessfulMocks(
           [createRumHit({ _date: 9_999_999 })],
-          [createTraceMetadata({ duration: 523_000 })],
+          [createTraceMetadata({ start_time: 1_000_000_000, end_time: 1_523_000_000 })],
         );
         wrapper = mountComponent();
         await flushPromises();
@@ -1165,7 +1166,16 @@ describe("PlayerTracesTab", () => {
 
       it("shows a dash, not 0us, for a trace whose duration is zero and no browser timing", async () => {
         wrapper.unmount();
-        setupSuccessfulMocks([createRumHit()], [createTraceMetadata({ duration: 0 })]);
+        setupSuccessfulMocks(
+          [createRumHit()],
+          [
+            createTraceMetadata({
+              start_time: 1_000_000_000,
+              end_time: 1_000_000_000,
+              duration: 0,
+            }),
+          ],
+        );
         wrapper = mountComponent();
         await flushPromises();
 
