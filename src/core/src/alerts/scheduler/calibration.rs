@@ -340,8 +340,12 @@ async fn analyse(
 }
 
 fn analysis_budget_secs() -> i64 {
-    // The collector's longest chain is three searches in a row, each capped by the query timeout.
-    3 * get_config().limit.query_timeout as i64
+    budget_secs(get_config().limit.query_timeout)
+}
+
+/// Three searches in a row plus the error-class phase, each capped by the query timeout (D:L257).
+fn budget_secs(query_timeout_secs: u64) -> i64 {
+    4 * query_timeout_secs as i64
 }
 
 /// Counted from the claim, since time spent queued for a worker uses up the same keep-alive.
@@ -590,6 +594,14 @@ mod tests {
         assert_eq!(outcome.status, RunOutcome::Error);
         assert_eq!(outcome.next_run_at, NOW + 60 * MINUTE);
         assert!(outcome.error.unwrap().starts_with("3 earlier attempts"));
+    }
+
+    #[test]
+    fn the_pass_budget_holds_one_enrichment_query_timeout() {
+        assert_eq!(budget_secs(30), 120);
+        let budget = budget_secs(get_config().limit.query_timeout);
+        assert_eq!(analysis_budget_secs(), budget);
+        assert_eq!(claim_lifetime_secs(), budget + WRITE_ALLOWANCE_SECS);
     }
 
     #[test]

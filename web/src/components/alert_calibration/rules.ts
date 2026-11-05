@@ -17,7 +17,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { DigestRecord, InsightAction, ReviewFocus, RuleId } from "./digests";
 
-export type EvidenceFormat = "count" | "ratio" | "seconds" | "text" | "boolean" | "time";
+export type EvidenceFormat =
+  "count" | "ratio" | "seconds" | "text" | "boolean" | "time" | "errorClass";
 
 export interface EvidenceField {
   column: `evidence_${string}`;
@@ -60,9 +61,24 @@ export const RULE_IDS: RuleId[] = [
 
 export const isRuleId = (value: string): value is RuleId => (RULE_IDS as string[]).includes(value);
 
-/** Why a version-2 `failure` record's alert cannot fire, as AutoObserve's definition check found it. */
-export type NotWorkingPattern =
-  "stream_missing" | "field_missing" | "ignored_matcher" | "empty_scope" | "source_inactive";
+/** The evaluation-error classes a version-2 `failure` record names (ENT context.rs `ErrorClass`). */
+export type ErrorClass =
+  "stream_missing" | "field_missing" | "syntax" | "resource_timeout" | "resource_memory" | "other";
+
+/** Why a version-2 `failure` record's alert cannot fire: a definition check or its recorded errors. */
+export type NotWorkingPattern = ErrorClass | "ignored_matcher" | "empty_scope" | "source_inactive";
+
+export const ERROR_CLASS_LABEL: Record<ErrorClass, I18nKey> = {
+  stream_missing: "alertCalibration.errorClass.streamMissing",
+  field_missing: "alertCalibration.errorClass.fieldMissing",
+  syntax: "alertCalibration.errorClass.syntax",
+  resource_timeout: "alertCalibration.errorClass.resourceTimeout",
+  resource_memory: "alertCalibration.errorClass.resourceMemory",
+  other: "alertCalibration.errorClass.other",
+};
+
+export const isErrorClass = (value: unknown): value is ErrorClass =>
+  typeof value === "string" && Object.hasOwn(ERROR_CLASS_LABEL, value);
 
 export const RULE_META: Record<RuleId, RuleMeta> = {
   failure: {
@@ -271,10 +287,49 @@ const STREAM: EvidenceField = {
   labelKey: "alertCalibration.evidence.stream",
   format: "text",
 };
+/** The recorded-error rows after the counts; each shows only when its column is written (spec §10). */
+const ERROR_BLOCK: EvidenceField[] = [
+  {
+    column: "evidence_notworking_error_class",
+    labelKey: "alertCalibration.evidence.errorClass",
+    format: "errorClass",
+  },
+  {
+    column: "evidence_notworking_class_errors",
+    labelKey: "alertCalibration.evidence.classErrors",
+    format: "count",
+  },
+  {
+    column: "evidence_notworking_first_failure_micros",
+    labelKey: "alertCalibration.evidence.firstFailure",
+    format: "time",
+  },
+  {
+    column: "evidence_notworking_last_failure_micros",
+    labelKey: "alertCalibration.evidence.lastFailure",
+    format: "time",
+  },
+  {
+    column: "evidence_notworking_last_success_micros",
+    labelKey: "alertCalibration.evidence.lastSuccess",
+    format: "time",
+  },
+  {
+    column: "evidence_notworking_last_edit_micros",
+    labelKey: "alertCalibration.evidence.lastEdit",
+    format: "time",
+  },
+  {
+    column: "evidence_notworking_error_sample",
+    labelKey: "alertCalibration.evidence.errorSample",
+    format: "text",
+  },
+];
+const ERROR_ROWS: EvidenceField[] = [...NOT_WORKING_ERRORS, ...ERROR_BLOCK];
 
 /** The rows each definition-check pattern shows, in the evidence grid the card already has (spec §4). */
 export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
-  stream_missing: [STREAM, ...NOT_WORKING_ERRORS, CHECKED_AT],
+  stream_missing: [STREAM, ...NOT_WORKING_ERRORS, CHECKED_AT, ...ERROR_BLOCK],
   field_missing: [
     {
       column: "evidence_notworking_field",
@@ -283,7 +338,12 @@ export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
     },
     ...NOT_WORKING_ERRORS,
     CHECKED_AT,
+    ...ERROR_BLOCK,
   ],
+  syntax: ERROR_ROWS,
+  resource_timeout: ERROR_ROWS,
+  resource_memory: ERROR_ROWS,
+  other: ERROR_ROWS,
   ignored_matcher: [
     {
       column: "evidence_notworking_field",
@@ -307,15 +367,26 @@ export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
 const isNotWorkingPattern = (value: unknown): value is NotWorkingPattern =>
   typeof value === "string" && Object.hasOwn(PATTERN_EVIDENCE, value);
 
-/** A version-2 `failure` record with a pattern is AutoObserve's definition finding, shown as far as it was stated. */
-export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): EvidenceField[] =>
-  record.rule_id === "failure" &&
-  (record.schema_version ?? 1) >= 2 &&
-  isNotWorkingPattern(record.pattern)
-    ? PATTERN_EVIDENCE[record.pattern].filter((field) => record[field.column] != null)
-    : RULE_META[record.rule_id].evidence.filter(
-        (field) => !field.optional || record[field.column] != null,
-      );
+/** A written column shows; an error class this build cannot name shows no row at all. */
+const isShown = (record: DigestRecord, field: EvidenceField): boolean =>
+  record[field.column] != null &&
+  (field.format !== "errorClass" || isErrorClass(record[field.column]));
+
+/** A version-2 `failure` record shows its pattern's rows, or the error rows when it has none it knows. */
+export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): EvidenceField[] => {
+  if (record.rule_id === "failure" && (record.schema_version ?? 1) >= 2) {
+    if (isNotWorkingPattern(record.pattern)) {
+      return PATTERN_EVIDENCE[record.pattern].filter((field) => isShown(record, field));
+    }
+    // Version-2 runs written before error classes (and older backends mid-rollout) carry v1 failure columns.
+    if (record.evidence_failure_evaluation_errors == null) {
+      return ERROR_ROWS.filter((field) => isShown(record, field));
+    }
+  }
+  return RULE_META[record.rule_id].evidence.filter(
+    (field) => !field.optional || record[field.column] != null,
+  );
+};
 
 /** Version 2 reports a broken alert under `failure`; historical runs keep their legacy label (M2). */
 export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
@@ -323,8 +394,11 @@ export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
     ? "alertCalibration.rules.notWorking"
     : RULE_META[rule].labelKey;
 
-/** The advice codes findings carry (ENT not_working.rs `advice`, no_destination.rs `ADVICE_*`). */
+/** The advice codes findings carry (ENT not_working.rs `advice`, failure.rs and no_destination.rs `ADVICE_*`). */
 export const ADVICE_LABEL: Record<string, I18nKey> = {
+  check_stream_not_found: "alertCalibration.advice.checkStreamNotFound",
+  check_field_not_found: "alertCalibration.advice.checkFieldNotFound",
+  check_query_syntax: "alertCalibration.advice.checkQuerySyntax",
   check_missing_stream: "alertCalibration.advice.checkMissingStream",
   check_missing_field: "alertCalibration.advice.checkMissingField",
   check_ignored_label: "alertCalibration.advice.checkIgnoredLabel",
@@ -338,11 +412,17 @@ export const ADVICE_LABEL: Record<string, I18nKey> = {
 export const LIMITATION_LABEL: Record<string, I18nKey> = {
   quiet_source: "alertCalibration.limitation.quietSource",
   scan_truncated: "alertCalibration.limitation.scanTruncated",
+  no_success_in_window: "alertCalibration.limitation.noSuccessInWindow",
+  failure_may_predate_window: "alertCalibration.limitation.failureMayPredateWindow",
+  edit_timing_only: "alertCalibration.limitation.editTimingOnly",
 };
 
-/** Quality-reason codes (ENT not_working.rs `QUALITY_SCAN_TRUNCATED`). */
+/** Quality-reason codes (ENT not_working.rs `QUALITY_*`). */
 export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
   scan_truncated: "alertCalibration.qualityReason.scanTruncated",
+  error_classes_capped: "alertCalibration.qualityReason.errorClassesCapped",
+  error_classes_timed_out: "alertCalibration.qualityReason.errorClassesTimedOut",
+  error_classes_failed: "alertCalibration.qualityReason.errorClassesFailed",
 };
 
 export type ProposedAction =

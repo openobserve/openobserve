@@ -481,6 +481,147 @@ describe("AlertCalibrationFindingCard", () => {
     }
   });
 
+  it("renders_error_class_rows_and_codes_and_never_a_raw_code", () => {
+    const at = (day: number, hour: number, minute = 0) =>
+      new Date(2026, 10, day, hour, minute).getTime() * 1000;
+    const failing = (overrides: Partial<FindingRecord>) =>
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "failure",
+        severity: "High",
+        confidence: "High",
+        alert_id: "a5",
+        alert_name: "checkout latency",
+        actions: undefined,
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_schedulerhealth_affected_orgs: undefined,
+        evidence_schedulerhealth_skipped_windows: undefined,
+        evidence_schedulerhealth_late_ratio: undefined,
+        insight_actions: JSON.stringify([{ type: "review_alert", alert_id: "a5", focus: "query" }]),
+        evidence_notworking_evaluation_errors: 30,
+        evidence_notworking_evaluations: 100,
+        ...overrides,
+      });
+    const timeout = mountCard(
+      failing({
+        pattern: "resource_timeout",
+        title: "checkout latency failed 30 of 100 evaluations: the query timed out",
+        evidence_notworking_error_class: "resource_timeout",
+        evidence_notworking_class_errors: 30,
+        evidence_notworking_first_failure_micros: at(4, 14, 3),
+        evidence_notworking_last_failure_micros: at(5, 9),
+        evidence_notworking_last_success_micros: at(4, 13),
+        evidence_notworking_last_edit_micros: at(4, 14, 1),
+        limitations: JSON.stringify(["edit_timing_only"]),
+      }),
+    );
+    expect(timeout.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "Error type",
+      "Errors of this type",
+      "First recorded failure",
+      "Last recorded failure",
+      "Last recorded success",
+      "Latest alert edit",
+    ]);
+    expect(timeout.findAll("dd").map((dd) => dd.text())).toEqual([
+      "30",
+      "100",
+      "Query timed out",
+      "30",
+      "Nov 4, 14:03",
+      "Nov 5, 09:00",
+      "Nov 4, 13:00",
+      "Nov 4, 14:01",
+    ]);
+    expect(timeout.find('[data-test="alert-calibration-finding-tier"]').exists()).toBe(false);
+    expect(timeout.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
+      "The latest edit is shown for timing only; it is not a confirmed cause.",
+    );
+
+    const merged = mountCard(
+      failing({
+        alert_id: "a1",
+        pattern: "stream_missing",
+        tier: "A",
+        title: "orders error rate reads logs/orders_v1, which doesn't exist",
+        advice: "check_missing_stream",
+        evidence_notworking_stream: "logs/orders_v1",
+        evidence_notworking_checked_at_micros: at(5, 9, 30),
+        evidence_notworking_error_class: "stream_missing",
+        evidence_notworking_class_errors: 30,
+        evidence_notworking_first_failure_micros: at(4, 14, 3),
+        evidence_notworking_last_failure_micros: at(5, 9),
+        limitations: JSON.stringify(["no_success_in_window"]),
+      }),
+    );
+    expect(merged.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Stream",
+      "Errors",
+      "Evaluations",
+      "Checked",
+      "Error type",
+      "Errors of this type",
+      "First recorded failure",
+      "Last recorded failure",
+    ]);
+    expect(merged.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
+      "No successful evaluation is recorded in this window, so when it last worked is unknown.",
+    );
+
+    const errorsOnly = mountCard(
+      failing({
+        pattern: "stream_missing",
+        tier: "A",
+        advice: "check_stream_not_found",
+        evidence_notworking_error_class: "stream_missing",
+      }),
+    );
+    expect(errorsOnly.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "Error type",
+    ]);
+    expect(errorsOnly.find('[data-test="alert-calibration-finding-advice"]').text()).toContain(
+      "Check the source the query reads: evaluations recorded it as not found.",
+    );
+
+    const partial = mountCard(
+      failing({
+        title: "checkout latency failed 30 of 100 evaluations",
+        quality: "partial",
+        quality_reasons: JSON.stringify(["error_classes_timed_out"]),
+        evidence_notworking_first_failure_micros: at(4, 14, 3),
+        evidence_notworking_error_sample: "search sql execute error overflow at <timestamp>",
+      }),
+    );
+    expect(partial.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "First recorded failure",
+      "Error message",
+    ]);
+    expect(partial.find('[data-test="alert-calibration-finding-quality-reasons"]').text()).toBe(
+      "Reason: error types were not read in time",
+    );
+
+    const unknown = mountCard(
+      failing({
+        pattern: "made_up",
+        evidence_notworking_error_class: "made_up",
+        evidence_notworking_class_errors: 4,
+      }),
+    );
+    expect(unknown.findAll("dt").map((dt) => dt.text())).toEqual([
+      "Errors",
+      "Evaluations",
+      "Errors of this type",
+    ]);
+    expect(unknown.text()).not.toContain("made_up");
+  });
+
   it("renders the no-destination advice and candidate rows, and nothing extra for a plain record", () => {
     const review = { type: "review_alert", alert_id: "a1", focus: "settings" };
     const noDestination = (overrides: Partial<FindingRecord>) =>

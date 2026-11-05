@@ -11368,7 +11368,22 @@
       "lastDataAt": "Last data",
       "checkedAt": "Checked",
       "suggestedDestination": "Suggested destination",
-      "folderAlertsUsingIt": "Enabled alerts in this folder using it"
+      "folderAlertsUsingIt": "Enabled alerts in this folder using it",
+      "errorClass": "Error type",
+      "classErrors": "Errors of this type",
+      "firstFailure": "First recorded failure",
+      "lastFailure": "Last recorded failure",
+      "lastSuccess": "Last recorded success",
+      "lastEdit": "Latest alert edit",
+      "errorSample": "Error message"
+    },
+    "errorClass": {
+      "streamMissing": "Stream not found",
+      "fieldMissing": "Field not found",
+      "syntax": "Query not valid",
+      "resourceTimeout": "Query timed out",
+      "resourceMemory": "Query ran out of memory",
+      "other": "Other error"
     },
     "actions": {
       "raiseThreshold": "Raise threshold",
@@ -11404,14 +11419,23 @@
       "checkFilterValues": "Check the query's filter values: no rows matched them in the searched window.",
       "confirmQuietSource": "Confirm whether this source is expected to be quiet before changing the alert.",
       "attachFolderDestination": "Other enabled alerts in this folder send to the suggested destination. It is a likely receiver, not a confirmed one: check it, or confirm this alert is meant to notify no one.",
-      "addDestination": "Add a destination in Edit Alert, or confirm this alert is meant to notify no one."
+      "addDestination": "Add a destination in Edit Alert, or confirm this alert is meant to notify no one.",
+      "checkStreamNotFound": "Check the source the query reads: evaluations recorded it as not found.",
+      "checkFieldNotFound": "Check the fields the query uses: evaluations recorded one as not found.",
+      "checkQuerySyntax": "Check the alert's query: the search engine rejected it as not valid. The error does not say which part is wrong."
     },
     "limitation": {
       "quietSource": "A quiet source can be a batch or cron job that is idle by design.",
-      "scanTruncated": "Wider searches timed out, so the empty answer covers less than the full 7 days."
+      "scanTruncated": "Wider searches timed out, so the empty answer covers less than the full 7 days.",
+      "noSuccessInWindow": "No successful evaluation is recorded in this window, so when it last worked is unknown.",
+      "failureMayPredateWindow": "Failures were already happening when this window began, so the first failure may be earlier.",
+      "editTimingOnly": "The latest edit is shown for timing only; it is not a confirmed cause."
     },
     "qualityReason": {
-      "scanTruncated": "wider searches timed out"
+      "scanTruncated": "wider searches timed out",
+      "errorClassesCapped": "error types were not read: too many failing alerts",
+      "errorClassesTimedOut": "error types were not read in time",
+      "errorClassesFailed": "error types could not be read"
     },
     "severity": {
       "high": "High",
@@ -11465,7 +11489,8 @@
       "definitionChecksUnavailable": "Alert definition checks need AutoObserve, which is off. The other checks ran.",
       "definitionChecksNotYet": "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
       "definitionChecksFailed": "Alert definition checks could not be read, so they were not judged.",
-      "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged."
+      "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged.",
+      "errorClassesUnassessed": "Error types were not read for {count} alert, so its card shows counts only. | Error types were not read for {count} alerts, so their cards show counts only."
     },
     "digests": {
       "schedule": "Schedule",

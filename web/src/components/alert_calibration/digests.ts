@@ -59,6 +59,8 @@ export interface Coverage {
   /** Written only when the org has alerts, and only from version 2. */
   coverage_definition_checks?: DefinitionChecks;
   coverage_definition_checks_truncated?: boolean;
+  /** Failing alerts whose errors were not classified; absent before P7a, null for a scoped reader. */
+  coverage_error_classes_unassessed?: number | null;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -244,6 +246,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
     coverage_definition_checks: record.coverage_definition_checks,
     coverage_definition_checks_truncated: record.coverage_definition_checks_truncated,
+    coverage_error_classes_unassessed: record.coverage_error_classes_unassessed,
     schema_version: record.schema_version,
     visibility: record.visibility,
   };
@@ -420,6 +423,7 @@ export function coverageNoteRows(t: TranslateFn, row: RunRow): CoverageNote[] {
       "alertCalibration.coverage.definitionsWithoutFacts",
       false,
     ],
+    ["coverage_error_classes_unassessed", "alertCalibration.coverage.errorClassesUnassessed", true],
   ];
   const flags: [keyof Coverage, I18nKey][] = [
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
