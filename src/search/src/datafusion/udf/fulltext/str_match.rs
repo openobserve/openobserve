@@ -29,6 +29,11 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 
+use crate::datafusion::udf::{
+    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+    STR_MATCH_UDF_NAME,
+};
+
 /// Implementation of str_match
 pub static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(StrMatchUdf::new()));
 
@@ -51,12 +56,11 @@ impl StrMatchUdf {
 
 impl ScalarUDFImpl for StrMatchUdf {
     fn name(&self) -> &str {
-        super::STR_MATCH_UDF_NAME
+        STR_MATCH_UDF_NAME
     }
 
     fn aliases(&self) -> &[String] {
-        static ALIASES: Lazy<Vec<String>> =
-            Lazy::new(|| vec![super::MATCH_FIELD_UDF_NAME.to_string()]);
+        static ALIASES: Lazy<Vec<String>> = Lazy::new(|| vec![MATCH_FIELD_UDF_NAME.to_string()]);
         &ALIASES
     }
 
@@ -88,12 +92,12 @@ impl StrMatchIgnoreCaseUdf {
 
 impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
     fn name(&self) -> &str {
-        super::STR_MATCH_UDF_IGNORE_CASE_NAME
+        STR_MATCH_UDF_IGNORE_CASE_NAME
     }
 
     fn aliases(&self) -> &[String] {
         static ALIASES: Lazy<Vec<String>> =
-            Lazy::new(|| vec![super::MATCH_FIELD_IGNORE_CASE_UDF_NAME.to_string()]);
+            Lazy::new(|| vec![MATCH_FIELD_IGNORE_CASE_UDF_NAME.to_string()]);
         &ALIASES
     }
 
@@ -205,7 +209,7 @@ mod tests {
     #[test]
     fn test_str_match_udf_name() {
         let udf = StrMatchUdf::new();
-        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_NAME);
+        assert_eq!(udf.name(), STR_MATCH_UDF_NAME);
     }
 
     #[test]
@@ -218,7 +222,7 @@ mod tests {
     #[test]
     fn test_str_match_ignore_case_udf_name() {
         let udf = StrMatchIgnoreCaseUdf::new();
-        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_IGNORE_CASE_NAME);
+        assert_eq!(udf.name(), STR_MATCH_UDF_IGNORE_CASE_NAME);
     }
 
     #[test]
@@ -232,11 +236,7 @@ mod tests {
     fn test_str_match_udf_aliases_include_match_field() {
         let udf = StrMatchUdf::new();
         let aliases = udf.aliases();
-        assert!(
-            aliases
-                .iter()
-                .any(|a| a == super::super::MATCH_FIELD_UDF_NAME)
-        );
+        assert!(aliases.iter().any(|a| a == MATCH_FIELD_UDF_NAME));
     }
 
     #[tokio::test]

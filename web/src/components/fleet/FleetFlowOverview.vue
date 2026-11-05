@@ -49,6 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             size="sm"
           >
+            <template v-if="opt.dot" #icon-left>
+              <span
+                class="size-2 shrink-0 rounded-full"
+                :class="opt.dot"
+                aria-hidden="true"
+                :data-test="`fleet-flow-overview-telemetry-dot-${opt.value}`"
+              />
+            </template>
             {{ opt.label }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -118,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :elements-selectable="false"
           :nodes-focusable="false"
           :edges-focusable="false"
-          :zoom-on-scroll="false"
-          :min-zoom="0.5"
+          :min-zoom="MIN_FLOW_ZOOM"
           :max-zoom="2"
           class="h-full w-full"
           @node-click="onNodeClick"
@@ -314,11 +321,18 @@ import {
   percent,
   ratio,
   SEVERITY_ORDER,
+  SIGNAL_DOT,
   type IssueAction,
   type PathIssue,
   type PathSeverity,
 } from "./flowIssues";
-import type { FleetFlowEdgeData, FleetFlowNodeData, FlowSignal, FlowWindow } from "./flowTypes";
+import {
+  MIN_FLOW_ZOOM,
+  type FleetFlowEdgeData,
+  type FleetFlowNodeData,
+  type FlowSignal,
+  type FlowWindow,
+} from "./flowTypes";
 import { buildPipelineMap, strokeWidth, type MapEdge, type MapNode } from "./pipelineGraph";
 import { formatCount } from "./fleetFormat";
 import { useFleetFlow } from "./useFleetApi";
@@ -383,9 +397,9 @@ const timeWindow = ref<FlowWindow>("1h");
 const windows: FlowWindow[] = ["5m", "1h", "24h"];
 const telemetryOptions = computed(() => [
   { value: "all", label: t("fleet.flow.all") },
-  { value: "logs", label: t("fleet.flow.logs") },
-  { value: "metrics", label: t("fleet.flow.metrics") },
-  { value: "traces", label: t("fleet.flow.traces") },
+  { value: "logs", label: t("fleet.flow.logs"), dot: SIGNAL_DOT.logs },
+  { value: "metrics", label: t("fleet.flow.metrics"), dot: SIGNAL_DOT.metrics },
+  { value: "traces", label: t("fleet.flow.traces"), dot: SIGNAL_DOT.traces },
 ]);
 
 const flowQuery = useFleetFlow(() => timeWindow.value);

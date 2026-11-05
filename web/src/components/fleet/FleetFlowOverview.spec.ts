@@ -222,6 +222,27 @@ describe("FleetFlowOverview map", () => {
     expect(Object.keys(logs)).not.toContain("severity");
   });
 
+  it("lets zoom-out and fit reach a map far taller than the canvas", async () => {
+    await mountOverview();
+    const floor = Number(wrapper.findComponent(VueFlowStub).attributes("min-zoom"));
+    expect(floor).toBeLessThanOrEqual(0.01);
+  });
+
+  it("leaves mouse-wheel zoom on", async () => {
+    await mountOverview();
+    expect(wrapper.findComponent(VueFlowStub).attributes("zoom-on-scroll")).not.toBe("false");
+  });
+
+  it("marks each signal filter with the colour its lines are drawn in", async () => {
+    await mountOverview();
+    const dot = (signal: string) =>
+      wrapper.find(`[data-test="fleet-flow-overview-telemetry-dot-${signal}"]`);
+    expect(dot("logs").classes()).toContain("bg-signal-logs");
+    expect(dot("metrics").classes()).toContain("bg-signal-metrics");
+    expect(dot("traces").classes()).toContain("bg-signal-traces");
+    expect(dot("all").exists()).toBe(false);
+  });
+
   it("branches the failing destination off with a dashed send-failed line and rings it", async () => {
     serve(basePipelines());
     await mountOverview();

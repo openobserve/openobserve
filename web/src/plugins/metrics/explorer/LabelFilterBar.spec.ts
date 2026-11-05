@@ -16,6 +16,7 @@
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import LabelFilterBar from "./LabelFilterBar.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -256,6 +257,69 @@ describe("LabelFilterBar", () => {
       expect(
         wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
       ).toBe(true);
+    });
+
+    describe("follow the value scope", () => {
+      const valueOptions = () =>
+        wrapper
+          .findAllComponents(OSelect)
+          .find((select) => select.props("creatable"))!
+          .props("options")
+          .map((o: { value: string }) => o.value);
+
+      it("reloads the open draft's suggestions and leaves the draft and filters alone", async () => {
+        const filters: LabelFilter[] = [{ label: "job", value: "api", operator: "=" }];
+        const loadValues = vi
+          .fn()
+          .mockResolvedValueOnce(["docker-host"])
+          .mockResolvedValueOnce(["docker-host", "host-a"]);
+        wrapper = createWrapper({ filters, loadValues, valueScope: "container" });
+
+        // Idle: nothing to refresh.
+        await wrapper.setProps({ valueScope: "process" });
+        expect(loadValues).not.toHaveBeenCalled();
+
+        await openPicker(wrapper);
+        await wrapper.vm.onLabelPicked("host_name");
+        await flushPromises();
+        wrapper.vm.draftOperator = "!=";
+        expect(valueOptions()).toEqual(["docker-host"]);
+
+        await wrapper.setProps({ valueScope: "system" });
+        await flushPromises();
+
+        expect(loadValues).toHaveBeenCalledTimes(2);
+        expect(valueOptions()).toEqual(["docker-host", "host-a"]);
+        expect(wrapper.emitted("add")).toBeUndefined();
+        expect(wrapper.emitted("remove")).toBeUndefined();
+        expect(wrapper.emitted("clear-all")).toBeUndefined();
+
+        // Free text still commits, with the operator picked before the refresh.
+        await wrapper.vm.onValueCreated("host-c");
+        expect(wrapper.emitted("add")![0]).toEqual([
+          { label: "host_name", value: "host-c", operator: "!=" },
+        ]);
+      });
+
+      it("drops an answer that lands after the scope changed", async () => {
+        let answerOldScope!: (values: string[]) => void;
+        const loadValues = vi
+          .fn()
+          .mockReturnValueOnce(new Promise((resolve) => (answerOldScope = resolve)))
+          .mockResolvedValueOnce(["host-a"]);
+        wrapper = createWrapper({ loadValues, valueScope: "container" });
+
+        await openPicker(wrapper);
+        const picked = wrapper.vm.onLabelPicked("host_name");
+        await wrapper.setProps({ valueScope: "system" });
+        await flushPromises();
+
+        answerOldScope(["docker-host"]);
+        await picked;
+        await flushPromises();
+
+        expect(valueOptions()).toEqual(["host-a"]);
+      });
     });
   });
 

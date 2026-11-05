@@ -25,6 +25,7 @@ pub use condition::Condition;
 use datafusion::{arrow::datatypes::SchemaRef, physical_plan::PhysicalExpr};
 use hashbrown::HashSet;
 use physical::conjunction;
+pub(crate) use physical::{like_contains_term, like_substring};
 use tantivy::{
     query::{BooleanQuery, Occur, Query},
     schema::{Field, Schema},
@@ -144,6 +145,8 @@ impl IndexCondition {
         Ok(conjunction(
             self.conditions
                 .iter()
+                // the plan's own filter still evaluates a LIKE
+                .filter(|condition| !matches!(condition, Condition::Like { .. }))
                 .map(|condition| condition.to_physical_expr(schema, fst_fields))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
@@ -265,5 +268,38 @@ mod tests {
 
         index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
         assert!(!index_condition.is_condition_all());
+    }
+
+    #[test]
+    fn test_to_physical_expr_leaves_like_to_the_plan_filter() {
+        use datafusion::{physical_plan::expressions::Literal, scalar::ScalarValue};
+
+        let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "service",
+            arrow_schema::DataType::Utf8,
+            true,
+        )]);
+        let like = Condition::Like {
+            field: "message".to_string(),
+            value: "err".to_string(),
+        };
+        let equal = Condition::Equal("service".to_string(), "a".to_string());
+        let physical_expr = |conditions: Vec<Condition>| {
+            IndexCondition { conditions }
+                .to_physical_expr(&schema, &[])
+                .unwrap()
+        };
+
+        assert_eq!(
+            physical_expr(vec![like.clone()])
+                .downcast_ref::<Literal>()
+                .unwrap()
+                .value(),
+            &ScalarValue::Boolean(Some(true))
+        );
+        assert_eq!(
+            physical_expr(vec![equal.clone(), like]).to_string(),
+            physical_expr(vec![equal]).to_string()
+        );
     }
 }

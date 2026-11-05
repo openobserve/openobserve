@@ -287,6 +287,9 @@ pub struct OrgSummary {
 #[derive(Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
+    /// Streams holding data the user sent; `num_streams` also counts the ones O2 writes itself.
+    #[serde(default)]
+    pub num_user_streams: i64,
     pub total_records: i64,
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
