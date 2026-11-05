@@ -194,6 +194,40 @@ export class CrossLinkPage {
         }
     }
 
+    async openStreamDetailsByType(streamName, streamType) {
+        const org = process.env['ORGNAME'] || 'default';
+        const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+        await this.page.goto(`${baseUrl}/web/streams?org_identifier=${org}`);
+        const filter = this.page.locator('[data-test="log-stream-type-filter"]');
+        await expect(filter).toBeVisible({ timeout: 30000 });
+        const label = streamType.charAt(0).toUpperCase() + streamType.slice(1);
+        const toggle = filter.getByRole('button', { name: label });
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('data-state', 'on');
+        const nameCells = this.page.locator('[data-test^="log-stream-name-cell-"]');
+        // The search box refetches the list after a debounce, which can drop a fill made while the list reloads.
+        await expect(async () => {
+            await this.page.locator('[data-test="streams-search-stream-input-field"]').fill(streamName);
+            await expect(nameCells).toHaveCount(1, { timeout: 5000 });
+        }).toPass({ timeout: 30000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
+        await this.page.locator('[data-test="log-stream-schema-btn"]').first().click();
+    }
+
+    /** The configuration tab renders in the same strip as the cross-linking one, so its presence means the strip is complete. */
+    async expectStreamDetailsTabsLoaded() {
+        await expect(this.page.locator('[data-test="schema-settings-tab"]')).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="schema-configuration-tab"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectCrossLinkingTabAbsent(message) {
+        await expect(this.page.locator('[data-test="schema-cross-linking-tab"]'), message).toHaveCount(0);
+    }
+
+    async expectAddCrossLinkVisible() {
+        await expect(this.page.locator(this.addCrossLinkBtn).first()).toBeVisible({ timeout: 15000 });
+    }
+
     async isCrossLinkingTabVisible() {
         testLogger.debug('Checking if cross-linking tab is visible');
         const tab = this.page.locator('[data-test="schema-cross-linking-tab"]');

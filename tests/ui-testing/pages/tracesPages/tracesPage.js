@@ -110,6 +110,13 @@ export class TracesPage {
     this.tracesErrorCountBadge = '[data-test="traces-error-count-badge"]';
     this.traceRowOperationName = '[data-test="trace-row-operation-name"]';
     this.traceRowDuration = '[data-test="trace-row-duration"]';
+    this.traceRowTimestamp = '[data-test="trace-row-timestamp-day"]';
+    this.searchNotStartedState = '[data-test="traces-search-not-started-text"]';
+    this.traceGraphChart = '[data-test="trace-details-service-map-chart"]';
+    this.flameGraphChartScroll = '[data-test="flame-graph-view-chart-scroll"]';
+    this.flameGraphRulerLabel = '[data-test="flame-graph-view-chart-wrapper"] > div:first-child > span';
+    this.shareTraceDetailsButton = '[data-test="trace-details-share-link-btn"]';
+    this.dagNodeLabel = '[data-test="traces-trace-dag-wrapper"] .vue-flow__node [data-test="o-truncated-text"]';
 
     // Trace Details
     this.traceDetailsHeader = '[data-test="trace-details-header"]';
@@ -1705,8 +1712,8 @@ export class TracesPage {
    * Requires a deployment with `web_url` set — ShareButton is disabled outright
    * without it (components/common/ShareButton.vue).
    */
-  async clickShareLinkAndGetUrl() {
-    const shareBtn = this.page.locator(this.shareLinkButton);
+  async clickShareLinkAndGetUrl(buttonSelector = this.shareLinkButton) {
+    const shareBtn = this.page.locator(buttonSelector);
     await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
     await shareBtn.click();
 
@@ -3623,5 +3630,205 @@ export class TracesPage {
   /** The cancelled state's only button is its Run query card. */
   async runQueryFromCancelledState() {
     await this.page.locator(this.searchCancelledState).getByRole('button').click();
+  }
+
+  /** ZO_AUTO_QUERY_ENABLED is read once at server start and only the browser acts on it, so the config response is pinned instead of needing its own shard. */
+  async pinAutoQueryEnabled(enabled = true) {
+    await this.page.route(/\/api\/[^/]+\/config(\?.*)?$/, async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const response = await route.fetch();
+      const body = await response.json().catch(() => ({}));
+      await route.fulfill({ response, json: { ...body, auto_query_enabled: enabled } });
+    });
+  }
+
+  async storeAutoRunOffWithLastStream(stream, org = process.env['ORGNAME'] || 'default') {
+    await this.page.evaluate(([name, orgId]) => {
+      localStorage.setItem('oo_toggle_auto_run', 'false');
+      localStorage.setItem(`oo_selected_stream_traces_${orgId}`, name);
+    }, [stream, org]);
+  }
+
+  async expectSelectedStream(stream) {
+    await expect.poll(() => this.getSelectedStreamName(), { timeout: 30000 }).toBe(stream);
+  }
+
+  async expectSearchNotStartedState() {
+    await expect(this.page.locator(this.searchNotStartedState)).toBeVisible({ timeout: 30000 });
+  }
+
+  /** A search landing inside the quiet window fails the caller; a timeout here is the passing outcome. */
+  async expectNoSearchRequest(requests, quietMs = 6000) {
+    const late = await this.page
+      .waitForRequest((request) => request.url().includes('/_search'), { timeout: quietMs })
+      .then((request) => request.url())
+      .catch(() => null);
+    expect(late, 'no search may start while Auto Run is off').toBeNull();
+    expect(requests.map((r) => r.panel), 'no search may have started while Auto Run is off').toEqual([]);
+  }
+
+  /** Scale and layout read from the chart itself, since canvas series have no DOM; null until it has data laid out. */
+  async readRenderedChart(rootSelector) {
+    return await this.page.evaluate((selector) => {
+      const root = document.querySelector(selector);
+      if (!root) return null;
+      const findChart = (vnode, depth) => {
+        if (!vnode || depth > 80) return null;
+        const inst = vnode.component;
+        if (inst) {
+          const chart = inst.setupState?.chart;
+          if (chart?.getDom && root.contains(chart.getDom())) return chart;
+          const nested = findChart(inst.subTree, depth + 1);
+          if (nested) return nested;
+        }
+        const children = [...(Array.isArray(vnode.children) ? vnode.children : []), ...(vnode.dynamicChildren || [])];
+        for (const child of children) {
+          if (child && typeof child === 'object') {
+            const found = findChart(child, depth + 1);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const chart = findChart(document.querySelector('#app')?._vnode, 0);
+      const series = chart?.getModel?.()?.getSeriesByIndex(0);
+      const data = series?.getData?.();
+      if (!data || !data.count()) return null;
+      const points = [];
+      const names = [];
+      for (let i = 0; i < data.count(); i++) {
+        names.push(data.getName(i));
+        const layout = data.getItemLayout(i);
+        const xy = Array.isArray(layout) ? layout : layout && [layout.x, layout.y];
+        if (xy && series.coordinateSystem) points.push(series.coordinateSystem.dataToPoint(xy));
+      }
+      let pixelSpan = 0;
+      for (const a of points) {
+        for (const b of points) pixelSpan = Math.max(pixelSpan, Math.hypot(a[0] - b[0], a[1] - b[1]));
+      }
+      const option = chart.getOption();
+      const xAxis = option.xAxis?.[0];
+      return {
+        type: series.subType,
+        names,
+        links: (option.series?.[0]?.links || []).map((link) => `${link.source}->${link.target}`),
+        pixelSpan,
+        xMin: xAxis?.min ?? null,
+        xMax: xAxis?.max ?? null,
+      };
+    }, rootSelector);
+  }
+
+  /** Resolves with the chart once two reads a moment apart agree, so a start-up animation is not taken as the baseline. */
+  async waitForSettledChart(rootSelector) {
+    let previous = null;
+    let settled = null;
+    await expect(async () => {
+      const current = await this.readRenderedChart(rootSelector);
+      expect(current, `the chart under ${rootSelector} must have laid out data`).not.toBeNull();
+      const same = JSON.stringify(current) === JSON.stringify(previous);
+      previous = current;
+      expect(same, 'the chart must stop moving').toBe(true);
+      settled = current;
+    }).toPass({ timeout: 30000, intervals: [500] });
+    return settled;
+  }
+
+  async clickChartZoomControl(prefix, kind) {
+    await this.page.locator(`[data-test="${prefix}-${kind}"]`).click();
+  }
+
+  async expectNodeChartZoomCycle(rootSelector, prefix) {
+    const baseline = await this.waitForSettledChart(rootSelector);
+    expect(baseline.pixelSpan, 'the chart needs at least two separated nodes to measure scale').toBeGreaterThan(0);
+    const span = async () => (await this.readRenderedChart(rootSelector))?.pixelSpan ?? 0;
+
+    await this.clickChartZoomControl(prefix, 'zoom-in');
+    await expect.poll(span, { timeout: 10000, message: 'zoom in must enlarge the rendered graph' })
+      .toBeGreaterThan(baseline.pixelSpan * 1.1);
+
+    await this.clickChartZoomControl(prefix, 'zoom-out');
+    await this.clickChartZoomControl(prefix, 'zoom-out');
+    await expect.poll(span, { timeout: 10000, message: 'zoom out must shrink the rendered graph below its first size' })
+      .toBeLessThan(baseline.pixelSpan * 0.9);
+
+    await this.clickChartZoomControl(prefix, 'fit-screen');
+    await expect.poll(async () => Math.abs((await span()) - baseline.pixelSpan), {
+      timeout: 15000,
+      message: 'fit must restore the first rendered size',
+    }).toBeLessThan(baseline.pixelSpan * 0.02);
+  }
+
+  async getFlameRulerLabels() {
+    return await this.page.locator(this.flameGraphRulerLabel).allInnerTexts();
+  }
+
+  async openTraceGraphView(view) {
+    expect(await this.openTraceDetailsTab('map'), 'the Trace Graph tab must exist').toBe(true);
+    const toggle = this.page.locator(`[data-test="trace-graph-${view}-view-btn"]`);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('data-state', 'on');
+    await expect(this.page.locator(this.traceGraphChart)).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectSidebarAttributeValue(field, value) {
+    await this.page.locator(this.sidebarAttributesTab).filter({ visible: true }).first().click();
+    const toggle = this.page.locator(this.sidebarAttributesViewTable).filter({ visible: true }).first();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('data-state', 'on');
+    const fieldCell = this.page.locator(this.sidebarAttributeFieldCell, { hasText: new RegExp(`^\\s*${field}\\s*$`) });
+    const row = this.page.locator(`${this.sidebarAttributesTable} ${this.sidebarAttributeRow}`).filter({ has: fieldCell }).first();
+    await expect(row).toContainText(value, { timeout: 15000 });
+  }
+
+  async getResultTimestamps() {
+    return await this.page.locator(`${this.searchResultList} ${this.traceRowTimestamp}`).allInnerTexts();
+  }
+
+  async expectResultRowCount(count) {
+    await expect(this.page.locator(`${this.searchResultList} ${this.traceRowTimestamp}`)).toHaveCount(count, { timeout: 60000 });
+  }
+
+  /** Per-node box and text geometry; the text's painted edge is cut at the label only when the label really clips its overflow. */
+  async measureDagNodeLabels() {
+    return await this.page.locator(this.dagNodeLabel).evaluateAll((labels) => labels.map((label) => {
+      const style = getComputedStyle(label);
+      const box = label.parentElement.getBoundingClientRect();
+      const rect = label.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const text = range.getBoundingClientRect();
+      const clipped = style.overflowX !== 'visible';
+      return {
+        text: label.textContent.trim(),
+        fullTextWidth: text.width,
+        labelWidth: rect.width,
+        textOverflow: style.textOverflow,
+        paintedLeft: clipped ? Math.max(text.left, rect.left) : text.left,
+        paintedRight: clipped ? Math.min(text.right, rect.right) : text.right,
+        paintedTop: clipped ? Math.max(text.top, rect.top) : text.top,
+        paintedBottom: clipped ? Math.min(text.bottom, rect.bottom) : text.bottom,
+        boxLeft: box.left,
+        boxRight: box.right,
+        boxTop: box.top,
+        boxBottom: box.bottom,
+      };
+    }));
+  }
+
+  async clickSpanViewLogs(spanId) {
+    const row = this.page.locator(`[data-test="trace-tree-span-operation-name-container-${spanId}"]`);
+    await row.waitFor({ state: 'visible', timeout: 30000 });
+    // The action is revealed on hover, the way a user reaches it.
+    await row.hover();
+    await this.page.locator(`[data-test="trace-tree-span-view-logs-btn-${spanId}"]`).first().click();
+  }
+
+  async expectTraceTreeHasSpans() {
+    await expect(this.page.locator('[data-test^="trace-tree-span-operation-name-container-"]').first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectWarningToast(message) {
+    await expect(this.page.locator('[data-test-variant="warning"]').filter({ hasText: message }).first()).toBeVisible({ timeout: 30000 });
   }
 }
