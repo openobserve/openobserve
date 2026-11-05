@@ -120,7 +120,7 @@ async fn create_and_assign_sre_readonly_role(
     .await
 }
 
-fn summarize_streams(streams: &[Stream]) -> (StreamSummary, bool) {
+fn summarize_streams(org_id: &str, streams: &[Stream]) -> (StreamSummary, bool) {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
@@ -131,7 +131,7 @@ fn summarize_streams(streams: &[Stream]) -> (StreamSummary, bool) {
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
             stream_summary.num_streams += 1;
-            if usage::is_user_data_stream(&stream.name, stream.stream_type) {
+            if usage::is_user_data_stream(org_id, &stream.name, stream.stream_type) {
                 stream_summary.num_user_streams += 1;
             }
             stream_summary.total_records += stream.stats.doc_num;
@@ -146,7 +146,7 @@ fn summarize_streams(streams: &[Stream]) -> (StreamSummary, bool) {
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
-    let (stream_summary, has_trigger_stream) = summarize_streams(&streams);
+    let (stream_summary, has_trigger_stream) = summarize_streams(org_id, &streams);
 
     let trigger_status_results = if !has_trigger_stream {
         vec![]
@@ -1526,7 +1526,27 @@ mod tests {
             "_o2_alert_calibration_digests",
             StreamType::Logs,
         )];
-        let (summary, _) = summarize_streams(&streams);
+        let (summary, _) = summarize_streams("summary_org", &streams);
+        assert_eq!(summary.num_streams, 1);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_counts_a_customer_stream_named_like_a_meta_stream() {
+        let streams = [summary_stream(usage::ERROR_STREAM, StreamType::Logs)];
+        let (summary, _) = summarize_streams("acme", &streams);
+        assert_eq!(summary.num_user_streams, 1);
+        let (summary, _) = summarize_streams(META_ORG_ID, &streams);
+        assert_eq!(summary.num_user_streams, 0);
+    }
+
+    #[test]
+    fn test_summarize_streams_does_not_count_slo_slices_as_user_data() {
+        let streams = [summary_stream(
+            config::meta::slo::stream::SLO_SLICES_STREAM,
+            StreamType::Logs,
+        )];
+        let (summary, _) = summarize_streams("acme", &streams);
         assert_eq!(summary.num_streams, 1);
         assert_eq!(summary.num_user_streams, 0);
     }
@@ -1539,7 +1559,7 @@ mod tests {
             summary_stream("default", StreamType::Logs),
             summary_stream("cpu_usage", StreamType::Metrics),
         ];
-        let (summary, has_trigger_stream) = summarize_streams(&streams);
+        let (summary, has_trigger_stream) = summarize_streams("summary_org", &streams);
         assert_eq!(summary.num_streams, 4);
         assert_eq!(summary.num_user_streams, 2);
         assert!(has_trigger_stream);

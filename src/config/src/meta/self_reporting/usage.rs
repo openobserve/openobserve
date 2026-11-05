@@ -37,7 +37,7 @@ pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
-/// Every stream name O2 writes itself; web/src/utils/internalStreams.ts must list the same names.
+/// Every stream name O2 writes itself.
 pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
     USAGE_STREAM,
     AUDIT_STREAM,
@@ -54,8 +54,15 @@ pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
     "_anomalies",
 ];
 
-/// `_o2_` streams customers' own collectors write; internalStreams.ts lists the same names.
-pub const USER_SOURCED_STREAM_NAMES: [&str; 1] = [DBM_SERVER_STREAM];
+/// Streams `is_system_stream` matches that hold customer data; internalStreams.ts lists them.
+pub const USER_SOURCED_STREAM_NAMES: [&str; 6] = [
+    DBM_SERVER_STREAM,
+    "_rumdata",
+    "_rumlog",
+    "_sessionreplay",
+    "synthetics_results",
+    "synthetics_step_results",
+];
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
 /// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
@@ -74,18 +81,6 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
                 | super::llm_experiments::LLM_EXPERIMENT_STREAM
                 | "_anomalies"
         )
-}
-
-/// Whether a stream holds data the user sent, not data O2 writes; web isUserDataStream mirrors it.
-pub fn is_user_data_stream(stream_name: &str, stream_type: StreamType) -> bool {
-    if !matches!(
-        stream_type,
-        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
-    ) {
-        return false;
-    }
-    USER_SOURCED_STREAM_NAMES.contains(&stream_name)
-        || !(stream_name.starts_with("_o2_") || INTERNAL_STREAM_NAMES.contains(&stream_name))
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".
@@ -1061,6 +1056,15 @@ pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
     }
 }
 
+/// Whether a stream holds the customer's own data; web isUserDataStream mirrors it.
+pub fn is_user_data_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
+    ) && (USER_SOURCED_STREAM_NAMES.contains(&stream_name)
+        || !is_system_stream(org_id, stream_name))
+}
+
 #[cfg(test)]
 mod run_outcome_tests {
     use super::*;
@@ -1691,15 +1695,6 @@ mod tests {
     }
 
     #[test]
-    fn test_internal_stream_names_match_web_list() {
-        let mut web = ts_stream_names(&web_internal_streams_source(), "INTERNAL_STREAM_NAMES");
-        web.sort();
-        let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
-        rust.sort();
-        assert_eq!(web, rust);
-    }
-
-    #[test]
     fn test_user_sourced_stream_names_match_web_list() {
         let mut web = ts_stream_names(&web_internal_streams_source(), "USER_SOURCED_STREAM_NAMES");
         web.sort();
@@ -1719,11 +1714,45 @@ mod tests {
 
     #[test]
     fn test_is_user_data_stream_ignores_streams_o2_writes_itself() {
-        for name in ["_o2_alert_calibration_digests", "_o2_ai_chat_events"] {
-            assert!(!is_user_data_stream(name, StreamType::Logs), "{name}");
+        for name in [
+            "_o2_alert_calibration_digests",
+            "_o2_ai_chat_events",
+            SLO_SLICES_STREAM,
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "_anomalies",
+        ] {
+            assert!(
+                !is_user_data_stream("acme", name, StreamType::Logs),
+                "{name}"
+            );
         }
         for name in INTERNAL_STREAM_NAMES {
-            assert!(!is_user_data_stream(name, StreamType::Logs), "{name}");
+            assert!(
+                !is_user_data_stream(META_ORG_ID, name, StreamType::Logs),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_counts_meta_only_names_in_customer_orgs() {
+        for name in [
+            ERROR_STREAM,
+            AUDIT_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+            "cloud_events",
+            "self_profiles",
+        ] {
+            assert!(
+                is_user_data_stream("acme", name, StreamType::Logs),
+                "{name} in acme"
+            );
+            assert!(
+                !is_user_data_stream(META_ORG_ID, name, StreamType::Logs),
+                "{name} in _meta"
+            );
         }
     }
 
@@ -1735,9 +1764,16 @@ mod tests {
             ("default", StreamType::Traces),
             ("default", StreamType::Profiles),
             ("_rumdata", StreamType::Logs),
+            ("_rumlog", StreamType::Logs),
+            ("_sessionreplay", StreamType::Logs),
+            ("synthetics_results", StreamType::Logs),
             (DBM_SERVER_STREAM, StreamType::Logs),
         ] {
-            assert!(is_user_data_stream(name, stream_type), "{name}");
+            assert!(is_user_data_stream("acme", name, stream_type), "{name}");
+            assert!(
+                is_user_data_stream(META_ORG_ID, name, stream_type),
+                "{name}"
+            );
         }
     }
 
@@ -1751,7 +1787,7 @@ mod tests {
             StreamType::ServiceGraph,
         ] {
             assert!(
-                !is_user_data_stream("default", stream_type),
+                !is_user_data_stream("acme", "default", stream_type),
                 "{stream_type:?}"
             );
         }

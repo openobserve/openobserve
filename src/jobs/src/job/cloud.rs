@@ -238,7 +238,7 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         let streams = get_streams(&org.identifier, None, false, None).await;
         if !streams
             .iter()
-            .any(|s| is_user_data_stream(&s.name, s.stream_type))
+            .any(|s| is_user_data_stream(&org.identifier, &s.name, s.stream_type))
         {
             report_to_segment(
                 "OpenObserve - No ingestion after creation",
