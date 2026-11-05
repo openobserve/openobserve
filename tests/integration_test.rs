@@ -7763,6 +7763,11 @@ mod tests {
                 "retry_repairs_missing_trigger",
                 Box::pin(e2e_retry_repairs_a_missing_trigger()),
             ),
+            ("rename_enable", Box::pin(e2e_rename_and_enable_runs_soon())),
+            (
+                "delete_old_key_row",
+                Box::pin(e2e_delete_removes_older_rows()),
+            ),
             (
                 "retry_keeps_old_key_row",
                 Box::pin(e2e_retry_keeps_a_row_under_an_older_key()),
@@ -8240,6 +8245,40 @@ mod tests {
         e2e_delete_scheduled(id).await;
     }
 
+    async fn e2e_rename_and_enable_runs_soon() {
+        let id = "rename_enable_pl";
+        let (mut pipeline, _) = e2e_create_scheduled(id, "rename_enable_old", false).await;
+        pipeline.enabled = false;
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+        let row = e2e_pipeline_triggers(id).await.remove(0);
+        e2e_seed_trigger(&row, 555, E2E_PIPELINE_FAR_RUN).await;
+
+        let mut pipeline = e2e_stored_pipeline(id).await;
+        pipeline.name = "rename_enable_new".to_string();
+        pipeline.enabled = true;
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(
+            rows[0].module_key,
+            format!("logs/e2e/rename_enable_new/{id}")
+        );
+        assert!(rows[0].next_run_at < E2E_PIPELINE_FAR_RUN, "{rows:?}");
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_delete_removes_older_rows() {
+        let id = "delete_old_key_pl";
+        e2e_create_scheduled(id, "delete_old_key_new", false).await;
+        e2e_push_stale_trigger(id, "delete_old_key_old", 666).await;
+
+        e2e_delete_scheduled(id).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert!(rows.is_empty(), "{rows:?}");
+    }
+
     async fn e2e_retry_repairs_a_missing_trigger() {
         let id = "retry_repair_pl";
         let (_, row) = e2e_create_scheduled(id, "retry_repair", false).await;
@@ -8247,9 +8286,10 @@ mod tests {
             .await
             .unwrap();
 
-        // The body equals the stored pipeline, as a retry after a failed trigger write does.
-        let stored = e2e_stored_pipeline(id).await;
-        assert_eq!(e2e_update_pipeline(&stored).await, StatusCode::OK);
+        // The pipeline write bumped the version, and the retried body still has the old one.
+        let mut retried = e2e_stored_pipeline(id).await;
+        retried.version -= 1;
+        assert_eq!(e2e_update_pipeline(&retried).await, StatusCode::OK);
 
         let rows = e2e_pipeline_triggers(id).await;
         assert_eq!(rows.len(), 1, "{rows:?}");

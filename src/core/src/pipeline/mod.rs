@@ -202,8 +202,10 @@ async fn move_trigger(
     .await?
     {
         // An upsert gives the row a new next run, which an unchanged schedule must not lose.
+        // A re-enable needs it: the disabled row was pushed days ahead.
         return Ok(source.trigger_condition != stored_source.trigger_condition
-            || source.tz_offset != stored_source.tz_offset);
+            || source.tz_offset != stored_source.tz_offset
+            || (pipeline.enabled && !stored.enabled));
     }
     // A run that began after the refusal holds the row; handle_derived_stream_triggers moves it.
     Ok(!scheduler::exists(
@@ -393,12 +395,14 @@ pub async fn update_pipeline_checked(
     // Both sides, or a legacy row's empty org reads as a source change on every edit.
     default_node_orgs(&mut existing_pipeline);
 
+    // A retry after a failed trigger write carries the version from before its first attempt.
+    let client_version = std::mem::replace(&mut pipeline.version, existing_pipeline.version);
     if existing_pipeline == pipeline {
         return repair_missing_trigger(&mut pipeline).await;
     }
 
     // check version
-    if existing_pipeline.version != pipeline.version {
+    if existing_pipeline.version != client_version {
         return Err(PipelineError::Modified(pipeline.id));
     }
 
@@ -600,19 +604,40 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     delete_listed_pipeline(existing_pipeline).await
 }
 
+/// A row under an older name cannot heal once its pipeline is gone, and only logs errors.
+async fn delete_older_triggers(org: &str, pipeline_id: &str) {
+    let suffix = format!("/{pipeline_id}");
+    let rows = match scheduler::list_by_org(org, Some(TriggerModule::DerivedStream)).await {
+        Ok(rows) => rows,
+        Err(error) => {
+            log::warn!("failed to list triggers of deleted pipeline {pipeline_id}: {error}");
+            return;
+        }
+    };
+    for row in rows.iter().filter(|row| row.module_key.ends_with(&suffix)) {
+        if let Err(error) =
+            scheduler::delete(org, TriggerModule::DerivedStream, &row.module_key).await
+        {
+            log::warn!("failed to delete stale trigger {}: {error}", row.module_key);
+        }
+    }
+}
+
 /// `delete_pipeline` for a pipeline the caller already read, such as from a primary listing.
 pub async fn delete_listed_pipeline(existing_pipeline: Pipeline) -> Result<(), PipelineError> {
     let pipeline_id = existing_pipeline.id.as_str();
     // delete DerivedStream details if there's any
-    if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source
-        && let Err(error) = super::alerts::derived_streams::delete(
+    if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source {
+        if let Err(error) = super::alerts::derived_streams::delete(
             &derived_stream,
             &existing_pipeline.name,
             &existing_pipeline.id,
         )
         .await
-    {
-        return Err(PipelineError::DeleteDerivedStream(error.to_string()));
+        {
+            return Err(PipelineError::DeleteDerivedStream(error.to_string()));
+        }
+        delete_older_triggers(&derived_stream.org_id, pipeline_id).await;
     }
 
     // Delete all backfill jobs associated with this pipeline

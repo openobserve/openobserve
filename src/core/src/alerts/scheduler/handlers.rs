@@ -5918,8 +5918,7 @@ async fn check_trigger_key(
     if pipeline.scheduler_module_key().as_deref() == Some(trigger.module_key.as_str()) {
         return Ok(TriggerKeyCheck::Current(pipeline));
     }
-    // The cache on this node can be old, so only the database can call a trigger stale.
-    // A row that cannot be checked must not run: it could repeat what the current row writes.
+    // The cache can be old, and an unchecked row must not run: it could repeat the current row.
     let pipeline = infra::pipeline::get_by_id(&pipeline.id)
         .await
         .map_err(|e| {
