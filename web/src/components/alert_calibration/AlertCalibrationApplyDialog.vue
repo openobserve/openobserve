@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="copy.title(alertName)"
     :primary-button-label="primary?.label"
     :primary-button-data-test="primary?.dataTest"
+    :primary-button-loading="opening"
     :secondary-button-label="copy.cancel()"
     secondary-button-variant="outline"
     data-test="alert-calibration-apply-dialog"
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -116,12 +117,7 @@ import { alertDetailQuery } from "@/services/alerts.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { AlertEditHandoff } from "@/ts/interfaces/alertPrefill";
 import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
-import {
-  CALIBRATION_PREFILL,
-  isStaleField,
-  isSupportedAlert,
-  plannedFields,
-} from "@/utils/alerts/alertEditHandoff";
+import { isStaleField, isSupportedAlert, plannedFields } from "@/utils/alerts/alertEditHandoff";
 import {
   applyCopy,
   patchOf,
@@ -130,6 +126,7 @@ import {
   type ApplySuggestion,
 } from "./applySuggestion";
 import { limitationsOf, type FindingRecord } from "./digests";
+import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
 
 type PromptState = "loading" | "fresh" | "stale" | "deleted" | "denied" | "failed" | "unsupported";
 
@@ -203,14 +200,65 @@ const notice = computed<{ variant: "error" | "warning" | "default"; text: I18nTe
   }
 });
 
-const openEditor = (handoff: AlertEditHandoff) => {
+interface FolderLookup {
+  promise: Promise<string | undefined>;
+  settled: boolean;
+  folder: string | undefined;
+}
+
+let folderLookup: FolderLookup | null = null;
+const opening = ref(false);
+// Bumped on every open, close and unmount, so a Continue that was waiting cannot outlive its prompt.
+let promptSession = 0;
+onBeforeUnmount(() => {
+  promptSession += 1;
+});
+watch(
+  () => props.open,
+  () => {
+    promptSession += 1;
+    opening.value = false;
+  },
+);
+
+const startFolderLookup = (): FolderLookup => {
+  const live = liveAlert.value?.name;
+  const name = typeof live === "string" && live ? live : props.finding.alert_name;
+  const lookup: FolderLookup = {
+    promise: alertFolderOf(orgId.value, props.action.alert_id, name),
+    settled: false,
+    folder: undefined,
+  };
+  void lookup.promise.then((folder) => {
+    lookup.folder = folder;
+    lookup.settled = true;
+  });
+  return lookup;
+};
+
+// Started once the live alert names it, so Continue usually finds the folder already known.
+watch(
+  () => [props.open, !!liveAlert.value] as const,
+  ([open, loaded]) => {
+    if (!open) folderLookup = null;
+    else if (loaded && !folderLookup) folderLookup = startFolderLookup();
+  },
+  { immediate: true },
+);
+
+const openEditor = async (handoff: AlertEditHandoff) => {
+  if (opening.value) return;
+  const lookup = folderLookup ?? (folderLookup = startFolderLookup());
+  if (!lookup.settled) {
+    const session = promptSession;
+    opening.value = true;
+    await lookup.promise;
+    if (session !== promptSession) return;
+    opening.value = false;
+  }
   writeAlertEditHandoff(handoff);
   emit("update:open", false);
-  void router.push({
-    name: "editAlert",
-    params: { alert_id: props.action.alert_id },
-    query: { org_identifier: orgId.value, prefill: CALIBRATION_PREFILL },
-  });
+  void router.push(editAlertRoute(orgId.value, props.action.alert_id, lookup.folder));
 };
 
 /** Continue only on a fresh alert; a stale or unsupported one can still be opened for review. */
@@ -219,14 +267,14 @@ const primary = computed(() => {
     return {
       label: copy.value.continueLabel(),
       dataTest: "alert-calibration-apply-continue",
-      run: () => openEditor(toEditHandoff(props.action, props.finding)),
+      run: () => void openEditor(toEditHandoff(props.action, props.finding)),
     };
   }
   if (state.value === "stale" || state.value === "unsupported") {
     return {
       label: copy.value.reviewInstead(),
       dataTest: "alert-calibration-apply-review",
-      run: () => openEditor(toReviewHandoff(props.action, props.finding)),
+      run: () => void openEditor(toReviewHandoff(props.action, props.finding)),
     };
   }
   return null;

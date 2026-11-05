@@ -74,6 +74,7 @@ const alerts = {
     query?: string,
     alert_type?: string,
     include_dependencies?: boolean,
+    options?: { silentForbidden?: boolean },
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -90,7 +91,7 @@ const alerts = {
     if (include_dependencies) {
       url += `&include_dependencies=true`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
