@@ -1341,7 +1341,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
     expect(instrumentCode()).toContain("--set-string 'ebpf.trace.ports={8080}'");
   });
 
-  it("gives one annotate line per language in my-namespace, restarted once, with no input", () => {
+  it("gives each language its own namespace placeholder and restart, with no input", () => {
     mountOnboarding({ traces: "library", languages: ["java", "nodejs"] });
     expect(titles()).toEqual([
       "Quick install (recommended)",
@@ -1354,13 +1354,14 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
     expect(instrumentCode()).toBe(
       [
         "# Every pod in the namespace is instrumented — no code or image change.",
-        "kubectl annotate namespace my-namespace \\",
+        "kubectl annotate namespace my-java-namespace \\",
         '  instrumentation.opentelemetry.io/inject-java="openobserve-collector/openobserve-java"',
-        "kubectl annotate namespace my-namespace \\",
+        "kubectl annotate namespace my-nodejs-namespace \\",
         '  instrumentation.opentelemetry.io/inject-nodejs="openobserve-collector/openobserve-nodejs"',
         "",
         "# Restart so running pods pick up the injection",
-        "kubectl rollout restart deployment -n my-namespace",
+        "kubectl rollout restart deployment -n my-java-namespace",
+        "kubectl rollout restart deployment -n my-nodejs-namespace",
       ].join("\n"),
     );
   });

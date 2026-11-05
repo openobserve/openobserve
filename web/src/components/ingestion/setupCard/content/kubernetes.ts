@@ -111,7 +111,7 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
 /**
  * Annotating a namespace makes the operator inject the language's auto-
  * instrumentation into every pod in it — no application code or image change.
- * One line per language; languages that share a namespace restart it once.
+ * One annotate and one restart per language, each in its own namespace.
  */
 export const annotate = (langs: { id: string; namespace: string }[]) =>
   `# Every pod in the namespace is instrumented — no code or image change.
@@ -123,9 +123,7 @@ ${langs
   .join("\n")}
 
 # Restart so running pods pick up the injection
-${[...new Set(langs.map(({ namespace }) => namespace))]
-  .map((namespace) => `kubectl rollout restart deployment -n ${namespace}`)
-  .join("\n")}`;
+${langs.map(({ namespace }) => `kubectl rollout restart deployment -n ${namespace}`).join("\n")}`;
 
 /** The languages the collector's Instrumentation resources cover; onboarding offers the same ones. */
 export const LANGUAGES: { id: string; label: string; icon: string }[] = [
@@ -135,7 +133,7 @@ export const LANGUAGES: { id: string; label: string; icon: string }[] = [
   { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
 ];
 
-const EBPF_DOC_URL =
+export const EBPF_DOC_URL =
   "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing";
 
 // --reuse-values would keep the old chart's defaults and lose the ebpf ones 0.6.0 adds.
@@ -249,10 +247,15 @@ const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardSte
     ...step,
     titleKey: "ingestion.setupCard.k8sTraceAppsTitle",
     descriptionKey: "ingestion.setupCard.k8sTraceLibraryDesc",
-    // As on the Data sources page, the user swaps in their own namespace.
+    // Two languages in one namespace trace neither, so each gets its own placeholder.
     code: {
       lang: "bash",
-      raw: annotate(langs.map((l) => ({ id: l.id, namespace: "my-namespace" }))),
+      raw: annotate(
+        langs.map((l) => ({
+          id: l.id,
+          namespace: langs.length > 1 ? `my-${l.id}-namespace` : "my-namespace",
+        })),
+      ),
     },
     note: t("ingestion.setupCard.k8sAnnotatePodNote"),
   };

@@ -18,6 +18,7 @@
 
 import {
   annotate,
+  EBPF_DOC_URL,
   EBPF_UPGRADE,
   LANGUAGES,
   scriptInstall,
@@ -205,7 +206,7 @@ function k8sTracing(traces: SetupCardPresets | undefined): string[] {
       "",
       "Details and limits, such as the privileged pods eBPF needs:",
       "",
-      "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing",
+      EBPF_DOC_URL,
       "",
     ];
   }
