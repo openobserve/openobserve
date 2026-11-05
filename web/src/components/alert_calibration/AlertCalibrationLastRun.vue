@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OBanner
     v-if="lastRun?.status === 'error'"
-    variant="warning"
+    variant="error"
     data-test="alert-calibration-last-run-failed"
   >
     {{

@@ -144,18 +144,61 @@ impl SearchPort for SearchAdapter {
 /// Engine rows land in `_meta` with an `org_id` field, so the customer org is never billed.
 pub struct MetaSink;
 
-#[async_trait]
-impl StreamSinkPort for MetaSink {
-    async fn append(&self, stream: &str, rows: Vec<Value>) -> anyhow::Result<()> {
+impl MetaSink {
+    /// The engine's own streams go through its `_meta` writer token; a routed gate stream does not.
+    async fn append_via(
+        transport: &dyn crate::ingestion::feature_writer::WriterTransport,
+        stream: &str,
+        rows: Vec<Value>,
+    ) -> anyhow::Result<()> {
+        use crate::ingestion::feature_writer::FeatureWriter;
         if rows.is_empty() {
             return Ok(());
         }
-        let params = StreamParams::new(META_ORG_ID, stream, StreamType::Logs);
-        crate::self_reporting::ingest_internal_logs(rows, params).await?;
+        if FeatureWriter::AutoObserve.allows(stream) {
+            Self::write_engine_rows(transport, stream, &rows).await?;
+        } else {
+            let params = StreamParams::new(META_ORG_ID, stream, StreamType::Logs);
+            crate::self_reporting::ingest_internal_logs(rows, params).await?;
+        }
         if let Err(e) = keep_bounded(stream, bound_retention).await {
             log::warn!("[autoobserve] setting {stream} retention failed: {e}");
         }
         Ok(())
+    }
+
+    async fn write_engine_rows(
+        transport: &dyn crate::ingestion::feature_writer::WriterTransport,
+        stream: &str,
+        rows: &[Value],
+    ) -> anyhow::Result<()> {
+        use crate::{
+            ingestion::feature_writer::{self, FeatureWriter},
+            traces::service_graph::v4::writer::{chunk, max_request_bytes},
+        };
+        // Looked up on every append, so a disable or a rotation applies to the next one.
+        let token = feature_writer::token(FeatureWriter::AutoObserve, META_ORG_ID).await?;
+        let chunks = chunk(rows, max_request_bytes());
+        let total = chunks.len();
+        for (index, data) in chunks.into_iter().enumerate() {
+            if let Err(e) = feature_writer::write(transport, &token, stream, data).await {
+                log::error!("[autoobserve] {stream} chunk {index} of {total} was not written: {e}");
+                return Err(e.into());
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl StreamSinkPort for MetaSink {
+    async fn append(&self, stream: &str, rows: Vec<Value>) -> anyhow::Result<()> {
+        Self::append_via(
+            &crate::ingestion::feature_writer::GrpcTransport,
+            stream,
+            rows,
+        )
+        .await
     }
 }
 
@@ -816,16 +859,107 @@ mod tests {
         infra::schema::remove_stream_settings(&key).await;
     }
 
+    /// Ingests in-process as the ingest handler does once a writer's request passed its scope.
+    struct InProcessIngester;
+
+    #[async_trait]
+    impl crate::ingestion::feature_writer::WriterTransport for InProcessIngester {
+        async fn send(
+            &self,
+            request: tonic::Request<proto::cluster_rpc::IngestionRequest>,
+        ) -> Result<proto::cluster_rpc::IngestionResponse, tonic::Status> {
+            use ingestion_common::{IngestUser, IngestionRequest, SystemJobType};
+            let body = request.into_inner();
+            let data = body.data.unwrap_or_default().data;
+            crate::logs::ingest::ingest(
+                0,
+                &body.org_id,
+                &body.stream_name,
+                IngestionRequest::Usage(bytes::Bytes::from(data)),
+                IngestUser::SystemJob(SystemJobType::AutoObserve),
+                None,
+                false,
+            )
+            .await
+            .map_err(|e| tonic::Status::internal(e.to_string()))?;
+            Ok(proto::cluster_rpc::IngestionResponse {
+                status_code: 200,
+                message: "OK".to_string(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn meta_sink_writes_autoobserve_streams_with_the_meta_writer_token() {
+        use crate::ingestion::feature_writer::tests::{RecordingTransport, meta_store};
+        meta_store().await;
+        let transport = RecordingTransport::answering(200);
+        let row = serde_json::json!({"org_id": "demo-org", "probe": 1});
+        MetaSink::append_via(&transport, "_o2_autoobserve_health", vec![row.clone()])
+            .await
+            .unwrap();
+        let sent = transport.credentials();
+        assert_eq!(sent.len(), 1);
+        let (credentials, org, body) = &sent[0];
+        let token = db::org_ingestion_tokens::get_by_name(META_ORG_ID, "_o2_autoobserve")
+            .await
+            .unwrap()
+            .expect("the writer made its _meta token");
+        assert_eq!(
+            credentials,
+            &format!("autoobserve@system.local:{}", token.token)
+        );
+        assert_eq!(
+            (org.as_str(), body.org_id.as_str()),
+            (META_ORG_ID, META_ORG_ID)
+        );
+        assert_eq!(body.stream_name, "_o2_autoobserve_health");
+        assert_eq!(
+            body.ingestion_type,
+            Some(proto::cluster_rpc::IngestionType::Usage as i32)
+        );
+
+        let routed = format!("ao_gate_decisions_{}", config::utils::time::now_micros());
+        MetaSink::append_via(&transport, &routed, vec![row])
+            .await
+            .unwrap();
+        assert_eq!(
+            transport.credentials().len(),
+            1,
+            "a routed stream used the writer token"
+        );
+        let schema = infra::schema::get(META_ORG_ID, &routed, StreamType::Logs)
+            .await
+            .unwrap();
+        assert!(
+            schema.field_with_name("probe").is_ok(),
+            "{routed} kept no row"
+        );
+    }
+
     /// The real sink path: the engine's write lands, a user's write to the same stream is refused.
+    #[tokio::test]
+    async fn a_storage_failure_or_refused_rows_fail_the_engine_append() {
+        use crate::ingestion::feature_writer::tests::{RecordingTransport, meta_store};
+        meta_store().await;
+        for code in [500, 207] {
+            let transport = RecordingTransport::answering(code);
+            let row = serde_json::json!({"org_id": "demo-org", "probe": 1});
+            let appended =
+                MetaSink::append_via(&transport, "_o2_autoobserve_health", vec![row]).await;
+            assert!(appended.is_err(), "a {code} reply let the engine move on");
+        }
+    }
+
     #[tokio::test]
     async fn the_meta_sink_writes_every_engine_stream_and_a_user_cannot() {
         use ingestion_common::{IngestUser, IngestionRequest};
         use o2_enterprise::enterprise::autoobserve::names::{decision_kinds, streams};
+        crate::ingestion::feature_writer::tests::meta_store().await;
         let decisions = streams::decisions(decision_kinds::STREAM_SILENCE);
         for stream in streams::ALL.iter().copied().chain([decisions.as_str()]) {
             let row = serde_json::json!({"org_id": "acme", "probe": 1});
-            MetaSink
-                .append(stream, vec![row.clone()])
+            MetaSink::append_via(&InProcessIngester, stream, vec![row.clone()])
                 .await
                 .unwrap_or_else(|e| panic!("{stream}: {e}"));
             let schema = infra::schema::get(META_ORG_ID, stream, StreamType::Logs)

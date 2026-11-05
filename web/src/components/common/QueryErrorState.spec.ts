@@ -281,6 +281,15 @@ describe("QueryErrorState plain-language errors", () => {
   });
 });
 
+describe("QueryErrorState block icon", () => {
+  it("the block error icon uses the error text token", () => {
+    const wrapper = mountState({ size: "block", errorMsg: "Search stream not found: nosuch" });
+    const classes = wrapper.find('[data-test="query-error-block-icon"]').classes();
+    expect(classes).toContain("text-status-error-text");
+    expect(classes).not.toContain("text-status-error");
+  });
+});
+
 describe("QueryErrorState protected-stream refusal", () => {
   it("the protected-stream refusal is a red denied state with the way to the records", async () => {
     const page = { template: "<div />" };

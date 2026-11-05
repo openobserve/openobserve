@@ -29,6 +29,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let ports = ports::ports();
     let triggers = ports.triggers.clone();
     autoobserve::init(ports).await?;
+    // Made at start-up so the first tick finds it cached; each append looks it up again.
+    let writer = crate::ingestion::feature_writer::FeatureWriter::AutoObserve;
+    if let Err(e) = crate::ingestion::feature_writer::token(writer, config::META_ORG_ID).await {
+        log::warn!("[autoobserve] could not prepare the ingestion token: {e}");
+    }
     // Only scheduler nodes claim the row, so only they have a reason to mint it.
     if LOCAL_NODE.is_scheduler()
         && job::ensure_trigger(true, triggers.as_ref(), now_micros()).await?

@@ -238,7 +238,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="flex w-full flex-col gap-3 p-4" data-test="query-error-state">
     <!-- Title row -->
     <div class="flex items-start gap-2">
-      <OIcon name="error-outline" size="sm" class="text-status-error mt-0.5 shrink-0" />
+      <OIcon
+        name="error-outline"
+        size="sm"
+        class="text-status-error-text mt-0.5 shrink-0"
+        data-test="query-error-block-icon"
+      />
       <div class="flex min-w-0 flex-col gap-0.5">
         <p class="text-text-body m-0 text-sm font-semibold">
           {{ resolvedTitle }}
