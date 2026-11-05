@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
-      content-class="p-1 shadow-lg!"
+      content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
     >
@@ -98,36 +98,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            v-if="showRail"
-            class="border-border-default col-start-1 row-start-1 flex items-center border-e border-b px-3 py-2 max-sm:order-1 max-sm:border-e-0 max-sm:border-b-0"
-            data-test="date-time-rail-header"
-          >
-            <span class="text-sm font-semibold">{{ t("common.timeRangeRecent") }}</span>
-          </div>
-          <div
             class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
-            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
+            :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
           >
-            <div v-if="!disableRelative" class="flex flex-1 gap-1">
-              <OButton
-                data-test="date-time-relative-tab"
-                class="flex-1"
-                :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+            <OToggleGroup
+              v-if="!disableRelative"
+              :model-value="selectedType"
+              type="single"
+              class="flex-1"
+              data-test="date-time-type-toggle"
+              @update:model-value="onTypeToggle"
+            >
+              <OToggleGroupItem
+                value="relative"
                 size="sm"
-                @click="selectTab('relative')"
+                class="flex-1"
+                data-test="date-time-relative-tab"
               >
                 {{ t("common.relative") }}
-              </OButton>
-              <OButton
-                data-test="date-time-absolute-tab"
-                class="flex-1"
-                :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="absolute"
                 size="sm"
-                @click="selectTab('absolute')"
+                class="flex-1"
+                data-test="date-time-absolute-tab"
               >
                 {{ t("common.absolute") }}
-              </OButton>
-            </div>
+              </OToggleGroupItem>
+            </OToggleGroup>
             <div v-else class="flex-1" />
             <OTooltip :content="t('common.copyRange')">
               <OButton
@@ -152,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="showRail"
-            class="border-border-default relative col-start-1 row-start-2 border-e max-sm:static max-sm:order-2 max-sm:border-e-0 max-sm:border-b"
+            class="bg-surface-panel border-border-default relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
             data-test="date-time-rail-frame"
           >
             <DateTimeRail
@@ -168,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
-            :class="showRail ? 'col-start-2 max-sm:order-4' : 'col-start-1'"
+            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
           >
             <div
               class="relative grid min-h-0 flex-1 overflow-y-auto max-sm:flex-none max-sm:overflow-visible"
@@ -345,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!hideRelativeTimezone || !autoApply"
-              class="flex shrink-0 items-center gap-3 px-3 py-2"
+              class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[0.4rem] py-2"
             >
               <OSelect
                 v-if="!hideRelativeTimezone"
@@ -353,18 +351,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="timezone"
                 :options="timezoneSelectOptions"
                 searchable
-                :label="t('logStream.timezone')"
+                :aria-label="t('logStream.timezone')"
+                :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
                 @update:model-value="onTimezoneChange"
                 @open="isTimezoneSelectOpen = true"
                 @close="isTimezoneSelectOpen = false"
-                class="min-w-0 flex-1"
+                class="min-w-0 italic"
+                :class="autoApply ? 'col-span-2' : ''"
               />
-              <div v-else class="flex-1" />
+              <div v-else />
               <OButton
                 v-if="!autoApply"
                 data-test="date-time-apply-btn"
                 variant="primary"
-                size="xs"
+                size="sm"
+                class="justify-self-end px-6!"
                 @click="applyAndClose"
               >
                 {{ t("common.apply") }}
@@ -392,6 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -435,7 +438,9 @@ import {
   exceedsRangeRestriction,
   formatAbsoluteInstant,
   formatRecentRange,
-  formatRecentRangeParts,
+  formatCalendarRailHint,
+  formatRecentDuration,
+  formatRecentRangeLabel,
   type TimeRangeRailItem,
 } from "@/utils/timeRangeRail";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
@@ -480,11 +485,16 @@ interface ConsumableDateTime {
   userChangedValue?: boolean;
 }
 
+// One offset lookup per zone for the whole app, not per picker instance.
+const zoneOffsets = new Map<string, string>();
+
 export default defineComponent({
   components: {
     OSeparator,
     OButton,
     OIcon,
+    OToggleGroup,
+    OToggleGroupItem,
     OTooltip,
     OTruncatedText,
     OInput,
@@ -673,12 +683,43 @@ export default defineComponent({
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
+    // longOffset throws on engines that lack it, so the label falls back to no offset.
+    const zoneOffset = (zone: string): string => {
+      const cached = zoneOffsets.get(zone);
+      if (cached !== undefined) return cached;
+      let offset = "";
+      try {
+        const name = new Intl.DateTimeFormat("en-US", {
+          timeZone: zone,
+          timeZoneName: "longOffset",
+        })
+          .formatToParts(new Date())
+          .find((part) => part.type === "timeZoneName")?.value;
+        offset = name?.replace("GMT", "") || "+00:00";
+      } catch {
+        offset = "";
+      }
+      zoneOffsets.set(zone, offset);
+      return offset;
+    };
+
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz },
-      ),
+      timezoneOptions.map((tz: string) => {
+        const isBrowser = tz === browserTime;
+        const zone = isBrowser ? browserTz : tz;
+        const offset = zoneOffset(zone);
+        const suffix = offset ? raw(`UTC${offset}`) : undefined;
+        if (isBrowser) {
+          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
+        }
+        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+        return {
+          label: raw(offset ? `${tz} (UTC${offset})` : tz),
+          listLabel: raw(tz),
+          suffix,
+          value: tz,
+        };
+      }),
     );
 
     let relativePeriods = [
@@ -792,6 +833,14 @@ export default defineComponent({
           id: preset.id,
           label,
           tooltip: state?.tooltip,
+          hint:
+            formatCalendarRailHint(
+              preset.token,
+              store.state.timezone,
+              tooltipNow.value,
+              intlLocale.value,
+              (quarter) => t("common.calendarQuarterShort", { quarter }),
+            ) ?? undefined,
           selected: selectedType.value === "relative" && calendarToken.value === preset.token,
           disabled: state?.disabled ?? false,
         };
@@ -803,7 +852,16 @@ export default defineComponent({
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
         label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
-        parts: formatRecentRangeParts(entry.startUs, entry.endUs, store.state.timezone),
+        compact: {
+          label: formatRecentRangeLabel(
+            entry.startUs,
+            entry.endUs,
+            store.state.timezone,
+            Date.now(),
+            intlLocale.value,
+          ),
+          duration: formatRecentDuration(entry.startUs, entry.endUs),
+        },
         tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
@@ -1606,6 +1664,11 @@ export default defineComponent({
       selectedType.value = type;
     };
 
+    // Clicking the active segment deselects it in the group; the picker always keeps one type.
+    const onTypeToggle = (value: unknown) => {
+      if (value === "relative" || value === "absolute") selectTab(value);
+    };
+
     const setDateType = (type: string) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
@@ -1679,23 +1742,13 @@ export default defineComponent({
       return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
     };
 
-    // Only the calendar section is a 2-column grid of this/last pairs; every other row is 1-item.
-    const railRows = (panel: HTMLElement): HTMLButtonElement[][] => {
-      const recentRows = Array.from(
-        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-recent]"),
-      ).map((btn) => [btn]);
-      const toggle = panel.querySelector<HTMLButtonElement>(
-        "[data-test='date-time-rail-recent-toggle']",
+    // Rail items in tab order: recent rows, the show-more toggle, then the single-column calendar rows.
+    const railItems = (panel: HTMLElement): HTMLButtonElement[] =>
+      Array.from(
+        panel.querySelectorAll<HTMLButtonElement>(
+          "[data-date-time-rail-recent], [data-test='date-time-rail-recent-toggle'], [data-date-time-rail-calendar]",
+        ),
       );
-      const calendarButtons = Array.from(
-        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-calendar]"),
-      );
-      const calendarRows: HTMLButtonElement[][] = [];
-      for (let i = 0; i < calendarButtons.length; i += 2) {
-        calendarRows.push(calendarButtons.slice(i, i + 2));
-      }
-      return [...recentRows, ...(toggle ? [[toggle]] : []), ...calendarRows];
-    };
 
     // Arrow-key navigation for the picker panel: Left/Right switch the
     // Relative/Absolute tabs, and arrows roam the relative preset grid.
@@ -1709,46 +1762,20 @@ export default defineComponent({
 
       const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
       if (railItem) {
-        // Only the calendar grid uses Left/Right; a recent row's own listener reaches its × with it.
-        const isCalendarItem = railItem.hasAttribute("data-date-time-rail-calendar");
-        if (!isCalendarItem && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        // A recent row's own listener reaches its × with Left/Right.
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
         event.preventDefault();
         event.stopPropagation();
 
-        const rows = railRows(panel);
-        const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
-        let r = -1;
-        let c = -1;
-        rows.forEach((row, ri) => {
-          const ci = row.indexOf(railItem);
-          if (ci !== -1) {
-            r = ri;
-            c = ci;
-          }
-        });
-        if (r === -1) return;
-
-        const stepInRow = (dir: number) => {
-          for (let ci = c + dir; ci >= 0 && ci < rows[r].length; ci += dir)
-            if (enabled(rows[r][ci])) return rows[r][ci];
-          return null;
-        };
-        const stepRows = (dir: number) => {
-          for (let ri = r + dir; ri >= 0 && ri < rows.length; ri += dir) {
-            const row = rows[ri];
-            const col = Math.min(c, row.length - 1);
-            if (enabled(row[col])) return row[col];
-            const alt = row.find((btn) => enabled(btn));
-            if (alt) return alt;
-          }
-          return null;
-        };
-
+        const items = railItems(panel);
+        const dir = event.key === "ArrowDown" ? 1 : -1;
         let next: HTMLButtonElement | null = null;
-        if (event.key === "ArrowLeft") next = stepInRow(-1);
-        else if (event.key === "ArrowRight") next = stepInRow(1);
-        else if (event.key === "ArrowUp") next = stepRows(-1);
-        else if (event.key === "ArrowDown") next = stepRows(1);
+        for (let i = items.indexOf(railItem) + dir; i >= 0 && i < items.length; i += dir) {
+          if (!items[i].disabled) {
+            next = items[i];
+            break;
+          }
+        }
         next?.focus();
         return;
       }
@@ -2134,6 +2161,7 @@ export default defineComponent({
       optionsFn,
       setDateType,
       selectTab,
+      onTypeToggle,
       shiftTimeRange,
       isNextShiftDisabled,
       onPickerKeydown,

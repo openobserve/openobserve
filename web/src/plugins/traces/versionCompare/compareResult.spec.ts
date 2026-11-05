@@ -64,6 +64,7 @@ describe("buildCompareResult", () => {
     expect(r.metrics.find((m) => m.key === "p99")!.ci).toBeNull();
     expect(r.metrics.find((m) => m.key === "volume")!.flagged).toBe(false);
   }, 20000);
+  // Real bootstraps take over 2s on a fast CI runner and can pass the 5s default on a slow one.
   it("marks results associative in sinceRollout mode", () => {
     const durs = Array.from({ length: 200 }, (_, i) => i + 1);
     const r = buildCompareResult(
@@ -75,7 +76,7 @@ describe("buildCompareResult", () => {
       3,
     );
     expect(r.metrics.every((m) => m.associative)).toBe(true);
-  });
+  }, 20000);
   it("empty raw-sample with traceCount>=MIN_SAMPLE yields insufficient p50/p95/cost, not a confident nochange", () => {
     const r = buildCompareResult(
       kpi(500, 10, 50),

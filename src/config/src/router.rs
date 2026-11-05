@@ -164,6 +164,16 @@ pub fn is_public_dashboard_slug(slug: &str) -> bool {
     slug.len() == PUBLIC_DASHBOARD_SLUG_LEN && slug.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
+/// Whether `path` is the MCP endpoint `/api/{org}/mcp`, under any base URI.
+pub fn is_mcp_endpoint(path: &str) -> bool {
+    let mut segments = extract_path_without_query(path)
+        .trim_end_matches('/')
+        .rsplit('/');
+    segments.next() == Some("mcp")
+        && segments.next().is_some_and(|org| !org.is_empty())
+        && segments.next() == Some("api")
+}
+
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
@@ -284,6 +294,32 @@ mod tests {
             )));
         }
         assert!(!is_querier_route("/api/org1/v1/profiles"));
+    }
+
+    #[test]
+    fn test_is_mcp_endpoint() {
+        for path in [
+            "/api/default/mcp",
+            "/api/default/mcp?x=1",
+            "/api/default/mcp/",
+            "/o2/api/default/mcp",
+            "/api/3GjLqZseGw8M8qmh6zEx7dgGUTY/mcp",
+        ] {
+            assert!(is_mcp_endpoint(path), "{path}");
+        }
+        // a stream named "mcp", or anything that only resembles the endpoint
+        for path in [
+            "/api/default/streams/mcp",
+            "/api/mcp",
+            "/api//mcp",
+            "/mcp",
+            "/web/mcp",
+            "/api/default/mcp/extra",
+            "/api/default/mcpx",
+            "/api/default/_search",
+        ] {
+            assert!(!is_mcp_endpoint(path), "{path}");
+        }
     }
 
     #[test]
