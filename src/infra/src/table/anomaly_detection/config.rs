@@ -280,6 +280,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
         src.last_processed_timestamp,
         &src.histogram_interval,
     );
+    let shape_changed = model_shape_differs(active, &src);
     active.org_id = Set(src.org_id);
     active.stream_name = Set(src.stream_name);
     active.stream_type = Set(src.stream_type);
@@ -331,6 +332,24 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
     // pending mark would recover an alert this region's destinations never received.
     // detection_lease_us is NOT patched: it is this region's in-flight detection run.
+    // The old backoff judged a query this row no longer runs, so it must not delay the new one.
+    if shape_changed {
+        active.retries = Set(0);
+        active.last_failed_at = Set(None);
+    }
+}
+
+/// Whether a peer's row changes what the trained model describes.
+fn model_shape_differs(active: &anomaly_detection_config::ActiveModel, src: &Model) -> bool {
+    let rows = |v: Option<&Json>| v.and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    stored_field(&active.query_mode).is_some_and(|mode| mode != src.query_mode)
+        || stored_field(&active.filters)
+            .is_some_and(|filters| rows(filters.as_ref()) != rows(src.filters.as_ref()))
+        || stored_field(&active.custom_sql).is_some_and(|sql| sql != src.custom_sql)
+        || stored_field(&active.detection_function)
+            .is_some_and(|function| function != src.detection_function)
+        || stored_field(&active.histogram_interval)
+            .is_some_and(|interval| interval != src.histogram_interval)
 }
 
 /// D10: a replicated apply never rewinds the cursor; only an interval edit's reset (§4.2) may.
@@ -1062,6 +1081,58 @@ mod tests {
 
         assert_eq!(active.last_processed_timestamp.unwrap(), None);
         assert_eq!(active.histogram_interval.unwrap(), "5m");
+    }
+
+    fn local_row_in_backoff() -> Model {
+        let mut local = make_model("anom-1", "org");
+        local.retries = 4;
+        local.last_failed_at = Some(1_700_000_000_000_000);
+        local
+    }
+
+    #[test]
+    fn test_patch_all_fields_clears_the_local_backoff_when_the_peer_changes_the_query() {
+        let edits: [(&str, fn(&mut Model)); 5] = [
+            ("query_mode", |m| m.query_mode = "custom_sql".to_string()),
+            ("filters", |m| {
+                m.filters = Some(serde_json::json!([{ "field": "a" }]))
+            }),
+            ("custom_sql", |m| {
+                m.custom_sql = Some("SELECT 2".to_string())
+            }),
+            ("detection_function", |m| {
+                m.detection_function = "avg(v)".to_string()
+            }),
+            ("histogram_interval", |m| {
+                m.histogram_interval = "5m".to_string()
+            }),
+        ];
+        for (field, edit) in edits {
+            let mut active = local_row_in_backoff().into_active_model();
+            let mut peer = local_row_in_backoff();
+            edit(&mut peer);
+            patch_all_fields(&mut active, peer);
+            assert_eq!(active.retries.clone().unwrap(), 0, "{field}");
+            assert_eq!(active.last_failed_at.clone().unwrap(), None, "{field}");
+        }
+    }
+
+    #[test]
+    fn test_patch_all_fields_keeps_the_local_backoff_on_any_other_replicated_update() {
+        let mut active = local_row_in_backoff().into_active_model();
+        let mut peer = local_row_in_backoff();
+        peer.name = "renamed".to_string();
+        peer.band_width = Some(4.0);
+        peer.training_window_days = 30;
+        peer.status = 2;
+        peer.is_trained = true;
+        peer.filters = Some(serde_json::json!({}));
+        patch_all_fields(&mut active, peer);
+        assert_eq!(active.retries.clone().unwrap(), 4);
+        assert_eq!(
+            active.last_failed_at.clone().unwrap(),
+            Some(1_700_000_000_000_000)
+        );
     }
 
     /// `put()` inserts unknown rows, so a fresh region starts its own backoff from zero.

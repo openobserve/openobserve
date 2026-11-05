@@ -1252,6 +1252,33 @@ describe("AnomalyDetectionConfig", () => {
       expect(getForm(wrapper).state.isValid).toBe(false);
     });
 
+    it("refuses a window over the server's 100,000 bucket limit and names the longest one", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 365,
+        detection_window_unit: "d",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1d 3h 46m 40s");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts a window at exactly the bucket limit", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 100000,
+        detection_window_unit: "s",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
+
     it("accepts exactly the floor and refuses one bucket under it", async () => {
       const shape = {
         schedule_interval_value: 5,
@@ -1301,6 +1328,17 @@ describe("AnomalyDetectionConfig", () => {
       await flushPromises();
       return w;
     };
+
+    it("tells the editor which changes retrain, only on the edit screen", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').text()).toContain(
+        "retrains this detector",
+      );
+      wrapper.unmount();
+      wrapper = mountConfig(matchingConfig);
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').exists()).toBe(false);
+    });
 
     it("an untouched below-floor triple passes: a description-only edit saves", async () => {
       wrapper = await mountStored(storedBelowFloor());

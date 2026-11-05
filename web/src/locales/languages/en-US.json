@@ -12687,6 +12687,8 @@
       "lastTrained": "Last trained",
       "level": "Level",
       "lookBackWindow": "Look Back Window",
+      "lookBackWindowCap": "Look Back Window can be at most {max} at this Detection Resolution: a longer window holds more than 100,000 buckets. Shorten the window or use a longer Detection Resolution.",
+      "retrainOnEditNote": "Changing the query, the function or the Detection Resolution retrains this detector. Detection pauses until training ends.",
       "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket when the first run fires, so that run would skip buckets.",
       "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but a first run can skip buckets until the window is raised.",
       "lookBackWindowMinimum": "At least {min}; {recommended} or more recommended for these settings.",
