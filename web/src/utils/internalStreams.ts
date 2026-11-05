@@ -32,12 +32,16 @@ export const INTERNAL_STREAM_NAMES = [
 
 export const INTERNAL_STREAM_PREFIXES = ["_o2_"] as const;
 
+/** `_o2_` streams customers' own collectors write; USER_SOURCED_STREAM_NAMES in usage.rs must hold the same names. */
+export const USER_SOURCED_STREAM_NAMES = ["_o2_dbm_server"] as const;
+
 /** RUM streams (_rumdata, _rumlog, _sessionreplay) are logs, so they count as user data. */
 export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces", "profiles"] as const;
 
 export type UserDataStreamType = (typeof USER_DATA_STREAM_TYPES)[number];
 
 const INTERNAL_NAMES: ReadonlySet<string> = new Set(INTERNAL_STREAM_NAMES);
+const USER_SOURCED_NAMES: ReadonlySet<string> = new Set(USER_SOURCED_STREAM_NAMES);
 
 export function isInternalStreamName(name: string): boolean {
   return INTERNAL_NAMES.has(name) || INTERNAL_STREAM_PREFIXES.some((p) => name.startsWith(p));
@@ -47,9 +51,12 @@ export function isUserDataStreamType(streamType: string): streamType is UserData
   return (USER_DATA_STREAM_TYPES as readonly string[]).includes(streamType);
 }
 
-/** True only for a logs, metrics, traces or profiles stream that O2 does not write itself. */
+/** True only for a logs, metrics, traces or profiles stream the user sends; mirrors is_user_data_stream in usage.rs. */
 export function isUserDataStream(name: string, streamType: string): boolean {
-  return isUserDataStreamType(streamType) && !isInternalStreamName(name);
+  return (
+    isUserDataStreamType(streamType) &&
+    (USER_SOURCED_NAMES.has(name) || !isInternalStreamName(name))
+  );
 }
 
 /** The rows of a stream list that hold user data. */
@@ -57,4 +64,17 @@ export function userDataStreams<T extends { name?: string; stream_type?: string 
   list: readonly T[] | undefined | null,
 ): T[] {
   return (list ?? []).filter((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? ""));
+}
+
+interface OrgSummaryStreams {
+  num_streams?: number | null;
+  num_user_streams?: number | null;
+}
+
+/** Whether an org summary reports a user data stream; a summary without num_user_streams counts every stream. */
+export function summaryHasUserData(
+  summary: { streams?: OrgSummaryStreams | null } | null | undefined,
+): boolean {
+  const streams = summary?.streams;
+  return !!(streams?.num_user_streams ?? streams?.num_streams);
 }

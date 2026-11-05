@@ -23,6 +23,7 @@ use crate::{
             auto_investigate::AUTO_INVESTIGATE_DECISIONS_STREAM,
         },
         dashboards::usage_report::DashboardInfo,
+        db_monitoring::DBM_SERVER_STREAM,
         search::{SearchEventContext, SearchEventType},
         slo::stream::SLO_SLICES_STREAM,
         stream::{FileMeta, StreamType},
@@ -53,6 +54,9 @@ pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
     "_anomalies",
 ];
 
+/// `_o2_` streams customers' own collectors write; internalStreams.ts lists the same names.
+pub const USER_SOURCED_STREAM_NAMES: [&str; 1] = [DBM_SERVER_STREAM];
+
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
 /// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
 pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
@@ -70,6 +74,18 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
                 | super::llm_experiments::LLM_EXPERIMENT_STREAM
                 | "_anomalies"
         )
+}
+
+/// Whether a stream holds data the user sent, not data O2 writes; web isUserDataStream mirrors it.
+pub fn is_user_data_stream(stream_name: &str, stream_type: StreamType) -> bool {
+    if !matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
+    ) {
+        return false;
+    }
+    USER_SOURCED_STREAM_NAMES.contains(&stream_name)
+        || !(stream_name.starts_with("_o2_") || INTERNAL_STREAM_NAMES.contains(&stream_name))
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".
@@ -1641,18 +1657,18 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
     }
 
-    /// Quoted names inside the `INTERNAL_STREAM_NAMES` array literal of a TypeScript source.
-    fn ts_internal_stream_names(source: &str) -> Vec<String> {
+    /// Quoted names inside the `const_name` array literal of a TypeScript source.
+    fn ts_stream_names(source: &str, const_name: &str) -> Vec<String> {
         let start = source
-            .find("INTERNAL_STREAM_NAMES")
-            .expect("INTERNAL_STREAM_NAMES missing from internalStreams.ts");
+            .find(&format!("const {const_name}"))
+            .unwrap_or_else(|| panic!("{const_name} missing from internalStreams.ts"));
         let rest = &source[start..];
         let assign = rest
             .find('=')
-            .expect("INTERNAL_STREAM_NAMES is not assigned");
+            .unwrap_or_else(|| panic!("{const_name} is not assigned"));
         let open = rest[assign..]
             .find('[')
-            .expect("INTERNAL_STREAM_NAMES has no array literal")
+            .unwrap_or_else(|| panic!("{const_name} has no array literal"))
             + assign;
         let close = rest[open..].find(']').expect("unterminated array literal") + open;
         rest[open + 1..close]
@@ -1668,13 +1684,15 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn test_internal_stream_names_match_web_list() {
+    fn web_internal_streams_source() -> String {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../web/src/utils/internalStreams.ts");
-        let source = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let mut web = ts_internal_stream_names(&source);
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
+    }
+
+    #[test]
+    fn test_internal_stream_names_match_web_list() {
+        let mut web = ts_stream_names(&web_internal_streams_source(), "INTERNAL_STREAM_NAMES");
         web.sort();
         let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
         rust.sort();
@@ -1682,9 +1700,61 @@ mod tests {
     }
 
     #[test]
+    fn test_user_sourced_stream_names_match_web_list() {
+        let mut web = ts_stream_names(&web_internal_streams_source(), "USER_SOURCED_STREAM_NAMES");
+        web.sort();
+        let mut rust = USER_SOURCED_STREAM_NAMES.map(str::to_string).to_vec();
+        rust.sort();
+        assert_eq!(web, rust);
+    }
+
+    #[test]
     fn test_ts_internal_stream_names_parses_quotes_and_comments() {
         let source = "export const INTERNAL_STREAM_NAMES: readonly string[] = [\n  \"usage\", // billing\n  'audit',\n] as const;\nconst OTHER = [\"x\"];";
-        assert_eq!(ts_internal_stream_names(source), vec!["usage", "audit"]);
+        assert_eq!(
+            ts_stream_names(source, "INTERNAL_STREAM_NAMES"),
+            vec!["usage", "audit"]
+        );
+    }
+
+    #[test]
+    fn test_is_user_data_stream_ignores_streams_o2_writes_itself() {
+        for name in ["_o2_alert_calibration_digests", "_o2_ai_chat_events"] {
+            assert!(!is_user_data_stream(name, StreamType::Logs), "{name}");
+        }
+        for name in INTERNAL_STREAM_NAMES {
+            assert!(!is_user_data_stream(name, StreamType::Logs), "{name}");
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_counts_streams_users_send() {
+        for (name, stream_type) in [
+            ("default", StreamType::Logs),
+            ("cpu_usage", StreamType::Metrics),
+            ("default", StreamType::Traces),
+            ("default", StreamType::Profiles),
+            ("_rumdata", StreamType::Logs),
+            (DBM_SERVER_STREAM, StreamType::Logs),
+        ] {
+            assert!(is_user_data_stream(name, stream_type), "{name}");
+        }
+    }
+
+    #[test]
+    fn test_is_user_data_stream_ignores_non_ingest_stream_types() {
+        for stream_type in [
+            StreamType::EnrichmentTables,
+            StreamType::Metadata,
+            StreamType::Index,
+            StreamType::Filelist,
+            StreamType::ServiceGraph,
+        ] {
+            assert!(
+                !is_user_data_stream("default", stream_type),
+                "{stream_type:?}"
+            );
+        }
     }
 
     #[test]

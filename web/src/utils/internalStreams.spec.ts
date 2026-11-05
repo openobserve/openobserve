@@ -20,6 +20,7 @@ import {
   INTERNAL_STREAM_NAMES,
   isInternalStreamName,
   isUserDataStream,
+  summaryHasUserData,
   userDataStreams,
 } from "./internalStreams";
 
@@ -91,6 +92,13 @@ describe("internalStreams", () => {
     expect(isUserDataStream("default", "enrichment_tables")).toBe(false);
   });
 
+  it("counts _o2_ streams the customer's own collectors write", () => {
+    expect(isUserDataStream("_o2_dbm_server", "logs")).toBe(true);
+    expect(isUserDataStream("_o2_dbm_server", "metadata")).toBe(false);
+    expect(isUserDataStream("_o2_alert_calibration_digests", "logs")).toBe(false);
+    expect(isUserDataStream("_o2_ai_chat_events", "logs")).toBe(false);
+  });
+
   it("never counts an internal name, whatever its type", () => {
     for (const name of INTERNAL_STREAM_NAMES) {
       expect(isUserDataStream(name, "logs")).toBe(false);
@@ -107,5 +115,19 @@ describe("internalStreams", () => {
     ];
     expect(userDataStreams(rows).map((r) => r.name)).toEqual(["default", "cpu"]);
     expect(userDataStreams(undefined)).toEqual([]);
+  });
+
+  it("reads an org summary with only O2-written streams as no user data", () => {
+    expect(summaryHasUserData({ streams: { num_streams: 1, num_user_streams: 0 } })).toBe(false);
+    expect(summaryHasUserData({ streams: { num_streams: 0, num_user_streams: 0 } })).toBe(false);
+    expect(summaryHasUserData({ streams: { num_streams: 3, num_user_streams: 1 } })).toBe(true);
+  });
+
+  it("falls back to num_streams for a summary without num_user_streams", () => {
+    expect(summaryHasUserData({ streams: { num_streams: 2 } })).toBe(true);
+    expect(summaryHasUserData({ streams: { num_streams: 0 } })).toBe(false);
+    expect(summaryHasUserData({ streams: {} })).toBe(false);
+    expect(summaryHasUserData(undefined)).toBe(false);
+    expect(summaryHasUserData(null)).toBe(false);
   });
 });
