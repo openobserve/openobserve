@@ -92,6 +92,11 @@ describe("SampleDataHomeBanner", () => {
 
   afterEach(() => wrapper.unmount());
 
+  // Enter, Enter must not delete everything
+  it("puts the focus on Cancel in the delete confirmation", () => {
+    expect(wrapper.findComponent(ConfirmStub).props("focusCancel")).toBe(true);
+  });
+
   it("disables Remove while a removal started anywhere runs", async () => {
     const removal = deferred<string[]>();
     vi.mocked(removeSampleData).mockReturnValue(removal.promise);

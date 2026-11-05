@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :message="t('sampleData.removeConfirm.message')"
     :ok-label="t('sampleData.remove')"
     ok-variant="destructive"
+    focus-cancel
     data-test="sample-data-cleanup-dialog"
     @update:ok="removeAll"
     @update:cancel="confirmRemove = false"
