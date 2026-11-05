@@ -2186,6 +2186,21 @@ describe("useMetricsExplorerGrid", () => {
       expect(await grid.loadLabelValues("pod")).toEqual(["api-1", "api-2"]);
     });
 
+    it("does not cache 'no values' when the schema load failed", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockRejectedValueOnce(new Error("500"));
+      (metricsService.labelValues as any).mockResolvedValue({ data: { data: ["api-1"] } });
+      expect(await grid.loadLabelValues("pod")).toEqual([]);
+
+      // The endpoint recovers; the next ask must load the labels and really ask.
+      (StreamService.nameList as any).mockResolvedValue({
+        data: {
+          list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })),
+        },
+      });
+      expect(await grid.loadLabelValues("pod")).toEqual(["api-1"]);
+    });
+
     it("widens the window when the fan-out answers success-but-empty", async () => {
       // Same index lag as the label names: a short recent window answers empty
       // with success, and the empty union used to get CACHED — suppressing the
@@ -2252,9 +2267,9 @@ describe("useMetricsExplorerGrid", () => {
     });
 
     it("keeps label values out of the chart-result cache", async () => {
-      // The preview LRU is sized for chart data. A 5-way label fan-out pushing five
-      // entries into it evicts five cards' worth of results — and label values have
-      // their own cache anyway.
+      // The preview LRU is sized for chart data. A label fan-out pushing one entry
+      // per stream into it evicts that many cards' worth of results — and label
+      // values have their own cache anyway.
       const grid = await setup();
       (StreamService.nameList as any).mockResolvedValueOnce({
         data: {
@@ -2275,6 +2290,182 @@ describe("useMetricsExplorerGrid", () => {
       expect(inFlight.length).toBeGreaterThan(0); // it really queried
       inFlight.forEach((q) => q.complete(SERIES));
       await preview;
+    });
+
+    describe("are sampled from the selected prefixes", () => {
+      // container_* (Docker host only) sorts before system_* (every host); process_* lacks host_name.
+      const gauge = (name: string, labels: string[]) => ({
+        name,
+        stream_type: "metrics",
+        metrics_meta: { metric_type: "Gauge", metric_family_name: name, help: "", unit: "" },
+        stats: { doc_num: 100 },
+        schema: labels.map((label) => ({ name: label, type: "Utf8" })),
+      });
+      const CONTAINER = Array.from({ length: 12 }, (_, i) =>
+        gauge(`container_metric_${String(i).padStart(2, "0")}`, ["host_name"]),
+      );
+      const HOST_ORG = [
+        ...CONTAINER,
+        gauge("system_cpu_time", ["host_name"]),
+        gauge("system_memory_usage", ["host_name"]),
+        gauge("process_threads", ["pid"]),
+        gauge("process_open_fds", ["pid"]),
+      ];
+      const ALL_HOSTS = ["docker-host", "host-a", "host-b"];
+      const hostsOf = (stream: string) =>
+        stream.startsWith("container_") ? ["docker-host"] : ALL_HOSTS;
+
+      const labelValues = metricsService.labelValues as any;
+      const askedStreams = () => labelValues.mock.calls.map(([args]: any) => args.match);
+
+      const setupHostOrg = async () => {
+        getStreamsMock.mockResolvedValue({ list: HOST_ORG });
+        (StreamService.nameList as any).mockResolvedValue({ data: { list: HOST_ORG } });
+        const grid = await setup();
+        await grid.ensureSchemas();
+        labelValues
+          .mockReset()
+          .mockImplementation(({ match }: any) =>
+            Promise.resolve({ data: { data: hostsOf(match) } }),
+          );
+        return grid;
+      };
+
+      it("finds every system_* host once container_* streams exist", async () => {
+        const grid = await setupHostOrg();
+
+        // No prefix: org-wide, and the ten-stream sample is all container_*.
+        expect(await grid.loadLabelValues("host_name")).toEqual(["docker-host"]);
+        expect(askedStreams().sort()).toEqual(CONTAINER.slice(0, 10).map((s) => s.name));
+
+        labelValues.mockClear();
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("system_cpu_time")]);
+
+        expect(await grid.loadLabelValues("host_name")).toEqual(ALL_HOSTS);
+        expect(askedStreams().sort()).toEqual(["system_cpu_time", "system_memory_usage"]);
+      });
+
+      it("samples every selected prefix when one alone could fill the sample", async () => {
+        const grid = await setupHostOrg();
+        grid.selectedPrefixes.value = new Set([
+          grid.prefixOf("container_metric_00"),
+          grid.prefixOf("system_cpu_time"),
+        ]);
+
+        expect(await grid.loadLabelValues("host_name")).toEqual(ALL_HOSTS);
+        expect(askedStreams()).toHaveLength(10);
+        expect(askedStreams()).toEqual(
+          expect.arrayContaining(["system_cpu_time", "system_memory_usage"]),
+        );
+      });
+
+      it("re-samples when the prefix selection changes, instead of serving the cached answer", async () => {
+        const grid = await setupHostOrg();
+        const container = new Set([grid.prefixOf("container_metric_00")]);
+        const system = new Set([grid.prefixOf("system_cpu_time")]);
+
+        grid.selectedPrefixes.value = container;
+        expect(await grid.loadLabelValues("host_name")).toEqual(["docker-host"]);
+
+        grid.selectedPrefixes.value = system;
+        expect(await grid.loadLabelValues("host_name")).toEqual(ALL_HOSTS);
+
+        grid.selectedPrefixes.value = container;
+        expect(await grid.loadLabelValues("host_name")).toEqual(["docker-host"]);
+      });
+
+      it("does not cache an answer that lands after the prefixes changed", async () => {
+        const grid = await setupHostOrg();
+        let openGate!: () => void;
+        const gate = new Promise<void>((resolve) => (openGate = resolve));
+        labelValues.mockImplementation(async ({ match }: any) => {
+          if (match.startsWith("container_")) await gate;
+          return { data: { data: hostsOf(match) } };
+        });
+
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("container_metric_00")]);
+        const stale = grid.loadLabelValues("host_name");
+        await flush();
+
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("system_cpu_time")]);
+        openGate();
+        await stale;
+
+        labelValues.mockClear();
+        expect(await grid.loadLabelValues("host_name")).toEqual(ALL_HOSTS);
+        expect(askedStreams().sort()).toEqual(["system_cpu_time", "system_memory_usage"]);
+      });
+
+      it.each([
+        [
+          "window",
+          (grid: any) => grid.setTimeRange({ start_time: NOW_US - 2 * HOUR_US, end_time: NOW_US }),
+        ],
+        ["org", (grid: any) => grid.onOrgChange()],
+      ])("does not cache an answer that lands after the %s changed", async (_, change) => {
+        const grid = await setupHostOrg();
+        // The first round hangs until the change cancels it; a widened retry would answer.
+        let hold = true;
+        labelValues.mockImplementation(({ match }: any) =>
+          hold ? new Promise(() => {}) : Promise.resolve({ data: { data: hostsOf(match) } }),
+        );
+        const stale = grid.loadLabelValues("host_name");
+        await flush();
+
+        change(grid);
+        hold = false;
+        await stale;
+
+        labelValues.mockClear();
+        await grid.loadLabelValues("host_name");
+        expect(labelValues).toHaveBeenCalled();
+      });
+
+      it("cancels the old prefixes' requests, so the new ones need not wait behind them", async () => {
+        const grid = await setupHostOrg();
+        const signals: AbortSignal[] = [];
+        labelValues.mockImplementation(({ match, signal }: any) => {
+          if (!match.startsWith("container_")) {
+            return Promise.resolve({ data: { data: hostsOf(match) } });
+          }
+          signals.push(signal);
+          return new Promise(() => {});
+        });
+
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("container_metric_00")]);
+        const stale = grid.loadLabelValues("host_name");
+        await flush();
+
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("system_cpu_time")]);
+        const fresh = grid.loadLabelValues("host_name");
+        await flush();
+
+        expect(signals.length).toBeGreaterThan(0);
+        expect(signals.every((signal) => signal.aborted)).toBe(true);
+        expect(askedStreams()).toEqual(
+          expect.arrayContaining(["system_cpu_time", "system_memory_usage"]),
+        );
+        expect(await fresh).toEqual(ALL_HOSTS);
+        await stale;
+      });
+
+      it("returns no suggestions when no stream in the selected prefixes has the label", async () => {
+        const grid = await setupHostOrg();
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("process_threads")]);
+
+        expect(await grid.loadLabelValues("host_name")).toEqual([]);
+        // No org-wide fallback: nothing outside the prefix is asked.
+        expect(labelValues).not.toHaveBeenCalled();
+      });
+
+      it("samples org-wide in Workspace, which ignores the hidden prefix selection", async () => {
+        const grid = await setupHostOrg();
+        grid.selectedPrefixes.value = new Set([grid.prefixOf("process_threads")]);
+        grid.showFavoritesOnly.value = true;
+
+        expect(await grid.loadLabelValues("host_name")).toEqual(["docker-host"]);
+        expect(askedStreams().sort()).toEqual(CONTAINER.slice(0, 10).map((s) => s.name));
+      });
     });
   });
   describe("the declared unit must survive into the preview", () => {

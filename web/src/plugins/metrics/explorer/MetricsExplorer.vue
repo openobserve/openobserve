@@ -235,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label-names-loading="grid.labelNamesLoading.value"
         :schema-loading="grid.schemaLoading.value"
         :load-values="grid.loadLabelValues"
+        :value-scope="grid.labelValueScope.value"
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"

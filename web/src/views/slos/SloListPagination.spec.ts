@@ -66,6 +66,12 @@ const manyRows = (count: number) =>
     sloRow({ id: `slo-${i}`, name: `slo-${String(i).padStart(3, "0")}` }),
   );
 
+// Two one-row pages: page 2 exists while every render is one real OTable row; 25-row pages took seconds and timed out on loaded runners.
+const twoPages = () => {
+  Object.assign(useListViewState("slos", { pageSize: 25 }), { pageSize: 1 });
+  return manyRows(2);
+};
+
 async function mountList() {
   const wrapper = mount(SloList, {
     attachTo: node,
@@ -94,12 +100,13 @@ describe("SloList pagination persistence", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    resetListViewState();
     (router as any).currentRoute.value.query = {};
     vi.restoreAllMocks();
   });
 
   it("seeds currentPage from the URL's page query param", async () => {
-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: twoPages() } } as any);
     (router as any).currentRoute.value.query = { page: "2" };
     wrapper = await mountList();
 
@@ -114,16 +121,15 @@ describe("SloList pagination persistence", () => {
   });
 
   it("restores the TanStack table's own page index once loading finishes", async () => {
-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: twoPages() } } as any);
     (router as any).currentRoute.value.query = { page: "2" };
     wrapper = await mountList();
 
-    // 25 rows/page (SloList's fixed page size) × 30 rows → page 2 exists.
     expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(1);
   });
 
   it("resets to page 1 and drops page from the URL on a folder switch", async () => {
-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: twoPages() } } as any);
     (router as any).currentRoute.value.query = { page: "2", folder: "default" };
     wrapper = await mountList();
     expect((wrapper.vm as any).currentPage).toBe(2);

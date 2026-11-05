@@ -300,7 +300,7 @@ const PREVIEW_POINTS = 50;
 const HEATMAP_POINTS = 40;
 
 /** The label-values picker fans out over at most this many matching streams. */
-const LABEL_VALUE_FANOUT = 5;
+const LABEL_VALUE_FANOUT = 10;
 const LABEL_VALUE_CAP = 100;
 
 const storageKey = (kind: string, org: string) => `o2.metricsExplorer.${kind}.${org}`;
@@ -2312,9 +2312,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   };
 
   /**
-   * Suggested values per label, for the CURRENT org and window.
+   * Suggested values per label, for the CURRENT org, window and prefix scope.
    *
-   * Keyed by the label ALONE, and emptied whenever the org or the window changes.
+   * Keyed by the label ALONE, and emptied whenever the org, the window or the
+   * selected prefixes change.
    *
    * It used to key the org and the time range into the string and never drop
    * anything but on an org switch. That grew without bound — one permanent entry
@@ -2328,26 +2329,66 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   const labelValueCache = new Map<string, string[]>();
 
+  /** Prefix groups the value suggestions sample from, as a key; "" is org-wide (none selected, or Workspace). */
+  const labelValueScope = computed(() =>
+    showFavoritesOnly.value ? "" : [...selectedPrefixes.value].sort().join("\u0000"),
+  );
+
+  const inLabelValueScope = (name: string) =>
+    !labelValueScope.value || selectedPrefixes.value.has(prefixOf(name));
+
+  /** Bumped whenever the cache is emptied (scope, window or org), so an answer asked before never refills it. */
+  let labelValueGeneration = 0;
+
+  /** Queue keys of the label-value requests in flight; a scope change cancels them and starts a new set. */
+  let labelValueKeys = new Set<string>();
+
+  // Sync, so a load issued in the same tick as the prefix change never reads the old scope's answers.
+  watch(
+    labelValueScope,
+    () => {
+      labelValueGeneration++;
+      labelValueCache.clear();
+      // No owner: everything queued here was asked for the old scope, and would hold DIALOG slots.
+      for (const key of labelValueKeys) queue.cancel(key);
+      labelValueKeys = new Set();
+    },
+    { flush: "sync" },
+  );
+
   /**
    * Best-effort value suggestions.
    *
    * `label/{label}/values` returns nothing without a `match[]`, and accepts only
    * one selector per request — so this is a bounded fan-out over a deterministic
-   * (alphabetical) sample of matching streams, unioned and capped. Failure is
-   * fail-open: the chip stays usable as free text. Safety comes from the grid
-   * narrowing above, not from these suggestions.
+   * sample of matching streams in the selected prefixes (alphabetical, each prefix in turn), unioned
+   * and capped. Failure is fail-open: the chip stays usable as free text. Safety
+   * comes from the grid narrowing above, not from these suggestions.
    */
   const loadLabelValues = async (label: string): Promise<string[]> => {
     const cached = labelValueCache.get(label);
     if (cached) return cached;
 
-    await ensureSchemas();
+    // Without the stream labels an empty sample is a failure, not a cacheable "none".
+    if (!(await ensureSchemas())) return [];
 
+    const generation = labelValueGeneration;
+    const inFlight = labelValueKeys;
+    const turns = new Map<string, number>();
+    // One stream per selected prefix in turn (the sort is stable), so a large prefix cannot fill the sample alone.
     const matching = Object.entries(labelsByStream.value)
-      .filter(([, labels]) => labels.includes(label))
+      .filter(([name, labels]) => labels.includes(label) && inLabelValueScope(name))
       .map(([name]) => name)
       .sort()
-      .slice(0, LABEL_VALUE_FANOUT);
+      .map((name) => {
+        const group = labelValueScope.value ? prefixOf(name) : "";
+        const turn = turns.get(group) ?? 0;
+        turns.set(group, turn + 1);
+        return { name, turn };
+      })
+      .sort((a, b) => a.turn - b.turn)
+      .slice(0, LABEL_VALUE_FANOUT)
+      .map(({ name }) => name);
 
     // The same widening ladder as the label names, for the same reason: the
     // label index lags ingestion, so a short recent window answers empty while
@@ -2374,11 +2415,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // window would be deduplicated against, and answered by, a request for
       // another.
       const requestKey = `${org.value}|${label}|${win.start_time}|${win.end_time}`;
+      const keys = matching.map((stream) => `labelvalues:${requestKey}:${stream}`);
+      for (const key of keys) inFlight.add(key);
 
       const responses = await Promise.allSettled(
-        matching.map((stream) =>
+        matching.map((stream, i) =>
           queue.run(
-            `labelvalues:${requestKey}:${stream}`,
+            keys[i],
             PRIORITY.DIALOG,
             (signal) =>
               metricsService
@@ -2392,7 +2435,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
                 })
                 .then((r: any) => r.data?.data ?? []),
             // These are label strings, not chart data. Letting them into the preview
-            // LRU meant a 5-way fan-out per label evicted five cards' worth of query
+            // LRU meant each label's fan-out evicted `LABEL_VALUE_FANOUT` cards' worth of query
             // results from a cache sized for charts — and they have their own cache
             // (`labelValueCache`) anyway. Use the queue for its concurrency limit and
             // cancellation, not for its cache.
@@ -2400,6 +2443,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
           ),
         ),
       );
+      for (const key of keys) inFlight.delete(key);
 
       const union = new Set<string>();
       anyFulfilled = false;
@@ -2410,8 +2454,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       values = [...union].sort().slice(0, LABEL_VALUE_CAP);
 
-      if (values.length || matching.length === 0) break;
+      if (values.length || matching.length === 0 || generation !== labelValueGeneration) break;
     }
+
+    // The scope, window or org changed mid-flight: this answer belongs to a cache that was emptied.
+    if (generation !== labelValueGeneration) return values;
 
     // Only cache an ANSWER. If every request failed, `values` is empty because we
     // learned nothing — not because the label has no values — and caching that
@@ -2618,6 +2665,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // suggestions back (never, since the key misses) and grows the map forever
     // (always, since nothing else drops them).
     labelValueCache.clear();
+    labelValueGeneration++;
 
     // And so are the label NAMES, for the same reason: the endpoint is asked over
     // the window. Dropping the values but keeping the names left the picker
@@ -2670,6 +2718,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     labelsByStream.value = {};
     labelNames.value = [];
     labelValueCache.clear();
+    labelValueGeneration++;
     clearFilters();
   };
 
@@ -2723,6 +2772,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     schemaLoaded,
     loadLabelNames,
     loadLabelValues,
+    labelValueScope,
     addLabelFilter,
     removeLabelFilter,
     setLabelGroupNegated,
