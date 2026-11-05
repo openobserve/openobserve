@@ -31,7 +31,7 @@ use config::{
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
     },
-    utils::time::now_micros,
+    utils::time::{now_micros, parse_interval},
 };
 use db::authz::{remove_ownership, set_ownership};
 use infra::{
@@ -1786,6 +1786,7 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         &req.histogram_interval,
         req.detection_window_seconds,
     )?;
+    validate_detection_window_cap(&req.histogram_interval, req.detection_window_seconds)?;
     validate_training_window(
         &req.histogram_interval,
         resolved_training_window_days(req.training_window_days),
@@ -2345,7 +2346,14 @@ fn validate_detection_window(
         schedule_interval,
         histogram_interval,
         detection_window_seconds,
-    )?;
+    )
+}
+
+/// A detection run expands its whole look-back into a bucket grid, so the window has a maximum.
+fn validate_detection_window_cap(
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
     // §4.5 (D9): an unparsable interval skips only this rule.
     if let Ok(histogram_secs) = parse_interval(histogram_interval) {
         let maximum = MAX_DETECTION_WINDOW_BUCKETS.saturating_mul(histogram_secs);
@@ -2481,7 +2489,20 @@ fn validated_detection_window(
     {
         return Ok(());
     }
-    validate_detection_window(&schedule, &histogram, window)
+    validate_detection_window(&schedule, &histogram, window)?;
+    // The schedule does not size the grid, so a schedule-only edit keeps an over-limit row
+    // editable.
+    if req
+        .histogram_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .detection_window_seconds
+            .is_none_or(|v| v == existing.detection_window_seconds)
+    {
+        return Ok(());
+    }
+    validate_detection_window_cap(&histogram, window)
 }
 
 /// Same grandfathering as `validated_detection_window`: only an edit to either field is judged.
@@ -3002,30 +3023,6 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
             _ => function.to_string(),
         },
     }
-}
-
-/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
-pub(crate) fn parse_interval(interval: &str) -> Result<i64> {
-    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
-        (stripped, 1)
-    } else if let Some(stripped) = interval.strip_suffix('m') {
-        (stripped, 60)
-    } else if let Some(stripped) = interval.strip_suffix('h') {
-        (stripped, 3600)
-    } else if let Some(stripped) = interval.strip_suffix('d') {
-        (stripped, 86400)
-    } else {
-        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
-    };
-    let value: i64 = value.parse().map_err(|_| {
-        anyhow::anyhow!(
-            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
-        )
-    })?;
-    // A positive wrap lands on a plausible schedule that clears every downstream guard.
-    value
-        .checked_mul(unit_seconds)
-        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
 /// Execute a SQL query for anomaly detection and return time-series data points
@@ -8132,6 +8129,18 @@ mod tests {
             }));
             assert!(checked_update_body(&mut req, &stored).is_err());
             let mut req = update_body(serde_json::json!({ "detection_window_seconds": 3600 }));
+            assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+
+        #[test]
+        fn a_schedule_only_edit_keeps_an_over_limit_row_editable() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                detection_window_seconds: ONE_YEAR_SECS,
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({ "schedule_interval": "2m" }));
             assert!(checked_update_body(&mut req, &stored).is_ok());
         }
 

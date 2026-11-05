@@ -2183,7 +2183,7 @@ fn parse_detection_interval_to_micros(interval: &str) -> i64 {
     // Old rows stored bare minutes; every other form is the grammar the validator accepted.
     let secs = match s.parse::<i64>() {
         Ok(minutes) => minutes.checked_mul(60),
-        Err(_) => crate::anomaly_detection::parse_interval(s).ok(),
+        Err(_) => config::utils::time::parse_interval(s).ok(),
     };
     match secs
         .filter(|secs| *secs > 0)

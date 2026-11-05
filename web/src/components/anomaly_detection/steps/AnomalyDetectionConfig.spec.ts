@@ -1340,6 +1340,32 @@ describe("AnomalyDetectionConfig", () => {
       expect(wrapper.find('[data-test="anomaly-retrain-note"]').exists()).toBe(false);
     });
 
+    it("a schedule-only edit leaves an over-limit row editable", async () => {
+      wrapper = mountConfig(
+        {
+          schedule_interval_value: 1,
+          schedule_interval_unit: "m",
+          histogram_interval_value: 1,
+          histogram_interval_unit: "s",
+          detection_window_value: 365,
+          detection_window_unit: "d",
+        },
+        {
+          storedIntervals: {
+            histogram: { raw: "1s", value: 1, unit: "s", parsed: true },
+            schedule: { raw: "1m", value: 1, unit: "m", parsed: true },
+            window: { raw: 31536000, value: 365, unit: "d", parsed: true },
+          },
+        },
+      );
+      await flushPromises();
+      getForm(wrapper).setFieldValue("schedule_interval_value", 2);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
+
     it("an untouched below-floor triple passes: a description-only edit saves", async () => {
       wrapper = await mountStored(storedBelowFloor());
       await getForm(wrapper).handleSubmit();

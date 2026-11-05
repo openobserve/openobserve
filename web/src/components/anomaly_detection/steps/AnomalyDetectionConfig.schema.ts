@@ -301,7 +301,9 @@ export const createAnomalyDetectionConfigSchema = (
         });
       }
     }
-    if (!grandfathered && histogramReliable) {
+    // The schedule does not size the grid, so a schedule-only edit keeps an over-limit row editable.
+    const capGrandfathered = stored !== null && histogramUntouched && windowUntouched;
+    if (!capGrandfathered && histogramReliable) {
       const cap = lookBackWindowCapSeconds(
         value.histogram_interval_value,
         value.histogram_interval_unit,

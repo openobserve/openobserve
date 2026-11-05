@@ -270,6 +270,9 @@ pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// `Status::Training` in the enterprise scheduler, which owns this column's values.
+const STATUS_TRAINING: i32 = 2;
+
 /// Overwrites every non-PK field of `active` with the values from `src`.
 /// `created_at` is intentionally excluded — it must never be overwritten.
 fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Model) {
@@ -308,7 +311,10 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.band_k = Set(src.band_k);
     active.seasonality = Set(src.seasonality);
     active.is_trained = Set(src.is_trained);
-    active.training_started_at = Set(src.training_started_at);
+    // Both regions claimed: each attempt keeps its own token, or neither could publish its model.
+    if stored_field(&active.status) != Some(STATUS_TRAINING) || src.status != STATUS_TRAINING {
+        active.training_started_at = Set(src.training_started_at);
+    }
     active.training_completed_at = Set(src.training_completed_at);
     active.last_error = Set(src.last_error);
     active.last_processed_timestamp = Set(cursor);
@@ -858,6 +864,9 @@ mod tests {
         let mut active = local.clone().into_active_model();
         patch_all_fields(&mut active, peer.clone());
 
+        // This peer changes the query, so the backoff that judged the old query is cleared.
+        local.retries = 0;
+        local.last_failed_at = None;
         let local_active = local.into_active_model();
         let replicated_expected = into_active_model(peer.clone());
         // Raw, un-normalized: the region-local arm needs the value the peer actually sent.
@@ -1092,7 +1101,8 @@ mod tests {
 
     #[test]
     fn test_patch_all_fields_clears_the_local_backoff_when_the_peer_changes_the_query() {
-        let edits: [(&str, fn(&mut Model)); 5] = [
+        type Edit = (&'static str, fn(&mut Model));
+        let edits: [Edit; 5] = [
             ("query_mode", |m| m.query_mode = "custom_sql".to_string()),
             ("filters", |m| {
                 m.filters = Some(serde_json::json!([{ "field": "a" }]))
@@ -1133,6 +1143,24 @@ mod tests {
             active.last_failed_at.clone().unwrap(),
             Some(1_700_000_000_000_000)
         );
+    }
+
+    #[test]
+    fn test_patch_all_fields_keeps_the_local_attempt_when_both_regions_claimed() {
+        let mut local = make_model("anom-1", "org");
+        local.status = STATUS_TRAINING;
+        local.training_started_at = Some(100);
+        let mut peer = local.clone();
+        peer.training_started_at = Some(200);
+        let mut active = local.clone().into_active_model();
+        patch_all_fields(&mut active, peer.clone());
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(100));
+
+        // Any peer row that is not a parallel claim still replaces the token.
+        peer.status = 1;
+        let mut active = local.into_active_model();
+        patch_all_fields(&mut active, peer);
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(200));
     }
 
     /// `put()` inserts unknown rows, so a fresh region starts its own backoff from zero.
