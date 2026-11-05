@@ -142,7 +142,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 142: add templates to oncall_response_events.
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
-pub const DB_SCHEMA_VERSION: u64 = 144;
+// 145: add alerts.incident_title_template.
+pub const DB_SCHEMA_VERSION: u64 = 145;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
