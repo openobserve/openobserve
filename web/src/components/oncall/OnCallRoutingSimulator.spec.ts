@@ -123,6 +123,16 @@ describe("OnCallRoutingSimulator", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("tells the page when the license refuses the ladder read", async () => {
+    escalationPreview.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = render({ preview: preview() });
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+  });
+
   it("opens pre-filled from the seed and asks once the input settles, at P1 by default", async () => {
     const wrapper = render({ seed: { service: "checkout" } });
     vi.advanceTimersByTime(350);

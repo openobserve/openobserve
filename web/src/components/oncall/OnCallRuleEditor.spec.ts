@@ -101,6 +101,16 @@ describe("OnCallRuleEditor", () => {
     whoIsOnCall.mockResolvedValue({ data: [] });
   });
 
+  it("tells the page when the license refuses the who-is-on-call read", async () => {
+    whoIsOnCall.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = render({ initialDimensions: { "k8s-namespace": "risk" } });
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+  });
+
   /// A path nothing claims is judged on the draft's conditions alone, so no conflict is named.
   it("names only the drafted team when nothing claims the path", async () => {
     const wrapper = render({
