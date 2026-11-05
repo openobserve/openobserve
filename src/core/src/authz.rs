@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::collections::HashMap;
 #[cfg(any(feature = "enterprise", test))]
 use std::collections::HashSet;
 #[cfg(all(feature = "enterprise", feature = "test-utils"))]
@@ -29,8 +31,14 @@ use config::meta::stream::StreamType;
 use config::meta::user::UserRole;
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
+#[cfg(feature = "enterprise")]
+use futures::StreamExt;
 
 use crate::auth::AuthExtractor;
+
+/// Bounds the OpenFGA calls one request has outstanding, since an org can hold many folders.
+#[cfg(feature = "enterprise")]
+const FOLDER_CHECKS_IN_FLIGHT: usize = 16;
 
 #[cfg(any(feature = "enterprise", test))]
 pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the listed streams, or change the query to streams you can read.";
@@ -379,6 +387,13 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
     }
 }
 
+/// A folder as the list endpoints see it: `list` gates it, `get` admits all it holds.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FolderAccess {
+    pub list: bool,
+    pub get: bool,
+}
+
 /// Checks stream permissions, returning `Some(forbidden response)` when the
 /// user is not permitted and `None` when access is allowed.
 #[cfg(feature = "enterprise")]
@@ -578,6 +593,64 @@ pub async fn list_objects_for_user(
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
+}
+
+/// The LIST and GET checks a folder listing makes, run once for each of `folders`.
+///
+/// `route` is the list endpoint's path, whose LIST check the auth middleware makes; `folder_type`
+/// is the folders' OpenFGA type. `get` is only true when `list` is.
+#[cfg(feature = "enterprise")]
+pub async fn folder_access(
+    org_id: &str,
+    user_id: &str,
+    role: &UserRole,
+    route: &[&str],
+    folder_type: &str,
+    folders: HashSet<String>,
+) -> HashMap<String, FolderAccess> {
+    futures::stream::iter(folders)
+        .map(|folder| async move {
+            let list = route_allows(org_id, user_id, role, route, &folder).await;
+            let get = list && folder_get(org_id, user_id, role, folder_type, &folder).await;
+            (folder, FolderAccess { list, get })
+        })
+        .buffer_unordered(FOLDER_CHECKS_IN_FLIGHT)
+        .collect()
+        .await
+}
+
+/// The LIST check the auth middleware makes for a GET on `path`.
+#[cfg(feature = "enterprise")]
+pub async fn route_allows(
+    org_id: &str,
+    user_id: &str,
+    role: &UserRole,
+    path: &[&str],
+    folder: &str,
+) -> bool {
+    let Some(route) =
+        o2_openfga::meta::route_permissions::resolve_permission(path, "GET", org_id, folder, None)
+    else {
+        return false;
+    };
+    check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: String::new(),
+            method: route.method,
+            o2_type: route.o2_type,
+            org_id: route.org_id,
+            bypass_check: route.bypass_check,
+            parent_id: route.parent_id,
+            use_all_org: route.use_all_org,
+            use_self_context: route.use_self_context,
+            use_self_parent: route.use_self_parent,
+            feature: None,
+        },
+        role.clone(),
+        false,
+    )
+    .await
 }
 
 /// Off RBAC allows every read, as [`check_permissions`] answers.
@@ -836,6 +909,35 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     );
     body.hint = Some(STREAM_ACCESS_HINT.to_string());
     (StatusCode::FORBIDDEN, Json(body)).into_response()
+}
+
+/// The folder GET check the dashboard and alert list filters make.
+#[cfg(feature = "enterprise")]
+async fn folder_get(
+    org_id: &str,
+    user_id: &str,
+    role: &UserRole,
+    folder_type: &str,
+    folder: &str,
+) -> bool {
+    check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: String::new(),
+            method: "GET".to_string(),
+            o2_type: format!("{folder_type}:{folder}"),
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: String::new(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: true,
+            feature: None,
+        },
+        role.clone(),
+        false,
+    )
+    .await
 }
 
 #[cfg(feature = "enterprise")]

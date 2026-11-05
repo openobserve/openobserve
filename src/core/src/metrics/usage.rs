@@ -33,8 +33,6 @@ use config::meta::{
     stream::StreamType,
 };
 use dashmap::DashMap;
-#[cfg(feature = "enterprise")]
-use futures::StreamExt;
 use promql::{ast::visitor::walk_expr, utils::metric_name};
 use promql_parser::{parser::Expr, util::ExprVisitor};
 use serde::Serialize;
@@ -42,8 +40,10 @@ use serde_json::Value;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+use crate::authz::{folder_access, route_allows};
 use crate::{
-    alerts::alert::is_alert_permitted, dashboards::is_dashboard_permitted,
+    alerts::alert::is_alert_permitted, authz::FolderAccess, dashboards::is_dashboard_permitted,
     pipeline::is_user_pipeline_visible,
 };
 
@@ -51,9 +51,6 @@ use crate::{
 const RANGE_PLACEHOLDER: &str = "1m";
 const VALUE_PLACEHOLDER: &str = "__o2_var__";
 const SCALAR_PLACEHOLDER: &str = "1";
-/// Bounds the OpenFGA calls one request has outstanding, since an org can hold many folders.
-#[cfg(feature = "enterprise")]
-const FOLDER_CHECKS_IN_FLIGHT: usize = 16;
 
 /// One scan per org at a time, since each loads and re-parses every query in the org.
 static SCANS: LazyLock<DashMap<String, Arc<Semaphore>>> = LazyLock::new(DashMap::new);
@@ -147,13 +144,6 @@ impl UsageSources {
             .chain(self.slos.iter().map(|slo| slo.folder_id.clone()))
             .collect()
     }
-}
-
-/// A folder as the list endpoints see it: `list` gates it, `get` admits all it holds.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct FolderAccess {
-    list: bool,
-    get: bool,
 }
 
 /// What the caller may list, gathered once per request; `None` grants mean no per-object filter.
@@ -433,89 +423,6 @@ async fn load_access(
         pipelines_listable: route_allows(org_id, user_id, role, &[org_id, "pipelines"], "").await,
         pipelines: individual("GET", model("pipelines")).await?,
     })
-}
-
-#[cfg(feature = "enterprise")]
-async fn folder_access(
-    org_id: &str,
-    user_id: &str,
-    role: &config::meta::user::UserRole,
-    route: &[&str],
-    folder_type: &str,
-    folders: HashSet<String>,
-) -> HashMap<String, FolderAccess> {
-    futures::stream::iter(folders)
-        .map(|folder| async move {
-            let list = route_allows(org_id, user_id, role, route, &folder).await;
-            let get = list && folder_get(org_id, user_id, role, folder_type, &folder).await;
-            (folder, FolderAccess { list, get })
-        })
-        .buffer_unordered(FOLDER_CHECKS_IN_FLIGHT)
-        .collect()
-        .await
-}
-
-/// The LIST check the auth middleware makes for a GET on `path`.
-#[cfg(feature = "enterprise")]
-async fn route_allows(
-    org_id: &str,
-    user_id: &str,
-    role: &config::meta::user::UserRole,
-    path: &[&str],
-    folder: &str,
-) -> bool {
-    let Some(route) =
-        o2_openfga::meta::route_permissions::resolve_permission(path, "GET", org_id, folder, None)
-    else {
-        return false;
-    };
-    crate::authz::check_permissions(
-        user_id,
-        crate::auth::AuthExtractor {
-            auth: String::new(),
-            method: route.method,
-            o2_type: route.o2_type,
-            org_id: route.org_id,
-            bypass_check: route.bypass_check,
-            parent_id: route.parent_id,
-            use_all_org: route.use_all_org,
-            use_self_context: route.use_self_context,
-            use_self_parent: route.use_self_parent,
-            feature: None,
-        },
-        role.clone(),
-        false,
-    )
-    .await
-}
-
-/// The folder GET check the dashboard and alert list filters make.
-#[cfg(feature = "enterprise")]
-async fn folder_get(
-    org_id: &str,
-    user_id: &str,
-    role: &config::meta::user::UserRole,
-    folder_type: &str,
-    folder: &str,
-) -> bool {
-    crate::authz::check_permissions(
-        user_id,
-        crate::auth::AuthExtractor {
-            auth: String::new(),
-            method: "GET".to_string(),
-            o2_type: format!("{folder_type}:{folder}"),
-            org_id: org_id.to_string(),
-            bypass_check: false,
-            parent_id: String::new(),
-            use_all_org: false,
-            use_self_context: false,
-            use_self_parent: true,
-            feature: None,
-        },
-        role.clone(),
-        false,
-    )
-    .await
 }
 
 /// Keeps what `access` lets the caller list.
