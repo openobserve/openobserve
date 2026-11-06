@@ -427,10 +427,26 @@ async fn move_files(
 
     // check data retention
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema).unwrap_or_default();
-    let mut stream_data_retention_days = cfg.compact.data_retention_days;
-    if stream_settings.data_retention > 0 {
-        stream_data_retention_days = stream_settings.data_retention;
-    }
+    let stream_data_retention_days = match db::organization::stream_retention_days(
+        &org_id,
+        stream_type,
+        &stream_name,
+        stream_settings.data_retention,
+    )
+    .await
+    {
+        Ok(days) => days,
+        Err(e) => {
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] can't read retention of [{org_id}/{stream_type}/{stream_name}], retry later: {e}"
+            );
+            let mut processing = PROCESSING_FILES.write().await;
+            for file in &files {
+                processing.remove(&file.key);
+            }
+            return Ok(());
+        }
+    };
     let num_uds_fields = stream_settings.defined_schema_fields.len();
 
     let stream_fields_num = if num_uds_fields > 0 {

@@ -160,6 +160,13 @@ export const updateOrgSettingsMutation = (org: string) =>
     },
   });
 
+// Reads only: it answers what the values would resolve to, so nothing to invalidate.
+export const previewOrgDataRetentionMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (payload: any) => organizations.preview_data_retention(org, payload),
+    meta: { silentError: true },
+  });
+
 export const linkOrgDomainMutation = (org: string) =>
   mutationOptions({
     mutationFn: (domain: string) => organizations.link_org_domain(org, domain),

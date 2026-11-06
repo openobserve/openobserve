@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    extract::Path,
+    extract::{Path, Query},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -23,11 +23,9 @@ use axum::{
 use config::utils::str::is_valid_domain;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
+use serde::Deserialize;
 #[cfg(feature = "enterprise")]
-use {
-    axum::extract::{Multipart, Query},
-    o2_enterprise::enterprise::common::settings,
-};
+use {axum::extract::Multipart, o2_enterprise::enterprise::common::settings};
 #[cfg(feature = "cloud")]
 use {
     o2_enterprise::enterprise::cloud::{
@@ -50,6 +48,12 @@ struct LogoUploadForm {
     file: Vec<u8>,
 }
 
+#[derive(Deserialize)]
+pub struct SaveSettingsQuery {
+    #[serde(default)]
+    dry_run: bool,
+}
+
 /// Organization specific settings
 
 #[utoipa::path(
@@ -67,6 +71,7 @@ struct LogoUploadForm {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("dry_run" = Option<bool>, Query, description = "Write nothing and return what each stream type's default retention would resolve to with the data_retention in the body"),
     ),
     request_body(content = inline(OrganizationSettingPayload), description = "Organization settings", content_type = "application/json"),
     responses(
@@ -80,10 +85,14 @@ struct LogoUploadForm {
 )]
 pub async fn create(
     Path(org_id): Path<String>,
+    Query(query): Query<SaveSettingsQuery>,
     Json(settings): Json<OrganizationSettingPayload>,
 ) -> Response {
     if let Err(msg) = validate_settings_payload(&settings) {
         return MetaHttpResponse::bad_request(msg);
+    }
+    if query.dry_run {
+        return dry_run_response(&org_id, &settings).await;
     }
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
@@ -145,16 +154,12 @@ pub async fn create(
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
     match get_org_setting(&org_id).await {
-        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
+        Ok(data) => settings_response(data),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return (
-                        StatusCode::OK,
-                        Json(OrganizationSettingResponse { data: setting }),
-                    )
-                        .into_response();
+                    return settings_response(setting);
                 }
             };
             MetaHttpResponse::bad_request(&err)
@@ -410,6 +415,40 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
+// A request without data_retention leaves the stored values in place, so that is what it resolves.
+async fn dry_run_response(org_id: &str, settings: &OrganizationSettingPayload) -> Response {
+    #[cfg(feature = "enterprise")]
+    let requested = settings.data_retention;
+    #[cfg(not(feature = "enterprise"))]
+    let requested = {
+        let _ = settings;
+        None
+    };
+    let org = match requested {
+        Some(org) => org,
+        None => match db::organization::org_retention_defaults(org_id).await {
+            Ok(org) => org,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        },
+    };
+    let resolved_data_retention = db::organization::resolved_retention_defaults(&org);
+    Json(serde_json::json!({ "resolved_data_retention": resolved_data_retention })).into_response()
+}
+
+fn settings_response(data: OrganizationSetting) -> Response {
+    let resolved_data_retention = db::organization::resolved_retention_defaults(
+        &db::organization::org_setting_retention_defaults(&data),
+    );
+    (
+        StatusCode::OK,
+        Json(OrganizationSettingResponse {
+            data,
+            resolved_data_retention,
+        }),
+    )
+        .into_response()
+}
+
 fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<(), &'static str> {
     if settings.scrape_interval == Some(0) {
         return Err("scrape_interval should be a positive value");
@@ -418,6 +457,12 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
         && !(1_000..=1_000_000).contains(&max_series_per_query)
     {
         return Err("max_series_per_query must be between 1,000 and 1,000,000");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = &settings.data_retention
+        && data_retention.validate().is_err()
+    {
+        return Err("data_retention values must be 0 or at least 3 days");
     }
     for link in settings.cross_links.iter().flatten() {
         if link.name.is_empty() {
@@ -666,6 +711,11 @@ fn apply_settings_payload(
         field_found = true;
         data.claim_parser_function = claim_parser_function;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = settings.data_retention {
+        field_found = true;
+        data.data_retention = data_retention;
+    }
     if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
         field_found = true;
         data.usage_stream_enabled = usage_stream_enabled;
@@ -717,6 +767,115 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn dry_run(org_id: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+        let response = create(
+            Path(org_id.to_string()),
+            Query(SaveSettingsQuery { dry_run: true }),
+            Json(serde_json::from_value(body).unwrap()),
+        )
+        .await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap_or_default())
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_dry_run_answers_from_the_global_levels_without_touching_the_store() {
+        let (status, body) = dry_run("no-such-org", serde_json::json!({})).await;
+        assert_eq!(status, StatusCode::OK);
+        let resolved = &body["resolved_data_retention"];
+        for key in [
+            "default", "logs", "metrics", "traces", "profiles", "metadata",
+        ] {
+            assert!(resolved[key].is_i64(), "{key}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_dry_run_resolves_the_request_and_writes_nothing() {
+        let org_id = "dry_run_test_org";
+        let (status, _) = dry_run(
+            org_id,
+            serde_json::json!({"data_retention": {"metrics": 2}}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+
+        let body = serde_json::json!({"data_retention": {"default": 40, "metrics": 180}});
+        let (status, body) = dry_run(org_id, body).await;
+        assert_eq!(status, StatusCode::OK);
+        let resolved = &body["resolved_data_retention"];
+        assert_eq!(resolved["metrics"], 180);
+        assert_eq!(resolved["logs"], 40);
+        // every source finite, so metadata follows the longest
+        assert_eq!(resolved["metadata"], 180);
+
+        let key = format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        assert!(
+            !crate::common::infra::config::ORGANIZATION_SETTING
+                .read()
+                .await
+                .contains_key(&key)
+        );
+        if std::env::var("ZO_META_STORE").is_ok() {
+            assert!(db::get(&key).await.is_err(), "a dry run must store nothing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_dry_run_without_data_retention_resolves_what_is_stored() {
+        let org_id = "dry_run_stored_test_org";
+        let key = format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        let stored = OrganizationSetting {
+            data_retention: config::meta::stream::DataRetentionDefaults {
+                default: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        crate::common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(key, stored);
+        let (status, body) = dry_run(org_id, serde_json::json!({})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["resolved_data_retention"]["logs"], 50);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_data_retention_payload_is_validated_and_replaces_as_a_whole() {
+        let payload = |json: serde_json::Value| -> OrganizationSettingPayload {
+            serde_json::from_value(json).unwrap()
+        };
+        let metrics = |days: i64| payload(serde_json::json!({"data_retention": {"metrics": days}}));
+        assert!(validate_settings_payload(&metrics(2)).is_err());
+        assert!(validate_settings_payload(&metrics(0)).is_ok());
+        assert!(validate_settings_payload(&metrics(3)).is_ok());
+
+        let mut data = OrganizationSetting::default();
+        let both = payload(serde_json::json!({"data_retention": {"default": 40, "logs": 21}}));
+        assert!(apply_settings_payload(&mut data, both));
+        assert_eq!(data.data_retention.default, 40);
+        assert_eq!(data.data_retention.logs, 21);
+
+        // a request carrying the field replaces the object: what it leaves out is removed
+        assert!(apply_settings_payload(&mut data, metrics(180)));
+        assert_eq!(data.data_retention.metrics, 180);
+        assert_eq!(data.data_retention.default, 0);
+        assert_eq!(data.data_retention.logs, 0);
+
+        // a request without it leaves the stored values alone
+        let other = payload(serde_json::json!({"scrape_interval": 30}));
+        assert!(apply_settings_payload(&mut data, other));
+        assert_eq!(data.data_retention.metrics, 180);
+    }
 
     #[test]
     fn test_merge_red_insights_enabled_sets_and_leaves() {

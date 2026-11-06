@@ -21,7 +21,11 @@ use common::{
     infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
     meta::organization::{Organization, OrganizationSetting},
 };
-use config::utils::json;
+use config::{
+    get_config,
+    meta::stream::{DataRetentionDefaults, RETENTION_STREAM_TYPES, StreamType},
+    utils::json,
+};
 use infra::{
     coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
@@ -35,6 +39,9 @@ use crate as db;
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
+
+// Date math in the retention callers overflows past this; no stored data can be that old.
+const MAX_EFFECTIVE_RETENTION_DAYS: i64 = 10_000_000;
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
@@ -112,6 +119,67 @@ pub async fn read_org_setting<T>(
     let picked = pick(&settings);
     ORGANIZATION_SETTING.write().await.insert(key, settings);
     Ok(picked)
+}
+
+/// Days a stream keeps data, resolved on read; 0 keeps it forever.
+pub async fn stream_retention_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    if stream_type == StreamType::Index {
+        return index_stream_retention_days(org_id, stream_name).await;
+    }
+    data_stream_retention_days(org_id, stream_type, stream_days).await
+}
+
+/// The global levels alone, for a caller that only estimates and can live with a failed org read.
+pub fn global_retention_days(stream_type: StreamType) -> i64 {
+    default_retention_days(
+        stream_type,
+        &DataRetentionDefaults::default(),
+        &global_retention_defaults(),
+    )
+}
+
+/// The org's stored defaults; a failed read is an error, never the possibly shorter global value.
+#[cfg(feature = "enterprise")]
+pub async fn org_retention_defaults(org_id: &str) -> Result<DataRetentionDefaults, Error> {
+    read_org_setting(org_id, org_setting_retention_defaults).await
+}
+
+/// The org layer is not compiled in, so it has nothing to say.
+#[cfg(not(feature = "enterprise"))]
+pub async fn org_retention_defaults(_org_id: &str) -> Result<DataRetentionDefaults, Error> {
+    Ok(DataRetentionDefaults::default())
+}
+
+/// What a stream of each type with no value of its own resolves to under these org values.
+pub fn resolved_retention_defaults(org: &DataRetentionDefaults) -> DataRetentionDefaults {
+    let global = global_retention_defaults();
+    let days = |stream_type| default_retention_days(stream_type, org, &global);
+    DataRetentionDefaults {
+        default: first_positive(&[org.default, global.default]),
+        logs: days(StreamType::Logs),
+        metrics: days(StreamType::Metrics),
+        traces: days(StreamType::Traces),
+        profiles: days(StreamType::Profiles),
+        metadata: days(StreamType::Metadata),
+    }
+}
+
+/// The org's stored defaults; every level is 0 where the org layer is not compiled in.
+pub fn org_setting_retention_defaults(setting: &OrganizationSetting) -> DataRetentionDefaults {
+    #[cfg(feature = "enterprise")]
+    {
+        setting.data_retention
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = setting;
+        DataRetentionDefaults::default()
+    }
 }
 
 /// Applies `apply` to the settings in the store's `get_for_update`; true if it wrote them.
@@ -546,6 +614,87 @@ async fn apply_event(ev: db::Event) {
     }
 }
 
+async fn data_stream_retention_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    if stream_days > 0 {
+        return Ok(stream_days.min(MAX_EFFECTIVE_RETENTION_DAYS));
+    }
+    let org = org_retention_defaults(org_id).await?;
+    Ok(default_retention_days(
+        stream_type,
+        &org,
+        &global_retention_defaults(),
+    ))
+}
+
+/// An index stream has no value of its own: it expires with the stream it was derived from.
+async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result<i64, Error> {
+    let Some((source, source_type)) = index_stream_source(index_stream) else {
+        log::warn!(
+            "[RETENTION] index stream {org_id}/{index_stream} has no recognizable source, keeping it"
+        );
+        return Ok(0);
+    };
+    let source_days = infra::schema::get_settings(org_id, source, source_type)
+        .await
+        .map_or(0, |settings| settings.data_retention);
+    data_stream_retention_days(org_id, source_type, source_days).await
+}
+
+/// Index streams are named `<source stream>_<source type>`.
+fn index_stream_source(index_stream: &str) -> Option<(&str, StreamType)> {
+    RETENTION_STREAM_TYPES.into_iter().find_map(|source_type| {
+        let source = index_stream.strip_suffix(source_type.as_str())?;
+        let source = source.strip_suffix('_')?;
+        (!source.is_empty()).then_some((source, source_type))
+    })
+}
+
+fn global_retention_defaults() -> DataRetentionDefaults {
+    get_config().compact.data_retention
+}
+
+/// Scope wins first (org over global), then type over generic inside a scope.
+fn default_retention_days(
+    stream_type: StreamType,
+    org: &DataRetentionDefaults,
+    global: &DataRetentionDefaults,
+) -> i64 {
+    if stream_type == StreamType::Metadata && org.metadata <= 0 && global.metadata <= 0 {
+        return longest_source_retention_days(org, global);
+    }
+    first_positive(&[
+        org.for_type(stream_type),
+        org.default,
+        global.for_type(stream_type),
+        global.default,
+    ])
+}
+
+/// Metadata must not expire before any stream it describes, and forever (0) outlasts any.
+fn longest_source_retention_days(
+    org: &DataRetentionDefaults,
+    global: &DataRetentionDefaults,
+) -> i64 {
+    let sources = [StreamType::Logs, StreamType::Metrics, StreamType::Traces]
+        .map(|source| default_retention_days(source, org, global));
+    if sources.contains(&0) {
+        0
+    } else {
+        sources.into_iter().max().unwrap_or_default()
+    }
+}
+
+fn first_positive(levels: &[i64]) -> i64 {
+    levels
+        .iter()
+        .find(|days| **days > 0)
+        .map_or(0, |days| (*days).min(MAX_EFFECTIVE_RETENTION_DAYS))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -886,5 +1035,240 @@ mod tests {
         }
 
         assert_eq!(listed, [orgs[0].0.clone()]);
+    }
+
+    fn levels(default: i64, logs: i64, metrics: i64, traces: i64) -> DataRetentionDefaults {
+        DataRetentionDefaults {
+            default,
+            logs,
+            metrics,
+            traces,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn retention_defaults_resolve_scope_first_then_type() {
+        let none = levels(0, 0, 0, 0);
+        let global = levels(100, 10, 20, 30);
+        let org_generic = levels(40, 0, 0, 0);
+        let org_typed = levels(40, 4, 5, 6);
+        let global_generic = levels(100, 0, 0, 0);
+        let org_metrics = levels(0, 0, 7, 0);
+        let global_profiles = DataRetentionDefaults {
+            profiles: 15,
+            ..global
+        };
+        let org_profiles = DataRetentionDefaults {
+            profiles: 8,
+            ..none
+        };
+
+        // (stream type, org, global, expected)
+        let cases = [
+            (StreamType::Logs, none, none, 0),
+            (StreamType::Metrics, none, none, 0),
+            (StreamType::Traces, none, none, 0),
+            (StreamType::Profiles, none, none, 0),
+            // global default only
+            (StreamType::Logs, none, global_generic, 100),
+            (StreamType::Metrics, none, global_generic, 100),
+            (StreamType::Traces, none, global_generic, 100),
+            (StreamType::Profiles, none, global_generic, 100),
+            (StreamType::ServiceGraph, none, global_generic, 100),
+            // a global per-type value beats the global default
+            (StreamType::Logs, none, global, 10),
+            (StreamType::Metrics, none, global, 20),
+            (StreamType::Traces, none, global, 30),
+            (StreamType::Profiles, none, global, 100),
+            (StreamType::Profiles, none, global_profiles, 15),
+            // the org default beats a global per-type value
+            (StreamType::Metrics, org_generic, global, 40),
+            (StreamType::Profiles, org_generic, global_profiles, 40),
+            // the org value for the type beats the org default
+            (StreamType::Logs, org_typed, global, 4),
+            (StreamType::Metrics, org_typed, global, 5),
+            (StreamType::Traces, org_typed, global, 6),
+            (StreamType::Profiles, org_typed, global, 40),
+            (StreamType::Profiles, org_profiles, global_profiles, 8),
+            // only one type set in the org: the others fall through to the global layer
+            (StreamType::Metrics, org_metrics, global, 7),
+            (StreamType::Logs, org_metrics, global, 10),
+            // global default off, a per-type value still applies
+            (StreamType::Metrics, none, levels(0, 0, 20, 0), 20),
+            (StreamType::Logs, none, levels(0, 0, 20, 0), 0),
+            // org default with the global default off
+            (StreamType::Logs, org_generic, none, 40),
+        ];
+        for (stream_type, org, global, expected) in cases {
+            assert_eq!(
+                default_retention_days(stream_type, &org, &global),
+                expected,
+                "{stream_type} org={org:?} global={global:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn retention_defaults_clamp_huge_levels() {
+        let none = levels(0, 0, 0, 0);
+        assert_eq!(
+            default_retention_days(StreamType::Logs, &levels(i64::MAX, 0, 0, 0), &none),
+            MAX_EFFECTIVE_RETENTION_DAYS
+        );
+    }
+
+    #[test]
+    fn metadata_keeps_the_longest_source_unless_it_has_its_own_value() {
+        let none = levels(0, 0, 0, 0);
+        let metadata = |org, global| default_retention_days(StreamType::Metadata, &org, &global);
+        // the source inherits a per-type value longer than the default
+        assert_eq!(metadata(none, levels(30, 0, 180, 0)), 180);
+        // the org layer counts too
+        assert_eq!(metadata(levels(0, 0, 400, 0), levels(30, 0, 180, 0)), 400);
+        // logs and traces are kept forever, so must be what describes them
+        assert_eq!(metadata(none, levels(0, 0, 180, 0)), 0);
+        assert_eq!(metadata(none, none), 0);
+        // its own value, at either level, takes the normal order
+        let own_org = DataRetentionDefaults {
+            metadata: 9,
+            ..none
+        };
+        let own_global = DataRetentionDefaults {
+            metadata: 9,
+            ..levels(30, 0, 180, 0)
+        };
+        assert_eq!(metadata(own_org, levels(30, 0, 180, 0)), 9);
+        assert_eq!(metadata(none, own_global), 9);
+        assert_eq!(metadata(levels(20, 0, 0, 0), own_global), 20);
+    }
+
+    #[test]
+    fn index_stream_source_comes_from_its_name() {
+        assert_eq!(
+            index_stream_source("app_logs"),
+            Some(("app", StreamType::Logs))
+        );
+        assert_eq!(
+            index_stream_source("app_logs_metrics"),
+            Some(("app_logs", StreamType::Metrics))
+        );
+        assert_eq!(
+            index_stream_source("a_b_metadata"),
+            Some(("a_b", StreamType::Metadata))
+        );
+        assert_eq!(index_stream_source("app"), None);
+        assert_eq!(index_stream_source("logs"), None);
+        assert_eq!(index_stream_source("_logs"), None);
+        assert_eq!(index_stream_source("app_file_list"), None);
+    }
+
+    #[test]
+    fn resolved_defaults_answer_each_stream_type() {
+        // these org values leave no level to the global layer, whatever the environment sets
+        let org = DataRetentionDefaults {
+            profiles: 8,
+            ..levels(40, 0, 7, 0)
+        };
+        assert_eq!(
+            resolved_retention_defaults(&org),
+            DataRetentionDefaults {
+                default: 40,
+                logs: 40,
+                metrics: 7,
+                traces: 40,
+                profiles: 8,
+                metadata: 40,
+            }
+        );
+
+        let global = get_config().compact.data_retention;
+        let resolved = resolved_retention_defaults(&levels(0, 0, 0, 0));
+        assert_eq!(resolved.default, first_positive(&[global.default]));
+        assert_eq!(
+            resolved.metrics,
+            first_positive(&[global.metrics, global.default])
+        );
+    }
+
+    #[test]
+    fn metadata_treats_keep_forever_as_longer_than_any_number_of_days() {
+        let none = levels(0, 0, 0, 0);
+        let metadata = |org, global| default_retention_days(StreamType::Metadata, &org, &global);
+        // every source is finite: the longest wins
+        assert_eq!(metadata(none, levels(0, 30, 180, 7)), 180);
+        // a numeric maximum would give 180 and expire metadata before the logs it describes
+        assert_eq!(metadata(none, levels(0, 0, 180, 7)), 0);
+        assert_eq!(metadata(none, levels(0, 30, 0, 7)), 0);
+        assert_eq!(metadata(none, levels(0, 30, 180, 0)), 0);
+        // the org layer can close the gap that left a source forever
+        assert_eq!(metadata(levels(0, 400, 0, 0), levels(0, 0, 180, 7)), 400);
+    }
+
+    #[test]
+    fn the_global_levels_ignore_the_org() {
+        let global = get_config().compact.data_retention;
+        assert_eq!(
+            global_retention_days(StreamType::Traces),
+            first_positive(&[global.traces, global.default])
+        );
+    }
+
+    #[tokio::test]
+    async fn the_stream_value_wins_without_reading_org_settings() {
+        // no org settings or store exist for this org, so a lookup would fail
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Metrics, "s", 5)
+                .await
+                .unwrap(),
+            5
+        );
+    }
+
+    #[tokio::test]
+    async fn an_index_stream_with_no_known_source_is_kept() {
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Index, "app", 5)
+                .await
+                .unwrap(),
+            0
+        );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn only_the_global_levels_apply_outside_enterprise() {
+        let global = get_config().compact.data_retention;
+        assert_eq!(
+            stream_retention_days("no-such-org", StreamType::Metrics, "s", 0)
+                .await
+                .unwrap(),
+            first_positive(&[global.metrics, global.default])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn org_settings_apply_in_enterprise() {
+        let org_id = "retention_defaults_test_org";
+        let setting = OrganizationSetting {
+            data_retention: levels(40, 0, 7, 0),
+            ..Default::default()
+        };
+        ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}"), setting);
+        let days = |t, d| stream_retention_days(org_id, t, "s", d);
+        assert_eq!(days(StreamType::Metrics, 0).await.unwrap(), 7);
+        assert_eq!(days(StreamType::Logs, 0).await.unwrap(), 40);
+        assert_eq!(days(StreamType::Metrics, 90).await.unwrap(), 90);
+        // an index stream of a metrics source follows that type's value
+        assert_eq!(
+            stream_retention_days(org_id, StreamType::Index, "s_metrics", 0)
+                .await
+                .unwrap(),
+            7
+        );
     }
 }

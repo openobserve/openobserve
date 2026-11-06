@@ -880,6 +880,7 @@ use crate::{
             meta::organization::OrgRenameBody,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
+            config::meta::stream::DataRetentionDefaults,
             meta::organization::RumIngestionResponse,
             meta::organization::RumIngestionToken,
             openobserve_api_management::request::organization::assume_service_account::AssumeServiceAccountRequest,

@@ -1464,6 +1464,8 @@ export default defineComponent({
           ai_rca_thread_tool_output:
             orgSettings?.data?.data?.ai_rca_thread_tool_output ??
             defaultSettings.ai_rca_thread_tool_output,
+          data_retention: orgSettings?.data?.data?.data_retention,
+          resolved_data_retention: orgSettings?.data?.resolved_data_retention,
         });
 
         if (
