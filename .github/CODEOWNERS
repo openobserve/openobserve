@@ -1,0 +1,26 @@
+/.github/CODEOWNERS @hengfeiyang @oasisk
+
+/src/lib.rs @hengfeiyang @oasisk
+/src/main.rs @hengfeiyang @oasisk
+
+/src/compaction/ @hengfeiyang @haohuaijin
+/src/flight/ @hengfeiyang @haohuaijin
+/src/infra/ @hengfeiyang @haohuaijin
+/src/ingester/ @hengfeiyang @haohuaijin
+/src/ingestion_common/ @hengfeiyang @haohuaijin
+/src/metrics_index/ @hengfeiyang @haohuaijin
+/src/node/ @hengfeiyang @haohuaijin
+/src/promql/ @hengfeiyang @haohuaijin
+/src/promql_service/ @hengfeiyang @haohuaijin
+/src/proto/ @hengfeiyang @haohuaijin
+/src/search/ @hengfeiyang @haohuaijin
+/src/search_service/ @hengfeiyang @haohuaijin
+/src/tantivy_utils/ @hengfeiyang @haohuaijin
+/src/wal/ @hengfeiyang @haohuaijin
+
+/src/core/src/ingestion/ @hengfeiyang @haohuaijin
+/src/core/src/logs/ @hengfeiyang @haohuaijin
+/src/core/src/metrics/ @hengfeiyang @haohuaijin
+/src/core/src/profiles/ @hengfeiyang @haohuaijin
+/src/core/src/ratelimit/ @hengfeiyang @haohuaijin
+/src/core/src/self_profiles/ @hengfeiyang @haohuaijin
