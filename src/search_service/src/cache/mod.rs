@@ -1400,7 +1400,8 @@ pub async fn apply_regex_to_response(
     };
 
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::datafusion::plan::regex_projections::get_columns_from_projections(sql).await?;
+        crate::datafusion::logical_plan::regex_projections::get_columns_from_projections(sql)
+            .await?;
     if projections.is_empty() {
         return Ok(());
     }

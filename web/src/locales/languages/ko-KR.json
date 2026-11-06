@@ -14596,6 +14596,7 @@
     "separator_placeholder": "구분자 입력 (예: {'|'}, \\n, \\t, 공백)",
     "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
     "templateDefaultOption": "기본값 ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "기본값으로 두면 표준 {type} 템플릿({name})을 사용하고, 아니면 사용자 지정 템플릿을 선택하세요.",
     "loadingData": "대상 데이터를 불러오는 중...",
     "noEmailTemplates": "아직 이메일 템플릿을 생성하지 않은 것 같습니다.",

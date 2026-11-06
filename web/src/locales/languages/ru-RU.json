@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Введите разделитель (например, {'|'}, \\n, \\t, пробел)",
     "separator_hint": "Строка-разделитель между записями (допускаются пробелы)",
     "templateDefaultOption": "По умолчанию ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Оставьте по умолчанию, чтобы использовать стандартный шаблон {type} ({name}), или выберите пользовательский.",
     "loadingData": "Загрузка данных получателя...",
     "noEmailTemplates": "Похоже, вы еще не создали ни одного шаблона электронной почты.",

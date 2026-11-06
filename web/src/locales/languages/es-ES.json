@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Ingrese el separador (p. ej., {'|'}, \\n, \\t, espacio)",
     "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)",
     "templateDefaultOption": "Predeterminada ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Déjala como predeterminada para usar la plantilla estándar de {type} ({name}), o elige una personalizada.",
     "loadingData": "Cargando datos del destino...",
     "noEmailTemplates": "Parece que aún no has creado ninguna plantilla de correo electrónico.",

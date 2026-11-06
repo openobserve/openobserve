@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Trennzeichen eingeben (z. B. {'|'}, \\n, \\t, Leerzeichen)",
     "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
     "templateDefaultOption": "Standard ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Belassen Sie den Standard, um die Standardvorlage für {type} ({name}) zu verwenden, oder wählen Sie eine eigene.",
     "loadingData": "Zieldaten werden geladen...",
     "noEmailTemplates": "Es scheint, dass Sie noch keine E-Mail-Vorlagen erstellt haben.",

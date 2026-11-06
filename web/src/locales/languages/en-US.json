@@ -14594,6 +14594,7 @@
     "separator_placeholder": "Enter separator (e.g., {'|'}, \\n, \\t, space)",
     "separator_hint": "Separator string to use between records (spaces allowed)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
     "loadingData": "Loading destination data...",
     "noEmailTemplates": "It looks like you haven't created any Email Templates yet.",

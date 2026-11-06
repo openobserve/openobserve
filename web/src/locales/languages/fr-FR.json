@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Saisissez un séparateur (ex. : {'|'}, \\n, \\t, espace)",
     "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
     "templateDefaultOption": "Par défaut ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Laissez la valeur par défaut pour utiliser le modèle {type} standard ({name}), ou choisissez un modèle personnalisé.",
     "loadingData": "Chargement des données de destination...",
     "noEmailTemplates": "Il semble que vous n'ayez pas encore créé de modèles d'e-mail.",

@@ -14596,6 +14596,7 @@
     "separator_placeholder": "セパレータを入力 (例: {'|'}, \\n, \\t, スペース)",
     "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "デフォルトのままにすると標準の {type} テンプレート ({name}) が使用されます。カスタムテンプレートを選択することもできます。",
     "loadingData": "宛先データを読み込んでいます...",
     "noEmailTemplates": "まだメールテンプレートを作成していないようです。",

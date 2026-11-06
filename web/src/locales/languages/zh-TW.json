@@ -14591,6 +14591,7 @@
     "separator_placeholder": "輸入分隔符（例如 {'|'}、\\n、\\t、空格）",
     "separator_hint": "記錄之間使用的分隔字串 (允許空格)",
     "templateDefaultOption": "預設（{name}）",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "保留為預設以使用標準的 {type} 範本（{name}），或選擇自訂範本。",
     "loadingData": "正在載入目標資料...",
     "noEmailTemplates": "您似乎尚未建立任何電子郵件範本。",

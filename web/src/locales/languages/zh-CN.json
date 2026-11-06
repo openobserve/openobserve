@@ -14596,6 +14596,7 @@
     "separator_placeholder": "输入分隔符 (例如 {'|'}, \\n, \\t, 空格)",
     "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
     "loadingData": "正在加载目标数据...",
     "noEmailTemplates": "您似乎还没有创建任何电子邮件模板。",

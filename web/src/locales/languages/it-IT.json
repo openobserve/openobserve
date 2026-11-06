@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Inserisci il separatore (es., {'|'}, \\n, \\t, spazio)",
     "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
     "templateDefaultOption": "Predefinito ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Lascia il valore predefinito per usare il template {type} standard ({name}), oppure scegline uno personalizzato.",
     "loadingData": "Caricamento dei dati della destinazione...",
     "noEmailTemplates": "Sembra che tu non abbia ancora creato alcun template email.",

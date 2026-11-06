@@ -14596,6 +14596,7 @@
     "separator_placeholder": "Nhập dấu phân cách (ví dụ: {'|'}, \\n, \\t, dấu cách)",
     "separator_hint": "Chuỗi phân cách dùng giữa các bản ghi (cho phép khoảng trắng)",
     "templateDefaultOption": "Mặc định ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Để mặc định để sử dụng mẫu {type} tiêu chuẩn ({name}), hoặc chọn mẫu tùy chỉnh.",
     "loadingData": "Đang tải dữ liệu đích...",
     "noEmailTemplates": "Có vẻ như bạn chưa tạo Mẫu Email nào.",

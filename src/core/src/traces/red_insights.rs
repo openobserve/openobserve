@@ -1219,8 +1219,8 @@ mod tests {
             prelude::{SessionConfig, SessionContext},
         };
         use search::datafusion::{
-            optimizer::physical_optimizer::aggregate_topk::AggregateTopkRule,
-            table_provider::empty_table::NewEmptyTable,
+            datasource::empty_table::NewEmptyTable,
+            physical_optimizer::aggregate_topk::AggregateTopkRule,
         };
 
         let schema = Arc::new(Schema::new(vec![
