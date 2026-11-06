@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "Geen bestemmingen gevonden",
       "noDetectionResults": "Nog geen detectieresultaten in dit bereik",
       "noFieldsFound": "Geen velden gevonden",
+      "checkDataNow": "Nu controleren",
+      "checkDataNowTooltip": "De huidige gegevens nu opnieuw evalueren in plaats van te wachten op de volgende automatische controle.",
+      "dataReadinessReason": "Reden",
       "noticeRetrain": "Automatische hertraining",
       "noticeRetrainTooltip": "Het opgeslagen model kon na een upgrade niet worden gelezen, dus het is weggegooid en de configuratie is automatisch in de wachtrij voor hertraining geplaatst. Er is geen actie nodig; de detectie wordt hervat zodra de training is voltooid.",
       "noticeSkipAbsence": "De beoordeling van afwezigheid liep achter op het Terugkijkvenster; de span die niet meer kon worden opgehaald, is overgeslagen en vastgelegd.",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "Automatisch wordt een niveau geleerd uit je geschiedenis.",
       "autoTrainingHelp": "Het niveau verschijnt zodra de training is voltooid.",
       "autoFailedHelp": "Training mislukt. Nog geen geleerd niveau. Bekijk de trainingsfout hierboven.",
+      "autoWaitingForDataHelp": "Nog niet genoeg geschikte trainingsgegevens. Tot die tijd geen geleerd niveau. De detector blijft ingeschakeld en wordt automatisch opnieuw gecontroleerd.",
+      "autoNotApplicableHelp": "De huidige gegevens ondersteunen geen anomaliemodel. Dit is geen fout. De detector blijft ingeschakeld en wordt automatisch opnieuw gecontroleerd.",
       "autoRetrainingHelp": "Opnieuw trainen. Het laatst geleerde niveau wordt getoond; de beschikbaarheid van het model is niet bevestigd.",
       "autoRetrainFailedHelp": "Opnieuw trainen mislukt. Het laatst geleerde niveau wordt getoond; de beschikbaarheid van het model is niet bevestigd. Bekijk de trainingsfout hierboven.",
       "autoUnconfirmedHelp": "Het laatst geleerde niveau wordt getoond; een actief model is niet bevestigd.",
@@ -23080,7 +23085,9 @@
         "ready": "Gereed",
         "running": "Bezig",
         "training": "Training",
-        "waiting": "Wachtend"
+        "waiting": "Wachtend",
+        "waitingForData": "Wachten op gegevens",
+        "notApplicable": "Niet van toepassing"
       },
       "anomalyStatus": {
         "active": "Actief",
@@ -23088,7 +23095,9 @@
         "training": "Training",
         "failed": "Mislukt",
         "waiting": "Wachtend",
-        "disabled": "Uitgeschakeld"
+        "disabled": "Uitgeschakeld",
+        "waitingForData": "Wachten op gegevens",
+        "notApplicable": "Niet van toepassing"
       },
       "aiToolsetKind": {
         "skill": "Vaardigheid",

@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "Nessuna destinazione trovata",
       "noDetectionResults": "Ancora nessun risultato di rilevamento in questo intervallo",
       "noFieldsFound": "Nessun campo trovato",
+      "checkDataNow": "Controlla ora",
+      "checkDataNowTooltip": "Valuta di nuovo i dati attuali ora invece di attendere il prossimo controllo automatico.",
+      "dataReadinessReason": "Motivo",
       "noticeRetrain": "Riaddestramento automatico",
       "noticeRetrainTooltip": "Impossibile leggere il modello salvato dopo un aggiornamento, quindi è stato eliminato e la configurazione è stata messa in coda per il riaddestramento automatico. Non è richiesta alcuna azione; il rilevamento riprende al termine dell'addestramento.",
       "noticeSkipAbsence": "La valutazione dell'assenza è rimasta indietro rispetto alla finestra di lookback; lo span che non poteva più essere recuperato è stato saltato e registrato.",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "Auto apprenderà un livello dalla tua cronologia.",
       "autoTrainingHelp": "Il livello apparirà al termine dell'addestramento.",
       "autoFailedHelp": "Addestramento non riuscito. Nessun livello appreso finora. Controlla l'errore di addestramento sopra.",
+      "autoWaitingForDataHelp": "Dati di addestramento adatti ancora insufficienti. Fino ad allora nessun livello appreso. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
+      "autoNotApplicableHelp": "I dati attuali non supportano un modello di anomalie. Non è un errore. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
       "autoRetrainingHelp": "Riaddestramento. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata.",
       "autoRetrainFailedHelp": "Riaddestramento non riuscito. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata. Controlla l'errore di addestramento sopra.",
       "autoUnconfirmedHelp": "Viene mostrato l'ultimo livello appreso; un modello attivo non è stato confermato.",
@@ -23080,7 +23085,9 @@
         "ready": "Pronto",
         "running": "In esecuzione",
         "training": "In addestramento",
-        "waiting": "In attesa"
+        "waiting": "In attesa",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "anomalyStatus": {
         "active": "Attivo",
@@ -23088,7 +23095,9 @@
         "training": "In addestramento",
         "failed": "Fallito",
         "waiting": "In attesa",
-        "disabled": "Disabilitato"
+        "disabled": "Disabilitato",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "aiToolsetKind": {
         "skill": "Abilità",

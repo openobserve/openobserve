@@ -12949,6 +12949,9 @@
       "noDestinationsFound": "找不到目標",
       "noDetectionResults": "此範圍內尚無偵測結果",
       "noFieldsFound": "找不到欄位",
+      "checkDataNow": "立即檢查",
+      "checkDataNowTooltip": "立即重新評估目前資料，而不是等待下一次自動檢查。",
+      "dataReadinessReason": "原因",
       "noticeRetrain": "自動重新訓練",
       "noticeRetrainTooltip": "升級後無法讀取已儲存的模型，因此該模型被捨棄，設定也自動排入重新訓練佇列。無須採取任何動作；訓練完成後即會恢復偵測。",
       "noticeSkipAbsence": "缺失評分落後於回溯視窗；已無法擷取的 Span 被略過並記錄下來。",
@@ -12983,6 +12986,8 @@
       "autoUntrainedHelp": "自動模式將根據您的歷史記錄學習等級。",
       "autoTrainingHelp": "訓練完成後將顯示等級。",
       "autoFailedHelp": "訓練失敗。尚無學習到的等級。請查看上方的訓練錯誤。",
+      "autoWaitingForDataHelp": "合適的訓練資料尚不足。在此之前沒有學習到的水準。偵測器保持啟用並會自動重新檢查。",
+      "autoNotApplicableHelp": "目前資料無法支援異常模型。這不是失敗。偵測器保持啟用並會自動重新檢查。",
       "autoRetrainingHelp": "正在重新訓練。目前顯示上次學習到的等級；模型可用性尚未確認。",
       "autoRetrainFailedHelp": "重新訓練失敗。目前顯示上次學習到的等級；模型可用性尚未確認。請查看上方的訓練錯誤。",
       "autoUnconfirmedHelp": "目前顯示上次學習到的等級；尚未確認有作用中的模型。",
@@ -23075,7 +23080,9 @@
         "ready": "就緒",
         "running": "執行中",
         "training": "訓練中",
-        "waiting": "等待中"
+        "waiting": "等待中",
+        "waitingForData": "等待資料",
+        "notApplicable": "不適用"
       },
       "anomalyStatus": {
         "active": "作用中",
@@ -23083,7 +23090,9 @@
         "training": "訓練中",
         "failed": "失敗",
         "waiting": "等待中",
-        "disabled": "已停用"
+        "disabled": "已停用",
+        "waitingForData": "等待資料",
+        "notApplicable": "不適用"
       },
       "aiToolsetKind": {
         "skill": "技能",

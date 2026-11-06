@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "宛先が見つかりません",
       "noDetectionResults": "この期間の検出結果はまだありません",
       "noFieldsFound": "フィールドが見つかりません",
+      "checkDataNow": "今すぐ確認",
+      "checkDataNowTooltip": "次回の自動確認を待たずに、現在のデータを今すぐ再評価します。",
+      "dataReadinessReason": "理由",
       "noticeRetrain": "自動再トレーニング",
       "noticeRetrainTooltip": "アップグレード後に保存済みモデルを読み取れなかったため、モデルは破棄され、設定は自動的に再トレーニングのキューに追加されました。操作は不要です。トレーニングが完了すると検出が再開されます。",
       "noticeSkipAbsence": "欠落の評価がルックバックウィンドウに間に合わなくなり、取得できなくなったスパンはスキップされ、記録されました。",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "自動モードでは履歴からレベルを学習します。",
       "autoTrainingHelp": "トレーニングが完了するとレベルが表示されます。",
       "autoFailedHelp": "トレーニングに失敗しました。学習済みレベルはまだありません。上記のトレーニングエラーを確認してください。",
+      "autoWaitingForDataHelp": "適切なトレーニングデータがまだ不足しています。それまで学習済みレベルはありません。検出器は有効のままで、自動的に再確認されます。",
+      "autoNotApplicableHelp": "現在のデータでは異常モデルを作成できません。これは失敗ではありません。検出器は有効のままで、自動的に再確認されます。",
       "autoRetrainingHelp": "再トレーニング中です。最後に学習したレベルを表示していますが、モデルの可用性は未確認です。",
       "autoRetrainFailedHelp": "再トレーニングに失敗しました。最後に学習したレベルを表示していますが、モデルの可用性は未確認です。上記のトレーニングエラーを確認してください。",
       "autoUnconfirmedHelp": "最後に学習したレベルを表示していますが、アクティブなモデルは確認されていません。",
@@ -23080,7 +23085,9 @@
         "ready": "準備完了",
         "running": "実行中",
         "training": "トレーニング",
-        "waiting": "待機中"
+        "waiting": "待機中",
+        "waitingForData": "データ待ち",
+        "notApplicable": "適用不可"
       },
       "anomalyStatus": {
         "active": "アクティブ",
@@ -23088,7 +23095,9 @@
         "training": "トレーニング中",
         "failed": "失敗",
         "waiting": "待機中",
-        "disabled": "無効"
+        "disabled": "無効",
+        "waitingForData": "データ待ち",
+        "notApplicable": "適用不可"
       },
       "aiToolsetKind": {
         "skill": "スキル",

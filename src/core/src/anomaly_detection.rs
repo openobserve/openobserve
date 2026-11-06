@@ -421,7 +421,8 @@ async fn pk_to_name(pk: Option<&str>) -> String {
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
-/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled".
+/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled", plus the
+/// data-readiness labels "waiting_for_data"/"not_applicable".
 fn status_label(status: i32) -> &'static str {
     o2_enterprise::enterprise::anomaly_detection::types::Status::label(status)
 }
@@ -1072,7 +1073,37 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let updated = active_model.update(db).await?;
+    let mut updated = active_model.update(db).await?;
+
+    // After the save, so the training it queues reads the repaired config, even over a claim.
+    if retryable_change {
+        match o2_enterprise::enterprise::anomaly_detection::scheduler::requeue_data_readiness(
+            db,
+            &updated.anomaly_id,
+        )
+        .await
+        {
+            Ok(true) => {
+                updated.status =
+                    o2_enterprise::enterprise::anomaly_detection::types::Status::Waiting.to_i32();
+                updated.retries = 0;
+                updated.last_error = None;
+                // A verdict between the save and the requeue can revoke the model, and the
+                // broadcast below must not restore `is_trained` in a peer region.
+                match config_to_update(db, org_id, anomaly_id).await {
+                    Ok(row) => updated = row,
+                    Err(e) => log::warn!(
+                        "[anomaly_detection {anomaly_id}] failed to re-read the config after a requeue: {e}"
+                    ),
+                }
+            }
+            Ok(false) => {}
+            // The edit is saved, so this logs and continues like the other steps after the save.
+            Err(e) => log::warn!(
+                "[anomaly_detection {anomaly_id}] failed to requeue a data-readiness config after an edit: {e}"
+            ),
+        }
+    }
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.

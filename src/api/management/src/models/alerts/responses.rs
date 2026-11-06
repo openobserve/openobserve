@@ -78,7 +78,8 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_trained_at: Option<i64>,
     /// Scheduler status string. Only present for `anomaly_detection` items.
-    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled"
+    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled" | "waiting_for_data" |
+    /// "not_applicable"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// Last error message from training or detection. Only present for `anomaly_detection` items.

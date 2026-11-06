@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "Aucune destination trouvée",
       "noDetectionResults": "Aucun résultat de détection sur cette période pour l'instant",
       "noFieldsFound": "Aucun champ n'a été trouvé",
+      "checkDataNow": "Vérifier maintenant",
+      "checkDataNowTooltip": "Réévaluer les données actuelles maintenant au lieu d'attendre la prochaine vérification automatique.",
+      "dataReadinessReason": "Raison",
       "noticeRetrain": "Réentraînement automatique",
       "noticeRetrainTooltip": "Le modèle enregistré n'a pas pu être lu après une mise à niveau ; il a donc été écarté et la configuration a été mise en file d'attente pour un réentraînement automatique. Aucune action n'est requise ; la détection reprend une fois l'entraînement terminé.",
       "noticeSkipAbsence": "L'évaluation des absences a pris du retard sur la Fenêtre d'analyse rétrospective ; le span qui ne pouvait plus être récupéré a été ignoré et enregistré.",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "Le mode automatique apprendra un niveau à partir de votre historique.",
       "autoTrainingHelp": "Le niveau apparaîtra une fois l'entraînement terminé.",
       "autoFailedHelp": "Échec de l'entraînement. Aucun niveau appris pour l'instant. Examinez l'erreur d'entraînement ci-dessus.",
+      "autoWaitingForDataHelp": "Pas encore assez de données d'entraînement adaptées. Aucun niveau appris d'ici là. Le détecteur reste activé et est revérifié automatiquement.",
+      "autoNotApplicableHelp": "Les données actuelles ne permettent pas de créer un modèle d'anomalies. Ce n'est pas un échec. Le détecteur reste activé et est revérifié automatiquement.",
       "autoRetrainingHelp": "Réentraînement en cours. Le dernier niveau appris est affiché ; la disponibilité du modèle n'est pas confirmée.",
       "autoRetrainFailedHelp": "Échec du réentraînement. Le dernier niveau appris est affiché ; la disponibilité du modèle n'est pas confirmée. Examinez l'erreur d'entraînement ci-dessus.",
       "autoUnconfirmedHelp": "Le dernier niveau appris est affiché ; aucun modèle actif n'a été confirmé.",
@@ -23080,7 +23085,9 @@
         "ready": "Prêt",
         "running": "En cours",
         "training": "Entraînement",
-        "waiting": "En attente"
+        "waiting": "En attente",
+        "waitingForData": "En attente de données",
+        "notApplicable": "Non applicable"
       },
       "anomalyStatus": {
         "active": "Actif",
@@ -23088,7 +23095,9 @@
         "training": "Entraînement",
         "failed": "Échoué",
         "waiting": "En attente",
-        "disabled": "Désactivé"
+        "disabled": "Désactivé",
+        "waitingForData": "En attente de données",
+        "notApplicable": "Non applicable"
       },
       "aiToolsetKind": {
         "skill": "Compétence",

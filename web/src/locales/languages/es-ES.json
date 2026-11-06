@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "No se encontraron destinos",
       "noDetectionResults": "Aún no hay resultados de detección en este rango",
       "noFieldsFound": "No se encontró ningún campo",
+      "checkDataNow": "Comprobar ahora",
+      "checkDataNowTooltip": "Evaluar de nuevo los datos actuales ahora en lugar de esperar a la siguiente comprobación automática.",
+      "dataReadinessReason": "Motivo",
       "noticeRetrain": "Reentrenamiento automático",
       "noticeRetrainTooltip": "El modelo guardado no se pudo leer tras una actualización, por lo que se descartó y la configuración se puso en cola para reentrenarse automáticamente. No se requiere ninguna acción; la detección se reanuda una vez que finaliza el entrenamiento.",
       "noticeSkipAbsence": "La evaluación de ausencia quedó rezagada respecto a la ventana de retroceso; el span que ya no se pudo recuperar se omitió y se registró.",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "El modo automático aprenderá un nivel de tu historial.",
       "autoTrainingHelp": "El nivel aparecerá cuando finalice el entrenamiento.",
       "autoFailedHelp": "El entrenamiento falló. Aún no hay un nivel aprendido. Revisa el error de entrenamiento que aparece arriba.",
+      "autoWaitingForDataHelp": "Aún no hay suficientes datos de entrenamiento adecuados. Hasta entonces no hay nivel aprendido. El detector sigue activado y se comprueba de nuevo automáticamente.",
+      "autoNotApplicableHelp": "Los datos actuales no admiten un modelo de anomalías. No es un fallo. El detector sigue activado y se comprueba de nuevo automáticamente.",
       "autoRetrainingHelp": "Reentrenando. Se muestra el último nivel aprendido; la disponibilidad del modelo no está confirmada.",
       "autoRetrainFailedHelp": "El reentrenamiento falló. Se muestra el último nivel aprendido; la disponibilidad del modelo no está confirmada. Revisa el error de entrenamiento que aparece arriba.",
       "autoUnconfirmedHelp": "Se muestra el último nivel aprendido; no se ha confirmado un modelo activo.",
@@ -23080,7 +23085,9 @@
         "ready": "Listo",
         "running": "Ejecutando",
         "training": "Entrenamiento",
-        "waiting": "En espera"
+        "waiting": "En espera",
+        "waitingForData": "Esperando datos",
+        "notApplicable": "No aplicable"
       },
       "anomalyStatus": {
         "active": "Activo",
@@ -23088,7 +23095,9 @@
         "training": "Entrenamiento",
         "failed": "Fallido",
         "waiting": "Esperando",
-        "disabled": "Deshabilitado"
+        "disabled": "Deshabilitado",
+        "waitingForData": "Esperando datos",
+        "notApplicable": "No aplicable"
       },
       "aiToolsetKind": {
         "skill": "Habilidad",
