@@ -285,6 +285,7 @@ const railItems = computed<SectionEntry[]>(() => {
       group: entry.group,
       locked: !open || undefined,
       lockedMessage: open ? undefined : entry.lockedMessage,
+      lockedLabel: open ? undefined : entry.lockedMessage,
     });
   }
   return items;
