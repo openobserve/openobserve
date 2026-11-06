@@ -11977,7 +11977,7 @@
         "help": "How this limit would have behaved",
         "loading": "Checking the last 24 hours…",
         "failed": "Could not check the last 24 hours.",
-        "result": "This would have alerted in {count} of the {total} {period}-minute windows.",
+        "result": "{count} of {total} checks would have alerted (one every {period} min).",
         "dayAgo": "24 h ago",
         "never": "It would not have alerted at all. If you expected it to, lower the limit.",
         "noisy": "That is often, so people may start to ignore it. A higher limit would make it quieter."
