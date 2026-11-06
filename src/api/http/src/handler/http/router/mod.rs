@@ -1301,6 +1301,8 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/incidents", get(autoobserve::incidents::list_incidents))
         .route("/v2/{org_id}/autoobserve/marks", get(autoobserve::list_marks))
         .route("/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}", put(autoobserve::put_mark).delete(autoobserve::delete_mark))
+        .route("/v2/{org_id}/autoobserve/review", get(autoobserve::review::get_review))
+        .route("/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id}", put(autoobserve::review::put_verdict))
 }
 
 #[rustfmt::skip]

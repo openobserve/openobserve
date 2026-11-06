@@ -1411,6 +1411,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::put_mark,
     openobserve_api_management::request::autoobserve::delete_mark,
     openobserve_api_management::request::autoobserve::incidents::list_incidents,
+    openobserve_api_management::request::autoobserve::review::get_review,
+    openobserve_api_management::request::autoobserve::review::put_verdict,
 ))]
 #[openapi(tags(
     (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
@@ -2224,6 +2226,12 @@ mod tests {
             (format!("{base}/marks"), "get", "list"),
             (mark.to_string(), "put", "update"),
             (mark.to_string(), "delete", "delete"),
+            (format!("{base}/review"), "get", "list"),
+            (
+                format!("{base}/review/{{decision_kind}}/{{cohort_id}}"),
+                "put",
+                "update",
+            ),
         ] {
             let op = &paths[path.as_str()][method];
             assert_eq!(

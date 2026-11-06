@@ -156,4 +156,6 @@ ent GET /api/v2/{org_id}/autoobserve/incidents | the handler answers openobserve
 ent GET /api/v2/{org_id}/autoobserve/marks | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
 ent DELETE /api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
 ent PUT /api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/review | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent PUT /api/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id} | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/suggestions | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
