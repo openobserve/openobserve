@@ -2481,6 +2481,12 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
+        name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
+    )]
+    pub sample_data_onboarding_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."

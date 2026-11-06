@@ -46,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, service_accounts, service_streams, short_url, slack, slos,
-    sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
+    slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1500,6 +1500,9 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
+
+        // Sample data
+        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))

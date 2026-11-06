@@ -7,21 +7,6 @@ export class OnboardingFormValidationPage {
     constructor(page) {
         this.page = page;
 
-        // ── GetStarted form (rendered as dialog inside MainLayout) ────────────
-        // OFormInput with data-test="onboarding-get-started-hear-about-us"
-        // → OInput generates -field and -error sub-attributes
-        this.hearAboutUsInput     = '[data-test="onboarding-get-started-hear-about-us-field"]';
-        this.hearAboutUsError     = '[data-test="onboarding-get-started-hear-about-us-error"]';
-
-        // OFormInput with data-test="onboarding-get-started-where-do-you-work"
-        this.whereDoYouWorkInput  = '[data-test="onboarding-get-started-where-do-you-work-field"]';
-        this.whereDoYouWorkError  = '[data-test="onboarding-get-started-where-do-you-work-error"]';
-
-        // Agree checkbox and submit button
-        this.agreeCheckbox        = '[data-test="onboarding-get-started-agree-checkbox"]';
-        this.submitBtn            = '[data-test="onboarding-get-started-submit-btn"]';
-        this.skipBtn              = '[data-test="onboarding-get-started-skip-btn"]';
-
         // ── AWS Marketplace form ──────────────────────────────────────────────
         // Route: /marketplace/aws/setup
         // OInput with data-test="aws-marketplace-org-name" → -field / -error
@@ -35,37 +20,6 @@ export class OnboardingFormValidationPage {
         this.azureOrgNameInput    = '[data-test="azure-marketplace-org-name-field"]';
         this.azureOrgNameError    = '[data-test="azure-marketplace-org-name-error"]';
         this.azureCreateLinkBtn   = '[data-test="azure-marketplace-create-link-btn"]';
-    }
-
-    // ── GetStarted helpers ────────────────────────────────────────────────────
-
-    async waitForGetStartedForm() {
-        await this.page.locator(this.hearAboutUsInput).waitFor({ state: 'visible', timeout: 10000 });
-    }
-
-    async fillHearAboutUs(value) {
-        await this.page.locator(this.hearAboutUsInput).fill(value);
-    }
-
-    async clearHearAboutUs() {
-        await this.page.locator(this.hearAboutUsInput).clear();
-    }
-
-    async fillWhereDoYouWork(value) {
-        await this.page.locator(this.whereDoYouWorkInput).fill(value);
-    }
-
-    async clearWhereDoYouWork() {
-        await this.page.locator(this.whereDoYouWorkInput).clear();
-    }
-
-    async checkAgreeCheckbox() {
-        // The box itself: the wrapper's centre lands on the Privacy policy link in the label.
-        await this.page.locator(this.agreeCheckbox).getByRole('checkbox').click();
-    }
-
-    async clickSubmit() {
-        await this.page.locator(this.submitBtn).click();
     }
 
     // ── AWS Marketplace helpers ───────────────────────────────────────────────
@@ -165,10 +119,6 @@ export class OnboardingFormValidationPage {
 
     // ── Locator getters for assertions ────────────────────────────────────────
 
-    getHearAboutUsErrorLocator()   { return this.page.locator(this.hearAboutUsError); }
-    getWhereDoYouWorkErrorLocator(){ return this.page.locator(this.whereDoYouWorkError); }
-    getSubmitBtnLocator()          { return this.page.locator(this.submitBtn); }
-    getSkipBtnLocator()            { return this.page.locator(this.skipBtn); }
     getAwsOrgNameInputLocator()    { return this.page.locator(this.awsOrgNameInput); }
     getAwsOrgNameErrorLocator()    { return this.page.locator(this.awsOrgNameError); }
     getAwsCreateLinkBtnLocator()   { return this.page.locator(this.awsCreateLinkBtn); }
