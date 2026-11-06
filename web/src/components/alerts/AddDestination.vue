@@ -541,6 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :show-body="previewShowsBody"
       :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
@@ -788,6 +789,7 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewShowsBody = ref(false);
 const previewRecipients = computed(() =>
   Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
 );
@@ -1367,7 +1369,11 @@ const handleTestDestination = async () => {
 
 // Show template preview
 const showPreview = async () => {
-  const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
+  const pickedTemplate =
+    isPrebuiltDestination.value && templateVal.value !== defaultPrebuiltTemplateName.value
+      ? templateVal.value
+      : undefined;
+  const customTemplate = isCustomWebhook.value ? templateVal.value : pickedTemplate;
   if (isCustomWebhook.value && !customTemplate) {
     toast({ variant: "error", message: t("alerts.validation.templateRequired") });
     return;
@@ -1383,6 +1389,7 @@ const showPreview = async () => {
       ? await renderTemplateBody(customTemplate)
       : await generatePreview(dtVal.value, prebuiltCredentials.value);
     previewContent.value = preview;
+    previewShowsBody.value = !!pickedTemplate;
 
     // Only show modal after content is ready
     showPreviewModal.value = true;

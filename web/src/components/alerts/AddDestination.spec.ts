@@ -146,7 +146,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationPreview: {
           name: "DestinationPreview",
           template: '<div data-test="destination-preview-stub"></div>',
-          props: ["modelValue", "type", "templateContent", "recipients"],
+          props: ["modelValue", "type", "templateContent", "recipients", "showBody"],
         },
         AppTabs: {
           template: '<div data-test="app-tabs-stub"></div>',
@@ -847,6 +847,36 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       },
     );
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
+  });
+
+  it("preview: a picked prebuilt_default renders its own body, the channel default keeps the mockup", async () => {
+    hoisted.mockRenderTemplateBody.mockResolvedValue('{"text": "unified"}');
+    hoisted.mockGeneratePreview.mockResolvedValue("channel body");
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    const previewBtn = '[data-test="destination-preview-button"]';
+    const preview = wrapper.findComponent({ name: "DestinationPreview" });
+
+    form.setFieldValue("template", "prebuilt_default");
+    await nextTick();
+    await wrapper.find(previewBtn).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("prebuilt_default");
+    expect(hoisted.mockGeneratePreview).not.toHaveBeenCalled();
+    expect(preview.props("templateContent")).toBe('{"text": "unified"}');
+    expect(preview.props("showBody")).toBe(true);
+
+    vi.clearAllMocks();
+    hoisted.mockGeneratePreview.mockResolvedValue("channel body");
+    form.setFieldValue("template", "prebuilt_slack");
+    await nextTick();
+    await wrapper.find(previewBtn).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockGeneratePreview).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockRenderTemplateBody).not.toHaveBeenCalled();
+    expect(preview.props("showBody")).toBe(false);
   });
 
   it("create: sends a picked prebuilt_default as the template override", async () => {
