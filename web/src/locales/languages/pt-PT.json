@@ -14591,6 +14591,7 @@
     "separator_placeholder": "Introduza o separador (por exemplo, {'|'}, \\n, \\t, espaço)",
     "separator_hint": "Cadeia de caracteres separadora a ser usada entre registos (espaços permitidos)",
     "templateDefaultOption": "Predefinido ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Deixe a predefinição para usar o modelo {type} padrão ({name}) ou escolha um personalizado.",
     "loadingData": "A carregar dados do destino...",
     "noEmailTemplates": "Parece que ainda não criou nenhum modelo de e-mail.",

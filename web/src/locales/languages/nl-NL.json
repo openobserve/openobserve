@@ -14591,6 +14591,7 @@
     "separator_placeholder": "Voer scheidingsteken in (bijv. {'|'}, \\n, \\t, spatie)",
     "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Laat op standaard staan om het standaard {type}-sjabloon ({name}) te gebruiken, of kies een aangepast sjabloon.",
     "loadingData": "Bestemmingsgegevens laden...",
     "noEmailTemplates": "Het lijkt erop dat u nog geen e-mailsjablonen heeft aangemaakt.",

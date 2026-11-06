@@ -14591,6 +14591,7 @@
     "separator_placeholder": "دخل الفاصلة (مثلا، {'|'}، \\n، \\t، المساحة)",
     "separator_hint": "سلسلة فاصل للاستخدام بين السجلات (المسافات مسموح بها)",
     "templateDefaultOption": "الافتراضي ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "اترك كخيار افتراضي لاستخدام قالب {type} القياسي ({name})، أو اختر قالب مخصص.",
     "loadingData": "جاري تحميل بيانات الوجهة...",
     "noEmailTemplates": "يبدو أنك لم تنشئ أي قوالب بريد إلكتروني بعد.",
