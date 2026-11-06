@@ -28,7 +28,7 @@ use arrow::{
     row::{RowConverter, SortField},
 };
 use datafusion::{
-    common::Result,
+    common::{Result, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream},
 };
 use futures::{Stream, StreamExt};
@@ -148,16 +148,14 @@ impl TopKHeapStream {
         sort_field: String,
         descending: bool,
         limit: usize,
-    ) -> Self {
+    ) -> Result<Self> {
         // Find the index of the sort column
         // also handle cases where the sort fields are not alias and can be names as count(*)[count]
-        let sort_column_index = schema
-            .fields()
-            .iter()
-            .position(|f| {
-                f.name() == &sort_field || f.name().split('[').next().unwrap_or("") == sort_field
-            })
-            .expect("Sort field not found in schema");
+        let Some(sort_column_index) = schema.fields().iter().position(|f| {
+            f.name() == &sort_field || f.name().split('[').next().unwrap_or("") == sort_field
+        }) else {
+            return internal_err!("TopKHeapStream: sort field {sort_field} not found in schema");
+        };
 
         // Create RowConverter for the sort column with proper sort options
         let sort_field_ref = &schema.fields()[sort_column_index];
@@ -168,10 +166,9 @@ impl TopKHeapStream {
         };
         let sort_field =
             SortField::new_with_options(sort_field_ref.data_type().clone(), sort_options);
-        let row_converter =
-            RowConverter::new(vec![sort_field]).expect("Failed to create RowConverter");
+        let row_converter = RowConverter::new(vec![sort_field])?;
 
-        Self {
+        Ok(Self {
             schema,
             stream,
             limit,
@@ -179,26 +176,26 @@ impl TopKHeapStream {
             topk_heap: BinaryHeap::new(),
             sort_column_index,
             row_converter,
-        }
+        })
     }
 
-    fn convert_sort_column(&mut self, array: &ArrayRef) -> arrow::row::Rows {
+    fn convert_sort_column(&mut self, array: &ArrayRef) -> Result<arrow::row::Rows> {
         // Direct conversion - simpler and avoids persistent memory
-        self.row_converter
-            .convert_columns(std::slice::from_ref(array))
-            .expect("Failed to convert column")
+        Ok(self
+            .row_converter
+            .convert_columns(std::slice::from_ref(array))?)
     }
 
-    fn process_batch(&mut self, batch: RecordBatch) {
+    fn process_batch(&mut self, batch: RecordBatch) -> Result<()> {
         if batch.num_rows() == 0 {
-            return;
+            return Ok(());
         }
 
         let sort_column = batch.column(self.sort_column_index);
         let mut entry = self.record_batch_registry.register_entry(batch.clone());
 
         // Convert all sort values at once - gets cleaned up automatically
-        let converted_rows = self.convert_sort_column(sort_column);
+        let converted_rows = self.convert_sort_column(sort_column)?;
         for row_index in 0..batch.num_rows() {
             // Get row from converted batch
             let row_ref = converted_rows.row(row_index);
@@ -231,11 +228,12 @@ impl TopKHeapStream {
         }
 
         self.record_batch_registry.submit_entry(entry);
+        Ok(())
     }
 
-    fn heap_to_record_batch(&mut self) -> Option<RecordBatch> {
+    fn heap_to_record_batch(&mut self) -> Result<Option<RecordBatch>> {
         if self.topk_heap.is_empty() {
-            return None;
+            return Ok(None);
         }
 
         // Convert heap to sorted vec
@@ -255,10 +253,7 @@ impl TopKHeapStream {
             .map(|row| (batch_id_array_pos[&row.batch_id], row.row_id))
             .collect();
 
-        let final_batch = interleave_record_batch(&record_batches, &indices)
-            .map_err(|_| log::error!("Failed to interleave_record_batch"))
-            .ok()?;
-        Some(final_batch)
+        Ok(Some(interleave_record_batch(&record_batches, &indices)?))
     }
 }
 
@@ -269,7 +264,9 @@ impl Stream for TopKHeapStream {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
                 // Process the batch incrementally with heap
-                self.process_batch(batch);
+                if let Err(e) = self.process_batch(batch) {
+                    return Poll::Ready(Some(Err(e)));
+                }
 
                 // Return empty batch to indicate progress
                 let schema = self.schema.clone();
@@ -278,14 +275,10 @@ impl Stream for TopKHeapStream {
             }
             Poll::Ready(None) => {
                 // Stream is finished, return final top-K result
-                let topk_batch = self.heap_to_record_batch();
-                Poll::Ready(topk_batch.map(Ok))
+                Poll::Ready(self.heap_to_record_batch().transpose())
             }
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(e))) => {
-                log::error!("Error in CacheTopkStream: {e}");
-                Poll::Ready(None)
-            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
         }
     }
 
@@ -388,7 +381,8 @@ mod tests {
             "count".to_string(),
             true, // descending
             5,    // limit
-        );
+        )
+        .unwrap();
 
         let mut results = Vec::new();
         while let Some(result) = topk_stream.next().await {
@@ -457,7 +451,8 @@ mod tests {
             "value".to_string(),
             false, // ascending
             5,     // limit
-        );
+        )
+        .unwrap();
 
         let mut results = Vec::new();
         while let Some(result) = topk_stream.next().await {
@@ -528,7 +523,8 @@ mod tests {
             "score".to_string(),
             true, // descending
             2,    // limit to 2
-        );
+        )
+        .unwrap();
 
         let mut results = Vec::new();
         while let Some(result) = topk_stream.next().await {
@@ -631,7 +627,8 @@ mod tests {
             "score".to_string(),
             true, // descending
             5,    // all 5 rows
-        );
+        )
+        .unwrap();
 
         let mut results = Vec::new();
         while let Some(result) = topk_stream.next().await {
@@ -752,7 +749,8 @@ mod tests {
             "value".to_string(),
             true, // descending
             3,    // limit to 3, but we have 6 batches
-        );
+        )
+        .unwrap();
 
         let mut results = Vec::new();
         while let Some(result) = topk_stream.next().await {
@@ -790,5 +788,56 @@ mod tests {
         assert_eq!(values.value(2), 50);
 
         println!("{}", pretty_format_batches(&results).unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_input_error_is_propagated() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", arrow::datatypes::DataType::Utf8, false),
+            Field::new("count", arrow::datatypes::DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b"])),
+                Arc::new(Int64Array::from(vec![1, 2])),
+            ],
+        )
+        .unwrap();
+        let input = futures::stream::iter(vec![
+            Ok(batch),
+            Err(datafusion::common::DataFusionError::Execution(
+                "cast failed".to_string(),
+            )),
+        ]);
+        let stream: SendableRecordBatchStream = Box::pin(
+            datafusion::physical_plan::stream::RecordBatchStreamAdapter::new(schema.clone(), input),
+        );
+
+        let mut topk_stream =
+            TopKHeapStream::new(schema, stream, "count".to_string(), true, 5).unwrap();
+
+        let mut err = None;
+        while let Some(result) = topk_stream.next().await {
+            if let Err(e) = result {
+                err = Some(e);
+                break;
+            }
+        }
+        assert!(err.unwrap().to_string().contains("cast failed"));
+    }
+
+    #[tokio::test]
+    async fn test_missing_sort_field_is_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "count",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let stream: SendableRecordBatchStream =
+            Box::pin(TestRecordBatchStream::new(schema.clone(), vec![]));
+
+        let res = TopKHeapStream::new(schema, stream, "missing".to_string(), true, 5);
+        assert!(res.is_err());
     }
 }
