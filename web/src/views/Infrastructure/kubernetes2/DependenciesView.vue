@@ -212,10 +212,25 @@ const expandedList = computed(() => {
     .sort((a, b) => a.localeCompare(b));
 });
 
-function toggleNamespace(id: string) {
+const groupChips = ref<HTMLElement | null>(null);
+const collapseModeGroup = ref<{ $el: HTMLElement } | null>(null);
+
+const chipEls = () => [...(groupChips.value?.querySelectorAll<HTMLElement>("[data-ns-id]") ?? [])];
+
+async function toggleNamespace(id: string) {
+  const wasExpanded = expandedNamespaces.value.has(id);
+  const index = expandedList.value.indexOf(id);
   const next = new Set(expandedNamespaces.value);
   if (!next.delete(id)) next.add(id);
   expandedNamespaces.value = next;
+  await nextTick();
+  const chips = chipEls();
+  const target = wasExpanded
+    ? (chips[index] ?? chips[index - 1])
+    : chips.find((c) => c.dataset.nsId === id);
+  (
+    target ?? collapseModeGroup.value?.$el?.querySelector<HTMLElement>("button, [tabindex]")
+  )?.focus();
 }
 
 const setCollapseMode = (mode: unknown) => {
@@ -380,7 +395,6 @@ watch(graph, (next) => {
 // Outside addresses, and owner types without a drawer, have nothing to open.
 const kindOf = (end: FlowEnd) => (end.kind === "external" ? null : detailKindOf(end.ownerType));
 
-// A namespace boundary expands in place instead of opening a drawer.
 const canOpen = (end: FlowEnd) => isBoundary(end) || kindOf(end) != null;
 
 function openEnd(end: FlowEnd) {
@@ -552,7 +566,8 @@ function clearFilters() {
           />
         </OText>
         <OToggleGroup
-          :model-value="collapseMode"
+          ref="collapseModeGroup"
+          :model-value="filtering ? 'expanded' : collapseMode"
           :aria-label="t('infra.k8s2.depsCollapseMode')"
           :disabled="filtering"
           mobile-dropdown
@@ -661,6 +676,7 @@ function clearFilters() {
       </OText>
       <div
         v-if="hasGroups || expandedList.length"
+        ref="groupChips"
         class="flex flex-wrap items-center gap-2"
         data-test="k8s2-deps-groups"
       >
@@ -678,6 +694,7 @@ function clearFilters() {
           variant="outline"
           size="xs"
           icon-left="close"
+          :data-ns-id="id"
           data-test="k8s2-deps-group-collapse"
           @click="toggleNamespace(id)"
         >

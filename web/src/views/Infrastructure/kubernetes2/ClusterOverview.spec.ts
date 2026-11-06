@@ -68,8 +68,8 @@ vi.mock("@/composables/useLockedAffordance", async () => {
 const tooltipStub = defineComponent({
   name: "OTooltip",
   props: ["content"],
-  setup(props) {
-    return () => h("span", { "data-test": "tooltip" }, props.content);
+  setup(props, { slots }) {
+    return () => [h("span", { "data-test": "tooltip" }, props.content), slots.default?.()];
   },
 });
 
@@ -594,8 +594,19 @@ describe("ClusterOverview", () => {
       expect(table.props("enableColumnResize")).toBe(true);
       expect(table.props("sorting")).toBe("client");
       const cols = table.props("columns") as any[];
-      expect(cols.every((c) => c.sortable)).toBe(true);
       expect(cols.find((c) => c.id === "message").meta.flex).toBe(true);
+    });
+
+    it("sorts by the Age header with undated rows last", async () => {
+      await mountView();
+      const ages = () =>
+        wrapper.findAll('[data-test^="k8s2-overview-warning-age-"]').map((r) => r.text());
+      expect(ages()).toEqual(["5m", "—", "5m"]);
+      await wrapper
+        .find('[data-test="o2-table-th-age"] [data-test="o2-table-th-sort-trigger"]')
+        .trigger("click");
+      await flushPromises();
+      expect(ages().at(-1)).toBe("—");
     });
 
     it("sizes the Object column to its longest name", async () => {

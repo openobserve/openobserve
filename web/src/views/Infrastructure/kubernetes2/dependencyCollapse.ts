@@ -57,12 +57,12 @@ interface Merge {
 
 export function collapseNamespaces(edges: FlowEdge[], state: CollapseState): FlowEdge[] {
   if (!shouldCollapse(edges, state)) return edges;
-  // A namespace whose traffic never leaves it would have no edge left to draw, so it stays as its workloads.
   const foldable = (end: FlowEnd) =>
     end.kind === "workload" && !state.expanded.has(namespaceId(end.cluster, end.namespace));
   const groupOf = (end: FlowEnd) =>
     foldable(end) ? namespaceId(end.cluster, end.namespace) : end.id;
   const linked = new Set<string>();
+  // A namespace whose traffic never leaves it would have no edge left to draw, so it stays as its workloads.
   for (const e of edges) {
     if (groupOf(e.source) === groupOf(e.target)) continue;
     for (const end of [e.source, e.target]) if (foldable(end)) linked.add(groupOf(end));

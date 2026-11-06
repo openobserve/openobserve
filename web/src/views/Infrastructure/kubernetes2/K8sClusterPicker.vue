@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { ClusterTone } from "./k8sTree";
 
 export interface PickerCluster {
@@ -47,46 +45,37 @@ const HEALTH_KEY: Record<ClusterTone, I18nKey> = {
   neutral: "infra.k8s2.healthSilent",
 };
 
-const open = ref(false);
-const query = ref("");
-
 const current = computed(() => props.clusters.find((c) => c.name === props.active) ?? null);
 
-const visible = computed(() => {
-  const needle = query.value.trim().toLowerCase();
-  return needle
-    ? props.clusters.filter((c) => c.name.toLowerCase().includes(needle))
-    : props.clusters;
-});
+const options = computed(() =>
+  props.clusters.map((c) => ({ label: raw(c.name), value: c.name, tone: c.tone })),
+);
 
-watch(open, (isOpen) => {
-  if (!isOpen) query.value = "";
-});
+const toneOf = (name: unknown) => props.clusters.find((c) => c.name === name)?.tone;
 
-const choose = (name: string) => {
-  open.value = false;
-  if (name !== props.active) emit("select", name);
+const onSelect = (value: unknown) => {
+  if (typeof value === "string" && value !== props.active) emit("select", value);
 };
 </script>
 
 <template>
-  <OPopover
-    v-model:open="open"
-    align="start"
-    content-class="w-(--reka-popover-trigger-width) min-w-56 p-0"
-    :aria-label="t('infra.k8s2.clusterPickerLabel')"
+  <OSelect
+    class="w-full"
+    size="md"
+    searchable
+    :model-value="active"
+    :options="options"
+    :search-placeholder="t('infra.k8s2.clusterPickerSearch')"
+    :aria-label="
+      current
+        ? t('infra.k8s2.clusterPickerTrigger', { name: raw(current.name) })
+        : t('infra.k8s2.clusterPickerLabel')
+    "
+    data-test="k8s2-cluster-picker"
+    @update:model-value="onSelect"
   >
     <template #trigger>
-      <button
-        type="button"
-        class="border-border-default bg-surface-base hover:bg-dropdown-item-hover-bg focus-visible:ring-accent rounded-default flex h-9 w-full items-center gap-2 border px-2.5 text-start text-sm outline-none focus-visible:ring-2"
-        :aria-label="
-          current
-            ? t('infra.k8s2.clusterPickerTrigger', { name: raw(current.name) })
-            : t('infra.k8s2.clusterPickerLabel')
-        "
-        data-test="k8s2-cluster-picker"
-      >
+      <span class="flex min-w-0 items-center gap-2">
         <span
           v-if="current"
           class="size-2.5 shrink-0 rounded-full"
@@ -96,59 +85,31 @@ const choose = (name: string) => {
         <OTruncatedText class="min-w-0 flex-1 font-semibold">{{
           current ? raw(current.name) : t("infra.k8s2.clusterPickerLabel")
         }}</OTruncatedText>
-        <OIcon
-          name="unfold-more"
-          size="sm"
-          class="text-text-secondary shrink-0"
+      </span>
+    </template>
+    <template #option="{ option }">
+      <span
+        v-if="toneOf(option.value)"
+        class="flex min-w-0 flex-1 items-center gap-2"
+        :aria-label="
+          t('infra.k8s2.hotbarTileLabel', {
+            name: raw(String(option.value)),
+            health: t(HEALTH_KEY[toneOf(option.value)!]),
+          })
+        "
+        :data-test="`k8s2-cluster-option-${option.value}`"
+      >
+        <span
+          class="size-2.5 shrink-0 rounded-full"
+          :class="DOT_CLASS[toneOf(option.value)!]"
+          :data-test="`k8s2-cluster-dot-${option.value}`"
           aria-hidden="true"
         />
-      </button>
+        <OTruncatedText class="min-w-0 flex-1">{{ raw(String(option.value)) }}</OTruncatedText>
+      </span>
     </template>
-
-    <div class="border-border-default border-b p-2">
-      <OSearchInput
-        v-model="query"
-        size="sm"
-        :placeholder="t('infra.k8s2.clusterPickerSearch')"
-        data-test="k8s2-cluster-picker-search"
-      />
-    </div>
-    <ul
-      class="max-h-72 overflow-y-auto p-1.5"
-      :aria-label="t('infra.k8s2.clusterPickerLabel')"
-      data-test="k8s2-cluster-picker-list"
-    >
-      <li v-for="cluster in visible" :key="cluster.name">
-        <button
-          type="button"
-          class="hover:bg-select-item-hover-bg focus-visible:ring-accent rounded-default flex w-full items-center gap-2 px-2 py-1.5 text-start text-sm outline-none focus-visible:ring-2"
-          :class="cluster.name === active ? 'bg-select-item-selected-bg font-semibold' : ''"
-          :aria-current="cluster.name === active ? 'true' : undefined"
-          :aria-label="
-            t('infra.k8s2.hotbarTileLabel', {
-              name: raw(cluster.name),
-              health: t(HEALTH_KEY[cluster.tone]),
-            })
-          "
-          :data-test="`k8s2-cluster-option-${cluster.name}`"
-          @click="choose(cluster.name)"
-        >
-          <span
-            class="size-2.5 shrink-0 rounded-full"
-            :class="DOT_CLASS[cluster.tone]"
-            :data-test="`k8s2-cluster-dot-${cluster.name}`"
-            aria-hidden="true"
-          />
-          <OTruncatedText class="min-w-0 flex-1">{{ raw(cluster.name) }}</OTruncatedText>
-        </button>
-      </li>
-      <li
-        v-if="!visible.length"
-        class="text-text-secondary px-2 py-3 text-center text-xs"
-        data-test="k8s2-cluster-picker-empty"
-      >
-        {{ t("infra.k8s2.clusterPickerEmpty") }}
-      </li>
-    </ul>
-  </OPopover>
+    <template #empty>
+      <span data-test="k8s2-cluster-picker-empty">{{ t("infra.k8s2.clusterPickerEmpty") }}</span>
+    </template>
+  </OSelect>
 </template>

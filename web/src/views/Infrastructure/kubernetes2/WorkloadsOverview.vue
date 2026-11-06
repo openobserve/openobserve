@@ -84,6 +84,8 @@ const RECENT_EVENTS = 10;
 
 const COMPACT = { cellClass: "text-compact" };
 
+const STATUS_TAG_PAD_PX = 24;
+
 const CARDS: Array<{ kind: StatusKind; title: I18nKey; icon: IconName }> = [
   { kind: "pod", title: "infra.k8s2.workloadsCardPods", icon: "view-in-ar" },
   { kind: "deployment", title: "infra.k8s2.workloadsCardDeployments", icon: "layers" },
@@ -238,7 +240,7 @@ const problemColumns = computed<OTableColumnDef<WorkloadProblem>[]>(() => {
       id: "status",
       header: colStatus,
       accessorKey: "severity",
-      size: fit(colStatus, (r) => r.severity),
+      size: fit(colStatus, (r) => t(problemStatusWord(r.kind, r.severity))) + STATUS_TAG_PAD_PX,
       sortable: true,
       meta: COMPACT,
     },
@@ -301,7 +303,7 @@ const columns = computed<OTableColumnDef<EventRow>[]>(() => {
       id: "count",
       header: t("infra.k8s2.workloadsColCount"),
       accessorKey: "count",
-      size: 80,
+      size: fit(t("infra.k8s2.workloadsColCount"), (r) => r.count ?? "—"),
       sortable: true,
       meta: COMPACT,
     },
@@ -309,7 +311,7 @@ const columns = computed<OTableColumnDef<EventRow>[]>(() => {
       id: "age",
       header: t("infra.k8s2.workloadsColAge"),
       accessorKey: "firstSeen",
-      size: 90,
+      size: fit(t("infra.k8s2.workloadsColAge"), (r) => ageText(r.firstSeen)),
       sortable: true,
       meta: COMPACT,
     },
@@ -317,15 +319,19 @@ const columns = computed<OTableColumnDef<EventRow>[]>(() => {
       id: "lastSeen",
       header: t("infra.k8s2.workloadsColLastSeen"),
       accessorKey: "lastSeen",
-      size: 100,
+      size: fit(t("infra.k8s2.workloadsColLastSeen"), (r) => ageText(r.lastSeen)),
       sortable: true,
       meta: COMPACT,
     },
   ];
 });
 
+function ageText(us: number | null) {
+  return formatAge(us == null ? null : props.endUs - us);
+}
+
 function since(us: number | null) {
-  return raw(formatAge(us == null ? null : props.endUs - us));
+  return raw(ageText(us));
 }
 
 function linkable(row: EventRow) {
