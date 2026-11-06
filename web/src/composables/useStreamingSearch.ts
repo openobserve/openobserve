@@ -190,13 +190,7 @@ const useHttpStreaming = () => {
 
     // Construct URL based on search type
     let url = "";
-    // An enrichment table ignores the time range, so a cached result plus its "new" window repeats every row.
-    const use_cache =
-      pageType === "enrichment_tables"
-        ? false
-        : (window as any).use_cache !== undefined
-          ? (window as any).use_cache
-          : true;
+    const use_cache = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";
