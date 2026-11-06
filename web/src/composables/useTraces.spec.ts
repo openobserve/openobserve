@@ -15,6 +15,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
+import { createMemoryHistory, createRouter, useRouter } from "vue-router";
+import { flushPromises } from "@vue/test-utils";
+import { trackPendingNavigation } from "@/utils/pendingNavigation";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -33,7 +36,8 @@ const mockCurrentRoute = {
   } as { name?: string; query: Record<string, unknown> },
 };
 
-vi.mock("vue-router", () => ({
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue-router")>()),
   useRouter: vi.fn(() => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
@@ -2037,6 +2041,39 @@ describe("useTraces", () => {
         stop();
         vi.useRealTimers();
       }
+    });
+
+    it("lets a held navigation away finish when the debounced write fires during it", async () => {
+      const appRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          { path: "/logs", name: "logs", component: { template: "<div />" } },
+        ],
+      });
+      await appRouter.push("/traces");
+      trackPendingNavigation(appRouter);
+      vi.mocked(useRouter).mockReturnValueOnce(appRouter);
+      const { searchObj, syncUrlViewState } = freshState();
+      const stop = syncUrlViewState();
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      appRouter.beforeEach(() => gate);
+      const leaving = appRouter.push("/logs");
+      await flushPromises();
+      vi.useFakeTimers();
+      try {
+        searchObj.data.editorValue = "duration > 1";
+        await nextTick();
+        vi.advanceTimersByTime(300);
+      } finally {
+        vi.useRealTimers();
+      }
+      release();
+      await leaving;
+      await flushPromises();
+      stop();
+      expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
     });
 
     it("writes a pending change at once when the sync stops, then stops writing", async () => {
