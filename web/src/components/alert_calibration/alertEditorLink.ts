@@ -15,12 +15,12 @@
 
 import { queryClient } from "@/composables/query/queryClient";
 import { alertsListQuery } from "@/services/alerts.queries";
-import { CALIBRATION_PREFILL } from "@/utils/alerts/alertEditHandoff";
+import { CALIBRATION_PREFILL, type EditHandoffPrefill } from "@/utils/alerts/alertEditHandoff";
 
 export interface EditAlertRoute {
   name: "editAlert";
   params: { alert_id: string };
-  query: { org_identifier: string; prefill: typeof CALIBRATION_PREFILL; folder?: string };
+  query: { org_identifier: string; prefill: EditHandoffPrefill; folder?: string };
 }
 
 interface AlertListRow {
@@ -51,12 +51,13 @@ export const editAlertRoute = (
   org: string,
   alertId: string,
   folder: string | undefined,
+  prefill: EditHandoffPrefill = CALIBRATION_PREFILL,
 ): EditAlertRoute => ({
   name: "editAlert",
   params: { alert_id: alertId },
   query: {
     org_identifier: org,
-    prefill: CALIBRATION_PREFILL,
+    prefill,
     ...(folder ? { folder } : {}),
   },
 });

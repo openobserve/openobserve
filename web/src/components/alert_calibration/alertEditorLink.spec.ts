@@ -69,4 +69,13 @@ describe("alertEditorLink", () => {
       query: { org_identifier: "demo-org", prefill: "calibration" },
     });
   });
+
+  it("an AutoObserve caller names its own handoff, and calibration's default is unchanged", () => {
+    expect(editAlertRoute("demo-org", "a1", "ops", "autoobserve").query).toEqual({
+      org_identifier: "demo-org",
+      prefill: "autoobserve",
+      folder: "ops",
+    });
+    expect(editAlertRoute("demo-org", "a1", "ops").query.prefill).toBe("calibration");
+  });
 });
