@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "其他字段仅显示流配置为使用用户定义 Schema 之前存在的 Schema 字段。",
     "addFieldsTitle": "添加字段",
     "dataRetentionDaysLabel": "数据保留（天）",
-    "globalRetentionDays": "全局保留期为 {days} 天",
-    "retentionMinOneDay": "保留期必须至少为 1 天",
+    "retentionDefaultDays": "留空以使用此数据流类型的默认值：{days} 天",
+    "retentionDefaultForever": "留空以使用此数据流类型的默认值：永久保留",
     "maxQueryRangeHoursLabel": "最大查询范围（小时）",
     "maxQueryRangeHelp": "允许查询的最大时间范围。设置为 0 表示无限制。",
     "globalFlattenLevel": "全局为 {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS 凭据",
       "azureCredentials": "Azure 凭据",
       "awsRoleArn": "AWS 角色 ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "数据保留默认值",
+      "about": "适用于没有自身保留设置的数据流。留空或填 0 则使用全局值；否则至少为 3 天。",
+      "defaultDays": "默认（天）",
+      "streamType": "数据流类型",
+      "days": "天",
+      "addType": "添加数据流类型",
+      "removeType": "移除此数据流类型",
+      "globalDefault": "全局：{value}",
+      "globalType": "全局 {type}：{value}",
+      "daysValue": "{days} 天",
+      "forever": "永久保留",
+      "invalid": "请填 0 或至少 3 天"
     },
     "organizationSettings": {
       "fieldNameHelp": "仅使用字母数字和 '+=,.{'@'}-_' 字符，不要空格。",

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Otros campos muestran solo los campos del esquema que existían antes de que el stream se configurara para usar un esquema definido por el usuario.",
     "addFieldsTitle": "Agregar campos",
     "dataRetentionDaysLabel": "Retención de datos (días)",
-    "globalRetentionDays": "La retención global es de {days} días",
-    "retentionMinOneDay": "El período de retención debe ser de al menos 1 día",
+    "retentionDefaultDays": "Déjalo vacío para usar el valor predeterminado de este tipo de stream: {days} días",
+    "retentionDefaultForever": "Déjalo vacío para usar el valor predeterminado de este tipo de stream: conservar para siempre",
     "maxQueryRangeHoursLabel": "Rango máximo de consulta (horas)",
     "maxQueryRangeHelp": "Rango de tiempo máximo permitido para consultas. Establezca 0 para un rango ilimitado.",
     "globalFlattenLevel": "El valor global es {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "Credenciales de AWS",
       "azureCredentials": "Credenciales de Azure",
       "awsRoleArn": "ARN de rol de AWS"
+    },
+    "dataRetentionDefaults": {
+      "title": "Valores predeterminados de retención de datos",
+      "about": "Para los streams sin retención propia. Vacío o 0 usa el valor global; de lo contrario, al menos 3 días.",
+      "defaultDays": "Predeterminado (días)",
+      "streamType": "Tipo de stream",
+      "days": "Días",
+      "addType": "Añadir tipo de stream",
+      "removeType": "Quitar este tipo de stream",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
+      "daysValue": "{days} días",
+      "forever": "conservar para siempre",
+      "invalid": "Usa 0 o al menos 3 días"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use solo caracteres alfanuméricos y '+=,.{'@'}-_' , sin espacios.",

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "تظهر الحقول الأخرى فقط حقول المخطط التي كانت موجودة قبل تكوين التدفق لاستخدام مخطط محدد من قبل المستخدم.",
     "addFieldsTitle": "إضافة الحقول",
     "dataRetentionDaysLabel": "الاحتفاظ بالبيانات (الأيام)",
-    "globalRetentionDays": "مدة الاحتفاظ العامة بالأيام: {days}",
-    "retentionMinOneDay": "يجب أن تكون فترة الاحتفاظ يوما واحدا على الأقل",
+    "retentionDefaultDays": "اتركه فارغًا لاستخدام الافتراضي لنوع التدفق هذا: {days} يومًا",
+    "retentionDefaultForever": "اتركه فارغًا لاستخدام الافتراضي لنوع التدفق هذا: الاحتفاظ إلى الأبد",
     "maxQueryRangeHoursLabel": "الحد الأقصى لنطاق الاستعلامات (الساعات)",
     "maxQueryRangeHelp": "الحد الأقصى للزمن المسموح به للاستعلامات. اضبط 0 لمدى غير محدود.",
     "globalFlattenLevel": "العالم {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS المؤهلات",
       "azureCredentials": "Azure المؤهلات",
       "awsRoleArn": "AWS الدور ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "الإعدادات الافتراضية للاحتفاظ بالبيانات",
+      "about": "للتدفقات التي ليس لها مدة احتفاظ خاصة بها. القيمة الفارغة أو 0 تستخدم القيمة العامة؛ وإلا فثلاثة أيام على الأقل.",
+      "defaultDays": "الافتراضي (أيام)",
+      "streamType": "نوع التدفق",
+      "days": "الأيام",
+      "addType": "إضافة نوع تدفق",
+      "removeType": "إزالة نوع التدفق هذا",
+      "globalDefault": "القيمة العامة: {value}",
+      "globalType": "القيمة العامة لـ {type}: {value}",
+      "daysValue": "{days} يومًا",
+      "forever": "الاحتفاظ إلى الأبد",
+      "invalid": "استخدم 0 أو 3 أيام على الأقل"
     },
     "organizationSettings": {
       "fieldNameHelp": "استخدم الأحرف الأبجدية الرقمية و'+=,.{'@'}-_' فقط، بدون مسافات.",

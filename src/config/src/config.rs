@@ -39,7 +39,7 @@ use crate::{
     meta::{
         cluster,
         meta_store::MetaStore,
-        stream::{QueryPartitionStrategy, StreamType},
+        stream::{DataRetentionDefaults, QueryPartitionStrategy, StreamType},
     },
     utils::{str::redact_dsn, sysinfo},
 };
@@ -3452,7 +3452,15 @@ pub struct Compact {
         help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
     )]
     pub dynamic_partition_window_days: i64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_DAYS",
+        default = "3650",
+        help = "Default retention in days for streams with no value of their own: a plain number (30), optionally with per-type values (30,logs:21,metrics:180). Types: logs, metrics, traces, profiles. Without a plain number the default is 3650; 0 keeps data forever and <type>:0 inherits the plain number. A positive value must be at least 3."
+    )]
+    pub data_retention_spec: String,
+    // Both parsed from data_retention_spec in check_compact_config.
+    #[env_config(parse, default = "0")]
+    pub data_retention: DataRetentionDefaults,
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
@@ -5116,11 +5124,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
-        return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
-        ));
-    }
+    cfg.compact.data_retention = cfg
+        .compact
+        .data_retention_spec
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid ZO_COMPACT_DATA_RETENTION_DAYS: {e}"))?;
+    cfg.compact.data_retention_days = cfg.compact.data_retention.default;
     parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
     if cfg.compact.dynamic_partition_window_days == 0 {
         cfg.compact.dynamic_partition_window_days = 7;
@@ -5964,13 +5973,12 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention_days = 10;
+        cfg.compact.data_retention_spec = "10".to_string();
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
@@ -6674,7 +6682,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 0;
+        cfg.compact.data_retention_spec = "0".to_string();
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
@@ -6705,18 +6713,47 @@ mod tests {
     #[test]
     fn test_check_compact_config_retention_too_short() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 1;
+        cfg.compact.data_retention_spec = "1".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_parses_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = "30,logs:21,metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 30);
+        assert_eq!(cfg.compact.data_retention.logs, 21);
+        assert_eq!(cfg.compact.data_retention.metrics, 180);
+
+        cfg.compact.data_retention_spec = "metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 3650);
+
+        cfg.compact.data_retention_spec = "30,index:7".to_string();
+        let err = check_compact_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("ZO_COMPACT_DATA_RETENTION_DAYS"), "{err}");
+    }
+
+    #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
     }
 
     #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 3;
+        cfg.compact.data_retention_spec = "3".to_string();
         assert!(check_compact_config(&mut cfg).is_ok());
-        cfg.compact.data_retention_days = 0; // 0 means disabled
+        cfg.compact.data_retention_spec = "0".to_string(); // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
     }
 

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Diğer alanlar, akışın kullanıcı tanımlı bir şema kullanacak şekilde yapılandırılmasından önce var olan şema alanlarını gösterir.",
     "addFieldsTitle": "Alan Ekle",
     "dataRetentionDaysLabel": "Veri Saklama (gün)",
-    "globalRetentionDays": "Genel saklama {days} gündür",
-    "retentionMinOneDay": "Saklama süresi en az 1 gün olmalıdır",
+    "retentionDefaultDays": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: {days} gün",
+    "retentionDefaultForever": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: sonsuza kadar sakla",
     "maxQueryRangeHoursLabel": "Maksimum Sorgu Aralığı (saat)",
     "maxQueryRangeHelp": "Sorgular için izin verilen maksimum zaman aralığı. Sınırsız aralık için 0 ayarlayın.",
     "globalFlattenLevel": "Genel seviye {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS Kimlik Bilgileri",
       "azureCredentials": "Azure Kimlik Bilgileri",
       "awsRoleArn": "AWS Rol ARN'si"
+    },
+    "dataRetentionDefaults": {
+      "title": "Veri saklama varsayılanları",
+      "about": "Kendi saklama ayarı olmayan akışlar için. Boş veya 0, genel değeri kullanır; aksi takdirde en az 3 gün.",
+      "defaultDays": "Varsayılan (gün)",
+      "streamType": "Akış türü",
+      "days": "Gün",
+      "addType": "Akış türü ekle",
+      "removeType": "Bu akış türünü kaldır",
+      "globalDefault": "Genel: {value}",
+      "globalType": "Genel {type}: {value}",
+      "daysValue": "{days} gün",
+      "forever": "sonsuza kadar sakla",
+      "invalid": "0 veya en az 3 gün kullanın"
     },
     "organizationSettings": {
       "fieldNameHelp": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluk olmadan.",

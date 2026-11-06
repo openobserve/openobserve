@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "其他欄位僅顯示串流設定為使用使用者定義結構描述之前所存在的結構描述欄位。",
     "addFieldsTitle": "新增欄位",
     "dataRetentionDaysLabel": "資料保留（天）",
-    "globalRetentionDays": "全域保留為 {days} 天",
-    "retentionMinOneDay": "保留期限必須至少為 1 天",
+    "retentionDefaultDays": "留空以使用此串流類型的預設值：{days} 天",
+    "retentionDefaultForever": "留空以使用此串流類型的預設值：永久保留",
     "maxQueryRangeHoursLabel": "最大查詢範圍（小時）",
     "maxQueryRangeHelp": "查詢允許的最大時間範圍。設定為 0 表示無限制。",
     "globalFlattenLevel": "全域為 {level}",
@@ -15521,6 +15521,20 @@
       "awsCredentials": "AWS 憑證",
       "azureCredentials": "Azure 憑證",
       "awsRoleArn": "AWS 角色 ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "資料保留預設值",
+      "about": "適用於沒有自身保留設定的串流。留空或 0 會使用全域值；否則至少 3 天。",
+      "defaultDays": "預設（天）",
+      "streamType": "串流類型",
+      "days": "天",
+      "addType": "新增串流類型",
+      "removeType": "移除此串流類型",
+      "globalDefault": "全域：{value}",
+      "globalType": "全域 {type}：{value}",
+      "daysValue": "{days} 天",
+      "forever": "永久保留",
+      "invalid": "使用 0 或至少 3 天"
     },
     "organizationSettings": {
       "fieldNameHelp": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不要包含空格。",

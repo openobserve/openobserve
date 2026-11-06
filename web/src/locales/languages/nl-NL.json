@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Andere velden tonen alleen de schema-velden die bestonden voordat de stream werd geconfigureerd om een gebruikersgedefinieerd schema te gebruiken.",
     "addFieldsTitle": "Velden toevoegen",
     "dataRetentionDaysLabel": "Dataretentie (dagen)",
-    "globalRetentionDays": "Globale retentie is {days} dagen",
-    "retentionMinOneDay": "Retentieperiode moet minimaal 1 dag zijn",
+    "retentionDefaultDays": "Laat leeg om de standaard voor dit streamtype te gebruiken: {days} dagen",
+    "retentionDefaultForever": "Laat leeg om de standaard voor dit streamtype te gebruiken: voor altijd bewaren",
     "maxQueryRangeHoursLabel": "Max querybereik (uren)",
     "maxQueryRangeHelp": "Maximale tijdsperiode toegestaan voor query's. Zet 0 in voor onbeperkt bereik.",
     "globalFlattenLevel": "Globaal is {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS-referenties",
       "azureCredentials": "Azure-referenties",
       "awsRoleArn": "AWS Role ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "Standaardwaarden voor gegevensretentie",
+      "about": "Voor streams zonder eigen retentie. Leeg of 0 gebruikt de globale waarde; anders ten minste 3 dagen.",
+      "defaultDays": "Standaard (dagen)",
+      "streamType": "Streamtype",
+      "days": "Dagen",
+      "addType": "Streamtype toevoegen",
+      "removeType": "Dit streamtype verwijderen",
+      "globalDefault": "Globaal: {value}",
+      "globalType": "Globaal {type}: {value}",
+      "daysValue": "{days} dagen",
+      "forever": "voor altijd bewaren",
+      "invalid": "Gebruik 0 of minimaal 3 dagen"
     },
     "organizationSettings": {
       "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",

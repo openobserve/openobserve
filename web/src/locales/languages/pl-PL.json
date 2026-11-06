@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Pozostałe pola pokazują tylko pola schematu, które istniały przed skonfigurowaniem strumienia do korzystania ze schematu zdefiniowanego przez użytkownika.",
     "addFieldsTitle": "Dodaj pola",
     "dataRetentionDaysLabel": "Przechowywanie danych (dni)",
-    "globalRetentionDays": "Globalny okres przechowywania (dni): {days}",
-    "retentionMinOneDay": "Okres przechowywania musi wynosić co najmniej 1 dzień",
+    "retentionDefaultDays": "Pozostaw puste, aby użyć wartości domyślnej dla tego typu strumienia: {days} dni",
+    "retentionDefaultForever": "Pozostaw puste, aby użyć wartości domyślnej dla tego typu strumienia: przechowuj bezterminowo",
     "maxQueryRangeHoursLabel": "Maksymalny zakres zapytania (godziny)",
     "maxQueryRangeHelp": "Maksymalny zakres czasu dozwolony dla zapytań. Ustaw 0 dla nieograniczonego zakresu.",
     "globalFlattenLevel": "Globalny: {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "Poświadczenia AWS",
       "azureCredentials": "Poświadczenia Azure",
       "awsRoleArn": "ARN roli AWS"
+    },
+    "dataRetentionDefaults": {
+      "title": "Domyślne ustawienia retencji danych",
+      "about": "Dla strumieni bez własnego okresu przechowywania. Pusta wartość lub 0 oznacza użycie wartości globalnej; w przeciwnym razie co najmniej 3 dni.",
+      "defaultDays": "Domyślne (dni)",
+      "streamType": "Typ strumienia",
+      "days": "Dni",
+      "addType": "Dodaj typ strumienia",
+      "removeType": "Usuń ten typ strumienia",
+      "globalDefault": "Globalnie: {value}",
+      "globalType": "Globalny {type}: {value}",
+      "daysValue": "{days} dni",
+      "forever": "przechowuj bezterminowo",
+      "invalid": "Użyj 0 lub co najmniej 3 dni"
     },
     "organizationSettings": {
       "fieldNameHelp": "Używaj tylko znaków alfanumerycznych oraz '+=,.{'@'}-_', bez spacji.",

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Các trường khác chỉ hiển thị các trường lược đồ đã tồn tại trước khi stream được cấu hình để sử dụng lược đồ do người dùng xác định.",
     "addFieldsTitle": "Thêm trường",
     "dataRetentionDaysLabel": "Thời gian lưu trữ dữ liệu (ngày)",
-    "globalRetentionDays": "Thời gian lưu trữ toàn cầu là {days} ngày",
-    "retentionMinOneDay": "Thời gian lưu trữ phải ít nhất 1 ngày",
+    "retentionDefaultDays": "Để trống để dùng mặc định cho loại stream này: {days} ngày",
+    "retentionDefaultForever": "Để trống để dùng mặc định cho loại stream này: lưu giữ vĩnh viễn",
     "maxQueryRangeHoursLabel": "Phạm vi truy vấn tối đa (giờ)",
     "maxQueryRangeHelp": "Khoảng thời gian tối đa được phép cho truy vấn. Đặt 0 để không giới hạn.",
     "globalFlattenLevel": "Toàn cầu là {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "Thông tin xác thực AWS",
       "azureCredentials": "Thông tin xác thực Azure",
       "awsRoleArn": "ARN vai trò AWS"
+    },
+    "dataRetentionDefaults": {
+      "title": "Mặc định lưu giữ dữ liệu",
+      "about": "Áp dụng cho các stream không có thời hạn lưu riêng. Để trống hoặc 0 sẽ dùng giá trị toàn cục; nếu không, tối thiểu 3 ngày.",
+      "defaultDays": "Mặc định (ngày)",
+      "streamType": "Loại stream",
+      "days": "Ngày",
+      "addType": "Thêm loại stream",
+      "removeType": "Xóa loại stream này",
+      "globalDefault": "Toàn cục: {value}",
+      "globalType": "Toàn cục {type}: {value}",
+      "daysValue": "{days} ngày",
+      "forever": "lưu giữ vĩnh viễn",
+      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày"
     },
     "organizationSettings": {
       "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",

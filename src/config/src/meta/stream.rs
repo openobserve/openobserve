@@ -108,6 +108,17 @@ impl PartialEq for DataField {
     }
 }
 
+pub const MIN_DATA_RETENTION_DAYS: i64 = 3;
+pub const DEFAULT_DATA_RETENTION_DAYS: i64 = 3650;
+// Date math in the retention callers overflows past this; no stored data can be that old.
+pub const MAX_DATA_RETENTION_DAYS: i64 = 10_000_000;
+/// The stream types a default retention can be set for.
+pub const RETENTION_STREAM_TYPES: [StreamType; 4] = [
+    StreamType::Logs,
+    StreamType::Metrics,
+    StreamType::Traces,
+    StreamType::Profiles,
+];
 pub const ALL_STREAM_TYPES: [StreamType; 9] = [
     StreamType::Logs,
     StreamType::Metrics,
@@ -216,6 +227,112 @@ impl std::fmt::Display for StreamType {
             StreamType::Metadata => write!(f, "metadata"),
             StreamType::Index => write!(f, "index"),
         }
+    }
+}
+
+/// Default retention days of a scope; 0 inherits the next level.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(default)]
+pub struct DataRetentionDefaults {
+    pub default: i64,
+    pub logs: i64,
+    pub metrics: i64,
+    pub traces: i64,
+    pub profiles: i64,
+}
+
+impl DataRetentionDefaults {
+    pub fn validate(&self) -> Result<(), String> {
+        [
+            self.default,
+            self.logs,
+            self.metrics,
+            self.traces,
+            self.profiles,
+        ]
+        .into_iter()
+        .try_for_each(Self::check_days)
+    }
+
+    /// The value for this type alone; a type that can't be configured has none.
+    pub fn for_type(&self, stream_type: StreamType) -> i64 {
+        match stream_type {
+            StreamType::Logs => self.logs,
+            StreamType::Metrics => self.metrics,
+            StreamType::Traces => self.traces,
+            StreamType::Profiles => self.profiles,
+            _ => 0,
+        }
+    }
+
+    /// Reads an API value, refusing the keys the lenient stored form would silently drop.
+    pub fn deserialize_strict<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Self>, D::Error> {
+        let mut defaults = Self::default();
+        for (key, days) in std::collections::BTreeMap::<String, i64>::deserialize(deserializer)? {
+            *defaults.days_mut(&key).ok_or_else(|| {
+                serde::de::Error::custom(format!("unknown data_retention key {key}"))
+            })? = days;
+        }
+        Ok(Some(defaults))
+    }
+
+    fn check_days(days: i64) -> Result<(), String> {
+        if days == 0 || days >= MIN_DATA_RETENTION_DAYS {
+            Ok(())
+        } else {
+            Err(format!(
+                "retention must be 0 or at least {MIN_DATA_RETENTION_DAYS} days, got {days}"
+            ))
+        }
+    }
+
+    fn days_mut(&mut self, key: &str) -> Option<&mut i64> {
+        match key {
+            "default" => Some(&mut self.default),
+            "logs" => Some(&mut self.logs),
+            "metrics" => Some(&mut self.metrics),
+            "traces" => Some(&mut self.traces),
+            "profiles" => Some(&mut self.profiles),
+            _ => None,
+        }
+    }
+}
+
+impl FromStr for DataRetentionDefaults {
+    type Err = String;
+
+    /// Parses `30` or `30,logs:21,metrics:180`.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut defaults = Self {
+            default: DEFAULT_DATA_RETENTION_DAYS,
+            ..Self::default()
+        };
+        if s.trim().is_empty() {
+            return Ok(defaults);
+        }
+        let mut seen = std::collections::HashSet::new();
+        for item in s.split(',').map(str::trim) {
+            let (key, days) = match item.split_once(':') {
+                Some((name, _)) if name.trim().eq_ignore_ascii_case("default") => {
+                    return Err(format!("unknown stream type in [{item}]"));
+                }
+                Some((name, days)) => (name.trim().to_lowercase(), days.trim()),
+                None => ("default".to_string(), item),
+            };
+            let days: i64 = days
+                .parse()
+                .map_err(|_| format!("can't parse the days in [{item}]"))?;
+            Self::check_days(days)?;
+            *defaults.days_mut(&key).ok_or_else(|| {
+                format!("unknown stream type {key}, expected logs, metrics, traces or profiles")
+            })? = days.min(MAX_DATA_RETENTION_DAYS);
+            if !seen.insert(key.clone()) {
+                return Err(format!("{key} is given twice"));
+            }
+        }
+        Ok(defaults)
     }
 }
 
@@ -2720,5 +2837,105 @@ mod tests {
         crate::CONFIG.store(saved);
         assert!(reloaded.approx_partition);
         assert!(created.approx_partition);
+    }
+
+    #[test]
+    fn test_data_retention_defaults_parse_from_env() {
+        let parsed = |s: &str| s.parse::<DataRetentionDefaults>();
+        let with = |default, logs, metrics| DataRetentionDefaults {
+            default,
+            logs,
+            metrics,
+            ..Default::default()
+        };
+        assert_eq!(parsed("30"), Ok(with(30, 0, 0)));
+        assert_eq!(parsed("0"), Ok(with(0, 0, 0)));
+        assert_eq!(parsed("30,logs:21,metrics:21"), Ok(with(30, 21, 21)));
+        assert_eq!(parsed(" 30 , logs : 21 "), Ok(with(30, 21, 0)));
+        assert_eq!(parsed("LOGS:21"), Ok(with(3650, 21, 0)));
+        assert_eq!(parsed("metrics:180"), Ok(with(3650, 0, 180)));
+        assert_eq!(parsed("30,metrics:0"), Ok(with(30, 0, 0)));
+        assert_eq!(parsed("metrics:1000000"), Ok(with(3650, 0, 1_000_000)));
+        assert_eq!(
+            parsed(&format!("{MAX_DATA_RETENTION_DAYS},logs:{}", i64::MAX)),
+            Ok(with(MAX_DATA_RETENTION_DAYS, MAX_DATA_RETENTION_DAYS, 0))
+        );
+        assert_eq!(parsed(""), Ok(with(3650, 0, 0)));
+        let all = parsed("traces:3,profiles:4").unwrap();
+        assert_eq!((all.traces, all.profiles), (3, 4));
+    }
+
+    #[test]
+    fn test_data_retention_defaults_refuse_bad_env_values() {
+        for bad in [
+            "1",
+            "2",
+            "-1",
+            "logs:1",
+            "logs:2",
+            "logs:-1",
+            "abc",
+            "logs:abc",
+            "logs:",
+            "30,",
+            "30,30",
+            "30,40",
+            "logs:21,logs:30",
+            "logs:21,logs:0",
+            "default:30",
+            "unknown:30",
+            "index:30",
+            "metadata:30",
+            "service_graph:30",
+            "enrichment_tables:30",
+            "file_list:30",
+        ] {
+            assert!(bad.parse::<DataRetentionDefaults>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn test_data_retention_defaults_validate_and_lookup() {
+        let with_profiles = |profiles| DataRetentionDefaults {
+            profiles,
+            ..Default::default()
+        };
+        assert!(with_profiles(0).validate().is_ok());
+        assert!(with_profiles(3).validate().is_ok());
+        assert!(with_profiles(1).validate().is_err());
+        assert!(with_profiles(2).validate().is_err());
+        assert!(with_profiles(-1).validate().is_err());
+
+        let all: DataRetentionDefaults = "9,logs:3,metrics:4,traces:5,profiles:6".parse().unwrap();
+        for (i, stream_type) in RETENTION_STREAM_TYPES.into_iter().enumerate() {
+            assert_eq!(all.for_type(stream_type), i as i64 + 3, "{stream_type}");
+        }
+        for stream_type in [
+            StreamType::Metadata,
+            StreamType::Index,
+            StreamType::ServiceGraph,
+            StreamType::EnrichmentTables,
+            StreamType::Filelist,
+        ] {
+            assert_eq!(all.for_type(stream_type), 0, "{stream_type}");
+        }
+    }
+
+    #[test]
+    fn test_data_retention_defaults_api_form_refuses_unknown_keys() {
+        let strict = |json: &str| {
+            let mut de = serde_json::Deserializer::from_str(json);
+            DataRetentionDefaults::deserialize_strict(&mut de)
+        };
+        let parsed = strict(r#"{"default": 30, "profiles": 7}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!((parsed.default, parsed.profiles, parsed.logs), (30, 7, 0));
+        assert!(strict(r#"{"index": 7}"#).is_err());
+        assert!(strict(r#"{"metadata": 7}"#).is_err());
+        assert!(strict(r#"{"service_graph": 7}"#).is_err());
+        // the stored form stays lenient so a rollback can still read a newer record
+        let stored: DataRetentionDefaults = serde_json::from_str(r#"{"future": 7}"#).unwrap();
+        assert_eq!(stored, DataRetentionDefaults::default());
     }
 }

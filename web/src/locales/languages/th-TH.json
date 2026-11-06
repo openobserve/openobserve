@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.",
     "addFieldsTitle": "Add Fields",
     "dataRetentionDaysLabel": "Data Retention (days)",
-    "globalRetentionDays": "Global retention is {days} days",
-    "retentionMinOneDay": "Retention period must be at least 1 day",
+    "retentionDefaultDays": "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นสำหรับสตรีมประเภทนี้: {days} วัน",
+    "retentionDefaultForever": "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นสำหรับสตรีมประเภทนี้: เก็บไว้ตลอดไป",
     "maxQueryRangeHoursLabel": "Max Query Range (hours)",
     "maxQueryRangeHelp": "Maximum time range allowed for queries. Set 0 for unlimited range.",
     "globalFlattenLevel": "Global is {level}",
@@ -15524,6 +15524,20 @@
       "awsCredentials": "AWS Credentials",
       "azureCredentials": "Azure Credentials",
       "awsRoleArn": "AWS Role ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "ค่าเริ่มต้นการเก็บข้อมูล",
+      "about": "สำหรับสตรีมที่ไม่ได้กำหนดระยะเวลาเก็บรักษาข้อมูลของตัวเอง หากเว้นว่างหรือเป็น 0 จะใช้ค่าส่วนกลาง มิฉะนั้นต้องมีอย่างน้อย 3 วัน",
+      "defaultDays": "ค่าเริ่มต้น (วัน)",
+      "streamType": "ประเภทสตรีม",
+      "days": "วัน",
+      "addType": "เพิ่มประเภทสตรีม",
+      "removeType": "ลบประเภทสตรีมนี้",
+      "globalDefault": "ส่วนกลาง: {value}",
+      "globalType": "ส่วนกลาง {type}: {value}",
+      "daysValue": "{days} วัน",
+      "forever": "เก็บไว้ตลอดไป",
+      "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",

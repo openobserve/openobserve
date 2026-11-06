@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Les autres champs affichent uniquement les champs de schéma qui existaient avant que le flux soit configuré pour utiliser un schéma défini par l'utilisateur.",
     "addFieldsTitle": "Ajouter des champs",
     "dataRetentionDaysLabel": "Rétention des données (jours)",
-    "globalRetentionDays": "La rétention globale est de {days} jours",
-    "retentionMinOneDay": "La période de rétention doit être d'au moins 1 jour",
+    "retentionDefaultDays": "Laissez vide pour utiliser la valeur par défaut de ce type de flux : {days} jours",
+    "retentionDefaultForever": "Laissez vide pour utiliser la valeur par défaut de ce type de flux : conserver indéfiniment",
     "maxQueryRangeHoursLabel": "Plage de requête maximale (heures)",
     "maxQueryRangeHelp": "Plage de temps maximale autorisée pour les requêtes. Mettez 0 pour une plage illimitée.",
     "globalFlattenLevel": "Le niveau global est {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "Identifiants AWS",
       "azureCredentials": "Identifiants Azure",
       "awsRoleArn": "ARN du rôle AWS"
+    },
+    "dataRetentionDefaults": {
+      "title": "Valeurs par défaut de conservation des données",
+      "about": "Pour les flux sans rétention propre. Vide ou 0 utilise la valeur globale ; sinon au moins 3 jours.",
+      "defaultDays": "Par défaut (jours)",
+      "streamType": "Type de flux",
+      "days": "Jours",
+      "addType": "Ajouter un type de flux",
+      "removeType": "Supprimer ce type de flux",
+      "globalDefault": "Global : {value}",
+      "globalType": "Global {type} : {value}",
+      "daysValue": "{days} jours",
+      "forever": "conserver indéfiniment",
+      "invalid": "Utilisez 0 ou au moins 3 jours"
     },
     "organizationSettings": {
       "fieldNameHelp": "Utilisez uniquement des caractères alphanumériques et '+=,.{'@'}-_', sans espaces.",

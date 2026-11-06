@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Andere Felder zeigen nur die Schemafelder, die vorhanden waren, bevor der Stream für die Verwendung eines benutzerdefinierten Schemas konfiguriert wurde.",
     "addFieldsTitle": "Felder hinzufügen",
     "dataRetentionDaysLabel": "Datenaufbewahrung (Tage)",
-    "globalRetentionDays": "Globale Aufbewahrung ist {days} Tage",
-    "retentionMinOneDay": "Der Aufbewahrungszeitraum muss mindestens 1 Tag betragen",
+    "retentionDefaultDays": "Leer lassen, um den Standard für diesen Stream-Typ zu verwenden: {days} Tage",
+    "retentionDefaultForever": "Leer lassen, um den Standard für diesen Stream-Typ zu verwenden: unbegrenzt aufbewahren",
     "maxQueryRangeHoursLabel": "Maximale Abfragezeitspanne (Stunden)",
     "maxQueryRangeHelp": "Maximaler Zeitbereich für Abfragen. Setzen Sie 0 für unbegrenzten Bereich.",
     "globalFlattenLevel": "Global ist {level}",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS-Anmeldeinformationen",
       "azureCredentials": "Azure-Anmeldeinformationen",
       "awsRoleArn": "AWS-Rolle ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "Standardwerte für die Datenaufbewahrung",
+      "about": "Für Streams ohne eigene Aufbewahrung. Leer oder 0 verwendet den globalen Wert; andernfalls mindestens 3 Tage.",
+      "defaultDays": "Standard (Tage)",
+      "streamType": "Stream-Typ",
+      "days": "Tage",
+      "addType": "Stream-Typ hinzufügen",
+      "removeType": "Diesen Stream-Typ entfernen",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
+      "daysValue": "{days} Tage",
+      "forever": "unbegrenzt aufbewahren",
+      "invalid": "0 oder mindestens 3 Tage verwenden"
     },
     "organizationSettings": {
       "fieldNameHelp": "Verwenden Sie nur alphanumerische Zeichen und '+=,.{'@'}-_', ohne Leerzeichen.",

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.",
     "addFieldsTitle": "Add Fields",
     "dataRetentionDaysLabel": "Data Retention (days)",
-    "globalRetentionDays": "Global retention is {days} days",
-    "retentionMinOneDay": "Retention period must be at least 1 day",
+    "retentionDefaultDays": "Leave empty to use the default for this stream type: {days} days",
+    "retentionDefaultForever": "Leave empty to use the default for this stream type: keep forever",
     "maxQueryRangeHoursLabel": "Max Query Range (hours)",
     "maxQueryRangeHelp": "Maximum time range allowed for queries. Set 0 for unlimited range.",
     "globalFlattenLevel": "Global is {level}",
@@ -15524,6 +15524,20 @@
       "awsCredentials": "AWS Credentials",
       "azureCredentials": "Azure Credentials",
       "awsRoleArn": "AWS Role ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "Data retention defaults",
+      "about": "For streams with no retention of their own. Empty or 0 uses the global value; otherwise at least 3 days.",
+      "defaultDays": "Default (days)",
+      "streamType": "Stream type",
+      "days": "Days",
+      "addType": "Add stream type",
+      "removeType": "Remove this stream type",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
+      "daysValue": "{days} days",
+      "forever": "keep forever",
+      "invalid": "Use 0 or at least 3 days"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",

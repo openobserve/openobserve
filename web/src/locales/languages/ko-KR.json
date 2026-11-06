@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "다른 필드에는 스트림이 사용자 정의 스키마를 사용하도록 구성되기 전에 존재했던 스키마 필드만 표시됩니다.",
     "addFieldsTitle": "필드 추가",
     "dataRetentionDaysLabel": "데이터 보존(일)",
-    "globalRetentionDays": "전역 보존은 {days}일입니다",
-    "retentionMinOneDay": "보존 기간은 최소 1일이어야 합니다",
+    "retentionDefaultDays": "비워 두면 이 스트림 유형의 기본값({days}일)을 사용합니다.",
+    "retentionDefaultForever": "비워 두면 이 스트림 유형의 기본값(영구 보존)을 사용합니다.",
     "maxQueryRangeHoursLabel": "최대 쿼리 범위(시간)",
     "maxQueryRangeHelp": "쿼리에 허용되는 최대 시간 범위입니다. 무제한 범위를 원하면 0으로 설정하세요.",
     "globalFlattenLevel": "전역은 {level}입니다",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS 자격 증명",
       "azureCredentials": "Azure 자격 증명",
       "awsRoleArn": "AWS 역할 ARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "데이터 보존 기본값",
+      "about": "자체 보존 기간이 없는 스트림의 경우. 비어 있거나 0이면 전역 값을 사용하며, 그렇지 않으면 최소 3일입니다.",
+      "defaultDays": "기본값(일)",
+      "streamType": "스트림 유형",
+      "days": "일",
+      "addType": "스트림 유형 추가",
+      "removeType": "이 스트림 유형 제거",
+      "globalDefault": "전역: {value}",
+      "globalType": "전역 {type}: {value}",
+      "daysValue": "{days}일",
+      "forever": "영구 보존",
+      "invalid": "0 또는 최소 3일을 사용하세요"
     },
     "organizationSettings": {
       "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",

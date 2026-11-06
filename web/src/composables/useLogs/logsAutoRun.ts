@@ -47,6 +47,7 @@ import {
   type WindowUs,
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
 import { featureState, type FeatureStates } from "@/utils/featureGate";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
@@ -215,10 +216,10 @@ function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs | nu
   return relativeWindow(signature.time.period, nowUs);
 }
 
-function estimateContext(nowUs: number): EstimateContext {
+function estimateContext(nowUs: number, streamType: string): EstimateContext {
   return {
     nowUs,
-    defaultRetentionDays: Number(zoConfig().data_retention_days ?? 0),
+    defaultRetentionDays: inheritedRetentionDays(appStore?.state ?? {}, streamType),
     superCluster: isSuperCluster(),
   };
 }
@@ -229,7 +230,12 @@ export function estimateSignature(
   nowUs: number,
 ): ScanEstimate {
   const { names } = scopeStreams(signature);
-  return estimateScanMb(names, list, signatureWindow(signature, nowUs), estimateContext(nowUs));
+  return estimateScanMb(
+    names,
+    list,
+    signatureWindow(signature, nowUs),
+    estimateContext(nowUs, signature.streamType),
+  );
 }
 
 function createLogsAutoRun() {
@@ -296,7 +302,7 @@ function createLogsAutoRun() {
       return chooseNarrowPreset(
         scopeStreams(signature).names,
         streamList(),
-        estimateContext(now),
+        estimateContext(now, signature.streamType),
         Number(zoConfig().auto_query_max_scan_mb ?? 0),
         window.endUs - window.startUs,
       );

@@ -5069,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "その他のフィールドには、ストリームがユーザー定義スキーマを使用するように設定される前に存在していたスキーマフィールドのみが表示されます。",
     "addFieldsTitle": "フィールドを追加",
     "dataRetentionDaysLabel": "データ保持期間 (日)",
-    "globalRetentionDays": "グローバル保持期間は {days} 日です",
-    "retentionMinOneDay": "保持期間は少なくとも 1 日必要です",
+    "retentionDefaultDays": "空欄にすると、このストリームタイプのデフォルト（{days} 日）が使用されます",
+    "retentionDefaultForever": "空欄にすると、このストリームタイプのデフォルト（無期限に保持）が使用されます",
     "maxQueryRangeHoursLabel": "最大クエリ範囲 (時間)",
     "maxQueryRangeHelp": "クエリに許可される最大時間範囲。制限なしにするには 0 に設定します。",
     "globalFlattenLevel": "グローバルは {level} です",
@@ -15526,6 +15526,20 @@
       "awsCredentials": "AWS認証情報",
       "azureCredentials": "Azure認証情報",
       "awsRoleArn": "AWSロールARN"
+    },
+    "dataRetentionDefaults": {
+      "title": "データ保持のデフォルト",
+      "about": "独自の保持期間を持たないストリームに適用されます。空または 0 の場合はグローバル値を使用します。それ以外の場合は最低 3 日です。",
+      "defaultDays": "デフォルト（日）",
+      "streamType": "ストリームタイプ",
+      "days": "日数",
+      "addType": "ストリームタイプを追加",
+      "removeType": "このストリームタイプを削除",
+      "globalDefault": "グローバル: {value}",
+      "globalType": "グローバル {type}: {value}",
+      "daysValue": "{days} 日",
+      "forever": "無期限に保持",
+      "invalid": "0 または 3 日以上を指定してください"
     },
     "organizationSettings": {
       "fieldNameHelp": "英数字と'+=,.{'@'}-_'文字のみを使用し、スペースは使用しないでください。",
