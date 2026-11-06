@@ -22,6 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center gap-2">
       <span class="text-text-secondary min-w-0 truncate text-xs">{{ title }}</span>
+      <span
+        v-if="partial && (status === 'ready' || status === 'empty')"
+        class="text-text-secondary shrink-0 text-xs"
+        :data-test="`autoobserve-coverage-chart-partial-${def.signal}`"
+        >{{ t("autoobserveLive.charts.partial") }}</span
+      >
+      <OTooltip v-if="wide && status === 'ready'" :content="wideText">
+        <span
+          role="img"
+          class="text-text-secondary inline-flex shrink-0"
+          :aria-label="wideText"
+          :data-test="`autoobserve-coverage-chart-wide-${def.signal}`"
+          ><OIcon name="info-outline" size="xs"
+        /></span>
+      </OTooltip>
       <OButton
         variant="ghost"
         size="xs"
@@ -35,13 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoobserve.coverage.details") }}
       </OButton>
     </div>
-    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <div
+      class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+      :class="status ? 'min-h-6.25' : ''"
+    >
       <span
-        v-if="cell.state !== 'gap' && !noData"
+        v-if="showValue"
         class="text-text-heading text-xl leading-tight font-semibold tabular-nums"
         :data-test="`autoobserve-coverage-chart-value-${def.signal}`"
         >{{ valueText }}</span
       >
+      <OSkeleton
+        v-else-if="status === 'loading'"
+        class="h-6.25 w-16 self-center"
+        animation="pulse"
+      />
       <span
         v-if="delta"
         class="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums"
@@ -63,8 +86,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
+    <OSkeleton
+      v-if="status === 'loading'"
+      class="h-30"
+      animation="pulse"
+      role="status"
+      :aria-label="t('autoobserveLive.charts.loading', { metric: title })"
+      :data-test="`autoobserve-coverage-chart-loading-${def.signal}`"
+    />
     <div
-      v-if="cell.state === 'gap' && !noData"
+      v-else-if="status === 'failed' || status === 'denied'"
+      :role="status === 'failed' ? 'alert' : 'status'"
+      class="border-banner-error-soft-border bg-banner-error-soft-bg text-banner-error-soft-text rounded-default flex h-30 min-w-0 flex-col items-start justify-center gap-1 border px-3 text-sm"
+      :data-test="`autoobserve-coverage-chart-${status}-${def.signal}`"
+    >
+      <span class="inline-flex min-w-0 items-center gap-1 font-medium"
+        ><OIcon :name="status === 'denied' ? 'lock' : 'error'" size="xs" class="shrink-0" />{{
+          reason
+        }}</span
+      >
+      <span v-if="detail" class="text-text-body line-clamp-2 text-xs break-words" :title="detail">{{
+        detail
+      }}</span>
+      <OButton
+        v-if="status === 'failed'"
+        variant="outline"
+        size="xs"
+        :data-test="`autoobserve-coverage-chart-retry-${def.signal}`"
+        @click="emit('retry')"
+        >{{ t("autoobserveLive.retry") }}</OButton
+      >
+    </div>
+    <div
+      v-else-if="cell.state === 'gap' && !cell.engine && !noData"
       class="bg-hatch-unavailable border-border-default rounded-default text-text-secondary flex h-16 items-center justify-center border border-dashed text-sm"
       :data-test="`autoobserve-coverage-chart-gap-${def.signal}`"
     >
@@ -72,10 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="noData"
-      class="bg-hatch-unavailable border-border-default rounded-default text-text-secondary flex h-16 items-center justify-center border border-dashed text-sm"
+      class="bg-hatch-unavailable border-border-default rounded-default text-text-secondary flex items-center justify-center border border-dashed px-3 text-center text-sm"
+      :class="status ? 'h-30' : 'h-16'"
       :data-test="`autoobserve-coverage-chart-nodata-${def.signal}`"
     >
-      {{ t("autoobserveLive.drawer.chartNoData") }}
+      {{ reason ?? t("autoobserveLive.drawer.chartNoData") }}
     </div>
     <template v-else>
       <div
@@ -84,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-30 min-w-0 cursor-pointer"
         @click="emit('toggle')"
       >
-        <!-- ChartRenderer, not PanelSchemaRenderer: static mock series and a learned band have no query to run. -->
+        <!-- ChartRenderer, not PanelSchemaRenderer: the series is built before it gets here, from a fixture or the drawer's own query. -->
         <ChartRenderer :data="{ options, extras: { panelId, isTimeSeries: true } }" />
       </div>
       <span
@@ -105,6 +160,8 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTheme from "@/composables/useTheme";
 import { chartColor, chartGridLine, chartTextColor } from "@/utils/chartTheme";
 import {
@@ -117,6 +174,7 @@ import {
 } from "./coverageSeries";
 import type { CoverageCell } from "./fixtures";
 import { liveCellWord } from "./live/liveCopy";
+import type { ServiceChartStatus } from "./live/useServiceCharts";
 
 const props = defineProps<{
   def: MetricDef;
@@ -128,9 +186,14 @@ const props = defineProps<{
   expanded: boolean;
   readyOn: I18nText | null;
   noData?: boolean;
+  status?: ServiceChartStatus;
+  reason?: I18nText;
+  detail?: I18nText;
+  partial?: boolean;
+  wide?: boolean;
 }>();
 
-const emit = defineEmits<{ toggle: [] }>();
+const emit = defineEmits<{ toggle: []; retry: [] }>();
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
@@ -139,12 +202,25 @@ const panelId = computed(() => `autoobserve-coverage-${props.def.signal}`);
 
 const title = computed(() => t(props.def.titleKey));
 
-const valueText = computed(() => raw(formatValue(props.def, props.series.current)));
+const valueText = computed(() => {
+  const { current } = props.series;
+  return raw(current == null ? "\u2014" : formatValue(props.def, current));
+});
+
+// A live cell carries engine state, and a live gap still has data worth charting.
+const showValue = computed(
+  () =>
+    !props.noData &&
+    (props.status == null || props.status === "ready") &&
+    (props.cell.state !== "gap" || !!props.cell.engine),
+);
+
+const wideText = computed(() => t("autoobserveLive.charts.wide"));
 
 // Against the start of the window; requests carry no good-or-bad colour.
 const delta = computed(() => {
   const { current, previous } = props.series;
-  if (props.cell.state === "gap" || props.noData || !previous) return null;
+  if (!showValue.value || current == null || !previous) return null;
   const change = (current - previous) / previous;
   const pct = raw(`${Math.round(Math.abs(change) * 100)}%`);
   if (Math.round(Math.abs(change) * 100) === 0)
@@ -177,10 +253,9 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
   if (props.cell.state === "gap")
     return {
       icon: "warning-amber",
-      label:
-        props.noData && props.cell.engine
-          ? liveCellWord(t, props.cell.engine.stateKey)
-          : t("autoobserve.coverage.badgeNotWatched"),
+      label: props.cell.engine
+        ? liveCellWord(t, props.cell.engine.stateKey)
+        : t("autoobserve.coverage.badgeNotWatched"),
       tone: "text-status-warning-text",
     };
   if (props.cell.state === "learning")
@@ -189,7 +264,7 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
       label: t("autoobserve.coverage.badgeLearning", { days, total }),
       tone: "text-status-info-text",
     };
-  if (props.noData && props.cell.engine?.detectorKind)
+  if (props.cell.engine?.detectorKind)
     return {
       icon: anomaly.value ? "insights" : "rule",
       label: props.cell.engine.detectorKind,
@@ -218,6 +293,8 @@ const learningCaption = computed(() => {
 const summary = computed(() => {
   const vars = { metric: title.value, value: valueText.value };
   const { current, low, high } = props.series;
+  if (current == null) return t("autoobserveLive.charts.summaryNone", { metric: title.value });
+  if (props.cell.engine) return t("autoobserveLive.charts.summary", vars);
   if (props.cell.state === "learning") return t("autoobserve.coverage.chartLearning", vars);
   if (!anomaly.value) {
     const limit = props.def.threshold ?? 0;
@@ -245,9 +322,10 @@ const compact = (v: number) =>
 
 const outside = computed(() => {
   const { points, band } = props.series;
-  if (anomaly.value && band) return points.filter(([, v], i) => v > band[i][2] || v < band[i][1]);
+  if (anomaly.value && band)
+    return points.filter(([, v], i) => v != null && (v > band[i][2] || v < band[i][1]));
   const limit = props.def.threshold;
-  return limit == null ? [] : points.filter(([, v]) => v >= limit);
+  return limit == null ? [] : points.filter(([, v]) => v != null && v >= limit);
 });
 
 const options = computed(() => {
@@ -306,11 +384,13 @@ const options = computed(() => {
       confine: true,
       axisPointer: { type: "line", lineStyle: { color: text, width: 1 } },
       textStyle: { fontSize: 12 },
-      formatter: (params: { seriesIndex: number; dataIndex: number; value: number[] }[]) => {
+      formatter: (
+        params: { seriesIndex: number; dataIndex: number; value: [number, number | null] }[],
+      ) => {
         const main = params.find((p) => p.seriesIndex === 0);
         if (!main) return "";
         const [ms, value] = main.value;
-        const parts = [fmtTime(ms), `<b>${formatValue(def, value)}</b>`];
+        const parts = [fmtTime(ms), `<b>${value == null ? "—" : formatValue(def, value)}</b>`];
         const b = band?.[main.dataIndex];
         if (b)
           parts.push(

@@ -247,6 +247,16 @@ export interface CoverageRow {
   status?: { state: "watched" | "gap"; label: I18nText };
   checks?: Record<LiveCheck, CoverageCell>;
   detectors?: number;
+  // Live preview only: the engine row's identity, which the drawer's charts scope their queries by.
+  identity?: LiveIdentity;
+}
+
+export interface LiveIdentity {
+  serviceId: string;
+  serviceName: string;
+  cluster: string | null;
+  namespace: string | null;
+  streams: { type: string; name: string }[];
 }
 
 export interface StreamScan {

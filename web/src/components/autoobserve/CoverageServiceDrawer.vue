@@ -190,7 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <h3 :class="HEADING">{{ t("autoobserve.coverage.signals") }}</h3>
           <OToggleGroup
-            v-if="!live"
             :model-value="range"
             class="ms-auto"
             :aria-label="t('autoobserve.coverage.rangeLabel')"
@@ -220,8 +219,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :end="timeWindow.end"
               :expanded="expanded === chart.def.signal"
               :ready-on="readyOn"
-              :no-data="live"
+              :no-data="!!chart.live && NO_DATA.has(chart.live.status)"
+              :status="chart.live?.status"
+              :reason="chart.live?.reason ?? undefined"
+              :detail="chart.live?.detail ?? undefined"
+              :partial="chart.live?.partial"
+              :wide="chart.live?.wide"
               @toggle="toggle(chart.def.signal)"
+              @retry="chart.live?.retry()"
             >
               <!-- One column on a phone keeps the detail under its own chart instead of under the row. -->
               <CoverageSignalDetail
@@ -346,7 +351,6 @@ import {
   seed,
   seriesFor,
   type ChartRange,
-  type MetricSeries,
 } from "./coverageSeries";
 import {
   detectorsOf,
@@ -369,6 +373,8 @@ import {
   liveCheckText,
   liveGapLines,
 } from "./live/liveCopy";
+import { liveMetricDef, type LiveChartSignal } from "./live/serviceChartSql";
+import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceCharts";
 
 type ServiceState = "watched" | "learning" | "gap";
 
@@ -403,19 +409,15 @@ const CHIP =
   "bg-surface-base border-border-subtle focus-visible:outline-focus-ring-accent inline-flex items-center gap-1.5 rounded-full border py-1 ps-1.5 pe-2.5 text-xs focus-visible:outline-2";
 const ROW =
   "hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default flex w-full cursor-pointer items-center gap-2 px-1 py-1.5 text-start focus-visible:outline-2";
-// The engine sends no metric series, so live charts get an empty one and render their no-data state.
-const NO_SERIES: MetricSeries = {
-  points: [],
-  band: null,
-  anomalies: [],
-  current: 0,
-  previous: 0,
-  low: null,
-  high: null,
-};
 const RANGES: ChartRange[] = ["1h", "24h", "7d"];
-// Of the three checks that decide a live state, only errors and latency have a metric to chart.
-const LIVE_CHARTED: Signal[] = ["errors", "latency"];
+// One chart per check that decides a live state; absence is charted as the service's request volume.
+const LIVE_CHARTED: Signal[] = ["requests", "errors", "latency"];
+const LIVE_CELL: Record<LiveChartSignal, LiveCheck> = {
+  requests: "absence",
+  errors: "errors",
+  latency: "latency",
+};
+const NO_DATA = new Set<ServiceChartStatus>(["noField", "noMatch", "empty"]);
 const RANGE_MS: Record<ChartRange, number> = {
   "1h": 59 * 60_000,
   "24h": 95 * 15 * 60_000,
@@ -481,7 +483,16 @@ watch(
   },
 );
 
-const timeWindow = computed(() => ({ start: DEMO_END - RANGE_MS[range.value], end: DEMO_END }));
+const serviceCharts = useServiceCharts(
+  computed(() => (props.live ? props.row : null)),
+  range,
+);
+
+const timeWindow = computed(() =>
+  props.live
+    ? serviceCharts.span.value
+    : { start: DEMO_END - RANGE_MS[range.value], end: DEMO_END },
+);
 
 const state = computed<ServiceState>(() => props.serviceStates[props.row.service] ?? "watched");
 
@@ -524,12 +535,17 @@ const liveChecks = computed(() => (props.live ? (props.row.checks ?? null) : nul
 
 const charts = computed(() =>
   metricsFor(props.row)
-    .filter((def) => (liveChecks.value ? LIVE_CHARTED : CHART_SIGNALS).includes(def.signal))
-    .map((def) => ({
-      def: props.live ? { ...def, titleKey: SIGNAL_LABEL[def.signal] } : def,
-      cell: liveChecks.value?.[def.signal as LiveCheck] ?? props.row.cells[def.signal],
-      series: props.live ? NO_SERIES : seriesFor(props.scenario, props.row, def, range.value),
-    }))
+    .filter((def) => (props.live ? LIVE_CHARTED : CHART_SIGNALS).includes(def.signal))
+    .map((def) => {
+      const signal = def.signal as LiveChartSignal;
+      const live = props.live ? serviceCharts.charts.value[signal] : null;
+      return {
+        def: live ? liveMetricDef(signal, live.unit) : def,
+        cell: liveChecks.value?.[LIVE_CELL[signal]] ?? props.row.cells[def.signal],
+        series: live ? live.series : seriesFor(props.scenario, props.row, def, range.value),
+        live,
+      };
+    })
     .filter((chart) => chart.cell.state !== "na"),
 );
 
@@ -604,7 +620,7 @@ const openSignal = (signal: Signal) => emit("expand", signal);
 
 const toggle = (signal: Signal) => emit("expand", props.expanded === signal ? null : signal);
 
-// Absence has no chart with its own Details toggle, so its chip toggles its detail open and shut.
+// Absence's chip opens its detail in the watched card, so the chip toggles it open and shut.
 const openCheck = (check: LiveCheck) => {
   if (check === "absence") emit("expand", props.expanded === "absence" ? null : "absence");
   else openSignal(check);
