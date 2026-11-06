@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const RETENTION_STREAM_TYPES = [
-  "logs",
-  "metrics",
-  "traces",
-  "profiles",
-  "metadata",
-] as const;
+export const RETENTION_STREAM_TYPES = ["logs", "metrics", "traces", "profiles"] as const;
 
 export type RetentionStreamType = (typeof RETENTION_STREAM_TYPES)[number];
 
@@ -31,43 +25,31 @@ interface RetentionState {
   organizationData?: {
     organizationSettings?: { resolved_data_retention?: ResolvedDataRetention };
   };
-  zoConfig?: { data_retention_days?: number };
+  zoConfig?: { data_retention_defaults?: ResolvedDataRetention };
 }
 
-interface RetentionStream {
-  stream_type?: string;
-  settings?: { data_retention?: number } | null;
-}
-
-export const retentionKeyFor = (streamType: string): RetentionKey =>
-  (RETENTION_STREAM_TYPES as readonly string[]).includes(streamType)
-    ? (streamType as RetentionStreamType)
-    : "default";
-
-/** Days a stream with no value of its own keeps data, 0 for forever; the backend owns the ordering. */
-export const inheritedRetentionDays = (state: RetentionState, streamType: string): number => {
-  const resolved = state.organizationData?.organizationSettings?.resolved_data_retention;
-  return Number(
-    resolved ? resolved[retentionKeyFor(streamType)] : (state.zoConfig?.data_retention_days ?? 0),
-  );
+const metadataSourceType = (streamName: string): RetentionStreamType | undefined => {
+  if (streamName.startsWith("trace_time_index_")) return "traces";
+  if (!streamName.startsWith("distinct_values_")) return undefined;
+  const typedName = streamName.slice("distinct_values_".length);
+  return RETENTION_STREAM_TYPES.find((type) => typedName.startsWith(`${type}_`));
 };
 
-export const isShorterRetention = (before: number, after: number): boolean =>
-  after > 0 && (before <= 0 || after < before);
+export const retentionKeyFor = (streamType: string, streamName = ""): RetentionKey => {
+  if (streamType === "metadata") return metadataSourceType(streamName) ?? "default";
+  return (RETENTION_STREAM_TYPES as readonly string[]).includes(streamType)
+    ? (streamType as RetentionStreamType)
+    : "default";
+};
 
-export const loweredRetentionKeys = (
-  before: ResolvedDataRetention,
-  after: ResolvedDataRetention,
-): RetentionKey[] =>
-  (Object.keys(after) as RetentionKey[]).filter((key) =>
-    isShorterRetention(before[key], after[key]),
-  );
-
-/** Streams that lose data when these defaults shrink: no value of their own, and subject to retention. */
-export const countInheritingStreams = (streams: RetentionStream[], keys: RetentionKey[]): number =>
-  streams.filter((stream) => {
-    const type = stream.stream_type ?? "logs";
-    if (["enrichment_tables", "file_list", "index"].includes(type)) return false;
-    if (Number(stream.settings?.data_retention ?? 0) > 0) return false;
-    return keys.includes(retentionKeyFor(type));
-  }).length;
+/** Days a stream with no value of its own keeps data, 0 for forever; the backend owns the ordering. */
+export const inheritedRetentionDays = (
+  state: RetentionState,
+  streamType: string,
+  streamName = "",
+): number => {
+  const resolved =
+    state.organizationData?.organizationSettings?.resolved_data_retention ??
+    state.zoConfig?.data_retention_defaults;
+  return Number(resolved?.[retentionKeyFor(streamType, streamName)] ?? 0);
+};

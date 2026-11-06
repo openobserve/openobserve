@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('logStream.dataRetention')"
             class="showLabelOnTop"
             type="number"
-            :placeholder="retentionPlaceholder"
             :help-text="retentionHelp"
           />
         </div>
@@ -109,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('logStream.dataRetention')"
           class="showLabelOnTop"
           type="number"
-          :placeholder="retentionPlaceholder"
           :help-text="retentionHelp"
         />
       </div>
@@ -121,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { watch, computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
@@ -205,7 +203,6 @@ const showDataRetention = computed(() => formStreamType.value !== "enrichment_ta
 const inheritedRetention = computed(() =>
   inheritedRetentionDays(store.state, formStreamType.value),
 );
-const retentionPlaceholder = computed(() => raw(String(inheritedRetention.value || "")));
 const retentionHelp = computed(() =>
   inheritedRetention.value > 0
     ? t("logStream.retentionDefaultDays", { days: inheritedRetention.value })

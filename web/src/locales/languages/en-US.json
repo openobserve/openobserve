@@ -15501,23 +15501,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Data retention defaults",
-      "about": "For streams with no retention of their own. Empty or 0 inherits the next level; otherwise at least 3 days.",
+      "about": "For streams with no retention of their own. Empty or 0 uses the global value; otherwise at least 3 days.",
       "defaultDays": "Default (days)",
       "streamType": "Stream type",
       "days": "Days",
       "addType": "Add stream type",
       "removeType": "Remove this stream type",
-      "otherTypes": "Other stream types",
-      "inherit": "Inherit",
-      "resolved": "Streams use: {value}",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
       "daysValue": "{days} days",
       "forever": "keep forever",
-      "invalid": "Use 0 or at least 3 days",
-      "confirmTitle": "Lower data retention?",
-      "confirmMessage": "This shortens the default retention: {changes}.",
-      "change": "{type} from {from} to {to}",
-      "confirmWarning": "No stream inherits these defaults right now. | {count} stream inherits these defaults. Data past the new retention is deleted on the next retention run and can't be recovered. | {count} streams inherit these defaults. Data past the new retention is deleted on the next retention run and can't be recovered.",
-      "confirmOk": "Lower retention"
+      "invalid": "Use 0 or at least 3 days"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",

@@ -132,13 +132,6 @@ const organizations = {
   post_organization_settings: (orgIdentifier: string, data: any) => {
     return http().post(`/api/${orgIdentifier}/settings`, data);
   },
-  preview_data_retention: (orgIdentifier: string, dataRetention: any) => {
-    return http().post(
-      `/api/${orgIdentifier}/settings`,
-      { data_retention: dataRetention },
-      { params: { dry_run: true } },
-    );
-  },
   list_org_domains: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/settings/domains`);
   },

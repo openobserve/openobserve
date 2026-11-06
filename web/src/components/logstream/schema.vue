@@ -481,7 +481,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             type="number"
                             min="1"
                             class="max-w-55"
-                            :placeholder="raw(String(inheritedRetention || ''))"
                             @update:model-value="markFormDirty"
                           />
                           <small data-test="stream-details-inherited-retention">
@@ -1833,7 +1832,7 @@ export default defineComponent({
     const showDataRetention = computed(() => modelValue.stream_type !== "enrichment_tables");
 
     const inheritedRetention = computed(() =>
-      inheritedRetentionDays(store.state, String(modelValue.stream_type)),
+      inheritedRetentionDays(store.state, String(modelValue.stream_type), String(modelValue.name)),
     );
 
     const disableOptions = (schema: any, option: any) => {

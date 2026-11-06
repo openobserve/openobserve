@@ -26,7 +26,10 @@ use config::{
     meta::stream::{
         DataRetentionDefaults, MAX_DATA_RETENTION_DAYS, RETENTION_STREAM_TYPES, StreamType,
     },
-    utils::json,
+    utils::{
+        json,
+        util::{DISTINCT_STREAM_PREFIX, TRACE_TIME_INDEX_STREAM_PREFIX},
+    },
 };
 use infra::{
     coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
@@ -127,10 +130,13 @@ pub async fn stream_retention_days(
     stream_name: &str,
     stream_days: i64,
 ) -> Result<i64, Error> {
-    if stream_type == StreamType::Index {
-        return index_stream_retention_days(org_id, stream_name).await;
+    match stream_type {
+        StreamType::Index => index_stream_retention_days(org_id, stream_name).await,
+        StreamType::Metadata => {
+            metadata_stream_retention_days(org_id, stream_name, stream_days).await
+        }
+        _ => data_stream_retention_days(org_id, stream_type, stream_days).await,
     }
-    data_stream_retention_days(org_id, stream_type, stream_days).await
 }
 
 /// The global levels alone, for a caller that only estimates and can live with a failed org read.
@@ -164,7 +170,6 @@ pub fn resolved_retention_defaults(org: &DataRetentionDefaults) -> DataRetention
         metrics: days(StreamType::Metrics),
         traces: days(StreamType::Traces),
         profiles: days(StreamType::Profiles),
-        metadata: days(StreamType::Metadata),
     }
 }
 
@@ -637,17 +642,57 @@ async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result
         );
         return Ok(0);
     };
-    let source_days = infra::schema::get_settings(org_id, source, source_type)
-        .await
-        .map_or(0, |settings| settings.data_retention);
+    let source_days = stored_retention_days(org_id, source, source_type).await;
+    if source_type == StreamType::Metadata {
+        return metadata_stream_retention_days(org_id, source, source_days).await;
+    }
     data_stream_retention_days(org_id, source_type, source_days).await
+}
+
+/// A derived metadata stream has no default of its own: it expires with the stream it describes.
+async fn metadata_stream_retention_days(
+    org_id: &str,
+    metadata_stream: &str,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    if stream_days > 0 {
+        return data_stream_retention_days(org_id, StreamType::Metadata, stream_days).await;
+    }
+    let Some((source, source_type)) = metadata_stream_source(metadata_stream) else {
+        return data_stream_retention_days(org_id, StreamType::Metadata, 0).await;
+    };
+    let source_days = stored_retention_days(org_id, source, source_type).await;
+    data_stream_retention_days(org_id, source_type, source_days).await
+}
+
+async fn stored_retention_days(org_id: &str, stream: &str, stream_type: StreamType) -> i64 {
+    infra::schema::get_settings(org_id, stream, stream_type)
+        .await
+        .map_or(0, |settings| settings.data_retention)
 }
 
 /// Index streams are named `<source stream>_<source type>`.
 fn index_stream_source(index_stream: &str) -> Option<(&str, StreamType)> {
+    RETENTION_STREAM_TYPES
+        .into_iter()
+        .chain([StreamType::Metadata])
+        .find_map(|source_type| {
+            let source = index_stream.strip_suffix(source_type.as_str())?;
+            let source = source.strip_suffix('_')?;
+            (!source.is_empty()).then_some((source, source_type))
+        })
+}
+
+/// Metadata streams are named `distinct_values_<source type>_<source>` or
+/// `trace_time_index_<source>`.
+fn metadata_stream_source(metadata_stream: &str) -> Option<(&str, StreamType)> {
+    if let Some(source) = metadata_stream.strip_prefix(TRACE_TIME_INDEX_STREAM_PREFIX) {
+        return (!source.is_empty()).then_some((source, StreamType::Traces));
+    }
+    let typed_source = metadata_stream.strip_prefix(DISTINCT_STREAM_PREFIX)?;
     RETENTION_STREAM_TYPES.into_iter().find_map(|source_type| {
-        let source = index_stream.strip_suffix(source_type.as_str())?;
-        let source = source.strip_suffix('_')?;
+        let source = typed_source.strip_prefix(source_type.as_str())?;
+        let source = source.strip_prefix('_')?;
         (!source.is_empty()).then_some((source, source_type))
     })
 }
@@ -662,34 +707,12 @@ fn default_retention_days(
     org: &DataRetentionDefaults,
     global: &DataRetentionDefaults,
 ) -> i64 {
-    if stream_type == StreamType::Metadata && org.metadata <= 0 && global.metadata <= 0 {
-        return longest_source_retention_days(org, global);
-    }
     first_positive(&[
         org.for_type(stream_type),
         org.default,
         global.for_type(stream_type),
         global.default,
     ])
-}
-
-/// Metadata must not expire before any stream it describes, and forever (0) outlasts any.
-fn longest_source_retention_days(
-    org: &DataRetentionDefaults,
-    global: &DataRetentionDefaults,
-) -> i64 {
-    let sources = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::Profiles,
-    ]
-    .map(|source| default_retention_days(source, org, global));
-    if sources.contains(&0) {
-        0
-    } else {
-        sources.into_iter().max().unwrap_or_default()
-    }
 }
 
 fn first_positive(levels: &[i64]) -> i64 {
@@ -1123,31 +1146,6 @@ mod tests {
     }
 
     #[test]
-    fn metadata_keeps_the_longest_source_unless_it_has_its_own_value() {
-        let none = levels(0, 0, 0, 0);
-        let metadata = |org, global| default_retention_days(StreamType::Metadata, &org, &global);
-        // the source inherits a per-type value longer than the default
-        assert_eq!(metadata(none, levels(30, 0, 180, 0)), 180);
-        // the org layer counts too
-        assert_eq!(metadata(levels(0, 0, 400, 0), levels(30, 0, 180, 0)), 400);
-        // logs and traces are kept forever, so must be what describes them
-        assert_eq!(metadata(none, levels(0, 0, 180, 0)), 0);
-        assert_eq!(metadata(none, none), 0);
-        // its own value, at either level, takes the normal order
-        let own_org = DataRetentionDefaults {
-            metadata: 9,
-            ..none
-        };
-        let own_global = DataRetentionDefaults {
-            metadata: 9,
-            ..levels(30, 0, 180, 0)
-        };
-        assert_eq!(metadata(own_org, levels(30, 0, 180, 0)), 9);
-        assert_eq!(metadata(none, own_global), 9);
-        assert_eq!(metadata(levels(20, 0, 0, 0), own_global), 20);
-    }
-
-    #[test]
     fn index_stream_source_comes_from_its_name() {
         assert_eq!(
             index_stream_source("app_logs"),
@@ -1168,6 +1166,29 @@ mod tests {
     }
 
     #[test]
+    fn metadata_stream_source_comes_from_its_name() {
+        assert_eq!(
+            metadata_stream_source(&config::utils::util::get_trace_time_index_stream_name(
+                "a_b"
+            )),
+            Some(("a_b", StreamType::Traces))
+        );
+        for stream_type in RETENTION_STREAM_TYPES {
+            assert_eq!(
+                metadata_stream_source(&config::utils::util::get_distinct_stream_name(
+                    stream_type,
+                    "a_logs"
+                )),
+                Some(("a_logs", stream_type))
+            );
+        }
+        assert_eq!(metadata_stream_source("trace_time_index_"), None);
+        assert_eq!(metadata_stream_source("distinct_values_logs_"), None);
+        assert_eq!(metadata_stream_source("distinct_values_unknown_a"), None);
+        assert_eq!(metadata_stream_source("app"), None);
+    }
+
+    #[test]
     fn resolved_defaults_answer_each_stream_type() {
         // these org values leave no level to the global layer, whatever the environment sets
         let org = DataRetentionDefaults {
@@ -1182,7 +1203,6 @@ mod tests {
                 metrics: 7,
                 traces: 40,
                 profiles: 8,
-                metadata: 40,
             }
         );
 
@@ -1193,29 +1213,6 @@ mod tests {
             resolved.metrics,
             first_positive(&[global.metrics, global.default])
         );
-    }
-
-    #[test]
-    fn metadata_treats_keep_forever_as_longer_than_any_number_of_days() {
-        let none = levels(0, 0, 0, 0);
-        let metadata = |org, global| default_retention_days(StreamType::Metadata, &org, &global);
-        let sources = |logs, metrics, traces, profiles| DataRetentionDefaults {
-            logs,
-            metrics,
-            traces,
-            profiles,
-            ..Default::default()
-        };
-        // every source is finite: the longest wins
-        assert_eq!(metadata(none, sources(30, 180, 7, 14)), 180);
-        assert_eq!(metadata(none, sources(30, 180, 7, 400)), 400);
-        // a numeric maximum would give 180 and expire metadata before the logs it describes
-        assert_eq!(metadata(none, sources(0, 180, 7, 14)), 0);
-        assert_eq!(metadata(none, sources(30, 0, 7, 14)), 0);
-        assert_eq!(metadata(none, sources(30, 180, 0, 14)), 0);
-        assert_eq!(metadata(none, sources(30, 180, 7, 0)), 0);
-        // the org layer can close the gap that left a source forever
-        assert_eq!(metadata(sources(400, 0, 0, 0), sources(0, 180, 7, 14)), 400);
     }
 
     #[test]
@@ -1232,6 +1229,38 @@ mod tests {
         // no org settings or store exist for this org, so a lookup would fail
         assert_eq!(
             stream_retention_days("no-such-org", StreamType::Metrics, "s", 5)
+                .await
+                .unwrap(),
+            5
+        );
+    }
+
+    #[tokio::test]
+    async fn a_metadata_stream_follows_the_stream_it_was_derived_from() {
+        let org = "metadata_follows_source";
+        let days = |data_retention| {
+            std::sync::Arc::new(config::meta::stream::StreamSettings {
+                data_retention,
+                ..Default::default()
+            })
+        };
+        let resolve = |stream_type, stream| stream_retention_days(org, stream_type, stream, 0);
+        infra::schema::put_stream_settings(format!("{org}/traces/own"), days(77)).await;
+        infra::schema::put_stream_settings(format!("{org}/metadata/trace_time_index_own"), days(0))
+            .await;
+
+        for stream in ["trace_time_index_own", "distinct_values_traces_own"] {
+            assert_eq!(resolve(StreamType::Metadata, stream).await.unwrap(), 77);
+        }
+        assert_eq!(
+            resolve(StreamType::Index, "trace_time_index_own_metadata")
+                .await
+                .unwrap(),
+            77
+        );
+        // a value synced from the source wins without reading the source
+        assert_eq!(
+            stream_retention_days(org, StreamType::Metadata, "trace_time_index_own", 5)
                 .await
                 .unwrap(),
             5

@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           min="0"
           class="showLabelOnTop py-3"
-          :placeholder="t('settings.dataRetentionDefaults.inherit')"
-          :help-text="resolvedHelp('default')"
+          :help-text="globalHelp('default')"
         />
       </div>
 
@@ -59,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.dataRetentionDefaults.days')"
             type="number"
             min="0"
-            :help-text="resolvedHelp(row.type)"
+            :help-text="globalHelp(row.type)"
           />
         </div>
         <div class="flex shrink-0 flex-col gap-1">
@@ -97,42 +96,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
     </OForm>
-
-    <ConfirmDialog
-      v-model="confirmOpen"
-      :title="t('settings.dataRetentionDefaults.confirmTitle')"
-      :message="confirmMessage"
-      :warning-message="confirmWarning"
-      :ok-label="t('settings.dataRetentionDefaults.confirmOk')"
-      ok-variant="destructive"
-      focus-cancel
-      @update:ok="onConfirm"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, watch } from "vue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { orgSettingsQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
 import {
-  orgSettingsQuery,
-  previewOrgDataRetentionMutation,
-  updateOrgSettingsMutation,
-} from "@/services/organizations.queries";
-import { streamNameListQuery } from "@/services/stream.queries";
-import {
-  countInheritingStreams,
-  loweredRetentionKeys,
   RETENTION_STREAM_TYPES,
   type ResolvedDataRetention,
   type RetentionKey,
@@ -152,14 +132,12 @@ const queryClient = useQueryClient();
 
 const settings = useQuery(() => orgSettingsQuery(orgId.value));
 const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
-const previewRetention = useMutation(() => previewOrgDataRetentionMutation(orgId.value));
 
 const typeLabels = computed((): Record<RetentionStreamType, I18nText> => ({
   logs: t("logStream.labelLogs"),
   metrics: t("logStream.labelMetrics"),
   traces: t("logStream.labelTraces"),
   profiles: t("logStream.labelProfiles"),
-  metadata: t("logStream.labelMetadata"),
 }));
 
 const toFormValues = (stored?: DefaultsPayload): DataRetentionDefaultsForm => ({
@@ -196,105 +174,43 @@ const typeOptions = (index: number) =>
 const addRow = () => form.pushFieldValue("types", { type: freeTypes.value[0], days: "" });
 const removeRow = (index: number) => form.removeFieldValue("types", index);
 
-const resolved = computed(
-  (): ResolvedDataRetention | undefined => settings.data.value?.resolved_data_retention,
+const globalDefaults = computed(
+  (): ResolvedDataRetention | undefined => store.state?.zoConfig?.data_retention_defaults,
 );
 
-const daysLabel = (days: number): I18nText =>
-  days > 0
-    ? t("settings.dataRetentionDefaults.daysValue", { days })
-    : t("settings.dataRetentionDefaults.forever");
-
-const resolvedHelp = (key: RetentionKey): I18nText =>
-  t("settings.dataRetentionDefaults.resolved", { value: daysLabel(resolved.value?.[key] ?? 0) });
-
-const keyLabel = (key: RetentionKey): I18nText =>
-  key === "default" ? t("settings.dataRetentionDefaults.otherTypes") : typeLabels.value[key];
-
-const confirmOpen = ref(false);
-const confirmMessage = shallowRef<I18nText>(raw(""));
-const confirmWarning = shallowRef<I18nText>(raw(""));
-const pendingDefaults = ref<DefaultsPayload | null>(null);
-
-const showError = (e: any) =>
-  toast({
-    variant: "error",
-    message:
-      raw(e?.response?.data?.message) ||
-      raw(e?.message) ||
-      t("settings.organizationSettings.settingsSaveError"),
-  });
-
-const save = async (candidate: DefaultsPayload) => {
-  await updateOrgSettings.mutateAsync({ data_retention: candidate });
-  const fresh = await queryClient.fetchQuery(orgSettingsQuery(orgId.value));
-  store.dispatch("setOrganizationSettings", {
-    ...store.state?.organizationData?.organizationSettings,
-    data_retention: fresh?.data?.data_retention,
-    resolved_data_retention: fresh?.resolved_data_retention,
-  });
-  toast({ variant: "success", message: t("settings.organizationSettings.settingsUpdated") });
-};
-
-const askToConfirm = async (
-  candidate: DefaultsPayload,
-  lowered: RetentionKey[],
-  next: ResolvedDataRetention,
-  current: ResolvedDataRetention,
-) => {
-  // The list endpoint answers one stream type at a time.
-  const lists = await Promise.all(
-    lowered
-      .filter((key) => key !== "default")
-      .map((key) =>
-        queryClient.fetchQuery({ ...streamNameListQuery(orgId.value, key), staleTime: 0 }),
-      ),
-  );
-  const count = countInheritingStreams(lists.flat(), lowered);
-  // The default only speaks for types with no entry of their own, which hold no data.
-  const typed = lowered.filter((key) => key !== "default");
-  const changes = (typed.length > 0 ? typed : lowered)
-    .map((key) =>
-      t("settings.dataRetentionDefaults.change", {
-        type: keyLabel(key),
-        from: daysLabel(current[key]),
-        to: daysLabel(next[key]),
-      }),
-    )
-    .join(", ");
-  confirmMessage.value = t("settings.dataRetentionDefaults.confirmMessage", {
-    changes: raw(changes),
-  });
-  confirmWarning.value = t("settings.dataRetentionDefaults.confirmWarning", { count }, count);
-  pendingDefaults.value = candidate;
-  confirmOpen.value = true;
+const globalHelp = (key: RetentionKey): I18nText => {
+  const days = globalDefaults.value?.[key] ?? 0;
+  const value =
+    days > 0
+      ? t("settings.dataRetentionDefaults.daysValue", { days })
+      : t("settings.dataRetentionDefaults.forever");
+  return key === "default"
+    ? t("settings.dataRetentionDefaults.globalDefault", { value })
+    : t("settings.dataRetentionDefaults.globalType", { type: typeLabels.value[key], value });
 };
 
 const onSubmit = async (value: DataRetentionDefaultsForm) => {
   const candidate: DefaultsPayload = { default: Number(value.default || 0) };
   for (const row of value.types) candidate[row.type] = Number(row.days);
   try {
-    const next: ResolvedDataRetention = (await previewRetention.mutateAsync(candidate)).data
-      .resolved_data_retention;
-    const current = resolved.value ?? next;
-    const lowered = loweredRetentionKeys(current, next);
-    if (lowered.length > 0) await askToConfirm(candidate, lowered, next, current);
-    else await save(candidate);
+    await updateOrgSettings.mutateAsync({ data_retention: candidate });
+    const fresh = await queryClient.fetchQuery(orgSettingsQuery(orgId.value));
+    store.dispatch("setOrganizationSettings", {
+      ...store.state?.organizationData?.organizationSettings,
+      data_retention: fresh?.data?.data_retention,
+      resolved_data_retention: fresh?.resolved_data_retention,
+    });
+    toast({ variant: "success", message: t("settings.organizationSettings.settingsUpdated") });
   } catch (e: any) {
-    showError(e);
+    toast({
+      variant: "error",
+      message:
+        raw(e?.response?.data?.message) ||
+        raw(e?.message) ||
+        t("settings.organizationSettings.settingsSaveError"),
+    });
   }
 };
 
-const onConfirm = async () => {
-  const candidate = pendingDefaults.value;
-  pendingDefaults.value = null;
-  if (!candidate) return;
-  try {
-    await save(candidate);
-  } catch (e: any) {
-    showError(e);
-  }
-};
-
-defineExpose({ onSubmit, onConfirm, confirmOpen, confirmMessage, confirmWarning, addRow });
+defineExpose({ onSubmit, addRow });
 </script>

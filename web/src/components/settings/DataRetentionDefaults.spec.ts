@@ -37,9 +37,16 @@ describe("DataRetentionDefaults schema", () => {
 
   it("requires days on a row, and accepts only the configurable types", () => {
     expect(acceptsRow("metrics", 180)).toBe(true);
-    expect(acceptsRow("metadata", 3)).toBe(true);
+    expect(acceptsRow("profiles", 3)).toBe(true);
     expect(acceptsRow("metrics", "")).toBe(false);
-    for (const type of ["index", "service_graph", "enrichment_tables", "file_list", ""]) {
+    for (const type of [
+      "metadata",
+      "index",
+      "service_graph",
+      "enrichment_tables",
+      "file_list",
+      "",
+    ]) {
       expect(acceptsRow(type, 30)).toBe(false);
     }
   });
