@@ -23,7 +23,7 @@ use arrow::{array::RecordBatch, datatypes::SchemaRef};
 use datafusion::{common::Result, execution::RecordBatchStream};
 use futures::Stream;
 
-use crate::cache::streaming_agg::get_record_batches;
+use crate::datafusion::physical_plan::streaming_aggs_exec::files::get_record_batches;
 
 pub(crate) struct CachedFileStream {
     id: String,

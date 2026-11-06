@@ -474,7 +474,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = &partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(streaming_id)
+        streaming_aggs_exec::registry::remove_cache(streaming_id)
     }
 
     Ok(())
@@ -998,7 +998,7 @@ pub async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(&streaming_id)
+        streaming_aggs_exec::registry::remove_cache(&streaming_id)
     }
 
     Ok(())

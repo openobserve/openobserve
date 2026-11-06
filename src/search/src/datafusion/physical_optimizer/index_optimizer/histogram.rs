@@ -337,9 +337,9 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        optimizer::rewrite_histogram::RewriteHistogram,
+        datasource::empty_table::NewEmptyTable, optimizer::rewrite_histogram::RewriteHistogram,
         physical_optimizer::index_optimizer::utils::tests::get_partial_aggregate_plan,
-        table_provider::empty_table::NewEmptyTable, udf::time::histogram,
+        udf::time::histogram,
     };
 
     #[tokio::test]

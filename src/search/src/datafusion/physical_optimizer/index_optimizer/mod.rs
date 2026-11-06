@@ -34,12 +34,15 @@ use parking_lot::Mutex;
 mod count;
 mod distinct;
 mod histogram;
+pub mod index;
+pub mod index_aggregate_rewrite;
+pub mod rewrite_match;
 mod select;
 mod topn;
 mod utils;
 
 use crate::datafusion::{
-    distributed::remote_scan_exec::RemoteScanExec,
+    distributed::remote_scan::remote_scan_exec::RemoteScanExec,
     physical_optimizer::index_optimizer::{
         count::is_simple_count,
         distinct::is_simple_distinct,
@@ -351,14 +354,14 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        distributed::node::RemoteScanNode,
+        datasource::empty_table::NewEmptyTable,
+        distributed::remote_scan::node::RemoteScanNode,
         optimizer::like_to_str_match::RewriteLikeToStrMatch,
         physical_optimizer::{
             aggregate_topk::AggregateTopkRule, index_optimizer::utils::tests::get_remote_scan,
             remote_scan::RemoteScanRule,
         },
         sort_order::FileSortOrder,
-        table_provider::empty_table::NewEmptyTable,
     };
 
     #[test]

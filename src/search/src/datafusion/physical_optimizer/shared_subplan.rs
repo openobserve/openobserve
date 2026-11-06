@@ -29,7 +29,7 @@ use datafusion::{
 };
 
 use crate::datafusion::{
-    distributed::remote_scan_exec::RemoteScanExec,
+    distributed::remote_scan::remote_scan_exec::RemoteScanExec,
     physical_plan::shared_subplan_exec::{SharedSubplanExec, SharedSubplanMarkerExec},
 };
 
@@ -149,7 +149,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        distributed::node::RemoteScanNode,
+        distributed::remote_scan::node::RemoteScanNode,
         physical_plan::shared_subplan_exec::SharedSubplanReaderExec,
     };
 

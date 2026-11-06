@@ -28,7 +28,7 @@ use flight::{
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 
-use super::remote_scan_exec::RemoteScanExec;
+use crate::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
 
 /// One remote node as the leader sees it, published to its scan on drop; the default records
 /// nothing.
@@ -207,7 +207,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::datafusion::distributed::node::RemoteScanNode;
+    use crate::datafusion::distributed::remote_scan::node::RemoteScanNode;
 
     #[derive(Debug)]
     struct TestNode;

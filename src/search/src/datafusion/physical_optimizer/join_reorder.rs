@@ -109,9 +109,8 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        optimizer::limit_join_right_side::LimitJoinRightSide,
-        planner::extension_planner::OpenobserveQueryPlanner,
-        table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable,
+        optimizer::limit_join_right_side::LimitJoinRightSide, planner::OpenobserveQueryPlanner,
     };
 
     #[test]

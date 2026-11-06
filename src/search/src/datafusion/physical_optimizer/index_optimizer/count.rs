@@ -98,7 +98,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::datafusion::table_provider::empty_table::NewEmptyTable;
+    use crate::datafusion::datasource::empty_table::NewEmptyTable;
 
     #[tokio::test]
     async fn test_is_simple_count() -> Result<()> {

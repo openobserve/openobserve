@@ -30,7 +30,7 @@ use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
 use crate::{
-    datafusion::distributed::query_context::{QueryContext, process_partial_err},
+    datafusion::distributed::remote_scan::query_context::{QueryContext, process_partial_err},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 

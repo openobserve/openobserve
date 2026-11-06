@@ -349,10 +349,12 @@ mod tests {
     use super::*;
     use crate::datafusion::{
         context::SearchContextBuilder,
-        distributed::{codec::get_physical_extension_codec, remote_scan_exec::RemoteScanExec},
+        datasource::empty_table::NewEmptyTable,
+        distributed::{
+            codec::get_physical_extension_codec, remote_scan::remote_scan_exec::RemoteScanExec,
+        },
         optimizer::rewrite_histogram::RewriteHistogram,
         physical_optimizer::{context::RemoteScanContext, remote_scan::RemoteScanRule},
-        table_provider::empty_table::NewEmptyTable,
         udf::time::histogram,
     };
 

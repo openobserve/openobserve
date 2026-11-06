@@ -21,8 +21,9 @@ use std::{
     },
 };
 
-use datafusion::execution::memory_pool::{
-    MemoryConsumer, MemoryLimit, MemoryPool, MemoryReservation,
+use datafusion::{
+    execution::memory_pool::{MemoryConsumer, MemoryLimit, MemoryPool, MemoryReservation},
+    prelude::SessionContext,
 };
 
 /// A memory pool wrapper that tracks the peak memory usage during DataFusion execution.
@@ -113,6 +114,18 @@ impl Drop for PeakMemoryPool {
             self.trace_id,
         );
     }
+}
+
+/// Get the peak memory from the SessionContext's memory pool.
+/// This should be called after the query execution to get the peak memory usage.
+pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
+    ctx.runtime_env()
+        .memory_pool
+        .clone()
+        .downcast_ref::<PeakMemoryPool>()
+        .unwrap()
+        .peak_memory
+        .clone()
 }
 
 #[cfg(test)]

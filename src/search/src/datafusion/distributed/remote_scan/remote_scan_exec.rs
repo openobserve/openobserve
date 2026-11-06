@@ -38,13 +38,16 @@ use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;
 use rand::prelude::SliceRandom;
 
-use super::{node::RemoteScanNode, profile::NodeProfileRecorder};
+use super::node::RemoteScanNode;
 use crate::datafusion::{
     distributed::{
+        analyze::profile::NodeProfileRecorder,
         codec::get_physical_extension_codec,
-        decoder_stream::FlightDecoderStream,
-        flight_client::make_flight_client,
-        query_context::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
+        remote_scan::{
+            decoder_stream::FlightDecoderStream,
+            flight_client::make_flight_client,
+            query_context::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
+        },
     },
     physical_plan::shared_subplan_exec::strip_shared_subplan_markers,
 };
@@ -430,7 +433,7 @@ mod tests {
     use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
-    use crate::datafusion::distributed::node::RemoteScanNode;
+    use crate::datafusion::distributed::remote_scan::node::RemoteScanNode;
 
     #[derive(Debug)]
     struct TestNode;

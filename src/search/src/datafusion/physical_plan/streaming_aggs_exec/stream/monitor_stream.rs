@@ -28,14 +28,13 @@ use futures::{Stream, StreamExt};
 use futures_util::ready;
 use parking_lot::Mutex;
 
-use crate::{
-    cache::streaming_agg::{
+use crate::datafusion::physical_plan::streaming_aggs_exec::{
+    files::{
         RecordBatchCacheRequest, cache_record_batches_to_disk,
         generate_aggregation_cache_file_name, get_cache_file_path,
     },
-    datafusion::physical_plan::streaming_aggs_exec::{
-        GLOBAL_CACHE, cache_buf::CacheBuf, get_cache_file_path_from_streaming_id,
-    },
+    merge::cache_buf::CacheBuf,
+    registry::{GLOBAL_CACHE, get_cache_file_path_from_streaming_id},
 };
 
 pub(crate) struct MonitorStream {
@@ -187,7 +186,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::datafusion::physical_plan::streaming_aggs_exec::cache_buf::CacheStream;
+    use crate::datafusion::physical_plan::streaming_aggs_exec::merge::cache_buf::CacheStream;
 
     #[test]
     fn test_monitor_stream_new() {

@@ -682,7 +682,7 @@ mod tests {
             shared_subplan::StripDivergedSharedSubplanRule,
         },
         physical_optimizer::shared_subplan::SharedSubplanRule,
-        planner::extension_planner::OpenobserveQueryPlanner,
+        planner::OpenobserveQueryPlanner,
     };
 
     fn table() -> Arc<MemTable> {

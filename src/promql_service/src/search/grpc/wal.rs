@@ -38,12 +38,12 @@ use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
     datafusion::{
-        distributed::{
+        datasource::empty_table::NewEmptyTable,
+        distributed::remote_scan::{
             node::{RemoteScanNode, SearchInfos},
             remote_scan_exec::RemoteScanExec,
         },
         exec::DataFusionContextBuilder,
-        table_provider::empty_table::NewEmptyTable,
     },
     utils::ScanStatsVisitor,
 };

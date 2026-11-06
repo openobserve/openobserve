@@ -30,11 +30,12 @@ use datafusion::{
 };
 use parking_lot::Mutex;
 
-use crate::{
-    cache::streaming_agg::{CacheEntry, StreamingAggsPartitionStrategy},
-    datafusion::{
-        physical_optimizer::utils::get_final_aggregate_plan,
-        physical_plan::streaming_aggs_exec::{self, exec::StreamingAggsExec},
+use crate::datafusion::{
+    physical_optimizer::utils::get_final_aggregate_plan,
+    physical_plan::streaming_aggs_exec::{
+        exec::StreamingAggsExec,
+        partition::{discovery::CacheEntry, partition_optimizer::StreamingAggsPartitionStrategy},
+        registry::GLOBAL_CACHE,
     },
 };
 
@@ -458,7 +459,7 @@ fn load_cache_files_from_strategy(
     }
 
     for file_path in cache_files {
-        streaming_aggs_exec::GLOBAL_CACHE.insert(streaming_id.to_string(), file_path.clone());
+        GLOBAL_CACHE.insert(streaming_id.to_string(), file_path.clone());
         log::debug!(
             "[streaming_id: {streaming_id}] Loaded cache file into GLOBAL_CACHE: {file_path}"
         );
@@ -560,7 +561,7 @@ impl StreamingAggsRewriter {
         };
 
         // Check if this partition is fully cached using partition strategy
-        let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
+        let streaming_item = GLOBAL_CACHE.id_cache.get(&id);
         let Some(item) = streaming_item else {
             // didn't find cache for the streaming_id, skip loading cache
             return Err(DataFusionError::Plan(format!(
@@ -585,9 +586,7 @@ impl StreamingAggsRewriter {
 
         if is_fully_cached {
             // Get all cached files currently in GLOBAL_CACHE for this streaming_id
-            let cached_files = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&id)
-                .unwrap_or_default();
+            let cached_files = GLOBAL_CACHE.get(&id).unwrap_or_default();
             log::info!(
                 "[streaming_id {id}] StreamingAggsRewriter: partition fully cached, time_range=[{start_time}, {end_time}], cached_files_count={}",
                 cached_files.len(),
@@ -613,9 +612,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             || is_single_node_aggregate(&node)
         {
             // get all cached files for the streaming_id(first partition -> current partition)
-            let cached_files = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&self.id)
-                .unwrap_or_default();
+            let cached_files = GLOBAL_CACHE.get(&self.id).unwrap_or_default();
 
             log::info!(
                 "[streaming_id {}] StreamingAggsRewriter: cache_strategy={}, cached_batches={}",
@@ -661,7 +658,7 @@ mod tests {
     use config::meta::search::Interval;
 
     use super::*;
-    use crate::cache::streaming_agg::CacheEntry;
+    use crate::datafusion::physical_plan::streaming_aggs_exec::partition::discovery::CacheEntry;
 
     #[test]
     fn test_score_cache_file_excludes_smaller_intervals() {

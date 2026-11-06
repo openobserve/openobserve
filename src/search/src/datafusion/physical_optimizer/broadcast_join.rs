@@ -33,10 +33,9 @@ use datafusion::{
 };
 
 use crate::datafusion::{
-    distributed::{
-        broadcast_join_exec::BroadcastJoinExec, node::RemoteScanNodes, tmp_exec::TmpExec,
-    },
+    distributed::remote_scan::node::RemoteScanNodes,
     physical_optimizer::remote_scan::{RemoteScanRewriter, remote_scan_to_top_if_needed},
+    physical_plan::broadcast_join::{broadcast_join_exec::BroadcastJoinExec, tmp_exec::TmpExec},
 };
 
 // Check if the plan can use broadcast join.
@@ -282,8 +281,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        physical_optimizer::join_reorder::JoinReorderRule,
-        table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, physical_optimizer::join_reorder::JoinReorderRule,
     };
 
     fn create_context() -> SessionContext {

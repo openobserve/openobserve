@@ -251,7 +251,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::datafusion::table_provider::empty_table::NewEmptyTable;
+    use crate::datafusion::datasource::empty_table::NewEmptyTable;
 
     /// Pins the flag on so a local env override cannot turn the rule off.
     fn enable_topk() {

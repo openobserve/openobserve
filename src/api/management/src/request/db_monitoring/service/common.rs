@@ -362,7 +362,7 @@ impl ScopeFilters {
 ///
 /// The window is therefore carried solely by the request payload, which the
 /// planner pushes down as a physical `_timestamp >= start AND _timestamp < end`
-/// FilterExec per scan (`search/src/datafusion/table_provider/helpers.rs`).
+/// FilterExec per scan (`search/src/datafusion/datasource/helpers.rs`).
 /// [`stats_read_range`] converts the caller's range into that payload.
 pub(crate) fn build_stats_sql(org_id: &str, record_type: &str, preds: &str) -> String {
     build_stats_sql_projected(org_id, record_type, preds, "*")

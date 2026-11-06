@@ -25,13 +25,10 @@ use datafusion_proto::physical_plan::{PhysicalExtensionCodec, PhysicalProtoConve
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::datafusion::{
-    distributed::tmp_exec::TmpExec,
-    physical_plan::{
-        aggregate_topk_exec::AggregateTopkExec, deduplication_exec::DeduplicationExec,
-        empty_exec::NewEmptyExec, enrichment_exec::EnrichmentExec,
-        streaming_aggs_exec::exec::StreamingAggsExec,
-    },
+use crate::datafusion::physical_plan::{
+    aggregate_topk_exec::AggregateTopkExec, broadcast_join::tmp_exec::TmpExec,
+    deduplication_exec::DeduplicationExec, empty_exec::NewEmptyExec,
+    enrichment_exec::EnrichmentExec, streaming_aggs_exec::exec::StreamingAggsExec,
 };
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec

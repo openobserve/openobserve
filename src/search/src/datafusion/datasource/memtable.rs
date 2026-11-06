@@ -30,8 +30,8 @@ use hashbrown::HashMap;
 
 use crate::{
     datafusion::{
+        datasource::helpers::{apply_combined_filter, apply_projection},
         sort_order::FileSortOrder,
-        table_provider::helpers::{apply_combined_filter, apply_projection},
     },
     index::IndexCondition,
 };

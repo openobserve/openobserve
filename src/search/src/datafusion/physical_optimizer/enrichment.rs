@@ -24,7 +24,7 @@ use datafusion::{
 };
 
 use crate::datafusion::{
-    distributed::node::RemoteScanNodes,
+    distributed::remote_scan::node::RemoteScanNodes,
     physical_optimizer::remote_scan::remote_scan_to_top_if_needed,
     physical_plan::{empty_exec::NewEmptyExec, enrichment_exec::EnrichmentExec},
 };

@@ -13,15 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod broadcast_join_exec;
+pub mod analyze;
 pub mod codec;
-mod decoder_stream;
-pub mod display;
-pub mod distribute_analyze_exec;
-mod flight_client;
-pub mod node;
-mod once_async;
-pub mod profile;
-mod query_context;
-pub mod remote_scan_exec;
-pub mod tmp_exec;
+pub mod remote_scan;

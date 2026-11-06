@@ -34,11 +34,11 @@ use tonic::async_trait;
 
 use crate::{
     datafusion::{
-        sort_order::FileSortOrder,
-        table_provider::{
+        datasource::{
             helpers::{apply_combined_filter, file_scan_config, with_access_plans},
             metrics::{handler_metrics_scan, hash_interval},
         },
+        sort_order::FileSortOrder,
     },
     index::IndexCondition,
 };
@@ -804,7 +804,7 @@ mod tests {
             prelude::{SessionConfig, SessionContext},
         };
 
-        use crate::datafusion::table_provider::uniontable::NewUnionTable;
+        use crate::datafusion::datasource::uniontable::NewUnionTable;
 
         let ctx = SessionContext::new_with_config(
             SessionConfig::new()

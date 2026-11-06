@@ -16,18 +16,17 @@
 use std::str::FromStr;
 
 pub mod context;
+pub mod datasource;
 pub mod distributed;
 pub mod exec;
 pub mod logical_plan;
+pub mod memory_pool;
 pub mod optimizer;
-pub mod peak_memory_pool;
 pub mod physical_optimizer;
 pub mod physical_plan;
-pub mod plan_metrics;
 pub mod planner;
 pub mod sort_order;
 pub mod storage;
-pub mod table_provider;
 pub mod udaf;
 pub mod udf;
 pub mod vortex;

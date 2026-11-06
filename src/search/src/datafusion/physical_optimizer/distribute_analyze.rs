@@ -24,7 +24,8 @@ use datafusion::{
 };
 
 use crate::datafusion::distributed::{
-    distribute_analyze_exec::DistributeAnalyzeExec, remote_scan_exec::RemoteScanExec,
+    analyze::distribute_analyze_exec::DistributeAnalyzeExec,
+    remote_scan::remote_scan_exec::RemoteScanExec,
 };
 
 // replace the AnalyzeExec to DistributeAnalyzeExec
@@ -73,7 +74,7 @@ mod tests {
     use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
-    use crate::datafusion::distributed::node::RemoteScanNode;
+    use crate::datafusion::distributed::remote_scan::node::RemoteScanNode;
 
     fn get_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![

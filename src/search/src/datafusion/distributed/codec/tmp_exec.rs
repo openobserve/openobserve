@@ -25,7 +25,7 @@ use datafusion_proto::{convert_required, protobuf::proto_error};
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::datafusion::distributed::tmp_exec::TmpExec;
+use crate::datafusion::physical_plan::broadcast_join::tmp_exec::TmpExec;
 
 pub fn try_decode(
     node: cluster_rpc::TmpExecNode,

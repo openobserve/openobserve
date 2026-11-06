@@ -45,8 +45,10 @@ use crate::{
     datafusion::{
         distributed::{
             codec::get_physical_extension_codec,
-            node::{RemoteScanNode, SearchInfos},
-            remote_scan_exec::RemoteScanExec,
+            remote_scan::{
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan_exec::RemoteScanExec,
+            },
         },
         exec::{DataFusionContextBuilder, register_udf},
         physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,

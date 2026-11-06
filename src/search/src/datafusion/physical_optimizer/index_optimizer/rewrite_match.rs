@@ -546,8 +546,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable,
-        udf::fulltext::match_all,
+        datasource::empty_table::NewEmptyTable, sort_order::FileSortOrder, udf::fulltext::match_all,
     };
 
     #[test]

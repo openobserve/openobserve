@@ -196,8 +196,7 @@ mod tests {
 
     use super::LimitJoinRightSide;
     use crate::datafusion::{
-        planner::extension_planner::OpenobserveQueryPlanner,
-        table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, planner::OpenobserveQueryPlanner,
     };
 
     #[test]

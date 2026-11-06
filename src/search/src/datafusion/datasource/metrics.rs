@@ -32,8 +32,8 @@ use datafusion::{
 };
 
 use crate::datafusion::{
+    datasource::helpers::{file_scan_config, with_access_plans},
     sort_order::FileSortOrder,
-    table_provider::helpers::{file_scan_config, with_access_plans},
 };
 
 /// The closed `__hash__` interval implied by the pushed-down filters, if any.

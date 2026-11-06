@@ -13,20 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, atomic::AtomicUsize};
-
-use datafusion::prelude::SessionContext;
-
-use super::peak_memory_pool::PeakMemoryPool;
-
-/// Get the peak memory from the SessionContext's memory pool.
-/// This should be called after the query execution to get the peak memory usage.
-pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
-    ctx.runtime_env()
-        .memory_pool
-        .clone()
-        .downcast_ref::<PeakMemoryPool>()
-        .unwrap()
-        .peak_memory
-        .clone()
-}
+pub mod broadcast_join_exec;
+mod once_async;
+pub mod tmp_exec;

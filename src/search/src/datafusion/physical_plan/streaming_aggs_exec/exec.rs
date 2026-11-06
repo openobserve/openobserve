@@ -31,9 +31,8 @@ use datafusion::{
 use parking_lot::Mutex;
 
 use super::{
-    cache_buf::{CacheBuf, CacheStream},
-    cached_file_stream::CachedFileStream,
-    monitor_stream::MonitorStream,
+    merge::cache_buf::{CacheBuf, CacheStream},
+    stream::{cached_file_stream::CachedFileStream, monitor_stream::MonitorStream},
 };
 
 #[derive(Debug)]

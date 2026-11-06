@@ -40,7 +40,7 @@ use proto::cluster_rpc::{self, KvItem};
 
 use crate::{
     datafusion::{
-        distributed::{node::RemoteScanNodes, remote_scan_exec::RemoteScanExec},
+        distributed::remote_scan::{node::RemoteScanNodes, remote_scan_exec::RemoteScanExec},
         physical_optimizer::{
             broadcast_join::{broadcast_join_rewrite, should_use_broadcast_join},
             context::RemoteScanContext,
@@ -537,8 +537,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        distributed::codec::get_physical_extension_codec,
-        table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, distributed::codec::get_physical_extension_codec,
     };
 
     #[test]

@@ -91,7 +91,7 @@ mod tests {
 
     use super::AddSortAndLimitRule;
     use crate::datafusion::{
-        physical_plan::empty_exec::ReplaceTableScanExec, table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, physical_plan::empty_exec::ReplaceTableScanExec,
     };
 
     #[tokio::test]

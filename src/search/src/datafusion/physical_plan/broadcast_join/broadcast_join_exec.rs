@@ -35,7 +35,7 @@ use datafusion::{
 use futures::{Stream, StreamExt};
 use futures_util::ready;
 
-use crate::datafusion::distributed::{
+use crate::datafusion::physical_plan::broadcast_join::{
     once_async::{OnceAsync, OnceFut},
     tmp_exec::TmpExec,
 };

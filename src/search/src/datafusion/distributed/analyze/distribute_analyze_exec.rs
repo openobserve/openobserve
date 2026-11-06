@@ -35,7 +35,9 @@ use datafusion::{
 use flight::profile::{ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
 use futures::StreamExt;
 
-use crate::datafusion::distributed::{display::DisplayableExecutionPlan, profile::build_profile};
+use crate::datafusion::distributed::analyze::{
+    display::DisplayableExecutionPlan, profile::build_profile,
+};
 
 /// EXPLAIN ANALYZE across nodes: one text row per node that ran a plan, phase = its depth.
 #[derive(Debug, Clone)]

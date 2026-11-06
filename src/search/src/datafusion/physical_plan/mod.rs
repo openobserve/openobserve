@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod aggregate_topk_exec;
+pub mod broadcast_join;
 pub mod deduplication_exec;
 pub mod empty_exec;
 pub mod enrich_exec;

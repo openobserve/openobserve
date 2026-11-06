@@ -24,7 +24,7 @@ use datafusion::{
 };
 use parking_lot::Mutex;
 
-use super::profile::NodeProfileRecorder;
+use crate::datafusion::distributed::analyze::profile::NodeProfileRecorder;
 
 #[derive(Debug)]
 pub struct QueryContext {

@@ -15,7 +15,7 @@
 
 use config::meta::search::Interval;
 
-use super::files::STREAMING_AGGS_CACHE_DIR;
+use crate::datafusion::physical_plan::streaming_aggs_exec::files::STREAMING_AGGS_CACHE_DIR;
 
 /// Time conversion constants
 pub const MICROS_PER_SECOND: i64 = 1_000_000;

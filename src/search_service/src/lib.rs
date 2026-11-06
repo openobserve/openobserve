@@ -311,7 +311,7 @@ pub async fn search(
         }
         Err(e) => {
             if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
-                streaming_aggs_exec::remove_cache(streaming_id)
+                streaming_aggs_exec::registry::remove_cache(streaming_id)
             }
             Err(e)
         }

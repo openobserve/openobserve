@@ -40,8 +40,8 @@ use parquet::{
 pub use result::{MergeResult, MergedFile};
 
 use crate::datafusion::{
-    exec::DataFusionContextBuilder, sort_order::FileSortOrder,
-    table_provider::uniontable::NewUnionTable,
+    datasource::uniontable::NewUnionTable, exec::DataFusionContextBuilder,
+    sort_order::FileSortOrder,
 };
 
 /// Merge `tables` (the union of the input files) into one or more files
