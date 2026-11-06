@@ -21,8 +21,8 @@ import { fitVisibleCount } from "@/utils/fitVisibleCount";
 const props = defineProps<{ items: T[] }>();
 
 defineSlots<{
-  default: (scope: { item: T; index: number }) => unknown;
-  more: (scope: { count: number }) => unknown;
+  default?: (scope: { item: T; index: number }) => unknown;
+  more?: (scope: { count: number }) => unknown;
 }>();
 
 const MAX_SETTLE_PASSES = 2;
@@ -32,13 +32,22 @@ const moreEl = ref<HTMLElement | null>(null);
 const visibleCount = ref(props.items.length);
 const hiddenCount = computed(() => Math.max(0, props.items.length - visibleCount.value));
 
+let frame = 0;
+// Cached by label because the style write in naturalWidths forces a layout per row, on every drag frame.
+let firstItemLabel: string | null = null;
+let firstItemWidth = 0;
+
 function naturalWidths(el: HTMLElement): number[] {
   const nodes = Array.from(el.querySelectorAll<HTMLElement>(":scope > [data-fit-item]"));
-  // Only the first item can shrink; freeze it so a truncated item still reports its full width.
-  if (nodes[0]) nodes[0].style.flexShrink = "0";
-  const widths = nodes.map((node) => node.offsetWidth);
-  if (nodes[0]) nodes[0].style.flexShrink = "";
-  return widths;
+  const first = nodes[0];
+  if (first && first.textContent !== firstItemLabel) {
+    // Only the first item can shrink; freeze it so a truncated item still reports its full width.
+    first.style.flexShrink = "0";
+    firstItemWidth = first.offsetWidth;
+    first.style.flexShrink = "";
+    firstItemLabel = first.textContent;
+  }
+  return nodes.map((node, index) => (index === 0 ? firstItemWidth : node.offsetWidth));
 }
 
 function measure(pass = 0): void {
@@ -56,7 +65,6 @@ function measure(pass = 0): void {
   if (pass < MAX_SETTLE_PASSES) void nextTick(() => measure(pass + 1));
 }
 
-let frame = 0;
 let resizeObserver: ResizeObserver | null = null;
 let mutationObserver: MutationObserver | null = null;
 

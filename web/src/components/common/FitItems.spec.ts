@@ -97,6 +97,32 @@ describe("FitItems", () => {
     globalThis.ResizeObserver = RealObserver;
   });
 
+  it("writes no styles when only the cell width changes", async () => {
+    const width = { current: 100 };
+    mockCell(width);
+    let fire = () => {};
+    const RealObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(cb: () => void) {
+        fire = cb;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    const wrapper = mountFit(["a", "b", "c"]);
+    await settle();
+    const first = wrapper.find("[data-fit-item]").element as HTMLElement;
+    const writes = vi.fn();
+    Object.defineProperty(first.style, "flexShrink", { set: writes, configurable: true });
+    width.current = 105;
+    fire();
+    await settle();
+    expect(wrapper.find(".more").text()).toBe("+2");
+    expect(writes).not.toHaveBeenCalled();
+    globalThis.ResizeObserver = RealObserver;
+  });
+
   it("recounts when labels change while the item list stays the same", async () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (

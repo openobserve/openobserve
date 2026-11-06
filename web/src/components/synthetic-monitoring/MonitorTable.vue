@@ -695,6 +695,11 @@ function locationLabel(id: string): string {
   return props.locationNames[id] ?? id;
 }
 
+// TanStack's sortUndefined only applies to undefined, so a never-run check has to read as that.
+function responseTimeSortValue(row: any): number | undefined {
+  return row.responseTime ?? undefined;
+}
+
 function responseTimeClass(row: any): string {
   // A browser value is whole-journey wall-clock time, so latency limits say nothing about it.
   if (row.type === "BROWSER") return "";
@@ -809,7 +814,8 @@ const HISTORY_COL: OTableColumnDef = {
 const RESPONSE_TIME_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.response"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 72,
   sortable: true,
@@ -819,7 +825,8 @@ const RESPONSE_TIME_COL: OTableColumnDef = {
 const PAGE_LOAD_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.pageLoad"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 80,
   sortable: true,

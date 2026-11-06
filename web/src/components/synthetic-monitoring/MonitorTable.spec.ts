@@ -661,7 +661,7 @@ describe("MonitorTable", () => {
       expect(wrapper.findAll("span.text-sm").some((s) => s.text() === "—")).toBe(true);
     });
 
-    it("sorts by duration through the real table, with no value below the fastest", async () => {
+    it("sorts by duration through the real table, with no value last in both directions", async () => {
       const data = [85, null, 62579, 1296].map((responseTime, i) => ({
         ...mockMonitorList[0],
         id: `m${i}`,
@@ -687,6 +687,8 @@ describe("MonitorTable", () => {
       await sort.trigger("click");
       await flushPromises();
       expect(order()).toEqual(["85 ms", "1.30 s", "62.58 s"]);
+      const ascending = wrapper.findAll("tbody tr").map((r) => r.text());
+      expect(ascending.findIndex((r) => r.includes("check-null"))).toBe(ascending.length - 1);
     });
   });
 

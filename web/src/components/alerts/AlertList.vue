@@ -473,8 +473,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </template>
 
-              <!-- Tags (PT-6). Three visible + overflow count, so an alert
-                   carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
                 <FitItems v-if="row.tags?.length" :items="row.tags">
                   <template #default="{ item }">
@@ -1242,7 +1240,7 @@ import {
   toRaw,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type { Ref } from "vue";
+import type { Component, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -1379,7 +1377,7 @@ export default defineComponent({
     OUserCell,
     OTag,
     OTruncatedText,
-    FitItems,
+    FitItems: FitItems as unknown as Component,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
