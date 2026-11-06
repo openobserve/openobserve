@@ -205,6 +205,7 @@ async function triggerSuggestionsWithRetry(page, pm, expectedValueOrNull, timeou
             lastSuggestions = [];
         }
         if (expectedValueOrNull == null) return lastSuggestions.length > 0;
+        if (expectedValueOrNull instanceof RegExp) return lastSuggestions.some((s) => expectedValueOrNull.test(s));
         return lastSuggestions.some((s) => s.includes(String(expectedValueOrNull)));
     }, { timeout, intervals: [400, 800, 1500] }).toBe(true);
     return lastSuggestions;
@@ -1139,11 +1140,9 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         // Don't run search - just type in query editor
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE `);
         await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
-        await page.keyboard.press('Control+Space');
 
-        // Wait for suggestions widget - cold start should still show SQL keywords/field names
-        await waitForSuggestionsWidget(page, pm, 10000);
-        const suggestions = await getSuggestionLabels(page, pm);
+        // A trigger answered before the editor's update:query debounce lists stale FROM-context stream names.
+        const suggestions = await triggerSuggestionsWithRetry(page, pm, /AND|OR|NOT|IN|LIKE|BETWEEN|IS/i);
 
         testLogger.info(`Cold start suggestions: ${suggestions.slice(0, 10).join(', ')}`);
 
