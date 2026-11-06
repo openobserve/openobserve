@@ -219,6 +219,48 @@ describe("OTooltip", () => {
       wrapper.unmount();
     });
 
+    const mountInfoButton = (listeners: Record<string, unknown> = {}) =>
+      mount(
+        {
+          render: () =>
+            h(
+              OButton,
+              { iconLeft: "info-outline", "data-testid": "btn", ...listeners },
+              { default: () => h(OTooltip, { content: "About this", delay: 5000 }) },
+            ),
+        },
+        { attachTo: document.body },
+      );
+
+    it("opens on click when the button has no action of its own", async () => {
+      const wrapper = mountInfoButton();
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(true);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not open on click when the button runs an action", async () => {
+      const wrapper = mountInfoButton({ onClick: () => {} });
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(false);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).not.toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not treat a popup trigger as inert", () => {
+      const wrapper = mount(() => h(OButton, { "aria-haspopup": "menu", "data-testid": "btn" }));
+      expect(wrapper.find('[data-testid="btn"]').attributes("data-o2-inert")).toBeUndefined();
+    });
+
     it("binds to a text-only button that gives it no previous sibling", () => {
       const wrapper = mount({
         render: () =>
