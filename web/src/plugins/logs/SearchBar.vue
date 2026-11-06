@@ -232,9 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
-            <!-- child-mode OTooltip attaches to its previous sibling, so this one
-               gives the switch its own tooltip (the button-level tooltip below
-               only covers the bolt icon). -->
+            <!-- The switch gets its own tooltip; the button-level one stays closed while the switch is hovered. -->
             <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
             <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
             <OTooltip :content="t('search.quickModeLabel')" />

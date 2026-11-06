@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     variant="outline"
-    size="icon-xs"
+    size="icon-toolbar"
     @click="downloadDashboard()"
     data-test="export-dashboard"
     icon-left="download"

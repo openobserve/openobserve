@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="homeDashboard"
         variant="outline"
         size="sm"
-        icon-left="keep"
+        icon-left="keep-outline"
         class="max-w-60"
         data-test="dashboard-home-shortcut"
         @click="openHomeDashboard"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="publicLinksEnabled"
         variant="outline"
         size="sm"
-        icon-left="public"
+        icon-left="language"
         data-test="dashboard-public-links"
         @click="openPublicLinks"
       >
@@ -241,14 +241,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
                   :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
-                  :title="
+                  :aria-label="
                     isFavorite(row.id)
                       ? t('dashboard.removeFromFavorites')
                       : t('dashboard.addToFavorites')
                   "
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
-                />
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="
+                      isFavorite(row.id)
+                        ? t('dashboard.removeFromFavorites')
+                        : t('dashboard.addToFavorites')
+                    "
+                  />
+                </OButton>
                 <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
@@ -301,35 +310,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
-                  :title="t('dashboard.move_to_another_folder')"
+                  :aria-label="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.move_to_another_folder')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="content-copy"
-                  :title="t('dashboard.duplicate')"
+                  :aria-label="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
+                </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="delete"
-                  :title="t('dashboard.delete')"
+                  :aria-label="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
-                />
+                >
+                  <OTooltip side="bottom" :content="t('dashboard.delete')" />
+                </OButton>
                 <!-- Overflow menu (rightmost) — houses the low-frequency "set as
                      home" action so it doesn't clutter every row with an
                      always-on icon. Move/Duplicate/Delete stay inline. -->
@@ -337,12 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
-                      :title="t('dashboard.moreActions')"
+                      :aria-label="t('dashboard.moreActions')"
                       variant="ghost"
                       size="icon-xs-sq"
                       data-test="dashboard-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('dashboard.moreActions')" />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     icon-left="drive-file-move"
