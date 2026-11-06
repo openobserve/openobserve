@@ -3296,6 +3296,7 @@
         "inThisView": "In deze weergave",
         "pagesFunnelNote": "Een funnelstap die een verborgen pagina noemt, komt nog steeds overeen.",
         "fieldMissing": "veld niet in deze stream",
+        "fieldMissingOn": "{field}: veld niet in deze stream",
         "field": "Veld",
         "match": "Overeenkomst",
         "values": "Waarden",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Geweigerd door de receiver {receiver}",
       "legend": "Pipelinestatus",
       "legendToggle": "Deze status op de kaart tonen of verbergen"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
+      "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
     }
   },
   "recentSearches": {

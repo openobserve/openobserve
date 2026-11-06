@@ -74,10 +74,9 @@ const DASHBOARD = {
   VARIABLE_SAVE_BTN: '[data-test="dashboard-variable-save-btn"]',
   VARIABLE_HIDE_ON_DASHBOARD: '[data-test="dashboard-variable-hide_on_dashboard"]',
 
-  // Variable filter configuration
-  ADD_FILTER_BTN: '[data-test="dashboard-add-filter-btn"]',
-  FILTER_NAME_SELECTOR: '[data-test="dashboard-query-values-filter-name-selector"]',
-  FILTER_OPERATOR_SELECTOR: '[data-test="dashboard-query-values-filter-operator-selector"]',
+  // Variable query filters (shared FilterBuilder)
+  VARIABLE_FILTER_BUILDER: '[data-test="dashboard-variable-filter-builder-root"]',
+  VARIABLE_FILTER_ADD_CONDITION: '[data-test="dashboard-variable-filter-builder-add-condition"]',
 
   // Variable options
   SHOW_MULTIPLE_VALUES: '[data-test="dashboard-query_values-show_multiple_values"]',

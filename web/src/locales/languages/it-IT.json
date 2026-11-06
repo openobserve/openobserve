@@ -3296,6 +3296,7 @@
         "inThisView": "In questa vista",
         "pagesFunnelNote": "Un passo del funnel che nomina una pagina nascosta corrisponde comunque.",
         "fieldMissing": "campo non presente in questo stream",
+        "fieldMissingOn": "{field}: campo non presente in questo stream",
         "field": "Campo",
         "match": "Corrispondenza",
         "values": "Valori",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Rifiutato dal receiver {receiver}",
       "legend": "Stato della pipeline",
       "legendToggle": "Mostra o nascondi questo stato sulla mappa"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
+      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
     }
   },
   "recentSearches": {

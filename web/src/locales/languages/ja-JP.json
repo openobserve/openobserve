@@ -3296,6 +3296,7 @@
         "inThisView": "このビューで",
         "pagesFunnelNote": "非表示のページを指定したファネルステップも引き続き一致します。",
         "fieldMissing": "このストリームに存在しないフィールド",
+        "fieldMissingOn": "{field}: このストリームに存在しないフィールド",
         "field": "フィールド",
         "match": "一致",
         "values": "値",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "{receiver} レシーバーが拒否",
       "legend": "パイプラインのステータス",
       "legendToggle": "このステータスをマップ上で表示または非表示にする"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "パターンは{max}文字以内にしてください。",
+      "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
     }
   },
   "recentSearches": {

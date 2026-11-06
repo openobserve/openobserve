@@ -3296,6 +3296,7 @@
         "inThisView": "이 뷰에서",
         "pagesFunnelNote": "숨겨진 페이지를 지정한 퍼널 단계도 계속 일치합니다.",
         "fieldMissing": "이 스트림에 없는 필드",
+        "fieldMissingOn": "{field}: 이 스트림에 없는 필드",
         "field": "필드",
         "match": "일치",
         "values": "값",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "{receiver} 리시버가 거부함",
       "legend": "파이프라인 상태",
       "legendToggle": "맵에서 이 상태 표시 또는 숨기기"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "패턴은 {max}자 이하로 입력하세요.",
+      "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
     }
   },
   "recentSearches": {

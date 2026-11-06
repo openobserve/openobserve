@@ -3296,6 +3296,7 @@
         "inThisView": "W tym widoku",
         "pagesFunnelNote": "Krok lejka wskazujący ukrytą stronę nadal pasuje.",
         "fieldMissing": "pole nie występuje w tym strumieniu",
+        "fieldMissingOn": "{field}: pole nie występuje w tym strumieniu",
         "field": "Pole",
         "match": "Dopasowanie",
         "values": "Wartości",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Odrzucone przez odbiornik {receiver}",
       "legend": "Status potoku",
       "legendToggle": "Pokaż lub ukryj ten status na mapie"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Wzorzec może mieć najwyżej {max} znaków.",
+      "regexInvalid": "Ten wzorzec jest nieprawidłowy lub nieobsługiwany. Nie można używać lookahead, lookbehind ani odwołań wstecznych."
     }
   },
   "recentSearches": {

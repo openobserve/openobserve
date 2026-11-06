@@ -341,7 +341,7 @@ pub async fn delete_folder(
         }
         FolderType::Alerts => {
             let params = ListAlertsParams::new(org_id).in_folder(folder_id);
-            let alerts = table::alerts::list(client, params).await?;
+            let alerts = table::alerts::list_fully_decoded(client, params).await?;
             if !alerts.is_empty() {
                 return Err(FolderError::DeleteWithAlerts);
             }

@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b px-1.5 py-0.75"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -239,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @replace="onReplaceLabelFilter"
         @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
@@ -1415,6 +1416,12 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onReplaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+      await grid.replaceLabelFilter(previous, next);
+      trackFilter("label");
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
       await requestOnScreen({ skipCache: true });
@@ -2469,6 +2476,7 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onReplaceLabelFilter,
       onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,

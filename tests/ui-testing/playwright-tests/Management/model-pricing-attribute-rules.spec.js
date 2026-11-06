@@ -40,10 +40,14 @@ test.describe("Model Pricing — Attribute Rules", () => {
 
             // Add a non-default tier, then a rule on it.
             await pm.modelPricingPage.clickAddTier();
-            await pm.modelPricingPage.clickAddRule(1);
-            await pm.modelPricingPage.fillRuleKeys(1, 0, 'openai.response.service_tier, openai.request.service_tier');
-            await pm.modelPricingPage.selectRuleOp(1, 0, 'in');
-            await pm.modelPricingPage.fillRuleValues(1, 0, 'flex');
+            // The tier arrives with a usage condition; a rule tier needs only the rule.
+            await pm.modelPricingPage.removeTierCondition(1, 'input');
+            await pm.modelPricingPage.addTierCondition(1, {
+                field: 'openai.response.service_tier, openai.request.service_tier',
+                search: 'openai.response',
+                operator: 'in',
+                values: ['flex'],
+            });
             await pm.modelPricingPage.addPriceRow('input', '0.000003', 1);
 
             const saved = await pm.modelPricingPage.clickSave();
@@ -119,7 +123,7 @@ test.describe("Model Pricing — Attribute Rules", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test("Saved rules prefill, operator swap flips values to threshold, and re-save persists", {
+    test("Saved rules prefill as chips, a replaced rule and an add-then-remove re-save as expected", {
         tag: ['@model-pricing-attribute-rules', '@modelPricing', '@edit', '@rules', '@P1', '@all'],
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -153,21 +157,24 @@ test.describe("Model Pricing — Attribute Rules", () => {
             const pm = new PageManager(page);
             await pm.modelPricingPage.gotoEditorEdit(createdId);
 
-            // Prefill reflects the saved rule (keys joined by ", ", op "in", values "flex").
-            await expect(pm.modelPricingPage.ruleKeysInput(1, 0))
-                .toHaveValue('openai.response.service_tier, openai.request.service_tier');
-            await pm.modelPricingPage.expectRuleOpValue(1, 0, 'in');
-            await expect(pm.modelPricingPage.ruleValuesInput(1, 0)).toHaveValue('flex');
+            const keys = 'openai.response.service_tier, openai.request.service_tier';
+            // Prefill reflects the saved rule as one chip: keys joined by ", ", values "flex".
+            await pm.modelPricingPage.expectTierCondition(1, keys, 'flex');
 
-            // Numeric operator swaps the values input for the threshold input.
-            await pm.modelPricingPage.selectRuleOp(1, 0, 'gt');
-            await pm.modelPricingPage.expectRuleValueInputVisible(1, 0);
-            await pm.modelPricingPage.expectRuleValuesInputHidden(1, 0);
-            await pm.modelPricingPage.fillRuleValue(1, 0, '200000');
+            // Swap it for a threshold rule on the same keys.
+            await pm.modelPricingPage.removeTierCondition(1, keys);
+            await pm.modelPricingPage.addTierCondition(1, {
+                field: keys,
+                search: 'openai.response',
+                operator: 'gt',
+                values: ['200000'],
+            });
 
             // Add then remove a second rule — the tier returns to one rule.
-            await pm.modelPricingPage.clickAddRule(1);
-            await pm.modelPricingPage.clickRemoveRule(1, 1);
+            await pm.modelPricingPage.addTierCondition(1, { field: 'usage.output', operator: 'lt', values: ['10'] });
+            await pm.modelPricingPage.expectTierConditionCount(1, 2);
+            await pm.modelPricingPage.removeTierCondition(1, 'usage.output');
+            await pm.modelPricingPage.expectTierConditionCount(1, 1);
 
             await pm.modelPricingPage.clickSave();
             await pm.modelPricingPage.verifyModelInList(name);
@@ -188,7 +195,7 @@ test.describe("Model Pricing — Attribute Rules", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test("Rule validation blocks save: empty keys required and presence-op-on-usage forbidden", {
+    test("Rule validation blocks save: presence-op-on-usage forbidden, shown under the tier's filter", {
         tag: ['@model-pricing-attribute-rules', '@modelPricing', '@validation', '@rules', '@P1', '@all'],
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -202,22 +209,10 @@ test.describe("Model Pricing — Attribute Rules", () => {
         await pm.modelPricingPage.fillPattern(`^${name}.*`);
         await pm.modelPricingPage.addPriceRow('input', '0.000002');
         await pm.modelPricingPage.clickAddTier();
-        await pm.modelPricingPage.clickAddRule(1);
-
-        // Clear the seeded keys and pick a presence operator.
-        await pm.modelPricingPage.fillRuleKeys(1, 0, '');
-        await pm.modelPricingPage.selectRuleOp(1, 0, 'exists');
-
-        // Empty keys is required — save stays on the editor with an inline error.
+        // "is set" on a usage. key is forbidden: save stays on the editor and says why under the builder.
+        await pm.modelPricingPage.addTierCondition(1, { field: 'usage.input', operator: 'is_not_null' });
         await pm.modelPricingPage.saveBtn.click();
-        await pm.modelPricingPage.expectRuleKeysError(1, 0);
-        await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
-
-        // A presence operator on a usage. key is forbidden.
-        await pm.modelPricingPage.fillRuleKeys(1, 0, 'usage.input');
-        await pm.modelPricingPage.expectRuleOpError(1, 0);
-        await pm.modelPricingPage.saveBtn.click();
-        await pm.modelPricingPage.expectRuleOpError(1, 0);
+        await pm.modelPricingPage.expectTierFilterError(1, 'usage.');
         await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
 
         testLogger.info('Test completed successfully');
@@ -257,7 +252,7 @@ test.describe("Model Pricing — Attribute Rules", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test("Add-rule button is disabled at the 8-rule cap", {
+    test("Add condition is disabled at the 8-rule cap", {
         tag: ['@model-pricing-attribute-rules', '@modelPricing', '@rules', '@P2', '@all'],
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -272,14 +267,19 @@ test.describe("Model Pricing — Attribute Rules", () => {
         await pm.modelPricingPage.addPriceRow('input', '0.000002');
         await pm.modelPricingPage.clickAddTier();
 
+        // The seeded usage condition plus 8 rules is the tier's whole budget.
         for (let i = 0; i < 8; i += 1) {
-            await pm.modelPricingPage.clickAddRule(1);
+            await pm.modelPricingPage.addTierCondition(1, {
+                field: `attr_${i}`,
+                operator: 'in',
+                values: ['x'],
+            });
         }
 
         // Confirm all 8 rules actually landed before asserting the cap — an
         // unrelated failure that disabled the button would otherwise pass.
-        await pm.modelPricingPage.expectRuleCount(1, 8);
-        await pm.modelPricingPage.expectAddRuleDisabled(1);
+        await pm.modelPricingPage.expectTierConditionCount(1, 9);
+        await pm.modelPricingPage.expectTierAddConditionDisabled(1);
 
         testLogger.info('Test completed successfully');
     });

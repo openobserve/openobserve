@@ -305,6 +305,16 @@ function handleOpenAutoFocus(event: Event) {
 // single-letter shortcuts. When a mutation batch both removes and adds fields,
 // move focus to the first field of the newly added content — unless the user
 // is still focused in a field that survived the swap.
+// A field portaled out of the body (a popover's search box) still belongs to this dialog's edit.
+function focusStaysInField(body: Element): boolean {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLElement &&
+    active.matches(AUTOFOCUS_ANY_FIELD) &&
+    (body.contains(active) || !!active.closest("[data-reka-popper-content-wrapper]"))
+  );
+}
+
 watchEffect((cleanup) => {
   if (!shown.value) return;
   const body = bodyRef.value;
@@ -319,16 +329,11 @@ watchEffect((cleanup) => {
     const removedField = records.flatMap((r) => Array.from(r.removedNodes)).some(containsField);
     if (!added.length || !removedField) return;
 
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      body.contains(active) &&
-      active.matches(AUTOFOCUS_ANY_FIELD)
-    ) {
-      return;
-    }
+    if (focusStaysInField(body)) return;
 
     nextTick(() => {
+      // A field the swap itself focused (a popover's search box) already holds the edit.
+      if (focusStaysInField(body)) return;
       for (const el of added) {
         if (!el.isConnected) continue;
         const field = findAutoFocusTarget(el);

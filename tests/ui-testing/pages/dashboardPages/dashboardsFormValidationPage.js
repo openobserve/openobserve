@@ -108,11 +108,10 @@ export class DashboardsFormValidationPage {
         this.panelLayoutSaveBtn     = '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]';
         this.panelLayoutCancelBtn   = '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-secondary-btn"]';
 
-        // ── AddCondition (panel editor Filters section) ───────────────────────
-        this.addConditionAddBtn     = '[data-test="dashboard-add-condition-add"]';
-        this.conditionColumn        = '[data-test="dashboard-add-condition-column-0"]';
-        this.conditionCondition     = '[data-test="dashboard-add-condition-condition-0"]';
-        this.conditionRemoveColumn  = '[data-test="dashboard-add-condition-remove-column-0"]';
+        // ── Panel editor Filters section (shared FilterBuilder chips) ─────────
+        // A condition is a chip `dashboard-filter-builder-chip-<field>` with -field/-operator/-value/-remove parts.
+        this.addConditionAddBtn     = '[data-test="dashboard-filter-builder-input"]';
+        this.filterChips            = '[data-test^="dashboard-filter-builder-chip-"]:has([data-test$="-field"])';
 
         // ── AddAnnotation dialog ──────────────────────────────────────────────
         this.addAnnotationDialog    = '[data-test="add-annotation-dialog"]';
@@ -145,12 +144,6 @@ export class DashboardsFormValidationPage {
         this.variableCancelBtn      = '[data-test="dashboard-variable-cancel-btn"]';
         this.variableSaveBtn        = '[data-test="dashboard-variable-save-btn"]';
 
-        // ── AddCondition (Panel config > Conditions tab) ──────────────────────
-        // First condition row (index 0)
-        this.conditionColumn0       = '[data-test="dashboard-add-condition-column-0"]';
-        this.conditionCondition0    = '[data-test="dashboard-add-condition-condition-0"]';
-        this.conditionValue         = '[data-test="dashboard-add-condition-value"]';
-        this.conditionRemove        = '[data-test="dashboard-add-condition-remove"]';
 
         // ── ConfigPanel (panel editor right sidebar) ──────────────────────────
         this.configPanelDescription  = '[data-test="dashboard-config-description"]';
@@ -472,26 +465,24 @@ export class DashboardsFormValidationPage {
     // ── AddCondition helpers ──────────────────────────────────────────────────
 
     getAddConditionAddBtnLocator() {
-        return this.page.locator(this.addConditionAddBtn);
+        return this.page.locator(this.addConditionAddBtn).first();
+    }
+
+    getConditionChipLocator(index = 0) {
+        return this.page.locator(this.filterChips).nth(index);
+    }
+
+    // A part of condition chip `index`: field, operator, value or remove.
+    getConditionPartLocator(part, index = 0) {
+        return this.getConditionChipLocator(index).locator(`[data-test$="-${part}"]`).first();
     }
 
     getConditionColumnLocator() {
-        return this.page.locator(this.conditionColumn);
+        return this.getConditionPartLocator('field');
     }
 
     getConditionConditionLocator() {
-        return this.page.locator(this.conditionCondition);
-    }
-
-    getConditionRemoveColumnLocator() {
-        return this.page.locator(this.conditionRemoveColumn);
-    }
-
-    // Label chip for condition row 0; an empty column ends "…-label-0-undefined".
-    getConditionLabelLocator() {
-        return this.page
-            .locator('[data-test^="dashboard-add-condition-label-0-"]')
-            .first();
+        return this.getConditionPartLocator('operator');
     }
 
     // ── Dashboard list search (used to detect dashboards list is ready) ──────
@@ -580,45 +571,28 @@ export class DashboardsFormValidationPage {
     }
 
     /**
-     * Add a filter condition row in the panel editor's Filters section.
-     * `dashboard-add-condition-add` is an ODropdown TRIGGER, not a plain button,
-     * and the created row is only a label chip — the column/operator/value
-     * controls live in a popup that chip opens.
+     * Add a complete condition (first listed field = "e2e") in the panel editor's Filters section:
+     * the bar opens its field list, then the operator and value lists follow.
      */
     async addConditionRow() {
-        const trigger = this.page.locator(this.addConditionAddBtn);
-        await trigger.waitFor({ state: 'visible', timeout: 15000 });
-        await trigger.click();
-        const item = this.page.locator('[data-test="dashboard-add-group-add-condition"]');
-        await item.waitFor({ state: 'visible', timeout: 10000 });
-        await item.click();
-
-        // Adding a condition renders only a LABEL CHIP
-        // (`dashboard-add-condition-label-${i}-${computedLabel}`). The column /
-        // operator / value controls live in a popup that the chip opens, so
-        // `dashboard-add-condition-column-0` does not exist until it is clicked.
-        // Verified against alpha: straight after "Add Condition" the only nodes
-        // present are the label, remove and add buttons.
-        const label = this.page
-            .locator('[data-test^="dashboard-add-condition-label-0"]')
-            .first();
-        await label.waitFor({ state: 'visible', timeout: 15000 });
-        await label.click();
-        await this.page
-            .locator(this.conditionColumn0)
-            .waitFor({ state: 'visible', timeout: 15000 });
+        const input = this.getAddConditionAddBtnLocator();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
+        await input.click();
+        const suggest = this.page.locator('[data-test="dashboard-filter-builder-suggest"]');
+        await suggest.waitFor({ state: 'visible', timeout: 10000 });
+        await suggest.getByRole('option').first().click();
+        await this.page.locator('[data-test="dashboard-filter-builder-suggest-item-eq"]').click();
+        await input.fill('e2e');
+        await suggest.getByRole('option', { name: 'Use "e2e"' }).click();
+        await this.page.keyboard.press('Escape');
+        await this.getConditionChipLocator(0).waitFor({ state: 'visible', timeout: 15000 });
     }
 
-    /**
-     * Switch the open condition popup to its "Condition" tab. The popup opens on
-     * the List tab, where `dashboard-add-condition-value` is not rendered at all.
-     */
+    /** Opens the value list of condition chip `index` and waits for it. */
     async openConditionTab(index = 0) {
-        const tab = this.page.locator(`[data-test="dashboard-add-condition-condition-${index}"]`);
-        await tab.waitFor({ state: 'visible', timeout: 10000 });
-        await tab.click();
+        await this.getConditionPartLocator('value', index).click();
         await this.page
-            .locator(this.conditionValue)
+            .locator('[data-test="dashboard-filter-builder-search"]')
             .waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -689,19 +663,19 @@ export class DashboardsFormValidationPage {
     // ── AddCondition helpers ──────────────────────────────────────────────────
 
     getConditionColumn0Locator() {
-        return this.page.locator(this.conditionColumn0);
+        return this.getConditionPartLocator('field');
     }
 
     getConditionCondition0Locator() {
-        return this.page.locator(this.conditionCondition0);
+        return this.getConditionPartLocator('operator');
     }
 
     getConditionValueLocator() {
-        return this.page.locator(this.conditionValue);
+        return this.getConditionPartLocator('value');
     }
 
     getConditionRemoveLocator() {
-        return this.page.locator(this.conditionRemove);
+        return this.getConditionPartLocator('remove');
     }
 
     // ── ConfigPanel helpers ───────────────────────────────────────────────────

@@ -3296,6 +3296,7 @@
         "inThisView": "在此檢視",
         "pagesFunnelNote": "指名隱藏頁面的漏斗步驟仍會符合。",
         "fieldMissing": "欄位不在此串流中",
+        "fieldMissingOn": "{field}: 欄位不在此串流中",
         "field": "欄位",
         "match": "比對",
         "values": "值",
@@ -30307,6 +30308,12 @@
       "receiverEvidence": "被 {receiver} 接收器拒絕",
       "legend": "管線狀態",
       "legendToggle": "在地圖上顯示或隱藏此狀態"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "模式最多 {max} 個字元。",
+      "regexInvalid": "此模式無效或不受支援。不能使用先行斷言、後行斷言和反向參照。"
     }
   },
   "recentSearches": {

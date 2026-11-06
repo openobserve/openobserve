@@ -3296,6 +3296,7 @@
         "inThisView": "Nesta visualização",
         "pagesFunnelNote": "Uma etapa de funil que nomeia uma página oculta ainda corresponde.",
         "fieldMissing": "campo não está neste stream",
+        "fieldMissingOn": "{field}: campo não está neste stream",
         "field": "Campo",
         "match": "Correspondência",
         "values": "Valores",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Recusado pelo recetor {receiver}",
       "legend": "Estado do pipeline",
       "legendToggle": "Mostrar ou ocultar este estado no mapa"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Use no máximo {max} caracteres no padrão.",
+      "regexInvalid": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores."
     }
   },
   "recentSearches": {

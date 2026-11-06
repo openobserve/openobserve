@@ -3296,6 +3296,7 @@
         "inThisView": "Trong chế độ xem này",
         "pagesFunnelNote": "Bước phễu có nêu một trang bị ẩn vẫn khớp.",
         "fieldMissing": "trường không có trong stream này",
+        "fieldMissingOn": "{field}: trường không có trong stream này",
         "field": "Trường",
         "match": "Khớp",
         "values": "Giá trị",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Bị receiver {receiver} từ chối",
       "legend": "Trạng thái pipeline",
       "legendToggle": "Hiện hoặc ẩn trạng thái này trên bản đồ"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
+      "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
     }
   },
   "recentSearches": {

@@ -3296,6 +3296,7 @@
         "inThisView": "Bu görünümde",
         "pagesFunnelNote": "Gizli bir sayfayı adlandıran bir huni adımı yine de eşleşir.",
         "fieldMissing": "bu akışta olmayan alan",
+        "fieldMissingOn": "{field}: bu akışta olmayan alan",
         "field": "Alan",
         "match": "Eşleşme",
         "values": "Değerler",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "{receiver} alıcısı tarafından reddedildi",
       "legend": "İşlem hattı durumu",
       "legendToggle": "Bu durumu haritada göster veya gizle"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
+      "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
     }
   },
   "recentSearches": {

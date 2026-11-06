@@ -16,7 +16,8 @@
 use std::collections::BTreeMap;
 
 use config::meta::{
-    pipeline::components::ScorerRef,
+    alerts::{ConditionGroup, ConditionList},
+    pipeline::components::{ConditionParams, ScorerRef},
     self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
 use sea_orm::{
@@ -220,10 +221,62 @@ impl OnlineEvalJob {
         if is_reserved_eval_source_stream(&self.stream) {
             return Err("Internal streams cannot be used as online eval sources");
         }
+        if !is_readable_condition(&self.filter_condition) {
+            return Err(
+                "Filter condition is invalid or uses an operator this version does not support",
+            );
+        }
         self.validate_target_scope()?;
         self.validate_span_selectors()?;
         self.sampling_rate()?;
         Ok(())
+    }
+
+    /// Extended-operator value checks on the job filter, end signals and span selector filters.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        validate_condition_json_operator_values(&self.filter_condition)?;
+        let end_signals = [
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ];
+        for signal in end_signals.into_iter().flatten() {
+            validate_condition_json_operator_values(signal)?;
+        }
+        self.span_selectors.iter().try_for_each(|selector| {
+            validate_condition_json_operator_values(&selector.filter_condition)
+        })
+    }
+
+    /// Names the first set condition this version cannot parse; an unparsed filter would match all.
+    pub fn unreadable_condition(&self) -> Option<&'static str> {
+        let end_signal = |signal: Option<&serde_json::Value>| {
+            signal.is_some_and(|signal| !is_readable_condition(signal))
+        };
+        if !is_readable_condition(&self.filter_condition) {
+            Some("filter condition")
+        } else if end_signal(
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ) || end_signal(
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        ) {
+            Some("end signal")
+        } else if self
+            .span_selectors
+            .iter()
+            .any(|selector| !is_readable_condition(&selector.filter_condition))
+        {
+            Some("span selector filter")
+        } else {
+            None
+        }
     }
 
     pub fn validate_for_activation(&self) -> Result<(), &'static str> {
@@ -549,7 +602,8 @@ pub async fn get_by_status(
     Ok(records)
 }
 
-/// Skips jobs of an org that is being deleted or has no organizations row.
+/// Skips jobs of an org that is being deleted or has no organizations row, and jobs with a
+/// condition this version cannot read, which would otherwise run unfiltered.
 pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Error> {
     use sea_orm::sea_query::{Expr, Query};
 
@@ -571,12 +625,9 @@ pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Er
         )
         .order_by(Column::CreatedAt, Order::Desc)
         .all(client)
-        .await?
-        .into_iter()
-        .map(OnlineEvalJob::from)
-        .collect();
+        .await?;
 
-    Ok(records)
+    Ok(runnable_jobs(records))
 }
 
 /// Jobs the health pass measures, across all orgs; paused ones settle to "no recent runs".
@@ -617,6 +668,35 @@ pub async fn get_by_stream(
 
 fn scorer_refs_contain(scorers: &[ScorerRef], scorer_entity_id: &str) -> bool {
     scorers.iter().any(|scorer| scorer.id == scorer_entity_id)
+}
+
+/// Unset ("all") or a shape the reconciler and scheduler parse; anything else they treat as
+/// match-all.
+fn is_readable_condition(condition: &serde_json::Value) -> bool {
+    condition.is_null()
+        || condition.as_object().is_some_and(|o| o.is_empty())
+        || condition
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|v| v.eq_ignore_ascii_case("all"))
+        || serde_json::from_value::<ConditionParams>(condition.clone()).is_ok()
+        || serde_json::from_value::<ConditionGroup>(condition.clone()).is_ok()
+        || serde_json::from_value::<ConditionList>(condition.clone()).is_ok()
+}
+
+fn runnable_jobs(models: Vec<Model>) -> Vec<OnlineEvalJob> {
+    crate::table::convert_skipping_unreadable(
+        "online_eval_jobs",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        |m| {
+            let job = OnlineEvalJob::from(m);
+            match job.unreadable_condition() {
+                Some(what) => Err(format!("its {what} cannot be read by this version")),
+                None => Ok(job),
+            }
+        },
+    )
 }
 
 pub async fn has_non_archived_by_scorer_ref(
@@ -735,6 +815,111 @@ mod tests {
             created_at: 1000,
             updated_at: 2000,
         }
+    }
+
+    fn future_operator(condition: serde_json::Value) -> serde_json::Value {
+        let mut condition = condition;
+        condition["conditions"]["conditions"][0]["operator"] = serde_json::json!("future_op");
+        condition
+    }
+
+    fn with_operator(operator: &str) -> serde_json::Value {
+        let mut condition = end_signal();
+        condition["conditions"]["conditions"][0]["operator"] = serde_json::json!(operator);
+        condition
+    }
+
+    #[test]
+    fn test_extended_operators_in_filter_end_signals_and_selectors_are_readable() {
+        let mut job = trace_job_with_selector();
+        job.filter_condition = with_operator("in");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(with_operator("starts_with")),
+            ..Default::default()
+        });
+        job.span_selectors[0].filter_condition = with_operator("re_match");
+        job.span_selectors[0].filter_condition["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        assert_eq!(job.unreadable_condition(), None);
+        assert!(job.validate().is_ok());
+    }
+
+    #[test]
+    fn test_an_unreadable_filter_fails_validation_instead_of_matching_all() {
+        let mut job = OnlineEvalJob::from(make_model());
+        for unset in [
+            serde_json::Value::Null,
+            serde_json::json!({}),
+            serde_json::json!({"type": "all"}),
+        ] {
+            job.filter_condition = unset;
+            assert!(job.validate().is_ok());
+            assert_eq!(job.unreadable_condition(), None);
+        }
+        job.filter_condition = end_signal();
+        assert!(job.validate().is_ok());
+
+        job.filter_condition = future_operator(end_signal());
+        assert!(job.validate().is_err());
+        assert_eq!(job.unreadable_condition(), Some("filter condition"));
+    }
+
+    #[test]
+    fn test_unreadable_end_signal_and_selector_filters_are_named() {
+        let mut model = make_model();
+        model.target_scope = "trace".to_string();
+        model.trace_config = Some(serde_json::json!({"endSignal": future_operator(end_signal())}));
+        let job = OnlineEvalJob::from(model);
+        assert_eq!(job.unreadable_condition(), Some("end signal"));
+
+        let mut job = trace_job_with_selector();
+        assert_eq!(job.unreadable_condition(), None);
+        job.span_selectors[0].filter_condition = future_operator(end_signal());
+        assert_eq!(job.unreadable_condition(), Some("span selector filter"));
+    }
+
+    #[test]
+    fn test_runnable_jobs_skip_and_log_jobs_with_unreadable_conditions() {
+        crate::table::testing::capture_error_logs();
+        let mut good = make_model();
+        good.id = "job-good".to_string();
+        let mut bad = make_model();
+        bad.id = "job-in-filter".to_string();
+        bad.filter_condition = future_operator(end_signal());
+
+        let ids: Vec<String> = runnable_jobs(vec![good, bad])
+            .into_iter()
+            .map(|job| job.id)
+            .collect();
+
+        assert_eq!(ids, ["job-good"]);
+        let logged = crate::table::testing::logged_errors_containing("id=job-in-filter");
+        assert!(
+            logged.iter().any(|l| l.contains("filter condition")),
+            "{logged:?}"
+        );
+    }
+
+    #[test]
+    fn test_validate_operator_values_checks_filter_and_end_signal() {
+        let mut job = OnlineEvalJob::from(make_model());
+        assert!(job.validate_operator_values().is_ok());
+
+        job.filter_condition = end_signal();
+        assert!(job.validate_operator_values().is_ok());
+
+        let mut bad_signal = end_signal();
+        bad_signal["conditions"]["conditions"][0]["operator"] = serde_json::json!("re_match");
+        bad_signal["conditions"]["conditions"][0]["value"] = serde_json::json!("(");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(bad_signal.clone()),
+            ..TraceEvalConfig::default()
+        });
+        assert!(job.validate_operator_values().is_err());
+
+        job.trace_config = None;
+        job.filter_condition = bad_signal["conditions"].clone();
+        assert!(job.validate_operator_values().is_err());
     }
 
     #[test]

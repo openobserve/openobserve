@@ -597,7 +597,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
+        <OButton
+          v-if="!searchObj.meta.sqlMode && !nlpMode"
+          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+          data-test="traces-search-bar-filter-builder-toggle"
+          :aria-pressed="filterBuilderOn"
+          variant="ghost"
+          size="icon-xs-sq"
+          class="absolute! top-0.75 z-51"
+          :style="{ right: filterBuilderToggleRight }"
+          @click="toggleFilterBuilder"
+        >
+          <OTooltip
+            :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
+          />
+        </OButton>
+        <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-10">
+          <SqlFilterBuilder
+            ref="filterBuilderRef"
+            :query="searchObj.data.editorValue"
+            :fields="filterBuilderFields"
+            :load-values="loadFilterBuilderValues"
+            :fields-loading="searchObj.loading"
+            :extra-suggestions="recentFilterSection"
+            data-test="traces-search-bar-filter-builder"
+            @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
+            @submit="searchData"
+            @exit="toggleFilterBuilder"
+            @focus="onFilterBuilderFocus"
+            @extra-select="pickRecentFilterRow"
+          />
+        </div>
         <UnifiedQueryEditor
+          v-show="!showFilterBuilder"
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           data-test-prefix="traces-search-bar"
@@ -634,6 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
+            !showFilterBuilder &&
             !recentFocusOpen &&
             !nlpMode
           "
@@ -742,6 +775,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
+import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -752,6 +789,7 @@ import {
   useRecentSearches,
   useRecentSearchesList,
 } from "@/composables/queryHistory/useRecentSearches";
+import { useRecentFilterSuggestions } from "@/composables/queryHistory/useRecentFilterSuggestions";
 import {
   recentQueryList,
   recentsOpenAfterEdit,
@@ -789,6 +827,7 @@ export default defineComponent({
     OSelect,
     OTooltip,
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
+    SqlFilterBuilder,
     SyntaxGuide,
     RecentSearchesButton,
     RecentSearchesDrawer,
@@ -798,6 +837,7 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
+    "filterBuilderGrowth",
     "cancel-query",
     "update:searchMode",
     "error-only-toggled",
@@ -931,6 +971,22 @@ export default defineComponent({
       setEditorValue(query);
       focusEditor();
     };
+    const { section: recentFilterSection, pick: pickRecentFilterRow } = useRecentFilterSuggestions(
+      "traces",
+      {
+        active: recentListActive,
+        examples: recentExamples,
+        run: (entry, when) => emit("recent-restore", entry, when, true),
+        load: (entry, when) => emit("recent-restore", entry, when, false),
+        viewAll: openRecentSearches,
+        example: applyRecentExample,
+      },
+    );
+
+    const onFilterBuilderFocus = () => {
+      if (recentSearchesEnabled.value) recentListActive.value = true;
+    };
+
     const onQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
       await _sqlOnBlur();
@@ -951,6 +1007,31 @@ export default defineComponent({
       updateStreamKeywords,
       resolveFieldValues,
     } = useSqlSuggestions();
+
+    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
+      useFilterBuilderPreference("o2.traces.queryInput");
+    const filterBuilderRef = ref(null);
+    // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
+    const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
+      immediate: true,
+    });
+    const showFilterBuilder = computed(() => filterBuilderOn.value && !searchObj.meta.sqlMode);
+    // QueryEditor's floating AI button takes the corner slot while the editor is shown.
+    const filterBuilderToggleRight = computed(() =>
+      !showFilterBuilder.value && isAiEnabled.value ? "2.375rem" : "0.25rem",
+    );
+    const filterBuilderFields = computed(() =>
+      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+    );
+    const loadFilterBuilderValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search });
+    // Returns whether the change should search now, the same rule a field-list click follows.
+    const onFilterBuilderQuery = (sql: string): boolean => {
+      searchObj.data.editorValue = sql;
+      (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
+      return Boolean(store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode);
+    };
 
     onActivated(async () => {
       await nextTick();
@@ -1611,6 +1692,9 @@ export default defineComponent({
       recentFocusRef,
       recentDrawerRef,
       recentFocusOpen,
+      recentFilterSection,
+      pickRecentFilterRow,
+      onFilterBuilderFocus,
       showRunQueryPending,
       recentQueries,
       recentExamples,
@@ -1637,6 +1721,14 @@ export default defineComponent({
       autoCompleteKeywords,
       effectiveKeywords,
       resolveFieldValues,
+      filterBuilderOn,
+      toggleFilterBuilder,
+      showFilterBuilder,
+      filterBuilderToggleRight,
+      filterBuilderFields,
+      filterBuilderRef,
+      loadFilterBuilderValues,
+      onFilterBuilderQuery,
       effectiveSuggestions,
       updateTimezone,
       dateTimeRef,

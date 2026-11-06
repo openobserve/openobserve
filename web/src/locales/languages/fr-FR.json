@@ -3296,6 +3296,7 @@
         "inThisView": "Dans cette vue",
         "pagesFunnelNote": "Une étape d'entonnoir qui nomme une page masquée correspond quand même.",
         "fieldMissing": "champ absent de ce flux",
+        "fieldMissingOn": "{field}: champ absent de ce flux",
         "field": "Champ",
         "match": "Correspondance",
         "values": "Valeurs",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Refusé par le récepteur {receiver}",
       "legend": "Statut des pipelines",
       "legendToggle": "Afficher ou masquer ce statut sur la carte"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Limitez le motif à {max} caractères.",
+      "regexInvalid": "Ce motif est invalide ou non pris en charge. Les assertions avant, les assertions arrière et les références arrière ne peuvent pas être utilisées."
     }
   },
   "recentSearches": {

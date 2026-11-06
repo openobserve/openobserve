@@ -3296,6 +3296,7 @@
         "inThisView": "In dieser Ansicht",
         "pagesFunnelNote": "Ein Trichter-Schritt, der eine ausgeblendete Seite nennt, trifft weiterhin zu.",
         "fieldMissing": "Feld nicht in diesem Stream",
+        "fieldMissingOn": "{field}: Feld nicht in diesem Stream",
         "field": "Feld",
         "match": "Übereinstimmung",
         "values": "Werte",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Vom Receiver {receiver} abgelehnt",
       "legend": "Pipeline-Status",
       "legendToggle": "Diesen Status auf der Karte ein- oder ausblenden"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Verwenden Sie für das Muster höchstens {max} Zeichen.",
+      "regexInvalid": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden."
     }
   },
   "recentSearches": {

@@ -3296,6 +3296,7 @@
         "inThisView": "En esta vista",
         "pagesFunnelNote": "Un paso del embudo que nombre una página oculta sigue coincidiendo.",
         "fieldMissing": "campo no está en este stream",
+        "fieldMissingOn": "{field}: campo no está en este stream",
         "field": "Campo",
         "match": "Coincidencia",
         "values": "Valores",
@@ -30312,6 +30313,12 @@
       "receiverEvidence": "Rechazado por el receptor {receiver}",
       "legend": "Estado del pipeline",
       "legendToggle": "Mostrar u ocultar este estado en el mapa"
+    }
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Usa como máximo {max} caracteres en el patrón.",
+      "regexInvalid": "Este patrón no es válido o no es compatible. No se pueden usar lookahead, lookbehind ni referencias inversas."
     }
   },
   "recentSearches": {

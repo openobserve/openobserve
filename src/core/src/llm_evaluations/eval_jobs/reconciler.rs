@@ -348,6 +348,7 @@ fn build_system_id_check_condition() -> ConditionParams {
                     operator: Operator::NotEqualTo,
                     value: serde_json::Value::String(String::new()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
                 ConditionItem::Condition(ConditionItemCondition {
@@ -355,6 +356,7 @@ fn build_system_id_check_condition() -> ConditionParams {
                     operator: Operator::NotEqualTo,
                     value: serde_json::Value::String(String::new()),
                     ignore_case: None,
+                    case_insensitive: None,
                     logical_operator: LogicalOperator::And,
                 }),
             ],

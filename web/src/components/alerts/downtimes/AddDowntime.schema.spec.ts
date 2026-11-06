@@ -2,7 +2,6 @@
 
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
-import { conditionToBuilder } from "@/utils/downtimes/conditionBridge";
 import { defaultDowntimeValues, type DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
 import { makeAddDowntimeSchema, repeatGapSecs, tabForPath } from "./AddDowntime.schema";
 
@@ -11,11 +10,11 @@ const NOW = Date.parse("2026-09-17T12:20:00Z");
 const valid = (): DowntimeFormValues => ({
   ...defaultDowntimeValues(NOW, "UTC"),
   condition_open: true,
-  condition: conditionToBuilder({
+  condition: {
     type: "group",
     op: "and",
     items: [{ type: "pair", key: "service", operator: "=", value: "payments" }],
-  }),
+  },
 });
 
 const errorsOf = (values: DowntimeFormValues, ctx = {}) => {
@@ -66,21 +65,21 @@ describe("AddDowntime schema", () => {
   it("names the condition caps of 32 pairs and depth 3", () => {
     const pair = { type: "pair" as const, key: "service", operator: "=" as const, value: "p" };
     const v = valid();
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: Array.from({ length: 33 }, () => pair),
-    });
+    };
     expect(errorsOf(v).condition).toBe("A condition can hold at most 32 pairs.");
   });
 
   it("rejects a condition made only of != rows", () => {
     const v = valid();
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: [{ type: "pair", key: "env", operator: "!=", value: "staging" }],
-    });
+    };
     expect(errorsOf(v).condition).toMatch(/^Add at least one = condition/);
   });
 
@@ -89,11 +88,11 @@ describe("AddDowntime schema", () => {
     v.modules = ["synthetics"];
     v.targets.synthetics.tags_open = true;
     v.targets.synthetics.tags = ["team:checkout"];
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: [{ type: "pair", key: "env", operator: "!=", value: "staging" }],
-    });
+    };
     expect(errorsOf(v)).toEqual({});
   });
 

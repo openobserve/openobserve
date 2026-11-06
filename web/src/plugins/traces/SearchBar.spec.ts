@@ -327,6 +327,8 @@ vi.mock("@/plugins/traces/composables/useTracesAlertAction", async () => {
 
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
+import queryHistory from "@/services/query_history";
+import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
 import analytics from "@/services/product_analytics";
@@ -1701,6 +1703,36 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder growth", () => {
+    let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    afterEach(() => {
+      rectSpy?.mockRestore();
+      localStorage.removeItem("o2.traces.queryInput");
+    });
+
+    it("reports how far the builder grew past one line, and null once the editor is back", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      rectSpy = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          const builder = this.getAttribute("data-test") === "traces-search-bar-filter-builder";
+          return { height: builder ? 84 : 0, width: 0 } as DOMRect;
+        });
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      // Three 1.875rem lines measure 84px; one line is the pane's own height.
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
+      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("plain-English filter (Ask AI) on the query editor", () => {
     const editor = () => wrapper.findComponent({ ref: "queryEditorRef" });
 
@@ -1758,6 +1790,31 @@ describe("SearchBar", () => {
         message: "traces.nlNeedsSql",
         variant: "warning",
       });
+    });
+
+    it("moves the builder toggle beside the AI button while the code editor shows, and hides it in AI mode", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      localStorage.setItem("o2.traces.queryInput", "query");
+      try {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        expect(toggle().attributes("style")).toContain("right: 0.25rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        editor().vm.$emit("update:nlpMode", true);
+        await flushPromises();
+        expect(toggle().exists()).toBe(false);
+      } finally {
+        localStorage.removeItem("o2.traces.queryInput");
+      }
     });
   });
 
@@ -2906,7 +2963,11 @@ describe("SearchBar", () => {
       await flushPromises();
       searchObjInstance.data.editorValue = "";
       searchObjInstance.meta.queryEditorPlaceholderFlag = true;
-      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const vm = wrapper.vm as unknown as {
+        recentFocusOpen: boolean;
+        toggleFilterBuilder: () => void;
+      };
+      vm.toggleFilterBuilder();
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
@@ -2918,6 +2979,53 @@ describe("SearchBar", () => {
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+  });
+
+  describe("recent searches with the filter builder on", () => {
+    const entry = {
+      id: "a",
+      source: "traces",
+      query: "service_name = 'api'",
+      status: "ok",
+      starred: false,
+      context: {},
+      updated_at: Date.now() * 1000,
+      created_at: Date.now() * 1000,
+      run_count: 1,
+    };
+    const DT = "traces-search-bar-filter-builder-bar";
+    const row = (key: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${DT}-suggest-item-${key}"]`);
+
+    it("lists them above the fields and hands the picked row to the page", async () => {
+      const list = vi
+        .spyOn(queryHistory, "list")
+        .mockResolvedValue({ data: [entry] } as Awaited<ReturnType<typeof queryHistory.list>>);
+      const count = vi
+        .spyOn(queryHistory, "count")
+        .mockResolvedValue({ data: { count: 0 } } as Awaited<
+          ReturnType<typeof queryHistory.count>
+        >);
+      store.state.zoConfig.query_history_enabled = true;
+      queryClient.clear();
+      localStorage.removeItem("o2.traces.queryInput");
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!.click();
+      await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
+      row("extra-recent-a")!.click();
+      await flushPromises();
+
+      expect(wrapper.emitted("recent-restore")![0].slice(0, 1)).toEqual([
+        expect.objectContaining({ id: "a" }),
+      ]);
+      expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+      list.mockRestore();
+      count.mockRestore();
     });
   });
 
