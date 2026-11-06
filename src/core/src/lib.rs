@@ -67,6 +67,7 @@ pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod rum_pa;
+pub mod sample_data;
 use search_service as search;
 #[cfg(feature = "cpu-profiling")]
 pub mod self_profiles;

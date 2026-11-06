@@ -39,7 +39,7 @@ use crate::{
     meta::{
         cluster,
         meta_store::MetaStore,
-        stream::{QueryPartitionStrategy, StreamType},
+        stream::{DataRetentionDefaults, QueryPartitionStrategy, StreamType},
     },
     utils::{str::redact_dsn, sysinfo},
 };
@@ -142,7 +142,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 142: add templates to oncall_response_events.
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
-pub const DB_SCHEMA_VERSION: u64 = 144;
+// 145: add alerts.incident_title_template.
+// 146: rename user folders named default so the built-in default folder can be created.
+pub const DB_SCHEMA_VERSION: u64 = 146;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -170,12 +172,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-// Uncompressed total per upload; the request body cap only bounds compressed bytes.
-pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
-pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
-// max file size for individual sourcemap. We temp cache these in mem,
-// so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
@@ -446,9 +442,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
-pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
-    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+/// The shortest `ZO_DYNAMIC_PARTITION_WINDOW_DAYS`: fewer days are too little to move a stream on.
+pub const DYNAMIC_PARTITION_MIN_WINDOW_DAYS: i64 = 3;
+
+/// `ZO_DYNAMIC_PARTITION_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static DYNAMIC_PARTITION_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_partition_stream_types(&get_config().compact.dynamic_partition_stream_types)
         .expect("validated at startup")
 });
 
@@ -1947,6 +1946,12 @@ pub struct Search {
     )]
     pub inverted_index_count_optimizer_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_LIKE_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle using the inverted index for `col LIKE '%x%'` and `col ILIKE '%x%'`. When off, these predicates are answered by scanning files."
+    )]
+    pub inverted_index_like_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
         help = "Toggle tantivy result cache."
@@ -2476,6 +2481,12 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
+        name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
+    )]
+    pub sample_data_onboarding_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -2728,6 +2739,26 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
+    // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
+    #[env_config(
+        name = "ZO_SOURCEMAP_FILE_MAX_SIZE",
+        default = 50,
+        help = "Maximum size in MB of one source map file in an upload; 0 means 50"
+    )]
+    pub sourcemap_file_max_size: u64,
+    // MB, uncompressed total per upload; the request body cap only bounds compressed bytes
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_SIZE",
+        default = 500,
+        help = "Maximum total uncompressed size in MB of one source map upload; 0 means 500"
+    )]
+    pub sourcemap_zip_max_size: u64,
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_ENTRIES",
+        default = 5000,
+        help = "Maximum number of source map files in one upload; 0 means 5000"
+    )]
+    pub sourcemap_zip_max_entries: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2933,9 +2964,15 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
         default = 0,
-        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged and noted on the evaluation's history record."
     )]
     pub alert_max_group_notifications_per_eval: usize,
+    #[env_config(
+        name = "ZO_ALERT_NOTIFICATION_TIMEOUT",
+        default = 30,
+        help = "Total time limit in seconds for one notification request to a destination, connection included. 0 uses the default of 30."
+    )]
+    pub alert_notification_timeout: u64,
     #[env_config(
         name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
         default = 60,
@@ -3404,12 +3441,26 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
     #[env_config(
-        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        name = "ZO_DYNAMIC_PARTITION_STREAM_TYPES",
         default = "",
-        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `dynamic_partition` overrides this per stream; while it is off the level can be set by hand. Levels already recorded stay in effect. Before downgrading to a version without this setting, set ZO_<TYPE>_QUERY_RETENTION=daily for these types, or queries miss the days already merged by day."
     )]
-    pub dynamic_merge_stream_types: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
+    pub dynamic_partition_stream_types: String,
+    #[env_config(
+        name = "ZO_DYNAMIC_PARTITION_WINDOW_DAYS",
+        default = 7,
+        help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
+    )]
+    pub dynamic_partition_window_days: i64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_DAYS",
+        default = "3650",
+        help = "Default retention in days for streams with no value of their own: a plain number (30), optionally with per-type values (30,logs:21,metrics:180). Types: logs, metrics, traces, profiles. Without a plain number the default is 3650; 0 keeps data forever and <type>:0 inherits the plain number. A positive value must be at least 3."
+    )]
+    pub data_retention_spec: String,
+    // Both parsed from data_retention_spec in check_compact_config.
+    #[env_config(parse, default = "0")]
+    pub data_retention: DataRetentionDefaults,
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
@@ -4308,6 +4359,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
+    // a zero limit fails every send, so it means the default
+    if cfg.limit.alert_notification_timeout == 0 {
+        cfg.limit.alert_notification_timeout = 30;
+    }
+
     // retain for atleast 1 hour
     if cfg.limit.workflow_error_retention_secs <= 3600 {
         cfg.limit.workflow_error_retention_secs = 3600;
@@ -4395,6 +4451,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
+    }
+    cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
+        0 => 50,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    cfg.limit.sourcemap_zip_max_size = match cfg.limit.sourcemap_zip_max_size {
+        0 => 500,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    if cfg.limit.sourcemap_zip_max_entries == 0 {
+        cfg.limit.sourcemap_zip_max_entries = 5000;
     }
     cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
@@ -5055,12 +5124,21 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
+    cfg.compact.data_retention = cfg
+        .compact
+        .data_retention_spec
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid ZO_COMPACT_DATA_RETENTION_DAYS: {e}"))?;
+    cfg.compact.data_retention_days = cfg.compact.data_retention.default;
+    parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
+    if cfg.compact.dynamic_partition_window_days == 0 {
+        cfg.compact.dynamic_partition_window_days = 7;
+    }
+    if cfg.compact.dynamic_partition_window_days < DYNAMIC_PARTITION_MIN_WINDOW_DAYS {
         return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
+            "ZO_DYNAMIC_PARTITION_WINDOW_DAYS is not allowed to be less than {DYNAMIC_PARTITION_MIN_WINDOW_DAYS} days."
         ));
     }
-    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -5114,21 +5192,19 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
-fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+/// Parses `ZO_DYNAMIC_PARTITION_STREAM_TYPES`; only logs, metrics and traces are classified.
+fn parse_dynamic_partition_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
     list.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let stream_type = StreamType::from(s);
-            stream_type
-                .support_dynamic_merge()
-                .then_some(stream_type)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
-                    )
-                })
+        // not `StreamType::from`: it turns an unknown name into logs instead of refusing it
+        .map(|s| match s.to_lowercase().as_str() {
+            "logs" => Ok(StreamType::Logs),
+            "metrics" => Ok(StreamType::Metrics),
+            "traces" => Ok(StreamType::Traces),
+            _ => Err(anyhow::anyhow!(
+                "ZO_DYNAMIC_PARTITION_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+            )),
         })
         .collect()
 }
@@ -5897,13 +5973,12 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention_days = 10;
+        cfg.compact.data_retention_spec = "10".to_string();
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
@@ -6095,6 +6170,37 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_sourcemap_limits_default_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_zero_falls_back_to_default() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 0;
+        cfg.limit.sourcemap_zip_max_size = 0;
+        cfg.limit.sourcemap_zip_max_entries = 0;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_mb_converted_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 7;
+        cfg.limit.sourcemap_zip_max_size = 9;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 7 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 9 * 1024 * 1024);
     }
 
     #[test]
@@ -6576,7 +6682,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 0;
+        cfg.compact.data_retention_spec = "0".to_string();
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
@@ -6607,18 +6713,47 @@ mod tests {
     #[test]
     fn test_check_compact_config_retention_too_short() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 1;
+        cfg.compact.data_retention_spec = "1".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_parses_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = "30,logs:21,metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 30);
+        assert_eq!(cfg.compact.data_retention.logs, 21);
+        assert_eq!(cfg.compact.data_retention.metrics, 180);
+
+        cfg.compact.data_retention_spec = "metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 3650);
+
+        cfg.compact.data_retention_spec = "30,index:7".to_string();
+        let err = check_compact_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("ZO_COMPACT_DATA_RETENTION_DAYS"), "{err}");
+    }
+
+    #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
     }
 
     #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 3;
+        cfg.compact.data_retention_spec = "3".to_string();
         assert!(check_compact_config(&mut cfg).is_ok());
-        cfg.compact.data_retention_days = 0; // 0 means disabled
+        cfg.compact.data_retention_spec = "0".to_string(); // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
     }
 
@@ -6972,15 +7107,34 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_merge_stream_types_accept_only_merged_types() {
-        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+    fn dynamic_partition_window_days_is_at_least_three() {
+        let check = |days| {
+            let mut cfg = Config::default();
+            cfg.compact.dynamic_partition_window_days = days;
+            super::check_compact_config(&mut cfg).map(|_| cfg.compact.dynamic_partition_window_days)
+        };
+        assert_eq!(check(0).unwrap(), 7);
+        assert_eq!(check(3).unwrap(), 3);
+        assert_eq!(check(30).unwrap(), 30);
+        for days in [1, 2, -1] {
+            assert!(check(days).is_err(), "{days}");
+        }
+    }
+
+    #[test]
+    fn dynamic_partition_stream_types_accept_only_supported_types() {
+        let set = super::parse_dynamic_partition_stream_types(" logs, Metrics ,,traces ").unwrap();
         assert_eq!(set.len(), 3);
         assert!(
-            super::parse_dynamic_merge_stream_types("")
+            super::parse_dynamic_partition_stream_types("")
                 .unwrap()
                 .is_empty()
         );
-        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,index").is_err());
+        // unknown names must not fall back to logs
+        assert!(super::parse_dynamic_partition_stream_types("foo").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("log").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,foo").is_err());
     }
 
     #[test]

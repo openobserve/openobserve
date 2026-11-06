@@ -250,12 +250,12 @@ describe("AddStream", () => {
   });
 
   describe("Default form state", () => {
-    it("seeds blank name / stream_type and dataRetentionDays = 14", async () => {
+    it("seeds blank name / stream_type and an empty dataRetentionDays", async () => {
       const wrapper = mountComp();
       await flushPromises();
       expect(values(wrapper).name).toBe("");
       expect(values(wrapper).stream_type).toBe("");
-      expect(values(wrapper).dataRetentionDays).toBe(14);
+      expect(values(wrapper).dataRetentionDays).toBeUndefined();
     });
 
     it("initializes fields as an empty array", async () => {
@@ -293,7 +293,7 @@ describe("AddStream", () => {
 
       expect(values(wrapper).name).toBe("");
       expect(values(wrapper).stream_type).toBe("");
-      expect(values(wrapper).dataRetentionDays).toBe(14);
+      expect(values(wrapper).dataRetentionDays).toBeUndefined();
     });
   });
 
@@ -426,7 +426,7 @@ describe("AddStream", () => {
   });
 
   describe("Conditional data-retention validation", () => {
-    it("requires dataRetentionDays > 0 when retention is enabled", async () => {
+    it("rejects a negative dataRetentionDays", async () => {
       const customStore = makeStore({ data_retention_days: 30 });
       const wrapper = mountComp(customStore);
       await flushPromises();
@@ -434,12 +434,58 @@ describe("AddStream", () => {
       const form = getForm(wrapper);
       form.setFieldValue("name", "ret_stream");
       form.setFieldValue("stream_type", "logs");
-      form.setFieldValue("dataRetentionDays", 0);
+      form.setFieldValue("dataRetentionDays", -1);
       await nextTick();
 
       await submit(wrapper);
       expect(form.state.isValid).toBe(false);
       expect(mockCreateStream).not.toHaveBeenCalled();
+    });
+
+    it("lets an empty dataRetentionDays through so the stream inherits", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "ret_stream");
+      form.setFieldValue("stream_type", "logs");
+      await nextTick();
+
+      await submit(wrapper);
+      expect(form.state.isValid).toBe(true);
+      expect(mockCreateStream).toHaveBeenCalled();
+    });
+
+    it("shows the retention field when the global value is off", async () => {
+      const wrapper = mountComp(makeStore({ data_retention_days: 0 }));
+      await flushPromises();
+      getForm(wrapper).setFieldValue("stream_type", "metrics");
+      await flushPromises();
+      expect((wrapper.vm as any).showDataRetention).toBe(true);
+    });
+
+    it("explains the default the stream type inherits", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      customStore.state.organizationData = {
+        organizationSettings: {
+          resolved_data_retention: {
+            default: 30,
+            logs: 7,
+            metrics: 180,
+            traces: 30,
+            derived: 180,
+          },
+        },
+      };
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+      getForm(wrapper).setFieldValue("stream_type", "metrics");
+      await flushPromises();
+      expect((wrapper.vm as any).inheritedRetention).toBe(180);
+      getForm(wrapper).setFieldValue("stream_type", "logs");
+      await flushPromises();
+      expect((wrapper.vm as any).inheritedRetention).toBe(7);
     });
 
     it("passes when retention is enabled and dataRetentionDays > 0", async () => {
@@ -683,7 +729,7 @@ describe("AddStream", () => {
       expect(payload.settings.data_retention).toBe(7);
     });
 
-    it("toasts and returns undefined when retention < 1 (and shown)", async () => {
+    it("leaves data_retention out when empty so the stream inherits", async () => {
       const customStore = makeStore({ data_retention_days: 30 });
       const wrapper = mountComp(customStore);
       await flushPromises();
@@ -692,12 +738,8 @@ describe("AddStream", () => {
       await flushPromises();
 
       const payload = (wrapper.vm as any).getStreamPayload(0, []);
-      expect(payload).toBeUndefined();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining("Invalid Data Retention"),
-        }),
-      );
+      expect(payload.settings).not.toHaveProperty("data_retention");
+      expect((wrapper.vm as any).getStreamPayload(7, []).settings.data_retention).toBe(7);
     });
   });
 });

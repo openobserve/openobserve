@@ -418,6 +418,7 @@ mod tests {
             updated_at: Some(START + 5),
             evaluation_generation: 0,
             pending_period_sec: 0,
+            incident_title_template: None,
         };
         let row: alert_composites::ActiveModel = model.into();
         alert_composites::Entity::insert(row.reset_all())

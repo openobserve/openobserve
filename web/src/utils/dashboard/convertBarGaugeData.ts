@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { format as echartsFormat } from "echarts/core";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { colorToRgba } from "./colorPalette";
 import { getFieldLabel } from "./fieldLabel";
@@ -413,7 +413,7 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any, panelWi
     axisTick: { show: false },
     axisLine: { show: false },
     axisLabel: {
-      color: chartColor("--color-text-secondary"),
+      color: chartAxisTextColor(),
       overflow: "truncate",
       width: nameWidth,
       margin: NAME_LABEL_MARGIN,

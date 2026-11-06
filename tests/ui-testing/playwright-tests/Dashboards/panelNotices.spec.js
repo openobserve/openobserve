@@ -62,9 +62,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await expect(pm.dashboardNotices.lastRefreshed).toBeVisible({
         timeout: 15000,
       });
-      // The header clock renders the 🕑 icon plus a relative age ("now"); the
-      // "Last Refreshed At" label lives in the hover tooltip title, not text.
-      await expect(pm.dashboardNotices.lastRefreshed).toContainText("🕑");
+      await expect(pm.dashboardNotices.lastRefreshedIcon).toBeVisible();
       await expect(pm.dashboardNotices.noticesContainer).toHaveCount(0);
       await expect(pm.dashboardNotices.errorIcon).toHaveCount(0);
 

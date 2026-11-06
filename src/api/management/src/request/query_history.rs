@@ -356,7 +356,7 @@ pub async fn star(
         ("id" = String, Path, description = "Entry id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ()),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),

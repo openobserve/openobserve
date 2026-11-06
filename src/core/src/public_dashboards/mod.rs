@@ -318,7 +318,7 @@ pub struct PublishResult {
 }
 
 /// A link as the admin API returns it; the slug is a bearer secret for authenticated routes only.
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct PublicLinkView {
     pub id: String,
     pub name: String,

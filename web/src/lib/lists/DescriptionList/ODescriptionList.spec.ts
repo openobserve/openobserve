@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { h } from "vue";
 import { mount } from "@vue/test-utils";
 import ODescriptionList from "./ODescriptionList.vue";
 import ODescriptionItem from "./ODescriptionItem.vue";
@@ -51,6 +52,17 @@ describe("ODescriptionItem", () => {
   ])("stacked=%s picks its layout", (stacked, expected) => {
     const w = mount(ODescriptionItem, { props: { label: raw("Team"), stacked } });
     expect(w.classes().join(" ")).toContain(expected);
+  });
+
+  it.each([
+    [undefined, "grid-cols-[10rem_1fr]"],
+    ["narrow", "grid-cols-[7rem_1fr]"],
+  ] as const)("takes its label width %s from the list", (labelWidth, expected) => {
+    const w = mount(ODescriptionList, {
+      props: labelWidth ? { labelWidth } : {},
+      slots: { default: () => h(ODescriptionItem, { label: raw("Team") }) },
+    });
+    expect(w.find("[data-test=o2-description-item]").classes()).toContain(expected);
   });
 
   it("lets the label be replaced by a slot", () => {

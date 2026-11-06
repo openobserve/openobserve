@@ -4,12 +4,8 @@
   thing a distributed team asks for, and until this control it had to be
   assembled by somebody who already understood restriction windows.
 
-  A tab per shape, not a step. The names stay on one strip while the chosen
-  one's form is edited under it, because choosing between four shapes is a
-  comparison — a back button between the names and what they build made the
-  reader hold the other three in their head. The strip is the same OTabs
-  every other module heads its sub-pages with, so this reads as one more page
-  rather than a bespoke picker.
+  One radio card per shape, a select on a phone. Each shape keeps what was
+  typed into it, so switching to compare never costs the values.
 
   A drawer rather than a dialog: the coverage grid is seven columns wide and
   every layer is a row of four controls, so the width is load-bearing.
@@ -22,36 +18,92 @@
   picture is redrawn on every keystroke; that lives in `.shape.ts` and degrades
   to "no picture" for an id this build has not met.
 
-  Applying replaces only the primary rotation's shift rules, keeping its id and name, so the confirm names it.
+  Applying replaces the chosen rotation's shift rules, keeping its id and name, or adds a new rotation.
 -->
 <template>
-  <ODrawer
-    v-model:open="open"
-    size="xxl"
-    :title="t('oncall.presetsTitle')"
-    :sub-title="t('oncall.presetsSubtitle')"
-    data-test="oncall-presets-drawer"
-  >
+  <ODrawer v-model:open="open" size="xxl" :title="drawerTitle" data-test="oncall-presets-drawer">
     <OInnerLoading v-if="loading" showing />
 
     <div v-else class="flex flex-col gap-4">
-      <!-- Every shape stays reachable: the chosen one has to be re-comparable
-           without losing the values already typed into it. -->
-      <OTabs v-model="activeId" bordered data-test="oncall-presets-tabs">
-        <OTab
+      <div
+        v-if="rotations.length"
+        class="flex flex-wrap items-start gap-3"
+        data-test="oncall-presets-target-row"
+      >
+        <OToggleGroup
+          :model-value="target"
+          type="single"
+          :label="t('oncall.presetsUseFor')"
+          label-position="top"
+          data-test="oncall-presets-target"
+          @update:model-value="setTarget"
+        >
+          <OToggleGroupItem :value="NEW_ROTATION" size="sm">
+            {{ t("oncall.presetsNewRotation") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            v-for="rotation in rotations"
+            :key="rotation.id"
+            :value="rotation.id"
+            size="sm"
+          >
+            {{ raw(rotation.name) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <!-- Kept in both modes so switching does not move the form; gap-2 matches the toggle's label gap. -->
+        <OInput
+          :model-value="targetRotation ? raw(targetRotation.name) : newName"
+          :label="t('oncall.rotationName')"
+          :maxlength="MAX_ROTATION_NAME_CHARS"
+          :disabled="Boolean(targetRotation)"
+          size="sm"
+          width="md"
+          class="gap-2!"
+          :error="newNameBlank || newNameTaken"
+          data-test="oncall-presets-new-name"
+          @update:model-value="setNewName"
+        />
+      </div>
+
+      <OSelect
+        v-if="isMobile"
+        v-model="activeId"
+        :label="t('oncall.presetsPickerLabel')"
+        :options="presetOptions"
+        data-test="oncall-presets-picker"
+      />
+      <ORadioGroup
+        v-else
+        v-model="activeId"
+        :label="t('oncall.presetsPickerLabel')"
+        orientation="vertical"
+        class="grid grid-cols-2 gap-2"
+        data-test="oncall-presets-picker"
+      >
+        <ORadio
           v-for="preset in presets"
           :key="preset.id"
-          :name="preset.id"
-          :label="raw(preset.name)"
+          :value="preset.id"
+          variant="card"
           :data-test="`oncall-preset-${preset.id}`"
-        />
-      </OTabs>
+        >
+          <template #label>
+            <span class="flex min-w-0 flex-col gap-0.5">
+              <OText variant="body-strong">{{ raw(preset.name) }}</OText>
+              <span
+                class="text-text-secondary line-clamp-2 text-xs"
+                :data-test="`oncall-preset-${preset.id}-description`"
+                >{{ raw(preset.description) }}</span
+              >
+            </span>
+          </template>
+        </ORadio>
+      </ORadioGroup>
+      <OText v-if="isMobile && chosen" variant="meta" data-test="oncall-presets-picked-description">
+        {{ raw(chosen.description) }}
+      </OText>
 
       <div v-if="chosen" class="flex min-w-0 flex-col gap-4">
-        <!-- The tab carries the name, so the line under it carries the part a
-             name cannot: what applying this one actually builds. -->
-        <OText variant="meta">{{ raw(chosen.description) }}</OText>
-
         <!-- One row per layer, in the priority order the schedule will hold
              them. A layer's people and its hours belong on one line: they are
              read together and, until this screen, were three stacked fields
@@ -75,7 +127,7 @@
                 v-if="row.titleField"
                 :model-value="titleOf(row)"
                 size="sm"
-                :placeholder="raw(row.titleField.label)"
+                :maxlength="MAX_ROTATION_NAME_CHARS"
                 :aria-label="raw(row.titleField.label)"
                 :error="nameInvalid(row)"
                 :error-message="nameInvalid(row) ? t('common.nameIsRequired') : undefined"
@@ -84,7 +136,14 @@
               />
               <span v-else class="flex items-center gap-1">
                 <OText variant="body-strong">{{ row.title }}</OText>
-                <OIcon v-if="row.help" name="info" size="sm" class="text-icon-color cursor-pointer">
+                <OIcon
+                  v-if="row.help"
+                  name="info"
+                  size="sm"
+                  :label="row.help"
+                  tabindex="0"
+                  class="text-icon-color cursor-pointer"
+                >
                   <OTooltip :content="row.help" side="right" />
                 </OIcon>
               </span>
@@ -104,6 +163,7 @@
                 variant="outline"
                 size="sm-action"
                 class="ms-auto"
+                icon-left="edit"
                 :data-test="`oncall-preset-override-${row.key}`"
                 @click="overridden[row.key] = true"
               >
@@ -118,8 +178,6 @@
                 :options="memberOptions"
                 class="min-w-0 md:w-56"
                 :aria-label="raw(row.memberField.label)"
-                :error="membersInvalid(row)"
-                :error-message="membersInvalid(row) ? t('oncall.presetMembersRequired') : undefined"
                 :data-test="`oncall-preset-field-${row.key}-members`"
                 @update:model-value="(v: string[]) => setField(row, row.memberField, v)"
               />
@@ -140,7 +198,7 @@
                 <span class="flex items-center gap-1.5">
                   <OSelect
                     :model-value="edgeOf(row.window, 'from')"
-                    :options="MINUTES"
+                    :options="HALF_HOURS"
                     size="sm"
                     width="xs"
                     :aria-label="raw(row.window.from.label)"
@@ -165,6 +223,17 @@
               </OText>
 
               <OButton
+                v-if="row.optional"
+                variant="ghost-primary"
+                size="sm-action"
+                class="ms-auto"
+                :data-test="`oncall-preset-revert-${row.key}`"
+                @click="revert(row)"
+              >
+                {{ t("oncall.presetRevert") }}
+              </OButton>
+
+              <OButton
                 v-if="row.removable"
                 variant="ghost"
                 size="icon-sm"
@@ -186,7 +255,7 @@
           >
             <span class="bg-border-default h-6 w-1 shrink-0 rounded-full" aria-hidden="true" />
             <template v-for="input in sentenceInputs" :key="input.field">
-              <OText variant="body-strong">{{ raw(input.label) }}</OText>
+              <OText variant="body-strong">{{ sentenceLead(input) }}</OText>
               <OSelect
                 :model-value="model[input.field] as SelectModelValue"
                 :options="optionsFor(input)"
@@ -197,25 +266,29 @@
                 @update:model-value="(v: SelectModelValue) => (model[input.field] = v)"
               />
             </template>
-            <OText variant="meta" class="min-w-0">{{ sentenceHint }}</OText>
+            <OText v-if="sentenceHint" variant="meta" class="min-w-0 basis-full ps-4">
+              {{ sentenceHint }}
+            </OText>
           </div>
         </div>
 
-        <OButton
-          v-if="addable"
-          variant="ghost"
-          size="sm-action"
-          icon-left="add"
-          class="self-start"
-          :data-test="`oncall-preset-group-add-${addable.field}`"
-          @click="addGroup(addable)"
-        >
-          {{ t("oncall.presetsAddGroup") }}
-        </OButton>
+        <span v-if="growable" class="flex items-center gap-2 self-start">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="add"
+            :disabled="atLimit"
+            :data-test="`oncall-preset-group-add-${growable.field}`"
+            @click="addGroup(growable)"
+          >
+            {{ t("oncall.presetsAddGroup") }}
+          </OButton>
+          <OText v-if="limitNote" variant="meta" data-test="oncall-preset-group-limit">
+            {{ limitNote }}
+          </OText>
+        </span>
 
-        <!-- Timezone, cadence and anchor are the same three answers for every
-             shape and are right by default, so they read as a sentence and
-             open only when somebody disagrees with one. -->
+        <!-- Cadence and anchor are right by default, so they read as a sentence until somebody disagrees. -->
         <div
           class="border-border-default rounded-surface flex flex-col gap-3 border px-4 py-3"
           data-test="oncall-preset-defaults"
@@ -227,6 +300,7 @@
               variant="ghost"
               size="sm-action"
               class="ms-auto"
+              icon-left="tune"
               data-test="oncall-preset-defaults-toggle"
               @click="defaultsOpen = !defaultsOpen"
             >
@@ -240,10 +314,7 @@
               :key="input.field"
               :model-value="model[input.field] as SelectModelValue"
               :options="optionsFor(input)"
-              :searchable="input.kind === 'timezone'"
               :label="raw(input.label)"
-              :placeholder="t('oncall.presetTimezoneTeamShort')"
-              clearable
               size="sm"
               width="md"
               :data-test="`oncall-preset-field-${input.field}`"
@@ -287,7 +358,19 @@
 
     <template #footer>
       <div class="flex flex-wrap items-center gap-3">
-        <OText variant="meta" class="min-w-0">{{ replaceNote }}</OText>
+        <span class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <OText v-if="replaceNote" variant="meta" data-test="oncall-presets-replace-note">
+            {{ replaceNote }}
+          </OText>
+          <!-- Not OText: its meta colour would override the warning token. -->
+          <span
+            v-if="blockedReason"
+            class="text-status-warning-text text-xs"
+            data-test="oncall-presets-blocked"
+          >
+            {{ blockedReason }}
+          </span>
+        </span>
         <div class="ms-auto flex gap-2">
           <OButton variant="outline" size="sm-action" @click="open = false">
             {{ t("oncall.cancel") }}
@@ -296,62 +379,85 @@
             variant="primary"
             size="sm-action"
             :loading="applying"
-            :disabled="!chosen"
+            :disabled="!chosen || Boolean(blockedReason)"
             data-test="oncall-presets-apply"
-            @click="primaryRotationName ? (confirmReplace = true) : apply()"
+            @click="onSave"
           >
-            {{ t("oncall.save") }}
+            {{ targetRotation ? t("oncall.save") : t("oncall.addRotation") }}
           </OButton>
         </div>
       </div>
     </template>
   </ODrawer>
 
-  <!-- Only when a rotation exists: confirming the replacement of nothing is a click tax. -->
-  <ConfirmDialog
-    v-model="confirmReplace"
-    :title="t('oncall.presetsReplaceTitle', { name: raw(primaryRotationName) })"
-    :message="t('oncall.presetsReplaceMessage', { name: raw(primaryRotationName) })"
-    :ok-label="t('oncall.save')"
-    @update:ok="apply"
-  />
+  <!-- Only a replace confirms: adding a rotation loses nothing. -->
+  <ODialog
+    v-model:open="confirmReplace"
+    size="sm"
+    data-test="oncall-presets-replace-confirm"
+    :title="t('oncall.presetsReplaceTitle', { name: raw(targetRotation?.name ?? '') })"
+    :primary-button-label="t('oncall.presetsReplaceOk')"
+    :secondary-button-label="t('oncall.cancel')"
+    @click:primary="confirmApply"
+    @click:secondary="confirmReplace = false"
+  >
+    <ul v-if="sideEffects.length" class="flex flex-col gap-2">
+      <li
+        v-for="(line, index) in sideEffects"
+        :key="index"
+        :data-test="`oncall-presets-effect-${index}`"
+      >
+        <OText>{{ line }}</OText>
+      </li>
+    </ul>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import { useOnCallClock } from "@/composables/useOnCallClock";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTime from "@/lib/forms/Time/OTime.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { applySchedulePresetMutation, schedulePresetsQuery } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
-import type { OnCallTeamMember, PresetDescriptor, PresetInput } from "@/ts/interfaces/oncall";
-import type { I18nText } from "@/types/i18n";
+import type {
+  OnCallTeamMember,
+  PresetDescriptor,
+  PresetInput,
+  Rotation,
+} from "@/ts/interfaces/oncall";
+import { DEFAULT_ROTATION_NAME, MAX_ROTATION_NAME_CHARS } from "@/ts/interfaces/oncall";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   SHIFT_PRESETS,
   formatInZone,
   formatMinuteOfDay,
   fromZonedInputValue,
-  resolvableTimezones,
   toZonedInputValue,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 import OnCallMemberPicker from "./OnCallMemberPicker.vue";
 import {
@@ -359,24 +465,41 @@ import {
   dayName,
   describeWhen,
   layersOf,
+  splitDay,
   type CoverageMark,
 } from "./OnCallSchedulePresets.shape";
+import {
+  firstFreeName,
+  duplicateName,
+  handoverChange,
+  lastMondayMidnight,
+  nextRotationName,
+  sharedPeople,
+  templateProblem,
+  type TemplateProblem,
+} from "./OnCallSchedulePresets.target";
 
 const props = defineProps<{
   teamId: string;
   members: OnCallTeamMember[];
-  /** The team's own zone — what an absent `timezone` resolves to server-side. */
+  /** The team's own zone, the only zone every template time is read in. */
   timezone: string;
-  /** The rotation whose shift rules applying replaces; empty skips the confirm. */
-  primaryRotationName: string;
+  /** The team's rotations, in lane order. */
+  rotations: Rotation[];
+  /** The rotation id the drawer opens on; empty opens on a new rotation. */
+  startOn: string;
 }>();
-const emit = defineEmits<{ applied: [] }>();
+const emit = defineEmits<{ applied: []; licenseDenied: [features: string[]] }>();
 const open = defineModel<boolean>("open", { required: true });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
+const nowMicros = useOnCallClock();
 
 const MINUTES_PER_DAY = 1440;
+/** The toggle's value for "New rotation"; never a minted rotation id. */
+const NEW_ROTATION = "__new__";
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const applyPresetWrite = useMutation(() => applySchedulePresetMutation(orgId.value, props.teamId));
@@ -386,20 +509,72 @@ const loading = ref(false);
 const chosen = ref<PresetDescriptor | null>(null);
 const applying = ref(false);
 const applyError = ref("");
-/// Gates the per-field red rings: they only appear once a save has actually
-/// been tried, not while the form is still being filled in for the first time.
-const attempted = ref(false);
 const confirmReplace = ref(false);
 const defaultsOpen = ref(false);
 /// Which optional groups the user has taken off their default. Keyed by row.
 const overridden = ref<Record<string, boolean>>({});
+/// A rotation id to replace, or NEW_ROTATION.
+const target = ref(NEW_ROTATION);
+const newName = ref("");
+/// Set by a successful apply, so the next open starts a new form even for the same target.
+const stale = ref(true);
 
 /// One flat model keyed by field name; groups hold arrays of row objects.
 /// Kept as plain wire values so `apply` is a spread, not a translation.
 const model = ref<Record<string, unknown>>({});
 
+const { optionOf, nameOf } = useOrgUserNames();
+
+/// What each shape holds while another is on screen, keyed by preset id.
+const drafts = new Map<
+  string,
+  { model: Record<string, unknown>; overridden: Record<string, boolean> }
+>();
+
 const memberOptions = computed<SelectOption[]>(() =>
-  props.members.map((m) => ({ label: raw(m.user_email), value: m.user_email })),
+  props.members.map((m) => optionOf(m.user_email, true)),
+);
+
+// ── The target ────────────────────────────────────────────────────────────────
+
+const targetRotation = computed(
+  () => props.rotations.find((rotation) => rotation.id === target.value) ?? null,
+);
+
+const newNameBlank = computed(
+  () => !targetRotation.value && props.rotations.length > 0 && !newName.value.trim(),
+);
+
+/// The server refuses a second rotation of the same name, compared trimmed and case-insensitive.
+const newNameTaken = computed(() => {
+  const name = newName.value.trim().toLowerCase();
+  return (
+    !targetRotation.value &&
+    !!name &&
+    props.rotations.some((rotation) => rotation.name.trim().toLowerCase() === name)
+  );
+});
+
+/// With no rotation at all the server names the first one, as it always has.
+const addedName = computed(() =>
+  props.rotations.length ? newName.value.trim() : DEFAULT_ROTATION_NAME,
+);
+
+function setNewName(value: string | number | null | undefined) {
+  if (!targetRotation.value) newName.value = String(value ?? "");
+}
+
+function setTarget(value: unknown) {
+  // A single toggle clicked again emits empty; the target stays where it was.
+  if (typeof value !== "string" || !value) return;
+  target.value = value;
+  refreshTickDefaults();
+}
+
+const drawerTitle = computed<I18nText>(() =>
+  targetRotation.value
+    ? t("oncall.presetsTitleFor", { name: raw(targetRotation.value.name) })
+    : t("oncall.presetsTitleNew"),
 );
 
 // ── The catalogue ─────────────────────────────────────────────────────────────
@@ -407,11 +582,27 @@ const memberOptions = computed<SelectOption[]>(() =>
 watch(
   open,
   (isOpen) => {
-    // Entered on every open: the catalogue's cache entry, not a guard, keeps a reopen off the wire.
-    if (isOpen) fetchPresets();
-    if (!isOpen) {
+    if (isOpen) {
+      const next = props.rotations.some((r) => r.id === props.startOn)
+        ? props.startOn
+        : NEW_ROTATION;
+      // A form filled for another target, or already saved, must not carry over; Esc must not cost one.
+      if (stale.value || next !== target.value) {
+        stale.value = false;
+        target.value = next;
+        newName.value = nextRotationName(
+          props.rotations.map((r) => r.name),
+          (n) => String(t("oncall.rotationNthName", { n })),
+        );
+        drafts.clear();
+        chosen.value = null;
+      } else {
+        refreshTickDefaults();
+      }
+      // Entered on every open: the catalogue's cache entry, not a guard, keeps a reopen off the wire.
+      fetchPresets();
+    } else {
       applyError.value = "";
-      attempted.value = false;
     }
   },
   // A dialog can be MOUNTED open; without this the catalogue never loads.
@@ -425,11 +616,18 @@ async function fetchPresets() {
     // Landing on a chosen shape: the screen's job is comparison, and an empty
     // right pane makes the first click cost a shape nobody had rejected yet.
     if (!chosen.value && presets.value[0]) choose(presets.value[0]);
-  } catch {
+  } catch (err) {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
     presets.value = [];
   } finally {
     loading.value = false;
   }
+}
+
+/// The team zone is the only zone, so a timezone input an older server still lists is dropped.
+function inputsOf(preset: PresetDescriptor): PresetInput[] {
+  return preset.inputs.filter((input) => input.kind !== "timezone");
 }
 
 function emptyGroup(input: PresetInput): Record<string, unknown> {
@@ -444,10 +642,10 @@ function emptyGroup(input: PresetInput): Record<string, unknown> {
 /// group_list at its own declared minimum so the form starts valid-shaped.
 function defaultModelOf(preset: PresetDescriptor): Record<string, unknown> {
   const next: Record<string, unknown> = {};
-  for (const input of preset.inputs) {
+  for (const input of inputsOf(preset)) {
     if (input.kind === "group_list") {
-      const entries = Array.from({ length: input.min ?? 1 }, () => emptyGroup(input));
-      tileDay(input, entries);
+      const entries: Record<string, unknown>[] = [];
+      for (let i = 0; i < (input.min ?? 1); i++) appendGroup(input, entries);
       next[input.field] = entries;
     } else if (input.kind === "group") {
       next[input.field] = emptyGroup(input);
@@ -455,20 +653,45 @@ function defaultModelOf(preset: PresetDescriptor): Record<string, unknown> {
       next[input.field] = input.default;
     }
   }
+  applyTickDefaults(preset, next);
   return next;
 }
 
-function choose(preset: PresetDescriptor) {
-  chosen.value = preset;
-  applyError.value = "";
-  attempted.value = false;
-  defaultsOpen.value = false;
-  overridden.value = {};
-  model.value = defaultModelOf(preset);
+/// A replace keeps the target's handovers: cadence and anchor come from its first shift rule.
+function applyTickDefaults(preset: PresetDescriptor, values: Record<string, unknown>) {
+  const rule = targetRotation.value?.shift_rules[0];
+  for (const input of inputsOf(preset)) {
+    let value: unknown;
+    if (input.kind === "duration_micros") value = rule ? rule.shift_micros : input.default;
+    else if (input.kind === "timestamp_micros") value = rule ? rule.anchor_micros : input.default;
+    else continue;
+    if (value === undefined) delete values[input.field];
+    else values[input.field] = value;
+  }
 }
 
-/// The strip's v-model. Re-picking the open tab must not wipe the values
-/// already typed into it, so the setter only fires on a real change.
+/// Every shape's cadence and anchor follow the target as it is now, not as it was when last opened.
+function refreshTickDefaults() {
+  if (chosen.value) applyTickDefaults(chosen.value, model.value);
+  for (const [id, draft] of drafts) {
+    const preset = presets.value.find((p) => p.id === id);
+    if (preset) applyTickDefaults(preset, draft.model);
+  }
+}
+
+function choose(preset: PresetDescriptor) {
+  if (chosen.value) {
+    drafts.set(chosen.value.id, { model: model.value, overridden: overridden.value });
+  }
+  const draft = drafts.get(preset.id);
+  chosen.value = preset;
+  applyError.value = "";
+  defaultsOpen.value = false;
+  overridden.value = draft?.overridden ?? {};
+  model.value = draft?.model ?? defaultModelOf(preset);
+}
+
+/// The picker's v-model; re-picking the open shape is a no-op.
 const activeId = computed<string>({
   get: () => chosen.value?.id ?? "",
   set: (id) => {
@@ -476,6 +699,10 @@ const activeId = computed<string>({
     if (preset && preset.id !== chosen.value?.id) choose(preset);
   },
 });
+
+const presetOptions = computed<SelectOption[]>(() =>
+  presets.value.map((preset) => ({ label: raw(preset.name), value: preset.id })),
+);
 
 function groupsOf(input: PresetInput): Record<string, unknown>[] {
   return (model.value[input.field] ?? []) as Record<string, unknown>[];
@@ -487,54 +714,40 @@ function edgesOf(input: PresetInput): [PresetInput, PresetInput] | null {
   return minutes.length === 2 && minutes[0] && minutes[1] ? [minutes[0], minutes[1]] : null;
 }
 
-/**
- * Regions open covering the day between them, in equal slices.
- *
- * The catalogue gives windows no default because it has no opinion about how
- * many regions there are. Opening on two blank time pickers made the first
- * thing the screen said "168 hours nobody covers" — about a shape whose whole
- * promise is that it covers them.
- */
-function tileDay(input: PresetInput, entries: Record<string, unknown>[]) {
+/** A repeated group's own name field, when it has one. */
+function titleFieldOf(input: PresetInput): PresetInput | null {
+  return (input.fields ?? []).find((f) => f.kind === "text" && f.required) ?? null;
+}
+
+/// A new region arrives named and the day is re-split evenly, so every row covers hours from the start.
+function appendGroup(input: PresetInput, entries: Record<string, unknown>[]) {
+  const entry = emptyGroup(input);
+  const title = titleFieldOf(input);
+  if (title) {
+    entry[title.field] = firstFreeName(
+      entries.map((e) => (typeof e[title.field] === "string" ? String(e[title.field]) : "")),
+      (n) => String(t("oncall.presetsGroupName", { label: title.label, n })),
+      1,
+    );
+  }
+  entries.push(entry);
   const edges = edgesOf(input);
-  if (!edges || !entries.length) return;
+  if (!edges) return;
   const [from, to] = edges;
-  const step = Math.round(MINUTES_PER_DAY / entries.length / 30) * 30;
-  entries.forEach((entry, index) => {
-    if (entry[from.field] === undefined) entry[from.field] = index * step;
-    if (entry[to.field] === undefined)
-      entry[to.field] = index === entries.length - 1 ? MINUTES_PER_DAY : (index + 1) * step;
+  splitDay(entries.length).forEach(([start, end], index) => {
+    entries[index][from.field] = start;
+    entries[index][to.field] = end;
   });
 }
 
-/**
- * A new region halves the last one rather than arriving empty: a region with no
- * hours is a row that changes nothing, and the picture above would not move.
- */
 function addGroup(input: PresetInput) {
-  const entries = groupsOf(input);
-  const next = emptyGroup(input);
-  const edges = edgesOf(input);
-  const last = entries.at(-1);
-  if (edges && last) {
-    const [from, to] = edges;
-    const start = Number(last[from.field] ?? 0);
-    const end = Number(last[to.field] ?? MINUTES_PER_DAY);
-    const span = end > start ? end - start : end + MINUTES_PER_DAY - start;
-    const mid = (start + Math.round(span / 2 / 30) * 30) % MINUTES_PER_DAY;
-    last[to.field] = mid;
-    next[from.field] = mid;
-    next[to.field] = end;
-  }
-  entries.push(next);
+  appendGroup(input, groupsOf(input));
 }
 
 // ── The form, read off the schema ─────────────────────────────────────────────
 
-/// The three answers that are about how the schedule TICKS rather than about
-/// who covers what. Keyed on kind, not on field name, so a shape that adds a
-/// second duration still gets the quiet treatment.
-const DEFAULT_KINDS = new Set(["timezone", "duration_micros", "timestamp_micros"]);
+/// How the schedule ticks rather than who covers what; keyed on kind so a second duration is quiet too.
+const DEFAULT_KINDS = new Set(["duration_micros", "timestamp_micros"]);
 
 interface WindowSpec {
   /** Where the window's values live — a group's own row, or the flat model. */
@@ -559,19 +772,19 @@ interface RowSpec {
   index: number;
 }
 
+const visibleInputs = computed(() => (chosen.value ? inputsOf(chosen.value) : []));
+
 const groupInputs = computed(() =>
-  (chosen.value?.inputs ?? []).filter((i) => i.kind === "group" || i.kind === "group_list"),
+  visibleInputs.value.filter((i) => i.kind === "group" || i.kind === "group_list"),
 );
 
 const scalarInputs = computed(() =>
-  (chosen.value?.inputs ?? []).filter(
+  visibleInputs.value.filter(
     (i) => i.kind !== "group" && i.kind !== "group_list" && !DEFAULT_KINDS.has(i.kind),
   ),
 );
 
-const defaultInputs = computed(() =>
-  (chosen.value?.inputs ?? []).filter((i) => DEFAULT_KINDS.has(i.kind)),
-);
+const defaultInputs = computed(() => visibleInputs.value.filter((i) => DEFAULT_KINDS.has(i.kind)));
 
 /**
  * A start/end PAIR of minutes at the top level is one layer's window and
@@ -597,17 +810,21 @@ const sentenceInputs = computed(() => {
   );
 });
 
-/// The one group_list that has not hit its own ceiling, if any.
-const addable = computed(
-  () =>
-    groupInputs.value.find(
-      (i) => i.kind === "group_list" && groupsOf(i).length < (i.max ?? Infinity),
-    ) ?? null,
+/// The one repeatable group, kept on screen at its ceiling so the limit can say why.
+const growable = computed(() => groupInputs.value.find((i) => i.kind === "group_list") ?? null);
+
+const atLimit = computed(
+  () => !!growable.value && groupsOf(growable.value).length >= (growable.value.max ?? Infinity),
 );
+
+const limitNote = computed<I18nText | "">(() => {
+  const input = growable.value;
+  if (!input?.max) return "";
+  return t("oncall.presetsGroupLimit", { max: input.max, label: input.label.toLowerCase() });
+});
 
 function rowOf(input: PresetInput, entry: Record<string, unknown>, index: number): RowSpec {
   const fields = input.fields ?? [];
-  const titleField = fields.find((f) => f.kind === "text" && f.required) ?? null;
   const minutes = fields.filter((f) => f.kind === "minute_of_day");
   const own: WindowSpec | null =
     minutes.length === 2 && minutes[0] && minutes[1]
@@ -621,7 +838,7 @@ function rowOf(input: PresetInput, entry: Record<string, unknown>, index: number
     // A repeated row's own label is its name field; the group label above it
     // would be the same word N times.
     help: index >= 0 ? "" : raw(input.description),
-    titleField,
+    titleField: titleFieldOf(input),
     memberField: fields.find((f) => f.kind === "member_list") ?? null,
     window: own,
     removable: index >= 0 && groupsOf(input).length > (input.min ?? 1),
@@ -651,6 +868,12 @@ function removeRow(row: RowSpec) {
   groupsOf(row.owner).splice(row.index, 1);
 }
 
+/// Back to "Covered by everyone above": an emptied catch-all is left out of the request.
+function revert(row: RowSpec) {
+  overridden.value[row.key] = false;
+  if (row.memberField) row.entry[row.memberField.field] = [];
+}
+
 function membersOf(row: RowSpec): string[] {
   const field = row.memberField;
   if (!field) return [];
@@ -677,13 +900,7 @@ function controlsVisible(row: RowSpec): boolean {
 }
 
 function nameInvalid(row: RowSpec): boolean {
-  return attempted.value && Boolean(row.titleField) && !titleOf(row).trim();
-}
-
-function membersInvalid(row: RowSpec): boolean {
-  return (
-    attempted.value && Boolean(row.memberField) && controlsVisible(row) && !membersOf(row).length
-  );
+  return Boolean(row.titleField) && !titleOf(row).trim();
 }
 
 function edgeOf(window: WindowSpec | null, edge: "from" | "to"): SelectModelValue {
@@ -707,10 +924,6 @@ const MINUTES: SelectOption[] = [...HALF_HOURS, { label: raw("24:00"), value: MI
 
 const DAY_OPTIONS: SelectOption[] = WEEK_DAYS.map((day) => ({ label: dayName(day), value: day }));
 
-const ZONE_OPTIONS = computed<SelectOption[]>(() =>
-  resolvableTimezones(props.timezone).map((z) => ({ label: raw(z), value: z })),
-);
-
 const HANDOVER_OPTIONS: SelectOption[] = SHIFT_PRESETS.map((preset) => ({
   label: t(preset.labelKey),
   value: preset.micros,
@@ -718,18 +931,24 @@ const HANDOVER_OPTIONS: SelectOption[] = SHIFT_PRESETS.map((preset) => ({
 
 function optionsFor(input: PresetInput): SelectOption[] {
   switch (input.kind) {
+    // A lone minute is a start or a split, and the server refuses 24:00 for both.
     case "minute_of_day":
-      return MINUTES;
+      return HALF_HOURS;
     case "day_of_week":
     case "day_list":
       return DAY_OPTIONS;
-    case "timezone":
-      return ZONE_OPTIONS.value;
     case "duration_micros":
       return HANDOVER_OPTIONS;
     default:
       return [];
   }
+}
+
+/// The boundary line reads "Split on <day> at <time>"; a kind it has no word for keeps the catalogue's label.
+function sentenceLead(input: PresetInput): I18nText {
+  if (input.kind === "day_of_week") return t("oncall.presetSplitOn");
+  if (input.kind === "minute_of_day") return t("oncall.presetSplitAt");
+  return raw(input.label);
 }
 
 function dayValues(window: WindowSpec | null): number[] {
@@ -754,19 +973,26 @@ const anchorInput = computed(
   () => defaultInputs.value.find((i) => i.kind === "timestamp_micros") ?? null,
 );
 const tickInputs = computed(() => defaultInputs.value.filter((i) => i.kind !== "timestamp_micros"));
-
-const sentenceHint = computed<I18nText | "">(() =>
-  sentenceInputs.value[0] ? raw(sentenceInputs.value[0].description) : "",
+const handoverInput = computed(
+  () => defaultInputs.value.find((i) => i.kind === "duration_micros") ?? null,
 );
 
-const anchorLocal = computed(() => {
+const sentenceHint = computed<I18nText | "">(() =>
+  sentenceInputs.value.some((i) => i.kind === "day_of_week") ? t("oncall.presetSplitHint") : "",
+);
+
+/// What the first shift is when nothing is sent: what the server would pick, so the pickers never open blank.
+const anchorMicros = computed(() => {
   const value = anchorInput.value ? model.value[anchorInput.value.field] : undefined;
-  return typeof value === "number" ? toZonedInputValue(value, zone.value) : "";
+  return typeof value === "number" ? value : lastMondayMidnight(nowMicros.value, zone.value);
 });
+
+const anchorLocal = computed(() => toZonedInputValue(anchorMicros.value, zone.value));
 
 function setAnchor(value: string | number) {
   const input = anchorInput.value;
-  if (!input) return;
+  // A picker echoing the shown value must not swap the target's exact anchor for a minute-rounded one.
+  if (!input || String(value) === anchorLocal.value) return;
   const micros = fromZonedInputValue(String(value), zone.value);
   if (micros === null) delete model.value[input.field];
   else model.value[input.field] = micros;
@@ -815,83 +1041,173 @@ function fillOf(tone: CoverageMark): string {
   return FILLS[tone];
 }
 
-const zone = computed(() => (model.value.timezone as string) || props.timezone);
+const zone = computed(() => props.timezone);
 
-const defaultsSentence = computed<I18nText>(() => {
-  const cadence = SHIFT_PRESETS.find((p) => p.micros === model.value.handover_micros);
-  const anchor = model.value.anchor_micros;
-  return t("oncall.presetDefaultsSentence", {
-    zone: model.value.timezone
-      ? String(model.value.timezone)
-      : String(t("oncall.presetTimezoneTeam", { zone: props.timezone })),
-    handover: String(cadence ? t(cadence.labelKey) : t("oncall.presetHandoverCustom")),
-    anchor:
-      typeof anchor === "number"
-        ? formatInZone(anchor, zone.value)
-        : String(t("oncall.presetAnchorDefault")),
-  });
+const handoverMicros = computed(() => {
+  const value = handoverInput.value ? model.value[handoverInput.value.field] : undefined;
+  return typeof value === "number" ? value : null;
 });
 
-const replaceNote = computed<I18nText>(() =>
-  props.primaryRotationName
-    ? t("oncall.presetsReplaceNote", { name: raw(props.primaryRotationName) })
-    : t("oncall.presetsReplaceNone"),
+/// What applying changes about the target rotation's handovers; nothing for a new rotation.
+const handoverDelta = computed(() =>
+  handoverMicros.value === null
+    ? { length: false, anchor: false }
+    : handoverChange(
+        targetRotation.value?.shift_rules[0],
+        handoverMicros.value,
+        anchorMicros.value,
+        zone.value,
+      ),
 );
+const handoverMoves = computed(() => handoverDelta.value.length || handoverDelta.value.anchor);
+
+/// A shift length as the handover picker names it, lowercased to sit mid-sentence.
+function lengthName(micros: number | null): string {
+  const preset = SHIFT_PRESETS.find((p) => p.micros === micros);
+  return String(preset ? t(preset.labelKey) : t("oncall.presetHandoverCustomLength")).toLowerCase();
+}
+
+const HANDOVER_AT: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+};
+
+const defaultsSentence = computed<I18nText>(() => {
+  const cadence = SHIFT_PRESETS.find((p) => p.micros === handoverMicros.value);
+  const values = {
+    zone: raw(zone.value),
+    handover: cadence ? lengthName(cadence.micros) : String(t("oncall.presetHandoverCustom")),
+    anchor: formatInZone(anchorMicros.value, zone.value),
+  };
+  return targetRotation.value && !handoverMoves.value
+    ? t("oncall.presetDefaultsSentenceSame", values)
+    : t("oncall.presetDefaultsSentence", values);
+});
+
+const replaceNote = computed<I18nText | "">(() => {
+  if (targetRotation.value)
+    return t("oncall.presetsReplaceNote", { name: raw(targetRotation.value.name) });
+  if (!addedName.value || newNameTaken.value) return "";
+  return t("oncall.presetsAddNote", { name: raw(addedName.value) });
+});
+
+/// Save waits for every field to be valid, and the footer names the first problem.
+const blockedReason = computed<I18nText | "">(() => {
+  if (newNameBlank.value) return t("oncall.presetsBlockedNewName");
+  if (newNameTaken.value)
+    return t("oncall.presetsBlockedNameTaken", { name: raw(newName.value.trim()) });
+  const unnamed = rows.value.find(nameInvalid)?.titleField;
+  if (unnamed) return t("oncall.presetsBlockedName", { label: unnamed.label.toLowerCase() });
+  const twice = duplicateName(
+    rows.value.map((row) => (row.titleField ? titleOf(row) : String(row.title))),
+  );
+  if (twice) return t("oncall.presetsBlockedDuplicateRule", { name: raw(twice) });
+  if (rows.value.some((row) => row.memberField && controlsVisible(row) && !membersOf(row).length))
+    return t("oncall.presetsBlockedMembers");
+  const problem = templateProblem(visibleInputs.value, model.value);
+  return problem ? problemReason(problem) : "";
+});
+
+function problemReason(problem: TemplateProblem): I18nText {
+  switch (problem.kind) {
+    case "empty_window":
+      return t("oncall.presetsBlockedEmptyWindow");
+    case "overlap": {
+      const label = titleFieldOf(problem.input)?.label ?? problem.input.label;
+      return t("oncall.presetsBlockedOverlap", { label: label.toLowerCase() });
+    }
+    case "no_days":
+      return t("oncall.presetsBlockedNoDays");
+    case "week_start":
+      return t("oncall.presetsBlockedWeekStart");
+  }
+}
+
+/// What a replace does beyond the rotation itself, one line each.
+const sideEffects = computed<I18nText[]>(() => {
+  const lines: I18nText[] = [];
+  const rule = targetRotation.value?.shift_rules[0];
+  // A line whose two ends read the same says nothing, so it is never shown.
+  const change = (key: I18nKey, from: string, to: string) => {
+    if (from !== to) lines.push(t(key, { from, to }));
+  };
+  if (rule && handoverDelta.value.length) {
+    change(
+      "oncall.presetsEffectLength",
+      lengthName(rule.shift_micros),
+      lengthName(handoverMicros.value),
+    );
+  }
+  if (rule && handoverDelta.value.anchor) {
+    change(
+      "oncall.presetsEffectMove",
+      formatInZone(rule.anchor_micros, zone.value, HANDOVER_AT),
+      formatInZone(anchorMicros.value, zone.value, HANDOVER_AT),
+    );
+  }
+  const people = rows.value.flatMap((row) => (controlsVisible(row) ? membersOf(row) : []));
+  const shared = sharedPeople(people, props.rotations, target.value);
+  const [first] = shared;
+  if (first) {
+    const values = {
+      name: raw(nameOf(first.email)),
+      rotation: raw(first.rotation),
+      count: shared.length - 1,
+    };
+    lines.push(
+      shared.length > 1
+        ? t(
+            shared.every((person) => person.rotation === first.rotation)
+              ? "oncall.presetsEffectSharedMore"
+              : "oncall.presetsEffectSharedOthers",
+            values,
+            values.count,
+          )
+        : t("oncall.presetsEffectShared", values),
+    );
+  }
+  return lines;
+});
 
 // ── Applying ──────────────────────────────────────────────────────────────────
 
-interface InvalidField {
-  kind: "name" | "members";
-  label: string;
+function onSave() {
+  if (!chosen.value || blockedReason.value) return;
+  if (targetRotation.value) confirmReplace.value = true;
+  else apply();
 }
 
-/// Every row whose title or member list is required but blank — a name the
-/// preset genuinely cannot guess (only follow-the-sun's regions), or a layer
-/// with nobody in it. Caught here, before the request leaves the browser,
-/// because the server refuses both too but only after a round trip — and a
-/// missing `members` arrives as axum's own extraction failure, not this
-/// API's usual named-field error.
-function invalidFields(): InvalidField[] {
-  const out: InvalidField[] = [];
-  for (const row of rows.value) {
-    if (row.titleField && !titleOf(row).trim())
-      out.push({ kind: "name", label: row.titleField.label });
-    if (row.memberField && controlsVisible(row) && !membersOf(row).length)
-      out.push({ kind: "members", label: row.memberField.label });
-  }
-  return out;
+function confirmApply() {
+  confirmReplace.value = false;
+  apply();
 }
 
 async function apply() {
   if (!chosen.value) return;
   applyError.value = "";
-  attempted.value = true;
-  const invalid = invalidFields();
-  if (invalid.length === 1) {
-    const [field] = invalid;
-    applyError.value =
-      field.kind === "name"
-        ? t("oncall.presetsMissingName", { label: field.label })
-        : t("oncall.presetsMissingMembers", { label: field.label });
-    return;
-  }
-  if (invalid.length > 1) {
-    applyError.value = t("oncall.presetsFixHighlighted");
-    return;
-  }
   applying.value = true;
+  const template = raw(chosen.value.name);
+  const replacing = targetRotation.value;
   try {
-    // Absent beats empty: a field the user never touched is the server's to
-    // default — `timezone` absent means the TEAM's zone, never UTC, and an
-    // un-overridden catch-all absent means everybody named above.
+    // Absent beats empty: an untouched field is the server's to default, and an absent catch-all means everyone above.
     const body: Record<string, unknown> & { preset: string } = { preset: chosen.value.id };
     for (const [key, value] of Object.entries(model.value)) {
       if (value === undefined || value === "" || value === null) continue;
       if (isUntouchedOptionalGroup(key, value)) continue;
       body[key] = value;
     }
+    if (replacing) body.rotation_id = replacing.id;
+    else if (props.rotations.length) body.new_rotation_name = addedName.value;
     await applyPresetWrite.mutateAsync(body);
-    toast({ variant: "success", message: t("oncall.presetsApplied") });
+    toast({
+      variant: "success",
+      message: replacing
+        ? t("oncall.presetsReplaced", { name: raw(replacing.name), template })
+        : t("oncall.presetsAdded", { name: raw(addedName.value), template }),
+    });
+    stale.value = true;
     open.value = false;
     emit("applied");
   } catch (err) {

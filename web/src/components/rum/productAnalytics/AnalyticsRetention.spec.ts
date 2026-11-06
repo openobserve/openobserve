@@ -302,6 +302,22 @@ describe("AnalyticsRetention", () => {
     expect(gridSqls()).toHaveLength(0);
   });
 
+  it("the too-short empty state at 1d offers the widen button", async () => {
+    await mountRetention({ period: "1d" });
+    expect(wrapper!.find('[data-test="rum-analytics-retention-widen-range-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("the too-short empty state at 30d (range clipped to data start) has no widen button", async () => {
+    streamStats.doc_time_min = Date.now() * 1000 - 2 * DAY_US;
+    await mountRetention({ period: "30d" });
+    expect(wrapper!.find('[data-test="rum-analytics-retention-too-short"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-retention-widen-range-btn"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("the legend says a cell click shows who returned", async () => {
     await mountRetention();
     expect(wrapper!.find('[data-test="rum-analytics-retention-cell-hint"]').text()).toBe(

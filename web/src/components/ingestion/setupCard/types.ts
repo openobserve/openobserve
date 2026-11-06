@@ -20,10 +20,27 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { InjectionKey, Ref } from "vue";
+
 import type { I18nKey, I18nText } from "@/types/i18n";
 
 import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+/** Onboarding's tracing answer, kept in the page URL as `traces` and `langs`. */
+export interface SetupCardPresets {
+  /** Skipped, eBPF, or a library per language; undefined when the URL has no answer. */
+  traces?: "off" | "ebpf" | "library";
+  /** The card's library language ids, e.g. `["java", "nodejs"]`. Empty unless `traces` is "library". */
+  languages: string[];
+}
+
+/**
+ * Provided by onboarding around its guides, with the tracing answer from the page URL. Its
+ * presence also puts a card in onboarding mode, where its verify step reads "Check Your Data".
+ */
+export const SETUP_CARD_ONBOARDING: InjectionKey<Readonly<Ref<SetupCardPresets>>> =
+  Symbol("SetupCardOnboarding");
 
 // Card copy comes in pairs: `title` (resolved I18nText, for raw() tokens and
 // markdown-authored content) and `titleKey` (an I18nKey the renderer translates).
@@ -217,6 +234,10 @@ export interface RichCardStep {
    * Untagged steps render in every mode; ignored when the card has no `setupModes`.
    */
   mode?: SetupMode;
+  /** Optional step whose body starts folded; the user opens it from its heading. */
+  collapsed?: boolean;
+  /** The card's data check does not prove this step: tracing, on a card that checks for logs. */
+  notProvenByDetect?: boolean;
 }
 
 export interface RichCardDetect {

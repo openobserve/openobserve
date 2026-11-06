@@ -20,7 +20,7 @@
 use config::meta::downtimes::TargetModule;
 use config::meta::{
     alerts::{alert::Alert, recovery::RecoveryEvent, state::AlertState},
-    self_reporting::usage::{TriggerData, TriggerDataType},
+    self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
 
 /// A clear run this long after the last window still closes the mute that window recorded.
@@ -170,6 +170,11 @@ async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Opt
             "[RECOVERY] destination consumer failed for {}: {e}",
             event.alert_id
         );
+        usage_reporting::publish_triggers_usage(failed_recovery_record(
+            alert,
+            event,
+            e.to_string(),
+        ));
     }
 
     if route.slack {
@@ -179,25 +184,36 @@ async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Opt
     // TODO: a workflow consumer, once a link can carry AlertResolved (see that variant).
 }
 
-/// Whether the scheduler's per-run on-call recovery waits: a window now, or a hold it started.
+/// Whether the scheduler's per-run on-call recovery waits: an open episode's hold, or a window.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now: i64) -> bool {
     let Some(alert_id) = alert.id.map(|id| id.to_string()) else {
         return false;
     };
+    // The episode close resolves the page; a re-fire inside the hold would hit flap dampening.
+    let held = defers_to_episode_close(&alert.query_condition, alert.keep_firing_for)
+        && episode_open(&alert_id).await;
+    // Runs even when held, so a mute record is still kept or forgotten on this clear run.
+    let muted = mute_withholds_oncall(alert, &alert_id, folder_id, now).await;
+    held || muted
+}
+
+/// Whether a window now, or a hold it started, withholds the per-run on-call recovery.
+#[cfg(feature = "enterprise")]
+async fn mute_withholds_oncall(alert: &Alert, alert_id: &str, folder_id: &str, now: i64) -> bool {
     let since = now.saturating_sub(RECORDED_MUTE_GRACE_MICROS);
     if !crate::alerts::downtimes::any_since(&alert.org_id, TargetModule::Alerts, since) {
         // A clear run more than the grace after the window still closes what the mute left open.
         if crate::alerts::downtimes::any_row(&alert.org_id, TargetModule::Alerts)
-            && recorded_downtime(&alert_id).await.is_some()
+            && recorded_downtime(alert_id).await.is_some()
         {
-            forget_recorded_mute(&alert.org_id, &alert_id).await;
+            forget_recorded_mute(&alert.org_id, alert_id).await;
         }
         return false;
     }
-    let recorded = recorded_downtime(&alert_id).await;
+    let recorded = recorded_downtime(alert_id).await;
     let muted_now = downtime_at(alert, folder_id, recorded.as_deref(), now).await;
-    let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(&alert_id).await;
+    let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(alert_id).await;
     let held = recorded.as_deref().is_some_and(|id| {
         let hold = alert.keep_firing_for.saturating_mul(1_000_000);
         crate::alerts::downtimes::had_window(&alert.org_id, id, now.saturating_sub(hold), now)
@@ -211,13 +227,13 @@ pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now
     if let Some(downtime_id) = decision.record {
         crate::alerts::scheduler::handlers::record_last_downtime(
             &alert.org_id,
-            &alert_id,
+            alert_id,
             Some(downtime_id),
         )
         .await;
     }
     if decision.forget {
-        forget_recorded_mute(&alert.org_id, &alert_id).await;
+        forget_recorded_mute(&alert.org_id, alert_id).await;
     }
     decision.withheld
 }
@@ -236,6 +252,15 @@ fn clear_run_oncall<'a>(
         record: muted_now.filter(|_| recorded.is_none() && episode_open),
         forget: recorded.is_some() && !withheld,
     }
+}
+
+/// A single-row alert's `keep_firing_for` hold leaves on-call to the episode close. [pure]
+#[cfg(feature = "enterprise")]
+fn defers_to_episode_close(
+    query: &config::meta::alerts::QueryCondition,
+    keep_firing_for_secs: i64,
+) -> bool {
+    keep_firing_for_secs > 0 && !query.multi_alert_enabled()
 }
 
 /// The Recovered thread reply on every Slack app destination the alert posts to.
@@ -277,7 +302,22 @@ fn suppressed_recovery_record(
     event: &RecoveryEvent,
     downtime_id: String,
 ) -> TriggerData {
-    let mut data = TriggerData {
+    let mut data = recovery_record(alert, event);
+    crate::alerts::alert::record_suppressed_run(&mut data, "alerts", downtime_id);
+    data
+}
+
+/// The history record of a recovery a destination did not get.
+fn failed_recovery_record(alert: &Alert, event: &RecoveryEvent, error: String) -> TriggerData {
+    let mut data = recovery_record(alert, event);
+    data.status = RunOutcome::NotifyFailed;
+    data.error = Some(error);
+    data
+}
+
+/// The history record of one recovery.
+fn recovery_record(alert: &Alert, event: &RecoveryEvent) -> TriggerData {
+    TriggerData {
         _timestamp: event.emitted_at,
         org: event.org_id.clone(),
         module: TriggerDataType::Alert,
@@ -286,9 +326,7 @@ fn suppressed_recovery_record(
         end_time: event.emitted_at,
         is_realtime: alert.is_real_time,
         ..Default::default()
-    };
-    crate::alerts::alert::record_suppressed_run(&mut data, "alerts", downtime_id);
-    data
+    }
 }
 
 /// Asked at `recovered_at`, so a `keep_firing_for` hold that outlasts the window still mutes.
@@ -408,7 +446,9 @@ async fn episode_open(alert_id: &str) -> bool {
     {
         Ok(state) => state.is_some_and(|state| state.episode_id.is_some()),
         Err(e) => {
-            log::warn!("[RECOVERY] state of {alert_id} unreadable for the mute record: {e}");
+            log::warn!(
+                "[RECOVERY] state of {alert_id} unreadable, so its episode reads as closed: {e}"
+            );
             false
         }
     }
@@ -440,12 +480,9 @@ async fn recorded_downtime(alert_id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::{
-        alerts::{
-            recovery::{EpisodeInput, apply_episode, recovery_event},
-            state::AlertState,
-        },
-        self_reporting::usage::RunOutcome,
+    use config::meta::alerts::{
+        recovery::{EpisodeInput, apply_episode, recovery_event},
+        state::AlertState,
     };
 
     use super::*;
@@ -457,6 +494,38 @@ mod tests {
             keep_firing_for_secs: 0,
             episode_id: None,
         }
+    }
+
+    #[test]
+    fn a_failed_recovery_send_is_a_failed_run_in_history() {
+        let mut alert = Alert::default();
+        alert.name = "a".to_string();
+        let event = RecoveryEvent {
+            org_id: "o".to_string(),
+            alert_id: "id".to_string(),
+            group_key: String::new(),
+            episode_id: "ep".to_string(),
+            incident_id: None,
+            opened_at: 1,
+            recovered_at: 5,
+            emitted_at: 7,
+            last_notified_level: None,
+            group_labels: None,
+            firing_started_at: None,
+            reason: Default::default(),
+            group_label_set: None,
+            value: None,
+        };
+
+        let record = failed_recovery_record(&alert, &event, "destination rec: gone".to_string());
+
+        assert_eq!(record.status, RunOutcome::NotifyFailed);
+        assert_eq!(record.error.as_deref(), Some("destination rec: gone"));
+        // The error can also mean a destination that no longer exists, so no send is claimed.
+        assert_eq!(record.delivery_attempted, None);
+        assert_eq!(record.key, "a/id");
+        assert_eq!(record.org, "o");
+        assert_eq!((record.start_time, record.end_time), (5, 7));
     }
 
     #[test]
@@ -564,6 +633,49 @@ mod tests {
             }
         );
         assert!(!clear_run_oncall(None, None, true, false).withheld);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_a_single_row_hold_defers_the_oncall_recovery_to_the_episode_close() {
+        use config::meta::alerts::{
+            AggFunction, Aggregation, Condition, Operator, QueryCondition, QueryType,
+        };
+
+        let single = QueryCondition::default();
+        let grouped = QueryCondition {
+            aggregation: Some(Aggregation {
+                group_by: Some(vec!["host".into()]),
+                function: AggFunction::Count,
+                having: Condition {
+                    column: "zo_sql_val".into(),
+                    operator: Operator::GreaterThan,
+                    value: 0.into(),
+                    ignore_case: false,
+                },
+                warning_value: None,
+                multi_alert: true,
+            }),
+            ..Default::default()
+        };
+        let promql_grouped = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        let cases = [
+            ("single row, held", &single, 300, true),
+            ("single row, no hold", &single, 0, false),
+            ("grouped, held", &grouped, 300, false),
+            ("PromQL grouped, held", &promql_grouped, 300, false),
+        ];
+        for (name, query, keep_firing_for, expected) in cases {
+            assert_eq!(
+                defers_to_episode_close(query, keep_firing_for),
+                expected,
+                "{name}"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]

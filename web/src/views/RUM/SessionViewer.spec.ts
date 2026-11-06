@@ -20,6 +20,9 @@ import { createRouter, createWebHistory } from "vue-router";
 
 // --- Module-level mocks (hoisted by Vitest before any import) ---
 
+// Extra fields a Sessions-list click-through leaves on the selected session.
+const seededSession = vi.hoisted(() => ({ extra: {} as Record<string, unknown> }));
+
 // Reactive like the real store, so computeds over the selected session follow getSession().
 vi.mock("@/composables/useSessionReplay", async () => {
   const { reactive } = await import("vue");
@@ -37,6 +40,7 @@ vi.mock("@/composables/useSessionReplay", async () => {
             city: "San Francisco",
             country: "US",
             session_id: "session-abc",
+            ...seededSession.extra,
           },
         },
       }),
@@ -1344,6 +1348,20 @@ describe("SessionViewer.vue — server-clock query windows (Risk 3)", () => {
     expect(windowsBy(150)[0]).toEqual({
       startTime: minTs - 60_000_000,
       endTime: maxTs + 60_000_000,
+    });
+    wrapper.unmount();
+  });
+
+  it("hands the Traces tab the events' arrival window, not the device-clock bounds", async () => {
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, max_ts: maxTs }] },
+    } as any);
+    const wrapper = await mountLoaded();
+
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: minTs - 60_000_000,
+      end: maxTs + 60_000_000,
     });
     wrapper.unmount();
   });
@@ -3981,6 +3999,34 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     wrapper.unmount();
   });
 
+  it("shows the session duration after a reload, when the store holds no row to copy it from", async () => {
+    const wrapper = await mountEventsOnly();
+    expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+    wrapper.unmount();
+  });
+
+  it("keeps the duration of the Sessions list row on a click-through instead of recomputing it", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-events" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("2m 3s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
+  });
+
+  it("ignores the duration of a different session left in the store by another entry point", async () => {
+    seededSession.extra = { time_spent: 123_000, session_id: "session-other" };
+    try {
+      const wrapper = await mountEventsOnly();
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+      wrapper.unmount();
+    } finally {
+      seededSession.extra = {};
+    }
+  });
+
   it("hands the Traces tab the route window padded by a day, not the device-clock bounds", async () => {
     const wrapper = await mountEventsOnly();
     const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
@@ -4117,11 +4163,14 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
     wrapper.unmount();
   });
 
-  it("gives the replay sidebar no rumWindowUs, so its trace search is unchanged", async () => {
+  it("gives the replay sidebar the route window ±1 day when the arrival times are missing", async () => {
     const { wrapper } = await mountFromFunnel();
     expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
     const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
-    expect(sidebar.props("rumWindowUs")).toBeFalsy();
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: 1692884400000000 - 86_400_000_000,
+      end: 1692884400000000 + 86_400_000_000,
+    });
     wrapper.unmount();
   });
 

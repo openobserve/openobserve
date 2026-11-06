@@ -308,30 +308,30 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
 /// Register the org-independent O2 UDFs/UDAFs (everything except the per-org
 /// VRL transform functions).
 pub fn register_builtin_udfs(ctx: &SessionContext) {
-    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
-    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
-    ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
-    ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
-    ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
-    ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
-    ctx.register_udf(super::udf::regexp_matches_udf::REGEX_MATCHES_UDF.clone());
-    ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
-    ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
-    ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
-    ctx.register_udf(super::udf::arrzip_udf::ARR_ZIP_UDF.clone());
-    ctx.register_udf(super::udf::arrindex_udf::ARR_INDEX_UDF.clone());
-    ctx.register_udf(super::udf::arr_descending_udf::ARR_DESCENDING_UDF.clone());
-    ctx.register_udf(super::udf::arrjoin_udf::ARR_JOIN_UDF.clone());
-    ctx.register_udf(super::udf::arrcount_udf::ARR_COUNT_UDF.clone());
-    ctx.register_udf(super::udf::arrsort_udf::ARR_SORT_UDF.clone());
-    ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::str_match::STR_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::str_match::STR_MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::fuzzy_match::FUZZY_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regex::regexp::REGEX_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regex::regexp::REGEX_NOT_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regex::regexp::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::regex::regexp_matches::REGEX_MATCHES_UDF.clone());
+    ctx.register_udf(super::udf::time::time_range::TIME_RANGE_UDF.clone());
+    ctx.register_udf(super::udf::time::date_format::DATE_FORMAT_UDF.clone());
+    ctx.register_udf(super::udf::array::string_to_array_v2::STRING_TO_ARRAY_V2_UDF.clone());
+    ctx.register_udf(super::udf::array::arrzip::ARR_ZIP_UDF.clone());
+    ctx.register_udf(super::udf::array::arrindex::ARR_INDEX_UDF.clone());
+    ctx.register_udf(super::udf::array::arr_descending::ARR_DESCENDING_UDF.clone());
+    ctx.register_udf(super::udf::array::arrjoin::ARR_JOIN_UDF.clone());
+    ctx.register_udf(super::udf::array::arrcount::ARR_COUNT_UDF.clone());
+    ctx.register_udf(super::udf::array::arrsort::ARR_SORT_UDF.clone());
+    ctx.register_udf(super::udf::array::cast_to_arr::CAST_TO_ARR_UDF.clone());
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
-    ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
-    ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::array::to_arr_string::TO_ARR_STRING.clone());
+    ctx.register_udf(super::udf::time::histogram::HISTOGRAM_UDF.clone());
     ctx.register_udf(super::udf::fold_native_frames_udf::FOLD_NATIVE_FRAMES_UDF.clone());
-    ctx.register_udf(super::udf::match_all_hash_udf::MATCH_ALL_HASH_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::match_all_hash::MATCH_ALL_HASH_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::match_all::MATCH_ALL_UDF.clone());
+    ctx.register_udf(super::udf::fulltext::match_all::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
@@ -350,7 +350,12 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udwf(datafusion::logical_expr::WindowUDF::from(
         super::udaf::sequence::SequenceStepMatch::new(),
     ));
-    ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
+    ctx.register_udf(super::udf::time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF.clone());
+    ctx.register_udf(super::udf::ip::ip_cidr_contains::IP_CIDR_CONTAINS_UDF.clone());
+    ctx.register_udf(super::udf::ip::ip_subnet::IP_SUBNET_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_ipv4::IS_IPV4_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_ipv6::IS_IPV6_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_private_ip::IS_PRIVATE_IP_UDF.clone());
 
     #[cfg(feature = "enterprise")]
     {
@@ -988,10 +993,27 @@ mod tests {
             "arrcount",
             "re_match",
             "cast_to_timestamp",
+            "ip_cidr_contains",
+            "ip_subnet",
+            "is_ipv4",
+            "is_ipv6",
+            "is_private_ip",
         ] {
             assert!(
                 names.iter().any(|n| n == expected),
                 "registry is missing the O2 UDF `{expected}`"
+            );
+        }
+    }
+
+    #[test]
+    fn default_functions_are_all_registered() {
+        let names = registered_function_names();
+        for function in crate::datafusion::udf::DEFAULT_FUNCTIONS {
+            assert!(
+                names.iter().any(|n| n == function.name),
+                "DEFAULT_FUNCTIONS lists `{}`, which is not registered",
+                function.name
             );
         }
     }

@@ -27,6 +27,7 @@ serde.workspace = true
 sourcemap.workspace = true
 tokio.workspace = true
 tonic = { workspace = true, optional = true }
+utoipa.workspace = true
 zip.workspace = true
 
 [dev-dependencies]

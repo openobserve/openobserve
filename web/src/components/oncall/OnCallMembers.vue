@@ -5,71 +5,36 @@
       :columns="columns"
       row-key="id"
       :frame="false"
-      pagination="client"
+      :pagination="filteredRows.length ? 'client' : 'none'"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-team-members"
       class="h-full min-h-0"
       data-test="oncall-members-table"
     >
-      <!-- Add on the left, the state of the roster on the right: the toolbar
-           answers "is anyone missing" in the same glance that offers to fix it. -->
       <template #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
-            class="w-full max-w-xs max-lg:max-w-none"
-            :placeholder="t('oncall.memberSearchPlaceholder')"
+            clearable
+            class="min-w-0 flex-1 max-md:min-w-40"
+            :placeholder="t('oncall.memberSearchShort')"
             data-test="oncall-members-search"
           />
-          <OSeparator vertical class="max-lg:hidden" />
-          <div class="min-w-0 flex-1">
-            <OSelect
-              v-if="!userLookupFailed"
-              ref="memberPickerRef"
-              v-model="selected"
-              multiple
-              searchable
-              :placeholder="t('oncall.memberPickPlaceholder')"
-              :aria-label="t('oncall.membersPickerLabel')"
-              :options="userOptions"
-              :loading="loadingUsers"
-              data-test="oncall-members-user-select"
-            />
-            <OInput
-              v-else
-              ref="memberPickerRef"
-              v-model="fallbackEmails"
-              :placeholder="t('oncall.memberEmailPlaceholder')"
-              :aria-label="t('oncall.membersPickerLabel')"
-              :help-text="t('oncall.memberEmailFallbackHint')"
-              data-test="oncall-members-email-input"
-            />
-          </div>
           <OButton
+            v-if="canConfigure"
             variant="primary"
-            size="sm-action"
-            :disabled="!pendingEmails.length"
-            :loading="adding"
-            data-test="oncall-members-add-btn"
-            @click="addMembers"
+            size="sm"
+            icon-left="person-add"
+            data-test="oncall-members-add-open"
+            @click="openAddDialog"
           >
-            {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
-            <OTooltip v-if="!pendingEmails.length" :content="t('oncall.addPeopleDisabledHint')" />
+            {{ t("oncall.membersAddOpen") }}
           </OButton>
-
-          <span
-            v-if="orgTotal"
-            class="text-text-secondary ms-auto shrink-0 text-xs max-md:hidden"
-            data-test="oncall-members-coverage"
-          >
-            {{ t("oncall.membersOfOrg", { onTeam: onTeamCount, total: orgTotal }) }}
-          </span>
         </div>
       </template>
 
-      <!-- Name, why this row matters, and the address underneath it. The three
-           badges are mutually exclusive on purpose: a person has one headline. -->
+      <!-- The state badges are mutually exclusive on purpose: a person has one headline. -->
       <template #cell-person="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5 py-1">
           <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -86,15 +51,6 @@
               <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
                 {{ awayLabel(row.away) }}
               </OTag>
-              <OButton
-                v-if="canConfigure"
-                variant="ghost"
-                size="icon-xs"
-                icon-left="close"
-                :aria-label="t('oncall.awayRemove')"
-                :data-test="`oncall-members-away-remove-${row.id}`"
-                @click.stop="removeAbsence(row.away)"
-              />
             </span>
             <OTag v-if="row.unreachable" variant="error-soft" size="sm">
               {{ t("oncall.contactUnreachable") }}
@@ -115,8 +71,6 @@
         />
       </template>
 
-      <!-- The bar is the whole point: an uneven rota is invisible as a column
-           of numbers and obvious as a column of bars. -->
       <template #cell-pages="{ row, value }">
         <ODataBarCell
           :value="row.pages"
@@ -145,56 +99,86 @@
       </template>
 
       <template #cell-actions="{ row }">
-        <OButton
-          v-if="canConfigure"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="event"
-          class="max-md:hidden"
-          :aria-label="t('oncall.awayMark')"
-          :data-test="`oncall-members-mark-away-${row.id}`"
-          @click.stop="openAway(row.user_email)"
-        />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          class="max-md:hidden"
-          :aria-label="t('oncall.removeMember')"
-          :data-test="`oncall-members-remove-${row.id}`"
-          @click.stop="memberToRemove = row"
-        />
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-left="more-vert"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="md:hidden"
-              :aria-label="t('oncall.moreActions')"
-              data-test="oncall-members-row-more-actions"
-              @click.stop
-            />
-          </template>
-          <ODropdownItem
+        <div class="flex items-center justify-end">
+          <OButton
+            v-if="mayMarkAway(row.user_email) && row.away"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="event-available"
+            class="max-md:hidden"
+            :aria-label="t('oncall.awayClear')"
+            :data-test="`oncall-members-clear-away-${row.id}`"
+            @click.stop="removeAbsence(row.away)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.awayClear')" />
+          </OButton>
+          <OButton
+            v-else-if="mayMarkAway(row.user_email)"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="event-busy"
+            class="max-md:hidden"
+            :aria-label="t('oncall.awayMark')"
+            :data-test="`oncall-members-mark-away-${row.id}`"
+            @click.stop="openAway(row.user_email)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.awayMark')" />
+          </OButton>
+          <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+          <OButton
             v-if="canConfigure"
-            icon-left="event"
-            class="md:hidden"
-            :data-test="`oncall-members-mark-away-${row.id}-menu`"
-            @select="openAway(row.user_email)"
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="delete-outline"
+            class="max-md:hidden"
+            :aria-label="t('oncall.removeMember')"
+            :data-test="`oncall-members-remove-${row.id}`"
+            @click.stop="memberToRemove = row"
           >
-            <span>{{ t("oncall.awayMark") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
-            icon-left="close"
-            variant="destructive"
-            class="md:hidden"
-            :data-test="`oncall-members-remove-${row.id}-menu`"
-            @select="memberToRemove = row"
-          >
-            <span>{{ t("oncall.removeMember") }}</span>
-          </ODropdownItem>
-        </ODropdown>
+            <OTooltip side="bottom" :content="t('oncall.removeMember')" />
+          </OButton>
+          <ODropdown v-if="canConfigure || mayMarkAway(row.user_email)" side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                data-test="oncall-members-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              v-if="mayMarkAway(row.user_email) && row.away"
+              icon-left="event-available"
+              class="md:hidden"
+              :data-test="`oncall-members-clear-away-${row.id}-menu`"
+              @select="removeAbsence(row.away)"
+            >
+              <span>{{ t("oncall.awayClear") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-else-if="mayMarkAway(row.user_email)"
+              icon-left="event-busy"
+              class="md:hidden"
+              :data-test="`oncall-members-mark-away-${row.id}-menu`"
+              @select="openAway(row.user_email)"
+            >
+              <span>{{ t("oncall.awayMark") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="canConfigure"
+              icon-left="delete-outline"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`oncall-members-remove-${row.id}-menu`"
+              @select="memberToRemove = row"
+            >
+              <span>{{ t("oncall.removeMember") }}</span>
+            </ODropdownItem>
+          </ODropdown>
+        </div>
       </template>
 
       <template #empty>
@@ -202,6 +186,7 @@
           size="hero"
           preset="no-oncall-members"
           :filtered="!!memberFilter"
+          :hide-action="!canConfigure && !memberFilter"
           data-test="oncall-members-empty"
           @action="(id) => (id === 'clear-filters' ? (memberFilter = '') : focusMemberPicker())"
         />
@@ -209,82 +194,100 @@
     </OTable>
 
     <ODialog
-      :open="awayOpen"
-      @update:open="(v: boolean) => (awayOpen = v)"
-      :title="t('oncall.awayTitle')"
-      data-test="oncall-members-away-dialog"
+      v-model:open="addOpen"
+      size="md"
+      :title="t('oncall.membersAddOpen')"
+      :primary-button-label="
+        pendingEmails.length
+          ? t('oncall.membersAddCta', { count: pendingEmails.length }, pendingEmails.length)
+          : t('oncall.membersAddOpen')
+      "
+      :secondary-button-label="t('oncall.cancel')"
+      :primary-button-disabled="!pendingEmails.length"
+      :primary-button-loading="adding"
+      primary-button-data-test="oncall-members-add-btn"
+      data-test="oncall-members-add-dialog"
+      @click:primary="addMembers"
+      @click:secondary="addOpen = false"
     >
       <div class="flex flex-col gap-3">
-        <span class="flex items-center gap-2">
-          <OUserCell v-if="awayEmail" :value="awayEmail" />
-        </span>
-        <p class="text-text-muted text-sm">{{ t("oncall.awayHint") }}</p>
-        <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
-        <span class="text-text-secondary text-xs" data-test="oncall-members-away-zone">
-          {{ zoneCaption(timezone, localZone, Date.now() * 1000, t) }}
-        </span>
-        <div class="flex flex-col gap-1">
-          <span class="o-input-label text-sm leading-tight font-semibold">
-            {{ t("oncall.awayFrom") }}
-          </span>
-          <div class="flex gap-2" data-test="oncall-members-away-from">
-            <ODate
-              class="min-w-0 flex-1"
-              v-model="awayFromDate"
-              data-test="oncall-members-away-from-date"
-            />
-            <OTime
-              class="min-w-0 flex-1"
-              v-model="awayFromTime"
-              data-test="oncall-members-away-from-time"
-            />
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <span class="o-input-label text-sm leading-tight font-semibold">
-            {{ t("oncall.awayTo") }}
-          </span>
-          <div class="flex gap-2" data-test="oncall-members-away-to">
-            <ODate
-              class="min-w-0 flex-1"
-              v-model="awayToDate"
-              data-test="oncall-members-away-to-date"
-            />
-            <OTime
-              class="min-w-0 flex-1"
-              v-model="awayToTime"
-              data-test="oncall-members-away-to-time"
-            />
-          </div>
-          <span class="text-datepicker-label text-xs leading-none">
-            {{ t("oncall.awayToHint") }}
-          </span>
-        </div>
+        <OSelect
+          v-if="!userLookupFailed"
+          ref="memberPickerRef"
+          v-model="selected"
+          multiple
+          searchable
+          :label="t('oncall.membersPickerLabel')"
+          :placeholder="t('oncall.memberPickPlaceholder')"
+          :options="userOptions"
+          :loading="loadingUsers"
+          data-test="oncall-members-user-select"
+        >
+          <!-- The picked people are listed once, below; chips here would say it twice. -->
+          <template #trigger>
+            <span class="text-select-placeholder flex-1 truncate text-start text-sm">
+              {{ t("oncall.memberPickPlaceholder") }}
+            </span>
+          </template>
+        </OSelect>
         <OInput
-          v-model="awayReason"
-          :label="t('oncall.awayReason')"
-          :placeholder="t('oncall.awayReasonPlaceholder')"
-          data-test="oncall-members-away-reason"
+          v-else
+          ref="memberPickerRef"
+          v-model="fallbackEmails"
+          :label="t('oncall.membersPickerLabel')"
+          :placeholder="t('oncall.memberEmailPlaceholder')"
+          :help-text="t('oncall.memberEmailFallbackHint')"
+          data-test="oncall-members-email-input"
         />
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="awayOpen = false">
-            {{ t("oncall.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :loading="awaySaving"
-            :disabled="!awayFromDate || !awayFromTime || !awayToDate || !awayToTime"
-            data-test="oncall-members-away-save"
-            @click="saveAbsence"
+
+        <ul
+          v-if="selected.length"
+          class="flex flex-col gap-1"
+          data-test="oncall-members-add-staged"
+        >
+          <li
+            v-for="email in selected"
+            :key="email"
+            class="flex items-center justify-between gap-2"
+            :data-test="`oncall-members-add-staged-${email}`"
           >
-            {{ t("oncall.awaySave") }}
-          </OButton>
-        </div>
-      </template>
+            <span class="flex min-w-0 flex-col">
+              <OTruncatedText class="text-text-heading text-sm">{{
+                raw(nameOf(email))
+              }}</OTruncatedText>
+              <OTruncatedText v-if="nameOf(email) !== email" class="text-text-secondary text-xs">{{
+                raw(email)
+              }}</OTruncatedText>
+            </span>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="close"
+              :aria-label="t('oncall.membersAddUnstage', { name: raw(nameOf(email)) })"
+              :data-test="`oncall-members-add-unstage-${email}`"
+              @click="selected = selected.filter((one) => one !== email)"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('oncall.membersAddUnstage', { name: raw(nameOf(email)) })"
+              />
+            </OButton>
+          </li>
+        </ul>
+
+        <!-- What the server will do with them, worked out the way it places a new member. -->
+        <OText v-if="pendingEmails.length" variant="meta" data-test="oncall-members-add-outcome">
+          {{ addOutcome }}
+        </OText>
+      </div>
     </ODialog>
+
+    <OnCallAwayDialog
+      v-model:open="awayOpen"
+      :email="awayEmail"
+      :timezone="timezone"
+      @saved="onAwaySaved"
+    />
 
     <ConfirmDialog
       :model-value="!!memberToRemove"
@@ -300,31 +303,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallAwayDialog from "@/components/oncall/OnCallAwayDialog.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import {
   addTeamMembersMutation,
-  createUnavailabilityMutation,
   deleteUnavailabilityMutation,
   removeTeamMemberMutation,
   resolvedScheduleQuery,
@@ -345,17 +344,14 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import {
-  formatInZone,
-  fromZonedInputValue,
-  listInLocale,
-  rotationMembers,
-  zoneCaption,
-} from "@/utils/oncall";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { formatInZone, listInLocale, rotationMembers } from "@/utils/oncall";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -376,7 +372,7 @@ const props = withDefaults(
     reachability?: TeamReachability | null;
     /** Pages carried per person, for the magnitude bars. */
     load?: TeamLoad | null;
-    /** May change on-call configuration. Hides the away actions when false. */
+    /** May change on-call configuration; off hides adding, removing and booking somebody else's absence. */
     canConfigure?: boolean;
   }>(),
   {
@@ -387,7 +383,16 @@ const props = withDefaults(
     canConfigure: true,
   },
 );
-const emit = defineEmits<{ changed: []; "open-schedule": [] }>();
+const emit = defineEmits<{
+  changed: [];
+  "open-schedule": [];
+  licenseDenied: [features: string[]];
+}>();
+
+function noteDenial(err: unknown) {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+}
 
 const { t, locale } = useI18nTyped();
 const { noteConfigurationDenied } = useOnCallPermissions();
@@ -398,7 +403,6 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 // Getter form: the tab outlives a team switch, and a bound id would write to the one it opened on.
 const addMembersWrite = useMutation(() => addTeamMembersMutation(orgId.value, props.teamId));
 const removeMemberWrite = useMutation(() => removeTeamMemberMutation(orgId.value, props.teamId));
-const createAbsenceWrite = useMutation(() => createUnavailabilityMutation(orgId.value));
 const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
 
 /// Which rotation, if any, actually pages this person. Adding somebody to a
@@ -427,12 +431,6 @@ const absences = ref<Unavailability[]>([]);
 const segments = ref<ResolvedSegment[]>([]);
 const awayOpen = ref(false);
 const awayEmail = ref("");
-const awayFromDate = ref("");
-const awayFromTime = ref("");
-const awayToDate = ref("");
-const awayToTime = ref("");
-const awayReason = ref("");
-const awaySaving = ref(false);
 
 async function fetchAbsences() {
   try {
@@ -440,7 +438,8 @@ async function fetchAbsences() {
     absences.value = await queryClient.fetchQuery(
       unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY),
     );
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     absences.value = [];
   }
 }
@@ -470,7 +469,8 @@ async function fetchSegments() {
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
     );
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     segments.value = [];
   }
 }
@@ -492,51 +492,21 @@ function awayLabel(absence: Unavailability): I18nText {
     : t("oncall.awayWindow", { from: raw(fmt(absence.start_at)), to: raw(fmt(absence.end_at)) });
 }
 
-const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-/// The form's date and time read on the team's clock; the Save button stays disabled until both are filled.
-function zonedMicros(date: string, time: string): number {
-  return fromZonedInputValue(`${date}T${time}`, props.timezone) ?? Number.NaN;
+/// Anybody may book their own absence; booking somebody else's is a configuration write.
+function mayMarkAway(email: string): boolean {
+  return props.canConfigure || email.toLowerCase() === selfEmail.value;
 }
 
 function openAway(email: string) {
   awayEmail.value = email;
-  awayFromDate.value = "";
-  awayFromTime.value = "";
-  awayToDate.value = "";
-  awayToTime.value = "";
-  awayReason.value = "";
   awayOpen.value = true;
 }
 
-async function saveAbsence() {
-  awaySaving.value = true;
-  try {
-    await createAbsenceWrite.mutateAsync({
-      user_email: awayEmail.value,
-      start_at: zonedMicros(awayFromDate.value, awayFromTime.value),
-      end_at: zonedMicros(awayToDate.value, awayToTime.value),
-      ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
-    });
-    awayOpen.value = false;
-    toast({ variant: "success", message: t("oncall.awaySaved") });
-    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
-    await Promise.all([fetchAbsences(), fetchSegments()]);
-    // The rota moves the away person's turn, so the schedule tab's answer
-    // just changed too.
-    emit("changed");
-  } catch (err: any) {
-    noteConfigurationDenied(err);
-    toast({
-      variant: "error",
-      message:
-        err?.response?.status === 403
-          ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.awaySaveFailed"),
-    });
-  } finally {
-    awaySaving.value = false;
-  }
+async function onAwaySaved() {
+  // Unforced: the write expired both scopes, so these repaint the refs from one server read.
+  await Promise.all([fetchAbsences(), fetchSegments()]);
+  // The rota moves the away person's turn, so the schedule tab's answer just changed too.
+  emit("changed");
 }
 
 async function removeAbsence(absence: Unavailability) {
@@ -546,14 +516,14 @@ async function removeAbsence(absence: Unavailability) {
     // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.awayRemoveFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.awayRemoveFailed"),
     });
   }
 }
@@ -568,8 +538,6 @@ type MemberState = "on_call" | "next" | "rostered" | "idle";
 interface MemberRow extends OnCallTeamMember {
   /** Display name, or the email when the org has no name on file. */
   name: string;
-  /** Rendered under the name — omitted when the name IS the email. */
-  subtitle: string;
   state: MemberState;
   rotation: string | null;
   away: Unavailability | null;
@@ -615,7 +583,6 @@ const rows = computed<MemberRow[]>(() => {
     return {
       ...m,
       name,
-      subtitle: name === email ? "" : email,
       state,
       rotation,
       away: awayOf(email),
@@ -749,8 +716,9 @@ const columns = computed<OTableColumnDef<MemberRow>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 80,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    pinned: "right",
+    size: 100,
+    meta: { align: "center", actionCount: 2 },
   },
 ]);
 
@@ -759,32 +727,74 @@ const columns = computed<OTableColumnDef<MemberRow>[]>(() => [
 const selected = ref<string[]>([]);
 const fallbackEmails = ref("");
 const adding = ref(false);
-/** Whichever of OSelect/OInput is currently mounted in the toolbar. Both
- * expose `focus()` (OSelect also opens its dropdown), so the empty state's
- * action can land the cursor there without a dialog of its own. */
-const memberPickerRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null);
-function focusMemberPicker() {
-  memberPickerRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  memberPickerRef.value?.focus();
+const addOpen = ref(false);
+
+function openAddDialog() {
+  selected.value = [];
+  fallbackEmails.value = "";
+  addOpen.value = true;
 }
-// Exposed so the attention banner's "Add a member" can land the cursor here even when this tab is already open.
+const memberPickerRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null);
+// Every road into the add dialog passes here, so a reader who cannot write members never reaches a form that 403s.
+function focusMemberPicker() {
+  if (!props.canConfigure) return;
+  openAddDialog();
+  void nextTick(() => memberPickerRef.value?.focus());
+}
+// Exposed so the attention banner's "Add members" can land the cursor here even when this tab is already open.
 defineExpose({ focusMemberPicker });
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
 const userLookupFailed = ref(false);
 
-const memberEmails = computed(() => new Set(props.members.map((m) => m.user_email)));
+const memberEmails = computed(() => new Set(props.members.map((m) => m.user_email.toLowerCase())));
 
-/** Org users not already on the team. */
+/** Every org user; those already on the team are listed but cannot be picked twice. */
 const userOptions = computed(() =>
-  orgUsers.value
-    .filter((u) => !memberEmails.value.has(u.email.toLowerCase()))
-    .map((u) => ({ label: raw(displayName(u)), value: u.email })),
+  orgUsers.value.map((u) => {
+    const name = nameOf(u.email);
+    const option = {
+      label: raw(name),
+      value: u.email,
+      subLabel: name === u.email ? undefined : raw(u.email),
+      subLabelInline: true,
+      searchText: `${name} ${u.email}`.toLowerCase(),
+    };
+    // The inline row draws no badge, so "on team" rides beside the email that tells two namesakes apart.
+    return memberEmails.value.has(u.email.toLowerCase())
+      ? {
+          ...option,
+          subLabel: t("oncall.membersOnTeamEmail", { email: raw(u.email) }),
+          disabled: true,
+        }
+      : option;
+  }),
 );
 
-const orgTotal = computed(() => orgUsers.value.length);
-const onTeamCount = computed(() => props.members.length);
+/// Mirrors the server's `place_member`: simple rotations get the newcomer appended, layered ones need placing by hand.
+const addOutcome = computed<I18nText>(() => {
+  const rotations = props.rotations ?? [];
+  const count = pendingEmails.value.length;
+  if (!rotations.length) return t("oncall.membersAddOutcomeNew", { count }, count);
+  const simple = rotations.every((rotation) => {
+    const rules = rotation.shift_rules ?? [];
+    return rules.length === 1 && !rules[0].restrictions?.length && !rules[0].priority;
+  });
+  if (!simple) return t("oncall.membersAddOutcomeManual", { count }, count);
+  return t(
+    "oncall.membersAddOutcomeAppend",
+    {
+      rotations: raw(
+        listInLocale(
+          rotations.map((r) => r.name),
+          locale.value,
+        ),
+      ),
+    },
+    count,
+  );
+});
 
 /** Comma/space/newline separated, so a pasted list works in the fallback. */
 const pendingEmails = computed(() => {
@@ -795,13 +805,7 @@ const pendingEmails = computed(() => {
     .filter(Boolean);
 });
 
-/** "Ana Sharma (ana@o2.ai)" when a name exists, the email otherwise. */
-function displayName(user: { email: string; first_name?: string; last_name?: string }): string {
-  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
-  return name ? `${name} (${user.email})` : user.email;
-}
-
-/** Just the name for the table — the email is already on the line below it. */
+/** The display name, or the email when the org has none on file. */
 function nameOf(email: string): string {
   const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
@@ -837,12 +841,14 @@ async function commitMembers(emails: string[]) {
     await addMembersWrite.mutateAsync(emails);
     selected.value = [];
     fallbackEmails.value = "";
+    addOpen.value = false;
     emit("changed");
     await reportPlacement(emails, before);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.addMemberFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.addMemberFailed"),
     });
   } finally {
     adding.value = false;
@@ -855,7 +861,8 @@ async function reportPlacement(emails: string[], before: Rotation[]) {
   try {
     after =
       (await queryClient.fetchQuery(teamScheduleQuery(orgId.value, props.teamId)))?.rotations ?? [];
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     after = null;
   }
   toast({
@@ -870,7 +877,7 @@ function placementMessage(emails: string[], before: Rotation[], after: Rotation[
   if (!after) {
     return {
       variant: "success" as const,
-      message: t("oncall.membersAdded", { names: names(emails) }, emails.length),
+      message: t("oncall.membersAddedCount", { count: emails.length }, emails.length),
     };
   }
   const onRotation = (email: string, rotation: Rotation) =>
@@ -897,7 +904,7 @@ function placementMessage(emails: string[], before: Rotation[], after: Rotation[
           { names: names(emails), rotations: raw(listInLocale(joined, locale.value)) },
           emails.length,
         )
-      : t("oncall.membersAdded", { names: names(emails) }, emails.length),
+      : t("oncall.membersAddedCount", { count: emails.length }, emails.length),
   };
 }
 
@@ -948,10 +955,11 @@ async function confirmRemoveMember() {
     await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
     await reportOnCallAfterRemove(member.user_email);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.removeMemberFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.removeMemberFailed"),
     });
   }
 }
@@ -962,7 +970,8 @@ async function reportOnCallAfterRemove(email: string) {
   let positions: OnCallPosition[];
   try {
     positions = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     toast({ variant: "success", message: t("oncall.memberRemoved", { name }) });
     return;
   }

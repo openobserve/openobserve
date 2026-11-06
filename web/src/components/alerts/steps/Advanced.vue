@@ -176,13 +176,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- The escape hatch for an alert whose identity dimensions cannot
                  express its owner. Normally routing works it out. -->
-            <div v-if="oncallEnabled">
+            <div v-if="oncallEnabled || oncallTeamLocked">
               <div
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.oncallTeam") }}</span>
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.oncallTeamTooltip')" side="right" />
+                <OTooltip v-if="oncallTeamLocked" :content="oncallLockReason" side="right">
+                  <span class="ms-1 inline-flex" data-test="alert-oncall-team-locked">
+                    <OIcon name="lock" size="sm" />
+                  </span>
+                </OTooltip>
+                <template v-else>
+                  <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                  <OTooltip :content="t('alerts.oncallTeamTooltip')" side="right" />
+                </template>
               </div>
               <OFormSelect
                 name="oncall_team"
@@ -315,6 +322,7 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
@@ -433,9 +441,28 @@ export default defineComponent({
     // control that cannot page anybody.
     const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
     const oncallTeams = ref<OnCallTeam[]>([]);
-    const oncallTeamOptions = computed(() =>
-      oncallTeams.value.map((team) => ({ label: raw(team.name), value: team.id })),
+    const { locked: oncallLicenseLocked, lockedReason: oncallLockReason } =
+      useLicenseLock("oncall");
+    const oncallTeamValue = form.useStore((s: any) => (s.values?.oncall_team ?? "") as string);
+    const lockedTargetNames = form.useStore(
+      (s: any) => s.values?._ui?.lockedTargetNames as Record<string, string> | undefined,
     );
+    // Shown only with a team to see or clear: with none, a locked picker has nothing to offer.
+    const oncallTeamLocked = computed(
+      () => oncallLicenseLocked.value && !!oncallTeamValue.value.trim(),
+    );
+    const oncallTeamOptions = computed(() => {
+      if (oncallTeamLocked.value) {
+        const name = lockedTargetNames.value?.[oncallTeamValue.value];
+        return [
+          {
+            label: name ? raw(name) : t("alerts.lockedTeamFallback"),
+            value: oncallTeamValue.value,
+          },
+        ];
+      }
+      return oncallTeams.value.map((team) => ({ label: raw(team.name), value: team.id }));
+    });
 
     // A failed lookup leaves the picker empty rather than blocking the save:
     // the field is optional, and routing still resolves from ownership.
@@ -518,6 +545,8 @@ export default defineComponent({
       raw,
       priorityOptions,
       oncallEnabled,
+      oncallTeamLocked,
+      oncallLockReason,
       oncallTeamOptions,
       t,
       store,

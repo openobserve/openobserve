@@ -200,6 +200,7 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    incident_title_template: "",
     // Off by default: a recovery is a new outbound message class, so it is opted into.
     notify_on_recovery: false,
     recovery_destinations: [],
@@ -496,17 +497,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // QueryConfig then keeps `_meta` fresh via its own syncMeta watcher, and
   // re-seeds `_ui.checkEvery` from the stored frequency at setup.
   const withFormExtras = (obj: any): any => {
+    // A response-only key: moved into `_ui`, which every save path strips.
+    const { locked_target_names: lockedTargetNames, ...alert } = obj ?? {};
     const groupBy: string[] = Array.isArray(obj?.query_condition?.aggregation?.group_by)
       ? obj.query_condition.aggregation.group_by.filter((g: string) => g)
       : [];
     const freq = frequencyDisplay(obj);
     return {
-      ...obj,
+      ...alert,
       logGroupBy: groupBy,
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
         forecast: formForecastOf(obj),
+        lockedTargetNames,
       },
       _meta:
         obj?._meta ??
@@ -1271,6 +1275,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
+        incident_title_template: source.creates_incident
+          ? String(source.incident_title_template ?? "").trim() || undefined
+          : undefined,
         workflows: source.workflows ?? [],
         priority: source.priority ?? null,
         tags: source.tags ?? [],
@@ -2681,6 +2688,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // form inputs expect strings/arrays, so normalize them here.
       data.description ??= "";
       data.template ??= "";
+      data.incident_title_template ??= "";
       data.tags ??= [];
       data.composite_condition ??= {
         expression: "",

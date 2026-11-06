@@ -13,46 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import i18n from "@/locales";
 import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
 
 const stubs = {
-  OTable: {
-    name: "OTable",
-    props: [
-      "data",
-      "columns",
-      "loading",
-      "globalFilter",
-      "enableColumnResize",
-      "persistColumns",
-      "tableId",
-    ],
-    template: `<div><slot name="toolbar" /><slot name="toolbar-trailing" /><slot v-if="!data.length" name="empty" /><div v-for="row in data" :key="row.rule_id">
-      <slot name="cell-match" :row="row" />
-      <slot name="cell-specificity" :row="row" />
-      <slot name="cell-caught" :row="row" />
-      <slot name="cell-last" :row="row" />
-      <slot name="cell-health" :row="row" />
-    </div></div>`,
-  },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["size", "preset", "filtered", "description"],
+    props: ["size", "preset", "filtered", "description", "hideAction"],
     emits: ["action"],
     template: "<div />",
   },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
-  OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
-  OText: { name: "OText", template: "<span><slot /></span>" },
-  OButton: { name: "OButton", template: "<button><slot /></button>" },
-  OTooltip: { name: "OTooltip", props: ["content", "side"], template: "<span />" },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    emits: ["select"],
+    template: "<button @click=\"$emit('select')\"><slot /></button>",
+  },
 };
+
+const teams = [
+  { id: "team_1", name: "Platform SRE" },
+  { id: "team_2", name: "Checkout" },
+];
 
 function rule(over: Partial<OwnershipRuleStats> = {}): OwnershipRuleStats {
   return {
@@ -70,264 +59,221 @@ function rule(over: Partial<OwnershipRuleStats> = {}): OwnershipRuleStats {
   };
 }
 
-function render(rules: OwnershipRuleStats[] = [rule()]) {
+function render(props: Record<string, unknown> = {}) {
   return mount(OnCallOwnershipRules, {
-    props: { rules, aliases: [{ id: "service", display: "Service" }] },
+    props: { rules: [rule()], teams, aliases: [{ id: "service", display: "Service" }], ...props },
     global: { plugins: [i18n, store], stubs },
   });
 }
 
-type Wrapper = ReturnType<typeof render>;
-
-const table = (w: Wrapper) => w.findComponent({ name: "OTable" });
-const rows = (w: Wrapper) => table(w).props("data") as OwnershipRuleStats[];
-const column = (w: Wrapper, id: string) =>
-  (table(w).props("columns") as any[]).find((c) => c.id === id);
-/// By data-test, not "the first OTag" — the specificity column renders tags too.
-const health = (w: Wrapper, id = "r1") => w.findComponent(`[data-test="oncall-rule-health-${id}"]`);
-
 describe("OnCallOwnershipRules", () => {
-  /// Precedence is the whole point of the table: the server breaks ties on
-  /// literal prefix length, so the longer rule is consulted first and must be
-  /// listed first. Creation order would put them in an order that misleads.
-  it("lists the most specific rule first, whatever order it arrived in", () => {
-    const wrapper = render([
-      // The namespace path is the longer STRING but the weaker claim: sorting
-      // on rendered text would put these the wrong way round.
-      rule({
-        rule_id: "short",
-        path: "k8s-namespace=payments",
-        dimensions: { "k8s-namespace": "payments" },
-      }),
-      rule({
-        rule_id: "long",
-        path: "service=payments-api",
-        dimensions: { service: "payments-api" },
-      }),
+  it("lists rules in a table, most specific first, numbered in that order", async () => {
+    const wrapper = render({
+      rules: [
+        rule(),
+        rule({
+          rule_id: "r2",
+          team_id: "team_2",
+          dimensions: { service: "cart", "k8s-namespace": "shop" },
+        }),
+      ],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-ownership-table"]').exists()).toBe(true);
+    const rows = wrapper.findAll('[data-test^="oncall-routing-says-"]');
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "oncall-routing-says-r2",
+      "oncall-routing-says-r1",
     ]);
-    expect(rows(wrapper).map((r) => r.rule_id)).toEqual(["long", "short"]);
+    expect(wrapper.text()).toContain("Order");
   });
 
-  it("numbers rows by that evaluation order, not by arrival", () => {
-    const wrapper = render([
-      rule({ rule_id: "short", dimensions: { "k8s-namespace": "payments" } }),
-      rule({ rule_id: "long", dimensions: { service: "payments-api" } }),
-    ]);
-    const order = column(wrapper, "order");
-    expect(order.accessorFn(rows(wrapper)[0])).toBe(1);
-    expect(order.accessorFn(rows(wrapper)[1])).toBe(2);
+  /// A team's tab is the org list filtered, so a rule keeps the number it has on org Routing.
+  it("numbers a team's rules by their place in the org's order", async () => {
+    const wrapper = render({
+      teamId: "team_1",
+      rules: [
+        rule(),
+        rule({
+          rule_id: "r2",
+          team_id: "team_2",
+          dimensions: { service: "cart", "k8s-namespace": "shop" },
+        }),
+      ],
+    });
+    await flushPromises();
+    const rows = wrapper
+      .findAll("tbody tr")
+      .filter((row) => row.find('[data-test^="oncall-routing-says-"]').exists());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].findAll("td")[0].text()).toBe("2");
   });
 
-  /// `k8s-namespace=payments` is how the engine stores it; a person reading a
-  /// table wants spaces.
-  it("renders the rule spaced for reading, sorted so it is stable", () => {
-    const wrapper = render([
-      rule({ dimensions: { "k8s-namespace": "payments", "k8s-cluster": "prod" } }),
-    ]);
-    expect(column(wrapper, "match").accessorFn(rows(wrapper)[0])).toBe(
-      "k8s-cluster = prod · k8s-namespace = payments",
+  /// "0 - 0 of 0" under an empty team list is a pager with nothing to page.
+  it("drops the pager from an empty team list and keeps it on the org list", async () => {
+    const team = render({ teamId: "team_9", rules: [rule()] });
+    await flushPromises();
+    expect(team.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+    const filled = render({ teamId: "team_1", rules: [rule()] });
+    await flushPromises();
+    expect(filled.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
+  });
+
+  /// One wording for the empty list, with no sub-sentence under the title.
+  it("shows the empty state with no description override", async () => {
+    const wrapper = render({ teamId: "team_9", rules: [] });
+    await flushPromises();
+    const empty = wrapper.findComponent({ name: "OEmptyState" });
+    expect(empty.props("preset")).toBe("no-oncall-rules");
+    expect(empty.props("description")).toBeUndefined();
+  });
+
+  it("reads the match as chips with sentence-case fields, and a trailing * as starts with", async () => {
+    const wrapper = render({
+      rules: [rule({ dimensions: { service: "checkout-*", "k8s-namespace": "shop" } })],
+    });
+    await flushPromises();
+    const says = wrapper.find('[data-test="oncall-routing-says-r1"]').text();
+    expect(says).toContain("K8s namespace");
+    expect(says).toContain("Service starts with");
+    expect(says).toContain("checkout-");
+    expect(says).not.toContain("*");
+  });
+
+  it("names where each rule routes on the org page, and drops that column on a team's tab", async () => {
+    const org = render({ rules: [rule(), rule({ rule_id: "r2", team_id: "team_2" })] });
+    await flushPromises();
+    expect(org.find('[data-test="oncall-rule-team-r2"]').text()).toBe("Checkout");
+    const team = render({
+      teamId: "team_1",
+      rules: [rule(), rule({ rule_id: "r2", team_id: "team_2" })],
+    });
+    await flushPromises();
+    expect(team.find('[data-test="oncall-routing-says-r1"]').exists()).toBe(true);
+    expect(team.find('[data-test="oncall-routing-says-r2"]').exists()).toBe(false);
+    expect(team.find('[data-test="oncall-rule-team-r1"]').exists()).toBe(false);
+  });
+
+  it("counts pages caught and marks a rule that never matched", async () => {
+    const wrapper = render({
+      rules: [rule(), rule({ rule_id: "r2", last_matched_at: null, pages_caught: 0 })],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-caught-r1"]').text()).toBe("6 pages");
+    expect(wrapper.text()).toContain("Never");
+  });
+
+  it("colours Health and Specificity through the badge registry", async () => {
+    const wrapper = render({
+      rules: [
+        rule({
+          health: "shadowed",
+          shadowed_by: [
+            {
+              rule_id: "r9",
+              team_id: "team_2",
+              team_name: "Checkout",
+              path: "service=payments-api/k8s-cluster=prod",
+              outcome: "",
+            },
+          ] as OwnershipRuleStats["shadowed_by"],
+        }),
+      ],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-health-r1"]').text()).toContain("Checkout");
+    const types = wrapper.findAllComponents(OTag).map((tag) => tag.props("type"));
+    expect(types).toContain("oncallRuleHealth");
+    expect(types).toContain("dimensionKey");
+  });
+
+  it("acts from the row: Edit and a destructive Delete, plus Test routing where hosted", async () => {
+    const wrapper = render({ testable: true });
+    await flushPromises();
+    const remove = wrapper
+      .findAllComponents(OButton)
+      .find((b) => b.attributes("data-test") === "oncall-ownership-delete-r1")!;
+    expect(remove.props("variant")).toBe("ghost-destructive");
+    await remove.trigger("click");
+    expect(wrapper.emitted("remove")?.[0]).toEqual([rule()]);
+    await wrapper.find('[data-test="oncall-routing-edit-r1"]').trigger("click");
+    expect(wrapper.emitted("edit")?.[0]).toEqual([rule()]);
+    await wrapper.find('[data-test="oncall-routing-test-r1"]').trigger("click");
+    expect(wrapper.emitted("test")?.[0]).toEqual([rule()]);
+  });
+
+  it("states the catch-all under the table on the org list", async () => {
+    const wrapper = render({ defaultTeamId: "team_2" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-row"]').exists()).toBe(false);
+    const row = wrapper.find('[data-test="oncall-routing-catch-all"]');
+    expect(row.text()).toContain("Everything else");
+    expect(row.text()).toContain("Checkout");
+    await wrapper.find('[data-test="oncall-routing-catch-all-set"]').trigger("click");
+    expect(wrapper.emitted("change-default")).toHaveLength(1);
+  });
+
+  it("warns when the org has no catch-all", async () => {
+    const wrapper = render({ defaultTeamId: null });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
+      "Everything else pages nobody",
     );
   });
 
-  /// "Shadowed" alone does not tell you who to go and talk to.
-  it("names the team taking a shadowed rule's pages", () => {
-    const wrapper = render([
-      rule({
-        health: "shadowed",
-        shadowed_by: [
-          {
-            rule_id: "r2",
-            team_id: "team_2",
-            team_name: "Ledger",
-            path: "service=x",
-            outcome: "takes it",
-          },
-        ],
-      }),
-    ]);
-    expect(health(wrapper).text()).toContain("Ledger");
-  });
-
-  it("marks a rule that has never matched", () => {
-    const wrapper = render([
-      rule({ health: "never_used", pages_caught: 0, last_matched_at: null }),
-    ]);
-    expect(health(wrapper).text()).toContain("Never used");
-    expect(health(wrapper).props("variant")).toBe("default-soft");
-  });
-
-  /// The server already computes why a rule is in the state it's in
-  /// (`health_summary`) — a reader staring at "Never used" with no traffic
-  /// context has no way to tell "no traffic yet" from "this rule is broken".
-  it("surfaces the server's own explanation on the health chip", () => {
-    const wrapper = render([rule({ health_summary: "no signal has ever carried this path" })]);
-    expect(health(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "no signal has ever carried this path",
+  it("shows the catch-all line on a team's tab only when that team is the default", async () => {
+    const own = render({ teamId: "team_1", defaultTeamId: "team_1" });
+    await flushPromises();
+    expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
+      "Also gets every alert no team owns",
     );
+    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
+    // The team's last rule, so it is the body's last row and never part of the pager.
+    const body = own.find('[data-test="o2-table-body"]');
+    const rows = body.findAll("tr");
+    expect(rows[rows.length - 1].attributes("data-test")).toBe("oncall-routing-catch-all-row");
+    expect(own.find('[data-test="o2-table-pagination-note"]').exists()).toBe(false);
+    const other = render({ teamId: "team_1", defaultTeamId: "team_2" });
+    await flushPromises();
+    expect(other.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(false);
   });
 
-  it("tones an active rule apart from a shadowed one", () => {
-    expect(health(render([rule()])).props("variant")).toBe("success-soft");
-    const shadowed = render([
-      rule({
-        health: "shadowed",
-        shadowed_by: [{ rule_id: "r2", team_id: "t", path: "p", outcome: "o" }],
-      }),
-    ]);
-    expect(health(shadowed).props("variant")).toBe("warning-soft");
+  /// The default team with no rule of its own still gets every unowned alert, so that row stands in for an empty table.
+  it("keeps the catch-all row on the default team's tab with no rules", async () => {
+    const wrapper = render({ rules: [], teamId: "team_1", defaultTeamId: "team_1" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-row"]').exists()).toBe(true);
   });
 
-  it("asks the parent to open the rule editor", async () => {
-    const wrapper = render();
-    await wrapper.find('[data-test="oncall-ownership-add-rule"]').trigger("click");
-    expect(wrapper.emitted("add")).toHaveLength(1);
+  it("filters by search on what the cells read", async () => {
+    const wrapper = render({
+      search: "checkout",
+      rules: [rule(), rule({ rule_id: "r2", team_id: "team_2", dimensions: { service: "cart" } })],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-says-r1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-routing-says-r2"]').exists()).toBe(true);
   });
 
-  /// The org screen hosts every team's rules on one table, so a row has to say
-  /// where it routes. On a team's own tab the same column would repeat the
-  /// page title on every row.
-  it("adds a team column only when asked to", () => {
-    const org = mount(OnCallOwnershipRules, {
-      props: { rules: [rule({ team_name: "Payments" })], showTeam: true },
-      global: { plugins: [i18n, store], stubs },
-    });
-    expect(column(org, "team")).toBeTruthy();
-    expect(column(org, "team").accessorFn(rows(org)[0])).toBe("Payments");
-    expect(column(render(), "team")).toBeUndefined();
+  // A reader who cannot write routing must not reach an editor whose save would only answer 403.
+  it("offers no add from the empty state to a reader who cannot edit routing", async () => {
+    const readOnly = render({ rules: [], editable: false });
+    await flushPromises();
+    const empty = readOnly.findComponent({ name: "OEmptyState" });
+    expect(empty.props("hideAction")).toBe(true);
+    empty.vm.$emit("action", "create");
+    expect(readOnly.emitted("add")).toBeUndefined();
+
+    const writer = render({ rules: [] });
+    await flushPromises();
+    writer.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
+    expect(writer.emitted("add")).toHaveLength(1);
   });
 
-  /// The id is what the rule is actually written against — the honest
-  /// fallback when the server sent no display name.
-  it("falls back to the team id when the server sent no name", () => {
-    const wrapper = mount(OnCallOwnershipRules, {
-      props: { rules: [rule({ team_name: null })], showTeam: true },
-      global: { plugins: [i18n, store], stubs },
-    });
-    expect(column(wrapper, "team").accessorFn(rows(wrapper)[0])).toBe("team_1");
-  });
-
-  /// A tab strip already names this list; repeating the title inside it reads
-  /// as two sections, and the header's Add rule as two ways in.
-  it("drops its own title when the host names the section", () => {
-    const wrapper = mount(OnCallOwnershipRules, {
-      props: { rules: [rule()], showHeader: false },
-      global: { plugins: [i18n, store], stubs },
-    });
-    expect(wrapper.find('[data-test="oncall-ownership-header"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-ownership-add-rule"]').exists()).toBe(false);
-  });
-
-  describe("the toolbar every other table has", () => {
-    // The table filters, not the host, so each row keeps its precedence number from the full list.
-    it("hands the search to the table, with resize and a column manager", () => {
-      const wrapper = mount(OnCallOwnershipRules, {
-        props: { rules: [rule()], search: "payments" },
-        global: { plugins: [i18n, store], stubs },
-      });
-      expect(table(wrapper).props("globalFilter")).toBe("payments");
-      expect(table(wrapper).props("enableColumnResize")).toBe(true);
-      expect(table(wrapper).props("persistColumns")).toBe(true);
-      expect(table(wrapper).props("tableId")).toBeTruthy();
-      for (const id of ["specificity", "caught", "last", "health"]) {
-        expect(column(wrapper, id).hideable).toBe(true);
-      }
-      expect(column(wrapper, "match").hideable).toBeFalsy();
-    });
-
-    it("renders the host's toolbar in the table's own", () => {
-      const wrapper = mount(OnCallOwnershipRules, {
-        props: { rules: [rule()] },
-        slots: {
-          toolbar: '<span data-test="host-toolbar" />',
-          "toolbar-trailing": '<span data-test="host-trailing" />',
-        },
-        global: { plugins: [i18n, store], stubs },
-      });
-      expect(wrapper.find('[data-test="host-toolbar"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="host-trailing"]').exists()).toBe(true);
-    });
-
-    // Search matches what the health cell shows, not the enum behind it.
-    it("searches the health column by its label", () => {
-      const wrapper = render([rule({ health: "never_used" })]);
-      expect(column(wrapper, "health").accessorFn(rows(wrapper)[0])).toBe(
-        String(i18n.global.t("oncall.ruleNeverUsed")),
-      );
-    });
-
-    // A search that matched nothing is not an org without rules: the Teams page's no-results state.
-    it("shows the no-results state under a search, and asks the host to clear it", () => {
-      const wrapper = mount(OnCallOwnershipRules, {
-        props: { rules: [], search: "nothing-matches" },
-        global: { plugins: [i18n, store], stubs },
-      });
-      const empty = wrapper.findComponent({ name: "OEmptyState" });
-      expect(empty.props("filtered")).toBe(true);
-      expect(empty.props("size")).toBe("hero");
-      expect(empty.props("description")).toBeUndefined();
-
-      empty.vm.$emit("action", "clear-filters");
-      expect(wrapper.emitted("clear-search")).toHaveLength(1);
-      expect(wrapper.emitted("add")).toBeUndefined();
-    });
-
-    it("keeps the no-rules state and its add action when nothing is searched", () => {
-      const wrapper = render([]);
-      const empty = wrapper.findComponent({ name: "OEmptyState" });
-      expect(empty.props("filtered")).toBeFalsy();
-      expect(empty.props("description")).toBeTruthy();
-
-      empty.vm.$emit("action", "create");
-      expect(wrapper.emitted("add")).toHaveLength(1);
-      expect(wrapper.emitted("clear-search")).toBeUndefined();
-    });
-  });
-
-  /// A phone's action column holds one control, so edit and remove are mirrored in a menu that must emit the same events.
-  describe("the phone row menu", () => {
-    const menuStubs = {
-      ...stubs,
-      OTable: {
-        name: "OTable",
-        props: ["data"],
-        template: `<div><div v-for="row in data" :key="row.rule_id"><slot name="cell-actions" :row="row" /></div></div>`,
-      },
-      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
-      ODropdownItem: {
-        name: "ODropdownItem",
-        emits: ["select"],
-        template: `<button @click="$emit('select')"><slot /></button>`,
-      },
-    };
-
-    function renderWithMenu() {
-      return mount(OnCallOwnershipRules, {
-        props: { rules: [rule()], aliases: [{ id: "service", display: "Service" }] },
-        global: { plugins: [i18n, store], stubs: menuStubs },
-      });
-    }
-
-    it("shows the buttons from md up and the menu below it, never both", () => {
-      const wrapper = renderWithMenu();
-
-      for (const action of ["edit", "delete"]) {
-        expect(wrapper.find(`[data-test="oncall-ownership-${action}-r1"]`).classes()).toContain(
-          "max-md:hidden",
-        );
-      }
-      expect(wrapper.find('[data-test="oncall-ownership-row-more-actions"]').classes()).toContain(
-        "md:hidden",
-      );
-    });
-
-    it("edits and removes the rule the row is for", async () => {
-      const wrapper = renderWithMenu();
-
-      await wrapper.find('[data-test="oncall-ownership-edit-r1-menu"]').trigger("click");
-      await wrapper.find('[data-test="oncall-ownership-delete-r1-menu"]').trigger("click");
-
-      expect(wrapper.emitted("edit")?.[0][0]).toMatchObject({ rule_id: "r1" });
-      expect(wrapper.emitted("remove")?.[0][0]).toMatchObject({ rule_id: "r1" });
-    });
+  it("hides row actions for a reader who cannot edit routing", async () => {
+    const wrapper = render({ editable: false, defaultTeamId: "team_1" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-edit-r1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').exists()).toBe(false);
   });
 });

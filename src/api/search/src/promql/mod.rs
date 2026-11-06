@@ -59,7 +59,7 @@ use crate::{
     ),
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 200, description = "Ingested; empty body"),
         (status = 400, description = "Not a protobuf body, the payload cannot be ingested, or part of it was not written", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -117,7 +117,7 @@ fn remote_write_response(outcome: metrics::prom::RemoteWriteOutcome) -> Response
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::response_schema::QueryResponseSchema, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "vector",
@@ -173,7 +173,7 @@ pub async fn query_get(
     ),
     request_body(content = inline(config::meta::promql::RequestQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::response_schema::QueryResponseSchema),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -302,9 +302,10 @@ async fn query(
         ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
         ("step" = Option<String>, Query, description = "Query resolution step width in duration format or float number of seconds"),
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
+        ("use_streaming" = Option<bool>, Query, description = "Answer with a server-sent event stream instead of JSON"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "JSON result, or a server-sent event stream when use_streaming is true", content((config::meta::promql::response_schema::QueryResponseSchema = "application/json", example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "matrix",
@@ -335,7 +336,7 @@ async fn query(
                   }
                ]
             }
-        })),
+        })), ("text/event-stream"))),
         (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
         (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
         (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
@@ -368,7 +369,7 @@ pub async fn query_range_get(
     ),
     request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
-        (status = 200, description = "JSON result, or a server-sent event stream when use_streaming is true", content((Object = "application/json"), ("text/event-stream"))),
+        (status = 200, description = "JSON result, or a server-sent event stream when use_streaming is true", content((config::meta::promql::response_schema::QueryResponseSchema = "application/json"), ("text/event-stream"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -402,12 +403,18 @@ pub async fn query_range_post(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("query" = String, Query, description = "Prometheus expression query string"),
-        ("start" = String, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, inclusive"),
-        ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
+        ("query" = String, Query, description = "Prometheus expression query string; an empty one fails to parse"),
+        ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, inclusive; defaults to now"),
+        ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive; defaults to now"),
+        ("step" = Option<String>, Query, description = "Query resolution step width in duration format or float number of seconds"),
+        ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
+        ("use_cache" = Option<bool>, Query, description = "Use the result cache"),
+        ("search_type" = Option<String>, Query, description = "Search event type the query is recorded under"),
+        ("regions" = Option<String>, Query, description = "Comma-separated regions to query; all when empty"),
+        ("clusters" = Option<String>, Query, description = "Comma-separated clusters to query; all when empty"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::response_schema::ExemplarsResponseSchema, example = json!({
             "status": "success",
             "data": [
                 {
@@ -459,7 +466,8 @@ pub async fn query_range_post(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn query_exemplars_get(
@@ -484,7 +492,7 @@ pub async fn query_exemplars_get(
     ),
     request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::response_schema::ExemplarsResponseSchema),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -680,7 +688,7 @@ async fn query_range(
         ("metric" = Option<String>, Query, description = "A metric name to filter metadata for. All metric metadata is retrieved if left empty"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<std::collections::HashMap<String, Vec<config::meta::promql::MetadataObject>>>, example = json!({
             "status": "success",
             "data": {
               "cortex_ring_tokens": [
@@ -960,7 +968,7 @@ async fn series(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<Vec<String>>, example = json!({
             "status": "success",
             "data": [
                 "__name__",
@@ -1016,7 +1024,7 @@ pub async fn labels_get(
     ),
     request_body(content = inline(config::meta::promql::RequestLabels), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<Vec<String>>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -1142,7 +1150,7 @@ async fn labels(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<Vec<String>>, example = json!({
             "status" : "success",
             "data" : [
                "node",
@@ -1370,7 +1378,7 @@ fn validate_range_window(start: i64, end: i64) -> Result<(), String> {
         ("query" = String, Query, description = "Prometheus expression query string."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<String>, example = json!({
             "status" : "success",
             "data" : "foo / bar"
         })),
@@ -1403,7 +1411,7 @@ pub async fn format_query_get(
     ),
     request_body(content = inline(config::meta::promql::RequestFormatQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<String>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -1447,7 +1455,8 @@ pub async fn format_query_post(
         (status = 400, description = "The query does not parse", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn parse_tree(

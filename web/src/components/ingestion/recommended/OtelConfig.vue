@@ -14,7 +14,7 @@
       :key="org"
       class="p-3"
       :org="org"
-      signal="traces"
+      :signal="signal"
       snippet-kind="config"
       config-tool="OpenTelemetry Collector"
       @copy-command="copyHttpConfig"
@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
@@ -79,6 +80,9 @@ service:
 });
 
 const store = useStore();
+// The Traces tab opens this page too; the Logs tab, and onboarding's logs row, wait for logs.
+const route = useRoute();
+const signal = computed(() => (route?.name === "ingestTracesFromOtel" ? "traces" : "logs"));
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const root = ref<HTMLElement | null>(null);
 const bar = ref<InstanceType<typeof FirstEventStatus> | null>(null);

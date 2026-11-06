@@ -506,14 +506,16 @@ pub struct ResolveRequest {
 }
 
 /// Viewport dimensions delivered to the probe so it doesn't need hardcoded device tables.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsViewport)]
 pub struct Viewport {
     pub width: u32,
     pub height: u32,
 }
 
 /// One engine+device combination with a pre-generated execution_id (from the scheduler).
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsBrowserDevice)]
 pub struct BrowserDeviceEntry {
     pub execution_id: String,
     pub engine: String,
@@ -521,7 +523,8 @@ pub struct BrowserDeviceEntry {
     pub viewport: Viewport,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsJobResolveResponse)]
 pub struct ResolveResponse {
     pub job_id: String,
     pub run_id: String,
@@ -558,7 +561,8 @@ pub struct ResolveResponse {
 }
 
 /// Ingest destination for probe result records.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsIngestInfo)]
 pub struct IngestInfo {
     pub base_url: String,
     pub org: String,
@@ -976,7 +980,8 @@ pub async fn presign_artifacts(
     })
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = SyntheticsJobAckResponse)]
 pub struct AckResponse {
     pub run_complete: bool,
     /// Aggregate run status string when run_complete = true: "passed"|"warning"|"failed"|"error".
@@ -1044,7 +1049,8 @@ pub struct AckResponse {
 
 /// The notification a completed run should send, resolved against the check's
 /// `alert_if_fails` / `cooldown_mins` settings and its persisted alert state.
-#[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq, utoipa::ToSchema)]
+#[schema(as = SyntheticsAlertDecision)]
 pub enum AlertDecision {
     /// Say nothing: the run is still below the failure threshold, inside the
     /// cooldown window, or healthy and was never alerting.
