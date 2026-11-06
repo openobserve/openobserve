@@ -22,7 +22,7 @@ pub const LLM_EXPERIMENT_STREAM: &str = "_llm_experiment";
 pub const STRUCTURED_OUTPUT_COLUMN: &str = "structured_output";
 
 /// Permanent evidence reason shared by Experiment execution and score records.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentSkipReason {
     NoReference,

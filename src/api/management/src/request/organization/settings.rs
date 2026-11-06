@@ -135,7 +135,7 @@ pub async fn create(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = OrganizationSettingResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -222,11 +222,9 @@ pub async fn upload_logo(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("theme" = Option<String>, Query, description = "Logo theme"),
     ),
-    request_body(content = inline(LogoUploadForm), description = "Image file", content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
@@ -284,10 +282,9 @@ pub async fn delete_logo(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("theme" = Option<String>, Query, description = "Logo theme"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
@@ -342,9 +339,8 @@ pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = String, description = "Logo text", content_type = "text/plain"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
@@ -399,7 +395,7 @@ pub async fn delete_logo_text() -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Not supported outside enterprise", content_type = "application/json", body = String),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),

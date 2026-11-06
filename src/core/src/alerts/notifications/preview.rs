@@ -52,6 +52,7 @@ pub struct PreviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = TemplatePreviewResponse)]
 pub struct PreviewResponse {
     /// The real wire payload (raw tab).
     pub payload: serde_json::Value,
