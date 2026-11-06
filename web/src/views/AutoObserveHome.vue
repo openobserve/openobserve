@@ -28,9 +28,11 @@ import { watch } from "vue";
 import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveView";
 import { resetDecisions } from "@/components/autoobserve/v2/useDecisions";
 import { useScenario } from "@/components/autoobserve/data/useScenario";
+import { useFixtureMode } from "@/components/autoobserve/live/liveModel";
 
 const { view } = useAutoObserveView();
 const { scenario } = useScenario();
+const fixture = useFixtureMode();
 // Answers belong to one scenario's story, so switching scenario in either view starts fresh.
-watch(scenario, resetDecisions);
+watch(scenario, () => fixture.value && resetDecisions());
 </script>

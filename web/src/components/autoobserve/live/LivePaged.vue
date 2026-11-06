@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ row.analysis.label }}
               </OBadge>
               <OTruncatedText
-                v-if="row.analysis.detail"
+                v-if="row.analysis.detail && !shared"
                 class="text-text-secondary text-xs"
                 data-test="autoobserve2-paged-analysis-detail"
                 >{{ row.analysis.detail }}</OTruncatedText
@@ -218,16 +218,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </li>
       </ul>
     </div>
-    <template v-if="settled && rows.length && hasMore" #footer>
-      <div class="flex items-center gap-2">
-        <span class="text-text-secondary text-xs" data-test="autoobserve2-paged-more">{{
-          moreText(t, locale, cap)
-        }}</span>
+    <template v-if="settled && rows.length && (hasMore || shared)" #footer>
+      <div class="flex min-w-0 items-center gap-2">
+        <span
+          v-if="hasMore"
+          class="text-text-secondary shrink-0 text-xs"
+          data-test="autoobserve2-paged-more"
+          >{{ moreText(t, locale, cap) }}</span
+        >
+        <span v-if="hasMore && shared" class="text-text-secondary text-xs" aria-hidden="true"
+          >·</span
+        >
+        <OTruncatedText
+          v-if="shared"
+          as="span"
+          :lines="1"
+          class="text-text-secondary min-w-0 flex-1 text-xs"
+          data-test="autoobserve2-paged-shared-analysis"
+          >{{ shared }}</OTruncatedText
+        >
         <OButton
+          v-if="hasMore"
           variant="ghost-primary"
           size="xs"
           icon-right="arrow-forward"
-          class="ms-auto"
+          class="ms-auto shrink-0"
           data-test="autoobserve2-paged-see-all"
           @click="router.push(incidentListLink(org))"
         >
@@ -265,6 +280,7 @@ import {
   PAGED_CAP,
   pagedCopy,
   pagingNote,
+  sharedAnalysis,
   skeletonRows,
   statusLabel,
 } from "./incidentsCopy";
@@ -322,6 +338,11 @@ const shown = computed(() =>
     opened: openedText(t, locale.value, item, paged.now.value),
     analysis: analysisLine(t, item, paged.rcaEnabled.value),
   })),
+);
+
+// The footer sits outside the subtitle slot, so a stale or new-findings notice never hides the reason the rows dropped.
+const shared = computed(() =>
+  settled.value ? sharedAnalysis(shown.value.map((row) => row.analysis)) : null,
 );
 
 const loadPhase = useLoadPhase(() => state.value.status, skeleton);

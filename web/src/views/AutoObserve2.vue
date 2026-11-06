@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <PageFooter
             class="order-3 pt-2"
-            :live="live"
             @open-coverage="openCoverage()"
             @open-activity="openActivity()"
           />
@@ -77,6 +76,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="(v) => setScenario(v as Scenario)"
               />
             </label>
+          </div>
+          <div
+            v-else
+            class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
+            data-test="autoobserve2-scenario-live"
+          >
+            <OTag variant="default-soft" size="xs" :label="scenarioNote.tag" />
+            <span class="text-text-body text-xs">{{ scenarioNote.text }}</span>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              icon-right="arrow-forward"
+              data-test="autoobserve2-scenario-live-action"
+              @click="howOpen = true"
+            >
+              {{ scenarioNote.action }}
+            </OButton>
           </div>
         </div>
         <aside
@@ -276,8 +292,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </header>
       <div
         class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 overflow-hidden border shadow-xs"
+        :class="live ? 'flex-1' : ''"
       >
+        <LiveIssues v-if="live" :range="issuesRange" initial-filter="all" />
         <AutoObserveIssuesTab
+          v-else
           :issues="issues"
           :scenario="scenario"
           initial-filter="all"
@@ -288,12 +307,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ChangesPage
       v-else
       :key="activityKey"
-      :ledger="ledger"
+      :ledger="live ? [] : ledger"
       :scenario="scenario"
       :highlight-id="changeId"
       @back="closePage"
       @update-entry="updateEntry"
-    />
+    >
+      <template v-if="live" #empty>
+        <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
+          <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+        </div>
+      </template>
+    </ChangesPage>
 
     <AutoObserveIssueDrawer
       v-model:open="problemOpen"
@@ -303,11 +328,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <HistoryDrawer
       v-model:open="historyOpen"
-      :entries="history"
+      :entries="live ? [] : history"
       :change-ids="changeIds"
       @open-change="openChange"
-    />
-    <SettingsDrawer v-model:open="settingsOpen" />
+    >
+      <template v-if="live" #empty>
+        <LiveSurfaceEmpty surface="history" @action="historyToIssues" />
+      </template>
+    </HistoryDrawer>
+    <SettingsDrawer v-model:open="settingsOpen">
+      <template v-if="live" #empty>
+        <LiveSurfaceEmpty surface="settings" @action="settingsToHowItWorks" />
+      </template>
+    </SettingsDrawer>
     <HowItWorksDrawer v-model:open="howOpen" />
     <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
   </div>
@@ -335,8 +368,13 @@ import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverage
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
-import { coverageSentence as liveSentence } from "@/components/autoobserve/live/liveCopy";
+import {
+  coverageSentence as liveSentence,
+  liveScenarioNote,
+} from "@/components/autoobserve/live/liveCopy";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
+import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
+import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
@@ -562,6 +600,18 @@ const setIssuesRange = (value: IssuesRange) => {
   void router.replace({
     query: { ...route.query, issuesRange: value === "30d" ? undefined : value },
   });
+};
+
+const scenarioNote = computed(() => liveScenarioNote(t));
+
+const historyToIssues = () => {
+  historyOpen.value = false;
+  openIssuesPage();
+};
+
+const settingsToHowItWorks = () => {
+  settingsOpen.value = false;
+  howOpen.value = true;
 };
 
 const openChange = (ledgerId: string) => {

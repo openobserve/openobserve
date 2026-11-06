@@ -1010,4 +1010,26 @@ describe("useEnterpriseRoutes lazy loading", () => {
       });
     walk(useEnterpriseRoutes());
   });
+
+  describe("AutoObserve is enterprise-only", () => {
+    const autoobserveRoutes = () =>
+      useEnterpriseRoutes().filter((route: any) => String(route.path).includes("autoobserve"));
+
+    it.each([
+      ["an OSS build", "false", "false"],
+      ["a cloud build without enterprise", "true", "false"],
+    ])("registers no AutoObserve route in %s", async (_name, isCloud, isEnterprise) => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = isCloud;
+      config.default.isEnterprise = isEnterprise;
+      expect(autoobserveRoutes()).toEqual([]);
+    });
+
+    it("registers the AutoObserve routes in an enterprise build", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      expect(autoobserveRoutes().map((route: any) => route.name)).toContain("autoobserve");
+    });
+  });
 });

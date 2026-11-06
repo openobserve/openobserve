@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications-active" size="sm" />
             <span>{{ t("autoobserve.tabs.issues") }}</span>
             <OTag
-              v-if="openIssues.length"
+              v-if="badge"
               variant="error-soft"
               size="xs"
-              :label="raw(String(openIssues.length))"
+              :label="badge"
+              data-test="autoobserve-tab-issues-badge"
             />
           </OTab>
           <OTab name="coverage" data-test="autoobserve-tab-coverage">
@@ -63,8 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </template>
 
+      <LiveIssues v-if="tab === 'issues' && live" range="30d" />
       <AutoObserveIssuesTab
-        v-if="tab === 'issues'"
+        v-else-if="tab === 'issues'"
         :issues="issues"
         :scenario="scenario"
         @open-issue="openIssue"
@@ -76,11 +78,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :source="live ? liveData.source.value : undefined"
         :skeleton="live && liveData.coverageSkeleton.value"
       />
+      <LiveSurfaceEmpty
+        v-else-if="tab === 'activity' && live"
+        surface="changes"
+        @action="allOpen = true"
+      />
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
         :ledger="ledger"
         @update-entry="updateEntry"
         @open-incident="openIncident"
+      />
+      <LiveSurfaceEmpty
+        v-else-if="tab === 'policy' && live"
+        surface="settings"
+        @action="howOpen = true"
       />
       <AutoObservePolicyTab v-else-if="tab === 'policy'" />
     </OPageLayout>
@@ -92,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :scenario="scenario"
       @update-entry="updateEntry"
     />
+    <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
+    <HowItWorksDrawer v-model:open="howOpen" />
   </div>
 </template>
 
@@ -110,7 +124,14 @@ import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivity
 import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
+import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
+import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
+import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
+import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
+import { useLiveIssues } from "@/components/autoobserve/live/useLiveIssues";
+import { openBadge } from "@/components/autoobserve/live/incidentsCopy";
+import type { IssuesRange } from "@/components/autoobserve/v2/fixtures";
 import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
 import { problemsIn } from "@/components/autoobserve/data/facts";
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
@@ -118,7 +139,7 @@ import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
 const NERD_TABS = ["issues", "coverage", "activity", "policy"] as const;
 type NerdTab = (typeof NERD_TABS)[number];
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 // Nerd ignores the shared ?scenario= param; only Standard switches scenario.
 const scenario = computed<Scenario>(() => "demo");
@@ -128,6 +149,7 @@ const live = useLiveMode();
 const liveData = useLiveAutoObserve();
 const linkedTab = route.query.tab;
 const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues");
+const liveIssues = useLiveIssues(computed<IssuesRange>(() => "30d"));
 const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);
 const drawerOpen = ref(false);
 const selectedIssue = ref<Issue | null>(null);
@@ -136,7 +158,16 @@ const issues = computed(() => issuesFor(scenario.value, t, overrides.value.fixed
 const openIssues = computed(() =>
   issues.value.filter((i) => i.status !== "resolved" && !i.deferred),
 );
-const awaitingCount = computed(() => ledger.value.filter((e) => e.status === "awaiting").length);
+const awaitingCount = computed(() =>
+  live.value ? 0 : ledger.value.filter((e) => e.status === "awaiting").length,
+);
+const allOpen = ref(false);
+const howOpen = ref(false);
+const badge = computed(() => {
+  if (!live.value) return openIssues.value.length ? raw(String(openIssues.value.length)) : null;
+  const open = liveIssues.openCount.value;
+  return open ? openBadge(locale.value, open, liveIssues.hasMore.value) : null;
+});
 
 const openIssue = (issue: Issue) => {
   selectedIssue.value = issue;
@@ -151,7 +182,9 @@ const openIncident = (incidentId: string) => {
 const linkedIssue = typeof route.query.issue === "string" ? route.query.issue : null;
 // Only an incident the current scenario contains opens; any other link is dropped from the URL.
 const knownIssue =
-  linkedIssue && problemsIn(scenario.value, "month").some((p) => p.incidentId === linkedIssue);
+  linkedIssue &&
+  !live.value &&
+  problemsIn(scenario.value, "month").some((p) => p.incidentId === linkedIssue);
 if (linkedIssue && knownIssue) {
   const issue = issues.value.find((i) => i.id === linkedIssue) ?? issueByIncident(linkedIssue);
   if (issue) openIssue(issue);

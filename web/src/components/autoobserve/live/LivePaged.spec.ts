@@ -44,6 +44,24 @@ const FIXTURE = fixture as unknown as AutoObserveIncidentList;
 const pick = (...indexes: number[]): AutoObserveIncidentItem[] =>
   indexes.map((i) => FIXTURE.items[i]);
 
+// Fixture row 4 re-keyed and given a not-run reason, so many rows can share one reason.
+const notRun = (n: number, reason: string | null = "rca_disabled") => {
+  const base = FIXTURE.items[4];
+  return {
+    ...base,
+    finding: { ...base.finding, id: `f-off-${n}` },
+    incident: { ...base.incident, id: `inc-off-${n}` },
+    investigation: {
+      run_id: null,
+      state: null,
+      outcome: null,
+      summary: null,
+      not_run_reason: reason,
+    },
+  } as AutoObserveIncidentItem;
+};
+const offRows = (n: number) => Array.from({ length: n }, (_, i) => notRun(i));
+
 const page = (items: AutoObserveIncidentItem[], extra: Partial<AutoObserveIncidentList> = {}) =>
   ({ data: { paging: true, has_more: false, items, ...extra } }) as never;
 
@@ -84,6 +102,7 @@ describe("LivePaged (D9-web)", () => {
     api.mockReset();
     push.mockReset();
     routeQuery.live = "1";
+    delete routeQuery.fixture;
     store.commit("setSelectedOrganization", { ...originalOrg, identifier: "demo-org" });
     store.commit("setConfig", { ...originalConfig, incidents_rca_enabled: true });
   });
@@ -371,11 +390,81 @@ describe("LivePaged (D9-web)", () => {
     expect(rail.find(sel("more")).text()).toBe("Showing the 3 newest");
   });
 
-  it("fetches nothing outside live mode", async () => {
+  it("fetches nothing in fixture mode", async () => {
     delete routeQuery.live;
+    routeQuery.fixture = "1";
     api.mockResolvedValue(page(pick(0)));
     mountCard();
     await flushPromises();
     expect(api).not.toHaveBeenCalled();
+  });
+
+  describe("an analysis reason shared by rows", () => {
+    const OFF_ONE = "AI analysis was off when this incident opened.";
+    const OFF_MANY = "AI analysis was off when these incidents opened.";
+    const details = (w: ReturnType<typeof mountCard>) =>
+      w.findAll(sel("analysis-detail")).map((d) => d.text());
+
+    it("zero rows state no reason", async () => {
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("empty")).exists()).toBe(true);
+      expect(w.find(sel("shared-analysis")).exists()).toBe(false);
+    });
+
+    it("one row keeps its reason on the row", async () => {
+      api.mockResolvedValueOnce(page(offRows(1)));
+      const w = mountCard();
+      await flushPromises();
+      expect(details(w)).toEqual([OFF_ONE]);
+      expect(w.find(sel("shared-analysis")).exists()).toBe(false);
+    });
+
+    it("three rows state it once next to the card's foot, each keeping its chip", async () => {
+      api.mockResolvedValueOnce(page(offRows(3)));
+      const w = mountCard();
+      await flushPromises();
+      expect(rows(w)).toHaveLength(3);
+      expect(w.findAll(sel("analysis"))).toHaveLength(3);
+      expect(details(w)).toEqual([]);
+      expect(w.findAll(sel("shared-analysis"))).toHaveLength(1);
+      expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
+      expect(w.text()).not.toContain(OFF_ONE);
+      expect(w.find(sel("more")).exists()).toBe(false);
+      expect(w.find(sel("see-all")).exists()).toBe(false);
+    });
+
+    it("twelve rows state it once next to the count", async () => {
+      api.mockResolvedValueOnce(page(offRows(12), { has_more: true }));
+      const w = mountCard({ cap: 10 });
+      await flushPromises();
+      expect(rows(w)).toHaveLength(10);
+      expect(details(w)).toEqual([]);
+      expect(w.findAll(sel("shared-analysis"))).toHaveLength(1);
+      expect(w.find(sel("more")).text()).toBe("Showing the 10 newest");
+      expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
+      expect(w.find(sel("see-all")).exists()).toBe(true);
+    });
+
+    it("mixed reasons stay on their rows", async () => {
+      api.mockResolvedValueOnce(page([notRun(0), notRun(1, null), notRun(2)]));
+      const w = mountCard();
+      await flushPromises();
+      expect(details(w)).toHaveLength(3);
+      expect(w.find(sel("shared-analysis")).exists()).toBe(false);
+    });
+
+    it("a failed refresh keeps the shared reason visible", async () => {
+      api.mockResolvedValueOnce(page(offRows(3)));
+      const w = mountCard();
+      await flushPromises();
+      api.mockRejectedValueOnce(httpError(500));
+      await refetch();
+      expect(w.find(sel("refresh-failed")).exists()).toBe(true);
+      expect(rows(w)).toHaveLength(3);
+      expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
+      expect(details(w)).toEqual([]);
+    });
   });
 });

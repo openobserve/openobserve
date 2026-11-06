@@ -25,4 +25,6 @@ export const autoobserveKeys = {
     orgKey(org, "autoobserve", "suggestions", "proposed", limit, offset),
   incidentsPage: (org: string, limit: number, offset: number) =>
     orgKey(org, "autoobserve", "incidents", limit, offset),
+  incidentsPages: (org: string, range: string, pageSize: number, cap: number) =>
+    orgKey(org, "autoobserve", "incidents", "pages", range, pageSize, cap),
 };

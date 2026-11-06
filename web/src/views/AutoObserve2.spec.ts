@@ -27,13 +27,21 @@ import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
+import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
+import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
+import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
+import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
+import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
+import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
+import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
 const routeQuery: Record<string, string> = {};
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ replace, push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace, push, back: vi.fn() }),
   useRoute: () => ({ query: routeQuery }),
 }));
 
@@ -62,10 +70,33 @@ const mountView = () =>
     global: { plugins: [i18n, store] },
   });
 
+const DrawerStub = {
+  props: ["open"],
+  template: "<div><slot name='header-right' /><slot /></div>",
+};
+
+// Drawers render their body whether open or not, so a test can read and click inside them.
+const mountOpen = () =>
+  mount(AutoObserve2, {
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        ODrawer: DrawerStub,
+        LivePaged: true,
+        LiveSuggestions: true,
+        AllSuggestionsDrawer: true,
+        HowItWorksDrawer: true,
+        AutoObserveIssueDrawer: true,
+        TopBar: true,
+      },
+    },
+  });
+
 describe("AutoObserve2 rail column (OSS-9)", () => {
   beforeEach(() => {
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     replace.mockReset();
+    push.mockReset();
     localStorage.setItem("autoobserve2.howItWorksSeen", "1");
     vi.mocked(autoobserve.coverage).mockReturnValue(pending());
     vi.mocked(autoobserve.suggestions).mockReturnValue(pending());
@@ -85,7 +116,7 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
   });
 
   it("keeps the single column in fixture mode when there is nothing to suggest", () => {
-    Object.assign(routeQuery, { scenario: quiet ?? "" });
+    Object.assign(routeQuery, { fixture: "1", scenario: quiet ?? "" });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-rail"]').exists()).toBe(false);
   });
@@ -110,25 +141,24 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
   });
 
   it("fixture mode is unchanged", () => {
-    Object.assign(routeQuery, { scenario: SCENARIOS[0] });
+    Object.assign(routeQuery, { fixture: "1", scenario: SCENARIOS[0] });
     const wrapper = mountView();
     expect(wrapper.findComponent(ThisWeek).exists()).toBe(true);
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(true);
     expect(wrapper.findComponent(LivePaged).exists()).toBe(false);
     expect(wrapper.findComponent(TopBar).props("live")).toBe(false);
-    expect(wrapper.findComponent(PageFooter).props("live")).toBe(false);
   });
 
-  it("live mode hides the fixture-only controls", () => {
+  it("live mode hides only the scenario picker; the footer keeps See changes", () => {
     Object.assign(routeQuery, { live: "1", scenario: SCENARIOS[0] });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
     const bar = wrapper.findComponent(TopBar);
     expect(bar.props("live")).toBe(true);
     expect(bar.props("checked")).toEqual({ kind: "loading" });
-    expect(wrapper.findComponent(PageFooter).props("live")).toBe(true);
-    const footer = mount(PageFooter, { props: { live: true }, global: { plugins: [i18n] } });
-    expect(footer.find('[data-test="autoobserve2-footer-activity"]').exists()).toBe(false);
+    expect(wrapper.findComponent(PageFooter).exists()).toBe(true);
+    const footer = mount(PageFooter, { global: { plugins: [i18n] } });
+    expect(footer.find('[data-test="autoobserve2-footer-activity"]').exists()).toBe(true);
     expect(footer.find('[data-test="autoobserve2-footer-coverage"]').exists()).toBe(true);
   });
 
@@ -143,11 +173,14 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(query.drawer).toBeUndefined();
     expect(query.problem).toBeUndefined();
     expect(query.live).toBe("1");
-    expect(wrapper.findComponent(AutoObserveIssueDrawer).props("open")).toBe(false);
+    const drawer = wrapper.findComponent(AutoObserveIssueDrawer);
+    expect(drawer.props("open")).toBe(false);
+    expect(drawer.props("issue")).toBeNull();
 
     wrapper.unmount();
     replace.mockReset();
     delete routeQuery.live;
+    routeQuery.fixture = "1";
     const fixtureView = mountView();
     await flushPromises();
     expect(fixtureView.findComponent(AutoObserveIssueDrawer).props("open")).toBe(true);
@@ -155,9 +188,130 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
   });
 
   it("the fixture view never fetches paged findings", () => {
-    Object.assign(routeQuery, { scenario: quiet ?? "" });
+    Object.assign(routeQuery, { fixture: "1", scenario: quiet ?? "" });
     const fixtureView = mountView();
     expect(fixtureView.findComponent(LivePaged).exists()).toBe(false);
     expect(autoobserve.incidents).not.toHaveBeenCalled();
+  });
+
+  it("is live with no query param: the home shows the paged card, not the fixture", () => {
+    const wrapper = mountView();
+    expect(wrapper.findComponent(LivePaged).exists()).toBe(true);
+    expect(wrapper.findComponent(ThisWeek).exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
+  });
+
+  it("the Issues page lists live incidents with no query param, never the fixture table", () => {
+    for (const issuesRange of [undefined, "7d", "90d"]) {
+      Object.assign(routeQuery, { page: "issues", issuesRange });
+      const wrapper = mountView();
+      const issues = wrapper.findComponent(LiveIssues);
+      expect(issues.exists(), issuesRange).toBe(true);
+      expect(issues.props("range")).toBe(issuesRange ?? "30d");
+      expect(issues.props("initialFilter")).toBe("all");
+      expect(wrapper.findComponent(AutoObserveIssuesTab).exists()).toBe(false);
+      expect(wrapper.find('[data-test="autoobserve-issues-table"]').exists()).toBe(false);
+      expect(wrapper.html()).not.toContain("INC-1051");
+      wrapper.unmount();
+    }
+  });
+
+  it("live mode keeps the Changes page with an honest empty state, never the fixture ledger", async () => {
+    Object.assign(routeQuery, { page: "activity", change: "c-1" });
+    const wrapper = mountOpen();
+    await flushPromises();
+    expect(replace).not.toHaveBeenCalled();
+    const changes = wrapper.findComponent(ChangesPage);
+    expect(changes.exists()).toBe(true);
+    expect(changes.props("ledger")).toEqual([]);
+    expect(wrapper.find('[data-test="autoobserve2-activity-empty"]').exists()).toBe(false);
+    const empty = wrapper.find('[data-test="autoobserve-live-empty-changes"]');
+    expect(empty.text()).toContain("No changes yet");
+    expect(empty.text()).toContain("hasn't changed any alert or setting");
+    expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(false);
+    await wrapper.find('[data-test="autoobserve-live-empty-changes-action"]').trigger("click");
+    expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(true);
+  });
+
+  it("live History lists no fixture entries and sends the reader to the Issues page", async () => {
+    const wrapper = mountOpen();
+    await flushPromises();
+    const history = wrapper.findComponent(HistoryDrawer);
+    expect(history.props("entries")).toEqual([]);
+    expect(wrapper.find('[data-test="autoobserve2-history-filter"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve-live-empty-history"]').text()).toContain(
+      "No history yet",
+    );
+    wrapper.findComponent(TopBar).vm.$emit("open", "history");
+    await flushPromises();
+    expect(history.props("open")).toBe(true);
+    await wrapper.find('[data-test="autoobserve-live-empty-history-action"]').trigger("click");
+    expect(history.props("open")).toBe(false);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push.mock.calls[0][0].query.page).toBe("issues");
+  });
+
+  it("live Settings shows no local controls and points to How it works", async () => {
+    const wrapper = mountOpen();
+    await flushPromises();
+    expect(wrapper.find('[data-test="autoobserve2-settings-reach"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve2-settings-autonomy"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve-live-empty-settings"]').text()).toContain(
+      "Nothing to set here yet",
+    );
+    wrapper.findComponent(TopBar).vm.$emit("open", "settings");
+    await flushPromises();
+    const settings = wrapper.findComponent(SettingsDrawer);
+    expect(settings.props("open")).toBe(true);
+    await wrapper.find('[data-test="autoobserve-live-empty-settings-action"]').trigger("click");
+    expect(settings.props("open")).toBe(false);
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(true);
+  });
+
+  it("fixture=1 keeps the fixture History and Settings bodies", async () => {
+    Object.assign(routeQuery, { fixture: "1", scenario: SCENARIOS[0] });
+    const wrapper = mountOpen();
+    await flushPromises();
+    expect(wrapper.find('[data-test="autoobserve2-history-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve2-settings-reach"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test^="autoobserve-live-empty-"]').exists()).toBe(false);
+  });
+
+  it("live mode keeps the scenario surface as a live-data note with a next step", async () => {
+    const wrapper = mountOpen();
+    await flushPromises();
+    expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve2-scenario-select"]').exists()).toBe(false);
+    const note = wrapper.find('[data-test="autoobserve2-scenario-live"]');
+    expect(note.text()).toContain("Live data");
+    expect(note.text()).toContain("Sample scenarios aren't shown");
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    await wrapper.find('[data-test="autoobserve2-scenario-live-action"]').trigger("click");
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(true);
+  });
+
+  it("fixture=1 shows the scenario picker and no live-data note", () => {
+    Object.assign(routeQuery, { fixture: "1", scenario: SCENARIOS[0] });
+    const wrapper = mountView();
+    expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve2-scenario-live"]').exists()).toBe(false);
+  });
+
+  it("fixture=1 in a test build keeps the fixture design path", () => {
+    Object.assign(routeQuery, { fixture: "1", scenario: SCENARIOS[0] });
+    const home = mountView();
+    expect(home.findComponent(ThisWeek).exists()).toBe(true);
+    expect(home.findComponent(AutoObserveIssueDrawer).exists()).toBe(true);
+    expect(home.findComponent(HistoryDrawer).exists()).toBe(true);
+    home.unmount();
+    Object.assign(routeQuery, { page: "issues" });
+    const issues = mountView();
+    expect(issues.findComponent(AutoObserveIssuesTab).exists()).toBe(true);
+    expect(issues.findComponent(LiveIssues).exists()).toBe(false);
+    issues.unmount();
+    Object.assign(routeQuery, { page: "activity" });
+    const changes = mountView();
+    expect(changes.findComponent(ChangesPage).exists()).toBe(true);
+    expect(replace).not.toHaveBeenCalled();
   });
 });

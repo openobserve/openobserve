@@ -72,13 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </dl>
     </header>
 
-    <p
-      v-if="!changes.length"
-      class="text-text-secondary bg-surface-base border-border-subtle rounded-surface border px-5 py-6 text-sm shadow-xs"
-      data-test="autoobserve2-activity-empty"
-    >
-      {{ t("autoobserve2.activityPage.empty.scenario") }}
-    </p>
+    <slot v-if="!changes.length" name="empty">
+      <p
+        class="text-text-secondary bg-surface-base border-border-subtle rounded-surface border px-5 py-6 text-sm shadow-xs"
+        data-test="autoobserve2-activity-empty"
+      >
+        {{ t("autoobserve2.activityPage.empty.scenario") }}
+      </p>
+    </slot>
     <template v-else>
       <OToggleGroup
         :model-value="filter"

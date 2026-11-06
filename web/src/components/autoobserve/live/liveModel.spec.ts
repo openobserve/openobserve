@@ -24,11 +24,13 @@ import autoobserve, {
   type AutoObserveIncidentList,
 } from "@/services/autoobserve";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
-import { keepLatched, useLiveAutoObserve } from "./liveModel";
+import { fixtureAllowed, keepLatched, useLiveAutoObserve, useLiveMode } from "./liveModel";
+
+const routeQuery: Record<string, string> = { live: "1" };
 
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRoute: () => ({ query: { live: "1" } }),
+  useRoute: () => ({ query: routeQuery }),
 }));
 
 vi.mock("@/services/autoobserve", () => ({
@@ -106,5 +108,34 @@ describe("keepLatched", () => {
     kept = keepLatched(ids, [withId("b", "b again"), withId("c")], kept);
     expect(kept.map((i) => i.incident.title)).toEqual(["a", "b again"]);
     expect(keepLatched([], [withId("a")], kept)).toEqual([]);
+  });
+});
+
+describe("useLiveMode (LIVE-Q1)", () => {
+  const liveWith = (query: Record<string, string>) => {
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    Object.assign(routeQuery, query);
+    return useLiveMode().value;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    liveWith({ live: "1" });
+  });
+
+  it("is live with no query and with live=1, and off only with fixture=1 in a test build", () => {
+    expect(fixtureAllowed()).toBe(true);
+    expect(liveWith({})).toBe(true);
+    expect(liveWith({ live: "1" })).toBe(true);
+    expect(liveWith({ fixture: "0" })).toBe(true);
+    expect(liveWith({ fixture: "1" })).toBe(false);
+  });
+
+  it("a production bundle never shows fixtures, whatever the URL says", () => {
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("MODE", "production");
+    expect(fixtureAllowed()).toBe(false);
+    expect(liveWith({ fixture: "1" })).toBe(true);
+    expect(liveWith({ fixture: "1", live: "0" })).toBe(true);
   });
 });
