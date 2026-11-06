@@ -1352,6 +1352,20 @@ describe("SessionViewer.vue — server-clock query windows (Risk 3)", () => {
     wrapper.unmount();
   });
 
+  it("hands the Traces tab the events' arrival window, not the device-clock bounds", async () => {
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, max_ts: maxTs }] },
+    } as any);
+    const wrapper = await mountLoaded();
+
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: minTs - 60_000_000,
+      end: maxTs + 60_000_000,
+    });
+    wrapper.unmount();
+  });
+
   it("falls back to the route range ±1 day when the arrival times are missing", async () => {
     const wrapper = await mountLoaded();
     const day = 86_400_000_000;
@@ -4149,11 +4163,14 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
     wrapper.unmount();
   });
 
-  it("gives the replay sidebar no rumWindowUs, so its trace search is unchanged", async () => {
+  it("gives the replay sidebar the route window ±1 day when the arrival times are missing", async () => {
     const { wrapper } = await mountFromFunnel();
     expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
     const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
-    expect(sidebar.props("rumWindowUs")).toBeFalsy();
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: 1692884400000000 - 86_400_000_000,
+      end: 1692884400000000 + 86_400_000_000,
+    });
     wrapper.unmount();
   });
 
