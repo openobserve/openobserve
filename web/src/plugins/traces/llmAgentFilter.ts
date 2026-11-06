@@ -53,9 +53,13 @@ export function buildAgentTraceFilter(
   if (agent.version) {
     clauses.push(`gen_ai_agent_version = '${sqlQuote(String(agent.version))}'`);
   }
-  if (agent.env) {
-    clauses.push(`gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`);
-  }
+  // A registry row without an env is the env-less variant, its own row apart
+  // from the same version's env'd rows: no clause would count every env.
+  clauses.push(
+    agent.env
+      ? `gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`
+      : "(gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')",
+  );
   return clauses.join(" AND ");
 }
 

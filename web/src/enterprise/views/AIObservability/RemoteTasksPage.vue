@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="ai-remote-tasks-page"
-    :title="t('aiObservability.nav.remoteTasks')"
-    :subtitle="t('aiObservability.subtitle.remoteTasks')"
-    icon="cloud-upload"
+    :title="header?.title ?? t('aiObservability.nav.remoteTasks')"
+    :subtitle="header?.subtitle ?? t('aiObservability.subtitle.remoteTasks')"
+    :icon="header?.icon ?? 'cloud-upload'"
     bleed
     :scroll="false"
+    :tabs-below="hasTabs"
   >
+    <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
       <OButton
         variant="primary"
@@ -238,6 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
+import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -280,6 +284,7 @@ import {
 defineOptions({ name: "AIRemoteTasksPage" });
 
 const { t } = useI18nTyped();
+const { hasTabs, header } = useAiSectionTabs();
 const store = useStore();
 const router = useRouter();
 const { confirm } = useConfirmDialog();

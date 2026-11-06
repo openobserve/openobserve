@@ -128,8 +128,28 @@ describe("llmDiscoveryService.search", () => {
       spanKind: "INTERNAL",
       quality: "multiple",
       issueCount: 2,
+      notHelpful: false,
+      feedbackComment: null,
       inQueue: false,
     });
+  });
+
+  it("carries a Not helpful end-user vote and its comment (AIO-40)", async () => {
+    mockGet.mockResolvedValue(
+      response({
+        scope: "trace",
+        targetId: "trace-2",
+        quality: "issue",
+        notHelpful: true,
+        feedbackComment: "wrong order",
+      }),
+    );
+
+    const [item] = (
+      await llmDiscoveryService.search("acme", { scope: "trace", startTime: 1, endTime: 2 })
+    ).items;
+
+    expect(item).toMatchObject({ notHelpful: true, feedbackComment: "wrong order" });
   });
 
   it("folds a span row's context (kind + duration, no service)", async () => {

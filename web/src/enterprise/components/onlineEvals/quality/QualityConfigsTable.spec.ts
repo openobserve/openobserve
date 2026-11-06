@@ -232,7 +232,6 @@ describe("QualityConfigsTable", () => {
     expect(tile.classes()).toContain("border-accent");
     expect(rowIds(wrapper)).toEqual(["row-ins"]);
     expect(wrapper.find('[data-test="quality-tile-chip"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="quality-configs-search"]').exists()).toBe(true);
 
     await tile.trigger("click");
     await flushPromises();
@@ -336,8 +335,7 @@ describe("QualityConfigsTable", () => {
   });
 
   it("matches the search on name and description", async () => {
-    const wrapper = mountTable();
-    await wrapper.find('[data-test="quality-configs-search"] input').setValue("instructions");
+    const wrapper = mountTable({ search: "instructions" });
     await flushPromises();
     expect(wrapper.find('[data-test="row-ins"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="row-hal"]').exists()).toBe(false);

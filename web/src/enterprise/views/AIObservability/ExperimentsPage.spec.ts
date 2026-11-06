@@ -91,6 +91,7 @@ vi.mock("@/services/online-evals.service", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import ExperimentsPage from "./ExperimentsPage.vue";
+import { queryClient } from "@/composables/query/queryClient";
 
 beforeEach(() => {
   route.query = { selected: "one" };
@@ -222,5 +223,39 @@ describe("ExperimentsPage drafts", () => {
     expect(button().attributes("aria-label")).toBe("common.editorDraft.newDot");
     wrapper.unmount();
     localStorage.clear();
+  });
+});
+
+describe("ExperimentsPage live rows", () => {
+  it("re-reads the list while a row is running, and stops once none is", async () => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    const service = (await import("@/services/llm-experiments.service")).default;
+    (service.list as any)
+      .mockResolvedValueOnce([makeExperiment({ id: "one", status: "running" })])
+      .mockResolvedValue([experiment("one")]);
+    route.query = {};
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot /></main>` },
+          ExperimentBrowser: true,
+          OEmptyState: true,
+        },
+      },
+    });
+    await flushPromises();
+    const calls = () => (service.list as any).mock.calls.length;
+    const afterMount = calls();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls()).toBe(afterMount + 1);
+    // The poll came back with nothing live, so no further read is scheduled.
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(calls()).toBe(afterMount + 1);
+
+    wrapper.unmount();
+    vi.useRealTimers();
   });
 });

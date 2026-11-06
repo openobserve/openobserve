@@ -199,7 +199,9 @@ pub fn build_llm_trace_query(
     };
 
     if validated.has_gen_ai {
-        let usage = |column: &str| validated.usage_sum(column);
+        // Same per-trace rule as Session Detail and Users: LLM calls, else the agent span.
+        let usage =
+            |column: &str| crate::traces::session::usage_rule(column, validated.has_operation_name);
         let total_tokens_expr = if validated.has_total_tokens {
             format!(
                 "{} as gen_ai_usage_details_total",
@@ -392,20 +394,25 @@ mod tests {
     }
 
     #[test]
-    fn test_build_llm_trace_query_sums_only_llm_call_spans() {
+    fn test_build_llm_trace_query_applies_the_per_trace_usage_rule() {
         let mut validated = schema_compat::ValidatedLlmSchema::fallback(true);
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
         let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
+        // LLM-call spans, else the agent span: agent-only traces keep their usage.
         for (column, alias) in [
             ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
             ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),
             ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
             ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
         ] {
-            let expected = format!("sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END) as {alias}");
+            let expected = format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END), 0), \
+                 max(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN {column} END), 0) \
+                 as {alias}"
+            );
             assert!(sql.contains(&expected), "{sql}");
         }
     }

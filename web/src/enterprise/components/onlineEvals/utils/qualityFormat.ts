@@ -30,6 +30,7 @@ import type {
 } from "@/services/online-evals.service";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import type { AiDrawerTrace } from "@/plugins/traces/AiTraceDrawer.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 
 /** A list row joined with the Score Config fields the API does not return. */
@@ -482,6 +483,30 @@ export function evaluatorTraceLink(score: QualityScore, org: string): RouteLocat
       from: score.timestamp - LINK_WINDOW_US,
       to: score.timestamp + LINK_WINDOW_US,
     },
+  };
+}
+
+/**
+ * The scored trace (or span) for the in-page trace drawer (AIO-21), over the
+ * same window as {@link targetLink}. Sessions have no trace to show.
+ */
+export function targetDrawerTrace(score: QualityScore): AiDrawerTrace | null {
+  const traceId = targetTraceId(score);
+  if (!traceId || !score.sourceStream) return null;
+  const { startTime, endTime } = targetWindow(score);
+  const spanId =
+    score.targetScope === "span" ? (score.spanId ?? score.targetId ?? undefined) : undefined;
+  return { traceId, stream: score.sourceStream, startTime, endTime, spanId };
+}
+
+/** The judge's trace on `_evaluator`, for the drawer's Evaluator trace toggle. */
+export function evaluatorDrawerTrace(score: QualityScore): AiDrawerTrace | null {
+  if (!score.evaluatorTraceId) return null;
+  return {
+    traceId: score.evaluatorTraceId,
+    stream: "_evaluator",
+    startTime: score.timestamp - LINK_WINDOW_US,
+    endTime: score.timestamp + LINK_WINDOW_US,
   };
 }
 

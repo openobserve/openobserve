@@ -19,6 +19,40 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 
+interface StreamErrorBody {
+  message?: string;
+  error?: string;
+  error_detail?: string;
+  status?: number;
+  code?: number;
+}
+
+export type StreamQueryError = Error & { status?: number; code?: number; raw: unknown };
+
+/**
+ * Turn a streaming-search error (`handlers.error`'s second argument) into an
+ * `Error` carrying the server's message, with `.status`, `.code` and `.raw`.
+ * useStreamingSearch wraps the server error body as
+ * `{ content: { ...errorBody, trace_id }, type: "error" }`.
+ */
+export function streamQueryError(
+  response: { content?: StreamErrorBody } | StreamErrorBody | undefined,
+): StreamQueryError {
+  const outer = (response ?? {}) as StreamErrorBody & { content?: StreamErrorBody };
+  const body = outer.content ?? outer;
+  const message =
+    body.message ||
+    body.error ||
+    body.error_detail ||
+    outer.message ||
+    gt("traces.failedToFetchQueryData");
+  return Object.assign(new Error(message), {
+    status: body.status ?? outer.status,
+    code: body.code ?? outer.code,
+    raw: response,
+  });
+}
+
 /**
  * Minimal SQL query runner against the traces stream search endpoint.
  * Used by LLM Insights panels and composables — accumulates hits across
@@ -118,7 +152,7 @@ export function useLLMStreamQuery() {
 
       // Honour the SQL's own LIMIT as the request `size` so the
       // backend doesn't scan more rows than the panel actually wants.
-      // Recent-errors panel uses LIMIT 10; latency raw uses LIMIT
+      // The table panels use LIMIT 10; latency raw uses LIMIT
       // 50000. Falls back to 1000 for queries without LIMIT.
       const size = querySize(sql);
 
@@ -159,24 +193,9 @@ export function useLLMStreamQuery() {
               metadataHits.push(...hits);
             }
           },
-          error: (response: any) => {
+          error: (_payload: any, response: any) => {
             activeTraceIds.delete(traceId);
-            // useStreamingSearch wraps the server error body as
-            // `{ content: { ...errorBody, trace_id }, type: "error" }`.
-            // Unwrap so the real fields (message / error_detail / status)
-            // are visible without forcing every caller to know the shape.
-            const body = response?.content ?? response ?? {};
-            const message =
-              body.message ||
-              body.error ||
-              body.error_detail ||
-              response?.message ||
-              gt("traces.failedToFetchQueryData");
-            const err: any = new Error(message);
-            err.status = body.status ?? response?.status;
-            err.code = body.code ?? response?.code;
-            err.raw = response;
-            reject(err);
+            reject(streamQueryError(response));
           },
           complete: () => {
             activeTraceIds.delete(traceId);

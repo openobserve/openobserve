@@ -18,8 +18,8 @@ use config::meta::{
     pipeline::components::ScorerRef,
 };
 use infra::table::online_eval_jobs::{
-    JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
-    TargetScope, TraceEvalConfig,
+    EvalJobBudget, JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector,
+    SpanSelectorBindings, TargetScope, TraceEvalConfig,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -63,6 +63,11 @@ pub struct EvalJobRequestBody {
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    /// Daily judge spend limit; omitted on update keeps the stored one. Only `dailyUsd` and
+    /// `onReach` are read.
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
@@ -93,6 +98,9 @@ pub struct EvalJobResponseBody {
     pub trace_config: Option<TraceEvalConfig>,
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
+    /// `pausedAt` is set while the budget holds the job paused; `liftedUntil` while it is lifted.
+    #[schema(value_type = Option<Object>)]
+    pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
@@ -216,6 +224,7 @@ impl TryFrom<EvalJobRequestBody> for infra::table::online_eval_jobs::OnlineEvalJ
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value.budget.map(|budget| budget.with_server_state_of(None)),
             sampling_mode: value.sampling_mode,
             sampling_value: value.sampling_value,
             status: "draft".to_string(),
@@ -253,6 +262,7 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobResponseBody
             span_selector_bindings: value.span_selector_bindings,
             trace_config: value.trace_config,
             session_config: value.session_config,
+            budget: value.budget,
             sampling_mode: value.sampling_mode,
             sampling_value,
             status: value.status,
@@ -316,6 +326,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!(0.1),
             status: "active".to_string(),
@@ -344,6 +355,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::json!(null),
         };
@@ -377,6 +389,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::Value::Null,
         };
@@ -475,6 +488,31 @@ mod tests {
         assert!(body.input_mapping.is_none());
         assert!(body.description.is_none());
         assert_eq!(body.target_scope, TargetScope::Span);
+    }
+
+    #[test]
+    fn test_eval_job_request_body_budget_ignores_client_pause_state() {
+        let json = r#"{
+            "name": "j",
+            "stream": "default",
+            "streamType": "traces",
+            "filterCondition": {},
+            "scorers": ["a"],
+            "budget": {"dailyUsd": 5, "onReach": "pause", "pausedAt": 1, "liftedUntil": 2},
+            "samplingMode": "rate",
+            "samplingValue": 0.1
+        }"#;
+        let body: EvalJobRequestBody = serde_json::from_str(json).unwrap();
+        let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
+        let budget = job.budget.clone().unwrap();
+        assert_eq!(budget.daily_usd, 5.0);
+        assert_eq!((budget.paused_at, budget.lifted_until), (None, None));
+
+        let response = serde_json::to_value(EvalJobResponseBody::from(job)).unwrap();
+        assert_eq!(
+            response["budget"],
+            serde_json::json!({"dailyUsd": 5.0, "onReach": "pause"})
+        );
     }
 
     #[test]

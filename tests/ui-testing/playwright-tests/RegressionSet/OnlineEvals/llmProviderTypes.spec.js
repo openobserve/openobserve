@@ -11,8 +11,8 @@
 //   - No API-key "required" marker in edit mode
 //   - Cancel returns to the provider list without persisting
 //
-// Enterprise gating: the `llm_providers` route only exists on enterprise/cloud
-// builds (useManagementRoutes.ts pushes it when isEnterprise || isCloud). Each test
+// Enterprise gating: the `llmProviders` route (/ai/llm-providers) is feature-gated
+// to enterprise/cloud builds (useAIObservabilityRoutes.ts). Each test
 // probes navigateToLlmProviders() and skips cleanly on the OSS binary.
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');

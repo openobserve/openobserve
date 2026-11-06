@@ -26,6 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <LLMPanelCard :title="displayTitle" :subtitle="displaySubtitle || undefined">
+    <template v-if="panel.alert" #actions>
+      <CreateAlertAction
+        variant="icon"
+        source="ai"
+        :build="buildAlert"
+        :data-test="`llm-panel-create-alert-${panel.id}`"
+      />
+    </template>
     <!-- h-55 matches LLMTrendPanel's chart height (13.75rem) so the converted
          panel lines up with the legacy ones in the same grid row. The renderer
          needs an explicit full size to fill the box — without it the echarts
@@ -41,6 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="folderId"
         searchType="dashboards"
         :allowAnnotationsAPI="false"
+        :allowDrilldown="false"
+        :class="panel.drill ? 'cursor-pointer' : ''"
+        @chart-click="onChartClick"
         :width="6"
         :height="6"
       />
@@ -50,11 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import LLMPanelCard from "./LLMPanelCard.vue";
 import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
+import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
+import type { LLMPanelDrill } from "./llmInsightsDrill";
 
 interface Props {
   panel: LLMPanelDef;
@@ -72,9 +88,37 @@ interface Props {
   // reuses that same mechanism. See LLMInsightsDashboard for how they're built.
   dashboardId?: string;
   folderId?: string;
+  /** The agent in scope, for "Create alert" (none = every agent on the stream). */
+  alertAgent?: string | null;
 }
 
 const props = defineProps<Props>();
+const emit = defineEmits<{ (e: "drill", drill: LLMPanelDrill): void }>();
+
+// Built on click: the panel's pack template for the agent in scope (AIO-20).
+const buildAlert = () =>
+  buildAiPrefill({ kind: props.panel.alert!, stream: props.streamName, agent: props.alertAgent });
+const store = useStore();
+
+// Horizontal bars select their category (the model); trends select the series
+// (breakdown value, or the value column for multi-series panels) at the
+// clicked bucket. Chart times are shifted into the viewer's timezone.
+function onChartClick(params: any) {
+  if (!props.panel.drill || !params) return;
+  if (props.panel.type === "horizontal-bar") {
+    emit("drill", { panel: props.panel, series: String(params.name ?? ""), atMicros: null });
+    return;
+  }
+  const x = Array.isArray(params.value) ? params.value[0] : params.name;
+  const ms = typeof x === "number" ? x : Date.parse(String(x));
+  emit("drill", {
+    panel: props.panel,
+    series: params.seriesName ?? null,
+    atMicros: Number.isFinite(ms)
+      ? getUTCTimestampFromZonedTimestamp(ms, store.state.timezone || "UTC")
+      : null,
+  });
+}
 
 const { t } = useI18nTyped();
 

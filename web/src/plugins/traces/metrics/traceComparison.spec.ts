@@ -725,10 +725,6 @@ describe("filterTermFor", () => {
       filterTermFor(numeric("bytes", "Int64"), { kind: "bin", index: 2 }, "lt")!,
       "duration >= '2ms'",
     ];
-    const normalise = (where: string) => {
-      const sql: string = p.sqlify(p.astify(`SELECT * FROM "default" WHERE ${where}`));
-      return sql.replace(/^[\s\S]*?\bWHERE\b\s+/i, "");
-    };
     for (const term of terms) {
       expect(() => p.astify(`SELECT * FROM "default" WHERE ${term}`), term).not.toThrow();
       const decoded = parseSpanKindWhereClause(
@@ -737,7 +733,8 @@ describe("filterTermFor", () => {
         "default",
       );
       expect(() => p.astify(`SELECT * FROM "default" WHERE ${decoded}`)).not.toThrow();
-      if (!/duration|span_kind/.test(term)) expect(decoded).toBe(normalise(term));
+      // Terms with nothing to convert reach the backend exactly as written.
+      if (!/duration|span_kind/.test(term)) expect(decoded).toBe(term);
     }
   });
 });

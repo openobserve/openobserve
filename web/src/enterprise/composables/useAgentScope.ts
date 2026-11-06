@@ -122,7 +122,7 @@ export function resolveScopeMode(
  * choice on reload and stop the page from re-deciding once agents change.
  */
 export function scopeUrlQuery(
-  current: LocationQuery,
+  current: LocationQueryRaw,
   scope: {
     mode: ScopeMode;
     explicit: boolean;

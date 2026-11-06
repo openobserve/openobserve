@@ -9,6 +9,8 @@
 const mockFetchSession = vi.fn();
 const mockFetchTurnDetail = vi.fn();
 const mockFetchSessionSpans = vi.fn();
+const mockFetchSessionAgent = vi.fn();
+const mockMappingGet = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterBack = vi.fn();
 
@@ -27,7 +29,12 @@ vi.mock("./composables/useSessions", () => ({
     fetchSession: mockFetchSession,
     fetchTurnDetail: mockFetchTurnDetail,
     fetchSessionSpans: mockFetchSessionSpans,
+    fetchSessionAgent: mockFetchSessionAgent,
   })),
+}));
+
+vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+  default: { get: (...args: unknown[]) => mockMappingGet(...args) },
 }));
 
 vi.mock("./TurnPreviewCard.vue", () => ({
@@ -268,6 +275,8 @@ beforeEach(() => {
     model: "gpt-4",
   });
   mockFetchSessionSpans.mockResolvedValue([makeSpan()]);
+  mockFetchSessionAgent.mockResolvedValue(null);
+  mockMappingGet.mockRejectedValue(new Error("not enterprise"));
 });
 
 // ---------------------------------------------------------------------------
@@ -556,6 +565,92 @@ describe("SessionDetails — turn rows", () => {
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector());
     expect(row.text()).toContain("1");
+  });
+
+  it("fetches turn spans over the session's range when it starts before the link's window", async () => {
+    // The details endpoint widens the window, so this session starts 1e6 s before `from`.
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ firstSeenMicros: 1699000000000000000, durationNanos: 1e15 }),
+      traces: [makeTrace()],
+    });
+
+    await mountComponent();
+
+    expect(mockFetchSessionSpans).toHaveBeenCalledWith(
+      "test-stream",
+      [expect.objectContaining({ traceId: "trace-xyz" })],
+      1698999999999999,
+      1700000000000001,
+    );
+  });
+
+  it("loads older turns on demand and fetches only their spans", async () => {
+    const newer = makeTrace({ traceId: "t-new", startTimeMicros: 1700000002000000000 });
+    const older = makeTrace({ traceId: "t-old", startTimeMicros: 1700000001000000000 });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 2 }),
+      traces: [newer],
+      hasOlder: true,
+    });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 2 }),
+      traces: [older, newer],
+      hasOlder: false,
+    });
+
+    const wrapper = await mountComponent();
+    // Counts say they cover the loaded turn, not the whole session.
+    expect(wrapper.find("[data-test='session-detail-kpi-errors']").text()).toContain(
+      "traces.sessionDetail.kpiSub.errorsNoneLoaded",
+    );
+    await wrapper.find("[data-test='session-load-older-turns-btn']").trigger("click");
+    await flushPromises();
+
+    expect(mockFetchSession).toHaveBeenLastCalledWith(
+      "test-stream",
+      "sess-abc",
+      1700000000000000,
+      1700001000000000,
+      [newer],
+    );
+    expect(wrapper.find(turnRowSelector("t-old")).exists()).toBe(true);
+    expect(mockFetchSessionSpans).toHaveBeenCalledTimes(2);
+    expect(mockFetchSessionSpans.mock.calls[1][1]).toEqual([older]);
+    // Every turn is loaded: the notice and the control are gone.
+    expect(wrapper.find("[data-test='session-older-turns-banner']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='session-detail-kpi-errors']").text()).toContain(
+      "traces.sessionDetail.kpiSub.errorsNone",
+    );
+    expect(wrapper.find("[data-test='session-detail-kpi-errors']").text()).not.toContain(
+      "errorsNoneLoaded",
+    );
+  });
+
+  it("hides the agent's harness text in the turn title and body (AIO-22)", async () => {
+    const message = "<system-reminder>context</system-reminder>\nFix the login bug";
+    mockMappingGet.mockResolvedValue({
+      harness_patterns: [{ agent: "omp", patterns: ["tag system-reminder"] }],
+    });
+    mockFetchSessionAgent.mockResolvedValue("omp");
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail(),
+      traces: [makeTrace({ turnUserMessage: message })],
+    });
+    mockFetchSessionSpans.mockResolvedValue([
+      makeSpan({ gen_ai_input_messages: JSON.stringify([{ role: "user", content: message }]) }),
+    ]);
+
+    const wrapper = await mountComponent();
+    const header = wrapper.find(turnHeaderSelector());
+    expect(header.text()).toContain("Fix the login bug");
+    expect(header.text()).not.toContain("system-reminder");
+
+    await header.trigger("click");
+    await flushPromises();
+    const body = wrapper.find(turnBodySelector());
+    expect(body.text()).toContain("Fix the login bug");
+    expect(body.text()).not.toContain("context");
+    expect(wrapper.find('[data-test="session-turn-harness-trace-xyz"]').exists()).toBe(true);
   });
 
   it("uses the full trace ID in the row test hook", async () => {

@@ -706,6 +706,7 @@ export default defineComponent({
     "show-legends",
     "format-column",
     "sendToAiChat",
+    "chart-click",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -2365,8 +2366,11 @@ export default defineComponent({
     });
 
     // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
-    const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
-      allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
+    // `chart-click` hands the raw point to hosts with their own click-through (AI Insights).
+    const onPanelClick = (...args: Parameters<typeof onChartClick>) => {
+      emit("chart-click", args[0]);
+      return allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
+    };
     // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
     const onMetricZoneClick = (
       m: { idx: number; layout?: { left?: number; top?: number } },

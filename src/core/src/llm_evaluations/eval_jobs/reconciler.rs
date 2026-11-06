@@ -443,6 +443,7 @@ mod tests {
             span_selector_bindings: Default::default(),
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!({"rate": 0.25}),
             status: "active".to_string(),

@@ -30,6 +30,7 @@
  */
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { toSeriesOverrideEntry } from "@/utils/dashboard/seriesOverrides";
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
@@ -37,6 +38,8 @@ import type { LLMPanelDef } from "./config/llmInsightsPanels";
 const TYPE_MAP: Record<string, string> = {
   "stacked-area": "area-stacked",
   "stacked-bar": "stacked",
+  // One unstacked line per series (breakdown value).
+  line: "line",
   "horizontal-bar": "h-bar",
 };
 
@@ -74,7 +77,9 @@ export function buildLLMPanelSchema(opts: {
   t: TranslateFn;
 }): any {
   const { panel, sql, stream, streamType = "traces", t } = opts;
-  const { timeField, seriesField, valueField, valueFormat, seriesLabelKey } = panel.query;
+  const { timeField, seriesField, valueField, valueFormat, seriesLabelKey, measures } = panel.query;
+  // Several measures (input / output tokens) are series of their own, as a breakdown is.
+  const multiSeries = !!seriesField || (measures?.length ?? 0) > 1;
   const seriesLabel = seriesLabelKey ? t(seriesLabelKey) : undefined;
 
   // Single-series panels (no breakdown) use the non-stacked "area" variant.
@@ -88,13 +93,13 @@ export function buildLLMPanelSchema(opts: {
         ? "area-stacked"
         : "area"
       : panel.type === "stacked-bar"
-        ? seriesField
+        ? multiSeries
           ? "stacked"
           : "bar"
         : (TYPE_MAP[panel.type] ?? "line");
 
   // Field roles differ by panel shape:
-  //  - trends (stacked-area / stacked-bar): time on X, series field = BREAKDOWN.
+  //  - trends (stacked-area / stacked-bar / line): time on X, series field = BREAKDOWN.
   //  - bars (horizontal-bar): the series field (e.g. model) is the X category
   //    and there is no breakdown (a single fixed-color series of bars).
   const isHBar = panel.type === "horizontal-bar";
@@ -112,7 +117,7 @@ export function buildLLMPanelSchema(opts: {
     config: {
       // Legend only when there's more than one series; single-series panels are
       // already labelled by their axis + title.
-      show_legends: !!breakdownName || (panel.series?.length ?? 0) > 1,
+      show_legends: !!breakdownName || multiSeries,
       legends_position: "bottom",
       // "numbers" → compact K/M/B/T suffixes (3.5M); "milliseconds" → ms/s/m
       // (65.3 s); cost → currency-dollar ($). "short" is NOT a valid OO unit and
@@ -125,8 +130,9 @@ export function buildLLMPanelSchema(opts: {
             : "numbers",
       unit_custom: "",
       decimals: 2,
-      // Bucket gaps read as a continued line rather than a hole.
-      connect_nulls: true,
+      // A bucket with no data is a gap: a line drawn through it would claim a
+      // latency for hours with no calls. Bars are unaffected.
+      connect_nulls: false,
       no_value_replacement: "",
       // Render a dot at each data point. LLM traffic is often sparse — a window
       // can have a single active bucket, and a line/area with no symbol can't
@@ -143,21 +149,26 @@ export function buildLLMPanelSchema(opts: {
       base_map: { type: "osm" },
       map_view: { zoom: 1, lat: 0, lng: 0 },
       mark_line: [],
-      // Color: grouped-bar panels pin one color per value series (p50→p99) via
-      // a palette; single-series panels (e.g. errors-over-time) pin one fixed
-      // brand color; breakdown panels omit it so the palette gives each series
-      // a distinct color.
-      ...(panel.series?.length
+      // Color: single-series panels can pin one fixed brand color; breakdown
+      // panels omit it so the palette gives each series a distinct color.
+      ...(panel.color
+        ? { color: { mode: "fixed", fixedColor: [panel.color], seriesBy: "last" } }
+        : {}),
+      // The dashboards stack a breakdown, not several measures, so the measures
+      // of a stacked panel get one stack group (input + output, OK + errored add
+      // up to the bucket's total) and their pinned colour, as series overrides.
+      ...(panel.type === "stacked-bar" && measures && measures.length > 1
         ? {
-            color: {
-              mode: "palette-classic",
-              fixedColor: panel.series.map((s) => s.color),
-              seriesBy: "last",
-            },
+            override_config: measures.map((m) =>
+              toSeriesOverrideEntry({
+                matchBy: "name",
+                value: t(m.labelKey),
+                color: m.color,
+                style: { stackGroup: "total" },
+              }),
+            ),
           }
-        : panel.color
-          ? { color: { mode: "fixed", fixedColor: [panel.color], seriesBy: "last" } }
-          : {}),
+        : {}),
     },
     queryType: "sql",
     queries: [
@@ -168,29 +179,14 @@ export function buildLLMPanelSchema(opts: {
         fields: {
           stream,
           stream_type: streamType,
-          // Grouped bars get a non-empty x-axis name so the dashboard grid
-          // reserves room below the plot for the bottom legend (the grid's
-          // `bottom` keys off `fields.x[0].label` via `hasXAxisName`). Without
-          // it, a grouped bar's legend overlaps the value-axis ticks — exactly
-          // the difference vs. the dashboards page, which always has a name.
           x: xFieldName
-            ? [
-                axisField(
-                  xFieldName,
-                  isHBar
-                    ? panel.series?.length
-                      ? xFieldName
-                      : ""
-                    : t("traces.lLMInsightsDashboard.timeAxis"),
-                ),
-              ]
+            ? [axisField(xFieldName, isHBar ? "" : t("traces.lLMInsightsDashboard.timeAxis"))]
             : [],
-          // Grouped-bar panels declare multiple value series (p50/p90/p95/p99)
-          // → one Y field each. Otherwise a single Y field; with no breakdown
-          // its label becomes the legend/series name, so honour the panel's
-          // translated seriesLabelKey (e.g. "errors") when set.
-          y: panel.series?.length
-            ? panel.series.map((s) => axisField(s.field, s.label))
+          // One Y field; with no breakdown its label becomes the legend/series
+          // name, so honour the panel's translated seriesLabelKey (e.g.
+          // "errors") when set.
+          y: measures?.length
+            ? measures.map((m) => axisField(m.field, t(m.labelKey)))
             : valueField
               ? [axisField(valueField, seriesLabel ?? valueField)]
               : [],

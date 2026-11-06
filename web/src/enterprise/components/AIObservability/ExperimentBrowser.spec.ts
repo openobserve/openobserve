@@ -45,6 +45,16 @@ vi.mock("@/services/llm-experiments.service", () => ({
   },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
+// No disclosure is the healthy answer, so a rising "% true" is a regression.
+vi.mock("@/services/online-evals.service", () => ({
+  default: {
+    scoreConfigs: {
+      list: async () => [
+        { entityId: "cfg-leak", dataType: "boolean", healthyThreshold: { healthy_value: false } },
+      ],
+    },
+  },
+}));
 
 vi.mock("vue-i18n", () => ({
   // Params are echoed, not dropped: a label is only correct if the right
@@ -117,6 +127,10 @@ const stubs = {
       "isRowSelectable",
       "showHeader",
       "loading",
+      "tree",
+      "getChildren",
+      "rowSection",
+      "sectionOrder",
     ],
     emits: ["update:selectedIds", "row-click"],
     methods: {
@@ -128,6 +142,9 @@ const stubs = {
       },
     },
     template: `<table :data-loading="String(loading ?? false)"><tbody>
+      <template v-if="rowSection">
+        <tr v-for="key in sectionOrder" :key="key"><td><slot name="group-header" :section-key="key" /></td></tr>
+      </template>
       <template v-for="row in data" :key="row.id">
         <tr @click="$emit('row-click', row, $event)">
           <td v-if="selection === 'multiple'">
@@ -354,8 +371,15 @@ describe("ExperimentBrowser", () => {
   });
 
   it("calls clearBaseline when the pin is clicked on the current baseline", async () => {
-    const cleared = makeExperiment({ id: "old", isBaseline: false });
-    clearBaseline.mockResolvedValue(cleared);
+    // The write's response carries no summary; the emitted row must keep the
+    // listed one's scores, or the row blanks until a refresh.
+    clearBaseline.mockResolvedValue(makeExperiment({ id: "old", isBaseline: false }));
+    const scoreSummaries = [
+      makeScoreSummary({
+        name: "approved",
+        value: { kind: "boolean", trueCount: 1, falseCount: 0 },
+      }),
+    ];
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -367,6 +391,7 @@ describe("ExperimentBrowser", () => {
             datasetId: "dataset-a",
             createdAt: 1,
             isBaseline: true,
+            scoreSummaries,
           }),
         ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
@@ -379,7 +404,10 @@ describe("ExperimentBrowser", () => {
 
     expect(clearBaseline).toHaveBeenCalledWith("acme", "old");
     expect(setBaseline).not.toHaveBeenCalled();
-    expect(wrapper.emitted("baseline-changed")?.[0]).toEqual([cleared, null]);
+    expect(wrapper.emitted("baseline-changed")?.[0]).toEqual([
+      expect.objectContaining({ id: "old", name: "old", isBaseline: false, scoreSummaries }),
+      null,
+    ]);
   });
 
   it("calls setBaseline when the pin is clicked on a non-baseline row", async () => {
@@ -673,5 +701,134 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.findAll('[data-test$="-actions-menu-draft-dot"]')).toHaveLength(1);
     const plain = menus.find((m) => m !== drafted[0]);
     expect(plain?.attributes("aria-label")).toBe("common.moreActions");
+  });
+
+  // The mode alone read "none × 39" and hid the 17 full leaks beside it.
+  it("shows every category of a categorical score with its count", () => {
+    const row = experiment("scored", "dataset-a", 1);
+    row.scoreSummaries = [
+      makeScoreSummary({
+        name: "severity",
+        value: { kind: "categorical", counts: { full: 17, none: 39 } },
+      }),
+    ];
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [row], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.get('[data-test="cell-score:severity-scored"]').text()).toBe(
+      "none × 39 · full × 17",
+    );
+  });
+
+  const leak = (trueCount: number) => [
+    makeScoreSummary({
+      name: "leak",
+      scoreConfigId: "cfg-leak",
+      sampleCount: 56,
+      value: { kind: "boolean", trueCount, falseCount: 56 - trueCount },
+    }),
+  ];
+
+  it("judges each run against the baseline on its scores, with the delta in each cell", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({ id: "pr", name: "pr", createdAt: 2, scoreSummaries: leak(23) });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-pr"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("leak −10.7");
+    expect(wrapper.get('[data-test="ai-experiment-delta-pr-leak"]').text()).toContain("−10.7");
+    expect(wrapper.find('[data-test="ai-experiment-outcome-base"]').exists()).toBe(false);
+    // The trend plots both runs and counts the one outside the band.
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 1",
+    );
+  });
+
+  it("still judges matching runs against a baseline the name search hides", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({ id: "pr", name: "pr", createdAt: 2, scoreSummaries: leak(23) });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await wrapper.get('[data-test="ai-experiment-name-search"]').setValue("pr");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiment-row-base"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="ai-experiment-outcome-pr"]').text()).toContain(
+      "experimentsAtScale.outcome.regressed",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-trend-regressed"]').exists()).toBe(true);
+  });
+
+  it("folds re-runs of one name on one commit into the latest, with their spread", () => {
+    const rerun = (id: string, createdAt: number, trueCount: number) =>
+      makeExperiment({
+        id,
+        name: "gh-pr172-303cfc8",
+        createdAt,
+        metadata: { "git.commit": "303cfc8", "git.pr": 172 },
+        scoreSummaries: leak(trueCount),
+      });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [rerun("r2", 2, 18), rerun("r1", 1, 15)],
+        datasets: [] as any,
+      },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.find('[data-test="ai-experiment-row-r1"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="ai-experiment-fold-r2"]').text()).toContain(
+      "experimentsAtScale.foldCount 2",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-spread-r2-leak"]').text()).toContain("27–32%");
+  });
+
+  it("groups by pull request from the URL and writes the sort back to it", async () => {
+    route.query = { group: "pr" };
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          makeExperiment({ id: "pr", name: "pr", metadata: { "git.pr": "181" } }),
+          makeExperiment({ id: "hand", name: "hand", createdAt: 2 }),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-pr:181"]').text()).toContain(
+      "experimentsAtScale.prGroup 181",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-none"]').text()).toContain(
+      "experimentsAtScale.noGroup.pr",
+    );
+
+    await wrapper.get('[data-test="ai-experiment-sort"]').setValue("regressions");
+    await flushPromises();
+    expect(replace).toHaveBeenLastCalledWith({ query: { group: "pr", sort: "regressions" } });
   });
 });

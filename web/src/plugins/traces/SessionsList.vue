@@ -36,6 +36,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `sessions-*` for the count/badges — so those two are passed explicitly to
          stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
          in solid text (Sessions never dimmed it). -->
+    <!-- List search, above the scope bar as on Insights and Quality — one
+         box, matched against the user id OR the conversation text server-side
+         (whichever the stream has). Live, debounced (300ms — same as the
+         Streams list's search), same pattern as LogStream.vue: no Enter /
+         run-query affordance, a settled value just re-fetches. The applied
+         term lives in useSessions' singleton next to the page/size so
+         back-navigation restores the filtered page. -->
+    <div
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      class="px-page-edge shrink-0 pt-2"
+    >
+      <label :for="SEARCH_INPUT_ID" class="sr-only">
+        {{ t("traces.sessionsList.search.placeholder") }}
+      </label>
+      <OSearchInput
+        :id="SEARCH_INPUT_ID"
+        v-model="searchKeyword"
+        :placeholder="t('traces.sessionsList.search.placeholder')"
+        :title="t('traces.sessionsList.search.title')"
+        clearable
+        :debounce="300"
+        class="w-full"
+        data-test="sessions-list-search"
+      />
+      <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
+      <OTag
+        v-if="searchUser"
+        variant="primary-soft"
+        :label="t('traces.sessionsList.search.user', { user: searchUser })"
+        removable
+        :remove-label="t('traces.sessionsList.search.clearUser')"
+        class="mt-2"
+        data-test="sessions-list-user-filter"
+        @remove="clearUserFilter"
+      />
+    </div>
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       :filter-mode="filterMode"
@@ -68,31 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
-      <!-- List search — one box, matched against the user id OR the
-           conversation text server-side (whichever the stream has). Live,
-           debounced (300ms — same as the Streams list's search), same
-           pattern as LogStream.vue: no Enter/run-query affordance, a settled
-           value just re-fetches. The applied term lives in useSessions'
-           singleton next to the page/size so back-navigation restores the
-           filtered page. -->
-      <template #trailing>
-        <div class="flex min-w-0 flex-1 items-center gap-2">
-          <label :for="SEARCH_INPUT_ID" class="sr-only">
-            {{ t("traces.sessionsList.search.placeholder") }}
-          </label>
-          <OSearchInput
-            :id="SEARCH_INPUT_ID"
-            v-model="searchKeyword"
-            :placeholder="t('traces.sessionsList.search.placeholder')"
-            :title="t('traces.sessionsList.search.title')"
-            size="sm"
-            clearable
-            :debounce="300"
-            class="w-full"
-            data-test="sessions-list-search"
-          />
-        </div>
-      </template>
     </AiScopeBar>
 
     <!-- Stream mode because these LLM spans carry no agent identity. -->
@@ -208,7 +219,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
         </span>
+        <!-- A message that was only harness text says so and names the tag (AIO-22). -->
+        <span v-else-if="row.harnessOnly" class="text-text-muted text-xs">
+          {{ t("readableSessions.onlyHarness", { tag: `<${row.harnessOnly}>` }) }}
+        </span>
         <span v-else class="text-text-muted text-xs">—</span>
+        <span
+          v-if="row.harnessHidden && row.firstUserMessage"
+          class="text-2xs text-text-muted block"
+          :data-test="`sessions-list-harness-hidden-${row.sessionId}`"
+        >
+          {{ t("readableSessions.hidden", { n: row.harnessHidden }, row.harnessHidden) }}
+        </span>
+      </template>
+
+      <template #cell-title="{ row }">
+        <span class="text-text-body text-xs font-medium">{{ row.title }}</span>
       </template>
 
       <!-- Turns -->
@@ -268,6 +294,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`sessions-list-status-${row.sessionId}`"
         />
       </template>
+
+      <!-- Feedback (AIO-40): a complaint outranks praise, with its comment. -->
+      <template #cell-feedback="{ row }">
+        <span
+          v-if="sessionFeedback[row.sessionId]?.notHelpful"
+          class="text-status-error-text inline-flex min-w-0 items-center gap-1 text-xs"
+          :data-test="`sessions-list-feedback-${row.sessionId}`"
+        >
+          <OIcon name="thumb-down-off-alt" size="xs" />
+          {{ t("endUserFeedback.notHelpful") }}
+          <span
+            v-if="sessionFeedback[row.sessionId].notHelpful > 1"
+            class="text-2xs tabular-nums"
+            >{{ sessionFeedback[row.sessionId].notHelpful }}</span
+          >
+          <span
+            v-if="sessionFeedback[row.sessionId].comment"
+            class="text-text-secondary truncate"
+            :title="sessionFeedback[row.sessionId].comment ?? undefined"
+            >{{
+              t("endUserFeedback.quoted", { comment: sessionFeedback[row.sessionId].comment ?? "" })
+            }}</span
+          >
+        </span>
+        <span
+          v-else-if="sessionFeedback[row.sessionId]?.helpful"
+          class="text-status-success-text inline-flex items-center gap-1 text-xs"
+          :data-test="`sessions-list-feedback-${row.sessionId}`"
+        >
+          <OIcon name="thumb-up-off-alt" size="xs" />
+          {{ t("endUserFeedback.helpfulVote") }}
+        </span>
+        <span v-else class="text-text-muted text-xs">{{ t("endUserFeedback.noVote") }}</span>
+      </template>
     </OTable>
   </div>
 </template>
@@ -293,6 +353,7 @@ import {
   agentIdentityKey,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import {
@@ -311,6 +372,8 @@ import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import LLMCostCell from "./LLMCostCell.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useSessionFeedback } from "./sessionFeedback";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
@@ -343,9 +406,11 @@ const {
   hasLoadedOnce,
   lastRunAt,
   loadedOrg,
+  loadedStream,
   currentPage,
   rowsPerPage,
   searchKeyword,
+  searchUser,
   sortBy,
   sortOrder,
   agents,
@@ -355,6 +420,12 @@ const {
   fetchPage,
   cancelAll,
 } = useSessions();
+// End-user votes for this page's sessions (AIO-40), one `_llm_scores` query per page.
+const sessionFeedback = useSessionFeedback(
+  sessions,
+  () => loadedStream.value,
+  () => props.startTime,
+);
 
 const urlScope = readUrlScope(route.query);
 // Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
@@ -375,14 +446,25 @@ const SEARCH_INPUT_ID = "sessions-list-search";
 // must reproduce its filtered view. When it differs from what the cached rows
 // were fetched with, the cache guard in `loadSessions` is bypassed once so the
 // mount fetch runs with the URL's term instead of restoring the stale page.
+// A link followed with the same term may name another stream, so only Back
+// (the entry has a `forward`) restores the cached rows.
 let searchChangedByUrl = false;
-if (urlKeyword && urlKeyword !== searchKeyword.value) {
+if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
   searchKeyword.value = urlKeyword;
+  searchChangedByUrl = true;
+}
+// `?user=<id>` keeps one user's sessions (exact match). The URL alone owns it:
+// a link without it shows every user.
+const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
+if (urlUser !== searchUser.value) {
+  searchUser.value = urlUser;
   searchChangedByUrl = true;
 }
 const searchActive = computed(() => searchKeyword.value.length > 0);
 const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchActive.value ? { keyword: searchKeyword.value || undefined } : undefined,
+  searchActive.value || searchUser.value
+    ? { keyword: searchKeyword.value || undefined, user: searchUser.value || undefined }
+    : undefined,
 );
 
 const activeStream = ref<string>(
@@ -583,6 +665,20 @@ const tableColumns = computed(() =>
       hideable: true,
       meta: { align: "left" },
     },
+    // A Title column when the agent mapping turns session titles on (AIO-22).
+    ...(sessions.value.some((s) => s.title)
+      ? [
+          {
+            id: "title",
+            header: t("readableSessions.title"),
+            accessorKey: "title",
+            size: COL.name,
+            sortable: false,
+            hideable: true,
+            meta: { align: "left" as const },
+          },
+        ]
+      : []),
     {
       id: "firstUserMessage",
       header: t("traces.sessionsList.columns.firstMessage"),
@@ -644,6 +740,19 @@ const tableColumns = computed(() =>
       hideable: true,
       meta: { align: "left", disableCellAction: true },
     },
+    // A Feedback column once any session on the page has an end-user vote (AIO-40).
+    ...(Object.keys(sessionFeedback.value).length
+      ? [
+          {
+            id: "feedback",
+            header: t("endUserFeedback.column"),
+            size: 200,
+            sortable: false,
+            hideable: true,
+            meta: { align: "left" as const, disableCellAction: true },
+          },
+        ]
+      : []),
     {
       id: "lastSeenNanos",
       header: t("traces.sessionsList.columns.lastActivity"),
@@ -689,19 +798,23 @@ function formatTokens(n: number): string {
 }
 
 function syncFilterUrl() {
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent: selectedAgent.value
-      ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
-      : null,
+  void replaceRouteQuery(router, route, (current) => {
+    const query = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent: selectedAgent.value
+        ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+        : null,
+    });
+    // Only the applied term — so the filtered view has a link and survives a
+    // reload, and a cleared box leaves no stale param behind.
+    if (searchKeyword.value) query.keyword = searchKeyword.value;
+    else delete query.keyword;
+    if (searchUser.value) query.user = searchUser.value;
+    else delete query.user;
+    return query;
   });
-  // Only the applied term — so the filtered view has a link and survives a
-  // reload, and a cleared box leaves no stale param behind.
-  if (searchKeyword.value) query.keyword = searchKeyword.value;
-  else delete query.keyword;
-  router.replace({ query }).catch(() => {});
 }
 
 function clearSessionRows() {
@@ -740,8 +853,9 @@ async function loadSessions(
   searchChangedByUrl = false;
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
-  if (loadedOrg.value && loadedOrg.value !== orgId && searchActive.value) {
-    searchKeyword.value = "";
+  if (loadedOrg.value && loadedOrg.value !== orgId) {
+    if (searchActive.value) searchKeyword.value = "";
+    searchUser.value = "";
   }
 
   // Hold the table skeleton across the whole load. We await the stream list and
@@ -804,6 +918,10 @@ async function loadSessions(
   const stream = effectiveStream.value;
   if (!stream) {
     clearSessionRows();
+    // The empty list is now this org's: without the stamp, the cache guard
+    // would serve it to the previous org on the way back (G2-12).
+    loadedOrg.value = orgId;
+    loadedStream.value = "";
     loading.value = false; // nothing to fetch — release the held skeleton
     return;
   }
@@ -832,6 +950,12 @@ watch(searchKeyword, () => {
 
 function clearSearch() {
   searchKeyword.value = "";
+}
+
+function clearUserFilter() {
+  searchUser.value = "";
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
 }
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch

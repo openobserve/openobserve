@@ -17,10 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-page">
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
+    <!-- The config list carries its rail item's header (Evaluations), the same on
+         each of its tabs; a config's detail has its own. -->
     <OPageHeader
-      :title="header.title"
-      :subtitle="header.subtitle"
-      :icon="configId ? undefined : 'star-rate'"
+      :title="!configId && sectionHeader ? sectionHeader.title : header.title"
+      :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
+      :icon="configId ? undefined : (sectionHeader?.icon ?? 'star-rate')"
       :back="
         configId
           ? {
@@ -31,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : undefined
       "
       title-data-test="quality-page-title"
+      :tabs-below="hasTabs && !configId"
     >
+      <!-- The config list's peer tabs; a config's detail has its back button instead. -->
+      <template v-if="hasTabs && !configId" #tabs><AiSectionTabs /></template>
       <template v-if="configId" #title-trail>
         <div class="flex shrink-0 items-center gap-1.5" data-test="quality-detail-tags">
           <OTag v-if="header.dataType" type="evalDataType" :value="header.dataType" />
@@ -62,6 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
         data-test="quality-body"
       >
+        <!-- The list's search sits above the scope bar, as on Insights. -->
+        <div v-if="!configId" class="px-page-edge shrink-0 pt-2">
+          <OSearchInput
+            v-model="search"
+            class="w-full"
+            :placeholder="t('onlineEvals.quality.table.searchPlaceholder')"
+            data-test="quality-configs-search"
+          />
+        </div>
         <!-- Env, Agent and Version scope the list and the detail alike; the detail adds its scope toggle. -->
         <div
           class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2"
@@ -132,10 +146,13 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
+import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type {
   EvalTargetScope,
   QualityAgentParams,
@@ -174,6 +191,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { hasTabs, header: sectionHeader } = useAiSectionTabs();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();

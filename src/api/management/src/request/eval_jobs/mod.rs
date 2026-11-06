@@ -644,6 +644,7 @@ mod tests {
             span_selector_bindings: None,
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: "all".to_string(),
             sampling_value: serde_json::json!(1),
             status: "archived".to_string(),

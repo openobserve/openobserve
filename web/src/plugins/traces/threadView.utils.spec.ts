@@ -28,6 +28,7 @@ import {
   buildTurnDetail,
   spanTimeBounds,
   maxOf,
+  toolCallParts,
 } from "./threadView.utils";
 
 // ===========================================================================
@@ -372,13 +373,14 @@ describe("extractContent", () => {
     expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe("let me check");
   });
 
-  it("renders a tool_call part instead of dropping the turn", () => {
+  // AIO-21: the Thread view draws tool calls as cards (toolCallParts), so the
+  // bubble keeps only the text around them.
+  it("leaves tool_call parts out of the text, for the tool cards", () => {
     const result = extractContent([
       { type: "reasoning", content: "checking the weather" },
       { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
     ]);
-    expect(result).toContain("checking the weather");
-    expect(result).toContain("get_weather");
+    expect(result).toBe("checking the weather");
   });
 
   it("renders a tool_call_response part", () => {
@@ -420,14 +422,31 @@ describe("extractContent", () => {
 
   // The exact shape ingested by repro_14127.py's turn 3 (issue-14127-repro/):
   // a real tool-calling turn, end to end through extractContent.
-  it("renders a full tool-calling turn (thinking + tool_call)", () => {
+  it("keeps the thinking of a tool-calling turn and drops the call text", () => {
     const result = extractContent([
       { type: "thinking", content: "I should call get_weather for Boston." },
       { type: "tool_call", id: "call_1", name: "get_weather", arguments: { city: "Boston" } },
     ]);
-    expect(result).toContain("I should call get_weather for Boston.");
-    expect(result).toContain("Called get_weather");
-    expect(result).toContain("Boston");
+    expect(result).toBe("I should call get_weather for Boston.");
+    expect(result).not.toContain("Called get_weather");
+  });
+
+  it("lists a turn's tool calls from semconv parts and OpenAI tool_calls", () => {
+    expect(
+      toolCallParts(
+        JSON.stringify([
+          {
+            role: "assistant",
+            parts: [{ type: "tool_call", id: "c1", name: "grep", arguments: { q: "x" } }],
+            tool_calls: [{ id: "c2", function: { name: "read", arguments: "{}" } }],
+          },
+        ]),
+      ),
+    ).toEqual([
+      { id: "c1", name: "grep", arguments: { q: "x" } },
+      { id: "c2", name: "read", arguments: "{}" },
+    ]);
+    expect(toolCallParts(null)).toEqual([]);
   });
 
   it("renders the tool response side of that turn (tool_call_response with `result`)", () => {
@@ -486,6 +505,36 @@ describe("messagesFromInput", () => {
     expect(msgs[1]).toMatchObject({ role: "assistant", content: "hi" });
     // sig used for cross-turn dedup.
     expect(msgs[0].sig).toBe("user::hello");
+  });
+
+  it("reads OpenInference message.contents[].message_content (input and output)", () => {
+    const input = JSON.stringify([
+      {
+        message: {
+          contents: [
+            { message_content: { type: "text", text: "What is in this image?" } },
+            { message_content: { type: "image", image: { image: { url: "https://x/a.png" } } } },
+          ],
+          role: "user",
+        },
+      },
+    ]);
+    const [msg] = messagesFromInput(input);
+    expect(msg.role).toBe("user");
+    expect(msg.content).toContain("What is in this image?");
+    expect(msg.content).not.toContain("message_content");
+    const output = JSON.stringify([
+      {
+        message: {
+          role: "assistant",
+          contents: [{ message_content: { type: "text", text: "A red square." } }],
+        },
+      },
+    ]);
+    expect(messagesFromOutput(output)[0]).toMatchObject({
+      role: "assistant",
+      content: "A red square.",
+    });
   });
 
   // OpenAI-style { messages: [...] }
@@ -1058,6 +1107,179 @@ describe("buildTraceGroup", () => {
     ];
     const g = buildTraceGroup(spans)!;
     expect(g.userQuery).toBe("EXPLICIT QUESTION");
+  });
+});
+
+// ===========================================================================
+// SDK tool-call and message shapes (QA C2-01 / C2-02)
+// ===========================================================================
+
+describe("SDK tool-call payload shapes", () => {
+  // Traceloop/OpenLLMetry, as the pipeline stores gen_ai.completion.0.tool_calls.*.
+  const traceloop = JSON.stringify([
+    {
+      finish_reason: "tool_calls",
+      tool_calls: [{ arguments: '{"city": "Bern"}', name: "get_weather", id: "call_t1" }],
+      role: "assistant",
+    },
+  ]);
+  // Vercel AI SDK with ai.response.text="" (pipeline wraps the calls in a message).
+  const vercelWrapped = JSON.stringify({
+    role: "assistant",
+    content: "",
+    tool_calls: [
+      { toolCallType: "function", toolCallId: "call_v9", toolName: "weather", args: '{"q":1}' },
+    ],
+  });
+  // Vercel AI SDK with no ai.response.text: the output is ai.response.toolCalls itself.
+  const vercelBare = JSON.stringify([
+    {
+      toolCallType: "function",
+      toolCallId: "call_v1",
+      toolName: "weather",
+      args: '{"city": "Rome"}',
+    },
+    { toolCallId: "call_v2", toolName: "time", input: { tz: "CET" } },
+  ]);
+  const anthropic = JSON.stringify([
+    {
+      role: "assistant",
+      content: [
+        { type: "text", text: "Let me check." },
+        { type: "tool_use", id: "toolu_1", name: "get_weather", input: { city: "Paris" } },
+      ],
+    },
+  ]);
+  const openInference = JSON.stringify([
+    {
+      message: {
+        role: "assistant",
+        tool_calls: [
+          {
+            tool_call: {
+              id: "call_o1",
+              function: { name: "get_weather", arguments: '{"city": "Oslo"}' },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  it.each([
+    [
+      "Traceloop",
+      traceloop,
+      [{ id: "call_t1", name: "get_weather", arguments: '{"city": "Bern"}' }],
+    ],
+    ["Vercel wrapped", vercelWrapped, [{ id: "call_v9", name: "weather", arguments: '{"q":1}' }]],
+    [
+      "Vercel bare",
+      vercelBare,
+      [
+        { id: "call_v1", name: "weather", arguments: '{"city": "Rome"}' },
+        { id: "call_v2", name: "time", arguments: { tz: "CET" } },
+      ],
+    ],
+    [
+      "Anthropic",
+      anthropic,
+      [{ id: "toolu_1", name: "get_weather", arguments: { city: "Paris" } }],
+    ],
+    [
+      "OpenInference",
+      openInference,
+      [{ id: "call_o1", name: "get_weather", arguments: '{"city": "Oslo"}' }],
+    ],
+  ])("reads %s tool calls with their names and arguments", (_sdk, output, expected) => {
+    expect(toolCallParts(output)).toEqual(expected);
+  });
+
+  it.each([
+    ["Traceloop", traceloop, []],
+    ["Vercel wrapped", vercelWrapped, []],
+    ["Vercel bare", vercelBare, []],
+    ["OpenInference", openInference, []],
+    ["Anthropic", anthropic, ["Let me check."]],
+  ])("leaves %s tool calls out of the assistant bubbles", (_sdk, output, expected) => {
+    expect(messagesFromOutput(output).map((m) => m.content)).toEqual(expected);
+  });
+
+  it("draws a named card for a tool call with no tool span, and skips a nameless one", () => {
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "Weather in Bern?" }]),
+        gen_ai_output_messages: JSON.stringify([
+          ...JSON.parse(traceloop),
+          { role: "assistant", tool_calls: [{ id: "call_x" }] },
+        ]),
+        start_time: 100,
+        end_time: 200,
+      }),
+    ])!;
+    expect(g.turns[0].assistant).toEqual([]);
+    expect(g.turns[0].toolCalls).toMatchObject([
+      {
+        gen_ai_tool_name: "get_weather",
+        gen_ai_tool_call_id: "call_t1",
+        gen_ai_tool_call_arguments: '{"city": "Bern"}',
+        synthetic: true,
+      },
+    ]);
+  });
+
+  // OpenInference wraps every message as {message: {...}}: the wrapped system
+  // message must not read as an earlier user message, nor the user turn repeat.
+  it("reads an OpenInference trace as a normal conversation", () => {
+    const wrap = (message: Record<string, unknown>) => ({ message });
+    const system = wrap({ role: "system", content: "You are a weather bot." });
+    const user = wrap({ role: "user", content: "Weather in Oslo?" });
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm-1",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([system, user]),
+        gen_ai_output_messages: openInference,
+        start_time: 100,
+        end_time: 200,
+      }),
+      makeSpan({
+        span_id: "tool",
+        gen_ai_operation_name: "execute_tool",
+        gen_ai_tool_name: "get_weather",
+        gen_ai_tool_call_id: "call_o1",
+        start_time: 210,
+        end_time: 260,
+      }),
+      makeSpan({
+        span_id: "llm-2",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([
+          system,
+          user,
+          JSON.parse(openInference)[0],
+          wrap({ role: "tool", content: '{"temp_c": -3}' }),
+        ]),
+        gen_ai_output_messages: JSON.stringify([
+          wrap({ role: "assistant", content: "Cold, -3°C in Oslo." }),
+        ]),
+        start_time: 300,
+        end_time: 400,
+      }),
+    ])!;
+    expect(g).toMatchObject({
+      systemPrompt: "You are a weather bot.",
+      userQuery: "Weather in Oslo?",
+      historicalUserCount: 0,
+    });
+    expect(g.turns.map((t) => t.toolCalls.map((c) => c.span_id))).toEqual([["tool"], []]);
+    expect(g.turns.map((t) => t.followupUsers)).toEqual([[], []]);
+    expect(g.turns.map((t) => t.assistant.map((m) => m.content))).toEqual([
+      [],
+      ["Cold, -3°C in Oslo."],
+    ]);
   });
 });
 

@@ -268,6 +268,11 @@ pub async fn prepare_job_update(
         .ok_or(EvalJobError::NotFound)?;
 
     job.input_mapping = merge_input_mapping(existing.input_mapping.clone(), job.input_mapping);
+    // A client that predates budgets sends none; the stored one keeps applying.
+    job.budget = match job.budget.take() {
+        Some(budget) => Some(budget.with_server_state_of(existing.budget.as_ref())),
+        None => existing.budget.clone(),
+    };
 
     job.apply_target_scope_defaults();
     job.normalize_sampling()
@@ -373,20 +378,57 @@ pub async fn transition_status(
     job_id: &str,
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    transition(org_id, job_id, new_status, false).await
+}
+
+/// The health pass's budget enforcement (AIO-24): pause a job whose spend reached its budget,
+/// or resume it once a new UTC day starts.
+#[tracing::instrument()]
+pub async fn transition_for_budget(
+    org_id: &str,
+    job_id: &str,
+    pause: bool,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    transition(
+        org_id,
+        job_id,
+        if pause { "paused" } else { "active" },
+        pause,
+    )
+    .await
+}
+
+async fn transition(
+    org_id: &str,
+    job_id: &str,
+    new_status: &str,
+    for_budget: bool,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
     let target = check_transition(org_id, &job, new_status).await?;
     let pipeline_id = reconciler::reconcile(&target)
         .await
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
+    let budget = job.budget.clone().map(|budget| {
+        budget.after_transition(new_status, for_budget, config::utils::time::now_micros())
+    });
 
     // Persist the new status (and any pipeline_id allocated by reconcile).
     let now = Utc::now().timestamp_millis();
-    table::online_eval_jobs::update_status(job_id, new_status, pipeline_id.as_deref(), now).await?;
+    table::online_eval_jobs::update_status(
+        job_id,
+        new_status,
+        pipeline_id.as_deref(),
+        budget.as_ref(),
+        now,
+    )
+    .await?;
 
     let mut updated = job;
     updated.status = new_status.to_string();
     updated.updated_at = now;
     updated.pipeline_id = pipeline_id;
+    updated.budget = budget;
     publish_eval_job_put(&updated).await;
     Ok(updated)
 }

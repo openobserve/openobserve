@@ -132,9 +132,17 @@ describe("experiment discovery", () => {
       cost: null,
       costIncomplete: false,
       scores: [
-        { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
-        { name: "approved", kind: "boolean", trueCount: 1, falseCount: 1, sampleCount: 2 },
+        { scoreConfigId: null, name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
         {
+          scoreConfigId: null,
+          name: "approved",
+          kind: "boolean",
+          trueCount: 1,
+          falseCount: 1,
+          sampleCount: 2,
+        },
+        {
+          scoreConfigId: null,
           name: "label",
           kind: "categorical",
           values: [

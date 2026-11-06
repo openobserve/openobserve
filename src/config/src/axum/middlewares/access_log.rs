@@ -307,9 +307,9 @@ where
     }
 }
 
-/// `url` as the access log may write it: share tokens cut, Slack callback secrets dropped.
+/// `url` as the access log may write it: share tokens cut, query-string secrets dropped.
 pub fn mask_log_url(url: &str) -> String {
-    mask_slack_callback_query(&mask_share_tokens(url))
+    mask_query_secrets(&mask_share_tokens(url))
 }
 
 /// `path` (or a URL) with every share token, dashboard slug or hook credential cut short.
@@ -397,15 +397,21 @@ fn hex_digit(byte: u8) -> Option<u8> {
         .and_then(|digit| u8::try_from(digit).ok())
 }
 
-/// A Slack callback's `code` and `state` are one-time OAuth secrets the SPA sends as Referer.
-fn mask_slack_callback_query(url: &str) -> String {
+/// Credentials that travel in a query string: a Slack callback's `code` and
+/// `state` (one-time OAuth secrets the SPA sends as Referer), and an end-user
+/// feedback vote's `token`.
+fn mask_query_secrets(url: &str) -> String {
     let Some((path, rest)) = url.split_once('?') else {
         return url.to_string();
     };
     let route = path.trim_end_matches('/');
-    if !(route.contains("/slack/") && route.ends_with("/callback")) {
+    let secrets: &[&str] = if route.contains("/slack/") && route.ends_with("/callback") {
+        &["code", "state"]
+    } else if route.ends_with("/annotations/public") {
+        &["token"]
+    } else {
         return url.to_string();
-    }
+    };
     let (query, fragment) = match rest.split_once('#') {
         Some((q, f)) => (q, Some(f)),
         None => (rest, None),
@@ -413,7 +419,7 @@ fn mask_slack_callback_query(url: &str) -> String {
     let pairs: Vec<String> = query
         .split('&')
         .map(|pair| match pair.split_once('=') {
-            Some((key, _)) if matches!(key, "code" | "state") => format!("{key}=…"),
+            Some((key, _)) if secrets.contains(&key) => format!("{key}=…"),
             _ => pair.to_string(),
         })
         .collect();
@@ -600,6 +606,18 @@ mod tests {
         assert_eq!(
             mask_log_url("/api/default/ai/shared/AbCdEfGhIjKl"),
             "/api/default/ai/shared/AbCdEf…"
+        );
+    }
+
+    #[test]
+    fn feedback_vote_tokens_never_reach_the_access_log() {
+        assert_eq!(
+            mask_log_url("/api/v2/default/annotations/public?token=fbt_eyJvcmc.abc"),
+            "/api/v2/default/annotations/public?token=…"
+        );
+        assert_eq!(
+            mask_log_url("/api/default/annotations?token=x"),
+            "/api/default/annotations?token=x"
         );
     }
 

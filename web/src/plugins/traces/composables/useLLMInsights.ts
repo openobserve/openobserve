@@ -18,8 +18,11 @@ import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
-import { compactSql, llmCallUsageSum } from "../config/llmInsightsPanels";
+import { compactSql } from "../config/llmInsightsPanels";
+import { traceUsageSum } from "../llmAttribution";
+import { TRACE_ERRORED_SQL } from "../llmTraceOutcome";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { streamQueryError } from "./useLLMStreamQuery";
 import { useStore } from "vuex";
 
 export interface LLMKPI {
@@ -39,6 +42,18 @@ export interface LLMSparklineSeries {
   errorRate: number[];
 }
 
+/** `WHERE <agent> AND <page filters>`, or "" for the whole stream. */
+function scopeWhere(
+  agent: GenAiAgentListItem | null | undefined,
+  streamName: string,
+  extraFilter: string,
+): string {
+  const clause = [buildAgentTraceFilter(agent, streamName), extraFilter]
+    .filter(Boolean)
+    .join(" AND ");
+  return clause ? `WHERE ${clause}` : "";
+}
+
 const EMPTY_KPI: LLMKPI = {
   requestCount: 0,
   traceCount: 0,
@@ -52,8 +67,8 @@ const EMPTY_KPI: LLMKPI = {
  * Composable that owns the LLM Insights dashboard's state + fetch flow.
  *
  * Returns a bag of refs (whole-window KPI numbers, sparkline series,
- * loading/error flags, the discovered list of LLM streams) plus two
- * methods (`fetchAll`, `cancelAll`).
+ * loading/error flags, the discovered list of LLM streams) plus three
+ * methods (`fetchAll`, `restore`, `cancelAll`).
  *
  * State is per-mount: a fresh component instance gets a fresh set of
  * refs. The dashboard's `onMounted` is the single trigger for the
@@ -153,18 +168,9 @@ export function useLLMInsights() {
             const hits: any[] = response.content?.results?.hits || [];
             if (hits.length > 0) onData(hits);
           },
-          error: (response: any) => {
+          error: (_payload: any, response: any) => {
             activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
-            const message =
-              response?.message ||
-              response?.error ||
-              response?.error_detail ||
-              gt("traces.failedToFetchQueryData");
-            const err: any = new Error(message);
-            err.status = response?.status;
-            err.code = response?.code;
-            err.raw = response;
-            reject(err);
+            reject(streamQueryError(response));
           },
           complete: () => {
             activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
@@ -193,13 +199,13 @@ export function useLLMInsights() {
     startTime: number,
     endTime: number,
     agent?: GenAiAgentListItem | null,
+    extraFilter = "",
   ): Promise<number> {
-    const agentFilter = buildAgentTraceFilter(agent, streamName);
     const sql = compactSql(`
       SELECT
         COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
       FROM "${streamName}"
-      ${agentFilter ? `WHERE ${agentFilter}` : ""}
+      ${scopeWhere(agent, streamName, extraFilter)}
     `);
 
     let p95 = 0;
@@ -211,57 +217,67 @@ export function useLLMInsights() {
 
   /**
    * Internal — fetch the bucketed time-series powering the sparklines
-   * under each KPI card, and derive the additive KPI totals (cost,
-   * tokens, traces, errors, requests) by summing those same buckets.
-   * One SQL query serves both the strip and the sparklines, so we don't
-   * pay for a separate whole-window rollup.
+   * under each KPI card, plus the KPI totals. Two queries run in parallel:
+   *
+   *   - the histogram: sparkline series, and the request total summed over
+   *     its buckets;
+   *   - a whole-window per-trace query for the trace and error counts and
+   *     the token and cost totals, exact so they agree with the per-trace
+   *     panels. Distinct counts are not additive: a trace with spans in two
+   *     buckets would be counted in both.
    *
    * `histogram(_timestamp)` is intentionally called WITHOUT an explicit
    * interval — the backend picks an appropriate bucket width for the
    * query window. We consume the returned rows in `ORDER BY ts` order,
    * so the frontend never needs to know the interval.
    *
-   * Summing is exact for the additive aggregates (SUM(tokens), SUM(cost),
-   * COUNT(requests)). Tokens and cost sum over LLM-call spans only
-   * (`llmCallUsageSum`) so agent spans repeating their children's usage
-   * don't double-count. The agent filter matches spans, and many SDKs tag
-   * only the agent span with the agent's identity, so an agent-scoped bucket
-   * with no matching LLM-call usage falls back to summing the spans it did
-   * match. `trace_count` / `error_count` use `approx_distinct`,
-   * so a trace with spans in two buckets is counted in both — the sums
-   * can run slightly high, which is an accepted tradeoff for serving the
-   * whole strip from one query. The error-rate CARD divides the summed
-   * error count by the summed trace count; the per-bucket error-rate
-   * SERIES is computed the same way per bucket.
+   * Each trace's tokens and cost follow `traceUsageSum` (its LLM calls'
+   * usage, else its agent span's), the rule Cost by, Users and Sessions use.
+   * The sparklines apply it per bucket, so they only trace the shape. The
+   * per-bucket error-rate SERIES divides each bucket's error count by its
+   * trace count.
    */
   async function fetchSummary(
     streamName: string,
     startTime: number,
     endTime: number,
     agent?: GenAiAgentListItem | null,
-  ): Promise<Omit<LLMKPI, "p95DurationMicros">> {
+    extraFilter = "",
+  ): Promise<{ totals: Omit<LLMKPI, "p95DurationMicros">; series: LLMSparklineSeries }> {
     // One size must cover every bucket — there's no pagination here. 10_000
     // is a wide margin (even a 1-year window at a coarse interval stays under).
     const size = 10_000;
 
-    const agentFilter = buildAgentTraceFilter(agent, streamName);
-    const usageSum = (column: string) =>
-      agentFilter
-        ? `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), SUM(${column}), 0)`
-        : `COALESCE(${llmCallUsageSum(column)}, 0)`;
+    const where = scopeWhere(agent, streamName, extraFilter);
     const mainSql = compactSql(`
       SELECT
         histogram(_timestamp) as ts,
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
         approx_distinct(trace_id) as trace_count,
         approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
-        ${usageSum("gen_ai_usage_total_tokens")} as total_tokens,
-        ${usageSum("gen_ai_usage_cost")} as total_cost,
+        ${traceUsageSum("gen_ai_usage_total_tokens")} as total_tokens,
+        ${traceUsageSum("gen_ai_usage_cost")} as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
       FROM "${streamName}"
-      ${agentFilter ? `WHERE ${agentFilter}` : ""}
+      ${where}
       GROUP BY ts
       ORDER BY ts
+    `);
+    const totalsSql = compactSql(`
+      SELECT
+        COUNT(*) as trace_count,
+        SUM(errored) as error_count,
+        SUM(tokens) as total_tokens,
+        SUM(cost) as total_cost
+      FROM (
+        SELECT trace_id,
+          ${TRACE_ERRORED_SQL} as errored,
+          ${traceUsageSum("gen_ai_usage_total_tokens")} as tokens,
+          ${traceUsageSum("gen_ai_usage_cost")} as cost
+        FROM "${streamName}"
+        ${where}
+        GROUP BY trace_id
+      )
     `);
 
     const series: LLMSparklineSeries = {
@@ -279,7 +295,7 @@ export function useLLMInsights() {
       totalCost: 0,
     };
 
-    await executeQuery(
+    const histogram = executeQuery(
       mainSql,
       streamName,
       startTime,
@@ -288,7 +304,6 @@ export function useLLMInsights() {
         // Rows arrive in `ORDER BY ts` order (across streaming chunks too),
         // so appending preserves the time-series order for the sparkline.
         for (const row of hits) {
-          const requestCount = Number(row.request_count) || 0;
           const traceCount = Number(row.trace_count) || 0;
           const errorCount = Number(row.error_count) || 0;
           const tokens = Number(row.total_tokens) || 0;
@@ -300,33 +315,35 @@ export function useLLMInsights() {
           series.cost.push(cost);
           series.errorRate.push(traceCount > 0 ? (errorCount / traceCount) * 100 : 0);
 
-          totals.requestCount += requestCount;
-          totals.traceCount += traceCount;
-          totals.errorCount += errorCount;
-          totals.totalTokens += tokens;
-          totals.totalCost += cost;
+          totals.requestCount += Number(row.request_count) || 0;
         }
       },
       size,
     );
+    const counts = executeQuery(totalsSql, streamName, startTime, endTime, (hits) => {
+      totals.traceCount = Number(hits[0].trace_count) || 0;
+      totals.errorCount = Number(hits[0].error_count) || 0;
+      totals.totalTokens = Number(hits[0].total_tokens) || 0;
+      totals.totalCost = Number(hits[0].total_cost) || 0;
+    });
+    await Promise.all([histogram, counts]);
 
-    sparklines.value = series;
-    return totals;
+    return { totals, series };
   }
 
   /**
-   * The single public fetch entry point. Kicks off two INDEPENDENT queries:
-   *   - histogram summary → `sparklines` + the additive `kpi` totals
-   *       drives `loading` (the main KPI strip skeleton)
+   * The single public fetch entry point. Kicks off two INDEPENDENT parts:
+   *   - summary (histogram + whole-window trace/error counts) → `sparklines`
+   *       + every `kpi` total but P95; drives `loading` (the KPI strip skeleton)
    *   - whole-window P95  → `kpi.p95DurationMicros`
    *       drives `p95Loading` (just the P95 card's loader)
    *
-   * The two are decoupled ON PURPOSE: the histogram-backed cards render as
-   * soon as that query lands instead of waiting on the slower P95 query, so
+   * The two are decoupled ON PURPOSE: the summary cards render as soon as
+   * their queries land instead of waiting on the slower P95 query, so
    * only the P95 card shows a loader while it's still in flight. A P95
    * failure degrades that card to "0" rather than failing the whole strip.
    *
-   * `error` (cleared on entry, populated only on the histogram rejection)
+   * `error` (cleared on entry, populated only on a summary rejection)
    * is caught internally so callers don't wrap in try/catch — they read
    * `error.value` after `await fetchAll(...)` resolves.
    *
@@ -338,21 +355,39 @@ export function useLLMInsights() {
    *   if (error.value) console.error(error.value);
    *   else console.log(kpi.value.totalCost);
    */
+  // Bumped per fetchAll; a response only lands if its call is still the latest,
+  // so a slower earlier load can't overwrite the tiles of a newer selection.
+  let fetchSeq = 0;
+
   async function fetchAll(
     streamName: string,
     startTime: number,
     endTime: number,
     agent?: GenAiAgentListItem | null,
-  ): Promise<void> {
-    if (!streamName || !startTime || !endTime) return;
+    extraFilter = "",
+  ): Promise<{ kpi: LLMKPI; sparklines: LLMSparklineSeries } | null> {
+    if (!streamName || !startTime || !endTime) return null;
+    const seq = ++fetchSeq;
+    const isLatest = () => seq === fetchSeq;
     loading.value = true;
     p95Loading.value = true;
     error.value = null;
 
-    // Histogram: powers the sparklines AND the additive KPI totals. Drives
+    // This call's own results; the snapshot returned to the caller (KPI cache)
+    // is built from these, never from the shared refs.
+    const own: {
+      summary?: { totals: Omit<LLMKPI, "p95DurationMicros">; series: LLMSparklineSeries };
+      p95: number;
+    } = { p95: 0 };
+
+    // Summary: powers the sparklines and every KPI total but P95. Drives
     // the main strip skeleton via `loading` — resolves independently of P95.
-    const summaryPromise = fetchSummary(streamName, startTime, endTime, agent)
-      .then((totals) => {
+    const summaryPromise = fetchSummary(streamName, startTime, endTime, agent, extraFilter)
+      .then((summary) => {
+        own.summary = summary;
+        if (!isLatest()) return;
+        const { totals, series } = summary;
+        sparklines.value = series;
         // Preserve whatever the (independent) P95 query has set so far — it's
         // patched into `p95DurationMicros` separately when it resolves.
         kpi.value = {
@@ -363,29 +398,51 @@ export function useLLMInsights() {
         hasLoadedOnce.value = true;
       })
       .catch((e: any) => {
+        if (!isLatest()) return;
         error.value = e?.message || gt("traces.failedToFetchLlmInsights");
         console.error("LLM Insights summary fetch error:", e);
       })
       .finally(() => {
-        loading.value = false;
+        if (isLatest()) loading.value = false;
       });
 
     // Separate whole-window P95 with its own loader — never blocks the strip.
     // On failure the card degrades to "0" instead of failing the whole page.
-    const p95Promise = fetchLatency(streamName, startTime, endTime, agent)
+    const p95Promise = fetchLatency(streamName, startTime, endTime, agent, extraFilter)
       .then((p95DurationMicros) => {
-        kpi.value = { ...kpi.value, p95DurationMicros };
+        own.p95 = p95DurationMicros;
       })
       .catch((e: any) => {
         console.error("LLM Insights P95 fetch error:", e);
-        kpi.value = { ...kpi.value, p95DurationMicros: 0 };
+        own.p95 = 0;
       })
       .finally(() => {
+        if (!isLatest()) return;
+        kpi.value = { ...kpi.value, p95DurationMicros: own.p95 };
         p95Loading.value = false;
       });
 
-    // Await both so callers (e.g. the KPI cache) see a fully-populated `kpi`.
     await Promise.all([summaryPromise, p95Promise]);
+    // Superseded or failed: nothing for the caller to cache.
+    if (!isLatest() || !own.summary) return null;
+    return {
+      kpi: { ...EMPTY_KPI, ...own.summary.totals, p95DurationMicros: own.p95 },
+      sparklines: own.summary.series,
+    };
+  }
+
+  /**
+   * Shows a cached selection's numbers. Supersedes any in-flight `fetchAll`, so
+   * a slower load for the previous selection can't land on top of them.
+   */
+  function restore(snapshot: { kpi: LLMKPI; sparklines: LLMSparklineSeries }) {
+    fetchSeq++;
+    kpi.value = snapshot.kpi;
+    sparklines.value = snapshot.sparklines;
+    error.value = null;
+    loading.value = false;
+    p95Loading.value = false;
+    hasLoadedOnce.value = true;
   }
 
   return {
@@ -398,6 +455,7 @@ export function useLLMInsights() {
     availableStreams,
     streamsLoaded,
     fetchAll,
+    restore,
     cancelAll,
   };
 }

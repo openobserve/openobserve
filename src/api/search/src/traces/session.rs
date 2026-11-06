@@ -73,6 +73,7 @@ struct LatestSessionsResponse {
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("keyword" = Option<String>, Query, description = "Case-insensitive substring match on the session's user id or conversation text (the input or output messages of any span in the session). Literal text: no wildcards or operators. Trimmed and capped at 256 characters; combined with `filter` using AND."),
+        ("user_id" = Option<String>, Query, description = "Exact match on the session's user id: only sessions with a span whose user id equals this value. Trimmed and capped at 256 characters; combined with `filter` and `keyword` using AND."),
         ("from" = i64, Query, description = "from"),
         ("size" = i64, Query, description = "size"),
         ("start_time" = i64, Query, description = "start time"),
@@ -107,7 +108,7 @@ struct LatestSessionsResponse {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. An optional keyword narrows the list by matching either the user id or conversation text.", "category": "traces"})),
+        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. An optional keyword narrows the list by matching either the user id or conversation text; user_id keeps only one user's sessions.", "category": "traces"})),
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
@@ -204,10 +205,11 @@ pub async fn get_latest_sessions(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // Session list aggregation assumes the session id is present on every span.
-    // Page by session id first, then aggregate only those sessions. This avoids
-    // materializing every trace id while keeping expensive summary aggregation
-    // after pagination.
+    // A session is its traces: those with a span carrying the session id, read
+    // across all their spans, as Session Detail reads them. Page by session id
+    // first, then aggregate only those sessions. This avoids materializing
+    // every trace id while keeping expensive summary aggregation after
+    // pagination.
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -387,7 +389,8 @@ pub async fn get_latest_sessions(
             return map_error_to_http_response(&err, Some(trace_id));
         }
     };
-    let sessions_data = normalize_latest_session_hits(resp_summary.hits, &session_ids);
+    let read_rules = SessionReadRules::for_org(&org_id).await;
+    let sessions_data = normalize_latest_session_hits(resp_summary.hits, &session_ids, &read_rules);
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -423,12 +426,17 @@ pub async fn get_latest_sessions(
     })
 }
 
+/// Most trace ids the legacy source-stream scan of one session returns, the
+/// same bound the time index applies to its trace lists.
+const SESSION_TRACE_ID_LIMIT: i64 = 50_000;
+
 /// GetSessionDetails
 ///
 /// Returns per-trace turn summaries for one LLM session. Session membership is
 /// selected by the session id column, then each returned trace is aggregated by
 /// `trace_id` across all spans so child/tool error spans are reflected in the
-/// turn status even when they do not carry the session id attribute.
+/// turn status even when they do not carry the session id attribute. `total`
+/// is the session's turn count; `from`/`size` page the turns newest first.
 ///
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
@@ -644,9 +652,9 @@ pub async fn get_session_details(
         req.query.sql =
             traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
         req.query.from = 0;
-        // Enough rows to build the requested page after merging with the
-        // index-discovered traces.
-        req.query.size = from.saturating_add(size);
+        // Every id (an id-only GROUP BY trace_id) so `total` counts all turns
+        // after merging with the index-discovered traces.
+        req.query.size = SESSION_TRACE_ID_LIMIT;
         req.query.start_time = caller.start_time;
         req.query.end_time = caller.end_time;
 
@@ -704,18 +712,11 @@ pub async fn get_session_details(
         }
     }
 
-    let mut ordered: Vec<(String, i64)> = ordering.into_iter().collect();
-    ordered.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    let trace_ids: Vec<String> = ordered
-        .into_iter()
-        .skip(from as usize)
-        .take(size as usize)
-        .map(|(tid, _)| tid)
-        .collect();
+    let (total, trace_ids) = session_trace_page(ordering, from, size);
     if trace_ids.is_empty() {
         return MetaHttpResponse::json(PaginatedResponse {
             took: 0,
-            total: 0,
+            total,
             from,
             size,
             hits: vec![],
@@ -806,7 +807,7 @@ pub async fn get_session_details(
 
     MetaHttpResponse::json(PaginatedResponse {
         took: (time * 1000.0) as usize,
-        total: hits.len(),
+        total,
         from,
         size,
         hits: hits
@@ -816,6 +817,25 @@ pub async fn get_session_details(
         trace_id,
         function_error: String::new(),
     })
+}
+
+/// The session's turn count and the requested page of its trace ids, ordered
+/// like the legacy "ORDER BY zo_sql_timestamp DESC, trace_id ASC" (newest first).
+fn session_trace_page(
+    ordering: HashMap<String, i64>,
+    from: i64,
+    size: i64,
+) -> (usize, Vec<String>) {
+    let mut ordered: Vec<(String, i64)> = ordering.into_iter().collect();
+    ordered.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let total = ordered.len();
+    let page = ordered
+        .into_iter()
+        .skip(from as usize)
+        .take(size as usize)
+        .map(|(tid, _)| tid)
+        .collect();
+    (total, page)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -998,7 +1018,7 @@ fn build_session_trace_details_sql(
         } else {
             "''".to_string()
         };
-        let usage = |column: &str| validated.usage_sum(column);
+        let usage = |column: &str| usage_rule(column, validated.has_operation_name);
         let optional_usage =
             |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
         let input_tokens_expr = usage("gen_ai_usage_input_tokens");
@@ -1244,6 +1264,23 @@ fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     }
 }
 
+/// One trace's usage: its LLM-call spans' sum, else the largest `invoke_agent`
+/// span's usage when no LLM call carries any. SDKs that report usage only on
+/// the agent span still count, and an agent span repeating its children's
+/// usage (or an outer agent repeating an inner one) counts once. Only valid
+/// inside a `GROUP BY trace_id`: a session's usage is the sum of its traces'.
+/// Mirrors `traceUsageSum` in `web/src/plugins/traces/llmAttribution.ts`.
+pub(super) fn usage_rule(column: &str, has_operation_name: bool) -> String {
+    let llm_sum = super::schema_compat::usage_sum_expr(column, has_operation_name);
+    if !has_operation_name {
+        return llm_sum;
+    }
+    format!(
+        "COALESCE(NULLIF({llm_sum}, 0), max(CASE WHEN gen_ai_operation_name = 'invoke_agent' \
+         THEN {column} END), 0)"
+    )
+}
+
 /// Older clients wrapped the agent predicate in a same-stream session
 /// membership subquery. Inside the grouped page query that becomes an
 /// unsupported `InSubquery` expression, while its inner WHERE clause has the
@@ -1311,12 +1348,14 @@ fn session_search_predicate(column: &str, term: &str) -> String {
     )
 }
 
-/// The list search `keyword`, already normalised. It is ORed across the user
-/// id and available message columns, then ANDed with `filter` inside the
-/// phase-1 session membership `HAVING`.
+/// The list search: `keyword` is ORed across the user id and available
+/// message columns, `user_id` is an exact match on the user id. Both are
+/// normalised and, with `filter`, each is its own session-level condition in
+/// the phase-1 membership `HAVING`.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct LatestSessionSearch {
     pub(super) keyword: Option<String>,
+    pub(super) user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1408,20 +1447,26 @@ impl LatestSessionSearch {
     fn from_query(query: &HashMap<String, String>) -> Self {
         Self {
             keyword: normalize_session_search_term(query.get("keyword")),
+            user_id: normalize_session_search_term(query.get("user_id")),
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.keyword.is_none()
-    }
-
-    fn predicate(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Option<String> {
-        let keyword = self.keyword.as_deref()?;
-        let user = session_search_predicate(validated.columns.user_id, keyword);
-        Some(match message_search_predicate(validated, keyword) {
-            Some(messages) => format!("({user} OR {messages})"),
-            None => format!("({user})"),
-        })
+    /// Each search condition on its own: the session matches when every one
+    /// holds on some span, not necessarily the same span.
+    fn predicates(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Vec<String> {
+        let user_col = validated.columns.user_id;
+        let keyword = self.keyword.as_deref().map(|keyword| {
+            let user = session_search_predicate(user_col, keyword);
+            match message_search_predicate(validated, keyword) {
+                Some(messages) => format!("({user} OR {messages})"),
+                None => format!("({user})"),
+            }
+        });
+        let user = self
+            .user_id
+            .as_deref()
+            .map(|user| format!("{user_col} = '{}'", user.replace('\'', "''")));
+        keyword.into_iter().chain(user).collect()
     }
 }
 
@@ -1474,91 +1519,124 @@ fn build_latest_session_page_sql(
 ) -> String {
     let session_id_col = validated.columns.session_id;
     let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
-    // The agent-scope filter alone keeps its historical shape (the frontend
-    // relies on the exact SQL for nothing, but the query cache key does). A
-    // search ANDs onto it, so the caller's predicate is parenthesised in case
-    // it contains an OR.
-    let mut predicates = Vec::with_capacity(2);
-    if !filter.is_empty() {
-        if search.is_empty() {
-            predicates.push(filter);
-        } else {
-            predicates.push(format!("({filter})"));
-        }
-    }
-    if let Some(search) = search.predicate(validated) {
-        predicates.push(search);
-    }
-    let membership_filter = if predicates.is_empty() {
+    // Each condition (the agent-scope filter, the keyword, the user) is its own
+    // per-trace flag the session must have set once, so they can hold on
+    // different spans: SDKs put `user.id` on the agent span and the messages on
+    // its chat child.
+    let conditions: Vec<String> = std::iter::once(filter)
+        .filter(|filter| !filter.is_empty())
+        .chain(search.predicates(validated))
+        .collect();
+    let match_columns: String = conditions
+        .iter()
+        .enumerate()
+        .map(|(index, predicate)| {
+            format!(", max(CASE WHEN {predicate} THEN 1 ELSE 0 END) as session_match_{index}")
+        })
+        .collect();
+    let membership_filter = if conditions.is_empty() {
         String::new()
     } else {
-        format!(
-            " HAVING max(CASE WHEN {} THEN 1 ELSE 0 END) = 1",
-            predicates.join(" AND ")
-        )
+        let checks: Vec<String> = (0..conditions.len())
+            .map(|index| format!("max(session_match_{index}) = 1"))
+            .collect();
+        format!(" HAVING {}", checks.join(" AND "))
     };
     let direction = sort.order.sql();
-    // Usage sorts use the same sum as the totals `build_latest_sessions_sql` reports.
-    let (sort_projection, order_by) = match sort.field {
-        LatestSessionSortField::EndTime => (
+    let (trace_sort, session_sort) = latest_session_sort_expressions(sort.field, validated);
+    let trace_sort_projection = trace_sort
+        .map(|expression| format!(", {expression} as trace_sort_value"))
+        .unwrap_or_default();
+    let (sort_projection, order_by) = match session_sort {
+        None => (
             String::new(),
             format!("session_last_activity {direction}, session_id {direction}"),
         ),
-        field => {
-            let sort_expression = latest_session_sort_expression(field, validated);
-            (
-                format!(", {sort_expression} as session_sort_value"),
-                format!(
-                    "session_sort_value {direction} NULLS LAST, \
-                     session_last_activity DESC, session_id DESC"
-                ),
-            )
-        }
+        Some(expression) => (
+            format!(", {expression} as session_sort_value"),
+            format!(
+                "session_sort_value {direction} NULLS LAST, \
+                 session_last_activity DESC, session_id DESC"
+            ),
+        ),
     };
     let stream_ident = traces::session::quote_identifier(stream_name);
+
+    // Per trace, over all of its spans: its session (the id its spans carry;
+    // SDKs often set it on the agent span only, while the chat children carry
+    // the usage, messages and errors), last activity, sort value and condition
+    // flags. Then per session, as Session Detail reads a session's traces.
+    // Grouping every trace and dropping the sessionless ones afterwards is
+    // faster than a `trace_id IN (SELECT ...)` membership semi-join.
     format!(
-        "SELECT {session_id_col} as session_id, \
-         max(end_time) as session_last_activity{sort_projection} \
+        "SELECT session_id, max(trace_last_activity) as session_last_activity{sort_projection} \
+         FROM (SELECT max({session_id_col}) as session_id, trace_id, \
+         max(end_time) as trace_last_activity{trace_sort_projection}{match_columns} \
          FROM {stream_ident} \
-         WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
-         GROUP BY {session_id_col}{membership_filter} \
+         GROUP BY trace_id) \
+         WHERE session_id IS NOT NULL AND session_id != '' \
+         GROUP BY session_id{membership_filter} \
          ORDER BY {order_by}"
     )
 }
 
-fn latest_session_sort_expression(
+/// The usage column a Tokens/Cost sort ranks by, when the stream stores it.
+fn latest_session_usage_sort_column(
     field: LatestSessionSortField,
     validated: &super::schema_compat::ValidatedLlmSchema,
-) -> String {
+) -> Option<&'static str> {
+    match (field, validated.has_gen_ai) {
+        (LatestSessionSortField::TotalTokens, true) if validated.has_total_tokens => {
+            Some("gen_ai_usage_total_tokens")
+        }
+        (LatestSessionSortField::TotalTokens, false) if validated.has_total_tokens => {
+            Some("llm_usage_tokens_total")
+        }
+        (LatestSessionSortField::Cost, true) => Some("gen_ai_usage_cost"),
+        (LatestSessionSortField::Cost, false) => Some("llm_usage_cost_total"),
+        _ => None,
+    }
+}
+
+/// A sort's per-trace value (`trace_sort_value`) and the session value rolled
+/// up from it over the per-trace rows. The end-time sort ranks by the session's
+/// last activity, which every page query projects.
+fn latest_session_sort_expressions(
+    field: LatestSessionSortField,
+    validated: &super::schema_compat::ValidatedLlmSchema,
+) -> (Option<String>, Option<String>) {
+    if let Some(column) = latest_session_usage_sort_column(field, validated) {
+        // The usage rule holds per trace; a session's usage is its traces' sum,
+        // like the totals `build_latest_sessions_sql` reports.
+        let usage = usage_rule(column, validated.has_operation_name);
+        return (
+            Some(format!("COALESCE({usage}, 0)")),
+            Some("sum(trace_sort_value)".to_string()),
+        );
+    }
     match field {
-        LatestSessionSortField::EndTime => "max(end_time)".to_string(),
-        LatestSessionSortField::UserId => {
-            format!("min(NULLIF({}, ''))", validated.columns.user_id)
+        LatestSessionSortField::EndTime => (None, None),
+        LatestSessionSortField::UserId => (
+            Some(format!("min(NULLIF({}, ''))", validated.columns.user_id)),
+            Some("min(trace_sort_value)".to_string()),
+        ),
+        LatestSessionSortField::TraceCount => (None, Some("count(trace_id)".to_string())),
+        LatestSessionSortField::Duration => (
+            Some("min(start_time)".to_string()),
+            Some(
+                "CASE WHEN max(trace_last_activity) > min(trace_sort_value) \
+                 THEN max(trace_last_activity) - min(trace_sort_value) ELSE 0 END"
+                    .to_string(),
+            ),
+        ),
+        // Only a stream without a total-tokens column lands here.
+        LatestSessionSortField::TotalTokens | LatestSessionSortField::Cost => {
+            (None, Some("0".to_string()))
         }
-        LatestSessionSortField::TraceCount => "count(DISTINCT trace_id)".to_string(),
-        LatestSessionSortField::Duration => "CASE WHEN max(end_time) > min(start_time) \
-             THEN max(end_time) - min(start_time) ELSE 0 END"
-            .to_string(),
-        LatestSessionSortField::TotalTokens if validated.has_total_tokens => {
-            let column = if validated.has_gen_ai {
-                "gen_ai_usage_total_tokens"
-            } else {
-                "llm_usage_tokens_total"
-            };
-            format!("COALESCE({}, 0)", validated.usage_sum(column))
-        }
-        LatestSessionSortField::TotalTokens => "0".to_string(),
-        LatestSessionSortField::Cost => {
-            let column = if validated.has_gen_ai {
-                "gen_ai_usage_cost"
-            } else {
-                "llm_usage_cost_total"
-            };
-            format!("COALESCE({}, 0)", validated.usage_sum(column))
-        }
-        LatestSessionSortField::Status => {
-            "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)".to_string()
-        }
+        LatestSessionSortField::Status => (
+            Some("max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)".to_string()),
+            Some("max(trace_sort_value)".to_string()),
+        ),
     }
 }
 
@@ -1593,7 +1671,7 @@ fn build_latest_sessions_sql(
         )
     };
 
-    let usage = |column: &str| validated.usage_sum(column);
+    let usage = |column: &str| usage_rule(column, validated.has_operation_name);
     let optional_usage =
         |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
     let input_tokens_expr = usage(input_tokens_col);
@@ -1604,14 +1682,25 @@ fn build_latest_sessions_sql(
         &usage(total_tokens_col),
         "gen_ai_usage_total_tokens",
     );
-    let first_message_expr = if validated.has_input_messages {
-        format!(
-            "FIRST_VALUE({input_messages_col} ORDER BY start_time ASC) \
-             FILTER (WHERE {input_messages_col} IS NOT NULL AND {input_messages_col} != '') \
-             as gen_ai_input_messages"
+    // Per trace: the trace's first message and when it was sent; the session
+    // keeps the earliest.
+    let (first_message_expr, session_first_message_expr) = if validated.has_input_messages {
+        let present = format!("{input_messages_col} IS NOT NULL AND {input_messages_col} != ''");
+        (
+            format!(
+                "FIRST_VALUE({input_messages_col} ORDER BY start_time ASC) \
+                 FILTER (WHERE {present}) as gen_ai_input_messages, \
+                 min(start_time) FILTER (WHERE {present}) as first_message_time"
+            ),
+            "FIRST_VALUE(gen_ai_input_messages ORDER BY first_message_time ASC) \
+             FILTER (WHERE gen_ai_input_messages IS NOT NULL) as gen_ai_input_messages"
+                .to_string(),
         )
     } else {
-        "'' as gen_ai_input_messages".to_string()
+        (
+            "'' as gen_ai_input_messages".to_string(),
+            "'' as gen_ai_input_messages".to_string(),
+        )
     };
 
     let cache_read_tokens_expr = optional_usage(
@@ -1643,20 +1732,64 @@ fn build_latest_sessions_sql(
         "gen_ai_usage_cost_net_cache_impact",
     );
     let unpriced_selects = validated.unpriced_selects();
+    let session_unpriced_models = if validated.has_gen_ai && validated.has_cost_status {
+        "array_distinct(flatten(array_agg(gen_ai_unpriced_models))) as gen_ai_unpriced_models, "
+    } else {
+        ""
+    };
+    let session_usage: String = [
+        "gen_ai_usage_input_tokens",
+        "gen_ai_usage_output_tokens",
+        "gen_ai_usage_total_tokens",
+        "gen_ai_usage_cost",
+        "gen_ai_unpriced_tokens",
+        "gen_ai_usage_cache_read_input_tokens",
+        "gen_ai_usage_cache_creation_input_tokens",
+        "gen_ai_usage_cost_cache_read_input",
+        "gen_ai_usage_cost_cache_creation_input",
+        "gen_ai_usage_cost_estimated_without_cache",
+        "gen_ai_usage_cost_cache_read_savings",
+        "gen_ai_usage_cost_net_cache_impact",
+    ]
+    .iter()
+    .map(|alias| format!("sum({alias}) as {alias}, "))
+    .collect();
     let stream_ident = traces::session::quote_identifier(stream_name);
+    // Picks the agent's harness patterns when the session is read (AIO-22).
+    let (agent_name_expr, session_agent_name_expr) = if validated.has_gen_ai {
+        (
+            "max(gen_ai_agent_name) as agent_name, ",
+            "max(agent_name) as agent_name, ",
+        )
+    } else {
+        ("", "")
+    };
 
+    // The usage rule holds per trace, so the inner query applies it per trace
+    // over all of the trace's spans and the outer one sums the traces of each
+    // session. A trace belongs to the session id its spans carry (the largest,
+    // as in the page query); the outer filter keeps this page's sessions. Like
+    // the page query, grouping every trace beats a membership semi-join.
     format!(
-        "SELECT {session_id_col} as session_id, \
+        "SELECT session_id, {session_agent_name_expr}\
          min(start_time) as start_time, \
          max(end_time) as end_time, \
          CASE WHEN max(end_time) > min(start_time) \
               THEN max(end_time) - min(start_time) ELSE 0 END as duration, \
          count(DISTINCT trace_id) as trace_count, \
+         {session_usage}\
+         {session_unpriced_models}\
+         sum(error_count) as error_count, \
+         array_distinct(flatten(array_agg(user_ids))) as user_ids, \
+         {session_first_message_expr} \
+         FROM (SELECT max({session_id_col}) as session_id, trace_id, {agent_name_expr}\
+         min(start_time) as start_time, \
+         max(end_time) as end_time, \
          {input_tokens_expr} as gen_ai_usage_input_tokens, \
          {output_tokens_expr} as gen_ai_usage_output_tokens, \
          {total_tokens_expr}, \
-        {cost_expr} as gen_ai_usage_cost, \
-        {unpriced_selects}, \
+         {cost_expr} as gen_ai_usage_cost, \
+         {unpriced_selects}, \
          {cache_read_tokens_expr}, \
          {cache_creation_tokens_expr}, \
          {cost_cache_read_expr}, \
@@ -1669,19 +1802,81 @@ fn build_latest_sessions_sql(
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
          {first_message_expr} \
          FROM {stream_ident} \
-         WHERE {session_id_col} IN ({session_ids_sql}) \
-         GROUP BY {session_id_col}"
+         GROUP BY trace_id) \
+         WHERE session_id IN ({session_ids_sql}) \
+         GROUP BY session_id"
     )
 }
+
+/// How sessions read for one org (AIO-22): each agent's harness patterns,
+/// compiled once per request, and where a session's short title comes from.
+#[derive(Default)]
+struct SessionReadRules {
+    harness: HashMap<String, Vec<config::meta::gen_ai::CompiledHarnessPattern>>,
+    title: config::meta::gen_ai::SessionTitleMode,
+}
+
+impl SessionReadRules {
+    async fn for_org(org_id: &str) -> Self {
+        let config = db::system_settings::get_saved_gen_ai_agent_mapping_config(org_id).await;
+        Self {
+            harness: config
+                .harness_patterns
+                .iter()
+                .map(|r| {
+                    (
+                        r.agent.clone(),
+                        config::meta::gen_ai::compile_harness_patterns(&r.patterns),
+                    )
+                })
+                .collect(),
+            title: config.session_title,
+        }
+    }
+}
+
+const FIRST_MESSAGE_LEN: usize = 400;
+const SESSION_TITLE_LEN: usize = 60;
 
 fn normalize_latest_session_hits(
     mut hits: Vec<json::Value>,
     session_ids: &[String],
+    rules: &SessionReadRules,
 ) -> Vec<json::Value> {
     for hit in &mut hits {
-        let first_user_message = hit
-            .get("gen_ai_input_messages")
-            .and_then(|value| extract_first_user_message(value, 400));
+        let patterns = hit
+            .get("agent_name")
+            .and_then(|value| value.as_str())
+            .and_then(|agent| rules.harness.get(agent));
+        // Harness text is hidden before the cut, or a long wrapper would push the
+        // request itself past it.
+        let full = hit.get("gen_ai_input_messages").and_then(|value| {
+            extract_first_user_message(
+                value,
+                if patterns.is_some() {
+                    usize::MAX
+                } else {
+                    FIRST_MESSAGE_LEN
+                },
+            )
+        });
+        let (first_user_message, hidden, only) = match (full, patterns) {
+            (Some(text), Some(patterns)) => {
+                let stripped = config::meta::gen_ai::strip_harness(&text, patterns);
+                (
+                    truncate_message(stripped.text, FIRST_MESSAGE_LEN),
+                    stripped.hidden,
+                    stripped.only,
+                )
+            }
+            (full, _) => (full, 0, None),
+        };
+        let title = match rules.title {
+            config::meta::gen_ai::SessionTitleMode::FirstRequest => {
+                first_user_message.as_deref().map(session_title)
+            }
+            config::meta::gen_ai::SessionTitleMode::Off => None,
+        };
         let Some(hit) = hit.as_object_mut() else {
             continue;
         };
@@ -1692,6 +1887,15 @@ fn normalize_latest_session_hits(
             "first_user_message".to_string(),
             first_user_message.map_or(json::Value::Null, json::Value::String),
         );
+        if hidden > 0 {
+            hit.insert("harness_hidden".to_string(), json::json!(hidden));
+        }
+        if let Some(only) = only {
+            hit.insert("harness_only".to_string(), json::Value::String(only));
+        }
+        if let Some(title) = title {
+            hit.insert("session_title".to_string(), json::Value::String(title));
+        }
 
         if let Some(json::Value::Array(user_ids)) = hit.get_mut("user_ids") {
             user_ids.retain(|value| value.as_str().is_some_and(|value| !value.is_empty()));
@@ -1752,6 +1956,21 @@ struct SessionTraceServiceNameItem {
     duration: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     service_type: Option<String>,
+}
+
+/// The request's first line, cut at a word near `SESSION_TITLE_LEN` characters.
+fn session_title(request: &str) -> String {
+    let line = request
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim();
+    if line.chars().count() <= SESSION_TITLE_LEN {
+        return line.to_string();
+    }
+    let cut: String = line.chars().take(SESSION_TITLE_LEN).collect();
+    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
+    format!("{}…", cut.trim_end())
 }
 
 fn truncate_message(value: String, max_len: usize) -> Option<String> {
@@ -1870,6 +2089,59 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    // AIO-22: the agent's harness text is hidden before the 400-character cut.
+    #[test]
+    fn session_hits_hide_the_agents_harness_text_and_take_a_title() {
+        let wrapper = format!("<system-reminder>{}</system-reminder>", "x".repeat(600));
+        let messages = json!([{"role": "user", "content": format!("{wrapper}\nFix the Thread durations in the trace view please")}]);
+        let hits = vec![
+            json!({"session_id": "a", "agent_name": "omp", "gen_ai_input_messages": messages.clone()}),
+            json!({"session_id": "b", "agent_name": "support-bot", "gen_ai_input_messages": messages}),
+            json!({"session_id": "c", "agent_name": "omp", "gen_ai_input_messages": [{"role": "user", "content": "<job>nightly</job>"}]}),
+        ];
+        let mut rules = SessionReadRules {
+            title: config::meta::gen_ai::SessionTitleMode::FirstRequest,
+            ..Default::default()
+        };
+        rules.harness.insert(
+            "omp".to_string(),
+            config::meta::gen_ai::compile_harness_patterns(&[
+                "tag system-reminder".to_string(),
+                "tag job".to_string(),
+            ]),
+        );
+        let ids = ["a".to_string(), "b".to_string(), "c".to_string()];
+        let out = normalize_latest_session_hits(hits, &ids, &rules);
+        assert_eq!(
+            out[0]["first_user_message"],
+            "Fix the Thread durations in the trace view please"
+        );
+        assert_eq!(out[0]["harness_hidden"], 1);
+        assert_eq!(
+            out[0]["session_title"],
+            "Fix the Thread durations in the trace view please"
+        );
+        // Another agent's sessions are untouched.
+        assert!(out[1].get("harness_hidden").is_none());
+        assert!(
+            out[1]["first_user_message"]
+                .as_str()
+                .unwrap()
+                .starts_with("<system-reminder>")
+        );
+        assert_eq!(out[2]["harness_only"], "job");
+        assert!(out[2]["first_user_message"].is_null());
+    }
+
+    #[test]
+    fn session_title_cuts_at_a_word() {
+        assert_eq!(session_title("short ask"), "short ask");
+        let long = "Rebase the AI observability branch onto origin main and fix every conflict";
+        let title = session_title(long);
+        assert!(title.ends_with('…'));
+        assert!(title.chars().count() <= SESSION_TITLE_LEN + 1);
+    }
 
     #[test]
     fn session_trace_details_sql_aggregates_by_trace_id() {
@@ -1998,22 +2270,23 @@ mod tests {
             &validated,
         );
 
-        assert!(!page_sql.contains("IN (SELECT"));
-        assert!(!page_sql.contains("trace_id"));
-        assert!(page_sql.contains("max(end_time) as session_last_activity"));
+        // The legacy membership subquery filter is unwrapped to its predicate.
+        assert!(!page_sql.contains("IN (SELECT gen_ai_conversation_id"));
+        assert!(page_sql.contains("max(trace_last_activity) as session_last_activity"));
         assert!(page_sql.contains("gen_ai_agent_id = 'agent-123'"));
-        assert!(page_sql.contains("HAVING max(CASE WHEN"));
+        assert!(page_sql.contains("HAVING max(session_match_0) = 1"));
         assert!(page_sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
         assert!(!page_sql.contains("min(start_time) as session_start_time"));
         assert!(sql.contains("count(DISTINCT trace_id) as trace_count"));
-        assert!(sql.contains("GROUP BY gen_ai_conversation_id"));
-        assert!(sql.contains("gen_ai_conversation_id IN ('session-1','session''2')"));
+        assert!(sql.contains("GROUP BY session_id"));
+        assert!(sql.contains("WHERE session_id IN ('session-1','session''2') GROUP BY session_id"));
         assert!(sql.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
         assert!(sql.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_total_tokens"));
         assert!(sql.contains("array_agg(DISTINCT user_id)"));
         assert!(sql.contains("FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC)"));
         assert!(!sql.contains("array_agg(DISTINCT trace_id)"));
-        assert!(!sql.contains("WHERE trace_id IN"));
+        // Trace ids are never materialized into the query text.
+        assert!(!sql.contains("trace_id IN ('"));
     }
 
     #[test]
@@ -2028,9 +2301,7 @@ mod tests {
         );
 
         assert!(
-            sql.contains(
-                "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != ''"
-            )
+            sql.contains(") WHERE session_id IS NOT NULL AND session_id != '' GROUP BY session_id")
         );
         assert!(!sql.contains("HAVING"));
         assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
@@ -2116,34 +2387,42 @@ mod tests {
     fn session_page_sql_orders_by_each_summary_value_before_pagination() {
         let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
         validated.has_total_tokens = true;
+        // (field, per-trace value over all the trace's spans, session rollup)
         let cases = [
             (
                 LatestSessionSortField::UserId,
-                "min(NULLIF(user_id, '')) as session_sort_value",
+                Some("min(NULLIF(user_id, '')) as trace_sort_value"),
+                "min(trace_sort_value) as session_sort_value",
             ),
             (
                 LatestSessionSortField::TraceCount,
-                "count(DISTINCT trace_id) as session_sort_value",
+                None,
+                "count(trace_id) as session_sort_value",
             ),
             (
                 LatestSessionSortField::Duration,
-                "THEN max(end_time) - min(start_time) ELSE 0 END as session_sort_value",
+                Some("min(start_time) as trace_sort_value"),
+                "THEN max(trace_last_activity) - min(trace_sort_value) ELSE 0 END \
+                 as session_sort_value",
             ),
             (
                 LatestSessionSortField::TotalTokens,
-                "COALESCE(sum(gen_ai_usage_total_tokens), 0) as session_sort_value",
+                Some("COALESCE(sum(gen_ai_usage_total_tokens), 0) as trace_sort_value"),
+                "sum(trace_sort_value) as session_sort_value",
             ),
             (
                 LatestSessionSortField::Cost,
-                "COALESCE(sum(gen_ai_usage_cost), 0) as session_sort_value",
+                Some("COALESCE(sum(gen_ai_usage_cost), 0) as trace_sort_value"),
+                "sum(trace_sort_value) as session_sort_value",
             ),
             (
                 LatestSessionSortField::Status,
-                "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as session_sort_value",
+                Some("max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as trace_sort_value"),
+                "max(trace_sort_value) as session_sort_value",
             ),
         ];
 
-        for (field, projection) in cases {
+        for (field, trace_value, session_value) in cases {
             let sql = build_latest_session_page_sql(
                 "bench_traces",
                 "",
@@ -2151,11 +2430,18 @@ mod tests {
                 &sort(field, LatestSessionSortOrder::Asc),
                 &validated,
             );
-            assert!(sql.contains(projection), "{field:?}: {sql}");
-            assert!(sql.contains(
-                "ORDER BY session_sort_value ASC NULLS LAST, \
+            let (per_session, per_trace, tail) = split_per_trace(&sql);
+            assert!(per_session.ends_with(session_value), "{field:?}: {sql}");
+            match trace_value {
+                Some(value) => assert!(per_trace.contains(value), "{field:?}: {sql}"),
+                None => assert!(!per_trace.contains("trace_sort_value"), "{field:?}: {sql}"),
+            }
+            assert_eq!(
+                tail,
+                "WHERE session_id IS NOT NULL AND session_id != '' \
+                 GROUP BY session_id ORDER BY session_sort_value ASC NULLS LAST, \
                  session_last_activity DESC, session_id DESC"
-            ));
+            );
         }
     }
 
@@ -2164,23 +2450,226 @@ mod tests {
         let mut legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
         legacy.has_total_tokens = true;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy),
-            "min(NULLIF(llm_user_id, ''))"
+            latest_session_sort_expressions(LatestSessionSortField::UserId, &legacy).0,
+            Some("min(NULLIF(llm_user_id, ''))".to_string())
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
-            "COALESCE(sum(llm_usage_tokens_total), 0)"
+            latest_session_usage_sort_column(LatestSessionSortField::TotalTokens, &legacy),
+            Some("llm_usage_tokens_total")
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy),
-            "COALESCE(sum(llm_usage_cost_total), 0)"
+            latest_session_usage_sort_column(LatestSessionSortField::Cost, &legacy),
+            Some("llm_usage_cost_total")
         );
 
         legacy.has_total_tokens = false;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
-            "0"
+            latest_session_usage_sort_column(LatestSessionSortField::TotalTokens, &legacy),
+            None
         );
+        let page = build_latest_session_page_sql(
+            "legacy_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &sort(
+                LatestSessionSortField::TotalTokens,
+                LatestSessionSortOrder::Desc,
+            ),
+            &legacy,
+        );
+        assert!(page.contains(", 0 as session_sort_value"), "{page}");
+    }
+
+    /// Splits a session query into the session-level select list, the
+    /// per-trace subquery up to its `GROUP BY trace_id` and the session-level
+    /// tail after it.
+    fn split_per_trace(sql: &str) -> (&str, &str, &str) {
+        let (per_session, rest) = sql
+            .split_once(" FROM (SELECT ")
+            .unwrap_or_else(|| panic!("no per-trace subquery: {sql}"));
+        let (per_trace, tail) = rest
+            .split_once(" GROUP BY trace_id) ")
+            .unwrap_or_else(|| panic!("no per-trace grouping: {sql}"));
+        (per_session, per_trace, tail)
+    }
+
+    #[test]
+    fn session_usage_rule_runs_per_trace_and_sums_per_session() {
+        // X3-01: sA = 3 agent-only traces of 1,000 tokens must read 3,000, not
+        // the largest agent span of the whole session (1,000).
+        let mut validated = with_operation_name();
+        validated.has_input_messages = true;
+        validated.has_cost_status = true;
+        let sql = build_latest_sessions_sql("bench_traces", &["sA".to_string()], &validated);
+        let (per_session, per_trace, tail) = split_per_trace(&sql);
+
+        assert!(per_trace.starts_with("max(gen_ai_conversation_id) as session_id, trace_id, "));
+        assert_eq!(tail, "WHERE session_id IN ('sA') GROUP BY session_id");
+        assert!(
+            !per_session.contains("gen_ai_operation_name"),
+            "{per_session}"
+        );
+        for column in [
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_total_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_usage_cache_read_input_tokens",
+        ] {
+            assert!(
+                per_trace.contains(&format!("{} as {column}", usage_rule(column, true))),
+                "{column}: {per_trace}"
+            );
+            assert!(
+                per_session.contains(&format!("sum({column}) as {column}")),
+                "{column}: {per_session}"
+            );
+        }
+        // The other session aggregates roll up from the traces.
+        for rollup in [
+            "count(DISTINCT trace_id) as trace_count",
+            "min(start_time) as start_time",
+            "max(end_time) as end_time",
+            "sum(error_count) as error_count",
+            "sum(gen_ai_unpriced_tokens) as gen_ai_unpriced_tokens",
+            "array_distinct(flatten(array_agg(gen_ai_unpriced_models))) as gen_ai_unpriced_models",
+            "array_distinct(flatten(array_agg(user_ids))) as user_ids",
+            "max(agent_name) as agent_name",
+            "FIRST_VALUE(gen_ai_input_messages ORDER BY first_message_time ASC)",
+        ] {
+            assert!(per_session.contains(rollup), "{rollup}: {per_session}");
+        }
+        for per_trace_value in [
+            "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count",
+            "array_agg(DISTINCT user_id)",
+            "as first_message_time",
+            "max(gen_ai_agent_name) as agent_name",
+        ] {
+            assert!(per_trace.contains(per_trace_value), "{per_trace_value}");
+        }
+    }
+
+    #[test]
+    fn session_usage_sort_ranks_by_per_trace_usage_and_keeps_membership() {
+        // X3-01: the Tokens/Cost sort must rank sessions by the same per-trace sum
+        // the list shows; each membership condition still holds per session.
+        let filter = "gen_ai_agent_id = 'agent-1'";
+        let mut validated = gen_ai_with_messages();
+        validated.has_total_tokens = true;
+        validated.has_operation_name = true;
+        for field in [
+            LatestSessionSortField::TotalTokens,
+            LatestSessionSortField::Cost,
+        ] {
+            let sql = build_latest_session_page_sql(
+                "bench_traces",
+                filter,
+                &search(Some("refund")),
+                &sort(field, LatestSessionSortOrder::Desc),
+                &validated,
+            );
+            let (per_session, per_trace, tail) = split_per_trace(&sql);
+            assert_eq!(
+                per_session,
+                "SELECT session_id, max(trace_last_activity) as session_last_activity, \
+                 sum(trace_sort_value) as session_sort_value"
+            );
+            assert!(per_trace.contains("max(CASE WHEN gen_ai_operation_name = 'invoke_agent'"));
+            assert!(per_trace.contains(&format!(
+                "max(CASE WHEN {filter} THEN 1 ELSE 0 END) as session_match_0"
+            )));
+            assert!(per_trace.contains("as session_match_1"));
+            assert_eq!(
+                tail,
+                "WHERE session_id IS NOT NULL AND session_id != '' \
+                 GROUP BY session_id HAVING max(session_match_0) = 1 AND max(session_match_1) = 1 \
+                 ORDER BY session_sort_value DESC NULLS LAST, \
+                 session_last_activity DESC, session_id DESC"
+            );
+        }
+    }
+
+    #[test]
+    fn session_list_reads_every_span_of_the_sessions_traces() {
+        // G4-06: the conversation id is often on the agent span only, while its
+        // chat children carry the usage, messages and errors. The page and the
+        // summary take a trace's session from the id its spans carry, as Session
+        // Detail picks a session's traces, and read every span of the trace,
+        // not only the spans with the id.
+        let mut validated = gen_ai_with_messages();
+        validated.has_total_tokens = true;
+        validated.has_operation_name = true;
+        let any_session = "WHERE session_id IS NOT NULL AND session_id != '' GROUP BY session_id";
+        let page_sorts = [
+            LatestSessionSortField::EndTime,
+            LatestSessionSortField::UserId,
+            LatestSessionSortField::TraceCount,
+            LatestSessionSortField::Duration,
+            LatestSessionSortField::TotalTokens,
+            LatestSessionSortField::Cost,
+            LatestSessionSortField::Status,
+        ];
+        let searches = [
+            LatestSessionSearch::default(),
+            LatestSessionSearch {
+                keyword: Some("kiwiword".to_string()),
+                user_id: Some("qa-user".to_string()),
+            },
+        ];
+        let mut queries = vec![(
+            build_latest_sessions_sql("bench_traces", &["s1".to_string()], &validated),
+            "WHERE session_id IN ('s1') GROUP BY session_id",
+        )];
+        for field in page_sorts {
+            for search in &searches {
+                queries.push((
+                    build_latest_session_page_sql(
+                        "bench_traces",
+                        "gen_ai_agent_id = 'agent-1'",
+                        search,
+                        &sort(field, LatestSessionSortOrder::Desc),
+                        &validated,
+                    ),
+                    any_session,
+                ));
+            }
+        }
+
+        for (sql, sessions) in queries {
+            let (_, per_trace, tail) = split_per_trace(&sql);
+            // A trace's session is the id its spans carry; the spans it reads
+            // are all of the trace's (no span-level WHERE), and only the
+            // per-trace rows are filtered by session.
+            assert!(
+                per_trace.starts_with("max(gen_ai_conversation_id) as session_id, trace_id, "),
+                "{sql}"
+            );
+            assert!(per_trace.ends_with(" FROM \"bench_traces\""), "{sql}");
+            assert!(tail.starts_with(sessions), "{sql}");
+            assert!(!tail.contains("gen_ai_conversation_id"), "{sql}");
+            // Conditions are per-trace flags, so the keyword and the user may
+            // sit on different spans of a session.
+            if sql.contains("kiwiword") {
+                assert!(per_trace.contains("as session_match_1"), "{sql}");
+                assert!(per_trace.contains("as session_match_2"), "{sql}");
+                assert!(tail.contains("HAVING max(session_match_0) = 1"), "{sql}");
+            }
+        }
+    }
+
+    #[test]
+    fn session_trace_page_reports_every_turn_and_pages_newest_first() {
+        // S3-03: `total` is the session's turn count, not the page length.
+        let ordering: HashMap<String, i64> = (0..5).map(|n| (format!("t{n}"), n)).collect();
+        assert_eq!(
+            session_trace_page(ordering.clone(), 0, 2),
+            (5, vec!["t4".to_string(), "t3".to_string()])
+        );
+        assert_eq!(
+            session_trace_page(ordering.clone(), 4, 2),
+            (5, vec!["t0".to_string()])
+        );
+        assert_eq!(session_trace_page(ordering, 9, 2), (5, vec![]));
     }
 
     const LLM_CALL: &str = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
@@ -2197,7 +2686,12 @@ mod tests {
     #[test]
     fn session_usage_sums_count_only_llm_call_spans() {
         let validated = with_operation_name();
-        let llm_sum = |column: &str| format!("sum(CASE WHEN {LLM_CALL} THEN {column} ELSE 0 END)");
+        let llm_sum = |column: &str| {
+            format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {LLM_CALL} THEN {column} ELSE 0 END), 0), \
+                 max(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN {column} END), 0)"
+            )
+        };
         let details = build_session_trace_details_sql(
             "default",
             &validated,
@@ -2246,7 +2740,7 @@ mod tests {
                 &sort(field, LatestSessionSortOrder::Desc),
                 &validated,
             );
-            let expected = format!("COALESCE({}, 0) as session_sort_value", llm_sum(column));
+            let expected = format!("COALESCE({}, 0) as trace_sort_value", llm_sum(column));
             assert!(page.contains(&expected), "{page}");
         }
     }
@@ -2275,9 +2769,9 @@ mod tests {
             assert!(!sql.contains("gen_ai_operation_name"), "{sql}");
         }
         assert!(sessions.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
-        assert!(sessions.contains("FROM \"bench_traces\" WHERE gen_ai_conversation_id IN"));
+        assert!(sessions.contains("WHERE session_id IN ('session-1')"));
         assert!(details.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
-        assert!(page.contains("COALESCE(sum(gen_ai_usage_cost), 0) as session_sort_value"));
+        assert!(page.contains("COALESCE(sum(gen_ai_usage_cost), 0) as trace_sort_value"));
     }
 
     // ── List search (`keyword`) ─────────────────────────────────────────────
@@ -2285,6 +2779,7 @@ mod tests {
     fn search(keyword: Option<&str>) -> LatestSessionSearch {
         LatestSessionSearch {
             keyword: keyword.map(str::to_string),
+            user_id: None,
         }
     }
 
@@ -2306,16 +2801,18 @@ mod tests {
         );
 
         assert!(sql.contains(
-            "HAVING max(CASE WHEN (str_match_ignore_case(user_id, 'refund') OR \
+            "max(CASE WHEN (str_match_ignore_case(user_id, 'refund') OR \
              (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
-             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) = 1"
+             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) \
+             as session_match_0"
         ));
+        assert!(sql.contains("GROUP BY session_id HAVING max(session_match_0) = 1 ORDER BY"));
         assert_eq!(sql.matches("HAVING").count(), 1);
         assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
     }
 
     #[test]
-    fn page_sql_ands_keyword_onto_a_parenthesised_agent_filter() {
+    fn page_sql_checks_agent_filter_and_keyword_as_separate_session_conditions() {
         let filter = "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'";
         assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
         let sql = build_latest_session_page_sql(
@@ -2327,11 +2824,14 @@ mod tests {
         );
 
         assert!(sql.contains(
-            "HAVING max(CASE WHEN (gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2') AND \
-             (str_match_ignore_case(user_id, 'refund') OR \
+            "max(CASE WHEN gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2' \
+             THEN 1 ELSE 0 END) as session_match_0, \
+             max(CASE WHEN (str_match_ignore_case(user_id, 'refund') OR \
              (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
-             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) = 1"
+             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) \
+             as session_match_1"
         ));
+        assert!(sql.contains("HAVING max(session_match_0) = 1 AND max(session_match_1) = 1"));
         assert_eq!(sql.matches("HAVING").count(), 1);
     }
 
@@ -2346,10 +2846,11 @@ mod tests {
             &gen_ai_with_messages(),
         );
 
-        assert!(!sql.contains("IN (SELECT"));
+        assert!(!sql.contains("IN (SELECT gen_ai_conversation_id"));
+        assert!(sql.contains("gen_ai_agent_id = 'agent-123'"));
         assert!(sql.contains(
-            "gen_ai_agent_id = 'agent-123') AND \
-             (str_match_ignore_case(user_id, 'luis') OR"
+            "THEN 1 ELSE 0 END) as session_match_0, \
+             max(CASE WHEN (str_match_ignore_case(user_id, 'luis') OR"
         ));
     }
 
@@ -2371,7 +2872,7 @@ mod tests {
             "(str_match_ignore_case(llm_input, 'refund') OR \
              str_match_ignore_case(llm_output, 'refund'))"
         ));
-        assert!(sql.contains("GROUP BY llm_session_id"));
+        assert!(sql.contains("max(llm_session_id) as session_id"));
     }
 
     #[test]
@@ -2416,11 +2917,70 @@ mod tests {
             &user_only,
         );
         assert!(user_sql.contains(
-            "HAVING max(CASE WHEN (str_match_ignore_case(user_id, 'refund')) \
-             THEN 1 ELSE 0 END) = 1"
+            "max(CASE WHEN (str_match_ignore_case(user_id, 'refund')) \
+             THEN 1 ELSE 0 END) as session_match_0"
         ));
         assert!(!user_sql.contains("gen_ai_input_messages"));
         assert!(!user_sql.contains("gen_ai_output_messages"));
+    }
+
+    #[test]
+    fn page_sql_user_id_matches_the_user_exactly() {
+        let filter = "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'";
+        let user = LatestSessionSearch {
+            keyword: None,
+            user_id: Some("o'brien".to_string()),
+        };
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &user,
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+        assert!(sql.contains(
+            "max(CASE WHEN gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2' \
+             THEN 1 ELSE 0 END) as session_match_0, \
+             max(CASE WHEN user_id = 'o''brien' THEN 1 ELSE 0 END) as session_match_1"
+        ));
+        assert!(sql.contains("HAVING max(session_match_0) = 1 AND max(session_match_1) = 1"));
+        assert!(!sql.contains("str_match_ignore_case"));
+
+        let both = LatestSessionSearch {
+            keyword: Some("refund".to_string()),
+            user_id: Some("qa-u1".to_string()),
+        };
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &both,
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+        // The user and the messages may sit on different spans of the session
+        // (user.id on the agent span, the text on its chat child), so each is
+        // its own session-level condition, not one per-span conjunction.
+        assert!(sql.contains(
+            "OR str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) \
+             as session_match_0, \
+             max(CASE WHEN user_id = 'qa-u1' THEN 1 ELSE 0 END) as session_match_1"
+        ));
+        assert!(!sql.contains("AND user_id = 'qa-u1'"));
+    }
+
+    #[test]
+    fn user_id_is_read_from_the_query_and_empty_means_absent() {
+        let mut query: HashMap<String, String> = HashMap::new();
+        query.insert("user_id".into(), "  qa-u1 ".into());
+        assert_eq!(
+            LatestSessionSearch::from_query(&query).user_id.as_deref(),
+            Some("qa-u1")
+        );
+        query.insert("user_id".into(), "  ".into());
+        assert_eq!(
+            LatestSessionSearch::from_query(&query),
+            LatestSessionSearch::default()
+        );
     }
 
     #[test]
@@ -2452,7 +3012,9 @@ mod tests {
     }
 
     #[test]
-    fn page_sql_with_keyword_still_plans_as_a_simple_session_level_aggregate() {
+    fn page_sql_keeps_conditions_out_of_subqueries() {
+        // A subquery inside a condition's `max(CASE ...)` is an unsupported
+        // `InSubquery` expression; conditions are plain per-trace flags.
         let sql = build_latest_session_page_sql(
             "bench_traces",
             "gen_ai_agent_id = 'agent-1'",
@@ -2461,13 +3023,8 @@ mod tests {
             &gen_ai_with_messages(),
         );
 
-        assert_eq!(
-            config::utils::sql::is_simple_aggregate_query(&sql),
-            Ok(true),
-            "{sql}"
-        );
-        assert!(sql.contains("GROUP BY gen_ai_conversation_id HAVING max(CASE WHEN"));
-        assert!(!sql.contains("IN (SELECT"));
+        assert!(!sql.contains("IN (SELECT"), "{sql}");
+        assert!(sql.contains("str_match_ignore_case(user_id, '100% refund')"));
     }
 
     #[test]
@@ -2476,7 +3033,7 @@ mod tests {
         let sql =
             build_latest_sessions_sql("legacy_traces", &["session-1".to_string()], &validated);
 
-        assert!(sql.contains("llm_session_id as session_id"));
+        assert!(sql.contains("max(llm_session_id) as session_id"));
         assert!(sql.contains("sum(llm_usage_tokens_input) as gen_ai_usage_input_tokens"));
         assert!(sql.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost"));
         assert!(sql.contains("0 as gen_ai_usage_total_tokens"));
@@ -2511,6 +3068,7 @@ mod tests {
         let normalized = normalize_latest_session_hits(
             hits,
             &["session-2".to_string(), "session-1".to_string()],
+            &SessionReadRules::default(),
         );
         assert_eq!(normalized[0]["session_id"], "session-2");
         assert_eq!(normalized[1]["first_user_message"], "show me the weather");

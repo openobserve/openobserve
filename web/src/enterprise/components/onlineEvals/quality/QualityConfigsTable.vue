@@ -37,13 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       width="100%"
       @row-click="(row: QualityRow) => emit('open', row, 'all')"
     >
-      <template #subheader>
-        <!-- Counts from an empty list would read "0 of 0 … every config gives a result" next to an error or an empty org. -->
-        <div
-          v-if="loading || tiles.total > 0"
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="quality-tiles"
-        >
+      <!-- The tiles sit in the toolbar so the column picker, which the table
+           draws only with a toolbar, shares their row. Counts from an empty
+           list would read "0 of 0 … every config gives a result" next to an
+           error or an empty org. -->
+      <template v-if="loading || tiles.total > 0" #toolbar>
+        <div class="min-w-0 flex-1" data-test="quality-tiles">
           <OStatStrip>
             <OTooltip :content="t('onlineEvals.quality.tiles.attentionTooltip')">
               <OStatCard
@@ -112,17 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #toolbar>
-        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
-          <OSearchInput
-            v-model="search"
-            class="min-w-0 flex-1 max-md:min-w-40"
-            :placeholder="t('onlineEvals.quality.table.searchPlaceholder')"
-            data-test="quality-configs-search"
-          />
-        </div>
-      </template>
-
       <template #empty>
         <div class="flex items-center justify-center py-8" data-test="quality-configs-empty">
           <OEmptyState v-if="loadError" size="hero" preset="load-error" @action="emit('retry')" />
@@ -131,8 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-score-configs"
             :filtered="!!search.trim() || !!tileFilter"
+            :actions="search.trim() || tileFilter ? undefined : emptyActions"
             @action="onEmptyAction"
           />
+          <OneClickEvalDialog v-model:open="oneClickOpen" :agent="scopeAgent" />
         </div>
       </template>
 
@@ -226,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -236,7 +226,8 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
+import OneClickEvalDialog from "../OneClickEvalDialog.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
@@ -379,7 +370,32 @@ function openConfig(row: QualityRow) {
     .catch(() => {});
 }
 
+// A first score in one screen (AIO-23), before the manual path.
+const oneClickOpen = ref(false);
+const scopeAgent = computed(() =>
+  typeof route.query.agent === "string" && route.query.agent ? route.query.agent : null,
+);
+const emptyActions = computed<EmptyStateAction[]>(() => [
+  {
+    id: "one-click",
+    icon: "auto-awesome",
+    titleKey: "oneClickEval.evaluate",
+    titleParams: { agent: scopeAgent.value ?? t("oneClickEval.anAgent") },
+    descriptionKey: "oneClickEval.emptyActionDesc",
+  },
+  {
+    id: "create",
+    icon: "add",
+    titleKey: "emptyState.noScoreConfigs.action",
+    descriptionKey: "emptyState.noScoreConfigs.actionDesc",
+  },
+]);
+
 function onEmptyAction(id?: string) {
+  if (id === "one-click") {
+    oneClickOpen.value = true;
+    return;
+  }
   if (id === "clear-filters") {
     search.value = "";
     emit("update:tileFilter", null);
