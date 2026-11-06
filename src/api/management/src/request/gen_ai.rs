@@ -112,7 +112,11 @@ pub struct ClearAgentRegistryResponse {
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "GenAI Settings", "operation": "list"}))
+    )
 )]
 pub async fn get_agent_mapping(
     Path(org_id): Path<String>,
@@ -163,7 +167,11 @@ pub async fn get_agent_mapping(
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "GenAI Settings", "operation": "update"}))
+    )
 )]
 pub async fn save_agent_mapping(
     Path(org_id): Path<String>,
@@ -228,7 +236,11 @@ pub async fn save_agent_mapping(
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "GenAI Settings", "operation": "list"}))
+    )
 )]
 pub async fn list_scored_agents(
     Path(org_id): Path<String>,
@@ -286,7 +298,11 @@ pub async fn list_scored_agents(
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "GenAI Settings", "operation": "delete"}))
+    )
 )]
 pub async fn clear_agent_registry(
     Path(org_id): Path<String>,

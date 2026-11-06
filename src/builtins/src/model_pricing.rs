@@ -95,7 +95,7 @@ pub struct BuiltInModelPricingEntry {
 }
 
 /// Result of a sync operation.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SyncResult {
     pub created: usize,
     pub updated: usize,

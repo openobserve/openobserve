@@ -63,7 +63,7 @@ use crate::{
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"__name__":"metrics stream name","__type__":"counter / gauge / histogram / summary","label_name1":"label_value1","label_name2":"label_value2", "_timestamp":1687175143,"value":1.2}])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::IngestionResponse, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -125,8 +125,8 @@ pub async fn json(
     request_body(description = "ExportMetricsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "ExportMetricsServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
-        (status = 206, description = "ExportMetricsServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 200, description = "ExportMetricsServiceResponse", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpMetricsExportJson = "application/json"))),
+        (status = 206, description = "ExportMetricsServiceResponse with a partial success (JSON requests only)", content((common::meta::otlp::OtlpMetricsExportJson = "application/json"))),
         (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),

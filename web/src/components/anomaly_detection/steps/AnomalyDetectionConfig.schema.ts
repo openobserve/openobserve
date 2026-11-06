@@ -97,6 +97,11 @@ export type AnomalyIntervalUnit = "s" | "m" | "h" | "d";
 
 const INTERVAL_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
 
+/** The server's MAX_DETECTION_WINDOW_BUCKETS; the two rules must reject the same windows. */
+const MAX_DETECTION_WINDOW_BUCKETS = 100_000;
+/** The server's MIN_ANOMALY_SCHEDULE_SECONDS; the two rules must reject the same schedules. */
+const MIN_SCHEDULE_SECONDS = 60;
+
 /** Seconds for one interval value + unit pair; null when either part is not a positive s/m/h/d interval. */
 export const anomalyIntervalSeconds = (value: number, unit: string): number | null => {
   const mult = INTERVAL_UNIT_SECONDS[unit];
@@ -153,6 +158,15 @@ export const lookBackWindowFloorSeconds = (
   const histogram = anomalyIntervalSeconds(histogramValue, histogramUnit);
   if (schedule === null || histogram === null) return null;
   return schedule + histogram;
+};
+
+/** The longest look-back the server accepts for a detection resolution; null when it does not parse. */
+export const lookBackWindowCapSeconds = (
+  histogramValue: number,
+  histogramUnit: string,
+): number | null => {
+  const histogram = anomalyIntervalSeconds(histogramValue, histogramUnit);
+  return histogram === null ? null : histogram * MAX_DETECTION_WINDOW_BUCKETS;
 };
 
 /** Compact human form for a seconds count, e.g. 3900 → "1h 5m". */
@@ -264,6 +278,22 @@ export const createAnomalyDetectionConfigSchema = (
     const windowUntouched =
       stored !== null &&
       sameInterval(stored.window, value.detection_window_value, value.detection_window_unit);
+    // The server judges this only when the schedule or the resolution changes.
+    if (stored === null || !histogramUntouched || !scheduleUntouched) {
+      const scheduleSecs = anomalyIntervalSeconds(
+        value.schedule_interval_value,
+        value.schedule_interval_unit,
+      );
+      if (scheduleSecs !== null && scheduleSecs < MIN_SCHEDULE_SECONDS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["schedule_interval_value"],
+          message: t("alerts.anomaly.scheduleIntervalFloor", {
+            min: formatAnomalySeconds(MIN_SCHEDULE_SECONDS),
+          }),
+        });
+      }
+    }
     // D4 grandfathering: an untouched stored triple round-trips verbatim, so the floor judges only edits.
     const grandfathered =
       stored !== null && histogramUntouched && scheduleUntouched && windowUntouched;
@@ -286,6 +316,25 @@ export const createAnomalyDetectionConfigSchema = (
           code: z.ZodIssueCode.custom,
           path: ["detection_window_value"],
           message: t("alerts.anomaly.lookBackWindowFloor", { min: formatAnomalySeconds(floor) }),
+        });
+      }
+    }
+    // The schedule does not size the grid, so a schedule-only edit keeps an over-limit row editable.
+    const capGrandfathered = stored !== null && histogramUntouched && windowUntouched;
+    if (!capGrandfathered && histogramReliable) {
+      const cap = lookBackWindowCapSeconds(
+        value.histogram_interval_value,
+        value.histogram_interval_unit,
+      );
+      const windowSecs = anomalyIntervalSeconds(
+        value.detection_window_value,
+        value.detection_window_unit,
+      );
+      if (cap !== null && windowSecs !== null && windowSecs > cap) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["detection_window_value"],
+          message: t("alerts.anomaly.lookBackWindowCap", { max: formatAnomalySeconds(cap) }),
         });
       }
     }

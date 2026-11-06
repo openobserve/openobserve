@@ -1,0 +1,57 @@
+{
+  "_comment": "Manifest for api_bugfix_regression.yml. Bug-fix API tests live under tests/regression/ and run only here; api-testing.yml ignores tests/regression/ on every PR. Fields: label = job name `api_regression / <label>`; target = pytest args, relative to tests/api-testing; server_env = KEY=VALUE pairs the server starts with; category = the junit artifact category parse-api-junit.py reads. A file under tests/regression/ with no shard fails generate_matrix. Several shards may name one file only with different server_env (a flag matrix).",
+  "shards": [
+    {
+      "label": "default",
+      "_comment": "Files that need no server env of their own.",
+      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py",
+      "server_env": "",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "utf8_view_false",
+      "target": "tests/regression/test_subquery_join_match.py",
+      "server_env": "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "utf8_view_true",
+      "target": "tests/regression/test_subquery_join_match.py",
+      "server_env": "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "join_match_one_true",
+      "target": "tests/regression/test_logs_to_logs_join.py",
+      "server_env": "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "join_match_one_false",
+      "target": "tests/regression/test_logs_to_logs_join.py",
+      "server_env": "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "otlp_grpc_backpressure",
+      "_comment": "A free-space requirement no runner meets keeps the disk circuit breaker tripped.",
+      "target": "tests/regression/test_otlp_grpc_backpressure.py",
+      "server_env": "ZO_DISK_CIRCUIT_BREAKER_ENABLED=true ZO_DISK_CIRCUIT_BREAKER_THRESHOLD=900000000",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "sqlite_meta_invalid_utf8",
+      "_comment": "Spawns and restarts its own server from the repo's debug binary.",
+      "target": "tests/regression/test_sqlite_invalid_utf8_meta_startup.py",
+      "server_env": "",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "promql_mixed_case_name",
+      "_comment": "openobserve#13926 only reproduces when stream names keep their case.",
+      "target": "tests/regression/test_promql_mixed_case_metric_name.py",
+      "server_env": "ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false",
+      "category": "api_integration_tests"
+    }
+  ]
+}

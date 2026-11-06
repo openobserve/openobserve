@@ -23,7 +23,7 @@ fn is_false(v: &bool) -> bool {
 /// One location as returned by `GET /{org}/synthetics/locations` — a superset
 /// of the legacy env-derived shape (`id`/`name`/`region`/`provider`) plus
 /// registry fields and computed per-type availability.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct LocationEntry {
     pub id: String,
     /// Display label — user/agent-chosen (private) or o2's friendly name (public).
@@ -73,7 +73,7 @@ pub struct LocationEntry {
 }
 
 /// Capabilities response sourced from the location registry.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SyntheticsCapabilitiesV2 {
     pub locations: Vec<LocationEntry>,
     pub browsers: Vec<String>,
@@ -387,7 +387,7 @@ pub(crate) async fn location_for_write(
 }
 
 /// Private rows carry the org's `o2syn_` token, withheld without PUT on the default folder.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CreateLocationResponse {
     pub location: synthetics_locations::SyntheticsLocationRecord,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -501,7 +501,7 @@ pub async fn create_location(
 
 /// A registered agent as shown on the location detail page (read-only —
 /// agents self-register; there is nothing to edit).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct LocationAgentInfo {
     pub id: String,
     pub name: String,
@@ -515,7 +515,7 @@ pub struct LocationAgentInfo {
 }
 
 /// One synthetic assigned to the location, for the detail page's checks table.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct LocationCheckSummary {
     pub id: String,
     pub name: String,
@@ -528,7 +528,7 @@ pub struct LocationCheckSummary {
 
 /// `GET /{org}/synthetics/locations/{id}` — the location entry (same stats as
 /// the list) plus its agents and assigned checks.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct LocationDetail {
     #[serde(flatten)]
     pub location: LocationEntry,
