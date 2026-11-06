@@ -90,3 +90,46 @@ export async function settleIntoView(page, locator) {
     await locator.first().scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
 }
+
+const DESTINATION_LIST = '[data-test="alert-destinations-list"]';
+const DESTINATION_LIST_OPTION = '[data-test="alert-destinations-list-option"]';
+const DESTINATION_TRIGGER = '[data-test="alert-destinations-select-trigger"]';
+
+/** Up to eight destinations render as checkboxes, more as a multi-select; true when the checkbox list is showing. */
+export async function destinationsShowAsList(page) {
+    const list = page.locator(`${DESTINATION_LIST}, ${DESTINATION_TRIGGER}`).first();
+    await list.waitFor({ state: 'attached', timeout: 15000 });
+    await settleIntoView(page, list);
+    return page.locator(DESTINATION_LIST).first().isVisible();
+}
+
+/** Picks one destination by name in either form of the destinations field. */
+export async function pickAlertDestination(page, destinationName) {
+    if (await destinationsShowAsList(page)) {
+        await page.locator(DESTINATION_LIST_OPTION).filter({ hasText: destinationName }).first().click();
+        return;
+    }
+    await page.locator(DESTINATION_TRIGGER).first().click();
+    const choice = page.getByRole('option', { name: destinationName, exact: true });
+    await choice.waitFor({ state: 'visible', timeout: 15000 });
+    await choice.click();
+    await page.keyboard.press('Escape');
+}
+
+/** Unpicks every selected destination in either form of the destinations field. */
+export async function clearAlertDestinations(page) {
+    if (await destinationsShowAsList(page)) {
+        const checked = page.locator(`${DESTINATION_LIST_OPTION} [aria-checked="true"]`);
+        while (await checked.count()) {
+            await checked.first().click();
+        }
+        return;
+    }
+    await page.locator(DESTINATION_TRIGGER).first().click();
+    const selected = page.locator('[role="option"][aria-selected="true"]');
+    await selected.first().waitFor({ state: 'visible', timeout: 15000 });
+    while (await selected.count()) {
+        await selected.first().click();
+    }
+    await page.keyboard.press('Escape');
+}
