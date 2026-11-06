@@ -33,12 +33,12 @@ use crate::{
     table::cipher,
 };
 
-/// The `_meta` DEK when a stored secret needs one and encryption is on, else `None`.
+/// The `_meta` DEK when a stored secret needs one and on-call secrets are on, else `None`.
 pub(super) async fn secrets_key(needed: bool) -> Result<Option<Vec<u8>>, Error> {
     if !needed {
         return Ok(None);
     }
-    key_if_encrypting(cipher::is_encrypting(), cipher::get_dek).await
+    key_if_encrypting(cipher::oncall_secrets_on(), cipher::get_dek).await
 }
 
 /// The stored form of a secret: `AESenc:` text under `key`, or null without a key.

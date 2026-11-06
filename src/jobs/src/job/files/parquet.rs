@@ -47,10 +47,9 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
+use search::{
+    datafusion::{exec::TableBuilder, sort_order::FileSortOrder},
     merge::{self, MergeMode, MergeOutput},
-    sort_order::FileSortOrder,
 };
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::{
