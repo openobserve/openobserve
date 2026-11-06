@@ -799,6 +799,5 @@ async function addToQueue(queue: LlmQueue, rows: LlmDiscoveryItem[]) {
   }
 }
 
-
 onMounted(fetchItems);
 </script>

@@ -1204,7 +1204,10 @@ pub fn basic_routes() -> Router {
         router = router.route(
             "/api/v2/{org_id}/annotations/public",
             post(annotations::post_feedback_vote)
-                .layer(DefaultBodyLimit::max(annotations::FEEDBACK_MAX_BODY_BYTES)),
+                .layer(DefaultBodyLimit::max(annotations::FEEDBACK_MAX_BODY_BYTES))
+                .route_layer(middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiObservability], req, next)
+                })),
         );
     }
 

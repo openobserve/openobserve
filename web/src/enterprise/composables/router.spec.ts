@@ -65,12 +65,9 @@ describe("enterprise routes: ai_observability license", () => {
     "/ai/model-pricing/gaps",
     "/ai/model-pricing/edit",
     "/ai/agent-mapping",
-  ])(
-    "tags %s with meta.licenseFeature so a locked license renders it locked",
-    (path) => {
-      expect(resolveMeta(path).licenseFeature).toBe("ai_observability");
-    },
-  );
+  ])("tags %s with meta.licenseFeature so a locked license renders it locked", (path) => {
+    expect(resolveMeta(path).licenseFeature).toBe("ai_observability");
+  });
 });
 
 describe("enterprise routes: removed Paid Usage page", () => {
