@@ -493,8 +493,10 @@ describe("AddAlert drafts", () => {
       { modelValue: { ...savedAlert }, isUpdated: true },
       false,
     );
-    const hidden = wrapper!.findComponent(AddAlert).get('select[aria-hidden="true"]');
-    hidden.element.dispatchEvent(new Event("change", { bubbles: true }));
+    const hidden = document.createElement("select");
+    hidden.setAttribute("aria-hidden", "true");
+    wrapper!.findComponent(AddAlert).get("form").element.appendChild(hidden);
+    hidden.dispatchEvent(new Event("change", { bubbles: true }));
     await flushPromises();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vm().form.setFieldValue("description", "set by a late load");

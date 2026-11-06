@@ -278,21 +278,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alerts.sections.watch.title')"
             :help="t('alerts.sections.watch.help')"
           >
+            <OSettingRow
+              :label="t('alerts.sections.howItChecks')"
+              fill
+              data-test="add-alert-how-it-checks-row"
+            >
+              <OChoiceCards
+                :model-value="formData.is_real_time"
+                :options="alertTypeOptions"
+                :label="t('alerts.sections.howItChecks')"
+                :disabled="beingUpdated || anomalyEditMode"
+                data-test="add-alert-type-tabs"
+                @update:model-value="onAlertTypeChange"
+              />
+            </OSettingRow>
             <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-              <OSettingRow
-                :label="t('alerts.sections.rows.streamTypeLabel')"
-                :description="t('alerts.sections.rows.streamType')"
-                required
-              >
-                <OFormSelect
-                  ref="streamTypeRef"
-                  name="stream_type"
-                  :aria-label="t('alerts.streamType')"
-                  data-test="add-alert-stream-type-select-dropdown"
-                  :options="streamTypes"
-                  :searchable="false"
-                  class="w-37.5"
+              <OSettingRow :label="t('alerts.sections.rows.streamTypeLabel')" required fill>
+                <OChoiceCards
+                  :model-value="formData.stream_type"
+                  :options="streamTypeOptions"
+                  :label="t('alerts.streamType')"
                   :disabled="beingUpdated || anomalyEditMode"
+                  data-test="add-alert-stream-type-cards"
                   @update:model-value="onStreamTypeChange"
                 />
               </OSettingRow>
@@ -320,8 +327,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </OSettingRow>
+              <AlertSampleEvents
+                v-if="formData.stream_name && !isAnomalyMode"
+                :stream-name="formData.stream_name"
+                :stream-type="formData.stream_type"
+              />
             </div>
+          </AlertFormSection>
 
+          <AlertFormSection
+            id="condition"
+            :index="2"
+            :title="t('alerts.sections.condition.title')"
+            :help="t('alerts.sections.condition.help')"
+          >
             <div data-test="add-alert-query-card" data-snap-stop>
               <CompositeAlertForm
                 v-if="isCompositeMode"
@@ -383,15 +402,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :section-targets="sectionTargets"
               />
             </div>
-          </AlertFormSection>
-
-          <AlertFormSection
-            id="condition"
-            :index="2"
-            :title="t('alerts.sections.condition.title')"
-            :help="t('alerts.sections.condition.help')"
-          >
             <div class="flex flex-col" data-snap-stop>
+              <OSettingRow
+                v-if="showsConditionPresets"
+                :label="t('alerts.sections.presets.label')"
+                :description="t('alerts.sections.presets.help')"
+                fill
+                data-test="add-alert-condition-presets"
+              >
+                <OChoiceCards
+                  :model-value="activeConditionPreset"
+                  :options="conditionPresetOptions"
+                  :label="t('alerts.sections.presets.label')"
+                  @update:model-value="applyConditionPreset"
+                />
+              </OSettingRow>
               <p
                 v-if="formData.is_real_time === 'true'"
                 class="text-text-secondary m-0 py-3 text-sm"
@@ -404,6 +429,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ref="(el) => setSectionTarget('queryCondition', el)"
                 class="empty:hidden"
                 data-snap-stop
+              />
+              <AlertBacktest
+                v-if="showsBacktest"
+                :query="backtestQuery"
+                :stream-type="formData.stream_type"
+                :period="Number(formData.trigger_condition.period)"
+                :operator="formData.trigger_condition.operator"
+                :threshold="Number(formData.trigger_condition.threshold)"
               />
               <div
                 v-show="isCompositeMode"
@@ -423,6 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="empty:hidden"
                 data-snap-stop
               />
+              <AlertOptionalHeading v-if="!isAnomalyMode && !isCompositeMode" />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsHold', el)"
@@ -523,36 +557,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :help="t('alerts.sections.schedule.help')"
           >
             <div class="flex flex-col" data-snap-stop>
-              <OSettingRow
-                :label="t('alerts.sections.howItChecks')"
-                fill
-                data-test="add-alert-how-it-checks-row"
-              >
-                <OToggleGroup
-                  :model-value="formData.is_real_time"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="min-w-0 self-start"
-                  mobile-dropdown
-                  data-test="add-alert-type-tabs"
-                  @update:model-value="onAlertTypeChange"
-                >
-                  <OToggleGroupItem
-                    v-for="option in alertTypeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                    size="sm"
-                    :data-test="`add-alert-type-tab-${option.value}`"
-                  >
-                    <template #icon-left>
-                      <OIcon :name="option.icon" size="sm" />
-                    </template>
-                    {{ option.label }}
-                  </OToggleGroupItem>
-                </OToggleGroup>
-                <p class="text-text-secondary m-0 mt-1.5 text-xs" data-test="add-alert-type-help">
-                  {{ alertTypeHelp }}
-                </p>
-              </OSettingRow>
               <div
                 v-show="!isAnomalyMode && !isCompositeMode"
                 :ref="(el) => setSectionTarget('querySchedule', el)"
@@ -570,6 +574,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ref="(el) => setSectionTarget('settingsSchedule', el)"
                 class="empty:hidden"
                 data-snap-stop
+              />
+              <AlertCheckTimeline
+                v-if="showsCheckTimeline"
+                :frequency="Number(formData.trigger_condition.frequency)"
+                :period="Number(formData.trigger_condition.period)"
               />
             </div>
           </AlertFormSection>
@@ -604,6 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </OSettingRow>
+              <AlertOptionalHeading v-if="!isAnomalyMode" />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('advancedDetails', el)"
@@ -665,6 +675,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add="onTierAdd"
                 @toggle="onTierToggle('details')"
               />
+              <div
+                class="border-border-default mt-3 flex flex-col gap-2 border-t pt-3"
+                data-test="add-alert-review"
+              >
+                <span class="text-text-heading text-sm font-medium">{{
+                  t("alerts.sections.review.title")
+                }}</span>
+                <dl class="m-0 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
+                  <div v-for="item in reviewItems" :key="item.id" class="min-w-0">
+                    <dt class="text-text-secondary text-xs">{{ item.title }}</dt>
+                    <dd class="m-0 min-w-0">
+                      <button
+                        type="button"
+                        class="text-accent block max-w-full cursor-pointer truncate text-sm hover:underline"
+                        :data-test="`add-alert-review-${item.id}`"
+                        @click="goToSection(item.id)"
+                      >
+                        {{ item.summary }}
+                      </button>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             </div>
           </AlertFormSection>
         </OSnapScroll>
@@ -925,6 +958,13 @@ import alertsService from "@/services/alerts";
 import OSnapScroll from "@/lib/core/SnapScroll/OSnapScroll.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSectionNav from "@/lib/navigation/SectionNav/OSectionNav.vue";
+import OChoiceCards from "@/lib/forms/ChoiceCards/OChoiceCards.vue";
+import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.types";
+import AlertSampleEvents from "./AlertSampleEvents.vue";
+import AlertCheckTimeline from "./AlertCheckTimeline.vue";
+import AlertBacktest from "./AlertBacktest.vue";
+import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
+import AlertOptionalHeading from "./AlertOptionalHeading.vue";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
 import { isTieredSetting, type AlertFindId } from "./alertSettingFind";
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
@@ -944,16 +984,13 @@ import config from "@/aws-exports";
 import { getUUID } from "@/utils/zincutils";
 import {
   AGGREGATION_ENABLED_FIELD,
+  ALERT_CONDITION_PRESETS,
   ALERT_SECTIONS,
   type AlertSectionId,
   type AlertSectionSlot,
   type AlertSectionTargets,
 } from "./alertFormSections";
-import {
-  useAlertFormSections,
-  checkEveryLabel,
-  type FieldMetaMap,
-} from "@/composables/alerts/useAlertFormSections";
+import { useAlertFormSections, type FieldMetaMap } from "@/composables/alerts/useAlertFormSections";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { OSnapScrollExpose } from "@/lib/core/SnapScroll/OSnapScroll.types";
 import AlertEditStatus from "./AlertEditStatus.vue";
@@ -1026,6 +1063,11 @@ export default defineComponent({
     OSnapScroll,
     OSettingRow,
     OSectionNav,
+    OChoiceCards,
+    AlertSampleEvents,
+    AlertCheckTimeline,
+    AlertBacktest,
+    AlertOptionalHeading,
     OCommandSearch,
     AlertFormSection,
     AlertTierLinks,
@@ -1185,20 +1227,29 @@ export default defineComponent({
     const activeEvaluationStatus = computed(
       () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
-    const alertTypeOptions = computed(() => [
+    const alertTypeOptions = computed<ChoiceCardOption[]>(() => [
       {
-        label: checkEveryLabel(alertForm.formData.value, alertForm.t),
+        label: alertForm.t("alerts.sections.onSchedule"),
+        description: alertForm.t("alerts.sections.typeHelp.scheduled"),
         value: "false",
         icon: "schedule",
+        dataTest: "add-alert-type-tab-false",
       },
-      { label: alertForm.t("alerts.sections.asItHappens"), value: "true", icon: "bolt" },
+      {
+        label: alertForm.t("alerts.sections.asItHappens"),
+        description: alertForm.t("alerts.sections.typeHelp.realtime"),
+        value: "true",
+        icon: "bolt",
+        dataTest: "add-alert-type-tab-true",
+      },
       ...(isAnomalyDetectionEnabled.value
         ? [
             {
               label: alertForm.t("alerts.sections.whenUnusual"),
+              description: alertForm.t("alerts.sections.typeHelp.anomaly"),
               value: "anomaly",
-              icon: "query-stats",
-              locked: anomalyLicenseLocked.value,
+              icon: "query-stats" as const,
+              dataTest: "add-alert-type-tab-anomaly",
             },
           ]
         : []),
@@ -1207,19 +1258,93 @@ export default defineComponent({
         ? [
             {
               label: alertForm.t("alerts.sections.whenCombined"),
+              description: alertForm.t("alerts.sections.typeHelp.composite"),
               value: "composite",
-              icon: "account-tree",
+              icon: "account-tree" as const,
+              dataTest: "add-alert-type-tab-composite",
             },
           ]
         : []),
     ]);
 
-    const alertTypeHelp = computed(() => {
-      const mode = alertForm.formData.value.is_real_time;
-      if (mode === "true") return alertForm.t("alerts.sections.typeHelp.realtime");
-      if (mode === "anomaly") return alertForm.t("alerts.sections.typeHelp.anomaly");
-      if (mode === "composite") return alertForm.t("alerts.sections.typeHelp.composite");
-      return alertForm.t("alerts.sections.typeHelp.scheduled");
+    const streamTypeOptions = computed<ChoiceCardOption[]>(() => [
+      {
+        label: alertForm.t("alerts.sections.dataTypes.logs.label"),
+        description: alertForm.t("alerts.sections.dataTypes.logs.help"),
+        value: "logs",
+        icon: "search",
+        dataTest: "add-alert-stream-type-card-logs",
+      },
+      {
+        label: alertForm.t("alerts.sections.dataTypes.metrics.label"),
+        description: alertForm.t("alerts.sections.dataTypes.metrics.help"),
+        value: "metrics",
+        icon: "bar-chart",
+        dataTest: "add-alert-stream-type-card-metrics",
+      },
+      {
+        label: alertForm.t("alerts.sections.dataTypes.traces.label"),
+        description: alertForm.t("alerts.sections.dataTypes.traces.help"),
+        value: "traces",
+        icon: "account-tree",
+        dataTest: "add-alert-stream-type-card-traces",
+      },
+    ]);
+
+    // A preset writes an event count, so it only fits a scheduled builder alert being created.
+    const showsConditionPresets = computed(() => {
+      const fd = alertForm.formData.value;
+      return (
+        !alertForm.beingUpdated.value &&
+        fd.is_real_time === "false" &&
+        (fd.query_condition?.type || "custom") === "custom" &&
+        !alertForm.isAggregationEnabled.value
+      );
+    });
+    const conditionPresetOptions = computed<ChoiceCardOption[]>(() =>
+      ALERT_CONDITION_PRESETS.map((preset) => ({
+        value: preset.id,
+        label: alertForm.t(preset.labelKey),
+        description: alertForm.t("alerts.sections.presets.orMore", { count: preset.threshold }),
+        dataTest: `add-alert-condition-preset-${preset.id}`,
+      })),
+    );
+    const activeConditionPreset = computed(() => {
+      const tc = alertForm.formData.value.trigger_condition;
+      return ALERT_CONDITION_PRESETS.find(
+        (preset) => tc?.operator === ">=" && Number(tc?.threshold) === preset.threshold,
+      )?.id;
+    });
+    const applyConditionPreset = (id: string) => {
+      const preset = ALERT_CONDITION_PRESETS.find((candidate) => candidate.id === id);
+      if (!preset) return;
+      alertForm.setF("trigger_condition.operator", ">=");
+      alertForm.setF("trigger_condition.threshold", preset.threshold);
+    };
+
+    // The 24-hour check replays an event count, so it needs a scheduled builder alert counting events.
+    const showsBacktest = computed(() => {
+      const fd = alertForm.formData.value;
+      return (
+        !!fd.stream_name &&
+        fd.is_real_time === "false" &&
+        (fd.query_condition?.type || "custom") === "custom" &&
+        !alertForm.isAggregationEnabled.value
+      );
+    });
+
+    const backtestQuery = computed(() =>
+      generateSqlQuery(
+        alertForm.formData.value,
+        alertForm.streamFieldsMap.value,
+        false,
+        store.state.zoConfig.timestamp_column || "_timestamp",
+      ),
+    );
+
+    const showsCheckTimeline = computed(() => {
+      const fd = alertForm.formData.value;
+      return fd.is_real_time === "false" && fd.trigger_condition?.frequency_type !== "cron";
     });
 
     // Mode as the subtitle, exactly as AddPanel does it ("Add Panel" / "Edit
@@ -1268,7 +1393,7 @@ export default defineComponent({
       alertForm.updateStreams();
     };
 
-    // Alert type now lives in a toggle group, not an OFormSelect, so it writes
+    // Alert type is not an OFormSelect, so it writes
     // the ONE form directly. The existing watch on is_real_time still drives the
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
@@ -1367,6 +1492,8 @@ export default defineComponent({
       visited: visitedSections,
       t: alertForm.t,
     });
+
+    const reviewItems = computed(() => sectionItems.value.filter((item) => item.id !== "details"));
 
     const alertSentence = computed(() => {
       if (alertForm.isAnomalyMode.value) return "";
@@ -1671,7 +1798,15 @@ export default defineComponent({
       isAnomalyDataReadinessStatus,
       anomalyCanCheckDataNow,
       alertTypeOptions,
-      alertTypeHelp,
+      streamTypeOptions,
+      showsConditionPresets,
+      conditionPresetOptions,
+      activeConditionPreset,
+      applyConditionPreset,
+      showsCheckTimeline,
+      showsBacktest,
+      backtestQuery,
+      reviewItems,
       lgUp,
       snapScrollRef,
       activeSection,
