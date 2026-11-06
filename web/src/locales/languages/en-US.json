@@ -10417,6 +10417,22 @@
     "sections": {
       "navLabel": "Alert sections",
       "eyebrow": "Step {n} of {total}",
+      "eyebrowOptional": "Step {n} of {total} · Optional",
+      "optional": {
+        "tag": "Optional",
+        "title": "Optional",
+        "help": "Skip these unless you need them. The defaults work for most alerts."
+      },
+      "backtest": {
+        "label": "Last 24 hours",
+        "help": "How this limit would have behaved",
+        "loading": "Checking the last 24 hours…",
+        "failed": "Could not check the last 24 hours.",
+        "result": "This would have alerted in {count} of the {total} {period}-minute windows.",
+        "dayAgo": "24 h ago",
+        "never": "It would not have alerted at all. If you expected it to, lower the limit.",
+        "noisy": "That is often, so people may start to ignore it. A higher limit would make it quieter."
+      },
       "filtersMode": "Filters",
       "addFilter": "Add a filter",
       "typeHelp": {
@@ -10443,17 +10459,49 @@
       "asItHappens": "As it happens",
       "whenUnusual": "When unusual",
       "whenCombined": "When alerts combine",
+      "onSchedule": "On a schedule",
+      "noDestinationsYet": "No destinations yet. Add one to get notified.",
+      "dataTypes": {
+        "logs": { "label": "Logs", "help": "Events your apps and systems write" },
+        "metrics": { "label": "Metrics", "help": "Numbers measured over time" },
+        "traces": { "label": "Traces", "help": "Requests moving through your services" }
+      },
+      "samples": {
+        "label": "Recent events",
+        "help": "The latest events, so you can check this is the right stream",
+        "loading": "Loading recent events…",
+        "empty": "Nothing in the last hour. You can still alert on this stream.",
+        "failed": "Could not load recent events."
+      },
+      "presets": {
+        "label": "Start from",
+        "help": "Pick one, then adjust it below",
+        "any": "Any event",
+        "few": "A few events",
+        "burst": "A burst",
+        "orMore": "{count} or more"
+      },
+      "timeline": {
+        "label": "What this looks like",
+        "now": "Now",
+        "minutesAgo": "{count} min ago",
+        "caption": "Every {frequency} min we read the last {period} min of data.",
+        "gap": "Each check reads less than the time between checks, so some events are never read."
+      },
+      "review": {
+        "title": "Your alert so far"
+      },
       "watch": {
-        "title": "What should we watch?",
-        "nav": "What to watch",
-        "help": "Pick the data this alert keeps an eye on.",
+        "title": "What kind of alert is this?",
+        "nav": "Alert type and data",
+        "help": "This decides which settings you see next.",
         "pickStream": "Pick a stream",
         "childCount": "{count} alert combined | {count} alerts combined"
       },
       "condition": {
         "title": "When should we alert you?",
         "nav": "When to alert",
-        "help": "Draw the line between normal and a problem. The preview shows how it behaves right now.",
+        "help": "Choose which events count and how many is a problem. The preview shows how it behaves right now.",
         "realtime": "Any matching event",
         "anomaly": "Unusual values",
         "composite": "When the expression holds"

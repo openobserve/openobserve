@@ -121,13 +121,24 @@ const showsSummary = (item: SectionNavItem): boolean =>
             >
               {{ item.stateLabel }}
             </span>
-            <OTruncatedText
-              v-if="showsSummary(item)"
-              class="text-text-secondary text-xs max-lg:hidden"
-              :data-test="`o-section-nav-summary-${item.id}`"
+            <span
+              v-if="showsSummary(item) || item.tag"
+              class="text-text-secondary flex min-w-0 gap-1.5 text-xs max-lg:hidden"
             >
-              {{ item.summary }}
-            </OTruncatedText>
+              <span
+                v-if="item.tag"
+                class="text-text-label shrink-0 font-medium"
+                :data-test="`o-section-nav-tag-${item.id}`"
+                >{{ item.tag }}</span
+              >
+              <OTruncatedText
+                v-if="showsSummary(item)"
+                class="min-w-0"
+                :data-test="`o-section-nav-summary-${item.id}`"
+              >
+                {{ item.summary }}
+              </OTruncatedText>
+            </span>
           </span>
         </button>
       </li>

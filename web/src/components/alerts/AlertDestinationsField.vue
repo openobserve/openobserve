@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="placeholder"
         :error="!!error"
         :wrap="wrap"
+        :list="list"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
         @refresh="refreshTargets"
@@ -121,6 +122,8 @@ const props = withDefaults(
     supportsWorkflows?: boolean;
     /** Let the controls wrap inside a column narrower than the row (opt-in). */
     wrap?: boolean;
+    /** Show a short list of targets as checkboxes instead of a dropdown (opt-in). */
+    list?: boolean;
     /** Render as an OSettingRow, for forms built from setting rows (opt-in). */
     settingRow?: boolean;
   }>(),
@@ -129,6 +132,7 @@ const props = withDefaults(
     notifiesNobody: false,
     showStatus: false,
     wrap: false,
+    list: false,
     settingRow: false,
   },
 );

@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertDestinationsField
               :wrap="!!sectionTargets"
               :setting-row="!!sectionTargets"
+              :list="!!sectionTargets"
               :class="sectionTargets ? '' : 'mb-4 pb-4'"
               :destinations="destinations"
               :workflows="workflows"
@@ -317,6 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertDestinationsField
               :wrap="!!sectionTargets"
               :setting-row="!!sectionTargets"
+              :list="!!sectionTargets"
               ref="destinationsFieldRef"
               :class="sectionTargets ? '' : 'me-2 mb-4!'"
               :destinations="destinations"
