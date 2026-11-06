@@ -190,7 +190,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   const items = computed<SectionNavItem[]>(() => {
     const fd = input.formData.value ?? {};
-    return ALERT_SECTIONS.map(({ id, navKey, optional }) => {
+    return ALERT_SECTIONS.map(({ id, navKey }) => {
       const facts = sectionFacts(id, fd);
       const errors = errorCounts.value[id];
       const seen = input.isEditing.value || (input.visited?.value.has(id) ?? true);
@@ -210,8 +210,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (seen && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
-      const tag = optional ? t("alerts.sections.optional.tag") : undefined;
-      return { id, title: t(navKey), tag, summary: facts.summary, state, stateLabel };
+      return { id, title: t(navKey), summary: facts.summary, state, stateLabel };
     });
   });
 

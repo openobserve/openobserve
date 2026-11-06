@@ -47,10 +47,9 @@ describe("useAlertFormSections", () => {
     expect(items.value[0].title).toBe("Alert type and data");
   });
 
-  it("tags the steps a user can skip as optional, and only those", () => {
+  it("tags no step in the section list", () => {
     const { items } = setup(scheduled());
-    const tagged = items.value.filter((i) => i.tag === "Optional").map((i) => i.id);
-    expect(tagged).toEqual(["notify", "schedule"]);
+    expect(items.value.filter((i) => i.tag)).toEqual([]);
   });
 
   it("asks for a stream and a name until they are set", () => {
