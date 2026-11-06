@@ -12954,6 +12954,9 @@
       "noDestinationsFound": "未找到目标",
       "noDetectionResults": "此范围内暂无检测结果",
       "noFieldsFound": "未找到字段",
+      "checkDataNow": "立即检查",
+      "checkDataNowTooltip": "立即重新评估当前数据，而不是等待下一次自动检查。",
+      "dataReadinessReason": "原因",
       "noticeRetrain": "自动重新训练",
       "noticeRetrainTooltip": "升级后无法读取已保存的模型，因此该模型已被丢弃，配置已自动排队等待重新训练。无需任何操作；训练完成后检测即会恢复。",
       "noticeSkipAbsence": "缺失评分落后于回看窗口；已无法再获取的时间区间被跳过并记录。",
@@ -12988,6 +12991,8 @@
       "autoUntrainedHelp": "自动模式将根据您的历史数据学习级别。",
       "autoTrainingHelp": "训练完成后将显示级别。",
       "autoFailedHelp": "训练失败。尚无已学习的级别。请查看上方的训练错误。",
+      "autoWaitingForDataHelp": "合适的训练数据尚不足。在此之前没有学习到的水平。检测器保持启用并会自动重新检查。",
+      "autoNotApplicableHelp": "当前数据无法支持异常模型。这不是失败。检测器保持启用并会自动重新检查。",
       "autoRetrainingHelp": "正在重新训练。显示的是上次学习的级别；模型可用性尚未确认。",
       "autoRetrainFailedHelp": "重新训练失败。显示的是上次学习的级别；模型可用性尚未确认。请查看上方的训练错误。",
       "autoUnconfirmedHelp": "显示的是上次学习的级别；尚未确认存在活跃模型。",
@@ -23080,7 +23085,9 @@
         "ready": "就绪",
         "running": "运行中",
         "training": "训练中",
-        "waiting": "等待中"
+        "waiting": "等待中",
+        "waitingForData": "等待数据",
+        "notApplicable": "不适用"
       },
       "anomalyStatus": {
         "active": "活跃",
@@ -23088,7 +23095,9 @@
         "training": "训练中",
         "failed": "失败",
         "waiting": "等待中",
-        "disabled": "已禁用"
+        "disabled": "已禁用",
+        "waitingForData": "等待数据",
+        "notApplicable": "不适用"
       },
       "aiToolsetKind": {
         "skill": "技能",

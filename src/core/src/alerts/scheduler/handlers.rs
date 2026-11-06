@@ -2125,6 +2125,8 @@ async fn handle_anomaly_detection_triggers(
                 .set(active)
                 .filter(anomaly_entity::Column::AnomalyId.eq(anomaly_id.as_str()))
                 .filter(anomaly_entity::Column::Status.ne(AnomalyStatus::Training.to_i32()))
+                // A refusal during this run revoked the model, so its status must survive.
+                .filter(anomaly_entity::Column::IsTrained.eq(true))
                 .exec(db)
                 .await
             {

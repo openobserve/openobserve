@@ -12952,6 +12952,9 @@
       "noDestinationsFound": "No destinations found",
       "noDetectionResults": "No detection results in this range yet",
       "noFieldsFound": "No fields found",
+      "checkDataNow": "Check now",
+      "checkDataNowTooltip": "Evaluate the current data again now instead of waiting for the next automatic check.",
+      "dataReadinessReason": "Reason",
       "noticeRetrain": "Auto-retraining",
       "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
       "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
@@ -12986,6 +12989,8 @@
       "autoUntrainedHelp": "Auto will learn a level from your history.",
       "autoTrainingHelp": "The level will appear when training completes.",
       "autoFailedHelp": "Training failed. No learned level yet. Review the training error above.",
+      "autoWaitingForDataHelp": "Not enough suitable training data yet. No learned level until then. The detector stays enabled and is checked again automatically.",
+      "autoNotApplicableHelp": "The current data cannot support an anomaly model. This is not a failure. The detector stays enabled and is checked again automatically.",
       "autoRetrainingHelp": "Retraining. The last learned level is shown; model availability is unconfirmed.",
       "autoRetrainFailedHelp": "Retraining failed. The last learned level is shown; model availability is unconfirmed. Review the training error above.",
       "autoUnconfirmedHelp": "The last learned level is shown; an active model has not been confirmed.",
@@ -23078,7 +23083,9 @@
         "ready": "Ready",
         "running": "Running",
         "training": "Training",
-        "waiting": "Waiting"
+        "waiting": "Waiting",
+        "waitingForData": "Waiting for data",
+        "notApplicable": "Not applicable"
       },
       "anomalyStatus": {
         "active": "Active",
@@ -23086,7 +23093,9 @@
         "training": "Training",
         "failed": "Failed",
         "waiting": "Waiting",
-        "disabled": "Disabled"
+        "disabled": "Disabled",
+        "waitingForData": "Waiting for data",
+        "notApplicable": "Not applicable"
       },
       "aiToolsetKind": {
         "skill": "Skill",

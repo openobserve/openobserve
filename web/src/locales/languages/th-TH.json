@@ -12952,6 +12952,9 @@
       "noDestinationsFound": "No destinations found",
       "noDetectionResults": "No detection results in this range yet",
       "noFieldsFound": "No fields found",
+      "checkDataNow": "ตรวจสอบตอนนี้",
+      "checkDataNowTooltip": "ประเมินข้อมูลปัจจุบันอีกครั้งตอนนี้โดยไม่ต้องรอการตรวจสอบอัตโนมัติครั้งถัดไป",
+      "dataReadinessReason": "เหตุผล",
       "noticeRetrain": "Auto-retraining",
       "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
       "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
@@ -12986,6 +12989,8 @@
       "autoUntrainedHelp": "Auto will learn a level from your history.",
       "autoTrainingHelp": "The level will appear when training completes.",
       "autoFailedHelp": "Training failed. No learned level yet. Review the training error above.",
+      "autoWaitingForDataHelp": "ยังมีข้อมูลการฝึกที่เหมาะสมไม่เพียงพอ จนกว่าจะถึงตอนนั้นจะไม่มีระดับที่เรียนรู้ ตัวตรวจจับยังคงเปิดใช้งานและจะตรวจสอบอีกครั้งโดยอัตโนมัติ",
+      "autoNotApplicableHelp": "ข้อมูลปัจจุบันไม่สามารถรองรับโมเดลความผิดปกติได้ นี่ไม่ใช่ความล้มเหลว ตัวตรวจจับยังคงเปิดใช้งานและจะตรวจสอบอีกครั้งโดยอัตโนมัติ",
       "autoRetrainingHelp": "Retraining. The last learned level is shown; model availability is unconfirmed.",
       "autoRetrainFailedHelp": "Retraining failed. The last learned level is shown; model availability is unconfirmed. Review the training error above.",
       "autoUnconfirmedHelp": "The last learned level is shown; an active model has not been confirmed.",
@@ -23078,7 +23083,9 @@
         "ready": "Ready",
         "running": "Running",
         "training": "Training",
-        "waiting": "Waiting"
+        "waiting": "Waiting",
+        "waitingForData": "กำลังรอข้อมูล",
+        "notApplicable": "ไม่สามารถใช้ได้"
       },
       "anomalyStatus": {
         "active": "Active",
@@ -23086,7 +23093,9 @@
         "training": "Training",
         "failed": "Failed",
         "waiting": "Waiting",
-        "disabled": "ปิดใช้งาน"
+        "disabled": "ปิดใช้งาน",
+        "waitingForData": "กำลังรอข้อมูล",
+        "notApplicable": "ไม่สามารถใช้ได้"
       },
       "aiToolsetKind": {
         "skill": "Skill",
