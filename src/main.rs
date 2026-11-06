@@ -210,6 +210,16 @@ async fn run() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("cipher master key boot failed: {e}");
             }
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = infra::table::cipher::install_oncall_key(
+                !o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .oncall_master_key
+                    .is_empty(),
+            ) {
+                job_init_tx.send(false).ok();
+                panic!("on-call key install failed: {e}");
+            }
 
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
