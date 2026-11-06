@@ -36,7 +36,7 @@ use crate::authz::{remove_ownership, set_ownership};
 pub enum FolderError {
     /// An error that occurs while interacting with the database through the
     /// [infra] crate.
-    #[error("InfraError# Internal error")]
+    #[error("InfraError# {0}")]
     InfraError(#[from] infra::errors::Error),
 
     /// An error that occurs while interacting with reports through the [infra::table::reports]
@@ -127,6 +127,10 @@ pub async fn save_folder(
         return Err(FolderError::UpdateDefaultFolder);
     }
 
+    if claims_default_name(&folder.folder_id, &folder.name) {
+        return Err(FolderError::FolderNameAlreadyExists);
+    }
+
     if folder.folder_id != DEFAULT_FOLDER {
         folder.folder_id = ider::generate();
     }
@@ -214,6 +218,10 @@ pub async fn update_folder(
 ) -> Result<Folder, FolderError> {
     if folder_id.eq(DEFAULT_FOLDER) {
         return Err(FolderError::UpdateDefaultFolder);
+    }
+
+    if claims_default_name(folder_id, &folder.name) {
+        return Err(FolderError::FolderNameAlreadyExists);
     }
 
     folder.folder_id = folder_id.to_string();
@@ -611,6 +619,12 @@ async fn permitted_folders(
         }
     }
     Ok(folder_list)
+}
+
+/// Whether a non-built-in folder would take the built-in one's name, blocking its creation. [pure]
+fn claims_default_name(folder_id: &str, name: &str) -> bool {
+    // Exact, like the case-sensitive unique index on (org, type, name) that the clash comes from.
+    folder_id != DEFAULT_FOLDER && name == DEFAULT_FOLDER
 }
 
 /// Drops the folder's ownership tuples and tells other regions; both only log a failure.
@@ -1013,5 +1027,47 @@ mod tests {
         // Test reports params
         let reports_params = ListReportsParams::new(org_id).in_folder(folder_id);
         assert_eq!(reports_params.org_id, org_id);
+    }
+
+    #[test]
+    fn only_the_built_in_folder_may_take_the_default_name() {
+        for (folder_id, name, expected) in [
+            ("abc", "default", true),
+            ("abc", "Default", false),
+            ("abc", " default", false),
+            ("abc", "default_1", false),
+            ("abc", "my default", false),
+            (DEFAULT_FOLDER, "default", false),
+        ] {
+            assert_eq!(
+                claims_default_name(folder_id, name),
+                expected,
+                "{folder_id:?} {name:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn create_and_rename_refuse_the_default_name_before_writing() {
+        let folder = |name: &str| Folder {
+            folder_id: String::new(),
+            name: name.to_string(),
+            ..Default::default()
+        };
+        let created = save_folder("o1", folder(" default "), FolderType::Alerts, false).await;
+        assert!(matches!(created, Err(FolderError::FolderNameAlreadyExists)));
+        let renamed = update_folder("o1", "abc", FolderType::Alerts, folder("default")).await;
+        assert!(matches!(renamed, Err(FolderError::FolderNameAlreadyExists)));
+    }
+
+    #[test]
+    fn infra_error_display_keeps_the_cause() {
+        let err = FolderError::InfraError(infra::errors::Error::Message(
+            "UNIQUE constraint failed: folders.name".to_string(),
+        ));
+        assert!(
+            err.to_string().contains("UNIQUE constraint failed"),
+            "{err}"
+        );
     }
 }

@@ -143,7 +143,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
 // 145: add alerts.incident_title_template.
-pub const DB_SCHEMA_VERSION: u64 = 145;
+// 146: rename user folders named default so the built-in default folder can be created.
+pub const DB_SCHEMA_VERSION: u64 = 146;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
