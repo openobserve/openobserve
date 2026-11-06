@@ -3,11 +3,7 @@
  * No types are declared inline in OGlyph.vue.
  */
 
-/**
- * A stored icon value. Either a Unicode emoji (`"🚀"`) or a registry glyph
- * reference (`"o2:redis"`). Callers persist and pass this opaquely; only OGlyph
- * and the registry need to know the difference.
- */
+/** A stored icon value: an emoji (`"🚀"`), `"o2:redis"`, `"icon:dashboard"` or `"mono:docker"`; callers treat it opaquely. */
 export type IconToken = string;
 
 /** Rendered footprint. `sm` suits a list row, `lg` a picker trigger. */
