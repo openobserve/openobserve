@@ -283,7 +283,7 @@ const props = withDefaults(
   defineProps<{
     preview?: RoutingPreview | null;
     teams?: { id: string; name: string }[];
-    aliases?: { id: string; display?: string }[];
+    aliases?: { id: string; display?: string; fields?: string[] }[];
     catalogue?: DimensionCatalogue;
     services?: DiscoveredService[];
     /** Signals that need an owner, offered as starting points. */
