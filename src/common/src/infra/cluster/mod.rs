@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use config::{
     cluster::{LOCAL_NODE, LOCAL_NODE_STATUS},
@@ -26,6 +26,8 @@ use config::{
 use infra::{cluster::*, errors::*};
 
 mod nats;
+
+static LOCAL_NODE_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
 /// Register and keep alive the node to cluster
 pub async fn register_and_keep_alive() -> Result<()> {
@@ -95,6 +97,8 @@ pub async fn set_offline() -> Result<()> {
 }
 
 pub async fn update_local_node(node: &Node) -> Result<()> {
+    LOCAL_NODE_SCHEDULED.store(node.scheduled, Ordering::Release);
+
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -111,6 +115,11 @@ pub async fn set_schedulable() -> Result<()> {
     if let Some(mut node) = get_node_by_uuid(&node_id).await {
         node.scheduled = true;
         update_local_node(&node).await?;
+    } else {
+        LOCAL_NODE_SCHEDULED.store(true, Ordering::Release);
+        log::warn!(
+            "[CLUSTER] node {node_id} is not in its own cache, the next heartbeat publishes scheduled=true"
+        );
     };
     Ok(())
 }
