@@ -39,22 +39,9 @@ pub struct GetAlertResponseBody {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
-    /// With `state`: how many visible alerts each view holds, across every permitted folder.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub counts: Option<config::meta::alerts::live_state::AlertLiveCounts>,
-    /// With `state`: the rows matching the filters before paging.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub total: Option<u64>,
-    /// With `state`: the latest visible recovery inside the `since` window.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_recovered: Option<LastRecoveredAlert>,
-}
-
-/// The alert that recovered last.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct LastRecoveredAlert {
-    pub name: String,
-    pub at: i64,
+    /// The run state could not be read, so the rows' live fields are blank.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub status_unavailable: bool,
 }
 
 /// An item in the list returned by the `ListAlerts` endpoint.
@@ -502,9 +489,7 @@ impl TryFrom<Vec<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>>
             .collect();
         Ok(Self {
             list: rslt?,
-            counts: None,
-            total: None,
-            last_recovered: None,
+            status_unavailable: false,
         })
     }
 }
@@ -903,14 +888,19 @@ mod tests {
     }
 
     #[test]
-    fn test_list_body_without_state_serializes_only_the_list() {
-        let body = ListAlertsResponseBody {
+    fn test_list_body_flags_unavailable_status_only_when_true() {
+        let body = |status_unavailable| ListAlertsResponseBody {
             list: vec![],
-            counts: None,
-            total: None,
-            last_recovered: None,
+            status_unavailable,
         };
-        assert_eq!(serde_json::to_string(&body).unwrap(), r#"{"list":[]}"#);
+        assert_eq!(
+            serde_json::to_string(&body(false)).unwrap(),
+            r#"{"list":[]}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&body(true)).unwrap(),
+            r#"{"list":[],"status_unavailable":true}"#
+        );
     }
 
     #[test]

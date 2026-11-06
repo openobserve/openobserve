@@ -733,6 +733,7 @@ fn filter_permitted_alerts(
         .into_iter()
         .filter(|a| {
             permissions.contains(&format!("alert:{}", a.name))
+                || permissions.contains(&format!("afolder:{}", a.folder_id))
                 || permissions.contains(&format!("alert:{}/{}", a.folder_id, a.id))
                 || permissions.contains(&format!("alert:{}", a.id))
         })
@@ -1278,6 +1279,17 @@ mod tests {
         assert_eq!(filter_permitted_alerts(alerts.clone(), None, "o").len(), 4);
         let all = Some(vec!["alert:_all_o".to_string()]);
         assert_eq!(filter_permitted_alerts(alerts, all, "o").len(), 4);
+    }
+
+    #[test]
+    fn test_filter_permitted_alerts_honours_a_folder_grant() {
+        let alerts = vec![named_alert("id1", "in_default", true)];
+        let grant = |folder: &str| Some(vec![format!("afolder:{folder}")]);
+        assert_eq!(
+            filter_permitted_alerts(alerts.clone(), grant("default"), "o").len(),
+            1
+        );
+        assert!(filter_permitted_alerts(alerts, grant("other"), "o").is_empty());
     }
 
     #[tokio::test]

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::alerts::{alert as meta_alerts, live_state::AlertLiveState};
+use config::meta::alerts::alert as meta_alerts;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
@@ -451,7 +451,7 @@ pub struct MoveAlertsRequestBody {
 }
 
 /// HTTP URL query component that contains parameters for listing alerts.
-#[derive(Debug, Default, Deserialize, utoipa::IntoParams)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 #[into_params(style = Form, parameter_in = Query)]
 #[serde(rename_all = "snake_case")]
 #[into_params(rename_all = "snake_case")]
@@ -523,12 +523,6 @@ pub struct ListAlertsQuery {
     /// (absent / false) keeps them off the hot list path so ordinary consumers
     /// neither pay the extra bytes nor receive destination/template names.
     pub include_dependencies: Option<bool>,
-
-    /// One live view in triage order, with `counts`, `total` and `last_recovered` added.
-    pub state: Option<AlertLiveState>,
-
-    /// Start of the `recovered` window in microseconds. Defaults to the last 24 hours.
-    pub since: Option<i64>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -581,19 +575,6 @@ impl ListAlertsQuery {
             sort_desc: matches!(self.sort_order.as_deref(), Some("desc")),
             slo_id: self.slo_id,
         }
-    }
-
-    /// Whether anything narrows the list below every alert the caller may see.
-    pub fn narrows_list(&self) -> bool {
-        self.folder.is_some()
-            || self.slo_id.is_some()
-            || self.stream_type.is_some()
-            || self.alert_name_substring.is_some()
-            || self.owner.is_some()
-            || self.enabled.is_some()
-            || self.alert_type.is_some()
-            || !self.priority.is_empty()
-            || self.tags.is_some()
     }
 
     /// The requested tag filter, normalized leniently (PT-8/D22).
@@ -973,8 +954,6 @@ mod tests {
             sort_by: None,
             sort_order: None,
             include_dependencies: None,
-            state: None,
-            since: None,
         };
         let params = q.into("my_org");
         assert_eq!(params.org_id, "my_org");
@@ -982,26 +961,6 @@ mod tests {
         assert_eq!(params.name_substring.as_deref(), Some("test_alert"));
         assert_eq!(params.enabled, Some(true));
         assert_eq!(params.page_size_and_idx, Some((20, 1)));
-    }
-
-    #[test]
-    fn test_narrows_list_ignores_paging_and_view_params() {
-        assert!(
-            !ListAlertsQuery {
-                page_size: Some(10),
-                state: Some(AlertLiveState::Firing),
-                since: Some(1),
-                ..Default::default()
-            }
-            .narrows_list()
-        );
-        assert!(
-            ListAlertsQuery {
-                folder: Some("default".to_string()),
-                ..Default::default()
-            }
-            .narrows_list()
-        );
     }
 
     #[test]
@@ -1022,8 +981,6 @@ mod tests {
             sort_by: None,
             sort_order: None,
             include_dependencies: None,
-            state: None,
-            since: None,
         };
         let params = q.into("org2");
         assert_eq!(params.org_id, "org2");
@@ -1049,8 +1006,6 @@ mod tests {
             sort_by: None,
             sort_order: None,
             include_dependencies: None,
-            state: None,
-            since: None,
         };
         let params = q.into("org3");
         assert_eq!(params.page_size_and_idx, Some((5, 0)));
@@ -1103,8 +1058,6 @@ mod priority_tag_query_tests {
             sort_by: sort_by.map(|s| s.to_string()),
             sort_order: order.map(|s| s.to_string()),
             include_dependencies: None,
-            state: None,
-            since: None,
         }
     }
 
