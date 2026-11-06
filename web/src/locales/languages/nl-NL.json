@@ -4330,6 +4330,7 @@
     "addRole": "Rol toevoegen",
     "roleName": "Naam van de rol",
     "roleUsers": "Gebruikers",
+    "roleServiceAccounts": "Serviceaccounts",
     "summaryInvited": "Uitgenodigd",
     "summaryTotalUsers": "Gebruikers",
     "groupName": "Naam van de groep",

@@ -4330,6 +4330,7 @@
     "addRole": "Rol Ekle",
     "roleName": "Rol Adı",
     "roleUsers": "Kullanıcılar",
+    "roleServiceAccounts": "Hizmet Hesapları",
     "summaryInvited": "Davetli",
     "summaryTotalUsers": "Kullanıcılar",
     "groupName": "Grup Adı",

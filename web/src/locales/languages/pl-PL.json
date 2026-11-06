@@ -4330,6 +4330,7 @@
     "addRole": "Nowa rola",
     "roleName": "Nazwa roli",
     "roleUsers": "Użytkownicy",
+    "roleServiceAccounts": "Konta usługi",
     "summaryInvited": "Zaproszeni",
     "summaryTotalUsers": "Użytkownicy",
     "groupName": "Nazwa grupy",

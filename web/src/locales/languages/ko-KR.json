@@ -4330,6 +4330,7 @@
     "addRole": "역할 추가",
     "roleName": "역할 이름",
     "roleUsers": "사용자",
+    "roleServiceAccounts": "서비스 계정",
     "summaryInvited": "초대됨",
     "summaryTotalUsers": "사용자",
     "groupName": "그룹 이름",

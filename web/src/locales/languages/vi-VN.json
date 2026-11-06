@@ -4330,6 +4330,7 @@
     "addRole": "Vai trò mới",
     "roleName": "Tên vai trò",
     "roleUsers": "Người dùng",
+    "roleServiceAccounts": "Tài khoản dịch vụ",
     "summaryInvited": "Đã mời",
     "summaryTotalUsers": "Người dùng",
     "groupName": "Tên nhóm",

@@ -4330,6 +4330,7 @@
     "addRole": "添加角色",
     "roleName": "角色名称",
     "roleUsers": "用户",
+    "roleServiceAccounts": "服务账号",
     "summaryInvited": "已邀请",
     "summaryTotalUsers": "用户",
     "groupName": "群组名称",

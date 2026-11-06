@@ -4330,6 +4330,7 @@
     "addRole": "新增角色",
     "roleName": "角色名稱",
     "roleUsers": "使用者",
+    "roleServiceAccounts": "服務帳戶",
     "summaryInvited": "已邀請",
     "summaryTotalUsers": "使用者",
     "groupName": "群組名稱",
