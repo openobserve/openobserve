@@ -27,12 +27,11 @@ The left navigation is assembled from a **flat list of top-level items**, which 
 grouping layer then reshapes into three visual shapes:
 
 1. **Plain rail item** — an icon tile on the left rail that navigates on click
-   (Home, Logs, Metrics, Traces, Alerts, Incidents, Actions, AI, IAM,
-   Management).
+   (Home, Logs, Metrics, Traces, Alerts, Incidents, Actions, AI).
 2. **Rail group with a hover flyout** — one tile that navigates to a primary page
    on click _and_ reveals a submenu of related pages on hover (currently **Data**
-   → Streams/Pipelines/Functions/Enrichment/Ingestion, and **Dashboards** →
-   Dashboards/Reports).
+   → Streams/Pipelines/Functions/Enrichment/Ingestion, **Dashboards** →
+   Dashboards/Reports, and **Settings** → Settings/IAM).
 3. **In-page section sub-nav (`SectionRail`)** — a secondary left sidebar _inside_
    a page that switches between sub-sections via `<router-view>` (used by
    **Settings/Management** and **IAM**).
@@ -185,8 +184,10 @@ setting `visible` to the same predicate the route uses.
 group` (+ `visible` if gated).
 3. Add the `settings.*` i18n keys.
 
-Settings is intentionally a **plain rail link** (no hover flyout) — its in-page
-`SectionRail` is where users switch sections. Don't also add it to `navGroups.ts`.
+The **Settings** rail tile is a `NAV_GROUPS` entry whose flyout holds two
+children, Settings and IAM, each with its own in-page `SectionRail`. A new
+Settings or IAM sub-page goes in that page's `SectionRail` only; don't add it to
+the flyout.
 
 ---
 
@@ -307,7 +308,7 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
 - [ ] Item in `settingsItems` / IAM sections: `key / label / description / icon /
   to / group` (+ `visible` if gated).
 - [ ] i18n keys added.
-- [ ] Not also added to `navGroups.ts` (Settings/IAM are plain rail links).
+- [ ] Not also added to `navGroups.ts` (the Settings flyout lists only the Settings and IAM pages).
 
 **New flyout child under Data / Dashboards**
 

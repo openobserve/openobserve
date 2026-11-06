@@ -136,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
-            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               :content="t('panel.cancel')"
@@ -343,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-toolbar"
                 data-test="dashboard-publish-public-btn"
-                icon-left="public"
+                icon-left="language"
                 :aria-label="t('dashboard.publicDashboard.shareTooltip')"
                 @click="showPublicLinksPanel = true"
               >

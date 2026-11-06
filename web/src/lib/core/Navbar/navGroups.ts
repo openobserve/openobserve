@@ -77,10 +77,11 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  *
  * Three shapes (see `RailEntry`):
  *   • plain link    — most items (Home, Logs, Metrics, Traces, Actions,
- *     Billings, AI, IAM, Management).
+ *     Billings, AI).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
  *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
- *     Data → /streams, Dashboards → /dashboards, Infra → /infra/databases) and
+ *     Data → /streams, Dashboards → /dashboards, Infra → /infra/databases,
+ *     Settings → /settings) and
  *     by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
@@ -491,13 +492,26 @@ export const NAV_GROUPS: NavGroupDef[] = [
       },
     ],
   },
+  {
+    key: "settings",
+    titleKey: "menu.settings",
+    icon: "settings",
+    parentLink: "/settings",
+    absorbs: ["iam", "settings"],
+    // Cloud inserts Billing between IAM and Settings; anchoring after it keeps Settings the last tile.
+    placeAfter: "billings",
+    children: [
+      { titleKey: "menu.allSettings", icon: "settings", name: "settings", requires: "settings" },
+      { titleKey: "menu.iam", icon: "manage-accounts", name: "iam", requires: "iam" },
+    ],
+  },
 ];
 
 /**
  * Top-level links that ALSO reveal their own in-page section nav on hover,
  * keyed by the top-level item's `name`.
  *
- * AI / IAM / Management are intentionally plain links (no rail submenu) — their
+ * AI is intentionally a plain link (no rail submenu) — its
  * in-page SectionRail is the place to switch sections. Re-add an entry here
  * (mirroring the page's SectionRail) to restore a hover flyout.
  *

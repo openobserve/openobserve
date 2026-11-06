@@ -1,7 +1,6 @@
 use std::io::Read;
 
 use anyhow::Context;
-use config::{SOURCEMAP_FILE_MAX_SIZE, SOURCEMAP_ZIP_MAX_ENTRIES, SOURCEMAP_ZIP_MAX_SIZE};
 use db::sourcemaps;
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -19,10 +18,28 @@ use {
     },
 };
 
+const MB: u64 = 1024 * 1024;
 const UNKNOWN_STR: &str = "<unknown>";
 // half-window size for returning source. Basically for trace at line l, it will return l-this -> l+
 // this so total of this*2 +1 lines.
 const SOURCE_CONTEXT_SIZE_HALF: u32 = 5;
+
+struct UploadLimits {
+    file_max_size: u64,
+    zip_max_size: u64,
+    zip_max_entries: usize,
+}
+
+impl UploadLimits {
+    fn from_config() -> Self {
+        let limit = &config::get_config().limit;
+        Self {
+            file_max_size: limit.sourcemap_file_max_size,
+            zip_max_size: limit.sourcemap_zip_max_size,
+            zip_max_entries: limit.sourcemap_zip_max_entries,
+        }
+    }
+}
 
 // only for internal user as of now.
 struct Filter {
@@ -84,6 +101,25 @@ pub async fn process_zip(
     version: Option<String>,
     file_data: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
+    process_zip_with_limits(
+        org_id,
+        service,
+        env,
+        version,
+        file_data,
+        &UploadLimits::from_config(),
+    )
+    .await
+}
+
+async fn process_zip_with_limits(
+    org_id: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+    file_data: Vec<u8>,
+    limits: &UploadLimits,
+) -> Result<(), anyhow::Error> {
     // Attempt to read the uploaded data as a ZIP file
     let mut archive = match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => archive,
@@ -142,10 +178,11 @@ pub async fn process_zip(
         ));
     }
 
-    if map_pairs.len() > SOURCEMAP_ZIP_MAX_ENTRIES {
+    if map_pairs.len() > limits.zip_max_entries {
         return Err(anyhow::anyhow!(
-            "zip contains {} sourcemap files, exceeding the maximum of {SOURCEMAP_ZIP_MAX_ENTRIES}",
-            map_pairs.len()
+            "zip contains {} sourcemap files, exceeding the maximum of {} (ZO_SOURCEMAP_ZIP_MAX_ENTRIES)",
+            map_pairs.len(),
+            limits.zip_max_entries
         ));
     }
 
@@ -173,7 +210,9 @@ pub async fn process_zip(
 
     let mut total_bytes = 0;
     for (i, (archive_path, entry)) in archive_paths.iter().zip(&entries).enumerate() {
-        if let Err(e) = store_map_file(&mut archive, archive_path, entry, &mut total_bytes).await {
+        if let Err(e) =
+            store_map_file(&mut archive, archive_path, entry, &mut total_bytes, limits).await
+        {
             rollback_stored(org_id, &entries[..=i]).await;
             return Err(e);
         }
@@ -193,17 +232,19 @@ async fn store_map_file(
     archive_path: &str,
     entry: &SourceMap,
     total_bytes: &mut u64,
+    limits: &UploadLimits,
 ) -> Result<(), anyhow::Error> {
     let buf = {
         let mut file = archive.by_path(archive_path).context(format!(
             "path {archive_path} missing unexpectedly in archive"
         ))?;
-        read_entry(&mut file, archive_path)?
+        read_entry(&mut file, archive_path, limits.file_max_size)?
     };
     *total_bytes += buf.len() as u64;
-    if *total_bytes > SOURCEMAP_ZIP_MAX_SIZE {
+    if *total_bytes > limits.zip_max_size {
         return Err(anyhow::anyhow!(
-            "total uncompressed size of files in zip exceeds maximum allowed size."
+            "total uncompressed size of files in zip exceeds the maximum of {} MB (ZO_SOURCEMAP_ZIP_MAX_SIZE)",
+            limits.zip_max_size / MB
         ));
     }
     let path = get_file_path(&entry.org, &entry.file_store_id);
@@ -214,16 +255,22 @@ async fn store_map_file(
 fn read_entry<R: Read>(
     file: &mut zip::read::ZipFile<'_, R>,
     name: &str,
+    max_size: u64,
 ) -> Result<Vec<u8>, anyhow::Error> {
-    let too_large = || anyhow::anyhow!("file {name} in zip exceeds maximum allowed file size.");
-    if file.size() > SOURCEMAP_FILE_MAX_SIZE {
+    let too_large = || {
+        anyhow::anyhow!(
+            "file {name} in zip exceeds the maximum file size of {} MB (ZO_SOURCEMAP_FILE_MAX_SIZE)",
+            max_size / MB
+        )
+    };
+    if file.size() > max_size {
         return Err(too_large());
     }
-    let mut buf = Vec::with_capacity(file.size().min(SOURCEMAP_FILE_MAX_SIZE) as usize);
+    let mut buf = Vec::with_capacity(file.size().min(max_size) as usize);
     // size() is the archive's own claim; only this bounded read is authoritative
-    file.take(SOURCEMAP_FILE_MAX_SIZE + 1)
+    file.take(max_size.saturating_add(1))
         .read_to_end(&mut buf)?;
-    if buf.len() as u64 > SOURCEMAP_FILE_MAX_SIZE {
+    if buf.len() as u64 > max_size {
         return Err(too_large());
     }
     Ok(buf)
@@ -985,46 +1032,87 @@ mod tests {
             .unwrap()
     }
 
+    fn limits(file_mb: u64, zip_mb: u64, entries: usize) -> UploadLimits {
+        UploadLimits {
+            file_max_size: file_mb * MB,
+            zip_max_size: zip_mb * MB,
+            zip_max_entries: entries,
+        }
+    }
+
     #[tokio::test]
     async fn test_zip_too_many_entries_is_rejected() {
         let org = "org_zip_entries";
-        let names: Vec<String> = (0..=SOURCEMAP_ZIP_MAX_ENTRIES)
-            .map(|i| format!("f{i}.js.map"))
-            .collect();
+        let names: Vec<String> = (0..4).map(|i| format!("f{i}.js.map")).collect();
         let files: Vec<(&str, &[u8])> = names.iter().map(|n| (n.as_str(), &b"{}"[..])).collect();
-        let err = process_zip(org, None, None, None, build_zip(&files))
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("exceeding the maximum"), "{err}");
+        let err =
+            process_zip_with_limits(org, None, None, None, build_zip(&files), &limits(1, 10, 3))
+                .await
+                .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("exceeding the maximum of 3"), "{msg}");
+        assert!(msg.contains("ZO_SOURCEMAP_ZIP_MAX_ENTRIES"), "{msg}");
         assert!(stored_files(org).await.is_empty());
     }
 
     #[tokio::test]
     async fn test_zip_total_size_over_limit_rolls_back_storage() {
         let org = "org_zip_total";
-        let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize];
-        let count = (SOURCEMAP_ZIP_MAX_SIZE / SOURCEMAP_FILE_MAX_SIZE) as usize + 1;
-        let names: Vec<String> = (0..count).map(|i| format!("f{i}.js.map")).collect();
+        let data = vec![0u8; MB as usize];
+        let names: Vec<String> = (0..4).map(|i| format!("f{i}.js.map")).collect();
         let files: Vec<(&str, &[u8])> = names
             .iter()
             .map(|n| (n.as_str(), data.as_slice()))
             .collect();
-        let err = process_zip(org, None, None, None, build_zip(&files))
+        let err =
+            process_zip_with_limits(org, None, None, None, build_zip(&files), &limits(2, 3, 10))
+                .await
+                .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("total uncompressed size"), "{msg}");
+        assert!(
+            msg.contains("3 MB") && msg.contains("ZO_SOURCEMAP_ZIP_MAX_SIZE"),
+            "{msg}"
+        );
+        assert!(stored_files(org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_zip_file_over_limit_names_limit() {
+        let org = "org_zip_file_limit";
+        let data = vec![0u8; 2 * MB as usize];
+        let zip = build_zip(&[("big.js.map", data.as_slice())]);
+        let err = process_zip_with_limits(org, None, None, None, zip, &limits(1, 10, 10))
             .await
             .unwrap_err();
-        assert!(err.to_string().contains("total uncompressed size"), "{err}");
+        let msg = err.to_string();
+        assert!(msg.contains("big.js.map") && msg.contains("1 MB"), "{msg}");
+        assert!(msg.contains("ZO_SOURCEMAP_FILE_MAX_SIZE"), "{msg}");
         assert!(stored_files(org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_zip_file_between_old_and_new_default_is_accepted() {
+        let org = &format!("org_zip_file_ok_{}", config::ider::uuid());
+        let data = vec![0u8; 6 * MB as usize];
+        let zip = build_zip(&[("big.js.map", data.as_slice())]);
+        process_zip_with_limits(org, None, None, None, zip, &limits(50, 500, 5000))
+            .await
+            .unwrap();
+        assert_eq!(stored_files(org).await.len(), 1);
     }
 
     #[tokio::test]
     async fn test_zip_entry_with_understated_size_is_rejected() {
         let org = "org_zip_declared";
-        let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize + 1];
+        let data = vec![0u8; 2 * MB as usize];
         let mut zip = build_zip(&[("big.js.map", data.as_slice())]);
         set_declared_size(&mut zip, 1024);
         let mut archive = zip::read::ZipArchive::new(std::io::Cursor::new(zip.clone())).unwrap();
         assert_eq!(archive.by_index(0).unwrap().size(), 1024);
-        let err = process_zip(org, None, None, None, zip).await.unwrap_err();
+        let err = process_zip_with_limits(org, None, None, None, zip, &limits(1, 10, 10))
+            .await
+            .unwrap_err();
         assert!(
             err.to_string()
                 .contains("larger than its declared uncompressed size"),
