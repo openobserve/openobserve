@@ -1,6 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import type { RouteRecordRaw } from "vue-router";
+import config from "@/aws-exports";
+import useRoutes from "@/composables/shared/router";
 import { groupNavLinks, NAV_GROUPS, NAV_SUBNAV, GATE_PREDICATES } from "./navGroups";
 import type { NavGateContext } from "./ONavbar.types";
 import type { NavItem, RailEntry } from "./ONavbar.types";
@@ -47,6 +50,12 @@ const dataGroup = (entries: RailEntry[]) =>
       e.type === "linkGroup" && e.item.name === "data",
   );
 
+const settingsGroup = (entries: RailEntry[]) =>
+  entries.find(
+    (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+      e.type === "linkGroup" && e.item.name === "settings",
+  );
+
 // Infra is standalone — it absorbs nothing, so it appears on every rail rather
 // than only when one of its members is present.
 const infraGroup = (entries: RailEntry[]) =>
@@ -54,6 +63,39 @@ const infraGroup = (entries: RailEntry[]) =>
     (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
       e.type === "linkGroup" && e.item.name === "infra",
   );
+
+describe("NAV_GROUPS against the real route table", () => {
+  const saved = { isCloud: config.isCloud, isEnterprise: config.isEnterprise };
+  const routeFeatures = new Map<unknown, unknown>();
+
+  // vue-router merges a parent's meta into its children, so a tag on the parent locks the child.
+  const collect = (routes: RouteRecordRaw[], inherited?: unknown) => {
+    for (const route of routes) {
+      const feature = route.meta?.licenseFeature ?? inherited;
+      routeFeatures.set(route.name, feature);
+      collect(route.children ?? [], feature);
+    }
+  };
+
+  beforeAll(() => {
+    // On-call needs an enterprise build and Reports a non-cloud one; these two values register every flyout child.
+    Object.assign(config, { isCloud: "false", isEnterprise: "true" });
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    collect([...parentRoutes, ...homeChildRoutes]);
+  });
+
+  afterAll(() => {
+    Object.assign(config, saved);
+  });
+
+  it.each(NAV_GROUPS.flatMap((g) => g.children).map((c) => [c.name, c.feature]))(
+    "flyout child %s carries the license feature of its route",
+    (name, feature) => {
+      expect(routeFeatures.has(name)).toBe(true);
+      expect(feature).toBe(routeFeatures.get(name));
+    },
+  );
+});
 
 describe("groupNavLinks", () => {
   it("preserves the input (main-branch) order", () => {
@@ -83,8 +125,7 @@ describe("groupNavLinks", () => {
       "link:dashboards",
       "linkGroup:reliability",
       "linkGroup:infra",
-      "link:iam",
-      "link:settings",
+      "linkGroup:settings",
     ]);
   });
 
@@ -545,7 +586,7 @@ describe("groupNavLinks", () => {
     expect(entries.every((e) => e.type === "link" || e.item.name === "infra")).toBe(true);
   });
 
-  it("renders AI / IAM / Management as plain links (no submenu)", () => {
+  it("renders AI as a plain link and folds IAM into the Settings tile", () => {
     const entries = groupNavLinks([
       link("home"),
       link("aiObservability"),
@@ -555,15 +596,24 @@ describe("groupNavLinks", () => {
     expect(keysWithoutInfra(entries)).toEqual([
       "link:home",
       "link:aiObservability",
-      "link:iam",
-      "link:settings",
+      "linkGroup:settings",
     ]);
-    // None of THEM carry a hover submenu anymore (Infra is a group by design,
-    // and is not one of the items under test here).
-    expect(entries.some((e) => e.type === "linkGroup" && e.item.name !== "infra")).toBe(false);
+    const settings = settingsGroup(entries);
+    expect(settings?.item.link).toBe("/settings");
+    expect(settings?.children.map((c) => c.name)).toEqual(["settings", "iam"]);
     // Traces is still the only top-level LINK with a subnav flyout — Infra's
     // flyout comes from NAV_GROUPS, not from a top-level item.
     expect(Object.keys(NAV_SUBNAV)).toEqual(["traces"]);
+  });
+
+  it("keeps Settings the last tile when Cloud inserts Billing between IAM and Settings", () => {
+    const entries = groupNavLinks([link("home"), link("iam"), link("billings"), link("settings")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:billings", "linkGroup:settings"]);
+  });
+
+  it("leaves Settings a plain link when IAM is hidden", () => {
+    const entries = groupNavLinks([link("home"), link("settings")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:settings"]);
   });
 
   it("emits Infra as a link+subnav tile with Hosts declared FIRST", () => {
@@ -756,7 +806,8 @@ describe("groupNavLinks", () => {
     const surfaced = entries.flatMap((e) =>
       e.type === "group" || e.type === "linkGroup" ? [] : [e.item.name],
     );
-    const expectedNonCollapsed = input.map((i) => i.name).filter((n) => n !== "incidentList");
+    const collapsed = new Set(["incidentList", "iam", "settings"]);
+    const expectedNonCollapsed = input.map((i) => i.name).filter((n) => !collapsed.has(n));
     expect(surfaced.sort()).toEqual(expectedNonCollapsed.sort());
 
     const reliability = entries.find(
@@ -929,10 +980,17 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true }))).toBe(false);
   });
 
-  it("marks Downtimes and Alert Calibration as Beta in the Reliability flyout, and nothing else there", () => {
+  it("marks Downtimes, Alert Calibration and every On-Call entry as Beta in the Reliability flyout, and nothing else there", () => {
     const reliability = NAV_GROUPS.find((g) => g.children.some((c) => c.name === "downtimes"))!;
     const beta = reliability.children.filter((c) => c.beta).map((c) => c.name);
-    expect(beta).toEqual(["downtimes", "alertCalibration"]);
+    expect(beta).toEqual([
+      "downtimes",
+      "alertCalibration",
+      "onCallResponses",
+      "onCallTeams",
+      "onCallRouting",
+      "onCallMine",
+    ]);
   });
 
   it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {

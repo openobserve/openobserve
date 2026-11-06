@@ -253,9 +253,13 @@ pub struct ListRunsQuery {
         ("page_size" = Option<i64>, Query, description = "Results per page (default 20)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_synthetics::service::ListRunsResponse),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_runs(
     Path((org_id, id)): Path<(String, String)>,
@@ -296,10 +300,14 @@ pub async fn list_runs(
         ("run_id" = String, Path, description = "Run ID (KSUID)"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = openobserve_synthetics::service::RunSummary),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "get"}))
+    )
 )]
 pub async fn get_run_detail(
     Path((org_id, id, run_id)): Path<(String, String, String)>,
@@ -328,15 +336,91 @@ pub struct ArtifactQuery {
 #[allow(dead_code)]
 struct ArtifactBytes(Vec<u8>);
 
-// Only documents the two shapes create_location reads from its raw JSON body.
-#[derive(ToSchema)]
+// Documents create_location's body only; a `locations` key always selects the batch form.
+struct CreateLocationBody;
+
+impl utoipa::PartialSchema for CreateLocationBody {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use openobserve_synthetics::service::CreateLocationRequest;
+        use utoipa::openapi::{
+            Ref, RefOr,
+            schema::{AdditionalProperties, ArrayBuilder, ObjectBuilder, OneOfBuilder, Schema},
+        };
+        let mut one = CreateLocationRequest::schema();
+        if let RefOr::T(Schema::Object(object)) = &mut one {
+            object.additional_properties = Some(Box::new(AdditionalProperties::FreeForm(false)));
+        }
+        let item = Ref::from_schema_name(CreateLocationRequest::name());
+        let batch = ObjectBuilder::new()
+            .property("locations", ArrayBuilder::new().items(item))
+            .required("locations")
+            .build();
+        RefOr::T(Schema::OneOf(
+            OneOfBuilder::new().item(one).item(batch).build(),
+        ))
+    }
+}
+
+impl ToSchema for CreateLocationBody {
+    fn schemas(
+        schemas: &mut Vec<(
+            String,
+            utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+        )>,
+    ) {
+        use openobserve_synthetics::service::CreateLocationRequest;
+        schemas.push((
+            CreateLocationRequest::name().into_owned(),
+            <CreateLocationRequest as utoipa::PartialSchema>::schema(),
+        ));
+    }
+}
+
+// Only documents create_location's answer: one location, or a result per batch item.
+#[derive(serde::Serialize, ToSchema)]
 #[serde(untagged)]
 #[allow(dead_code)]
-enum CreateLocationBody {
-    One(openobserve_synthetics::service::CreateLocationRequest),
-    Batch {
-        locations: Vec<openobserve_synthetics::service::CreateLocationRequest>,
-    },
+enum CreateLocationVariants {
+    One(Box<openobserve_synthetics::service::CreateLocationResponse>),
+    Batch { results: Vec<CreateLocationResult> },
+}
+
+config::any_of_schema!(CreateLocationAnswer, CreateLocationVariants);
+
+#[derive(serde::Serialize, ToSchema)]
+#[allow(dead_code)]
+struct CreateLocationResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pool: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+// Only documents job_ack's answer: one ack, or a result per batch item.
+#[derive(serde::Serialize, ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum JobAckVariants {
+    One(Box<openobserve_synthetics::job_api::AckResponse>),
+    Batch { results: Vec<JobAckResult> },
+}
+
+config::any_of_schema!(JobAckAnswer, JobAckVariants);
+
+#[derive(serde::Serialize, ToSchema)]
+#[allow(dead_code)]
+struct JobAckResult {
+    job_id: String,
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    run_complete: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 /// Streams artifact bytes from the object store. Proxy target for local disk
@@ -522,6 +606,10 @@ pub async fn job_upload(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::SyntheticListResponse),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_synthetics(
     Path(org_id): Path<String>,
@@ -752,6 +840,10 @@ async fn checked_template(
         (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
@@ -835,6 +927,10 @@ pub async fn create_synthetic(
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "get"}))
+    )
 )]
 pub async fn get_synthetic(
     Path((org_id, id)): Path<(String, String)>,
@@ -888,6 +984,10 @@ pub async fn get_synthetic(
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
@@ -1012,6 +1112,10 @@ pub async fn update_synthetic(
         (status = 404, description = "Not found"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "delete"}))
+    )
 )]
 pub async fn delete_synthetic(
     Path((org_id, id)): Path<(String, String)>,
@@ -1068,7 +1172,7 @@ pub async fn delete_synthetic(
     ),
     request_body(content = BulkDeleteSyntheticsRequestBody, description = "IDs to delete", content_type = "application/json"),
     responses(
-        (status = 200, description = "Deleted", content_type = "application/json", body = Object),
+        (status = 200, description = "Deleted", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
@@ -1152,6 +1256,10 @@ pub async fn delete_synthetics_bulk(
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn move_synthetics(
     Path(org_id): Path<String>,
@@ -1230,6 +1338,10 @@ pub async fn move_synthetics(
         (status = 404, description = "Not found"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn set_synthetic_enabled(
     Path((org_id, id)): Path<(String, String)>,
@@ -1288,6 +1400,10 @@ pub async fn set_synthetic_enabled(
         (status = 404, description = "Not found"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn run_synthetic_now(
     Path((org_id, id)): Path<(String, String)>,
@@ -1349,6 +1465,10 @@ pub async fn run_synthetic_now(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn get_referenced_by(
     Path((org_id, id)): Path<(String, String)>,
@@ -1398,11 +1518,14 @@ pub async fn get_referenced_by(
     security(("Authorization" = [])),
     request_body(content = Object, description = r#"{"job_id": 42}"#, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_synthetics::job_api::ResolveResponse),
         (status = 404, description = "Job not found"),
         (status = 422, description = "Config error — the run is settled as failed and the probe stops"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true}))
+    )
 )]
 pub async fn job_resolve(
     Path(org_id): Path<String>,
@@ -1504,6 +1627,9 @@ async fn settle_config_error(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true}))
+    )
 )]
 pub async fn job_lease(
     Path(org_id): Path<String>,
@@ -1557,9 +1683,12 @@ pub async fn job_lease(
     security(("Authorization" = [])),
     request_body(content = Object, description = r#"{"job_id": 42, "status": "up", "response_time_ms": 1200, "error": null}"#, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = JobAckAnswer),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true}))
+    )
 )]
 pub async fn job_ack(
     Path(org_id): Path<String>,
@@ -1989,7 +2118,7 @@ fn location_error_response(e: anyhow::Error) -> Response {
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(CreateLocationBody), description = "One location, or `locations` for a batch", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = CreateLocationAnswer),
         (status = 400, description = "Validation error"),
         (status = 403, description = "Public locations are root-only"),
     ),
@@ -2049,7 +2178,7 @@ pub async fn create_location(
     }
 }
 
-#[utoipa::path(
+#[cfg_attr(feature = "enterprise", utoipa::path(
     get,
     path = "/{org_id}/synthetics/agent-setup",
     context_path = "/api",
@@ -2059,14 +2188,14 @@ pub async fn create_location(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = o2_enterprise::enterprise::synthetics::service::AgentSetupResponse),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
-)]
+))]
 pub async fn agent_setup(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2153,7 +2282,7 @@ pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(CreateAgentTokenRequest), content_type = "application/json"),
     responses(
-        (status = 200, description = "New token (shown once)", content_type = "application/json", body = Object),
+        (status = 200, description = "New token (shown once)", content_type = "application/json", body = openobserve_synthetics::service::AgentTokenSecret),
         (status = 400, description = "Name missing/reserved/duplicate"),
         (status = 403, description = "Admin or Root role required"),
     ),
@@ -2200,7 +2329,7 @@ pub async fn create_agent_token(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(RotateAgentTokenRequest), content_type = "application/json"),
     responses(
-        (status = 200, description = "New token (shown once)", content_type = "application/json", body = Object),
+        (status = 200, description = "New token (shown once)", content_type = "application/json", body = openobserve_synthetics::service::AgentTokenSecret),
         (status = 400, description = "Token name already exists"),
         (status = 403, description = "Admin or Root role required"),
     ),
@@ -2294,7 +2423,7 @@ pub async fn set_agent_token_enabled(
         ("id" = String, Path, description = "Location id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_synthetics::service::locations::LocationDetail),
         (status = 404, description = "Not found"),
     ),
     extensions(
@@ -2338,7 +2467,7 @@ pub async fn get_location(
     ),
     request_body(content = inline(openobserve_synthetics::service::UpdateLocationRequest), content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::synthetics_locations::SyntheticsLocationRecord),
         (status = 403, description = "Public locations are root-only"),
         (status = 404, description = "Not found"),
     ),
@@ -2411,8 +2540,12 @@ pub async fn delete_location(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_synthetics::service::SyntheticsCapabilitiesV2),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     match openobserve_synthetics::service::list_locations_for_org(&_org_id).await {

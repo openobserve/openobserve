@@ -33,6 +33,7 @@ export interface HistoryContext {
   time?: HistoryTime;
   error?: string;
   warning?: string;
+  no_results?: boolean;
   time_range?: TimeQueryParams;
   step?: string | null;
   chart_type?: string;

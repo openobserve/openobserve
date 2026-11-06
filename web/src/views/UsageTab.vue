@@ -25,10 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gap below only appears when a banner is actually shown. -->
       <div class="flex shrink-0 flex-col gap-2 not-empty:mb-3 empty:hidden">
         <TrialPeriod></TrialPeriod>
-        <LicensePeriod
-          v-if="!showUsageReportBanner"
-          @update-license="goToLicensePage"
-        ></LicensePeriod>
+        <LicensePeriod v-if="!showUsageReportBanner" @renew="goToLicensePage"></LicensePeriod>
         <UsageReportBanner></UsageReportBanner>
         <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
       </div>
@@ -497,6 +494,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
+import { summaryHasUserData } from "@/utils/internalStreams";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -515,10 +513,12 @@ import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { useLicensePage } from "@/composables/useLicensePage";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const { goToLicensePage } = useLicensePage();
 const { isLocked, lockedReason } = useLicenseLocks();
 
 const viewLabel = (feature: string) =>
@@ -656,8 +656,8 @@ const getSummary = (org_id: any) => {
     .then((data: any) => {
       const res = { data };
       if (
-        res.data.streams.num_streams == 0 &&
-        res.data.alerts.num_realtime == 0 &&
+        !summaryHasUserData(res.data) &&
+        res.data.alerts?.num_realtime == 0 &&
         res.data.alerts.num_scheduled == 0 &&
         res.data.pipelines?.num_realtime == 0 &&
         res.data.pipelines?.num_scheduled == 0 &&
@@ -918,10 +918,6 @@ const pipelinesPanelData = computed(() => {
     ],
   };
 });
-
-const goToLicensePage = () => {
-  router.push({ name: "license" });
-};
 
 const formattedAnimatedEventsCount = computed(() => {
   return animatedEventsCount.value > 0

@@ -31,6 +31,9 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { alertRoutesByChannel } from "@/utils/slackAppDestination";
@@ -58,6 +61,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 const { isMetaOrg } = useIsMetaOrg();
 
 const installations = useQuery(() => slackInstallationsQuery(org.value));
@@ -160,7 +164,14 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
   { id: "answers", header: t("slackApp.channels.columnAnswers"), size: 130 },
   { id: "alert_routes", header: t("slackApp.channels.columnAlertRoutes"), size: 120 },
   { id: "set_by", header: t("slackApp.channels.columnSetBy"), size: 220 },
-  { id: "actions", header: raw(""), size: ownOrgOnly.value ? 170 : 100, isAction: true },
+  {
+    id: "actions",
+    header: raw(""),
+    size: ownOrgOnly.value ? 170 : 100,
+    isAction: true,
+    pinned: "right",
+    meta: { align: "center", actionCount: 2 },
+  },
 ]);
 
 const openDrawer = (row: SlackChannelDefaultRow | null): void => {
@@ -202,11 +213,11 @@ const save = async (value: DefaultForm): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.channels.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.channels.description") }}</p>
       </div>
       <OButton
-        variant="primary"
+        variant="outline"
         size="sm-action"
+        icon-left="add"
         data-test="slack-channel-set-default"
         @click="openDrawer(null)"
       >
@@ -260,24 +271,58 @@ const save = async (value: DefaultForm): Promise<void> => {
         <template v-else>{{ t(`slackApp.channels.setFrom.${row.set_from}`) }}</template>
       </template>
       <template #cell-actions="{ row }">
-        <span v-if="canChange(row)" class="flex justify-end gap-1">
+        <div v-if="canChange(row)" class="flex items-center justify-end">
           <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
-            :title="t('slackApp.channels.edit')"
+            class="max-md:hidden"
+            :aria-label="t('slackApp.channels.edit')"
             :data-test="`slack-channel-edit-${row.channel_id}`"
-            @click="openDrawer(row)"
-          />
+            @click.stop="openDrawer(row)"
+          >
+            <OTooltip side="bottom" :content="t('slackApp.channels.edit')" />
+          </OButton>
           <OButton
             variant="ghost-destructive"
             size="icon-sm"
-            icon-left="delete"
-            :title="t('slackApp.channels.remove')"
+            icon-left="delete-outline"
+            class="max-md:hidden"
+            :aria-label="t('slackApp.channels.remove')"
             :data-test="`slack-channel-remove-${row.channel_id}`"
-            @click="askRemove(row)"
-          />
-        </span>
+            @click.stop="askRemove(row)"
+          >
+            <OTooltip side="bottom" :content="t('slackApp.channels.remove')" />
+          </OButton>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                :aria-label="t('dashboard.moreActions')"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :data-test="`slack-channel-${row.channel_id}-menu`"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              :data-test="`slack-channel-edit-${row.channel_id}-menu`"
+              @select="openDrawer(row)"
+            >
+              {{ t("slackApp.channels.edit") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              :data-test="`slack-channel-remove-${row.channel_id}-menu`"
+              @select="askRemove(row)"
+            >
+              {{ t("slackApp.channels.remove") }}
+            </ODropdownItem>
+          </ODropdown>
+        </div>
         <span
           v-else-if="ownOrgOnly"
           class="text-text-secondary flex items-center justify-end gap-1 text-xs"
@@ -310,7 +355,7 @@ const save = async (value: DefaultForm): Promise<void> => {
     <ODrawer
       v-model:open="drawerOpen"
       size="md"
-      :title="t('slackApp.channels.setDefault')"
+      :title="editing ? t('slackApp.channels.editDefault') : t('slackApp.channels.setDefault')"
       :form-id="FORM_ID"
       :primary-button-label="t('common.save')"
       :secondary-button-label="t('common.cancel')"
@@ -374,7 +419,7 @@ const save = async (value: DefaultForm): Promise<void> => {
         />
         <OInput
           v-else-if="onInstance"
-          :model-value="t('slackApp.card.thisOrg', { org })"
+          :model-value="t('slackApp.card.thisOrg', { org: orgName })"
           :label="t('slackApp.channels.columnDefaultOrg')"
           :help-text="t('slackApp.channels.ownOrgOnlyHint')"
           readonly
@@ -406,7 +451,7 @@ const save = async (value: DefaultForm): Promise<void> => {
       :title="t('slackApp.channels.removeTitle', { channel: removing?.channel_name ?? '' })"
       message-keypath="slackApp.channels.removeMessage"
       :message-name="removing ? `#${removing.channel_name}` : ''"
-      :ok-label="t('slackApp.channels.remove')"
+      :ok-label="t('slackApp.channels.removeConfirm')"
       ok-variant="destructive"
       focus-cancel
       @update:ok="confirmRemove"

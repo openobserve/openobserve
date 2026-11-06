@@ -105,6 +105,10 @@ pub const SCHEDULE_FIELD_MAX_SECS: i64 = 365 * 24 * 60 * 60;
 /// `tz_offset` values `chrono::FixedOffset` can represent: strictly less than a day either way.
 pub const TZ_OFFSET_RANGE_MINUTES: std::ops::RangeInclusive<i32> = -1439..=1439;
 
+/// What alert history says when the license withheld an alert's workflows.
+pub const WORKFLOWS_UNLICENSED_REASON: &str =
+    "workflow not run: Workflows is not included in your license";
+
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
 pub enum AlertError {
@@ -228,6 +232,10 @@ pub enum AlertError {
 
     #[error("{error_message}")]
     SendNotificationError { error_message: String },
+
+    /// Holds the feature key; terminal, because no retry helps until the license changes.
+    #[error("{}", WORKFLOWS_UNLICENSED_REASON)]
+    FeatureNotLicensed(String),
 
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
@@ -584,6 +592,40 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
     Ok(())
 }
 
+/// The template and destinations a firing needs; a missing one fails every firing later.
+pub(crate) async fn validate_template_and_destinations(
+    org_id: &str,
+    template: Option<&str>,
+    destinations: &[String],
+) -> Result<(), AlertError> {
+    if let Some(template_name) = template.filter(|name| !name.is_empty()) {
+        let template = db::alerts::templates::get(org_id, template_name)
+            .await
+            .map_err(|_| AlertError::AlertTemplateNotFound {
+                template: template_name.to_string(),
+            })?;
+        check_alert_template(template_name, &template)?;
+    }
+
+    for dest in destinations {
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
+                        d.module,
+                    )));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
 pub(crate) async fn validate_jira_destinations(
     org_id: &str,
@@ -868,34 +910,8 @@ async fn prepare_alert(
         }
     }
 
-    // Validate alert-level template if specified
-    if let Some(ref template_name) = alert.template
-        && !template_name.is_empty()
-    {
-        let template = db::alerts::templates::get(org_id, template_name)
-            .await
-            .map_err(|_| AlertError::AlertTemplateNotFound {
-                template: template_name.clone(),
-            })?;
-        check_alert_template(template_name, &template)?;
-    }
-
-    for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
-            Ok(d) => {
-                if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
-                        d.module,
-                    )));
-                }
-            }
-            Err(_) => {
-                return Err(AlertError::AlertDestinationNotFound {
-                    dest: dest.to_string(),
-                });
-            }
-        }
-    }
+    validate_template_and_destinations(org_id, alert.template.as_deref(), &alert.destinations)
+        .await?;
 
     #[cfg(feature = "enterprise")]
     for workflow in alert.workflows.iter() {
@@ -2435,6 +2451,14 @@ pub(crate) fn with_unlicensed_page_reason(
     }
 }
 
+/// History's text for a failed send; a license denial is not a send error, so its reason stands.
+pub(crate) fn send_failure_message(error: &AlertError) -> String {
+    match error {
+        AlertError::FeatureNotLicensed(_) => error.to_string(),
+        _ => format!("error sending notification for alert: {error}"),
+    }
+}
+
 /// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
 pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
     result.as_ref().map_or(true, |outcome| outcome.attempted)
@@ -2556,9 +2580,9 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     #[cfg(feature = "enterprise")]
     let incident_notify_error = with_unlicensed_page_reason(
         incident_notify_error,
-        o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id).await,
+        crate::alerts::scheduler::handlers::unlicensed_reason_for_firing(&alert, &rows).await,
     );
-    let outcome = alert
+    let sent = alert
         .send_notification(
             &trace_id,
             &rows,
@@ -2571,13 +2595,44 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             skip_destinations,
             None,
         )
-        .await?;
+        .await;
+    // Not from `opened`: a teamless record woke nobody, and a page already open returns nothing.
+    #[cfg(feature = "enterprise")]
+    let paged = async {
+        o2_enterprise::enterprise::oncall::is_enabled()
+            && o2_enterprise::enterprise::oncall::escalation::routes_to_a_team(
+                &alert.org_id,
+                alert.oncall_team.as_deref(),
+                &crate::alerts::scheduler::handlers::alert_identity(&alert, &rows).await,
+            )
+            .await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let paged = async { false };
+    let outcome =
+        workflows_denial_as_warning(sent, async { incident_notified || paged.await }).await?;
     let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
     Ok(ManualTrigger::Sent {
         success_message: outcome.success_message,
         error_message,
     })
+}
+
+/// A locked workflow fails a manual trigger only when it was the alert's one way to reach anyone.
+async fn workflows_denial_as_warning(
+    sent: Result<NotificationOutcome, AlertError>,
+    // Awaited only on a denial: it reads routing per group and logs when that read fails.
+    reached_someone: impl Future<Output = bool>,
+) -> Result<NotificationOutcome, AlertError> {
+    if matches!(sent, Err(AlertError::FeatureNotLicensed(_))) && reached_someone.await {
+        return Ok(NotificationOutcome {
+            attempted: true,
+            error_message: WORKFLOWS_UNLICENSED_REASON.to_string(),
+            ..Default::default()
+        });
+    }
+    sent
 }
 
 /// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
@@ -2755,11 +2810,15 @@ impl AlertExt for Alert {
         let mut workflow_error = 0;
         #[cfg(feature = "enterprise")]
         let mut workflow_err_msg = "".to_string();
+        #[cfg(feature = "enterprise")]
+        let mut workflow_denials = 0;
 
         #[cfg(not(feature = "enterprise"))]
         let workflow_error = 0;
         #[cfg(not(feature = "enterprise"))]
         let workflow_err_msg = "".to_string();
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_denials = 0;
 
         // WHICH SLO this notification is about, resolved ONCE and shared by
         // every surface below (each destination's template, and the workflow
@@ -3046,16 +3105,24 @@ impl AlertExt for Alert {
                         e
                     );
                     workflow_error += 1;
-                    workflow_err_msg = format!(
-                        "{workflow_err_msg} Error triggering workflow {} err: {e};",
-                        workflow
-                    );
+                    if is_license_denial(&e) {
+                        workflow_denials += 1;
+                    } else {
+                        workflow_err_msg = format!(
+                            "{workflow_err_msg} Error triggering workflow {} err: {e};",
+                            workflow
+                        );
+                    }
                 }
+            }
+            // One line, not one per workflow: the reason names the license, not a workflow.
+            if workflow_denials > 0 {
+                workflow_err_msg = format!("{workflow_err_msg} {WORKFLOWS_UNLICENSED_REASON}");
             }
         }
 
         outcome.success_message = success_message;
-        outcome.error_message = format!("{err_message}{workflow_err_msg}");
+        outcome.error_message = send_error_message(&err_message, &workflow_err_msg);
 
         // Attempted = destinations not skipped by the ledger. An attempt in
         // which every attempted destination failed is still a hard error, so
@@ -3081,12 +3148,37 @@ impl AlertExt for Alert {
                 error_message: outcome.error_message,
             })
         } else if all_workflows_failed(attempted, self.workflows.len(), workflow_error) {
-            Err(AlertError::SendNotificationError {
-                error_message: workflow_err_msg,
-            })
+            Err(all_workflows_failed_error(
+                workflow_denials,
+                workflow_error,
+                outcome.error_message,
+            ))
         } else {
             Ok(outcome)
         }
+    }
+}
+
+/// Whether a workflow send was refused by the license rather than failing to run.
+#[cfg(feature = "enterprise")]
+fn is_license_denial(error: &anyhow::Error) -> bool {
+    matches!(
+        error.downcast_ref::<infra::errors::ErrorCodes>(),
+        Some(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(_))
+    )
+}
+
+pub(crate) fn all_workflows_failed_error(
+    denials: usize,
+    failures: usize,
+    error_message: String,
+) -> AlertError {
+    // The license is read per workflow, so a change mid-loop can mix in a real, retryable failure.
+    if denials > 0 && denials == failures {
+        let feature: &str = config::meta::feature::Feature::Workflows.into();
+        AlertError::FeatureNotLicensed(feature.to_string())
+    } else {
+        AlertError::SendNotificationError { error_message }
     }
 }
 
@@ -3096,6 +3188,13 @@ fn all_workflows_failed(
     workflow_errors: usize,
 ) -> bool {
     attempted_destinations == 0 && workflow_count > 0 && workflow_errors == workflow_count
+}
+
+/// Each part starts with its own separator, so the first one's must not lead the message.
+fn send_error_message(destination_errors: &str, workflow_errors: &str) -> String {
+    format!("{destination_errors}{workflow_errors}")
+        .trim_start()
+        .to_string()
 }
 
 /// Build the notification context for a send, resolving the row template
@@ -3429,11 +3528,7 @@ pub(crate) async fn send_http_notification(
         .into());
     }
 
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let build_req = |body: String| {
@@ -3653,11 +3748,7 @@ pub(crate) async fn send_discord_with_attachment(
         ))
         .into());
     }
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
@@ -4973,14 +5064,103 @@ mod send_path_tests {
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
+    #[cfg(feature = "enterprise")]
+    use super::is_license_denial;
     use super::{
-        Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
-        has_delivery_target, send_attempted, send_discord_with_attachment, send_http_notification,
+        Alert, AlertError, AlertExt, NotificationOutcome, WORKFLOWS_UNLICENSED_REASON,
+        all_workflows_failed, all_workflows_failed_error, choose_template, has_delivery_target,
+        send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
+        send_http_notification, workflows_denial_as_warning,
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server, truncated_server},
+        ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
     };
+
+    #[test]
+    fn all_failed_workflows_report_the_license_only_when_it_refused_them() {
+        let denied = all_workflows_failed_error(2, 2, "ignored".to_string());
+        assert!(matches!(&denied, AlertError::FeatureNotLicensed(f) if f == "workflows"));
+        assert_eq!(denied.to_string(), WORKFLOWS_UNLICENSED_REASON);
+
+        let failed = all_workflows_failed_error(0, 2, "timed out".to_string());
+        assert!(matches!(failed, AlertError::SendNotificationError { .. }));
+    }
+
+    #[test]
+    fn a_real_workflow_failure_beside_a_denial_is_kept_and_stays_retryable() {
+        let mixed = all_workflows_failed_error(1, 2, "workflow a timed out".to_string());
+        assert!(
+            matches!(&mixed, AlertError::SendNotificationError { error_message } if error_message == "workflow a timed out")
+        );
+    }
+
+    #[test]
+    fn a_send_error_message_never_leads_with_a_separator() {
+        let denial = format!(" {WORKFLOWS_UNLICENSED_REASON}");
+        assert_eq!(send_error_message("", &denial), WORKFLOWS_UNLICENSED_REASON);
+        assert_eq!(
+            send_error_message(" Error a;", &denial),
+            format!("Error a; {WORKFLOWS_UNLICENSED_REASON}")
+        );
+        assert_eq!(send_error_message("", ""), "");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_workflow_gate_error_is_classified_as_a_license_denial() {
+        let denied = crate::workflows::require_workflows_license(false).unwrap_err();
+        assert!(is_license_denial(&denied));
+        assert!(!is_license_denial(&anyhow::anyhow!("workflow timed out")));
+    }
+
+    #[tokio::test]
+    async fn a_denial_is_a_warning_only_when_the_trigger_reached_someone() {
+        async fn only_a_denial_asks() -> bool {
+            panic!("reached_someone must not be awaited unless the workflows were denied")
+        }
+        let denial = || Err(all_workflows_failed_error(1, 1, String::new()));
+
+        let warned = workflows_denial_as_warning(denial(), async { true })
+            .await
+            .unwrap();
+        assert_eq!(warned.error_message, WORKFLOWS_UNLICENSED_REASON);
+        assert!(warned.attempted);
+
+        assert!(matches!(
+            workflows_denial_as_warning(denial(), async { false }).await,
+            Err(AlertError::FeatureNotLicensed(_))
+        ));
+
+        let delivery_failure = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(matches!(
+            workflows_denial_as_warning(delivery_failure, only_a_denial_asks()).await,
+            Err(AlertError::SendNotificationError { .. })
+        ));
+
+        let sent =
+            workflows_denial_as_warning(Ok(NotificationOutcome::default()), only_a_denial_asks())
+                .await
+                .unwrap();
+        assert!(sent.error_message.is_empty());
+    }
+
+    #[test]
+    fn history_quotes_a_license_denial_without_calling_it_a_send_error() {
+        assert_eq!(
+            send_failure_message(&all_workflows_failed_error(1, 1, String::new())),
+            WORKFLOWS_UNLICENSED_REASON
+        );
+        let failed = AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        };
+        assert_eq!(
+            send_failure_message(&failed),
+            "error sending notification for alert: http 500"
+        );
+    }
 
     #[test]
     fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
@@ -5181,6 +5361,32 @@ mod send_path_tests {
     fn assert_sends_and_failures(seen: &[Result<String, String>]) {
         let delivered: Vec<bool> = seen.iter().map(Result::is_ok).collect();
         assert_eq!(delivered, [true, false, true, false, false], "{seen:?}");
+    }
+
+    #[test]
+    fn a_destination_that_never_answers_fails_at_the_notification_timeout() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_never_answers_fails_at_the_notification_timeout"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = hanging_server().await;
+                let limit = std::time::Duration::from_secs(10);
+                let hanging = endpoint(&base, "/hang");
+                let http = send_http_notification(&hanging, "{}".into());
+                let http = tokio::time::timeout(limit, http).await;
+                assert!(http.expect("the HTTP send has no limit").is_err());
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let discord = send_discord_with_attachment(&hanging, "{}".into(), png);
+                let discord = tokio::time::timeout(limit, discord).await;
+                assert!(discord.expect("the multipart send has no limit").is_err());
+            },
+        );
     }
 
     #[test]

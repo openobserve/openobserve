@@ -1,5 +1,6 @@
 // iamPage.js
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 
 export class IamPage {
@@ -9,7 +10,6 @@ export class IamPage {
         // ============================================================
         // IAM navigation locators
         // ============================================================
-        this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
 
         // Org selector (navbar combobox + popover option matched by data-test-value)
@@ -116,7 +116,7 @@ export class IamPage {
     }
 
     async gotoIamPage() {
-        await this.iamPageMenu.click();
+        await openNavFlyoutChild(this.page, 'iam');
         // An org switch issued before this navigation commits reuses the old path and cancels it.
         await expect(this.page).toHaveURL(/\/iam/, { timeout: 15000 });
     }

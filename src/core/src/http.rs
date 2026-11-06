@@ -136,6 +136,13 @@ impl From<AlertError> for Response {
             AlertError::GetDestinationWithTemplateError(err) => {
                 MetaHttpResponse::internal_error(err)
             }
+            AlertError::FeatureNotLicensed(feature) => (
+                StatusCode::FORBIDDEN,
+                Json(MetaHttpResponse::error_code(
+                    infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.clone()),
+                )),
+            )
+                .into_response(),
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
@@ -273,7 +280,9 @@ impl From<PipelineError> for Response {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
+                MetaHttpResponse::conflict(value)
+            }
             PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }

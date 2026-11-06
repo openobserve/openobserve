@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { openNavFlyoutChild } from '../commonActions.js';
+
 export class IamFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -8,7 +10,6 @@ export class IamFormValidationPage {
         this.page = page;
 
         // ── Navigation ───────────────────────────────────────────────────────
-        this.iamMenuLink           = '[data-test="menu-link-\\/iam-item"]';
         this.iamOrganizationsTab   = '[data-test="iam-organizations-tab"]';
         this.iamGroupsTab          = '[data-test="iam-groups-tab"]';
         this.iamRolesTab           = '[data-test="iam-roles-tab"]';
@@ -111,7 +112,7 @@ export class IamFormValidationPage {
     // ── Navigation helpers ────────────────────────────────────────────────────
 
     async navigateToIam() {
-        await this.page.locator(this.iamMenuLink).click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.page.locator('[data-test="iam-page"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 

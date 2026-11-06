@@ -27,7 +27,7 @@ import {
 } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import { isElementTruncated, readElementText } from "./useIsTruncated";
-import { tooltipNameTarget } from "./triggerName";
+import { isDisplayContents, tooltipHoverTarget, tooltipNameTarget } from "./triggerName";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
 // anchor pair), so Vue has no single root to fall attributes onto: anything a
@@ -42,7 +42,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   align: "center",
   sideOffset: 4,
   alignOffset: 0,
-  delay: 700,
+  delay: 300,
   maxWidth: "20rem",
   disabled: false,
   hoverable: false,
@@ -171,10 +171,11 @@ function onChildOpenChange(next: boolean) {
   else childOpen.value = next;
 }
 
-// getComputedStyle forces a style recalc on every mount, so only ask when a class or inline style can set display:contents.
-function mayBeDisplayContents(el: Element): boolean {
-  if ((el as HTMLElement).style?.display === "contents") return true;
-  return [...el.classList].some((c) => c === "contents" || c.endsWith(":contents"));
+// A control-level tooltip yields to one owned by a hovered control nested inside it, so only the innermost opens.
+function hoversNestedTrigger(): boolean {
+  const own = parentEl.value;
+  const nested = own?.querySelector(`[${TOOLTIP_TRIGGER_ATTR}]:hover`);
+  return !!nested && nested !== own;
 }
 
 onMounted(() => {
@@ -192,14 +193,12 @@ onMounted(() => {
       // Fallback: walk up past display:contents ancestors — they have no layout box
       // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
       candidate = childAnchorRef.value.parentElement;
-      while (
-        candidate &&
-        mayBeDisplayContents(candidate) &&
-        window.getComputedStyle(candidate).display === "contents"
-      ) {
+      while (candidate && isDisplayContents(candidate)) {
         candidate = candidate.parentElement;
       }
     }
+    // An overflow-only tooltip measures its own text element, so it never widens to the control.
+    if (candidate && !props.overflowOnly) candidate = tooltipHoverTarget(candidate);
     parentEl.value = candidate;
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
@@ -211,6 +210,7 @@ onMounted(() => {
       // cheap.
       const activateAndOpen = () => {
         childShowTimer = null;
+        if (hoversNestedTrigger()) return;
         if (props.overflowOnly) {
           // Measured now, not at mount: width and text may have changed since.
           if (!parentEl.value || !isElementTruncated(parentEl.value)) return;

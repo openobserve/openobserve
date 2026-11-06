@@ -16,7 +16,7 @@
  * somebody who was not on call. Both halves are asserted on every case here.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
- *   - The specificity tag. `oncall-simulator-specificity` renders only when
+ *   - The also-matched list. `oncall-simulator-also` renders only when
  *     there is something to explain — a second rule that matched and lost — so
  *     on a single-rule fixture its absence is correct, and asserting it would
  *     make the case about seeding competition rather than about agreement.
@@ -159,7 +159,9 @@ test.describe('On-call dry runs', {
     const predictedResponder = predicted.current_responder?.user_email
       ?? predicted.ladder?.[0]?.recipients?.[0]?.user_email ?? null;
     expect(predictedResponder, 'a preview that does not name a person has predicted nothing').toBeTruthy();
-    expect(rendered.responder, 'the screen names the same person the engine does')
+    const renderedResponders = await pm.oncallRoutingPage.readSimulatorResponderEmails();
+    testLogger.info('TS-13.01 rendered responders', { renderedResponders });
+    expect(renderedResponders, 'the screen names the same person the engine does')
       .toContain(predictedResponder);
 
     // Simulating must cost nothing: no record, no unrouted entry, no page.
@@ -425,14 +427,11 @@ test.describe('On-call dry runs', {
       'a result panel that renders empty is the failure mode this case exists to catch')
       .toBeTruthy();
 
-    // The matched-rule slot: either absent, or carrying words. Never present
-    // and blank — that is a confident answer to a question with no answer.
-    if (rendered.specificity !== null) {
-      expect(
-        rendered.specificity,
-        'W-09: the matched-rule slot renders an empty element instead of saying nothing matched',
-      ).not.toBe('');
-    }
+    // The matched-rule line always renders; blank would be a confident answer to a question with no answer.
+    expect(
+      rendered.won,
+      'W-09: the matched-rule line renders empty instead of saying nothing matched',
+    ).toMatch(/no rule matches/i);
 
     // And the panel must say, in words a human can act on, that nothing claimed it.
     expect(

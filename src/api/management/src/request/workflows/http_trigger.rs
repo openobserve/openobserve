@@ -151,8 +151,8 @@ pub async fn get_http_trigger(
     ),
     request_body(content = PutHttpTriggerBody, description = "Endpoint settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated; a mode switch also carries the new `secret`", content_type = "application/json", body = Object),
-        (status = 201, description = "Created, with the new `secret`", content_type = "application/json", body = Object),
+        (status = 200, description = "Updated; a mode switch also carries the new `secret`", content_type = "application/json", body = SecretResponse<manage::TriggerView>),
+        (status = 201, description = "Created, with the new `secret`", content_type = "application/json", body = SecretResponse<manage::TriggerView>),
         (status = 400, description = "invalid_limit or invalid_auth_mode", content_type = "application/json", body = ()),
         (status = 403, description = "Minting a credential needs credential access", content_type = "application/json", body = ()),
         (status = 404, description = "workflow_not_found", content_type = "application/json", body = ()),
@@ -249,7 +249,7 @@ pub async fn delete_http_trigger(Path((org_id, id)): Path<(String, String)>) -> 
     ),
     request_body(content = RotateBody, description = "Overlap of the old credential", content_type = "application/json"),
     responses(
-        (status = 201, description = "The new credential with its `secret`", content_type = "application/json", body = Object),
+        (status = 201, description = "The new credential with its `secret`", content_type = "application/json", body = SecretResponse<manage::CredentialView>),
         (status = 400, description = "invalid_overlap", content_type = "application/json", body = ()),
         (status = 403, description = "Minting a credential needs credential access", content_type = "application/json", body = ()),
         (status = 404, description = "not_configured", content_type = "application/json", body = ()),
@@ -329,7 +329,7 @@ pub async fn revoke_http_credential(
         ("cred_id" = String, Path, description = "Credential id"),
     ),
     responses(
-        (status = 200, description = "The credential and its `secret`", content_type = "application/json", body = Object),
+        (status = 200, description = "The credential and its `secret`", content_type = "application/json", body = manage::RevealView),
         (status = 403, description = "Needs credential access", content_type = "application/json", body = ()),
         (status = 404, description = "not_configured or credential_not_found", content_type = "application/json", body = ()),
         (status = 500, description = "The stored secret is missing or unreadable", content_type = "application/json", body = ()),
@@ -382,7 +382,7 @@ pub async fn reveal_http_credential_secret(
     ),
     request_body(content = HttpTriggerTestBody, description = "Sample data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Per-node inputs, outputs and errors", content_type = "application/json", body = Object),
+        (status = 200, description = "Per-node inputs, outputs and errors", content_type = "application/json", body = WorkflowTestResult),
         (status = 400, description = "The workflow could not run", content_type = "application/json", body = ()),
         (status = 404, description = "not_configured or workflow_not_found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),

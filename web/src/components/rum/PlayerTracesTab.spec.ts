@@ -1893,5 +1893,59 @@ describe("PlayerTracesTab", () => {
       expect(bulk[1]).toBe(START_MS * 1000);
       expect(bulk[2]).toBe(END_MS * 1000);
     });
+
+    it("starts at the device start when the arrival window starts later", async () => {
+      // A RUM batch can arrive before the first replay row, whose arrival starts the window.
+      const late = { start: START_MS * 1000 + 40_000_000, end: END_MS * 1000 + PAD };
+      await remount({ rumWindowUs: late }, [createRumHit()]);
+
+      expect(rumCalls()[0][0].query.query.start_time).toBe(START_MS * 1000);
+    });
+
+    it("fetches again when the arrival window comes in after the tab opened", async () => {
+      await remount({}, [createRumHit()]);
+      expect(rumCalls()).toHaveLength(1);
+      expect(rumCalls()[0][0].query.query.end_time).toBe(END_MS * 1000);
+
+      vi.spyOn(Date, "now").mockReturnValue(END_MS + 600_000);
+      await wrapper.setProps({ rumWindowUs: RUM_WINDOW });
+      await flushPromises();
+      expect(rumCalls()).toHaveLength(2);
+      expect(rumCalls()[1][0].query.query.sql).toContain("_first_ts");
+      expect(rumCalls()[1][0].query.query.end_time).toBeGreaterThanOrEqual(RUM_WINDOW.end);
+
+      // The same bounds in a new object do not fetch again.
+      await wrapper.setProps({ rumWindowUs: { ...RUM_WINDOW } });
+      await flushPromises();
+      expect(rumCalls()).toHaveLength(2);
+    });
+
+    it("keeps the newer result when the replaced fetch answers last", async () => {
+      await remount({}, [createRumHit()]);
+      const normal = mockSearch.getMockImplementation()!;
+      let releaseFirst: (value: any) => void = () => {};
+      let first = true;
+      // The first _rumdata query (no window yet) answers only when released, with no rows.
+      mockSearch.mockImplementation((params: any, source: string) => {
+        if (first && source === "RUM" && params.page_type === "logs") {
+          first = false;
+          return new Promise((resolve) => {
+            releaseFirst = resolve;
+          });
+        }
+        return normal(params, source);
+      });
+      wrapper.unmount();
+      wrapper = mountComponent({ props: { startTime: START_MS, endTime: END_MS } });
+      await flushPromises();
+
+      await wrapper.setProps({ rumWindowUs: RUM_WINDOW });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+
+      releaseFirst({ data: { hits: [] } });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+    });
   });
 });

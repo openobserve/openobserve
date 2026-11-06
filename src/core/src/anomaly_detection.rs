@@ -31,7 +31,7 @@ use config::{
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
     },
-    utils::time::now_micros,
+    utils::time::{MIN_ANOMALY_SCHEDULE_SECONDS, now_micros, parse_interval},
 };
 use db::authz::{remove_ownership, set_ownership};
 use infra::{
@@ -141,6 +141,10 @@ const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 
 /// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
 const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
+/// Enterprise clamps stored rows to these same limits, so a row over them cannot exhaust memory.
+const MAX_DETECTION_WINDOW_BUCKETS: i64 = 100_000;
+/// Higher than detection because the default 28 day window at 1 second must stay valid.
+const MAX_TRAINING_WINDOW_BUCKETS: i64 = 3_000_000;
 
 /// Longest destination response body kept in the alert-history error column.
 #[cfg(feature = "enterprise")]
@@ -163,8 +167,11 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_function: String,
     pub detection_function_field: Option<String>,
     pub histogram_interval: String,
+    /// At least 1 minute; a stored row below it runs every minute.
     pub schedule_interval: String,
+    /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: i64,
+    /// At most 3,000,000 histogram buckets; a stored row over the limit trains clamped to it.
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
     /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
@@ -239,6 +246,8 @@ where
     serde::Deserialize::deserialize(deserializer).map(Some)
 }
 
+/// A new `query_mode`, `filters`, `custom_sql`, `detection_function` or `histogram_interval`
+/// resets the model, and detection pauses until retraining ends; an unchanged value does not.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
@@ -249,8 +258,11 @@ pub struct UpdateAnomalyConfigRequest {
     pub detection_function: Option<String>,
     pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
+    /// At least 1 minute; a stored row below it runs every minute.
     pub schedule_interval: Option<String>,
+    /// At most 100,000 histogram buckets; a stored row over the limit runs clamped to it.
     pub detection_window_seconds: Option<i64>,
+    /// At most 3,000,000 histogram buckets; a stored row over the limit trains clamped to it.
     pub training_window_days: Option<i32>,
     /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
@@ -859,7 +871,8 @@ pub async fn check_update_config(
     Ok(())
 }
 
-/// Update an existing anomaly detection configuration
+/// Update an existing anomaly detection configuration; see [`UpdateAnomalyConfigRequest`] for
+/// the edits that reset the model.
 pub async fn update_config(
     org_id: &str,
     anomaly_id: &str,
@@ -872,6 +885,7 @@ pub async fn update_config(
     let existing = config_to_update(db, org_id, anomaly_id).await?;
     checked_update_body(&mut req, &existing)?;
 
+    let shape_changed = model_shape_changed(&existing, &req);
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
@@ -1051,6 +1065,9 @@ pub async fn update_config(
     // A repaired config must not sit out the inherited backoff before it is retried.
     if retryable_change {
         active_model.retries = Set(0);
+    }
+    if shape_changed {
+        reset_for_model_shape_change(&mut active_model);
     }
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
@@ -1370,10 +1387,7 @@ pub async fn clone_config(
 ///
 /// Resets the config status to `Waiting` and clears `training_started_at` so the
 /// enterprise training scheduler stops treating it as an active job.  The background
-/// tokio task (if any) will complete on its own but its final `update_config_status`
-/// call is idempotent — it will simply overwrite `Waiting` with `Active` if it succeeds,
-/// which the user can then re-cancel if needed.  In practice the task will notice the
-/// status change and bail early on the next DB write.
+/// tokio task (if any) completes on its own, and its later writes match no row.
 pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     let db = get_orm_client_rw().await;
 
@@ -1781,6 +1795,11 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         &req.histogram_interval,
         req.detection_window_seconds,
     )?;
+    validate_detection_window_cap(&req.histogram_interval, req.detection_window_seconds)?;
+    validate_training_window(
+        &req.histogram_interval,
+        resolved_training_window_days(req.training_window_days),
+    )?;
 
     // §4.1.1: a custom query's own histogram() must sit on the config's grid.
     if req.query_mode == "custom_sql"
@@ -2178,6 +2197,7 @@ fn checked_update_body(
 
     validated_intervals(req, existing).map_err(validation_error)?;
     validated_detection_window(req, existing).map_err(validation_error)?;
+    validated_training_window(req, existing).map_err(validation_error)?;
     validated_detection_function(req, existing).map_err(validation_error)?;
     validated_custom_sql(req, existing).map_err(validation_error)?;
     validated_denominator(req, existing).map_err(validation_error)?;
@@ -2192,6 +2212,43 @@ fn checked_update_body(
         validate_retrain_interval_days(days).map_err(validation_error)?;
     }
     validated_band_settings(req, existing).map_err(validation_error)
+}
+
+/// Whether the update changes what the trained model describes, compared as `retryable_change` is.
+fn model_shape_changed(
+    previous: &infra::table::entity::anomaly_detection_config::Model,
+    req: &UpdateAnomalyConfigRequest,
+) -> bool {
+    let rows =
+        |v: Option<&serde_json::Value>| v.and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    req.query_mode
+        .as_ref()
+        .is_some_and(|mode| *mode != previous.query_mode)
+        || req
+            .filters
+            .as_ref()
+            .is_some_and(|filters| rows(previous.filters.as_ref()) != rows(Some(filters)))
+        || req
+            .custom_sql
+            .as_deref()
+            .is_some_and(|sql| previous.custom_sql.as_deref() != Some(sql))
+        || req.detection_function.as_deref().is_some_and(|function| {
+            previous.detection_function
+                != combine_detection_fn(function, req.detection_function_field.as_deref())
+        })
+        || req
+            .histogram_interval
+            .as_ref()
+            .is_some_and(|interval| *interval != previous.histogram_interval)
+}
+
+/// Never reads the fetched row: training can publish between this update's read and its write.
+fn reset_for_model_shape_change(
+    active: &mut infra::table::entity::anomaly_detection_config::ActiveModel,
+) {
+    active.is_trained = Set(false);
+    active.status = Set(0i32);
+    active.retries = Set(0);
 }
 
 /// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.
@@ -2250,6 +2307,13 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
 
     validate_origin_aligned_interval(histogram_interval, histogram_secs)?;
 
+    if schedule_secs < MIN_ANOMALY_SCHEDULE_SECONDS {
+        anyhow::bail!(
+            "schedule_interval ({schedule_interval}) must be at least \
+             {MIN_ANOMALY_SCHEDULE_SECONDS} seconds"
+        );
+    }
+
     // A short schedule scores a partial bucket against a full-bucket baseline, forever.
     if schedule_secs < histogram_secs {
         anyhow::bail!(
@@ -2299,6 +2363,48 @@ fn validate_detection_window(
         histogram_interval,
         detection_window_seconds,
     )
+}
+
+/// A detection run expands its whole look-back into a bucket grid, so the window has a maximum.
+fn validate_detection_window_cap(
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): an unparsable interval skips only this rule.
+    if let Ok(histogram_secs) = parse_interval(histogram_interval) {
+        let maximum = MAX_DETECTION_WINDOW_BUCKETS.saturating_mul(histogram_secs);
+        if histogram_secs > 0 && detection_window_seconds > maximum {
+            anyhow::bail!(
+                "detection_window_seconds ({}) is over the maximum of {} for histogram_interval \
+                 ({}): a detection run must not hold more than {} buckets",
+                detection_window_seconds,
+                maximum,
+                histogram_interval,
+                MAX_DETECTION_WINDOW_BUCKETS
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Training expands its whole window into a bucket grid, so the window needs a maximum too.
+fn validate_training_window(histogram_interval: &str, training_window_days: i32) -> Result<()> {
+    let Ok(histogram_secs) = parse_interval(histogram_interval) else {
+        return Ok(());
+    };
+    let window_secs = i64::from(training_window_days).saturating_mul(86_400);
+    if histogram_secs > 0
+        && window_secs > MAX_TRAINING_WINDOW_BUCKETS.saturating_mul(histogram_secs)
+    {
+        anyhow::bail!(
+            "training_window_days ({}) is too long for histogram_interval ({}): a training run \
+             must not hold more than {} buckets",
+            training_window_days,
+            histogram_interval,
+            MAX_TRAINING_WINDOW_BUCKETS
+        );
+    }
+    Ok(())
 }
 
 /// A validity floor, not health: below it no cadence holds a complete bucket at an off-grid phase.
@@ -2399,7 +2505,43 @@ fn validated_detection_window(
     {
         return Ok(());
     }
-    validate_detection_window(&schedule, &histogram, window)
+    validate_detection_window(&schedule, &histogram, window)?;
+    // The schedule does not size the grid, so a schedule-only edit keeps an over-limit row
+    // editable.
+    if req
+        .histogram_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .detection_window_seconds
+            .is_none_or(|v| v == existing.detection_window_seconds)
+    {
+        return Ok(());
+    }
+    validate_detection_window_cap(&histogram, window)
+}
+
+/// Same grandfathering as `validated_detection_window`: only an edit to either field is judged.
+fn validated_training_window(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    if req
+        .training_window_days
+        .is_none_or(|v| v == existing.training_window_days)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+    {
+        return Ok(());
+    }
+    let (_, histogram) = merged_interval_pair(req, existing);
+    let days = req
+        .training_window_days
+        .unwrap_or(existing.training_window_days)
+        .max(1);
+    validate_training_window(&histogram, days)
 }
 
 /// §4.1.1 grandfathering: a stored violating row stays editable; a grid-touching edit is not.
@@ -2440,6 +2582,19 @@ fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
     let statements =
         sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
             .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    // visit_statements, because a Query can hold a DELETE behind WITH or in a subquery.
+    if !matches!(statements.as_slice(), [sqlparser::ast::Statement::Query(_)])
+        || sqlparser::ast::visit_statements(&statements, |statement| {
+            if matches!(statement, sqlparser::ast::Statement::Query(_)) {
+                ControlFlow::Continue(())
+            } else {
+                ControlFlow::Break(())
+            }
+        })
+        .is_break()
+    {
+        anyhow::bail!("custom_sql must be exactly one SELECT statement");
+    }
     // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
     let config_interval_secs = parse_interval(histogram_interval).ok();
     let walk =
@@ -2896,30 +3051,6 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
     }
 }
 
-/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
-fn parse_interval(interval: &str) -> Result<i64> {
-    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
-        (stripped, 1)
-    } else if let Some(stripped) = interval.strip_suffix('m') {
-        (stripped, 60)
-    } else if let Some(stripped) = interval.strip_suffix('h') {
-        (stripped, 3600)
-    } else if let Some(stripped) = interval.strip_suffix('d') {
-        (stripped, 86400)
-    } else {
-        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
-    };
-    let value: i64 = value.parse().map_err(|_| {
-        anyhow::anyhow!(
-            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
-        )
-    })?;
-    // A positive wrap lands on a plausible schedule that clears every downstream guard.
-    value
-        .checked_mul(unit_seconds)
-        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
-}
-
 /// Execute a SQL query for anomaly detection and return time-series data points
 ///
 /// `start_time` and `end_time` are microseconds since epoch. The search service uses
@@ -3021,6 +3152,7 @@ fn anomaly_search_request(
         search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         search_event_context: None,
         use_cache: false,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -4321,6 +4453,17 @@ mod tests {
         let mut req = make_valid_filters_req();
         req.histogram_interval = "10x".to_string();
         assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_schedule_floor() {
+        let mut req = make_valid_filters_req();
+        req.histogram_interval = "1s".to_string();
+        req.schedule_interval = "59s".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("at least 60 seconds"), "{err}");
+        req.schedule_interval = "1m".to_string();
+        assert!(validate_config_request(&req).is_ok());
     }
 
     #[test]
@@ -7933,5 +8076,388 @@ mod tests {
         assert!(initial_training_error(trigger_training("no-such-id").await).is_none());
         assert!(initial_training_error(Err(anyhow::anyhow!("db down"))).is_some());
         assert!(initial_training_error(Ok(())).is_none());
+    }
+
+    mod p1_window_limits {
+        use super::{update_interval_validation::stored_config, *};
+
+        const ONE_YEAR_SECS: i64 = 365 * 86_400;
+
+        fn one_second_create() -> CreateAnomalyConfigRequest {
+            CreateAnomalyConfigRequest {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                detection_window_seconds: 3600,
+                ..make_valid_filters_req()
+            }
+        }
+
+        fn update_body(body: serde_json::Value) -> UpdateAnomalyConfigRequest {
+            serde_json::from_value(body).unwrap()
+        }
+
+        #[cfg(feature = "enterprise")]
+        #[test]
+        fn enterprise_clamps_to_the_limits_validation_enforces() {
+            use o2_enterprise::enterprise::anomaly_detection::absence;
+            assert_eq!(
+                MAX_DETECTION_WINDOW_BUCKETS,
+                absence::MAX_DETECTION_WINDOW_BUCKETS
+            );
+            assert_eq!(
+                MAX_TRAINING_WINDOW_BUCKETS,
+                absence::MAX_TRAINING_WINDOW_BUCKETS
+            );
+        }
+
+        #[test]
+        fn create_rejects_a_one_year_window_at_one_second() {
+            let mut req = CreateAnomalyConfigRequest {
+                detection_window_seconds: ONE_YEAR_SECS,
+                ..one_second_create()
+            };
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("detection_window_seconds"), "{err}");
+        }
+
+        #[test]
+        fn create_keeps_a_one_hour_window_at_one_second() {
+            assert!(checked_create_body(&mut one_second_create()).is_ok());
+        }
+
+        #[test]
+        fn create_keeps_a_window_at_exactly_the_bucket_limit() {
+            let mut req = CreateAnomalyConfigRequest {
+                detection_window_seconds: 100_000,
+                ..one_second_create()
+            };
+            assert!(checked_create_body(&mut req).is_ok());
+        }
+
+        #[test]
+        fn create_rejects_an_oversized_training_window() {
+            let mut req = CreateAnomalyConfigRequest {
+                training_window_days: Some(35),
+                ..one_second_create()
+            };
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("training_window_days"), "{err}");
+        }
+
+        #[test]
+        fn create_accepts_the_default_training_window_at_one_second() {
+            for days in [None, Some(28), Some(34)] {
+                let mut req = CreateAnomalyConfigRequest {
+                    training_window_days: days,
+                    ..one_second_create()
+                };
+                assert!(checked_create_body(&mut req).is_ok(), "{days:?}");
+            }
+        }
+
+        #[test]
+        fn update_rejects_a_one_year_window_at_one_second() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({
+                "detection_window_seconds": ONE_YEAR_SECS
+            }));
+            assert!(checked_update_body(&mut req, &stored).is_err());
+            let mut req = update_body(serde_json::json!({ "detection_window_seconds": 3600 }));
+            assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+
+        #[test]
+        fn a_row_below_the_schedule_floor_stays_editable_until_its_schedule_changes() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "10s".to_string(),
+                schedule_interval: "30s".to_string(),
+                ..stored_config()
+            };
+            let req = update_body(serde_json::json!({ "name": "renamed" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
+            let req = update_body(serde_json::json!({ "schedule_interval": "30s" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
+            let req = update_body(serde_json::json!({ "schedule_interval": "40s" }));
+            assert!(validated_intervals(&req, &stored).is_err());
+            let req = update_body(serde_json::json!({ "schedule_interval": "1m" }));
+            assert!(validated_intervals(&req, &stored).is_ok());
+        }
+
+        #[test]
+        fn a_schedule_only_edit_keeps_an_over_limit_row_editable() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                detection_window_seconds: ONE_YEAR_SECS,
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({ "schedule_interval": "2m" }));
+            assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+
+        #[test]
+        fn update_rejects_an_oversized_training_window() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({ "training_window_days": 35 }));
+            assert!(checked_update_body(&mut req, &stored).is_err());
+            let mut req = update_body(serde_json::json!({ "training_window_days": 28 }));
+            assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+
+        #[test]
+        fn a_histogram_only_update_cannot_cross_the_detection_limit() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                detection_window_seconds: 30 * 86_400,
+                training_window_days: 1,
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({ "histogram_interval": "1s" }));
+            let err = checked_update_body(&mut req, &stored)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("detection_window_seconds"), "{err}");
+        }
+
+        #[test]
+        fn a_histogram_only_update_cannot_cross_the_training_limit() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                detection_window_seconds: 7200,
+                training_window_days: 60,
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({ "histogram_interval": "1s" }));
+            let err = checked_update_body(&mut req, &stored)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("training_window_days"), "{err}");
+        }
+
+        #[test]
+        fn a_stored_oversized_row_stays_editable_when_its_windows_are_left_alone() {
+            let stored = infra::table::entity::anomaly_detection_config::Model {
+                histogram_interval: "1s".to_string(),
+                schedule_interval: "1m".to_string(),
+                detection_window_seconds: ONE_YEAR_SECS,
+                training_window_days: 365,
+                ..stored_config()
+            };
+            let mut req = update_body(serde_json::json!({
+                "name": "renamed",
+                "histogram_interval": "1s",
+                "detection_window_seconds": ONE_YEAR_SECS,
+                "training_window_days": 365
+            }));
+            assert!(checked_update_body(&mut req, &stored).is_ok());
+        }
+    }
+
+    mod p1_model_shape {
+        use infra::table::entity::anomaly_detection_config::{Column, Entity, Model};
+        use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+
+        use super::{update_interval_validation::stored_config, *};
+
+        fn body(body: serde_json::Value) -> UpdateAnomalyConfigRequest {
+            serde_json::from_value(body).unwrap()
+        }
+
+        fn custom_sql_row() -> Model {
+            Model {
+                query_mode: "custom_sql".to_string(),
+                filters: None,
+                custom_sql: Some("SELECT 1".to_string()),
+                ..stored_config()
+            }
+        }
+
+        #[test]
+        fn each_shaping_field_marks_the_model_stale() {
+            let filters_row = Model {
+                filters: Some(serde_json::json!([{ "field": "a", "operator": "=", "value": "b" }])),
+                ..stored_config()
+            };
+            let cases = [
+                (
+                    "query_mode",
+                    stored_config(),
+                    serde_json::json!({ "query_mode": "custom_sql" }),
+                ),
+                (
+                    "filters",
+                    filters_row,
+                    serde_json::json!({ "filters": [{ "field": "a", "operator": "=", "value": "c" }] }),
+                ),
+                (
+                    "custom_sql",
+                    custom_sql_row(),
+                    serde_json::json!({ "custom_sql": "SELECT 2" }),
+                ),
+                (
+                    "detection_function",
+                    stored_config(),
+                    serde_json::json!({ "detection_function": "avg", "detection_function_field": "v" }),
+                ),
+                (
+                    "histogram_interval",
+                    stored_config(),
+                    serde_json::json!({ "histogram_interval": "1m" }),
+                ),
+            ];
+            for (field, row, change) in cases {
+                assert!(model_shape_changed(&row, &body(change)), "{field}");
+            }
+        }
+
+        #[test]
+        fn a_field_the_model_does_not_depend_on_keeps_the_model() {
+            for change in [
+                serde_json::json!({ "band_width": 4.0 }),
+                serde_json::json!({ "percentile": 99.0 }),
+                serde_json::json!({ "alert_enabled": true }),
+                serde_json::json!({ "alert_direction": "above" }),
+                serde_json::json!({ "alert_destinations": ["d1"] }),
+                serde_json::json!({ "training_window_days": 30 }),
+                serde_json::json!({ "schedule_interval": "2h" }),
+                serde_json::json!({ "detection_window_seconds": 7200 }),
+                serde_json::json!({ "name": "renamed" }),
+            ] {
+                assert!(
+                    !model_shape_changed(&stored_config(), &body(change.clone())),
+                    "{change}"
+                );
+            }
+        }
+
+        #[test]
+        fn resaving_the_same_body_keeps_the_model() {
+            let filters = serde_json::json!({
+                "query_mode": "filters",
+                "filters": [],
+                "custom_sql": null,
+                "detection_function": "count(*)",
+                "histogram_interval": "5m"
+            });
+            assert!(!model_shape_changed(&stored_config(), &body(filters)));
+            let sql = serde_json::json!({
+                "query_mode": "custom_sql",
+                "filters": null,
+                "custom_sql": "SELECT 1",
+                "histogram_interval": "5m"
+            });
+            assert!(!model_shape_changed(&custom_sql_row(), &body(sql)));
+            let no_filters = Model {
+                filters: None,
+                ..stored_config()
+            };
+            assert!(!model_shape_changed(
+                &no_filters,
+                &body(serde_json::json!({ "filters": [] }))
+            ));
+        }
+
+        async fn config_db(row: Model) -> sea_orm::DatabaseConnection {
+            let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+            let schema = sea_orm::Schema::new(sea_orm::DatabaseBackend::Sqlite);
+            let statement = schema.create_table_from_entity(Entity);
+            db.execute(db.get_database_backend().build(&statement))
+                .await
+                .unwrap();
+            Entity::insert(row.into_active_model())
+                .exec(&db)
+                .await
+                .unwrap();
+            db
+        }
+
+        /// The trainer's publish landing between the edit's read and the edit's write.
+        #[tokio::test]
+        async fn an_edit_that_read_an_untrained_row_still_untrains_a_model_published_since() {
+            let db = config_db(stored_config()).await;
+            let read_by_edit = Entity::find_by_id("a1").one(&db).await.unwrap().unwrap();
+            assert!(!read_by_edit.is_trained);
+
+            Entity::update_many()
+                .col_expr(Column::IsTrained, sea_orm::sea_query::Expr::value(true))
+                .col_expr(Column::Status, sea_orm::sea_query::Expr::value(2))
+                .col_expr(Column::Retries, sea_orm::sea_query::Expr::value(4))
+                .filter(Column::AnomalyId.eq("a1"))
+                .exec(&db)
+                .await
+                .unwrap();
+
+            let mut active = read_by_edit.into_active_model();
+            reset_for_model_shape_change(&mut active);
+            active.updated_at = Set(2000);
+            active.update(&db).await.unwrap();
+
+            let stored = Entity::find_by_id("a1").one(&db).await.unwrap().unwrap();
+            assert!(!stored.is_trained);
+            assert_eq!(stored.status, 0);
+            assert_eq!(stored.retries, 0);
+        }
+
+        #[cfg(feature = "enterprise")]
+        #[test]
+        fn status_zero_is_the_waiting_state_the_scheduler_queues() {
+            use o2_enterprise::enterprise::anomaly_detection::types::Status;
+            assert_eq!(Status::Waiting.to_i32(), 0);
+        }
+    }
+
+    mod p1_custom_sql_statement {
+        use super::*;
+
+        const GRID: &str = "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS c FROM logs";
+
+        #[test]
+        fn a_column_or_value_that_contains_a_destructive_word_is_kept() {
+            for clause in [
+                "WHERE updated_at > 0",
+                "WHERE is_deleted = false",
+                "WHERE inserted_at > 0",
+                "WHERE dropped_count > 0",
+                "WHERE op = 'update'",
+            ] {
+                let sql = format!("{GRID} {clause} GROUP BY ts");
+                assert!(validate_custom_sql_grid(&sql, "5m").is_ok(), "{clause}");
+            }
+        }
+
+        #[test]
+        fn only_one_select_statement_is_kept() {
+            for sql in [
+                "DELETE FROM logs WHERE a = 1",
+                "WITH a AS (SELECT 1) DELETE FROM logs",
+                "WITH a AS (DELETE FROM logs RETURNING *) SELECT 1 FROM a",
+                "SELECT 1 FROM (DELETE FROM logs RETURNING *) t",
+                "DROP TABLE logs",
+                "UPDATE logs SET a = 1",
+                "INSERT INTO logs VALUES (1)",
+                "SELECT 1; DROP TABLE t",
+            ] {
+                let err = validate_custom_sql_grid(sql, "5m").unwrap_err().to_string();
+                assert!(err.contains("one SELECT"), "{sql}: {err}");
+            }
+        }
+
+        #[test]
+        fn create_refuses_a_statement_that_is_not_a_select() {
+            let mut req = CreateAnomalyConfigRequest {
+                query_mode: "custom_sql".to_string(),
+                filters: None,
+                custom_sql: Some("DELETE FROM logs".to_string()),
+                ..make_valid_filters_req()
+            };
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("one SELECT"), "{err}");
+        }
     }
 }

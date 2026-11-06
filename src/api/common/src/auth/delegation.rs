@@ -358,7 +358,8 @@ pub(crate) async fn authorize(
         )
         .await;
     if !allowed {
-        return Err(forbidden("permission denied"));
+        log::debug!("delegated token refused: permission denied");
+        return Err(AuthError::RoleRefused("Unauthorized Access".to_string()));
     }
     #[cfg(feature = "enterprise")]
     if let Some(caller) = &result.delegation {
@@ -585,6 +586,7 @@ fn touch_due(last_used_at: i64, now: i64) -> bool {
     now - last_used_at >= TOUCH_INTERVAL_MICROS
 }
 
+#[cfg(any(feature = "enterprise", test))]
 fn forbidden(reason: &str) -> AuthError {
     log::debug!("delegated token refused: {reason}");
     AuthError::Forbidden("Unauthorized Access".to_string())
@@ -633,7 +635,7 @@ mod tests {
         match result {
             Ok(_) => 200,
             Err(AuthError::Unauthorized(_)) => 401,
-            Err(AuthError::Forbidden(_)) => 403,
+            Err(AuthError::Forbidden(_) | AuthError::RoleRefused(_)) => 403,
             Err(AuthError::NotFound(_)) => 404,
             Err(AuthError::Locked { .. }) => 429,
             Err(AuthError::Unavailable(_)) => 503,

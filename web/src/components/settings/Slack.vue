@@ -34,6 +34,7 @@ import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import SlackConnectEmpty from "./SlackConnectEmpty.vue";
 import SlackInstallConfirmation from "./SlackInstallConfirmation.vue";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
+import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
 import SlackOrgAccess from "./SlackOrgAccess.vue";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import SlackSwitchAllCard from "./SlackSwitchAllCard.vue";
@@ -188,6 +189,7 @@ const openDialog = (mode: DialogMode): void => {
           <OButton
             variant="outline"
             size="sm-action"
+            icon-left="add"
             class="ms-auto"
             data-test="slack-add-workspace"
             @click="adding = true"
@@ -203,6 +205,9 @@ const openDialog = (mode: DialogMode): void => {
           @disconnect="openDialog('disconnect')"
           @uninstall="openDialog('uninstall')"
         >
+          <template #oncall>
+            <SlackOncallUnlinked :installation="current" />
+          </template>
           <SlackOrgAccess v-if="showOrgAccess" :installation="current" />
           <SlackChannelDefaults :installation-id="current.id" />
           <SlackLinkingSection :installation="current" />
@@ -213,6 +218,7 @@ const openDialog = (mode: DialogMode): void => {
           <OButton
             variant="outline"
             size="sm-action"
+            icon-left="close"
             data-test="slack-add-workspace-cancel"
             @click="adding = false"
           >

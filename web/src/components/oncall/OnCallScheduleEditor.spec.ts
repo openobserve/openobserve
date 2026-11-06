@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { queryClient } from "@/composables/query/queryClient";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
@@ -21,6 +22,7 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type {
+  OnCallPolicy,
   OnCallSchedule,
   OnCallTeamMember,
   ScheduleEditorIntent,
@@ -244,6 +246,7 @@ function render(
     timezone?: string;
     drawerOnly?: boolean;
     intent?: ScheduleEditorIntent | null;
+    policy?: OnCallPolicy | null;
   } = {},
 ) {
   return mount(OnCallScheduleEditor, {
@@ -254,6 +257,7 @@ function render(
       members: opts.members ?? members("ana@o2.ai", "bob@o2.ai"),
       drawerOnly: opts.drawerOnly,
       intent: opts.intent ?? null,
+      policy: opts.policy ?? null,
     },
     global: { plugins: [i18n, store], stubs },
   });
@@ -274,6 +278,21 @@ describe("OnCallScheduleEditor", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it.each(["listUnavailability", "previewResolvedSchedule"] as const)(
+    "tells the page when the license refuses %s",
+    async (read) => {
+      queryClient.clear();
+      service[read].mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+      });
+      const wrapper = render({ schedule: schedule([rota("Primary")]) });
+      await openRotation(wrapper);
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    },
+  );
 
   // A rotation can only contain people who are on the team, so sending the
   // user to an editor with nothing to pick would be a dead end.
@@ -379,6 +398,7 @@ describe("OnCallScheduleEditor", () => {
   });
 
   // B1: one row per team day for a week; the open tab's rule is solid, other rules soft, gaps a gap.
+  // U17: hue is the shift rule, so one person on two rules shows two colours.
   it("draws the picture one day per row with the open rule in full colour", async () => {
     const day = 86_400_000_000;
     const from = Date.UTC(2023, 10, 14) * 1000;
@@ -396,7 +416,7 @@ describe("OnCallScheduleEditor", () => {
           rotation: "Office",
           from: from + day / 2,
           to: from + 1.5 * day,
-          user_email: "bob@o2.ai",
+          user_email: "ana@o2.ai",
         },
         { rotation_id: "rot_primary", from: from + 1.5 * day, to: from + 14 * day },
       ],
@@ -417,6 +437,58 @@ describe("OnCallScheduleEditor", () => {
     ]);
     expect(tracks[1].bands.map((b: any) => b.tone)).toEqual([2, "gap"]);
     expect(String(tracks[0].bands[0].ariaLabel)).toContain("Base");
+  });
+
+  // B1: the preview tells Off from a gap the way the timeline does; a rotation not saved yet stays red.
+  it("draws a stretch outside every rule as Off when no step pages the rotation alone", async () => {
+    const from = Date.UTC(2023, 10, 14) * 1000;
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [{ rotation_id: "rot_primary", from, to: from + 14 * 86_400_000_000 }],
+    } as any);
+    const policy = {
+      id: "p",
+      org_id: "default",
+      team_id: "team_1",
+      rungs: [
+        {
+          priority: 1 as const,
+          channels: [],
+          steps: [
+            {
+              after_micros: 0,
+              targets: [
+                { kind: "rotation" as const, rotation_id: "rot_primary" },
+                { kind: "rotation" as const, rotation_id: "rot_other" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const tones = (wrapper: any) =>
+      (wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks") as any[])[0].bands.map(
+        (b: any) => b.tone,
+      );
+
+    const stored = render({ schedule: schedule([rota("Primary")]), policy });
+    await openRotation(stored);
+    expect(tones(stored)).toEqual(["off"]);
+    // F5: the legend keys what is drawn, so an Off-only week has no "No one on call".
+    const legend = (wrapper: any, kind: string) =>
+      wrapper.find(`[data-test="oncall-draft-preview-legend-${kind}"]`);
+    expect(legend(stored, "off").text()).toBe("Off");
+    expect(legend(stored, "nobody").exists()).toBe(false);
+
+    // A copy is staffed but not saved, so its id is in no step yet.
+    const fresh = render({
+      schedule: schedule([rota("Primary")]),
+      policy,
+      intent: { mode: "duplicate", id: "rot_primary" },
+    });
+    await flushPromises();
+    expect(tones(fresh)).toEqual(["gap"]);
+    expect(legend(fresh, "nobody").text()).toBe("No one on call");
+    expect(legend(fresh, "off").exists()).toBe(false);
   });
 
   // D5: bands sit on the wall-clock scale of the axis, so local noon is under 12:00 on a 25-hour day.
@@ -558,6 +630,45 @@ describe("OnCallScheduleEditor", () => {
     ).toBeUndefined();
   });
 
+  // Handover and active hours are wall times on the team's clock, so both say which.
+  it("names the team's zone beside the handover time and the active hours", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary")]),
+      timezone: "Asia/Kolkata",
+      drawerOnly: true,
+      intent: { mode: "edit", id: "rot_primary" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-schedule-handover-0-zone"]').text()).toBe(
+      "Asia/Kolkata",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-covers-0-zone"]').text()).toBe("Asia/Kolkata");
+  });
+
+  /// A name two rotations share makes every menu, cover and level naming it ambiguous, so it cannot be saved.
+  it("blocks saving a rotation renamed to another rotation's name, and says why", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary"), rota("Secondary")]),
+      drawerOnly: true,
+      intent: { mode: "edit", id: "rot_secondary" },
+    });
+    await flushPromises();
+    const done = () => wrapper.find('[data-test="oncall-rotation-done"]');
+    expect(done().attributes("disabled")).toBeUndefined();
+
+    await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", " primary ");
+    await flushPromises();
+    expect(done().attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-schedule-name-clash"]').text()).toBe(
+      "Another rotation is already called Primary. Pick a different name to save.",
+    );
+
+    await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Backup");
+    await flushPromises();
+    expect(done().attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-schedule-name-clash"]').exists()).toBe(false);
+  });
+
   /// Nothing in this drawer can add a person, so the empty picker has to hand
   /// the reader to the one screen that can.
   it("sends the reader to the roster from inside the drawer", async () => {
@@ -626,6 +737,17 @@ describe("OnCallScheduleEditor", () => {
     // The position is named on the rotation; the rule underneath is "Base".
     expect(rows[1].shift_rules[0].name).toBe("Base");
     expect(rows[1].name).not.toBe("Base");
+  });
+
+  // U17: the drawer names what it edits; a rotation not saved yet has no name to use.
+  it("titles the drawer with the rotation it edits", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("title")).toBe("Edit Primary");
+
+    const fresh = render({ schedule: schedule([rota("Primary")]), intent: { mode: "new" } });
+    await flushPromises();
+    expect(fresh.findComponent({ name: "ODrawer" }).props("title")).toBe("New rotation");
   });
 
   /// The drawer used to survive its own save; the parent then rebuilt `draft`,
@@ -1358,6 +1480,12 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     expect(drawerRules(wrapper)[0].ends_at).toBe(ANCHOR + 2 * hour);
     expect(wrapper.find('[data-test="oncall-schedule-rule-summary-0"]').text()).toContain("stops");
     expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-0"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[data-test="oncall-schedule-rule-tab-icon-0"]')
+        .findComponent({ name: "OTooltip" })
+        .props("content"),
+    ).toBe("Stopped");
     await save(wrapper);
     expect(savedRotations()[0].shift_rules[0].ends_at).toBe(ANCHOR + 2 * hour);
   });
@@ -1551,7 +1679,7 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     await openTab(wrapper, 1);
 
     expect(wrapper.find('[data-test="oncall-schedule-rule-summary-1"]').text()).toBe(
-      "All hours · India wins over this · on call only Every day 12:00–24:00",
+      "Every day 12:00–24:00 · India wins over this",
     );
   });
 
@@ -1582,8 +1710,11 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
       expect(wrapper.find(`[data-test="oncall-schedule-rule-never-used-${index}"]`).text()).toBe(
         "Never used: Follow-the-sun catch-all covers all its hours and wins over it.",
       );
-      expect(wrapper.find(`[data-test="oncall-schedule-rule-tab-icon-${index}"]`).exists()).toBe(
-        true,
+      const icon = wrapper.find(`[data-test="oncall-schedule-rule-tab-icon-${index}"]`);
+      expect(icon.exists()).toBe(true);
+      // The icon alone said nothing; its tooltip names the problem.
+      expect(icon.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Never used — another rule always wins",
       );
     }
     expect(
@@ -1615,12 +1746,45 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     await openRotation(wrapper);
 
     expect(wrapper.find('[data-test="oncall-schedule-rule-summary-0"]').text()).toBe(
-      "All hours · Office wins over this · on call only Mon 00:00–09:00, Mon–Thu 18:00–09:00 next day, Fri 18:00–24:00, Sat, Sun all day",
+      "Mon 00:00–09:00, Mon–Thu 18:00–09:00 next day, Fri 18:00–24:00, Sat, Sun · all day · Office wins over this",
     );
     await openTab(wrapper, 1);
     expect(wrapper.find('[data-test="oncall-schedule-rule-summary-1"]').text()).toBe(
       "Mon–Fri 09:00–18:00 · wins over Base",
     );
+  });
+
+  // U17: the overlap choice says what applies, in the rule's own name.
+  it("asks which rule to use where two both apply", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary", [rule(), office])]) });
+    await openRotation(wrapper);
+
+    const control = wrapper.find('[data-test="oncall-schedule-overlap-0"]');
+    expect(control.element.previousElementSibling?.textContent?.trim()).toBe(
+      "When this and Office both apply:",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-overlap-0-wins"]').text()).toBe(
+      "Use this rule",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-overlap-0-loses"]').text()).toBe("Use Office");
+  });
+
+  // B10: an unrestricted rule under a higher one does not hold all hours, so its pick says so.
+  it("labels a partly overridden catch-all's hours as all other hours", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary", [rule(), office])]) });
+    await openRotation(wrapper);
+
+    const options = wrapper
+      .findComponent('[data-test="oncall-schedule-covers-0"]')
+      .props("options") as Array<{ label: unknown; value: string }>;
+    expect(String(options.find((o) => o.value === "all")!.label)).toBe("All other hours");
+
+    const alone = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(alone);
+    const own = alone
+      .findComponent('[data-test="oncall-schedule-covers-0"]')
+      .props("options") as Array<{ label: unknown; value: string }>;
+    expect(String(own.find((o) => o.value === "all")!.label)).toBe("All hours");
   });
 
   it("R4: offers no winner choice to rules that never overlap", async () => {
