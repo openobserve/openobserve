@@ -424,13 +424,16 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     }
   }
 
-  // A typed needle is passed to the loader so high-cardinality fields search server side.
-  watch([step, () => draft.value?.field, text], ([currentStep, field, typed]) => {
-    if (currentStep !== "value" || !field) return;
-    clearTimeout(valueTimer);
-    const search = editedValue.value === null ? typed.trim() : "";
-    valueTimer = setTimeout(() => fetchValues(field, search), search ? VALUE_DEBOUNCE_MS : 0);
-  });
+  // A typed needle is passed to the loader so high-cardinality fields search server side; a new loader reloads.
+  watch(
+    [step, () => draft.value?.field, text, options.loadValues],
+    ([currentStep, field, typed]) => {
+      if (currentStep !== "value" || !field) return;
+      clearTimeout(valueTimer);
+      const search = editedValue.value === null ? typed.trim() : "";
+      valueTimer = setTimeout(() => fetchValues(field, search), search ? VALUE_DEBOUNCE_MS : 0);
+    },
+  );
 
   function startDraft(field: string) {
     dropValues();

@@ -13,15 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+vi.mock("@/services/users", () => ({
+  default: {
+    orgUsers: vi.fn().mockResolvedValue({
+      data: { data: [{ email: "ana@o2.ai", first_name: "Ana", last_name: "Ruiz" }] },
+    }),
+  },
+}));
 
 const stubs = {
-  OUserCell: { name: "OUserCell", props: ["value", "name"], template: "<span />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 function render(over: Record<string, unknown> = {}) {
@@ -32,7 +41,7 @@ function render(over: Record<string, unknown> = {}) {
       teamName: "Payments",
       ...over,
     } as any,
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -73,7 +82,13 @@ describe("OnCallShiftBanner", () => {
     );
   });
 
-  it("labels the viewer's own avatar as You", () => {
-    expect(render().findComponent({ name: "OUserCell" }).props("name")).toBe("You");
+  /// The viewer reads as You, with their name and email one hover away rather than in a native title.
+  it("labels the viewer as You, with name and email in the tooltip", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const you = wrapper.find('[data-test="oncall-shift-banner-you"]');
+    expect(you.text()).toBe("You");
+    expect(you.findComponent({ name: "OTooltip" }).props("content")).toBe("Ana Ruiz (ana@o2.ai)");
+    expect(wrapper.find("[title]").exists()).toBe(false);
   });
 });

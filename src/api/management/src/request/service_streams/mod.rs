@@ -64,6 +64,10 @@ struct ServiceRow {
     ),
     security(
         ("Authorization" = [])
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
     )
 )]
 pub async fn get_dimension_analytics(
@@ -122,7 +126,11 @@ pub async fn get_dimension_analytics(
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
+    )
 )]
 pub async fn list_services(
     Path(org_id): Path<String>,
@@ -248,7 +256,8 @@ pub async fn list_services(
         ("Authorization" = [])
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "create"}))
     )
 )]
 pub async fn correlate_streams(
@@ -381,7 +390,11 @@ pub struct CorrelationRequest {
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
+    )
 )]
 pub async fn get_identity_config(
     Path(org_id): Path<String>,
@@ -425,7 +438,11 @@ pub async fn get_identity_config(
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "update"}))
+    )
 )]
 pub async fn save_identity_config(
     Path(org_id): Path<String>,

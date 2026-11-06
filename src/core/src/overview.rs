@@ -22,8 +22,10 @@ use common::meta::stream::Stream;
 use config::{
     get_config,
     meta::{
-        alerts::state::AlertState, pipeline::Pipeline,
-        self_reporting::ai_chat::is_protected_ai_chat_stream, stream::StreamType,
+        alerts::state::AlertState,
+        pipeline::Pipeline,
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::is_user_data_stream},
+        stream::StreamType,
     },
     utils::time::now_micros,
 };
@@ -576,7 +578,7 @@ async fn load_streams(
         streams.iter().map(|s| s.stream_type.to_string()).collect();
     let now = now_micros();
     let schema_changes_24h = count_schema_changes(org_id, &streams, now - DAY_MICROS).await;
-    let mut data = build_streams_data(streams, top_n, now);
+    let mut data = build_streams_data(org_id, streams, top_n, now);
     data.schema_changes_24h = schema_changes_24h;
     data.compaction_pending = pending_compaction(org_id, &visible_types).await;
     Ok(data)
@@ -595,7 +597,7 @@ async fn fetch_streams(org_id: &str, scope: &OverviewScope) -> Result<Vec<Stream
 async fn count_schema_changes(org_id: &str, streams: &[Stream], since: i64) -> u64 {
     let counted: Vec<(StreamType, &str)> = streams
         .iter()
-        .filter(|s| is_counted_user_stream(s))
+        .filter(|s| is_counted_user_stream(org_id, s))
         .map(|s| (s.stream_type, s.name.as_str()))
         .collect();
     infra::schema::count_cached_versions_since(org_id, &counted, since).await as u64
@@ -626,15 +628,15 @@ fn sum_pending_for_org(
 }
 
 /// User data streams only; enrichment tables, AI chat and internal streams are left out.
-fn is_counted_user_stream(stream: &Stream) -> bool {
-    infra::schema::is_user_data_stream(stream.stream_type, &stream.name)
+fn is_counted_user_stream(org_id: &str, stream: &Stream) -> bool {
+    is_user_data_stream(org_id, &stream.name, stream.stream_type)
         && !is_protected_ai_chat_stream(&stream.name)
 }
 
-fn quiet_count(streams: &[Stream], now: i64) -> usize {
+fn quiet_count(org_id: &str, streams: &[Stream], now: i64) -> usize {
     streams
         .iter()
-        .filter(|s| is_counted_user_stream(s))
+        .filter(|s| is_counted_user_stream(org_id, s))
         .filter(|s| {
             let last = s.stats.doc_time_max;
             last < now - QUIET_AFTER_MICROS && last > now - QUIET_FORGOTTEN_AFTER_MICROS
@@ -642,7 +644,7 @@ fn quiet_count(streams: &[Stream], now: i64) -> usize {
         .count()
 }
 
-fn build_streams_data(streams: Vec<Stream>, top_n: usize, now: i64) -> StreamsData {
+fn build_streams_data(org_id: &str, streams: Vec<Stream>, top_n: usize, now: i64) -> StreamsData {
     let mut by_type = Vec::with_capacity(OVERVIEW_STREAM_TYPES.len());
     for stream_type in OVERVIEW_STREAM_TYPES {
         let mut of_type: Vec<&Stream> = streams
@@ -676,7 +678,7 @@ fn build_streams_data(streams: Vec<Stream>, top_n: usize, now: i64) -> StreamsDa
                 .collect(),
         });
     }
-    let quiet_count = quiet_count(&streams, now);
+    let quiet_count = quiet_count(org_id, &streams, now);
     StreamsData {
         total_streams: by_type.iter().map(|t| t.count).sum(),
         total_storage_size_mb: by_type.iter().fold(0.0, |acc, t| acc + t.storage_size_mb),
@@ -942,7 +944,7 @@ mod tests {
             stream("m1", StreamType::Metrics, 2.0, 20),
             stream("internal", StreamType::Index, 100.0, 1),
         ];
-        let data = build_streams_data(streams, 2, now_micros());
+        let data = build_streams_data("acme", streams, 2, now_micros());
         assert_eq!(data.total_streams, 4);
         assert_eq!(data.total_storage_size_mb, 17.0);
         let logs = &data.by_type[0];
@@ -1237,21 +1239,19 @@ mod tests {
     fn test_internal_and_ai_chat_streams_are_not_counted_as_user_streams() {
         let now = now_micros();
         let old = now - 2 * QUIET_AFTER_MICROS;
-        assert!(is_counted_user_stream(&stream_at(
-            "app",
-            StreamType::Logs,
-            old
-        )));
-        assert!(!is_counted_user_stream(&stream_at(
-            "_o2_internal",
-            StreamType::Logs,
-            old
-        )));
+        assert!(is_counted_user_stream(
+            "acme",
+            &stream_at("app", StreamType::Logs, old)
+        ));
+        assert!(!is_counted_user_stream(
+            "acme",
+            &stream_at("_o2_internal", StreamType::Logs, old)
+        ));
         let streams = vec![
             stream_at("app", StreamType::Logs, old),
             stream_at("_o2_internal", StreamType::Logs, old),
         ];
-        assert_eq!(quiet_count(&streams, now), 1);
+        assert_eq!(quiet_count("acme", &streams, now), 1);
     }
 
     #[test]
@@ -1331,6 +1331,7 @@ mod tests {
         };
         let seeded = Overview {
             streams: Section::ok(build_streams_data(
+                org,
                 vec![stream("only_for_admin", StreamType::Logs, 7.0, 1)],
                 5,
                 now_micros(),
@@ -1374,12 +1375,12 @@ mod tests {
             stream_at("lookup", StreamType::EnrichmentTables, now - 2 * 60 * MIN),
             stream_at("index", StreamType::Index, now - 2 * 60 * MIN),
         ];
-        assert_eq!(quiet_count(&streams, now), 2);
+        assert_eq!(quiet_count("acme", &streams, now), 2);
     }
 
     #[test]
     fn test_streams_data_serializes_added_fields_when_empty() {
-        let data = build_streams_data(vec![], 5, now_micros());
+        let data = build_streams_data("acme", vec![], 5, now_micros());
         let v = serde_json::to_value(&data).unwrap();
         assert_eq!(v["quiet_count"], 0);
         assert_eq!(v["schema_changes_24h"], 0);
@@ -1456,6 +1457,19 @@ mod tests {
     }
 
     #[test]
+    fn test_quiet_count_classifies_streams_by_org() {
+        let now = now_micros();
+        let old = now - 2 * QUIET_AFTER_MICROS;
+        let streams = vec![
+            stream_at("errors", StreamType::Logs, old),
+            stream_at("_o2_dbm_server", StreamType::Logs, old),
+            stream_at("slo_slices", StreamType::Logs, old),
+        ];
+        assert_eq!(quiet_count("acme", &streams, now), 2);
+        assert_eq!(quiet_count(config::META_ORG_ID, &streams, now), 1);
+    }
+
+    #[test]
     fn test_quiet_boundaries_exactly_one_hour_and_seven_days() {
         let now = 100 * DAY_MICROS;
         let streams = vec![
@@ -1464,7 +1478,7 @@ mod tests {
             stream_at("h1_more", StreamType::Logs, now - QUIET_AFTER_MICROS - 1),
         ];
         // exactly 1h is still active and exactly 7d is already forgotten
-        assert_eq!(quiet_count(&streams, now), 1);
+        assert_eq!(quiet_count("acme", &streams, now), 1);
     }
 
     #[test]

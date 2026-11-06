@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     armed_for    BIGINT
 );"#;
 
+/// Moves only a Waiting row: `$5` is Waiting, so a running job keeps its key until it ends.
+const RENAME_KEY_QUERY: &str = r#"UPDATE scheduled_jobs SET module_key = $1
+    WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5
+    RETURNING *;"#;
+
 /// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
 /// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
 const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
@@ -101,6 +106,24 @@ const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
     data = $5,
     armed_for = NULL
 WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
+
+/// [`super::Scheduler::rename_key`] on `pool`.
+async fn rename_key_in(
+    pool: &Pool<Sqlite>,
+    org: &str,
+    module: TriggerModule,
+    key: &str,
+    new_key: &str,
+) -> Result<Option<Trigger>> {
+    Ok(sqlx::query_as::<_, Trigger>(RENAME_KEY_QUERY)
+        .bind(new_key)
+        .bind(org)
+        .bind(module)
+        .bind(key)
+        .bind(TriggerStatus::Waiting)
+        .fetch_optional(pool)
+        .await?)
+}
 
 /// [`super::Scheduler::arm_slack_sync`] on `pool`.
 async fn arm_slack_sync_in(
@@ -479,6 +502,16 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(result.rows_affected() == 1)
     }
 
+    async fn rename_key(
+        &self,
+        org: &str,
+        module: TriggerModule,
+        key: &str,
+        new_key: &str,
+    ) -> Result<Option<Trigger>> {
+        rename_key_in(&CLIENT_RW.clone(), org, module, key, new_key).await
+    }
+
     async fn arm_slack_sync(&self, org: &str, response_id: &str, t: i64) -> Result<()> {
         arm_slack_sync_in(&CLIENT_RW.clone(), org, response_id, t).await
     }
@@ -742,7 +775,7 @@ mod tests {
     use super::{
         ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, FINISH_SLACK_SYNC_QUERY, PULL_QUERY_BY_MODULE,
         SlackSyncFinish, Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in,
-        finish_slack_sync_in,
+        finish_slack_sync_in, rename_key_in,
     };
     use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
 
@@ -765,6 +798,32 @@ mod tests {
     }
 
     impl SyncDb for SqliteDb {
+        async fn rename(&self, module: TriggerModule, key: &str, new_key: &str) -> bool {
+            rename_key_in(&self.0, ORG, module, key, new_key)
+                .await
+                .unwrap()
+                .is_some()
+        }
+
+        async fn row_at(&self, module: TriggerModule, key: &str) -> Option<Trigger> {
+            sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(key)
+            .bind(module)
+            .fetch_optional(&self.0)
+            .await
+            .unwrap()
+        }
+
+        async fn set_data(&self, data: &str) {
+            sqlx::query("UPDATE scheduled_jobs SET data = $1")
+                .bind(data)
+                .execute(&self.0)
+                .await
+                .unwrap();
+        }
+
         async fn fresh() -> Option<Self> {
             let pool = sqlx::sqlite::SqlitePoolOptions::new()
                 .max_connections(1)
@@ -846,6 +905,11 @@ mod tests {
             .await
             .unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn a_rename_moves_only_a_waiting_row() {
+        cases::a_rename_moves_only_a_waiting_row::<SqliteDb>().await;
     }
 
     #[tokio::test]

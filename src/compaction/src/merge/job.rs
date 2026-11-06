@@ -17,19 +17,19 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::stream::{PartitionTimeLevel, StreamType},
+    meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::time::{day_micros, hour_micros},
 };
 use infra::{
     cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
-    schema::{get_partition_time_level, unwrap_stream_created_at},
+    schema::{get_partition_time_level_at, get_settings, unwrap_stream_created_at},
 };
 
 /// Last microsecond of the range a merge job at `offset` covers: the hour of
 /// `offset`, or the whole day for daily-partitioned streams. No file of the
 /// job can be newer, so "is the range old enough" is decided against this.
-pub(super) fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
+pub(crate) fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
     let offset = offset - offset % hour_micros(1);
     if partition_time_level == PartitionTimeLevel::Daily {
         offset - offset % day_micros(1) + day_micros(1) - 1
@@ -38,11 +38,35 @@ pub(super) fn job_range_end(offset: i64, partition_time_level: PartitionTimeLeve
     }
 }
 
+/// The level the day's jobs are scheduled at; the file-list stream keeps its hourly jobs.
+pub(crate) fn scheduling_level(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+    offset: i64,
+) -> PartitionTimeLevel {
+    if stream_type.support_dynamic_partition() {
+        get_partition_time_level_at(stream_type, settings, offset)
+    } else {
+        PartitionTimeLevel::Hourly
+    }
+}
+
+/// The first and last microsecond of the job covering `offset`; its offset is the first.
+pub(crate) fn job_range(offset: i64, level: PartitionTimeLevel) -> (i64, i64) {
+    let unit = if level == PartitionTimeLevel::Daily {
+        day_micros(1)
+    } else {
+        hour_micros(1)
+    };
+    (offset - offset % unit, job_range_end(offset, level))
+}
+
 /// A settled 00:00 metrics job covers its whole day once `has_rule(day end)` finds a rule.
 pub(super) fn job_time_level(
     stream_type: StreamType,
     offset: i64,
     finalize: bool,
+    day_level: PartitionTimeLevel,
     has_rule: impl Fn(i64) -> bool,
 ) -> PartitionTimeLevel {
     if finalize
@@ -52,7 +76,7 @@ pub(super) fn job_time_level(
     {
         return PartitionTimeLevel::Daily;
     }
-    get_partition_time_level(stream_type)
+    day_level
 }
 
 /// Generate merging job by stream
@@ -103,30 +127,30 @@ pub async fn generate_job_by_stream(
         return Ok(()); // no data
     }
 
-    // format to hour with zero minutes, seconds
-    let offset = offset - offset % hour_micros(1);
-    if !crate::is_past_hour(offset) {
+    let settings = get_settings(org_id, stream_name, stream_type).await;
+    let level = scheduling_level(stream_type, settings.as_deref(), offset);
+    let (job_offset, job_end) = job_range(offset, level);
+    if !crate::is_past_hour(job_end) {
         return Ok(()); // the time is future, just wait
     }
 
     log::debug!(
-        "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
+        "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {job_offset}"
     );
 
     // generate merging job
-    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
+    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, job_offset).await {
         return Err(anyhow::anyhow!(
             "[COMPACTOR] add file_list_jobs failed: {e}"
         ));
     }
 
     // write new offset
-    let offset = offset + hour_micros(1);
     db::compact::files::set_offset(
         org_id,
         stream_type,
         stream_name,
-        offset,
+        job_end + 1,
         Some(&LOCAL_NODE.uuid.clone()),
     )
     .await?;
@@ -208,6 +232,7 @@ pub async fn generate_old_data_job_by_stream(
     .await?;
 
     // generate merging job
+    let mut job_offsets = hashbrown::HashSet::with_capacity(hours.len());
     for hour in hours {
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
@@ -221,6 +246,12 @@ pub async fn generate_old_data_job_by_stream(
         ))?
         .with_timezone(&Utc);
         let offset = offset.timestamp_micros();
+        let level = scheduling_level(stream_type, Some(&stream_settings), offset);
+        let (offset, _) = job_range(offset, level);
+        // the hours of a daily day all activate the one job of that day
+        if !job_offsets.insert(offset) {
+            continue;
+        }
         log::debug!(
             "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] hours: {hour}, offset: {offset}"
         );
@@ -377,6 +408,62 @@ mod tests {
     }
 
     #[test]
+    fn test_job_range_of_a_daily_day_is_the_whole_day() {
+        let day = Utc
+            .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        let day_end = day + day_micros(1) - 1;
+        let daily = PartitionTimeLevel::Daily;
+        assert_eq!(job_range(day, daily), (day, day_end));
+        // a stream created mid-day starts from its day
+        assert_eq!(job_range(day + hour_micros(5) + 7, daily), (day, day_end));
+
+        let hourly = PartitionTimeLevel::Hourly;
+        let hour = day + hour_micros(5);
+        assert_eq!(
+            job_range(hour + 7, hourly),
+            (hour, hour + hour_micros(1) - 1)
+        );
+        assert_eq!(
+            job_range(day_end, hourly),
+            (day_end + 1 - hour_micros(1), day_end)
+        );
+    }
+
+    #[test]
+    fn test_scheduling_level_keeps_the_file_list_stream_hourly() {
+        use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
+        let settings = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                dynamic: None,
+                changes: vec![PartitionTimeLevelChange {
+                    since: 100,
+                    level: PartitionTimeLevel::Daily,
+                }],
+            },
+            ..Default::default()
+        };
+        let level = |stream_type, ts| scheduling_level(stream_type, Some(&settings), ts);
+        assert_eq!(level(StreamType::Logs, 100), PartitionTimeLevel::Daily);
+        assert_eq!(level(StreamType::Logs, 99), PartitionTimeLevel::Hourly);
+        assert_eq!(level(StreamType::Filelist, 100), PartitionTimeLevel::Hourly);
+        assert_eq!(level(StreamType::Profiles, 100), PartitionTimeLevel::Hourly);
+    }
+
+    #[test]
+    fn test_job_range_end_decides_when_a_daily_00_job_is_past() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 8, 18, 3, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        let day = now - now % day_micros(1);
+        // the hour of the 00:00 job is over; the day it stands for is not
+        assert!(job_range_end(day, PartitionTimeLevel::Hourly) < now);
+        assert!(job_range_end(day, PartitionTimeLevel::Daily) > now);
+    }
+
+    #[test]
     fn test_job_time_level_whole_day_only_for_downsampling() {
         let day = Utc
             .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
@@ -386,18 +473,23 @@ mod tests {
         let metrics = StreamType::Metrics;
 
         // the rule is asked about the end of the day, not of hour 00
-        let level = job_time_level(metrics, day, true, |max_ts| max_ts == day_end);
+        let hourly = PartitionTimeLevel::Hourly;
+        let level = job_time_level(metrics, day, true, hourly, |max_ts| max_ts == day_end);
         assert_eq!(level, PartitionTimeLevel::Daily);
 
         // no rule for the day end: the plain hour-00 merge stays hourly
-        let level = job_time_level(metrics, day, true, |_| false);
+        let level = job_time_level(metrics, day, true, hourly, |_| false);
         assert_eq!(level, PartitionTimeLevel::Hourly);
         // other hours, open hours and other stream types never widen
-        let level = job_time_level(metrics, day + hour_micros(5), true, |_| true);
+        let level = job_time_level(metrics, day + hour_micros(5), true, hourly, |_| true);
         assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(metrics, day, false, |_| true);
+        let level = job_time_level(metrics, day, false, hourly, |_| true);
         assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(StreamType::Logs, day, true, |_| true);
+        let level = job_time_level(StreamType::Logs, day, true, hourly, |_| true);
         assert_eq!(level, PartitionTimeLevel::Hourly);
+        // the level of the day holds without a rule, whatever the job
+        let daily = PartitionTimeLevel::Daily;
+        let level = job_time_level(StreamType::Logs, day, false, daily, |_| false);
+        assert_eq!(level, PartitionTimeLevel::Daily);
     }
 }

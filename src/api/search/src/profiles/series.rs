@@ -138,6 +138,10 @@ struct SeriesRow {
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "create"}))
     )
 )]
 pub async fn profiles_series(
@@ -191,6 +195,10 @@ pub async fn profiles_series(
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "list"}))
     )
 )]
 pub async fn profiles_series_get(

@@ -14,63 +14,35 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { orgUsersQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import type { OwnershipRuleStats, RoutingPreview, UnroutedSignal } from "@/ts/interfaces/oncall";
 
-/// The dialog portals its body and renders its Save/Cancel in a footer this
-/// file never sees, so it is replaced by a plain wrapper — the assertions are
-/// about the form, and the footer's own wiring is ODialog's contract.
+const whoIsOnCall = vi.fn();
+vi.mock("@/services/oncall", () => ({
+  default: { whoIsOnCall: (...args: unknown[]) => whoIsOnCall(...args) },
+}));
+
+/// The dialog portals its body; the form is what this file asserts on.
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonDisabled", "primaryButtonLoading", "neutralButtonLabel"],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-    template: "<div><slot /></div>",
+    props: ["open", "title", "primaryButtonDisabled", "primaryButtonLoading"],
+    emits: ["update:open", "click:primary", "click:secondary"],
+    template: "<div><slot /><slot name='footer-left' /></div>",
   },
-  OButton: {
-    name: "OButton",
-    props: ["disabled"],
-    template: `<button :disabled="disabled"><slot /></button>`,
-  },
-  /// Label and help text are rendered so the assertions can read what the
-  /// field says about itself — both are part of this form's contract now that
-  /// the rule is asked as labelled fields rather than a sentence.
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options", "label", "helpText"],
-    emits: ["update:modelValue"],
-    template: `<span><label>{{ label }}</label><select :value="modelValue" /><small>{{ helpText }}</small></span>`,
-  },
-  OCombobox: {
-    name: "OCombobox",
-    props: ["modelValue", "items", "label"],
-    emits: ["update:modelValue"],
-    template: `<span><label>{{ label }}</label><input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></span>`,
-  },
-  /// The chip's own two-segment rendering is its spec's business; here it only
-  /// has to say which condition it carries.
-  ODimensionChip: {
-    name: "ODimensionChip",
-    props: ["dimKey", "keyLabel", "value", "removable"],
-    emits: ["remove"],
-    template: `<span><span class="chip-label">{{ keyLabel || dimKey }} = {{ value }}</span><button class="chip-remove" @click="$emit('remove')" /></span>`,
-  },
-  OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: `<span />` },
-  /// Rendered inline so the menu's contents are assertable without driving the
-  /// real popup open; that it IS a menu is asserted through its trigger.
-  ODropdown: {
-    name: "ODropdown",
-    props: ["align", "contentClass"],
-    template: "<div><slot name='trigger' /><slot /></div>",
-  },
-  ODropdownItem: {
-    name: "ODropdownItem",
-    props: ["textValue"],
-    emits: ["select"],
-    template: "<button @click=\"$emit('select')\"><slot /></button>",
+    props: ["modelValue", "options", "label", "helpText", "disabled", "creatable", "searchable"],
+    emits: ["update:modelValue", "create"],
+    template: `<span><label>{{ label }}</label><small class="help">{{ helpText }}</small></span>`,
   },
 };
 
@@ -79,35 +51,20 @@ const TEAMS = [
   { id: "team_2", name: "Payments" },
 ];
 
-const ALIASES = [
-  { id: "k8s-cluster", display: "K8s Cluster" },
-  { id: "k8s-namespace", display: "K8s Namespace" },
-  { id: "service", display: "Service" },
-];
-
 const SIGNALS = [
   {
     id: "s1",
+    path: "k8s-namespace=risk/service=fraud-scorer",
     dimensions: { "k8s-namespace": "risk", service: "fraud-scorer", "k8s-pod-name": "pod-1" },
     occurrences: 3,
-    last_title: "fraud_scoring_stalled",
-    description: "fraud_scoring_stalled",
   },
   {
     id: "s2",
+    path: "k8s-namespace=risk/service=risk-api",
     dimensions: { "k8s-namespace": "risk", service: "risk-api" },
     occurrences: 6,
-    last_title: "risk_api_slow",
-    description: "risk_api_slow",
   },
-  {
-    id: "s3",
-    dimensions: { "k8s-namespace": "billing", service: "billing-sync" },
-    occurrences: 3,
-    last_title: "billing_sync_backlog",
-    description: "billing_sync_backlog",
-  },
-] as any;
+] as unknown as UnroutedSignal[];
 
 function render(props: Record<string, unknown> = {}) {
   return mount(OnCallRuleEditor, {
@@ -115,9 +72,15 @@ function render(props: Record<string, unknown> = {}) {
       open: true,
       teamId: "team_1",
       teams: TEAMS,
-      aliases: ALIASES,
+      aliases: [
+        { id: "service", display: "Service" },
+        { id: "k8s-namespace", display: "K8s Namespace" },
+      ],
+      catalogue: {
+        present: ["service", "k8s-namespace"],
+        values: { service: { "risk-api": 2, checkout: 1 } },
+      },
       signals: SIGNALS,
-      ladder: [{ priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: false }],
       ...props,
     },
     global: { plugins: [i18n, store], stubs },
@@ -126,403 +89,303 @@ function render(props: Record<string, unknown> = {}) {
 
 type Wrapper = ReturnType<typeof render>;
 
+const select = (w: Wrapper, test: string) =>
+  w.findAllComponents({ name: "OSelect" }).find((c) => c.attributes("data-test") === test)!;
+
 const dialog = (w: Wrapper) => w.findComponent({ name: "ODialog" });
 
-async function addCondition(wrapper: Wrapper, name: string, value: string) {
-  await wrapper
-    .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
-    .vm.$emit("update:modelValue", name);
-  await wrapper
-    .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
-    .vm.$emit("update:modelValue", value);
-  await wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').trigger("click");
-}
-
 describe("OnCallRuleEditor", () => {
-  it("opens empty for a new rule and seeds from the rule being edited", async () => {
-    const wrapper = render({
-      rule: { rule_id: "r1", team_id: "team_2", dimensions: { "k8s-cluster": "introspection" } },
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-cluster"]').text()).toContain(
-      "K8s Cluster = introspection",
-    );
+  beforeEach(() => {
+    queryClient.clear();
+    whoIsOnCall.mockReset();
+    whoIsOnCall.mockResolvedValue({ data: [] });
   });
 
-  /// R10: "nothing claims this" is judged on the draft's conditions alone, and says so.
-  it("says an unclaimed path is judged on these conditions alone", async () => {
+  it("tells the page when the license refuses the who-is-on-call read", async () => {
+    whoIsOnCall.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = render({ initialDimensions: { "k8s-namespace": "risk" } });
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+  });
+
+  /// A path nothing claims is judged on the draft's conditions alone, so no conflict is named.
+  it("names only the drafted team when nothing claims the path", async () => {
     const wrapper = render({
       initialDimensions: { "k8s-namespace": "risk" },
       conflict: { decision: null, team_id: null },
     });
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-conflict-now"]').text()).toBe(
-      "Nothing claims this path today, judged on these conditions alone — a page matching it reaches the catch-all, or nobody.",
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Future alerts like this go to Search",
     );
   });
 
-  /// A claim arrives with the signal's identity path already filled — the click
-  /// worth removing is the one where the user retypes what is on screen.
-  it("seeds from a claim's pre-filled dimensions", async () => {
-    const wrapper = render({ initialDimensions: { "k8s-namespace": "risk" } });
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
-      true,
-    );
-  });
-
-  /// The chip is the control: dismissing a condition is a click on the thing
-  /// it names, not on a button parked beside it.
-  it("drops a condition from its own chip", async () => {
-    const wrapper = render({
-      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
-    });
-    await flushPromises();
-
-    await wrapper
-      .find('[data-test="oncall-rule-editor-condition-service"] .chip-remove')
-      .trigger("click");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
-      true,
-    );
-  });
-
-  /// The server lowercases values before matching. Writing one string and
-  /// reading back another is how a rule that looks right catches nothing.
-  it("normalises a value the way the server will store it", async () => {
+  it("opens a new rule on one live row, field preset to service", () => {
     const wrapper = render();
-    await flushPromises();
-    await addCondition(wrapper, "k8s-cluster", "  PROD ");
-    expect(wrapper.text()).toContain("K8s Cluster = prod");
-    expect(wrapper.text()).not.toContain("PROD");
+    expect(wrapper.findAll('[data-test^="oncall-rule-editor-row-"]')).toHaveLength(1);
+    expect(select(wrapper, "oncall-rule-editor-field-0").props("modelValue")).toBe("service");
+    expect(wrapper.find('[data-test="oncall-rule-editor-value-0"]').exists()).toBe(true);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
   });
 
-  /// The placeholder was `k8s-namespace` — a real, valid dimension key — on a
-  /// select, so the field read as already filled while `draftName` was "". Add
-  /// and Save stayed disabled, no request was made, and nothing on screen said
-  /// why: the dialog simply never became usable.
-  it("says why Add is refused instead of going quiet", async () => {
-    // A new rule opens with the adder already showing — which is exactly the
-    // state that used to look filled and refuse to save.
+  it("picking a value is adding the condition", async () => {
     const wrapper = render();
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await flushPromises();
-
-    const problem = () => wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').text();
-    expect(problem()).toContain("Pick the dimension");
-
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
-      .vm.$emit("update:modelValue", "k8s-cluster");
-    expect(problem()).toContain("value it has to equal");
-
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
-      .vm.$emit("update:modelValue", "prod");
-    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').exists()).toBe(false);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")?.[0]).toEqual([
+      { dimensions: { service: "risk-api" }, team_id: "team_1" },
+    ]);
   });
 
-  /// A rule pinning the same dimension twice cannot mean anything, and the
-  /// second value would silently win.
-  it("refuses a duplicate condition name", async () => {
+  // Counts exist only for values that needed an owner, so none carries one rather than some.
+  it("offers known values busiest first, with no count on any of them", () => {
     const wrapper = render();
-    await flushPromises();
-    // The row stays open after a commit, ready for the next condition — no
-    // second click on "Add condition" needed to write a second one.
-    await addCondition(wrapper, "k8s-cluster", "prod");
-
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
-      .vm.$emit("update:modelValue", "k8s-cluster");
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
-      .vm.$emit("update:modelValue", "staging");
-
-    expect(
-      wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').attributes("disabled"),
-    ).toBeDefined();
-    // And it says which dimension is already spoken for, rather than leaving
-    // the reader to compare the row against the list above it.
-    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').text()).toContain(
-      "k8s-cluster",
-    );
+    const options = select(wrapper, "oncall-rule-editor-value-0").props("options") as {
+      value: string;
+      subLabel?: string;
+    }[];
+    expect(options[0].value).toBe("risk-api");
+    expect(options.map((o) => o.value)).toContain("checkout");
+    expect(options.every((o) => o.subLabel === undefined)).toBe(true);
   });
 
-  /// Closing the row on every commit turned a multi-condition rule into a
-  /// click-Add-condition-again per condition. The row stays put so entering
-  /// several is Dimension, Value, Add, Dimension, Value, Add.
-  it("keeps the adder open after a commit so a second condition needs no reopening", async () => {
+  it("writes starts with as the engine's trailing *", async () => {
     const wrapper = render();
+    select(wrapper, "oncall-rule-editor-op-0").vm.$emit("update:modelValue", "prefix");
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("create", "checkout-");
     await flushPromises();
-    await addCondition(wrapper, "k8s-cluster", "prod");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-name"]').exists()).toBe(true);
-    expect(
-      wrapper.findComponent('[data-test="oncall-rule-editor-dimension-name"]').props("modelValue"),
-    ).toBe("");
-
-    await addCondition(wrapper, "k8s-namespace", "risk");
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-cluster"]').exists()).toBe(
-      true,
-    );
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
-      true,
-    );
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")?.[0]).toEqual([
+      { dimensions: { service: "checkout-*" }, team_id: "team_1" },
+    ]);
   });
 
-  /// Two chips side by side read as an either/or just as easily as an and, and
-  /// the difference is the whole meaning of the rule.
-  it("spells out the conjunction between conditions", async () => {
-    const wrapper = render({
-      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
-    });
-    await flushPromises();
-    // One "and": between the two chips, not before the first.
-    expect(wrapper.findAll('[data-test="oncall-rule-editor-and"]')).toHaveLength(1);
-
-    // Still one while a third is being written: the adder is a labelled row of
-    // its own, not another clause in the list.
+  it("blocks Save on a row with a field but no value, and drops a fully empty row", async () => {
+    const wrapper = render();
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
-    expect(wrapper.findAll('[data-test="oncall-rule-editor-and"]')).toHaveLength(1);
-  });
-
-  /// The only way out of the adder used to be to finish it: a half-written
-  /// condition left Add disabled and the row parked in the sentence.
-  it("discards a half-written condition without adding it", async () => {
-    const wrapper = render({ initialDimensions: { service: "risk-api" } });
     await flushPromises();
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
 
-    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
-      .vm.$emit("update:modelValue", "k8s-cluster");
-    await wrapper.find('[data-test="oncall-rule-editor-cancel-condition"]').trigger("click");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-name"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-cluster"]').exists()).toBe(
-      false,
+    select(wrapper, "oncall-rule-editor-field-1").vm.$emit("update:modelValue", "k8s-namespace");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').text()).toBe(
+      "Pick a value",
     );
-    // The draft went with it — reopening the adder starts clean.
-    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
-    expect(
-      wrapper.findComponent('[data-test="oncall-rule-editor-dimension-name"]').props("modelValue"),
-    ).toBe("");
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(wrapper.find('[data-test="oncall-rule-editor-save-problem"]').text()).toBe(
+      "Pick a value",
+    );
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")).toBeUndefined();
+
+    await wrapper.find('[data-test="oncall-rule-editor-remove-1"]').trigger("click");
+    await flushPromises();
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")?.[0]).toEqual([
+      { dimensions: { service: "risk-api" }, team_id: "team_1" },
+    ]);
   });
 
-  /// With no condition there is nothing to go back to, and a rule cannot be
-  /// saved without one — a cancel there would only empty the dialog.
-  it("offers no discard on the first condition", async () => {
-    const wrapper = render();
+  it("never saves an edited two-condition rule with one value cleared or one field changed", async () => {
+    const rule = {
+      rule_id: "r1",
+      team_id: "team_1",
+      path: "k8s-namespace=prod/service=payments",
+      dimensions: { "k8s-namespace": "prod", service: "payments" },
+    } as unknown as OwnershipRuleStats;
+    const wrapper = render({ rule });
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", null);
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-cancel-condition"]').exists()).toBe(false);
-  });
-
-  /// The hands are already on the value field; reaching for Add is the slow
-  /// half of writing a two-condition rule.
-  it("commits the condition on Enter in the value field", async () => {
-    const wrapper = render();
-    await flushPromises();
-
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
-      .vm.$emit("update:modelValue", "service");
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
-      .vm.$emit("update:modelValue", "risk-api");
-    await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').trigger("keyup.enter");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(true);
-  });
-
-  it("cannot be saved with no condition", async () => {
-    const wrapper = render();
-    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').exists()).toBe(true);
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
 
-    await addCondition(wrapper, "service", "api");
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "prod");
+    await flushPromises();
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
-  });
 
-  it("emits the dimensions and the team on save", async () => {
-    const wrapper = render();
+    select(wrapper, "oncall-rule-editor-field-0").vm.$emit("update:modelValue", "environment");
     await flushPromises();
-    await addCondition(wrapper, "k8s-namespace", "risk");
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').text()).toBe(
+      "Pick a value",
+    );
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
     dialog(wrapper).vm.$emit("click:primary");
-
-    expect(wrapper.emitted("save")?.[0]?.[0]).toEqual({
-      dimensions: { "k8s-namespace": "risk" },
-      team_id: "team_1",
-    });
+    expect(wrapper.emitted("save")).toBeUndefined();
   });
 
-  /// The replay is the verification, and it counts both halves: how many
-  /// distinct signals the rule takes and how often they actually fired.
-  it("replays the draft against the unrouted queue", async () => {
+  it("does not offer a field twice", async () => {
     const wrapper = render();
-    await flushPromises();
-    await addCondition(wrapper, "k8s-namespace", "risk");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-catch-count"]').text()).toContain(
-      "9 pages match",
-    );
-    expect(wrapper.find('[data-test="oncall-rule-editor-catch-s1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-rule-editor-catch-s3"]').exists()).toBe(false);
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    const fields = (
+      select(wrapper, "oncall-rule-editor-field-1").props("options") as {
+        value: string;
+      }[]
+    ).map((o) => o.value);
+    expect(fields).toEqual(["k8s-namespace"]);
   });
 
-  it("says so when a draft would catch nothing in the queue", async () => {
+  it("starts from a signal that needs an owner, identity dimensions only", async () => {
     const wrapper = render();
+    select(wrapper, "oncall-rule-editor-signals").vm.$emit("update:modelValue", "s1");
     await flushPromises();
-    await addCondition(wrapper, "k8s-namespace", "nowhere");
-    expect(wrapper.find('[data-test="oncall-rule-editor-catch-summary"]').text()).toContain(
-      "Nothing in the unrouted queue",
-    );
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")?.[0]).toEqual([
+      {
+        dimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+        team_id: "team_1",
+      },
+    ]);
   });
 
-  /// Starting from a signal keeps only the identity dimensions: a rule pinned
-  /// to a pod name matches one incarnation of one process, then nothing.
-  it("starts from a signal without pinning its evidence", async () => {
-    const wrapper = render();
-    await flushPromises();
-    await wrapper.find('[data-test="oncall-rule-editor-signal-s1"]').trigger("click");
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-pod-name"]').exists()).toBe(
-      false,
-    );
-  });
-
-  /// The queue used to be printed open above an empty form: three paths of raw
-  /// dimensions to read before the first field. It is one control now, and it
-  /// stands down once the draft is the thing being judged.
-  it("offers the queue behind one control, and drops it once a condition exists", async () => {
-    const wrapper = render();
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-rule-editor-signals"]').text()).toContain(
-      "Start from a signal",
-    );
-
-    await addCondition(wrapper, "k8s-namespace", "risk");
-
+  it("opens an existing wildcard rule as a starts with row", () => {
+    const rule = {
+      rule_id: "r1",
+      team_id: "team_2",
+      path: "service=checkout-*",
+      dimensions: { service: "checkout-*" },
+    } as unknown as OwnershipRuleStats;
+    const wrapper = render({ rule });
+    expect(select(wrapper, "oncall-rule-editor-op-0").props("modelValue")).toBe("prefix");
+    expect(select(wrapper, "oncall-rule-editor-value-0").props("modelValue")).toBe("checkout-");
+    expect(select(wrapper, "oncall-rule-editor-team").props("modelValue")).toBe("team_2");
     expect(wrapper.find('[data-test="oncall-rule-editor-signals"]').exists()).toBe(false);
   });
 
-  /// Two different emergencies share the queue: a path the catch-all absorbed
-  /// paged the wrong team, one without a default paged nobody at all. The row a
-  /// rule is started from has to say which it was.
-  it("says what each startable signal did before offering it", async () => {
-    const wrapper = render({
-      signals: [{ ...SIGNALS[0], defaulted_team_id: "team_2" }, SIGNALS[1]],
-    });
+  it("states one outcome: where future alerts go and how many waiting signals it catches", async () => {
+    const wrapper = render();
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-signal-s1"]').text()).toContain(
-      "sent to Payments",
-    );
-    expect(wrapper.find('[data-test="oncall-rule-editor-signal-s2"]').text()).toContain(
-      "No one notified",
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Future alerts like this go to Search · catches 1 signal that needs an owner",
     );
   });
 
-  /// The panel is a check, not a list — past the shown rows the remainder is
-  /// counted, and it names the team they would all page from now on.
-  it("counts the matches it does not show and names their new owner", async () => {
-    const many = Array.from({ length: 6 }, (_, index) => ({
-      ...SIGNALS[1],
-      id: `m${index}`,
-      last_title: `risk_api_slow_${index}`,
-    })) as any;
-    const wrapper = render({ signals: many });
+  it("counts the waiting signals alone while no team is picked", async () => {
+    const wrapper = render({ teamId: "" });
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await flushPromises();
-    await addCondition(wrapper, "k8s-namespace", "risk");
-
-    const more = wrapper.find('[data-test="oncall-rule-editor-catch-more"]').text();
-    expect(more).toContain("2 more");
-    expect(more).toContain("Search");
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Matches 1 of the signals that need an owner",
+    );
   });
 
-  /// "Page" has to say what paging means, or it is a team name with no
-  /// consequence attached.
-  it("names the ladder a page would run", async () => {
-    const wrapper = render();
-    await flushPromises();
-    expect(
-      wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
-    ).toContain("P1 ladder");
-  });
-
-  it("says when the target team has no ladder that wakes anybody", async () => {
+  it("offers fields the signals and existing rules use, labelled in sentence case", async () => {
     const wrapper = render({
-      ladder: [{ priority: "P1", rungs: 0, pages_anyone: false, ends_with_whole_team: false }],
+      catalogue: { present: ["service"], values: {} },
+      rules: [{ rule_id: "r1", team_id: "team_2", dimensions: { environment: "prod" } }],
+    });
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    const fields = select(wrapper, "oncall-rule-editor-field-1").props("options") as {
+      label: string;
+      value: string;
+    }[];
+    expect(fields.map((o) => o.value)).toEqual(["k8s-namespace", "environment"]);
+    expect(fields[0].label).toBe("K8s namespace");
+  });
+
+  /// A claim names an owner for one signal: the title says whose, and the outcome says where alerts like it go.
+  it("titles a claim for its team and states where future alerts go", async () => {
+    const wrapper = render({
+      open: false,
+      teamId: "team_2",
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(dialog(wrapper).props("title")).toBe("Claim for Payments");
+    const outcome = wrapper.find('[data-test="oncall-rule-editor-outcome"]').text();
+    expect(outcome).toBe("Future alerts like this go to Payments");
+    expect(outcome).not.toContain("Matches");
+  });
+
+  it("asks for an owner, with no queue count, until a claim has a team", async () => {
+    const wrapper = render({
+      open: false,
+      teamId: "",
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(dialog(wrapper).props("title")).toBe("Give it an owner");
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').exists()).toBe(false);
+  });
+
+  // A claim arrives as dimensions; the picker names the signal they came from instead of "Choose…".
+  it("names the claimed signal in the start-from picker", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
     });
     await flushPromises();
-    expect(
-      wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
-    ).toContain("No escalation ladder yet");
-  });
-
-  /// A host serving more than one team (the org-level dialog) cannot ship a
-  /// static `ladder` prop — it has to be told which team is picked so it can
-  /// fetch that team's own ladder.
-  it("emits team-change with the seeded team when it opens", async () => {
-    const wrapper = render();
-    await flushPromises();
-    expect(wrapper.emitted("team-change")?.[0]).toEqual(["team_1"]);
-  });
-
-  it("emits an empty team-change when it reopens with no team chosen", async () => {
-    const wrapper = render();
-    await flushPromises();
-    expect(wrapper.emitted("team-change")?.[0]).toEqual(["team_1"]);
-
-    // Same long-lived editor instance, closed and reopened for a fresh rule
-    // with no team pre-selected — the host must be told to drop the
-    // previous team's ladder rather than keep showing it under the new form.
+    expect(select(wrapper, "oncall-rule-editor-signals").props("modelValue")).toBe("s1");
     await wrapper.setProps({ open: false });
-    await wrapper.setProps({ open: true, teamId: "", rule: null });
-    await flushPromises();
-    expect(wrapper.emitted("team-change")?.at(-1)).toEqual([""]);
+    await wrapper.setProps({ open: true, initialDimensions: null });
+    expect(select(wrapper, "oncall-rule-editor-signals").props("modelValue")).toBeNull();
   });
 
-  it("emits team-change when a different team is picked from the dropdown", async () => {
+  // Two operators need no search box.
+  it("offers the operator as a plain two-option list", () => {
+    const op = select(render(), "oncall-rule-editor-op-0");
+    expect(op.props("searchable")).toBe(false);
+    expect(op.props("options")).toHaveLength(2);
+  });
+
+  it("names the team it takes alerts from when another team holds a broader path", async () => {
+    const conflict = {
+      team_id: "team_2",
+      decision: { path: "k8s-namespace=risk" },
+    } as unknown as RoutingPreview;
+    const wrapper = render({
+      conflict,
+      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Takes alerts from Payments",
+    );
+  });
+
+  it("shows who is on call now for the picked team", async () => {
+    whoIsOnCall.mockResolvedValue({ data: [{ user_email: "ana@example.com" }] });
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@example.com", first_name: "Ana", last_name: "Silva" },
+    ]);
     const wrapper = render();
     await flushPromises();
-    await wrapper
-      .findComponent('[data-test="oncall-rule-editor-team"]')
-      .vm.$emit("update:modelValue", "team_2");
-    expect(wrapper.emitted("team-change")?.at(-1)).toEqual(["team_2"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-on-call"]').text()).toBe(
+      "On call now: Ana Silva",
+    );
+    const person = wrapper.findComponent(OnCallPersonName);
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(person.props("email")).toBe("ana@example.com");
+    expect(person.findComponent(OTooltip).exists()).toBe(true);
   });
 
-  /// The row is Edit and nothing else, so removing a rule is a decision made
-  /// about the one already open — and only ever about an existing one.
-  describe("removing the rule", () => {
-    const dialog = (w: ReturnType<typeof render>) => w.findComponent({ name: "ODialog" });
+  it("hides the on-call line when the schedule cannot be read", async () => {
+    whoIsOnCall.mockRejectedValue(new Error("403"));
+    const wrapper = render();
+    await flushPromises();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-on-call"]').exists()).toBe(false);
+  });
 
-    it("offers no removal while writing a new rule", async () => {
-      const wrapper = render();
-      await flushPromises();
-      expect(dialog(wrapper).props("neutralButtonLabel")).toBeUndefined();
-    });
-
-    it("passes the removal up so the host can confirm it", async () => {
-      const wrapper = render({
-        rule: { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-cluster": "introspection" } },
-      });
-      await flushPromises();
-      expect(dialog(wrapper).props("neutralButtonLabel")).toBe("Remove rule");
-
-      dialog(wrapper).vm.$emit("click:neutral");
-      await wrapper.vm.$nextTick();
-      expect(wrapper.emitted("remove")).toHaveLength(1);
-    });
-
-    it("offers no removal when the host's row already has one", async () => {
-      const wrapper = render({
-        rule: { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-cluster": "introspection" } },
-        allowRemove: false,
-      });
-      await flushPromises();
-      expect(dialog(wrapper).props("neutralButtonLabel")).toBeUndefined();
-    });
+  it("asks the host who holds the drafted path once the conditions settle", async () => {
+    vi.useFakeTimers();
+    const wrapper = render();
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(350);
+    const previews = wrapper.emitted("preview") ?? [];
+    expect(previews[previews.length - 1]).toEqual([{ service: "risk-api" }]);
+    vi.useRealTimers();
   });
 });

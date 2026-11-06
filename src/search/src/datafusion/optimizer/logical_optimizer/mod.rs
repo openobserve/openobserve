@@ -16,6 +16,7 @@
 pub mod add_sort_and_limit;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
+pub mod like_to_str_match;
 pub mod limit_join_right_side;
 pub mod rewrite_histogram;
 pub mod shared_subplan;

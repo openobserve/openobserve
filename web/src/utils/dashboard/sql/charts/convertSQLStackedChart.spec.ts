@@ -148,8 +148,8 @@ describe("applyStackedChart", () => {
   it("sets tooltip axisPointer label backgroundColor from the crosshair token", () => {
     const ctx = makeMockContext();
     applyStackedChart(ctx);
-    // No longer a theme branch: the chip bg comes from the --color-chart-crosshair-bg
-    // token (dark #333, light left "auto"/empty), resolved via chartColor().
+    // A light chip falling back to ECharts' "auto" copies the faint axis line colour.
+    expect(chartColor("--color-chart-crosshair-bg")).not.toBe("");
     expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe(
       chartColor("--color-chart-crosshair-bg"),
     );

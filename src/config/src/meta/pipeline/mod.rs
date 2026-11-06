@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 use crate::{
     meta::{
         function::VRLResultResolver,
-        stream::{StreamParams, StreamType},
+        stream::{RemoteStreamParams, StreamParams, StreamType},
     },
     stats::MemorySize,
     utils::json,
@@ -272,8 +272,13 @@ impl Pipeline {
         }
     }
 
-    /// The first Stream/Query node, else the source, naming another org; empty org is this one.
-    /// [pure]
+    /// The full key of this pipeline's scheduler trigger; realtime pipelines have none.
+    pub fn scheduler_module_key(&self) -> Option<String> {
+        self.get_derived_stream()
+            .map(|source| source.get_scheduler_module_key(&self.name, &self.id))
+    }
+
+    /// The first Stream/Query/RemoteStream node, else the source, naming another org. [pure]
     pub fn cross_org(&self) -> Option<CrossOrg<'_>> {
         let foreign = |org: &str| !org.is_empty() && org != self.org;
         let node = self.nodes.iter().find_map(|node| match &node.data {
@@ -282,6 +287,9 @@ impl Pipeline {
                 params,
             }),
             NodeData::Query(query) if foreign(&query.org_id) => Some(CrossOrg::Query(query)),
+            NodeData::RemoteStream(remote) if foreign(remote.org_id.as_ref()) => {
+                Some(CrossOrg::RemoteStream(remote))
+            }
             _ => None,
         });
         if node.is_some() {
@@ -313,6 +321,10 @@ impl Pipeline {
                 stream(if is_source { "source" } else { "destination" }, params)
             }
             CrossOrg::Query(derived_stream) => query(derived_stream),
+            CrossOrg::RemoteStream(remote) => (
+                format!("remote destination {}", remote.destination_name),
+                remote.org_id.to_string(),
+            ),
             CrossOrg::Source(PipelineSource::Realtime(params)) => stream("source", params),
             CrossOrg::Source(PipelineSource::Scheduled(derived_stream)) => query(derived_stream),
         };
@@ -656,6 +668,7 @@ pub enum CrossOrg<'a> {
         params: &'a StreamParams,
     },
     Query(&'a DerivedStream),
+    RemoteStream(&'a RemoteStreamParams),
     Source(&'a PipelineSource),
 }
 
@@ -757,6 +770,31 @@ pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_ty
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
+
+    #[test]
+    fn scheduler_module_key_keeps_a_name_with_a_slash_whole() {
+        let mut pipeline = Pipeline {
+            id: "pl_id".to_string(),
+            name: "team/nightly".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "org".to_string(),
+                ..Default::default()
+            }),
+            version: 1,
+            enabled: true,
+            org: "org".to_string(),
+            description: String::new(),
+            nodes: vec![],
+            edges: vec![],
+            kind: Default::default(),
+        };
+        assert_eq!(
+            pipeline.scheduler_module_key().as_deref(),
+            Some("logs/org/team/nightly/pl_id")
+        );
+        pipeline.source = PipelineSource::Realtime(Default::default());
+        assert_eq!(pipeline.scheduler_module_key(), None);
+    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {
@@ -2231,6 +2269,18 @@ mod tests {
                 "input".to_string(),
             )
         };
+        let remote = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::RemoteStream(RemoteStreamParams {
+                    org_id: org.to_string().into(),
+                    destination_name: "d".to_string().into(),
+                }),
+                0.0,
+                0.0,
+                "output".to_string(),
+            )
+        };
         let refusal = |what: &str, org: &str| {
             Some(format!(
                 "Pipeline {what} points at organization {org}; pipeline streams must be in organization a"
@@ -2258,6 +2308,12 @@ mod tests {
             (
                 vec![query("src", "b"), stream("dst", "a", "out")],
                 refusal("scheduled query on metrics streams", "b"),
+            ),
+            (vec![stream("src", "a", "in"), remote("dst", "a")], None),
+            (vec![stream("src", "a", "in"), remote("dst", "")], None),
+            (
+                vec![stream("src", "a", "in"), remote("dst", "b")],
+                refusal("remote destination d", "b"),
             ),
         ];
         let pipeline = |source: PipelineSource, nodes| Pipeline {

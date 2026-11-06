@@ -146,6 +146,60 @@ describe("LabelFilterBar", () => {
     expect(loadValues).toHaveBeenCalledTimes(2);
   });
 
+  describe("follow the value scope", () => {
+    it("reloads the open value step and keeps the draft and filters", async () => {
+      const loadValues = vi
+        .fn()
+        .mockResolvedValueOnce(["docker-host"])
+        .mockResolvedValueOnce(["docker-host", "host-a"]);
+      createWrapper({ filters: [filter("job", "api")], loadValues, valueScope: "container" });
+
+      await wrapper!.setProps({ valueScope: "process" });
+      await flushPromises();
+      expect(loadValues).not.toHaveBeenCalled();
+
+      await focus();
+      await type("instance");
+      await press("Enter");
+      await press("ArrowDown");
+      await press("Enter");
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["docker-host"]));
+
+      await wrapper!.setProps({ valueScope: "system" });
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["docker-host", "host-a"]));
+      expect(loadValues).toHaveBeenCalledTimes(2);
+      expect(wrapper!.emitted("add")).toBeUndefined();
+      expect(wrapper!.emitted("remove")).toBeUndefined();
+
+      await type("host-c");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "instance", operator: "!=", value: "host-c" },
+      ]);
+    });
+
+    it("drops an answer that lands after the scope changed", async () => {
+      let answerOldScope!: (values: string[]) => void;
+      const loadValues = vi
+        .fn()
+        .mockReturnValueOnce(new Promise((resolve) => (answerOldScope = resolve)))
+        .mockResolvedValueOnce(["host-a"]);
+      createWrapper({ loadValues, valueScope: "container" });
+
+      await focus();
+      await type("instance");
+      await press("Enter");
+      await press("Enter");
+      await vi.waitFor(() => expect(loadValues).toHaveBeenCalledTimes(1));
+      await wrapper!.setProps({ valueScope: "system" });
+      await vi.waitFor(() => expect(rowKeys()).toEqual(["host-a"]));
+
+      answerOldScope(["docker-host"]);
+      await flushPromises();
+      expect(rowKeys()).toEqual(["host-a"]);
+    });
+  });
+
   it.each([
     ["neq", "!="],
     ["regex", "=~"],

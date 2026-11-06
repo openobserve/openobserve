@@ -1,7 +1,7 @@
 <template>
   <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
   <div>
-    <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
+    <LicensePeriod @renew="redirectToGetLicense()"></LicensePeriod>
 
     <div v-if="loading" class="flex flex-col items-center justify-center p-3">
       <OSpinner size="md" />
@@ -26,7 +26,7 @@
                 variant="primary"
                 size="sm-action"
                 class="ms-2 mt-2"
-                @click="redirectToGetLicense"
+                @click="redirectToGetLicense()"
               >
                 {{ t("about.get_license") }}
               </OButton>
@@ -166,7 +166,8 @@
                     <td class="px-3 py-2 text-sm">
                       <LicenseFeatures
                         :license="licenseData.license"
-                        @request-access="redirectToGetLicense"
+                        :evaluated-at="licenseData.evaluated_at"
+                        @request-access="redirectToGetLicense()"
                       />
                     </td>
                   </tr>
@@ -256,11 +257,11 @@
                   </tr>
                 </tbody>
               </table>
-              <div class="mt-3 flex gap-3">
+              <div v-if="licenseData.can_update_license" class="mt-3 flex gap-3">
                 <OButton
                   variant="primary"
                   size="sm-action"
-                  @click="redirectToGetLicense"
+                  @click="redirectToGetLicense()"
                   data-test="request-new-license-btn"
                 >
                   {{ t("about.request_new_license") }}
@@ -396,13 +397,7 @@
                       v-else
                       v-html="
                         DOMPurify.sanitize(
-                          t('about.license_allows_ingestion', {
-                            limit:
-                              !licenseData?.expired &&
-                              licenseData?.license?.limits?.Ingestion?.value
-                                ? licenseData?.license?.limits?.Ingestion?.value
-                                : '50',
-                          }),
+                          t('about.license_allows_ingestion', { limit: ingestionLimitGB }),
                         )
                       "
                     ></span>
@@ -609,7 +604,16 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import { refreshMessage } from "@/utils/licenseRefresh";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
+import {
+  FREE_LIMIT_GB,
+  licenseKeyLosses,
+  licenseRequestUrl,
+  type LicenseKeyLosses,
+} from "@/utils/featureGate";
+import { b64DecodeUnicode } from "@/utils/formatters";
+import { formatLicenseDay } from "@/utils/licenseWaivers";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -638,8 +642,9 @@ export default defineComponent({
     OCardSection,
   },
   setup() {
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const { confirm } = useConfirmDialog();
+    const { featureNames } = useFeatureNames();
     const loading = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
@@ -816,6 +821,46 @@ export default defineComponent({
       if (data) licenseData.value = data as typeof licenseData.value;
     };
 
+    // The payload is unverified, so a key that cannot be read skips the dialog and the server answers it.
+    const pastedKeyLosses = (key: string) => {
+      try {
+        return licenseKeyLosses(
+          licenseData.value.license,
+          JSON.parse(b64DecodeUnicode(key.split(".")[1]) || ""),
+          store.state.zoConfig.features ?? {},
+          Date.now() * 1000,
+        );
+      } catch {
+        return null;
+      }
+    };
+
+    const limitLabel = (gb: number | null) =>
+      gb === null ? t("about.license_status_unlimited") : t("about.license_limit_per_day", { gb });
+
+    const lossLines = ({ expiredAt, lost, limit, expiry }: LicenseKeyLosses) => {
+      const day = (us: number) => formatLicenseDay(us, locale.value);
+      const lines = [];
+      if (expiredAt) lines.push(t("about.license_downgrade_expired", { date: day(expiredAt) }));
+      if (lost.length) {
+        lines.push(t("about.license_downgrade_lose", { names: featureNames(lost) }));
+      }
+      if (limit) {
+        lines.push(
+          t("about.license_downgrade_limit", {
+            old: limitLabel(limit.from),
+            new: limitLabel(limit.to),
+          }),
+        );
+      }
+      if (expiry) {
+        lines.push(
+          t("about.license_downgrade_expiry", { old: day(expiry.from), new: day(expiry.to) }),
+        );
+      }
+      return lines;
+    };
+
     const updateLicense = async (value?: LicenseForm) => {
       if (checking.value || updating.value) return;
       clearKeyCheck();
@@ -823,6 +868,22 @@ export default defineComponent({
       updating.value = true;
       const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
+        const losses = pastedKeyLosses(key);
+        if (
+          losses &&
+          !(await confirm({
+            title: t("about.license_downgrade_title"),
+            message: t("about.license_downgrade_intro"),
+            lines: lossLines(losses),
+            linesDataTest: "license-key-losses",
+            confirmLabel: t("about.yes_update_license"),
+            cancelLabel: t("about.no_keep_current"),
+            confirmVariant: "destructive",
+            focusCancel: true,
+          }))
+        ) {
+          return;
+        }
         await updateMutation.mutateAsync(key);
         toast({
           variant: "success",
@@ -903,11 +964,12 @@ export default defineComponent({
     };
 
     const redirectToGetLicense = () => {
-      const baseUrl = window.location.origin;
-      const installationId = licenseData.value.installation_id || "";
-      const serverUrl = String(store.state.zoConfig.license_server_url ?? "").replace(/\/+$/, "");
-      const licenseUrl = `${serverUrl}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
-      window.open(licenseUrl, "_blank");
+      const url = licenseRequestUrl(
+        store.state.zoConfig,
+        licenseData.value,
+        window.location.origin,
+      );
+      window.open(url, "_blank");
     };
 
     const checkAndAutoFillLicenseFromUrl = async () => {
@@ -952,7 +1014,10 @@ export default defineComponent({
     };
 
     const isIngestionUnlimited = computed(() => {
-      return licenseData.value.license?.limits?.Ingestion?.typ === "Unlimited";
+      return (
+        licenseData.value.license?.limits?.Ingestion?.typ === "Unlimited" &&
+        !licenseData.value.expired
+      );
     });
 
     // For license version >= 2, use limit_breach_allowed_count from the license data.
@@ -991,29 +1056,6 @@ export default defineComponent({
       return "red";
     };
 
-    const showLicenseExpiryWarning = computed(() => {
-      if (!store.state.zoConfig.license_expiry) return false;
-      const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-      return daysUntilExpiry < 14;
-    });
-
-    const getLicenseExpiryMessage = () => {
-      if (!store.state.zoConfig.license_expiry) return "";
-      const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-
-      if (daysUntilExpiry > 1) {
-        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
-      } else if (daysUntilExpiry === 1) {
-        return t("settings.licensePage.oneDayRemaining");
-      } else {
-        return t("settings.licensePage.licenseExpired");
-      }
-    };
-
     // Current time object for dashboard (calendar start date to current date)
     // Similar to TelemetryCorrelationDashboard, we pass microsecond timestamps to Date constructor
     const currentTimeObj = computed(() => {
@@ -1037,7 +1079,8 @@ export default defineComponent({
       if (isIngestionUnlimited.value) {
         return null; // No limit for unlimited plans
       }
-      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+      const licensed = licenseData.value?.license?.limits?.Ingestion?.value;
+      return (!licenseData.value?.expired && licensed) || FREE_LIMIT_GB;
     });
 
     // Generate usage dashboard data
@@ -1051,7 +1094,9 @@ export default defineComponent({
         thresholds.push({
           type: "yAxis",
           name: t("settings.limitExceeded"),
-          value: ingestionLimit,
+          // sum(size) is MB, and the megabytes unit counts 1024 MB to the GB.
+          value: ingestionLimit * 1024,
+          label_formatter: `{b}:${ingestionLimit} GB`,
           color: "#FF0000", // Red
           lineStyle: "solid",
           width: 2,
@@ -1231,6 +1276,9 @@ export default defineComponent({
       dashboardRenderKey.value++;
     };
 
+    // The first build runs before the license loads, so the line has to follow the loaded limit.
+    watch(ingestionLimitGB, generateUsageDashboard);
+
     onMounted(() => {
       loadLicenseData();
       generateUsageDashboard();
@@ -1270,8 +1318,6 @@ export default defineComponent({
       isIngestionUnlimited,
       ingestionUsagePercent,
       getIngestionUsageColor,
-      showLicenseExpiryWarning,
-      getLicenseExpiryMessage,
       showUpdateFormAndFocus,
       maskKey,
       getMaskedLicenseKey,

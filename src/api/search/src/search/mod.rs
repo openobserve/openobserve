@@ -114,7 +114,7 @@ pub mod utils;
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -439,7 +439,7 @@ pub async fn search(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -574,7 +574,7 @@ pub async fn around_v1(
         "pod_name": "openobserve-ingester-0"
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -708,7 +708,7 @@ pub async fn around_v2(
         ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "values": [
                 {
@@ -905,6 +905,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        use_index: true,
         clear_cache: req.clear_cache,
         local_mode: None,
         agent_options: None,
@@ -1088,6 +1089,7 @@ async fn values_inner(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        use_index: true,
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
         agent_options: None,
@@ -1305,7 +1307,7 @@ fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> O
 
 /// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
-async fn check_sql_stream_permissions(
+pub(crate) async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,
@@ -1356,7 +1358,7 @@ async fn check_sql_stream_permissions(
         "end_time": 1675185660872049i64
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::SearchPartitionResponse, example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -1519,7 +1521,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 40,
@@ -1713,7 +1715,7 @@ pub async fn search_history(
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::ResultSchemaResponse, example = json!({
             "projections": ["ns","histogram(k8s._timestamp)"],
             "group_by": ["histogram(k8s._timestamp)"],
             "timeseries_field": "histogram(k8s._timestamp)",

@@ -13,41 +13,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { orgUsersQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
-import type { Channel, RoutingPreview } from "@/ts/interfaces/oncall";
+import type {
+  OwnershipRuleStats,
+  RoutingPreview,
+  TestPageResult,
+  UnroutedSignal,
+} from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
 
+const escalationPreview = vi.fn();
+vi.mock("@/services/oncall", () => ({
+  default: { escalationPreview: (...args: unknown[]) => escalationPreview(...args) },
+}));
+
+/// OSelect is stubbed so a test can pick a value; the condition rows themselves are real.
 const stubs = {
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
-  OIcon: { name: "OIcon", template: "<i />" },
-  OText: { name: "OText", template: "<span><slot /></span>" },
-  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
-  OButton: {
-    name: "OButton",
-    props: ["disabled"],
-    template: `<button :disabled="disabled"><slot /></button>`,
-  },
-  OInput: {
-    name: "OInput",
-    props: ["modelValue"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
-  },
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options"],
-    emits: ["update:modelValue"],
-    template: `<select :value="modelValue" />`,
+    props: ["modelValue", "options", "label", "creatable"],
+    emits: ["update:modelValue", "create"],
+    template: "<span />",
   },
-  OEmptyState: {
-    name: "OEmptyState",
-    props: ["title", "description"],
-    template: `<div><span>{{ title }}</span></div>`,
-  },
+  OCollapsible: { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" },
 };
 
 function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
@@ -58,35 +54,55 @@ function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
     ladder: [
       {
         priority: "P1",
-        rungs: 3,
+        rungs: 2,
         pages_anyone: true,
-        nobody_after_micros: 1_200_000_000,
-        ends_with_whole_team: true,
-        channels: ["email"],
+        nobody_after_micros: 300_000_000,
+        ends_with_whole_team: false,
+        channels: ["email", "sms"],
+      },
+      {
+        priority: "P4",
+        rungs: 0,
+        pages_anyone: false,
+        ends_with_whole_team: false,
+        channels: [],
       },
     ],
     current_responder: {
-      user_email: "aarav@o2.ai",
+      user_email: "ana@o2.ai",
       reason: "on call",
       would_a_page_land: true,
-      deliverable_channels: ["email"],
+      deliverable_channels: ["email", "sms"],
     },
     also_matched: [],
     notes: [],
     ...over,
-  };
+  } as RoutingPreview;
 }
+
+const SIGNALS = [
+  {
+    id: "s1",
+    path: "service=checkout",
+    dimensions: { service: "checkout", "k8s-pod-name": "pod-1" },
+    occurrences: 5,
+  },
+] as unknown as UnroutedSignal[];
+
+const RULES = [
+  { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-namespace": "payments" } },
+] as unknown as OwnershipRuleStats[];
 
 function render(props: Record<string, unknown> = {}) {
   return mount(OnCallRoutingSimulator, {
     props: {
-      teamId: "team_1",
-      teamName: "Payments",
       teams: [
-        { id: "team_1", name: "Payments" },
-        { id: "team_2", name: "Ledger" },
+        { id: "team_1", name: "Payments SRE" },
+        { id: "team_2", name: "Checkout" },
       ],
-      aliases: [{ id: "service", display: "Service" }],
+      catalogue: { present: ["service", "k8s-namespace"], values: {} },
+      signals: SIGNALS,
+      rules: RULES,
       ...props,
     },
     global: { plugins: [i18n, store], stubs },
@@ -95,312 +111,416 @@ function render(props: Record<string, unknown> = {}) {
 
 type Wrapper = ReturnType<typeof render>;
 
-async function addDimension(wrapper: Wrapper, name: string, value: string) {
-  await wrapper.find('[data-test="oncall-simulator-add-dimension"]').trigger("click");
-  await wrapper
-    .findComponent('[data-test="oncall-simulator-dimension-name"]')
-    .vm.$emit("update:modelValue", name);
-  await wrapper.find('[data-test="oncall-simulator-dimension-value"]').setValue(value);
-  await wrapper.find('[data-test="oncall-simulator-dimension-confirm"]').trigger("click");
-}
-
-/// Priority is offered, never assumed — so a test about the ladder asks for
-/// one first, the way a reader does.
-async function pickPriority(wrapper: Wrapper, priority = "P1") {
-  await wrapper
-    .findComponent('[data-test="oncall-simulator-priority"]')
-    .vm.$emit("update:modelValue", priority);
-}
+const select = (w: Wrapper, test: string) =>
+  w.findAllComponents({ name: "OSelect" }).find((c) => c.attributes("data-test") === test)!;
 
 describe("OnCallRoutingSimulator", () => {
-  /// The title above already explains the concept; a bare form with no
-  /// example of what a run produces left first-time users guessing at what
-  /// to do next.
-  it("guides a first-time user before anything has been tried", () => {
-    const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(true);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    escalationPreview.mockReset();
+    escalationPreview.mockResolvedValue({ data: { rungs: [] } });
   });
+  afterEach(() => vi.useRealTimers());
 
-  it("drops the guidance once a run has produced a result", () => {
+  it("tells the page when the license refuses the ladder read", async () => {
+    escalationPreview.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
     const wrapper = render({ preview: preview() });
-    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(false);
+    await flushPromises();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
   });
 
-  /// A pre-filled P1 makes the tester answer a question nobody asked, and the
-  /// answer changes with the priority — so it starts empty.
-  it("assumes no priority until one is chosen", async () => {
-    const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').exists()).toBe(false);
-
-    await pickPriority(wrapper);
-    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').text()).toContain("P1");
-    // The picker gives way to the chip it created.
-    expect(wrapper.find('[data-test="oncall-simulator-priority"]').exists()).toBe(false);
-  });
-
-  /// Nothing to test against means the button would ask the server "where does
-  /// an alert with no facts go", which has no useful answer.
-  it("cannot run with no dimensions", () => {
-    expect(
-      render().find('[data-test="oncall-simulator-run"]').attributes("disabled"),
-    ).toBeDefined();
-  });
-
-  // The server lowercases before matching, so testing the un-normalised string
-  // would answer a different question than the one asked.
-  it("normalises a dimension the way the server will match it", async () => {
-    const wrapper = render();
-    await addDimension(wrapper, "service", "  Payments-API ");
-    await pickPriority(wrapper);
-    await wrapper.find('[data-test="oncall-simulator-run"]').trigger("click");
-
-    expect(wrapper.emitted("run")?.[0][0]).toMatchObject({
-      dimensions: { service: "payments-api" },
-      priority: "P1",
-    });
-  });
-
-  it("drops a dimension the reader removes", async () => {
-    const wrapper = render();
-    await addDimension(wrapper, "service", "api");
-    expect(wrapper.find('[data-test="oncall-simulator-chip-service"]').exists()).toBe(true);
-
-    await wrapper.find('[data-test="oncall-simulator-chip-service"] button').trigger("click");
-    expect(wrapper.find('[data-test="oncall-simulator-chip-service"]').exists()).toBe(false);
-  });
-
-  it("shows the whole path — rule, team, ladder, person", async () => {
-    const wrapper = render({ preview: preview() });
-    await pickPriority(wrapper);
-    const result = wrapper.find('[data-test="oncall-simulator-result"]');
-
-    expect(result.text()).toContain("service = payments-api");
-    expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toContain("Payments");
-    expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("P1 ladder");
-    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain(
-      "aarav@o2.ai",
-    );
-  });
-
-  /// "most specific of 1 match" is noise dressed as a finding.
-  it("only claims specificity when something else actually matched", () => {
-    expect(
-      render({ preview: preview() }).find('[data-test="oncall-simulator-specificity"]').exists(),
-    ).toBe(false);
-
-    const contested = render({
-      preview: preview({
-        also_matched: [
-          {
-            rule_id: "r2",
-            team_id: "team_1",
-            path: "k8s-namespace=payments",
-            same_team: true,
-            lost_because: "a longer literal prefix wins",
-          },
-        ],
-      }),
-    });
-    expect(contested.find('[data-test="oncall-simulator-specificity"]').text()).toContain("2");
-  });
-
-  /// A losing rule pointing at ANOTHER team is the case worth naming — that is
-  /// a page that would have gone to a different set of phones.
-  it("renders the server's reason a rule lost, and who it pointed at", () => {
-    const wrapper = render({
-      preview: preview({
-        also_matched: [
-          {
-            rule_id: "r2",
-            team_id: "team_2",
-            team_name: "Ledger",
-            path: "k8s-namespace=payments",
-            same_team: false,
-            lost_because: "`service=payments-api` pins a longer literal prefix",
-          },
-        ],
-      }),
-    });
-    const line = wrapper.find('[data-test="oncall-simulator-also-r2"]');
-    expect(line.text()).toContain("k8s-namespace = payments");
-    expect(line.text()).toContain("Ledger");
-    expect(line.text()).toContain("pins a longer literal prefix");
-  });
-
-  it("says plainly when nothing owns the dimensions", () => {
-    const wrapper = render({ preview: preview({ team_id: null, decision: { kind: "unrouted" } }) });
-    expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toContain("Nobody");
-    // Nothing to page, so no test page can be offered.
-    expect(wrapper.find('[data-test="oncall-simulator-send-test"]').exists()).toBe(false);
-  });
-
-  /// The reason a page would not land is the server's sentence — never a guess
-  /// assembled here.
-  it("gives the server's reason a responder cannot be reached", () => {
-    const wrapper = render({
-      preview: preview({
-        current_responder: {
-          user_email: "aarav@o2.ai",
-          reason: "on call",
-          would_a_page_land: false,
-          why_not: "this deployment has no SMTP transport configured",
-          deliverable_channels: [],
-        },
-      }),
-    });
-    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain(
-      "no SMTP transport configured",
-    );
-  });
-
-  describe("the responder's channels", () => {
-    const withLadder = (ladder: RoutingPreview["ladder"]) =>
-      preview({
-        ladder,
-        current_responder: {
-          user_email: "aarav@o2.ai",
-          reason: "on call",
-          would_a_page_land: true,
-          deliverable_channels: ["email", "sms"],
-        },
-      });
-    const p1 = (channels: Channel[]) => [
-      { priority: "P1", rungs: 1, pages_anyone: true, ends_with_whole_team: true, channels },
-    ];
-    const note = (wrapper: Wrapper) =>
-      wrapper.find('[data-test="oncall-simulator-responder-note"]');
-    const tone = (wrapper: Wrapper) =>
-      note(wrapper)
-        .classes()
-        .find((c) => c.startsWith("text-status"));
-
-    it.each<[string, Channel[], string, string]>([
-      [
-        "names only what the priority sends",
-        ["sms", "voice"],
-        "SMS · now",
-        "text-status-success-text",
-      ],
-      [
-        "lists every channel both sides share",
-        ["email", "sms"],
-        "Email, SMS · now",
-        "text-status-success-text",
-      ],
-      [
-        "warns when the priority sends nothing they receive",
-        ["voice"],
-        "This priority sends nothing they can receive",
-        "text-status-warning-text",
-      ],
-    ])("%s", async (_, sends, expected, colour) => {
-      const wrapper = render({ preview: withLadder(p1(sends)) });
-      await pickPriority(wrapper);
-      expect(note(wrapper).text()).toBe(expected);
-      expect(tone(wrapper)).toBe(colour);
-    });
-
-    it("with no priority chosen, lists what they can receive", () => {
-      const wrapper = render({ preview: withLadder(p1(["voice"])) });
-      expect(note(wrapper).text()).toBe("Email, SMS · now");
-    });
-  });
-
-  it("marks a priority that would wake nobody", async () => {
-    const wrapper = render({
-      preview: preview({
-        ladder: [
-          {
-            priority: "P1",
-            rungs: 0,
-            pages_anyone: false,
-            ends_with_whole_team: false,
-            channels: [],
-          },
-        ],
-      }),
-    });
-    await pickPriority(wrapper);
-    expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("Pages nobody");
-  });
-
-  it("asks the parent to send a real page for the resolved team", async () => {
-    const wrapper = render({ preview: preview() });
-    await pickPriority(wrapper);
-    await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
-    expect(wrapper.emitted("send-test")?.[0][0]).toEqual({ team_id: "team_1", priority: "P1" });
-  });
-
-  it("renders Send test page disabled once the org is latched read-only", async () => {
-    const wrapper = render({ preview: preview(), canConfigure: false });
-    await pickPriority(wrapper);
-    expect(
-      wrapper.find('[data-test="oncall-simulator-send-test"]').attributes("disabled"),
-    ).toBeDefined();
-  });
-
-  /// Attempts, not people: one person on email and text is two attempts, and the old toast called that "2 people".
-  it("lists each test page attempt in the result card", async () => {
-    const wrapper = await sentTest({
-      reached_anyone: true,
-      channels: ["email", "sms"],
-      attempts: [
-        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
-        {
-          channel: "sms",
-          recipient: "aarav@o2.ai",
-          reason: "on call",
-          delivered: false,
-          detail: "no phone number",
-        },
-      ],
-    });
-
-    const result = wrapper.find('[data-test="oncall-simulator-test-result"]');
-    expect(result.find('[data-test="oncall-simulator-test-count"]').text()).toBe("Sent 1 of 2");
-    const rows = result.findAll('[data-test^="oncall-simulator-test-attempt-"]');
-    expect(rows.map((row) => row.text())).toEqual([
-      "aarav@o2.ai · Email · Sent",
-      "aarav@o2.ai · SMS · Not sent: no phone number",
+  it("opens pre-filled from the seed and asks once the input settles, at P1 by default", async () => {
+    const wrapper = render({ seed: { service: "checkout" } });
+    vi.advanceTimersByTime(350);
+    expect(wrapper.emitted("run")?.at(-1)).toEqual([
+      { dimensions: { service: "checkout" }, priority: "P1" },
     ]);
   });
 
-  it("says why nothing was sent when no attempt was made", async () => {
-    const wrapper = await sentTest({
-      reached_anyone: false,
-      not_sent_because: "nobody is on call",
-      channels: ["email"],
-      attempts: [],
-    });
-
-    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').text()).toBe(
-      "Nothing was sent — nobody is on call",
-    );
+  it("re-asks live when the priority changes", async () => {
+    const wrapper = render({ seed: { service: "checkout" } });
+    select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P3");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(350);
+    expect(wrapper.emitted("run")?.at(-1)).toEqual([
+      { dimensions: { service: "checkout" }, priority: "P3" },
+    ]);
   });
 
-  /// A result describes the team and priority it was sent for, never the ones on screen after a change.
-  it("hides the test result once the priority changes", async () => {
-    const wrapper = await sentTest({
+  it("starts from a signal, a rule or a discovered service", async () => {
+    const wrapper = render({ services: [{ name: "cart", setId: "default", identity: {} }] });
+    const start = select(wrapper, "oncall-simulator-start");
+    const values = (start.props("options") as { value?: string }[]).map((o) => o.value);
+    expect(values).toEqual(expect.arrayContaining(["signal:s1", "rule:r1", "service:cart"]));
+
+    start.vm.$emit("update:modelValue", "signal:s1");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(350);
+    expect(wrapper.emitted("run")?.at(-1)).toEqual([
+      { dimensions: { service: "checkout" }, priority: "P1" },
+    ]);
+
+    start.vm.$emit("update:modelValue", "rule:r1");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(350);
+    expect(wrapper.emitted("run")?.at(-1)).toEqual([
+      { dimensions: { "k8s-namespace": "payments" }, priority: "P1" },
+    ]);
+  });
+
+  /// A start names the conditions it filled in; once the rows say something else it would describe an alert nobody is testing.
+  it("clears the start once the conditions no longer match it", async () => {
+    const wrapper = render();
+    const start = () => select(wrapper, "oncall-simulator-start");
+    start().vm.$emit("update:modelValue", "rule:r1");
+    await wrapper.vm.$nextTick();
+    expect(start().props("modelValue")).toBe("rule:r1");
+
+    wrapper
+      .findComponent({ name: "OnCallConditionRows" })
+      .vm.$emit("update:modelValue", { "k8s-namespace": "payments", service: "cart" });
+    await wrapper.vm.$nextTick();
+    expect(start().props("modelValue")).toBe(null);
+  });
+
+  it("keeps the start while the rows still say what it filled in", async () => {
+    const wrapper = render();
+    select(wrapper, "oncall-simulator-start").vm.$emit("update:modelValue", "rule:r1");
+    await wrapper.vm.$nextTick();
+    wrapper
+      .findComponent({ name: "OnCallConditionRows" })
+      .vm.$emit("update:modelValue", { "k8s-namespace": "payments" });
+    await wrapper.vm.$nextTick();
+    expect(select(wrapper, "oncall-simulator-start").props("modelValue")).toBe("rule:r1");
+  });
+
+  // A test describes one real alert, and no alert carries a literal trailing star.
+  it("uses the rule editor's rows with only is, reading a prefix seed as its literal value", async () => {
+    const wrapper = render({ seed: { service: "checkout-*" } });
+    expect(wrapper.findComponent({ name: "OnCallConditionRows" }).exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-simulator-op-0"]').text()).toBe("is");
+    expect(select(wrapper, "oncall-simulator-op-0")).toBeUndefined();
+    await flushPromises();
+    vi.advanceTimersByTime(400);
+    expect(wrapper.emitted("run")?.at(-1)?.[0]).toMatchObject({
+      dimensions: { service: "checkout-" },
+    });
+  });
+
+  it("answers in one line by name: team, who is woken now, and the next new person", async () => {
+    vi.useRealTimers();
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "raj@o2.ai", first_name: "Raj" },
+    ]);
+    const lands = (email: string) => ({
+      user_email: email,
+      reason: "",
+      would_a_page_land: true,
+      deliverable_channels: ["email"],
+    });
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [lands("ana@o2.ai")],
+            resolves_to_nobody: false,
+          },
+          {
+            after_micros: 300_000_000,
+            targets: [],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai")],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const answer = wrapper.find('[data-test="oncall-simulator-answer"]').text();
+    expect(answer).toContain("→ Payments SRE");
+    expect(answer).toContain("wakes Ana now");
+    expect(answer).not.toContain("@");
+    const next = wrapper.find('[data-test="oncall-simulator-next"]').text();
+    expect(next).toContain("then Raj after 5m");
+    expect(next).not.toContain("Ana");
+    const ana = wrapper
+      .findAllComponents(OnCallPersonName)
+      .find((c) => c.props("email") === "ana@o2.ai");
+    // The tooltip's two lines are OnCallPersonName's own contract, covered in its spec.
+    expect(ana!.findComponent(OTooltip).exists()).toBe(true);
+  });
+
+  // The engine's current responder is one person; a first step paging Primary and Secondary wakes both.
+  it("names everybody the first step pages as woken now, not only the current responder", async () => {
+    vi.useRealTimers();
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "raj@o2.ai", first_name: "Raj" },
+      { email: "kim@o2.ai", first_name: "Kim" },
+    ]);
+    const lands = (email: string) => ({
+      user_email: email,
+      reason: "",
+      would_a_page_land: true,
+      deliverable_channels: ["email", "sms"],
+    });
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email", "sms"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai")],
+            resolves_to_nobody: false,
+          },
+          {
+            after_micros: 300_000_000,
+            targets: [],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai"), lands("kim@o2.ai")],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const responder = wrapper.find('[data-test="oncall-simulator-responder"]').text();
+    expect(responder).toBe("wakes Ana, Raj now (Email, SMS)");
+    const next = wrapper.find('[data-test="oncall-simulator-next"]').text();
+    expect(next).toBe("then Kim after 5m");
+  });
+
+  /// The server's reason can run to a sentence; it sits in the tooltip so the answer stays on one line.
+  it("says why when nobody on the first step can receive a page", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [
+              {
+                user_email: "ana@o2.ai",
+                reason: "",
+                would_a_page_land: false,
+                why_not: "no verified channel",
+                deliverable_channels: [],
+              },
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const responder = wrapper.find('[data-test="oncall-simulator-responder"]');
+    expect(responder.text()).toBe("No channel can carry a page");
+    expect(responder.findComponent(OTooltip).props("content")).toBe("no verified channel");
+    expect(responder.classes()).toContain("text-status-error-text");
+  });
+
+  it("says a silent priority pages nobody rather than naming the responder", async () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P4");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toBe("Pages nobody");
+  });
+
+  it("disables Send a test page, with the reason, when the priority pages nobody", async () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    const button = () => wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button().attributes("aria-disabled")).toBeUndefined();
+    select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P4");
+    await wrapper.vm.$nextTick();
+    // Unavailable but still focusable, so a keyboard or screen-reader user reaches the reason.
+    expect(button().attributes("aria-disabled")).toBe("true");
+    expect(button().attributes("disabled")).toBeUndefined();
+    const reasonId = button().attributes("aria-describedby");
+    expect(wrapper.find(`[id="${reasonId}"]`).text()).toBe(
+      "P4 pages nobody, so there is nothing to test",
+    );
+    await button().trigger("click");
+    expect(wrapper.emitted("send-test")).toBeUndefined();
+    const tip = wrapper
+      .find('[data-test="oncall-simulator-send-test-wrap"]')
+      .findComponent({ name: "OTooltip" });
+    expect(tip.props("content")).toBe("P4 pages nobody, so there is nothing to test");
+  });
+
+  it("disables Send a test page, with the reason, when the first step reaches nobody", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [{ after_micros: 0, targets: [], recipients: [], resolves_to_nobody: true }],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBe("true");
+    const reasonId = button.attributes("aria-describedby");
+    expect(wrapper.find(`[id="${reasonId}"]`).text()).toBe(
+      "Nobody is on call now, so there is nothing to test",
+    );
+    await button.trigger("click");
+    expect(wrapper.emitted("send-test")).toBeUndefined();
+    const tip = wrapper
+      .find('[data-test="oncall-simulator-send-test-wrap"]')
+      .findComponent({ name: "OTooltip" });
+    expect(tip.props("content")).toBe("Nobody is on call now, so there is nothing to test");
+  });
+
+  it("keeps Send a test page enabled when the first step's people cannot receive a page", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [
+              {
+                user_email: "ana@o2.ai",
+                reason: "",
+                would_a_page_land: false,
+                why_not: "no verified channel",
+                deliverable_channels: [],
+              },
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    await button.trigger("click");
+    expect(wrapper.emitted("send-test")?.at(-1)).toEqual([{ team_id: "team_1", priority: "P1" }]);
+  });
+
+  it("keeps Send a test page enabled while the escalation preview has not loaded", async () => {
+    escalationPreview.mockReturnValue(new Promise(() => {}));
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await wrapper.vm.$nextTick();
+    const button = wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    expect(
+      wrapper
+        .find('[data-test="oncall-simulator-send-test-wrap"]')
+        .findComponent(OTooltip)
+        .exists(),
+    ).toBe(false);
+  });
+
+  it("says the winning rule inline and counts the less specific ones, with no expander", () => {
+    const wrapper = render({
+      seed: { service: "payments-api" },
+      preview: preview({
+        also_matched: [
+          {
+            rule_id: "r9",
+            team_id: "team_2",
+            team_name: "Checkout",
+            path: "k8s-namespace=payments",
+            same_team: false,
+            lost_because: "fewer conditions",
+          },
+        ],
+      }),
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
+      "Matched rule: Service = payments-api",
+    );
+    const also = wrapper.find('[data-test="oncall-simulator-also"]');
+    expect(also.text()).toBe("Also matched, less specific: 1 rule");
+    expect(also.attributes("tabindex")).toBe("0");
+  });
+
+  it("leaves out the less-specific line when no other rule matched", () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-simulator-also"]').exists()).toBe(false);
+  });
+
+  it("says a miss in plain words, never the engine's k=v note", () => {
+    const wrapper = render({
+      seed: { service: "orphan" },
+      preview: preview({
+        decision: { kind: "unrouted" },
+        team_id: null,
+        current_responder: null,
+        notes: ["no ownership rule covers service=orphan"],
+      }),
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
+      "No rule matches, so nobody is paged",
+    );
+    expect(wrapper.text()).not.toContain("no ownership rule covers");
+  });
+
+  it("names the start the seed came from instead of a blank picker", () => {
+    const wrapper = render({ seed: { "k8s-namespace": "payments" } });
+    expect(select(wrapper, "oncall-simulator-start").props("modelValue")).toBe("rule:r1");
+  });
+
+  it("names nobody when no team owns the alert", () => {
+    const wrapper = render({
+      seed: { service: "orphan" },
+      preview: preview({ team_id: null, current_responder: null }),
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toBe("→ Nobody");
+    expect(wrapper.find('[data-test="oncall-simulator-send-test"]').exists()).toBe(false);
+  });
+
+  it("sends a test page for the answered team at the chosen priority", async () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
+    expect(wrapper.emitted("send-test")?.[0]).toEqual([{ team_id: "team_1", priority: "P1" }]);
+  });
+
+  it("shows the test result only beside the inputs it was sent for", async () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
+    const result: TestPageResult = {
       reached_anyone: true,
+      not_sent_because: null,
       channels: ["email"],
       attempts: [
-        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
+        { channel: "email", recipient: "ana@o2.ai", reason: "", delivered: true, detail: null },
       ],
-    });
+    } as unknown as TestPageResult;
+    await wrapper.setProps({ testResult: result });
     expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(true);
 
-    await wrapper.find('[data-test="oncall-simulator-chip-priority"] button').trigger("click");
-    await pickPriority(wrapper, "P2");
-
+    select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P2");
+    await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(false);
   });
-});
 
-/// The parent hands the result back after the click, the way the routing page does.
-async function sentTest(testResult: Record<string, unknown>) {
-  const wrapper = render({ preview: preview() });
-  await pickPriority(wrapper);
-  await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
-  await wrapper.setProps({ testResult });
-  return wrapper;
-}
+  it("asks for a condition instead of an empty answer", () => {
+    const wrapper = render({ signals: [], rules: [] });
+    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(true);
+    expect(wrapper.emitted("run")).toBeUndefined();
+  });
+});

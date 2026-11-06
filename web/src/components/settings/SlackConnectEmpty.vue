@@ -23,9 +23,9 @@ import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
-import useBreakpoint from "@/composables/useBreakpoint";
 import {
   confirmConnectionMutation,
   connectInstallationMutation,
@@ -60,7 +60,6 @@ const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConf
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { isMobile } = useBreakpoint();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 
@@ -163,44 +162,14 @@ const connectWithTicket = async (): Promise<void> => {
 const candidate = computed(() => props.upgradeCandidates[0] ?? null);
 const addToSlackSrcset = `${addToSlackImage2x} 2x`;
 
-const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
+const nextSteps = computed<I18nText[]>(() =>
   props.isCloud
-    ? [
-        { title: t("slackApp.connect.stepAddTitle"), detail: t("slackApp.connect.popupHint") },
-        {
-          title: t("slackApp.connect.stepLinkTitle"),
-          detail: t("slackApp.connect.stepLinkDetail"),
-        },
-      ]
-    : isMobile.value
-      ? [
-          {
-            title: t("slackApp.connect.stepCheckTitle"),
-            detail: t("slackApp.connect.stepCheckDetailShort"),
-          },
-          {
-            title: t("slackApp.connect.stepCreateTitle"),
-            detail: t("slackApp.connect.stepCreateDetailShort"),
-          },
-          {
-            title: t("slackApp.connect.stepInstallTitle"),
-            detail: t("slackApp.connect.stepInstallDetailShort"),
-          },
-        ]
-      : [
-          {
-            title: t("slackApp.connect.stepCheckTitle"),
-            detail: t("slackApp.connect.stepCheckDetail"),
-          },
-          {
-            title: t("slackApp.connect.stepCreateTitle"),
-            detail: t("slackApp.connect.stepCreateDetail"),
-          },
-          {
-            title: t("slackApp.connect.stepInstallTitle"),
-            detail: t("slackApp.connect.stepInstallDetail"),
-          },
-        ],
+    ? [t("slackApp.connect.stepAddTitle"), t("slackApp.connect.stepLinkTitle")]
+    : [
+        t("slackApp.connect.stepCheckTitle"),
+        t("slackApp.connect.stepCreateTitle"),
+        t("slackApp.connect.stepInstallTitle"),
+      ],
 );
 </script>
 
@@ -260,6 +229,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         <OButton
           variant="primary"
           size="sm-action"
+          icon-left="sync"
           :loading="
             popup.connecting.value &&
             action.kind === 'install' &&
@@ -288,6 +258,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         <OButton
           variant="primary"
           size="sm-action"
+          icon-left="link"
           :loading="connectInstallation.isPending.value"
           data-test="slack-connect-ticket"
           @click="connectWithTicket"
@@ -297,14 +268,39 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
       </template>
     </OBanner>
 
+    <OCard
+      v-if="!isCloud && offered.length"
+      variant="outlined"
+      class="gap-3 p-5"
+      data-test="slack-available"
+    >
+      <h2 class="text-text-heading m-0 text-lg font-semibold">
+        {{ t("slackApp.connect.existingTitle") }}
+      </h2>
+      <div
+        v-for="item in offered"
+        :key="item.installation_id"
+        class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
+        :data-test="`slack-available-${item.installation_id}`"
+      >
+        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          icon-left="link"
+          :loading="popup.connecting.value && connectingId === item.installation_id"
+          @click="runPopup({ kind: 'connect', installationId: item.installation_id })"
+        >
+          {{ t("slackApp.connect.connectExisting") }}
+        </OButton>
+      </div>
+    </OCard>
+
     <OCard variant="outlined">
       <OEmptyState
         size="block"
         illustration="connect"
         :title="t('slackApp.connect.title')"
-        :description="
-          isCloud ? t('slackApp.connect.description') : t('slackApp.connect.descriptionSelfHosted')
-        "
         :backdrop="false"
       >
         <template #actions>
@@ -327,8 +323,9 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           </OButton>
           <OButton
             v-else
-            variant="primary"
+            :variant="offered.length ? 'outline' : 'primary'"
             size="md"
+            icon-left="settings"
             data-test="slack-setup-app"
             @click="emit('setup')"
           >
@@ -336,9 +333,6 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           </OButton>
         </template>
         <template #extra>
-          <span class="text-text-label text-2xs font-semibold">
-            {{ t("slackApp.connect.nextTitle", { minutes: isCloud ? 2 : 5 }) }}
-          </span>
           <ol
             class="m-0 grid w-full max-w-2xl list-none grid-cols-1 gap-3 p-0 text-start"
             :class="nextSteps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'"
@@ -348,7 +342,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
             <li
               v-for="(item, index) in nextSteps"
               :key="index"
-              class="border-border-subtle bg-surface-panel rounded-default flex items-start gap-2.5 border p-3"
+              class="border-border-subtle bg-surface-panel rounded-default flex items-center gap-2.5 border p-3"
               data-test="slack-connect-step"
             >
               <span
@@ -356,61 +350,33 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
               >
                 {{ index + 1 }}
               </span>
-              <span class="flex min-w-0 flex-col gap-0.5">
-                <span class="text-text-heading text-compact font-medium">{{ item.title }}</span>
-                <span class="text-text-secondary text-xs">{{ item.detail }}</span>
-              </span>
+              <span class="text-text-heading text-compact min-w-0 font-medium">{{ item }}</span>
             </li>
           </ol>
           <span v-if="!isCloud && instance" class="text-text-secondary text-xs">
             {{ t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name }) }}
           </span>
-          <span class="text-text-secondary text-xs">
+          <!-- What Slack may read is a privacy fact worth one hover, not a paragraph under the steps. -->
+          <span class="text-text-secondary flex items-center gap-1 text-xs">
             {{ t("slackApp.connect.permissionHint") }}
+            <OnCallHint
+              :hint="
+                isCloud ? t('slackApp.connect.consent') : t('slackApp.connect.consentSelfHosted')
+              "
+              icon-class=""
+              max-width="24rem"
+              data-test="slack-connect-consent"
+            >
+              <template #content>
+                <span class="flex flex-col gap-1">
+                  <span>{{ t("slackApp.connect.consent") }}</span>
+                  <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
+                </span>
+              </template>
+            </OnCallHint>
           </span>
-          <OBanner
-            variant="info"
-            dense
-            icon="verified-user"
-            class="w-full max-w-2xl text-start"
-            data-test="slack-connect-consent"
-          >
-            {{ t("slackApp.connect.consent") }}
-          </OBanner>
         </template>
       </OEmptyState>
-    </OCard>
-
-    <OCard
-      v-if="!isCloud && offered.length"
-      variant="outlined"
-      class="gap-3 p-5"
-      data-test="slack-available"
-    >
-      <div class="flex flex-col gap-1">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.connect.existingTitle") }}
-        </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.connect.existingDescription") }}
-        </p>
-      </div>
-      <div
-        v-for="item in offered"
-        :key="item.installation_id"
-        class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
-        :data-test="`slack-available-${item.installation_id}`"
-      >
-        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :loading="popup.connecting.value && connectingId === item.installation_id"
-          @click="runPopup({ kind: 'connect', installationId: item.installation_id })"
-        >
-          {{ t("slackApp.connect.connectExisting") }}
-        </OButton>
-      </div>
     </OCard>
   </div>
 </template>

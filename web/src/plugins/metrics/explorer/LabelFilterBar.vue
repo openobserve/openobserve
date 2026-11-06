@@ -58,6 +58,8 @@ const props = defineProps<{
   schemaLoading: boolean;
   /** Best-effort value suggestions; may resolve empty or reject. */
   loadValues: (label: string) => Promise<string[]>;
+  /** Changes when the sample `loadValues` draws from does; an open value step then reloads. */
+  valueScope?: string;
 }>();
 
 const emit = defineEmits<{
@@ -140,7 +142,11 @@ const { placeholder: filterHint } = useFilterHint(
   computed(() => !focused.value && !props.filters.length),
 );
 
-const loadValues = (label: string) => props.loadValues(label);
+// A new loader is what tells the open value step its sample moved, so it reloads.
+const loadValues = computed(() => {
+  void props.valueScope;
+  return (label: string) => props.loadValues(label);
+});
 
 // A list matcher has no PromQL operator of its own, so `in` becomes an anchored alternation.
 const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {

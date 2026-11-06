@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #free>{{ split.free.length }}</template>
       </i18n-t>
       <OButton
-        v-if="split.missing.length || split.addedLocked.length"
+        v-if="!hideRequestAccess && (split.missing.length || split.addedLocked.length)"
         variant="ghost-primary"
         size="xs"
         icon-right="arrow-forward"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-surface-subtle text-text-secondary sticky top-0 z-10 pt-2 pb-1 text-xs font-semibold"
         >
           {{
-            group.id === "free"
+            group.id === "free" || group.id === "free-not-included"
               ? group.heading
               : t("about.features_group_heading", {
                   heading: group.heading,
@@ -153,10 +153,14 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { splitLicenseFeatures, type LicenseFeatureSource } from "@/utils/featureGate";
 
-type GroupId = "unlocked" | "missing" | "free" | "new";
+type GroupId = "unlocked" | "missing" | "free" | "free-not-included" | "new";
 type FilterId = "all" | GroupId;
 
-const props = defineProps<{ license: LicenseFeatureSource | null | undefined }>();
+const props = defineProps<{
+  license: LicenseFeatureSource | null | undefined;
+  evaluatedAt?: number;
+  hideRequestAccess?: boolean;
+}>();
 
 const emit = defineEmits<{ (e: "request-access"): void }>();
 
@@ -172,7 +176,7 @@ const name = (key: string): string =>
   key;
 
 const split = computed(() =>
-  splitLicenseFeatures(props.license, store.state.zoConfig?.features ?? {}),
+  splitLicenseFeatures(props.license, store.state.zoConfig?.features ?? {}, props.evaluatedAt),
 );
 
 const total = computed(() =>
@@ -180,6 +184,7 @@ const total = computed(() =>
     ? split.value.unlocked.length +
       split.value.missing.length +
       split.value.free.length +
+      split.value.freeNotIncluded.length +
       split.value.added.length
     : 0,
 );
@@ -192,6 +197,11 @@ const groups = computed(() => {
     { id: "missing" as const, heading: t("about.features_missing"), items: s.missing },
     { id: "new" as const, heading: t("about.features_new"), items: s.added },
     { id: "free" as const, heading: t("about.features_free_heading"), items: s.free },
+    {
+      id: "free-not-included" as const,
+      heading: t("about.features_free_not_included"),
+      items: s.freeNotIncluded,
+    },
   ];
 });
 
@@ -211,7 +221,12 @@ const filterOptions = computed(() => {
     },
     { id: "new" as const, label: t("about.features_filter_new"), count: s?.added.length ?? 0 },
     { id: "free" as const, label: t("about.features_filter_free"), count: s?.free.length ?? 0 },
-  ].filter((option) => option.id !== "new" || option.count);
+    {
+      id: "free-not-included" as const,
+      label: t("about.features_free_not_included"),
+      count: s?.freeNotIncluded.length ?? 0,
+    },
+  ].filter((option) => (option.id !== "new" && option.id !== "free-not-included") || option.count);
 });
 
 const visibleGroups = computed(() => {

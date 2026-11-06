@@ -30,8 +30,6 @@
  *
  * A failure here means FALLBACKS is wrong, not that the test is too strict: add
  * the missing token, or correct the stale value to the one the CSS resolves to.
- * The single sanctioned omission is `--color-chart-crosshair-bg`, which has no
- * light declaration on purpose (see base.css).
  */
 
 import { describe, it, expect } from "vitest";
@@ -50,13 +48,6 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".vue", ".js"]);
 
 /** Directories with no chart code, skipped so the walk stays cheap. */
 const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "assets"]);
-
-/**
- * Documented omission: the crosshair chip is dark-only, and the empty string
- * `chartColor()` returns in light is exactly what makes ECharts pick its own
- * default. Giving it a fallback would change the light-theme rendering.
- */
-const UNMIRRORED_BY_DESIGN = new Set(["--color-chart-crosshair-bg"]);
 
 /**
  * Floor on the number of distinct tokens the call-site scan must find.
@@ -189,9 +180,7 @@ describe("chartTheme FALLBACKS", () => {
   // Without an entry, chartColor() returns "" under jsdom and SSR, and the chart
   // draws with no colour at all rather than with the wrong one.
   it("mirrors every token any chartColor call site asks for", () => {
-    const offenders = [...CALL_SITE_TOKENS]
-      .filter((token) => !UNMIRRORED_BY_DESIGN.has(token) && !FALLBACKS.has(token))
-      .sort();
+    const offenders = [...CALL_SITE_TOKENS].filter((token) => !FALLBACKS.has(token)).sort();
     expect(offenders).toEqual([]);
   });
 
@@ -199,11 +188,6 @@ describe("chartTheme FALLBACKS", () => {
     const tokens = readMapClassTokens();
     expect(tokens.length).toBeGreaterThanOrEqual(9);
     expect(tokens.filter((token) => !FALLBACKS.has(token)).sort()).toEqual([]);
-  });
-
-  it("leaves the deliberately unmirrored tokens out of the map", () => {
-    const offenders = [...UNMIRRORED_BY_DESIGN].filter((token) => FALLBACKS.has(token));
-    expect(offenders).toEqual([]);
   });
 
   // A stale value is the worse failure of the two: it renders confidently wrong.
