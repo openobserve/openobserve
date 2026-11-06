@@ -23,6 +23,7 @@ import alertCalibration, {
   type UpdateAlertCalibrationConfig,
 } from "./alert_calibration";
 import { alertCalibrationKeys } from "./alert_calibration.querykeys";
+import { autoobserveKeys } from "./autoobserve.querykeys";
 import {
   LIST_MAX_PAGES,
   LIST_PAGE,
@@ -182,7 +183,8 @@ export const dismissFindingMutation = (org: string) =>
     mutationFn: async ({ findingId, body }: { findingId: string; body: DismissBody }) =>
       (await alertCalibration.dismissFinding(org, findingId, body)).data,
     meta: {
-      invalidates: [alertCalibrationKeys.dismissals(org)],
+      // The AutoObserve rail lists the same findings, so both surfaces drop or restore it at once.
+      invalidates: [alertCalibrationKeys.dismissals(org), autoobserveKeys.suggestions(org)],
       awaitInvalidation: true,
       silentError: true,
     },
@@ -193,7 +195,7 @@ export const reopenDismissalMutation = (org: string) =>
     mutationFn: async ({ id, revision }: { id: string; revision: number }) =>
       (await alertCalibration.reopenDismissal(org, id, revision)).data,
     meta: {
-      invalidates: [alertCalibrationKeys.dismissals(org)],
+      invalidates: [alertCalibrationKeys.dismissals(org), autoobserveKeys.suggestions(org)],
       awaitInvalidation: true,
       silentError: true,
     },

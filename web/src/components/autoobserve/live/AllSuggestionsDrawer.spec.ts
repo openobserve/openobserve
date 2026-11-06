@@ -22,6 +22,8 @@ import { queryClient } from "@/composables/query/queryClient";
 import autoobserve, { type AutoObserveSuggestion } from "@/services/autoobserve";
 import OTable from "@/lib/core/Table/OTable.vue";
 import AllSuggestionsDrawer from "./AllSuggestionsDrawer.vue";
+import config from "@/aws-exports";
+import router from "@/test/unit/helpers/router";
 
 vi.mock("@/services/autoobserve", () => ({
   default: { coverage: vi.fn(), suggestions: vi.fn() },
@@ -341,10 +343,102 @@ describe("AllSuggestionsDrawer: a monitor that notifies no one (demo bug 4)", ()
     expect(kind.props("variant")).toBe("error-soft");
     expect(
       wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-gap"]').props("variant"),
-    ).toBe("default-soft");
+    ).toBe("warning-soft");
     expect(wrapper.get('[data-test="autoobserve2-suggestions-note-silent"]').text()).toBe(
       "svc-no-data would notice svc-y stopping, but it notifies no one. Give it a destination.",
     );
     expect(wrapper.find('[data-test="autoobserve2-suggestions-note-gap"]').exists()).toBe(false);
+  });
+});
+
+describe("AllSuggestionsDrawer: Next step and the row's Details (test 15)", () => {
+  const NOT_WORKING_ID = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+
+  const notWorking = (over: Partial<AutoObserveSuggestion> = {}): AutoObserveSuggestion => ({
+    id: NOT_WORKING_ID,
+    org: "default",
+    analyzer: "alert_calibration",
+    kind: "alert_not_working",
+    subject: { kind: "alert", key_dims: { entity_id: "a2" } },
+    evidence: {
+      alert_name: "payments-latency",
+      pattern: "field_missing",
+      rule_id: "failure",
+      finding_id: NOT_WORKING_ID,
+      field: "duration_ms",
+      evaluation_errors: 4,
+      evaluations: 9,
+      severity: "high",
+      run_window_start: 1_762_000_000_000_000,
+      run_window_end: 1_762_300_000_000_000,
+    },
+    score: null,
+    confidence: "suggestive",
+    status: "proposed",
+    decided_score: null,
+    on_accept: null,
+    tier: "A",
+    advice: "check_missing_field",
+    limitations: [],
+    actions: [{ type: "review_alert", alert_id: "a2", focus: "query" }],
+    ...over,
+  });
+
+  let enterprise: string;
+
+  beforeEach(() => {
+    enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    api.mockReset();
+    setOrg("org-a");
+  });
+
+  afterEach(() => {
+    config.isEnterprise = enterprise;
+    store.commit("setSelectedOrganization", originalOrg);
+  });
+
+  it("puts the CTA in Next step, the red chip in Kind, and Details in the expanded row", async () => {
+    api.mockResolvedValueOnce({
+      data: { suggestions: [notWorking(), suggestion("gap")], total: 2, limit: 25, offset: 0 },
+    } as never);
+    const wrapper = mount(AllSuggestionsDrawer, {
+      props: { open: true },
+      attachTo: document.body,
+      global: { plugins: [i18n, store, router], stubs: { ODrawer: DrawerStub } },
+    });
+    await flushPromises();
+    const headers = (wrapper.findComponent(OTable).props("columns") as { header: string }[]).map(
+      (c) => c.header,
+    );
+    expect(headers.at(-1)).toBe("Next step");
+    const kind = wrapper.findComponent(
+      `[data-test="autoobserve2-suggestions-kind-${NOT_WORKING_ID}"]`,
+    );
+    expect(kind.text()).toBe("Not working");
+    expect(kind.props("variant")).toBe("error-soft");
+    expect(
+      wrapper.get(`[data-test="autoobserve2-suggestions-next-${NOT_WORKING_ID}"]`).text(),
+    ).toBe("Review query");
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-next-gap"]').exists()).toBe(false);
+    const details = `[data-test="insight-block-${NOT_WORKING_ID}-details"]`;
+    expect(wrapper.find(details).exists()).toBe(false);
+    await wrapper
+      .get(`[data-test="autoobserve2-suggestions-next-${NOT_WORKING_ID}"]`)
+      .element.closest("tr")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(wrapper.get(details).text()).toContain(
+      "Check the field the query filters on: none of its streams has it.",
+    );
+    expect(wrapper.get(`[data-test="insight-block-${NOT_WORKING_ID}-dismiss"]`).text()).toBe(
+      "Dismiss…",
+    );
+    await wrapper.get(`[data-test="insight-block-${NOT_WORKING_ID}-dismiss"]`).trigger("click");
+    await flushPromises();
+    expect(
+      document.body.querySelectorAll('[data-test="alert-calibration-dismiss-dialog"]'),
+    ).toHaveLength(1);
+    wrapper.unmount();
   });
 });

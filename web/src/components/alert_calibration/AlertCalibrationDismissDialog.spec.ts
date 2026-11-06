@@ -150,7 +150,9 @@ describe("AlertCalibrationDismissDialog", () => {
     expect(byTest("alert-calibration-dismiss-dialog")?.textContent).toContain(
       "Dismiss finding on ops_cpu",
     );
-    expect(notice()?.textContent).toContain('Hides "No destination" for this alert');
+    expect(notice()?.textContent).toMatch(
+      /^\s*Hidden for everyone in default Organization until \w{3} \d{1,2}, \d{4}, then shown again if it still fails\. Recorded with your name and reason\. Undo from Dismissed\.\s*$/,
+    );
     expect(notice()?.getAttribute("data-severity")).toBe("default");
     expect(byTest("alert-calibration-dismiss-ends")?.textContent).toContain("Hidden until");
     await chooseReason("other");
@@ -208,8 +210,9 @@ describe("AlertCalibrationDismissDialog", () => {
     await submit();
     expect(wrapper?.props("open")).toBe(false);
     expect(toast).toHaveBeenCalledWith({
-      message: "Dismissed until Feb 3, 2027. Find it under Dismissed.",
+      message: "Dismissed until Feb 3, 2027: ops_cpu.",
       variant: "success",
+      action: { label: "Undo", handler: expect.any(Function) },
     });
     expect(vi.mocked(alertCalibration.dismissFinding).mock.calls[0][2]).toEqual({
       rule_id: "no_destination",
@@ -249,5 +252,25 @@ describe("AlertCalibrationDismissDialog", () => {
     expect(notice()?.getAttribute("data-severity")).toBe("error");
     expect(notice()?.textContent).toContain(t("alertCalibration.dismiss.error.gone"));
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the scope changes with the chosen duration, and that until reopened has no date", async () => {
+    await mountDialog();
+    await chooseDuration("until_reopened");
+    expect(notice()?.textContent?.trim()).toBe(
+      "Hidden for everyone in default Organization until someone reopens it. Recorded with your name and reason. Undo from Dismissed.",
+    );
+  });
+
+  it("offers the m13 reasons in their words", async () => {
+    await mountDialog();
+    const label = (reason: string) =>
+      byTest(`alert-calibration-dismiss-reason-${reason}`)?.closest("label")?.textContent?.trim() ??
+      document.body
+        .querySelector(`[data-test="alert-calibration-dismiss-reason-${reason}"]`)
+        ?.parentElement?.textContent?.trim();
+    expect(label("not_useful")).toContain("Not needed");
+    expect(label("false_positive")).toContain("Wrong: this didn't happen");
+    expect(label("known_issue")).toContain("Will fix later");
   });
 });

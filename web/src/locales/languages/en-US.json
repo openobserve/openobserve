@@ -11458,13 +11458,14 @@
       "button": "Dismiss",
       "title": "Dismiss finding on {alert}",
       "alertFallback": "this alert",
-      "scope": "Hides \"{finding}\" for this alert from the next runs. The alert itself does not change.",
+      "scopeUntil": "Hidden for everyone in {org} until {date}, then shown again if it still fails. Recorded with your name and reason. Undo from Dismissed.",
+      "scopeNoEnd": "Hidden for everyone in {org} until someone reopens it. Recorded with your name and reason. Undo from Dismissed.",
       "reason": "Reason",
       "reasons": {
         "expected": "Expected for this alert",
-        "known_issue": "Known issue, handled elsewhere",
-        "not_useful": "Correct, but not worth acting on",
-        "false_positive": "The finding is wrong",
+        "known_issue": "Will fix later",
+        "not_useful": "Not needed",
+        "false_positive": "Wrong: this didn't happen",
         "other": "Other"
       },
       "reasonUnknown": "Another reason",
@@ -11479,6 +11480,9 @@
       "endsNever": "Hidden until someone reopens it.",
       "saved": "Dismissed until {date}. Find it under Dismissed.",
       "savedNoEnd": "Dismissed until reopened. Find it under Dismissed.",
+      "savedUndo": "Dismissed until {date}: {alert}.",
+      "savedUndoNoEnd": "Dismissed until reopened: {alert}.",
+      "undo": "Undo",
       "error": {
         "denied": "You don't have permission to dismiss findings. Ask an admin for edit access to Alert Calibration.",
         "gone": "This alert no longer exists, or you can no longer see it. The page was refreshed.",
@@ -34010,6 +34014,43 @@
         "review": "Opened from an AutoObserve suggestion.",
         "applied": "Suggested by AutoObserve: {changes}. Review, then click Save."
       }
+    },
+    "chip": {
+      "notWorking": "Not working"
+    },
+    "labels": {
+      "why": "Why",
+      "next": "Next",
+      "details": "Details",
+      "nextStep": "Next step"
+    },
+    "alert": {
+      "why": "{failed} of {total} run failed since {time} with {errorType}; the last good run was {lastGood}. | {failed} of {total} runs failed since {time} with {errorType}; the last good run was {lastGood}.",
+      "whyNever": "{failed} of {total} run failed since {time}, so it cannot fire. | {failed} of {total} runs failed since {time}, so it cannot fire.",
+      "whyCount": "{failed} of {total} run failed in the last calibration window. | {failed} of {total} runs failed in the last calibration window.",
+      "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
+      "errorType": {
+        "stream_missing": "stream-not-found errors",
+        "field_missing": "field-not-found errors",
+        "syntax": "query syntax errors",
+        "resource_timeout": "timeouts",
+        "resource_memory": "out-of-memory errors",
+        "other": "errors"
+      }
+    },
+    "actions": {
+      "openInLogs": "Open in Logs",
+      "openInCalibration": "Open in Alert calibration",
+      "dismiss": "Dismiss…"
+    },
+    "note": {
+      "reviewQuery": "Opens the alert editor at the query. Nothing is saved until you save.",
+      "reviewThreshold": "Opens the alert editor at the threshold. Nothing is saved until you save.",
+      "reviewSettings": "Opens the alert editor at its settings. Nothing is saved until you save.",
+      "reviewAlert": "Opens the alert editor. Nothing is saved until you save.",
+      "openInLogs": "Opens Logs on {stream}, from an hour before its last data.",
+      "openInLogsRun": "Opens Logs on {stream} over the window the last run checked.",
+      "openInLogsHour": "Opens Logs on {stream} for the last hour."
     }
   }
 }

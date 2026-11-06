@@ -273,7 +273,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
-import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import {
@@ -310,11 +309,10 @@ import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
 import { dismissalCopy, isDismissable, type DismissalView } from "./dismissals";
-import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
+import { openAlertReview } from "./reviewAlert";
 import {
   applyCopy,
   applySuggestionsOf,
-  toEditHandoff,
   type ApplySuggestion,
   type ReviewAlertAction,
 } from "./applySuggestion";
@@ -441,16 +439,11 @@ onBeforeUnmount(() => {
   unmounted = true;
 });
 
-/** The same tab, so the editor's Cancel comes back to this finding (P6-D10). */
 const openReview = async (key: string, action: ReviewAlertAction) => {
   if (reviewPending.value) return;
   reviewPending.value = key;
-  // Looked up on click, not per card: a digest page can hold many cards.
-  const folder = await alertFolderOf(orgId.value, action.alert_id, props.finding.alert_name);
+  await openAlertReview(router, orgId.value, action, props.finding, () => !unmounted);
   reviewPending.value = null;
-  if (unmounted) return;
-  writeAlertEditHandoff(toEditHandoff(action, props.finding));
-  void router.push(editAlertRoute(orgId.value, action.alert_id, folder));
 };
 
 /** A v2 record carries typed actions only; its `actions` column is never read. Apply comes first. */

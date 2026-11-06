@@ -147,7 +147,7 @@ describe("alert_not_working cards (P5b test 27)", () => {
     expect(text(ITEMS[5])).toBeNull();
   });
 
-  it("renders High amber, the tier neutral, the run time, and no raw pattern, code or id", async () => {
+  it("renders the tier neutral, the run time in Details, and no raw pattern, code or id", async () => {
     const wrapper = mount(LiveSuggestions, {
       props: { rail: rail(ITEMS), skeleton: false },
       global: { plugins: [i18n, store, router] },
@@ -156,14 +156,15 @@ describe("alert_not_working cards (P5b test 27)", () => {
     expect(String(first?.label)).toBe("Alert not working");
     expect(String(first?.why)).toBe("From the calibration run 2 hours ago");
     expect(first?.tags.map((tag) => [String(tag.label), tag.variant])).toEqual([
-      ["High", "warning-soft"],
       ["Confirmed condition", "default-soft"],
     ]);
     const medium = rail(ITEMS).requests[2].copy;
     expect(medium?.tags.map((tag) => [String(tag.label), tag.variant])).toEqual([
-      ["Medium", "default-soft"],
       ["Investigate", "default-soft"],
     ]);
+    for (const toggle of wrapper.findAll('[data-test$="-details-toggle"]')) {
+      await toggle.trigger("click");
+    }
     const text = wrapper.text();
     expect(text).toContain("checkout-errors reads logs/checkout, which doesn't exist");
     expect(text).toContain("From the calibration run 2 hours ago");
@@ -177,20 +178,14 @@ describe("alert_not_working cards (P5b test 27)", () => {
     ]) {
       expect(text).not.toContain(raw);
     }
-    for (const more of wrapper.findAll('[data-test^="autoobserve2-request-more-"]')) {
-      await more.trigger("click");
-    }
-    expect(wrapper.text()).not.toContain("future_advice");
-    expect(wrapper.text()).toContain("The engine sent no more detail.");
+    expect(text).not.toContain("future_advice");
   });
 
-  it("gives the drawer row the same headline, kind and severity", () => {
+  it("gives the drawer row the same headline and the red Not working chip, with no High tag", () => {
     const [row] = toSuggestionRows(gt, ZONE, [ITEMS[0]]);
     expect(String(row.headline)).toBe("checkout-errors reads logs/checkout, which doesn't exist");
-    expect(String(row.kind)).toBe("Alert not working");
-    expect(row.severity && [String(row.severity.label), row.severity.variant]).toEqual([
-      "High",
-      "warning-soft",
-    ]);
+    expect(String(row.kind)).toBe("Not working");
+    expect(row.kindVariant).toBe("error-soft");
+    expect(row.severity).toBeNull();
   });
 });

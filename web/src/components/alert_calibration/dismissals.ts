@@ -16,7 +16,14 @@
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { httpStatus } from "@/services/alert_calibration";
-import { countOrDash, schemaVersion, type FindingRecord, type RunRow } from "./digests";
+import type { AutoObserveSuggestion } from "@/services/autoobserve";
+import {
+  countOrDash,
+  schemaVersion,
+  type FindingRecord,
+  type RuleId,
+  type RunRow,
+} from "./digests";
 import { ERROR_CLASS_LABEL, isRuleId, ruleLabelKey, type NotWorkingPattern } from "./rules";
 
 /** The server's reasons (ENT dismissals.rs `DismissReason`). */
@@ -110,6 +117,11 @@ export type DismissableFinding = FindingRecord & {
   scope_key: string;
 };
 
+export type DismissTarget = Pick<
+  DismissableFinding,
+  "finding_id" | "rule_id" | "pattern" | "scope_kind" | "scope_key" | "alert_name"
+>;
+
 /** A type, not an interface, so it satisfies the form's `Record<string, unknown>` bound. */
 export type DismissForm = {
   reason: string;
@@ -132,6 +144,9 @@ export interface ReopenResult {
 export const isDismissReason = (value: unknown): value is DismissReason =>
   typeof value === "string" && (DISMISS_REASONS as readonly string[]).includes(value);
 
+const isDismissableRule = (rule: unknown): rule is RuleId =>
+  typeof rule === "string" && isRuleId(rule) && rule !== "scheduler_health";
+
 /** What the server accepts (P4-D5): a v2 per-alert finding of a known rule that names an alert. */
 export function isDismissable(record: FindingRecord): record is DismissableFinding {
   return (
@@ -140,15 +155,32 @@ export function isDismissable(record: FindingRecord): record is DismissableFindi
     FINDING_ID.test(record.finding_id) &&
     record.scope_kind === "alert" &&
     !!record.scope_key &&
-    isRuleId(record.rule_id) &&
-    record.rule_id !== "scheduler_health"
+    isDismissableRule(record.rule_id)
   );
+}
+
+export function dismissableOf(
+  item: Pick<AutoObserveSuggestion, "kind" | "evidence" | "subject">,
+): DismissTarget | null {
+  if (item.kind !== "alert_not_working") return null;
+  const { finding_id, rule_id, pattern, alert_name } = item.evidence;
+  const scopeKey = item.subject.key_dims.entity_id;
+  if (typeof finding_id !== "string" || !FINDING_ID.test(finding_id)) return null;
+  if (!isDismissableRule(rule_id) || !scopeKey) return null;
+  return {
+    finding_id,
+    rule_id,
+    ...(typeof pattern === "string" && pattern ? { pattern } : {}),
+    scope_kind: "alert",
+    scope_key: scopeKey,
+    ...(typeof alert_name === "string" && alert_name ? { alert_name } : {}),
+  };
 }
 
 /** Code points, as the server counts with `chars().count()`. */
 export const noteLength = (note: string): number => Array.from(note.trim()).length;
 
-export function dismissBodyOf(finding: DismissableFinding, form: DismissForm): DismissBody {
+export function dismissBodyOf(finding: DismissTarget, form: DismissForm): DismissBody {
   const note = form.note.trim();
   return {
     rule_id: finding.rule_id,
@@ -281,7 +313,13 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
       t("alertCalibration.dismiss.title", {
         alert: alert ? raw(alert) : t("alertCalibration.dismiss.alertFallback"),
       }),
-    scope: (finding: I18nText) => t("alertCalibration.dismiss.scope", { finding }),
+    scopeLine: (org: string, duration: DismissDuration, nowMs: number): I18nText =>
+      duration === "until_reopened"
+        ? t("alertCalibration.dismiss.scopeNoEnd", { org: raw(org) })
+        : t("alertCalibration.dismiss.scopeUntil", {
+            org: raw(org),
+            date: date((nowMs + Number(duration) * 86_400_000) * 1000),
+          }),
     durationLabel: (duration: DismissDuration): I18nText =>
       duration === "until_reopened"
         ? t("alertCalibration.dismiss.untilReopened")
@@ -297,6 +335,13 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
       view.expires_at === null
         ? t("alertCalibration.dismiss.savedNoEnd")
         : t("alertCalibration.dismiss.saved", { date: date(view.expires_at) }),
+    savedWithUndo: (view: Pick<DismissalView, "expires_at">, alert: string | null | undefined) => {
+      const name = alert ? raw(alert) : t("alertCalibration.dismiss.alertFallback");
+      return view.expires_at === null
+        ? t("alertCalibration.dismiss.savedUndoNoEnd", { alert: name })
+        : t("alertCalibration.dismiss.savedUndo", { alert: name, date: date(view.expires_at) });
+    },
+    undo: () => t("alertCalibration.dismiss.undo"),
     filterDismissed: (total: number | null): I18nText =>
       total === null
         ? t("alertCalibration.dismiss.filterDismissed", { count: raw("—") })

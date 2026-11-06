@@ -106,10 +106,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span v-else class="text-text-muted">—</span>
         </template>
+        <template #cell-next="{ row }">
+          <OButton
+            v-if="row.insight.cta"
+            variant="outline"
+            size="xs"
+            class="max-w-full"
+            :title="row.insight.cta.label"
+            :loading="pendingId === row.id"
+            :data-test="`autoobserve2-suggestions-next-${row.id}`"
+            @click.stop="run(row.id, row.insight.cta)"
+          >
+            {{ row.insight.cta.label }}
+          </OButton>
+          <span v-else class="text-text-muted">—</span>
+        </template>
         <template #expansion="{ row }">
-          <p class="text-text-body px-4 py-3 text-sm leading-relaxed text-pretty">
-            {{ say(t, row.detail) }}
-          </p>
+          <div class="max-md:sticky max-md:start-0 max-md:max-w-[calc(100vw-2rem)]">
+            <InsightBlock
+              :parts="row.insight"
+              variant="details"
+              :pending="pendingId === row.id"
+              @cta="(cta) => run(row.id, cta)"
+              @secondary="(cta) => run(row.id, cta)"
+              @dismiss="dismiss(row.insight)"
+            />
+          </div>
         </template>
         <template #empty>
           <div
@@ -128,6 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+    <AlertCalibrationDismissDialog
+      v-if="dismissTarget"
+      v-model:open="dismissOpen"
+      :finding="dismissTarget"
+    />
   </ODrawer>
 </template>
 
@@ -138,12 +165,15 @@ import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { autoobserveSuggestionsPageQuery } from "@/services/autoobserve.queries";
-import { say } from "../v2/fixtures";
+import InsightBlock from "../insight/InsightBlock.vue";
+import { useInsightActions } from "../insight/useInsightActions";
+import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
 import { toSuggestionRows, type SuggestionRow } from "./liveAdapter";
@@ -164,6 +194,7 @@ const emit = defineEmits<{ "update:open": [value: boolean] }>();
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const zone = useLiveZone();
+const { run, dismiss, pendingId, dismissTarget, dismissOpen } = useInsightActions();
 const page = ref(1);
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
@@ -240,5 +271,6 @@ const columns = computed<OTableColumnDef<SuggestionRow>[]>(() => [
   },
   { id: "kind", header: t("autoobserveLive.suggestions.columns.kind"), size: 150 },
   { id: "severity", header: t("autoobserveLive.suggestions.columns.severity"), size: 100 },
+  { id: "next", header: t("insight.labels.nextStep"), size: 190 },
 ]);
 </script>

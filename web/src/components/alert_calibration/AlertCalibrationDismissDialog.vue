@@ -30,16 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OForm :id="formId" :form="form">
       <div class="flex flex-col gap-4">
-        <!-- Two lines tall at rest, so a longer notice never moves the fields below. -->
         <OBanner
           dense
-          class="min-h-15 justify-center"
+          class="min-h-20 justify-center"
           :variant="notice?.variant ?? 'default'"
           :icon="NOTICE_ICON[notice?.variant ?? 'default']"
           :data-severity="notice?.variant ?? 'default'"
           data-test="alert-calibration-dismiss-notice"
         >
-          {{ notice?.text ?? copy.scope(copy.findingLabel(finding.rule_id, finding.pattern)) }}
+          {{ notice?.text ?? copy.scopeLine(orgName, duration, openedAt) }}
         </OBanner>
 
         <div class="flex flex-col gap-1">
@@ -95,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
+import { useStore } from "vuex";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -112,6 +112,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { httpStatus } from "@/services/alert_calibration";
 import { dismissFindingMutation } from "@/services/alert_calibration.queries";
 import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
+import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
 import { dismissDefaults, makeDismissSchema } from "./AlertCalibrationDismissDialog.schema";
 import {
   dismissalCopy,
@@ -119,8 +120,8 @@ import {
   DISMISS_REASONS,
   DURATION_OPTIONS,
   NOTE_MAX_CHARS,
-  type DismissableFinding,
   type DismissForm,
+  type DismissTarget,
   type WriteNotice,
 } from "./dismissals";
 
@@ -128,7 +129,7 @@ const NOTICE_ICON = { default: "info", error: "error", warning: "warning" } as c
 
 const props = defineProps<{
   open: boolean;
-  finding: DismissableFinding;
+  finding: DismissTarget;
   /** Re-reads the records behind the dialog after a 404 or 409. */
   refresh?: () => void;
 }>();
@@ -136,7 +137,10 @@ const emit = defineEmits<{ "update:open": [open: boolean] }>();
 
 const { t, locale } = useI18nTyped();
 const orgId = useOrgId();
+const store = useStore();
 const queryClient = useQueryClient();
+const { reopen } = useReopenDismissal();
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || orgId.value);
 const copy = computed(() => dismissalCopy(t, locale.value));
 const formId = `alert-calibration-dismiss-${useId()}`;
 const dismiss = useMutation(() => dismissFindingMutation(orgId.value));
@@ -165,7 +169,12 @@ async function submit(values: DismissForm) {
     });
     notice.value = null;
     emit("update:open", false);
-    toast({ message: copy.value.saved(view), variant: "success" });
+    const alert = props.finding.alert_name;
+    toast({
+      message: copy.value.savedWithUndo(view, alert),
+      variant: "success",
+      action: { label: copy.value.undo(), handler: () => void reopen(view) },
+    });
   } catch (error) {
     notice.value = copy.value.writeError(error);
     const status = httpStatus(error);

@@ -13,8 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+
+vi.mock("@/services/alert_calibration", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      dismissFinding: vi.fn(),
+      reopenDismissal: vi.fn(),
+      listDismissals: vi.fn(),
+    },
+  };
+});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/components/alert_calibration/alertEditorLink", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/alert_calibration/alertEditorLink")>()),
+  alertFolderOf: vi.fn(),
+}));
+vi.mock("@/utils/alerts/alertPrefillStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/alerts/alertPrefillStorage")>()),
+  writeAlertEditHandoff: vi.fn(),
+}));
+
+import config from "@/aws-exports";
+import alertCalibration from "@/services/alert_calibration";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { queryClient } from "@/composables/query/queryClient";
+import { autoobserveKeys } from "@/services/autoobserve.querykeys";
+import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
+import { alertFolderOf, editAlertRoute } from "@/components/alert_calibration/alertEditorLink";
+import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
+import { byTest } from "@/test/unit/helpers/draftDom";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -36,6 +68,38 @@ const suggestion = (id: string): AutoObserveSuggestion => ({
   status: "proposed",
   decided_score: null,
   on_accept: null,
+});
+
+const NOT_WORKING_ID = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+
+const notWorking = (over: Partial<AutoObserveSuggestion> = {}): AutoObserveSuggestion => ({
+  id: NOT_WORKING_ID,
+  org: "default",
+  analyzer: "alert_calibration",
+  kind: "alert_not_working",
+  subject: { kind: "alert", key_dims: { entity_id: "a2" } },
+  evidence: {
+    alert_name: "payments-latency",
+    pattern: "field_missing",
+    rule_id: "failure",
+    finding_id: NOT_WORKING_ID,
+    field: "duration_ms",
+    evaluation_errors: 4,
+    evaluations: 9,
+    severity: "high",
+    run_window_start: 1_762_000_000_000_000,
+    run_window_end: 1_762_300_000_000_000,
+  },
+  score: null,
+  confidence: "suggestive",
+  status: "proposed",
+  decided_score: null,
+  on_accept: null,
+  tier: "A",
+  advice: "check_missing_field",
+  limitations: [],
+  actions: [{ type: "review_alert", alert_id: "a2", focus: "query" }],
+  ...over,
 });
 
 const rail = (count: number, total: number, over: Partial<RailSource> = {}): RailSource => ({
@@ -61,7 +125,7 @@ const mountRail = (source: RailSource, skeleton = false) =>
   });
 
 const cards = (wrapper: ReturnType<typeof mountRail>) =>
-  wrapper.findAll('[data-test^="autoobserve2-request-headline-"]');
+  wrapper.findAll('[data-test^="insight-block-"][data-test$="-headline"]');
 
 const countChip = (wrapper: ReturnType<typeof mountRail>) => {
   const chip = wrapper.find("header > span");
@@ -222,7 +286,7 @@ describe("LiveSuggestions rail: a monitor that notifies no one (demo bug 4)", ()
         requests: toRequests(gt, { locale: "en-US", timeZone: "UTC" }, [silent]),
       }),
     );
-    const card = wrapper.get('[data-test^="autoobserve2-request-"]');
+    const card = wrapper.get('[data-test="insight-block-s-silent"]');
     expect(card.find("article > span").classes()).toContain("bg-status-error-text");
     expect(card.find("article > span").classes()).not.toContain("bg-ingest-accent-amber");
     expect(card.text()).toContain("Notifies no one");
@@ -230,5 +294,230 @@ describe("LiveSuggestions rail: a monitor that notifies no one (demo bug 4)", ()
     expect(card.text()).toContain(
       "ops-pager takes tickets, not alerts. Add a webhook or email next to it; ops-pager stays.",
     );
+  });
+});
+
+describe("LiveSuggestions rail: one card shape for 0, 1, a few and many (test 16)", () => {
+  it("shows three cards with no footer, and seven as five plus 'and 2 more · See all 7'", () => {
+    const three = mountRail(rail(3, 3));
+    expect(cards(three)).toHaveLength(3);
+    expect(three.find('[data-test="autoobserve2-suggestions-see-all"]').exists()).toBe(false);
+    const seven = mountRail(rail(7, 7));
+    expect(cards(seven)).toHaveLength(5);
+    expect(seven.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 2 more");
+    expect(seven.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all 7");
+  });
+
+  it("keeps the CTA bar in the skeleton, so the cards land without a shift", () => {
+    const wrapper = mountRail(rail(0, 0, { status: "loading" }), true);
+    const card = wrapper.get('[data-test="autoobserve2-suggestions-skeleton"] li');
+    expect(card.find(".min-h-8").exists()).toBe(true);
+  });
+});
+
+describe("LiveSuggestions rail: a Not working alert acts (tests 10-14)", () => {
+  const block = (part: string) => `[data-test="insight-block-${NOT_WORKING_ID}-${part}"]`;
+  const VIEW = {
+    id: "d1",
+    rule_id: "failure",
+    pattern: "field_missing",
+    scope_kind: "alert",
+    scope_key: "a2",
+    state: "active",
+    revision: 3,
+    reason: "known_issue",
+    note: null,
+    has_note: false,
+    actor: "u-ops@example.com",
+    dismissed_at: 1,
+    duration_days: 30,
+    expires_at: new Date(2026, 11, 6).getTime() * 1000,
+    reopened_at: null,
+    reopened_by: null,
+    updated_at: 1,
+    alert_name: "payments-latency",
+  };
+  const settle = async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+    }
+  };
+  const click = async (selector: string) => {
+    const el = document.body.querySelector<HTMLElement>(selector);
+    if (!el) throw new Error(`missing ${selector}`);
+    el.click();
+    await settle();
+  };
+  let enterprise: string;
+  let wrapper: ReturnType<typeof mountRail> | null = null;
+  const mountItems = (items: AutoObserveSuggestion[]) => {
+    wrapper = mount(LiveSuggestions, {
+      props: {
+        rail: rail(0, items.length, {
+          requests: toRequests(gt, { locale: "en-US", timeZone: "UTC" }, items),
+        }),
+        skeleton: false,
+      },
+      attachTo: document.body,
+      global: { plugins: [i18n, store, router] },
+    });
+    return wrapper;
+  };
+  const dismissFromRail = async () => {
+    const rail = mountItems([notWorking()]);
+    await rail.get(block("details-toggle")).trigger("click");
+    await rail.get(block("dismiss")).trigger("click");
+    await settle();
+    expect(byTest("alert-calibration-dismiss-dialog")?.textContent).toContain("payments-latency");
+    await click('[data-test="alert-calibration-dismiss-reason-known_issue"]');
+    await click('[data-test="alert-calibration-dismiss-duration-option"][data-test-value="30"]');
+    await click('[data-test="alert-calibration-dismiss-submit"]');
+    return rail;
+  };
+
+  beforeEach(() => {
+    enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    queryClient.clear();
+    vi.mocked(toast).mockReset();
+    vi.mocked(alertFolderOf).mockReset();
+    vi.mocked(writeAlertEditHandoff).mockReset();
+    vi.mocked(alertCalibration.dismissFinding).mockReset();
+    vi.mocked(alertCalibration.reopenDismissal).mockReset();
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue({
+      data: { items: [], next_cursor: null, total: 0 },
+    } as never);
+  });
+
+  afterEach(() => {
+    config.isEnterprise = enterprise;
+    wrapper?.unmount();
+    wrapper = null;
+    vi.restoreAllMocks();
+  });
+
+  it("draws Not working red with its why, and keeps Details closed at first paint", () => {
+    const card = mountItems([notWorking()]);
+    expect(card.get(block("chip")).text()).toBe("Not working");
+    expect(card.find("article > span").classes()).toContain("bg-status-error-text");
+    expect(card.get(block("why")).text()).toBe(
+      "4 of 9 runs failed in the last calibration window.",
+    );
+    expect(card.find(block("details")).exists()).toBe(false);
+    expect(card.text()).not.toContain("High");
+  });
+
+  it("Review query reads the folder first, then opens the editor at the query (test 10, M-F)", async () => {
+    let answer: (folder: string | undefined) => void = () => undefined;
+    vi.mocked(alertFolderOf).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const card = mountItems([notWorking()]);
+    const cta = card.get(block("cta"));
+    expect(cta.text()).toBe("Review query");
+    await cta.trigger("click");
+    expect(alertFolderOf).toHaveBeenCalledWith("default", "a2", "payments-latency");
+    expect(cta.attributes("aria-busy")).toBe("true");
+    expect(writeAlertEditHandoff).not.toHaveBeenCalled();
+    answer("ops");
+    await flushPromises();
+    expect(writeAlertEditHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "calibration",
+        target: { alertId: "a2", findingId: NOT_WORKING_ID },
+        focus: "query",
+      }),
+    );
+    expect(push).toHaveBeenCalledWith(editAlertRoute("default", "a2", "ops"));
+    expect(cta.attributes("aria-busy")).not.toBe("true");
+  });
+
+  it("dismisses from Details once, refreshes the rail and toasts with Undo (test 11, M-I)", async () => {
+    vi.mocked(alertCalibration.dismissFinding).mockResolvedValue({ data: VIEW } as never);
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    await dismissFromRail();
+    expect(alertCalibration.dismissFinding).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(alertCalibration.dismissFinding).mock.calls[0]).toEqual([
+      "default",
+      NOT_WORKING_ID,
+      {
+        rule_id: "failure",
+        pattern: "field_missing",
+        scope_kind: "alert",
+        scope_key: "a2",
+        reason: "known_issue",
+        duration_days: 30,
+      },
+    ]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: autoobserveKeys.suggestions("default") });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: alertCalibrationKeys.dismissals("default"),
+    });
+    expect(toast).toHaveBeenCalledWith({
+      message: "Dismissed until Dec 6, 2026: payments-latency.",
+      variant: "success",
+      action: { label: "Undo", handler: expect.any(Function) },
+    });
+  });
+
+  it("Undo reopens the dismissal it made and refreshes both surfaces (test 12, M-R)", async () => {
+    vi.mocked(alertCalibration.dismissFinding).mockResolvedValue({ data: VIEW } as never);
+    vi.mocked(alertCalibration.reopenDismissal).mockResolvedValue({
+      data: { ...VIEW, state: "reopened", revision: 4 },
+    } as never);
+    await dismissFromRail();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const [{ action }] = vi.mocked(toast).mock.calls[0] as unknown as [
+      { action: { handler: () => void } },
+    ];
+    action.handler();
+    await settle();
+    expect(alertCalibration.reopenDismissal).toHaveBeenCalledWith("default", "d1", 3);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: autoobserveKeys.suggestions("default") });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: alertCalibrationKeys.dismissals("default"),
+    });
+  });
+
+  it("shows a refused dismissal in red in the dialog and keeps the card (test 13)", async () => {
+    vi.mocked(alertCalibration.dismissFinding).mockRejectedValue(
+      Object.assign(new Error("HTTP 403"), { response: { status: 403, data: {} } }),
+    );
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const card = await dismissFromRail();
+    const notice = byTest("alert-calibration-dismiss-notice");
+    expect(notice?.getAttribute("data-severity")).toBe("error");
+    expect(notice?.textContent).toContain("You don't have permission to dismiss findings.");
+    expect(toast).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalledWith({
+      queryKey: autoobserveKeys.suggestions("default"),
+    });
+    expect(card.find(block("cta")).exists()).toBe(true);
+  });
+
+  it("gives an AutoObserve alert row the CTA and no Dismiss… (test 14, M-D)", async () => {
+    const card = mountItems([
+      {
+        ...suggestion("blind-a7"),
+        kind: "blind_guardrail",
+        subject: { kind: "alert", key_dims: { entity_id: "a7" } },
+        evidence: {
+          monitor_name: "checkout-errors",
+          reason: { stream_missing: null },
+          detail: "logs/checkout",
+        },
+        actions: [{ type: "review_alert", alert_id: "a7", focus: "query" }],
+      },
+    ]);
+    expect(card.get('[data-test="insight-block-blind-a7-cta"]').text()).toBe("Review query");
+    await card.get('[data-test="insight-block-blind-a7-details-toggle"]').trigger("click");
+    expect(card.find('[data-test="insight-block-blind-a7-dismiss"]').exists()).toBe(false);
+  });
+
+  it("offers no button in the open-source build", () => {
+    config.isEnterprise = "false";
+    const card = mountItems([notWorking()]);
+    expect(card.find(block("cta")).exists()).toBe(false);
+    expect(card.get(block("why")).text()).toContain("4 of 9 runs failed");
   });
 });

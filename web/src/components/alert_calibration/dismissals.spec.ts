@@ -18,9 +18,11 @@ import en from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { FindingRecord } from "./digests";
+import type { AutoObserveSuggestion } from "@/services/autoobserve";
 import {
   dismissalCopy,
   dismissBodyOf,
+  dismissableOf,
   dismissedSinceRun,
   DISMISS_REASONS,
   DURATION_OPTIONS,
@@ -208,7 +210,10 @@ describe("dismissals", () => {
     rec.saved(view({ expires_at: null }));
     rec.title("ops_cpu");
     rec.title(null);
-    rec.scope(rec.findingLabel("noise"));
+    for (const duration of DURATION_OPTIONS) rec.scopeLine("Demo", duration, Date.now());
+    rec.savedWithUndo(view(), "ops_cpu");
+    rec.savedWithUndo(view({ expires_at: null }), null);
+    rec.undo();
     rec.button();
     rec.filterDismissed(3);
     rec.filterDismissed(null);
@@ -231,11 +236,81 @@ describe("dismissals", () => {
   it("fold_parts_join_actor_reason_and_until", () => {
     expect(copy.foldParts(view())).toEqual([
       "Dismissed by u-ops@example.com",
-      "Known issue, handled elsewhere",
+      "Will fix later",
       "Hidden until Feb 3, 2027",
     ]);
     expect(
       copy.foldParts(view({ reason: "made_up" as never, duration_days: null, expires_at: null })),
     ).toEqual(["Dismissed by u-ops@example.com", "Another reason", "Hidden until reopened"]);
+  });
+});
+
+describe("dismissableOf: a rail item of a calibration finding (test 9)", () => {
+  const item = (
+    evidence: Record<string, unknown> = {},
+    over: Partial<AutoObserveSuggestion> = {},
+  ): AutoObserveSuggestion => ({
+    id: ID,
+    org: "demo-org",
+    analyzer: "alert_calibration",
+    kind: "alert_not_working",
+    subject: { kind: "alert", key_dims: { entity_id: "a2" } },
+    evidence: {
+      alert_name: "payments-latency",
+      pattern: "field_missing",
+      rule_id: "failure",
+      finding_id: ID,
+      ...evidence,
+    },
+    score: null,
+    confidence: "suggestive",
+    status: "proposed",
+    decided_score: null,
+    on_accept: null,
+    ...over,
+  });
+
+  it("scopes the dismissal to the alert the item names, not to the item id (M-K)", () => {
+    const target = dismissableOf(item());
+    expect(target).toEqual({
+      finding_id: ID,
+      rule_id: "failure",
+      pattern: "field_missing",
+      scope_kind: "alert",
+      scope_key: "a2",
+      alert_name: "payments-latency",
+    });
+    expect(
+      dismissBodyOf(target as NonNullable<typeof target>, {
+        reason: "known_issue",
+        note: "",
+        duration: "30",
+      }),
+    ).toEqual({
+      rule_id: "failure",
+      pattern: "field_missing",
+      scope_kind: "alert",
+      scope_key: "a2",
+      reason: "known_issue",
+      duration_days: 30,
+    });
+  });
+
+  it("refuses what the server would refuse, and AutoObserve's own rows", () => {
+    expect(dismissableOf(item({ finding_id: "0b87270549" }))).toBeNull();
+    expect(dismissableOf(item({ finding_id: undefined }))).toBeNull();
+    expect(dismissableOf(item({ rule_id: "scheduler_health" }))).toBeNull();
+    expect(dismissableOf(item({ rule_id: "made_up" }))).toBeNull();
+    expect(dismissableOf(item({}, { subject: { kind: "alert", key_dims: {} } }))).toBeNull();
+    expect(dismissableOf(item({}, { kind: "blind_guardrail" }))).toBeNull();
+  });
+
+  it("leaves out a pattern or name it does not have", () => {
+    expect(dismissableOf(item({ pattern: undefined, alert_name: "" }))).toEqual({
+      finding_id: ID,
+      rule_id: "failure",
+      scope_kind: "alert",
+      scope_key: "a2",
+    });
   });
 });

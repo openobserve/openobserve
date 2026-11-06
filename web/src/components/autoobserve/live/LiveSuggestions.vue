@@ -39,18 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="i"
             class="border-border-subtle rounded-default flex flex-col gap-2 border py-3.5 ps-4 pe-3.5"
           >
-            <div class="flex items-start gap-3">
-              <OSkeleton type="circle" animation="none" class="size-8 shrink-0" />
-              <div class="flex flex-1 flex-col gap-2">
-                <OSkeleton animation="none" class="h-2.5 w-20" />
-                <OSkeleton animation="none" class="h-3 w-[90%]" />
-              </div>
-            </div>
+            <OSkeleton animation="none" class="h-4.5 w-20" />
+            <OSkeleton animation="none" class="h-3.5 w-[90%]" />
             <OSkeleton animation="none" class="h-3 w-full" />
             <OSkeleton animation="none" class="h-3 w-[70%]" />
-            <div class="flex gap-1.5">
-              <OSkeleton animation="none" class="h-4.5 w-10" />
-              <OSkeleton animation="none" class="h-4.5 w-24" />
+            <div class="flex min-h-8 items-center gap-2 pt-1">
+              <OSkeleton animation="none" class="h-7 w-28" />
+              <OSkeleton animation="none" class="ms-auto h-4 w-14" />
             </div>
           </li>
         </ul>
@@ -106,10 +101,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <ul class="flex flex-col gap-2.5 px-3 pb-3 sm:px-4">
         <li v-for="request in shown" :key="request.id">
-          <AskCard :request="request" />
+          <InsightBlock
+            :parts="request.insight"
+            :pending="pendingId === request.id"
+            @cta="(cta) => run(request.id, cta)"
+            @secondary="(cta) => run(request.id, cta)"
+            @dismiss="dismiss(request.insight)"
+          />
         </li>
       </ul>
     </template>
+    <AlertCalibrationDismissDialog
+      v-if="dismissTarget"
+      v-model:open="dismissOpen"
+      :finding="dismissTarget"
+    />
     <template v-if="beyond" #footer>
       <div class="flex items-center gap-2">
         <span
@@ -140,7 +146,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import SectionCard from "../v2/SectionCard.vue";
-import AskCard from "../v2/AskCard.vue";
+import InsightBlock from "../insight/InsightBlock.vue";
+import { useInsightActions } from "../insight/useInsightActions";
+import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
 import {
@@ -167,6 +175,7 @@ const props = defineProps<{ rail: RailSource; skeleton: boolean }>();
 const emit = defineEmits<{ "see-all": [] }>();
 
 const { t, locale } = useI18nTyped();
+const { run, dismiss, pendingId, dismissTarget, dismissOpen } = useInsightActions();
 
 const shown = computed(() => props.rail.requests.slice(0, RAIL_CAP));
 const settled = computed(() => !props.skeleton && props.rail.status === "ready");

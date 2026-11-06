@@ -147,7 +147,7 @@ export function applySuggestionsOf(record: DigestRecord): ApplySuggestion[] {
 /** The one handoff the editor reads; an apply carries its patch and focuses its first field. */
 export function toEditHandoff(
   action: ApplySuggestion | ReviewAlertAction,
-  finding: DigestRecord,
+  finding: Pick<DigestRecord, "finding_id">,
 ): AlertEditHandoff {
   const base = {
     version: ALERT_PREFILL_VERSION,

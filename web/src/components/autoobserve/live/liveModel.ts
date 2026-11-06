@@ -34,11 +34,11 @@ import {
   autoobserveSuggestionsPageQuery,
 } from "@/services/autoobserve.queries";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
-import type { Request } from "../v2/fixtures";
 import {
   toCoverageSource,
   toRequests,
   type CoverageSource,
+  type LiveRequest,
   type SourceState,
   type SourceStatus,
   type Zone,
@@ -56,7 +56,7 @@ import {
 import { PAGED_CAP, failedDetail } from "./incidentsCopy";
 
 export interface RailSource extends Required<SourceState> {
-  requests: Request[];
+  requests: LiveRequest[];
   total: number;
 }
 

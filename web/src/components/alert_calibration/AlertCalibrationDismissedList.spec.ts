@@ -114,7 +114,7 @@ describe("AlertCalibrationDismissedList", () => {
     expect(reopenButtons()).toHaveLength(1);
     expect(text()).toContain("ops_cpu");
     expect(text()).toContain("No destination");
-    expect(text()).toContain("Known issue, handled elsewhere");
+    expect(text()).toContain("Will fix later");
     expect(text()).toContain("Owned by the ingest team");
     expect(text()).toContain("Feb 3, 2027");
     expect(text()).toContain("u-ops@example.com, 2 hours ago");

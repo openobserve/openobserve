@@ -33,7 +33,7 @@ import {
   type LiveCheck,
   type Signal,
 } from "../fixtures";
-import type { Msg, Request, RequestCopy } from "../v2/fixtures";
+import { say, type Msg, type Request, type RequestCopy } from "../v2/fixtures";
 import type { LookKind } from "../v2/changes";
 import { TIER_LABEL } from "@/components/alert_calibration/format";
 import {
@@ -46,6 +46,7 @@ import {
   type LiveStale,
 } from "./liveCopy";
 import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
+import { insightCopy, type InsightParts, type InsightToday } from "../insight/insightCopy";
 
 export type SourceStatus = "loading" | "error" | "ready";
 
@@ -80,8 +81,11 @@ export interface Zone {
   timeZone: string;
 }
 
+export type LiveRequest = Request & { insight: InsightParts };
+
 export interface SuggestionRow {
   id: string;
+  insight: InsightParts;
   headline: I18nText;
   where: I18nText;
   kind: I18nText;
@@ -173,7 +177,7 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
     tag: "error-soft",
   },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
-  alert_not_working: { label: "alertCalibration.rules.notWorking", look: "fix" },
+  alert_not_working: { label: "alertCalibration.rules.notWorking", look: "notify" },
 };
 
 const NO_ABSENCE_KEY: Record<AutoObserveCellState, I18nKey> = {
@@ -668,14 +672,13 @@ const severityTag = (t: TranslateFn, s: AutoObserveSuggestion) => {
 
 const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] => {
   const tags: { label: I18nText; variant: BadgeVariant }[] = [];
-  const severity = severityTag(t, s);
-  if (severity) tags.push(severity);
-  // A calibration finding states its tier the way the calibration page does, not an evidence level.
   if (s.kind === "alert_not_working") {
     if (s.tier && Object.hasOwn(TIER_LABEL, s.tier))
       tags.push({ label: t(TIER_LABEL[s.tier]), variant: "default-soft" });
     return tags;
   }
+  const severity = severityTag(t, s);
+  if (severity) tags.push(severity);
   if (CONFIDENCE_KEY[s.confidence])
     tags.push({ label: t(CONFIDENCE_KEY[s.confidence]), variant: "default-soft" });
   return tags;
@@ -687,16 +690,32 @@ const firstOfEachId = (suggestions: AutoObserveSuggestion[]) => {
   return suggestions.filter((s) => !seen.has(s.id) && !!seen.add(s.id));
 };
 
+const todayOf = (t: TranslateFn, s: AutoObserveSuggestion, parts: Parts): InsightToday => ({
+  label: kindOf(t, s),
+  headline: parts.headline,
+  why: whyAndNext(t, parts),
+  body: say(t, parts.body),
+  tags: tagsFor(t, s),
+});
+
+export const insightOf = (
+  t: TranslateFn,
+  zone: Zone,
+  s: AutoObserveSuggestion,
+  nowMs = Date.now(),
+): InsightParts => insightCopy(t, zone, s, todayOf(t, s, partsFor(t, zone, s, nowMs)), nowMs);
+
 // The server ranks with sort=priority; the rail keeps that order so it matches the drawer row for row.
 export const toRequests = (
   t: TranslateFn,
   zone: Zone,
   suggestions: AutoObserveSuggestion[],
   nowMs = Date.now(),
-): Request[] =>
+): LiveRequest[] =>
   firstOfEachId(suggestions).map((s) => {
     const parts = partsFor(t, zone, s, nowMs);
     return {
+      insight: insightCopy(t, zone, s, todayOf(t, s, parts), nowMs),
       id: s.id,
       kind: "fromNowOn",
       body: parts.body,
@@ -722,17 +741,20 @@ export const toSuggestionRows = (
   t: TranslateFn,
   zone: Zone,
   suggestions: AutoObserveSuggestion[],
+  nowMs = Date.now(),
 ): SuggestionRow[] =>
   firstOfEachId(suggestions).map((s) => {
     const parts = partsFor(t, zone, s);
+    const insight = insightCopy(t, zone, s, todayOf(t, s, parts), nowMs);
     return {
       id: s.id,
+      insight,
       headline: parts.headline,
       where: whereOf(t, s),
-      kind: kindOf(t, s),
-      kindVariant: SUGGESTION_KIND[s.kind]?.tag ?? "default-soft",
+      kind: insight.chip.label,
+      kindVariant: insight.chip.variant,
       note: parts.next ? whyAndNext(t, parts) : null,
-      severity: severityTag(t, s),
+      severity: s.kind === "alert_not_working" ? null : severityTag(t, s),
       detail: parts.body,
     };
   });

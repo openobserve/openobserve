@@ -1042,7 +1042,7 @@ describe("AlertCalibrationFindingCard", () => {
     );
     const fold = folded.find('[data-test="alert-calibration-finding-fold"]');
     expect(fold.text()).toContain("Dismissed by u-ops@example.com");
-    expect(fold.text()).toContain("Known issue, handled elsewhere");
+    expect(fold.text()).toContain("Will fix later");
     expect(fold.text()).toContain("Hidden until Feb 3, 2027");
     expect(fold.find('[data-test="alert-calibration-finding-reopen"]').text()).toBe("Reopen");
     expect(folded.find("dl").exists()).toBe(false);

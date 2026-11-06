@@ -110,7 +110,7 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
       kind: "Coverage gap",
-      kindVariant: "default-soft",
+      kindVariant: "warning-soft",
       note: null,
       severity: { label: "High", variant: "warning-soft" },
     });
