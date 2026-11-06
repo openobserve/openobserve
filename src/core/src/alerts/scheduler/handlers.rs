@@ -512,6 +512,8 @@ struct GroupDispatchOutcome {
     // how many have transitioned to pending state
     pending: usize,
     errors: Vec<String>,
+    /// Firing groups no send was made for; a dropped page is not a destination failing.
+    undelivered: Vec<String>,
     /// Whether any group's send dispatched a destination or workflow.
     attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
@@ -542,6 +544,17 @@ impl GroupDispatchOutcome {
         if let Some(acked_by) = self.acked_by.clone() {
             row.acked_by = Some(acked_by);
         }
+    }
+
+    /// Everything the evaluation's record should say went wrong, failed sends first.
+    fn record_error(&self) -> Option<String> {
+        let parts: Vec<&str> = self
+            .errors
+            .iter()
+            .chain(&self.undelivered)
+            .map(String::as_str)
+            .collect();
+        (!parts.is_empty()).then(|| parts.join("; "))
     }
 
     /// The evaluation's record: any undelivered destination is a delivery failure.
@@ -636,6 +649,7 @@ async fn dispatch_per_group(
             fired: 0,
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
+            undelivered: Vec::new(),
             attempted: false,
             state_failed: true,
             downtime_id: None,
@@ -655,6 +669,7 @@ async fn dispatch_per_group(
                 fired: 0,
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
+                undelivered: Vec::new(),
                 attempted: false,
                 state_failed: true,
                 downtime_id: None,
@@ -689,6 +704,7 @@ async fn dispatch_per_group(
     let acked_groups =
         crate::alerts::ack::in_force_by_group(&alert.org_id, &alert_id, &states).await;
 
+    let max_sends = cfg.limit.alert_max_group_notifications_per_eval;
     // Downtime first, then ack; an ack never holds back a real level increase (R-119).
     let plan = plan_dispatch(
         classification,
@@ -696,7 +712,7 @@ async fn dispatch_per_group(
         &rows,
         &alert.trigger_condition,
         now_micros(),
-        cfg.limit.alert_max_group_notifications_per_eval,
+        max_sends,
         alert.suppresses_repeats(),
         |key, decision, last_notified| {
             muted_groups.contains_key(key)
@@ -712,7 +728,7 @@ async fn dispatch_per_group(
             "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group notification(s) dropped by \
              ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL={}: {:?}",
             plan.dropped_by_knob.len(),
-            cfg.limit.alert_max_group_notifications_per_eval,
+            max_sends,
             plan.dropped_by_knob
         );
     }
@@ -752,10 +768,13 @@ async fn dispatch_per_group(
         downtime_id.get_or_insert(downtime.id.clone());
     }
     // Groups with nowhere to send open no silence window for a later destination to inherit.
-    let items: &[_] = if has_delivery_target(alert) {
-        &plan.items
+    let (items, undelivered): (&[_], _) = if has_delivery_target(alert) {
+        (
+            &plan.items,
+            plan.undelivered_notes(classification, max_sends),
+        )
     } else {
-        &[]
+        (&[], Vec::new())
     };
     for item in items {
         // The plan already moved muted groups out; this only guards a send.
@@ -877,9 +896,10 @@ async fn dispatch_per_group(
     );
     Some(GroupDispatchOutcome {
         failed,
-        fired: plan.items.len(),
+        fired: plan.not_withheld(),
         pending: plan.pending,
         errors,
+        undelivered,
         attempted,
         state_failed: false,
         downtime_id,
@@ -4400,8 +4420,8 @@ async fn handle_alert_triggers(
             if let Some(status) = dispatch.history_status() {
                 trigger_data_stream.status = status;
             }
-            if !dispatch.errors.is_empty() {
-                trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            if let Some(error) = dispatch.record_error() {
+                trigger_data_stream.error = Some(error);
             }
 
             dispatch.record_downtime(&mut trigger_data_stream);
@@ -7777,6 +7797,7 @@ mod tests {
             fired: delivered + failed,
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
+            undelivered: Vec::new(),
             attempted: false,
             state_failed: false,
             downtime_id: None,
@@ -7833,6 +7854,30 @@ mod tests {
             assert_eq!(dispatch.history_status(), history, "{case}");
             assert_eq!(dispatch.rollup_rewrite(), rollup, "{case}");
         }
+    }
+
+    #[test]
+    fn undelivered_groups_reach_the_record_without_failing_the_delivery() {
+        let dispatch = GroupDispatchOutcome {
+            undelivered: vec!["1 firing group(s) not notified".to_string()],
+            ..dispatch_counts(2, 0, 0, &[])
+        };
+        assert_eq!(dispatch.history_status(), None);
+        assert_eq!(dispatch.rollup_rewrite(), None);
+        assert_eq!(
+            dispatch.record_error().as_deref(),
+            Some("1 firing group(s) not notified")
+        );
+
+        let with_failure = GroupDispatchOutcome {
+            undelivered: vec!["1 firing group(s) not notified".to_string()],
+            ..dispatch_counts(1, 1, 0, &["group a: boom"])
+        };
+        assert_eq!(
+            with_failure.record_error().as_deref(),
+            Some("group a: boom; 1 firing group(s) not notified")
+        );
+        assert_eq!(dispatch_counts(2, 0, 0, &[]).record_error(), None);
     }
 
     #[test]
