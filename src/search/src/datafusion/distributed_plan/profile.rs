@@ -66,7 +66,10 @@ impl NodeProfileRecorder {
     }
 
     pub fn mark_skipped(&self) {
-        self.update(|p| p.status = NodeStatus::Skipped);
+        self.update(|p| {
+            p.status = NodeStatus::Skipped;
+            p.skipped = true;
+        });
     }
 
     /// The request is going out; a call dropped before the node answers stopped early.
@@ -88,7 +91,7 @@ impl NodeProfileRecorder {
         self.update(|p| p.status = NodeStatus::TimedOut);
     }
 
-    /// The call failed before the node sent a stream, so there is no report to fetch.
+    /// The call failed on this side; a report fetched later keeps this status.
     pub fn mark_failed(&self, e: &tonic::Status) {
         let status = match e.code() {
             tonic::Code::DeadlineExceeded => NodeStatus::TimedOut,
@@ -97,14 +100,8 @@ impl NodeProfileRecorder {
         self.update(|p| p.status = status);
     }
 
-    pub fn finish(&self, metrics: &RemoteScanMetrics, scan_stats: ScanStats) {
-        self.update(|p| {
-            p.output_rows = metrics.output_rows.value() as u64;
-            p.output_batches = metrics.batches_received.value() as u64;
-            p.output_bytes = metrics.bytes_received.value() as u64;
-            p.decode_ns = metrics.decode_time.value() as u64;
-            p.scan_stats = Some(scan_stats);
-        });
+    pub fn add_scan_stats(&self, stats: &ScanStats) {
+        self.update(|p| p.scan_stats.get_or_insert_default().add(stats));
     }
 
     fn update(&self, f: impl FnOnce(&mut RemoteNodeProfile)) {
@@ -118,7 +115,11 @@ impl NodeProfileRecorder {
 
 impl Drop for NodeProfileRecorder {
     fn drop(&mut self) {
-        self.update(|p| p.end_us = now_micros());
+        self.update(|p| {
+            if p.end_us == 0 {
+                p.end_us = now_micros();
+            }
+        });
     }
 }
 
@@ -134,15 +135,7 @@ impl fmt::Display for PlanDetail<'_> {
 /// Profile of an executed plan; a remote scan lists the nodes it called, as its children never ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let inputs = match plan.downcast_ref::<RemoteScanExec>() {
-        Some(remote) => ProfileInputs::Remote(
-            remote
-                .state
-                .node_profiles
-                .lock()
-                .values()
-                .cloned()
-                .collect(),
-        ),
+        Some(remote) => ProfileInputs::Remote(remote_node_profiles(remote)),
         None => ProfileInputs::Children(
             plan.children()
                 .into_iter()
@@ -168,11 +161,12 @@ pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duratio
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);
     let mut fetches = Vec::new();
+    let now = now_micros();
     for remote in scans {
-        let pending = pending_reports(
-            &mut remote.state.node_profiles.lock(),
-            &remote.remote_scan_node().nodes,
-        );
+        let mut profiles = remote.state.node_profiles.lock();
+        end_open_calls(&mut profiles, now);
+        let pending = pending_reports(&mut profiles, &remote.remote_scan_node().nodes);
+        drop(profiles);
         for (partition, job_id) in pending {
             fetches.push(fetch_report(remote, partition, job_id, timeout));
         }
@@ -279,6 +273,15 @@ async fn fetch_report(
     }
 }
 
+/// Ends the calls whose streams the runtime has not dropped yet: their caller has stopped reading.
+fn end_open_calls(profiles: &mut BTreeMap<usize, RemoteNodeProfile>, now_us: i64) {
+    for p in profiles.values_mut() {
+        if p.start_us > 0 && p.end_us == 0 {
+            p.end_us = now_us;
+        }
+    }
+}
+
 fn node_profile(partition: usize, node: &dyn NodeInfo) -> RemoteNodeProfile {
     let role = match (node.is_querier(), node.is_ingester()) {
         (true, true) => "querier,ingester",
@@ -314,6 +317,22 @@ fn pending_reports(
         .filter(|(_, p)| p.plan.is_none() && !p.job_id.is_empty())
         .map(|(partition, p)| (*partition, p.job_id.clone()))
         .collect()
+}
+
+/// The scan's node entries with their counters read from the scan, as a stream may drop late.
+fn remote_node_profiles(remote: &RemoteScanExec) -> Vec<RemoteNodeProfile> {
+    let metrics = remote.metrics.clone_inner();
+    let mut profiles: Vec<_> = remote
+        .state
+        .node_profiles
+        .lock()
+        .values()
+        .cloned()
+        .collect();
+    for profile in &mut profiles {
+        RemoteScanMetrics::copy_to_profile(&metrics, profile);
+    }
+    profiles
 }
 
 #[cfg(test)]
@@ -383,9 +402,6 @@ mod tests {
         recorder.mark_streaming("j2".to_string());
         assert_eq!(status(&profiles), NodeStatus::Unavailable);
         assert_eq!(profiles.lock()[&2].job_id, "j2");
-        let metrics = RemoteScanMetrics::new(2, &ExecutionPlanMetricsSet::new());
-        metrics.record_output(&batch(3));
-        metrics.record_output(&batch(4));
         recorder.record_plan(vec![Metrics {
             profile: Some(ProfileNode {
                 name: "FilterExec".to_string(),
@@ -393,20 +409,17 @@ mod tests {
             }),
             ..Default::default()
         }]);
-        recorder.finish(
-            &metrics,
-            ScanStats {
-                files: 5,
+        for files in [2, 3] {
+            recorder.add_scan_stats(&ScanStats {
+                files,
                 ..Default::default()
-            },
-        );
+            });
+        }
         drop(recorder);
 
         let p = profiles.lock().get(&2).cloned().unwrap();
         assert_eq!(p.node_name, "q-0");
         assert_eq!(p.status, NodeStatus::Completed);
-        assert_eq!(p.output_rows, 7);
-        assert_eq!(p.output_batches, 2);
         assert!(p.end_us >= p.start_us);
         assert_eq!(p.scan_stats.unwrap().files, 5);
         assert_eq!(p.plan.unwrap().name, "FilterExec");
@@ -431,6 +444,7 @@ mod tests {
             let profiles = NodeProfiles::default();
             mark(&NodeProfileRecorder::start(profiles.clone(), 0, &TestNode));
             assert_eq!(profiles.lock()[&0].status, expected);
+            assert_eq!(profiles.lock()[&0].skipped, expected == NodeStatus::Skipped);
         }
         NodeProfileRecorder::default().mark_skipped();
     }
@@ -565,5 +579,52 @@ mod tests {
             panic!("expected remote inputs");
         };
         assert_eq!(remote[0].node_name, "q-0");
+    }
+
+    #[tokio::test]
+    async fn test_profile_reads_a_stream_the_runtime_has_not_dropped() {
+        let node = RemoteScanNode {
+            nodes: vec![Arc::new(TestNode), Arc::new(TestNode)],
+            opentelemetry_context: opentelemetry::Context::current(),
+            query_identifier: Default::default(),
+            search_infos: Default::default(),
+            index_info: Default::default(),
+            super_cluster_info: Default::default(),
+        };
+        let remote = RemoteScanExec::new(empty(), node).unwrap();
+        let recorders = [(0, 3), (1, 5)].map(|(partition, rows)| {
+            let recorder = NodeProfileRecorder::start(
+                remote.state.node_profiles.clone(),
+                partition,
+                &TestNode,
+            );
+            recorder.mark_sent();
+            recorder.add_scan_stats(&ScanStats {
+                files: i64::from(rows),
+                ..Default::default()
+            });
+            let metrics = RemoteScanMetrics::new(partition, &remote.metrics);
+            metrics.record_output(&batch(rows));
+            metrics.record_output(&batch(rows));
+            recorder
+        });
+
+        complete_remote_profiles(&remote, Duration::from_secs(1)).await;
+        let ProfileInputs::Remote(nodes) = build_profile(&remote).inputs else {
+            panic!("expected remote inputs");
+        };
+        let counts = nodes
+            .iter()
+            .map(|p| (p.output_rows, p.output_batches, p.scan_stats.unwrap().files))
+            .collect::<Vec<_>>();
+        assert_eq!(counts, [(6, 2, 3), (10, 2, 5)]);
+        assert!(
+            nodes
+                .iter()
+                .all(|p| p.output_bytes > 0 && p.end_us >= p.start_us)
+        );
+        let end_us = nodes[0].end_us;
+        drop(recorders);
+        assert_eq!(remote.state.node_profiles.lock()[&0].end_us, end_us);
     }
 }

@@ -168,6 +168,9 @@ pub struct RemoteNodeProfile {
     pub decode_ns: u64,
     #[serde(default)]
     pub status: NodeStatus,
+    /// Same as `status == Skipped`; the UI still reads this instead of `status`.
+    #[serde(default)]
+    pub skipped: bool,
     /// Identifies the call, so the caller can fetch the report a stream did not deliver.
     #[serde(skip)]
     pub job_id: String,

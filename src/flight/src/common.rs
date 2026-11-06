@@ -32,7 +32,7 @@ use datafusion::{
     self,
     physical_plan::{
         ExecutionPlan,
-        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
+        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue, MetricsSet},
     },
 };
 use parking_lot::Mutex;
@@ -42,6 +42,9 @@ use crate::profile::{ProfileNode, RemoteNodeProfile};
 
 /// Flight action that fetches a node's report on one finished run.
 pub const QUERY_PROFILE_ACTION: &str = "query_profile";
+
+const DECODE_TIME: &str = "decode_time";
+const BATCHES_RECEIVED: &str = "batches_received";
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
@@ -62,10 +65,10 @@ pub struct RemoteScanMetrics {
 impl RemoteScanMetrics {
     pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
         let fetch_time = MetricBuilder::new(metrics).subset_time("fetch_time", input_partition);
-        let decode_time = MetricBuilder::new(metrics).subset_time("decode_time", input_partition);
+        let decode_time = MetricBuilder::new(metrics).subset_time(DECODE_TIME, input_partition);
         let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
         let batches_received =
-            MetricBuilder::new(metrics).counter("batches_received", input_partition);
+            MetricBuilder::new(metrics).counter(BATCHES_RECEIVED, input_partition);
 
         // Register as OutputBytes so the display uses human_readable_size (KB/MB/GB)
         // instead of human_readable_count (K/M/B where B means billion).
@@ -81,6 +84,19 @@ impl RemoteScanMetrics {
             batches_received,
             bytes_received,
         }
+    }
+
+    /// Copies the counters a scan's `set` holds for `profile`'s partition into it.
+    pub fn copy_to_profile(set: &MetricsSet, profile: &mut RemoteNodeProfile) {
+        let partition = Some(profile.partition);
+        let sum = |name: &str| {
+            set.sum(|m| m.partition() == partition && m.value().name() == name)
+                .map_or(0, |v| v.as_usize() as u64)
+        };
+        profile.output_rows = sum("output_rows");
+        profile.output_batches = sum(BATCHES_RECEIVED);
+        profile.output_bytes = sum("output_bytes");
+        profile.decode_ns = sum(DECODE_TIME);
     }
 
     pub fn record_output(&self, batch: &RecordBatch) {
