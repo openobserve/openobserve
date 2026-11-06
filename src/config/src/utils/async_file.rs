@@ -213,8 +213,8 @@ pub fn create_wal_dir_datetime_filter(
         };
 
         let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days =
-            month_days[(month - 1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        let is_leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        let days = month_days[(month - 1) as usize] + if month == 2 && is_leap { 1 } else { 0 };
         let day = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(day)) => {
                 if 1 <= day && day <= days {
@@ -661,6 +661,11 @@ mod tests {
 
         let f = make_filter((2025, 1, 15, 0), (2025, 3, 31, 0));
         assert!(f(PathBuf::from("2025/2")));
+
+        // 2100 is not a leap year, so February has 28 days.
+        let f = make_filter((2100, 1, 15, 0), (2100, 3, 31, 0));
+        assert!(f(PathBuf::from("2100/2")));
+        assert!(!f(PathBuf::from("2100/2/29")));
     }
 
     #[test]
