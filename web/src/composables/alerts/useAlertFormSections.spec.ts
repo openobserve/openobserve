@@ -44,7 +44,13 @@ describe("useAlertFormSections", () => {
       "schedule",
       "details",
     ]);
-    expect(items.value[0].title).toBe("What to watch");
+    expect(items.value[0].title).toBe("Alert type and data");
+  });
+
+  it("tags the steps a user can skip as optional, and only those", () => {
+    const { items } = setup(scheduled());
+    const tagged = items.value.filter((i) => i.tag === "Optional").map((i) => i.id);
+    expect(tagged).toEqual(["notify", "schedule"]);
   });
 
   it("asks for a stream and a name until they are set", () => {
@@ -160,7 +166,9 @@ describe("checkEveryLabel", () => {
 describe("sectionOfField", () => {
   it("maps form paths to the section that shows them", () => {
     expect(sectionOfField("stream_name")).toBe("watch");
-    expect(sectionOfField("query_condition.conditions.conditions[0].value")).toBe("watch");
+    expect(sectionOfField("query_condition.conditions.conditions[0].value")).toBe("condition");
+    expect(sectionOfField("is_real_time")).toBe("watch");
+    expect(sectionOfField("children")).toBe("condition");
     expect(sectionOfField("query_condition.aggregation.having.value")).toBe("condition");
     expect(sectionOfField("query_condition.promql_warning_value")).toBe("condition");
     expect(sectionOfField("trigger_condition.warning_threshold")).toBe("condition");

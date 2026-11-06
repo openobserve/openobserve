@@ -32,7 +32,8 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const total = ALERT_SECTIONS.length;
-const icon = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id)?.icon);
+const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
+const icon = computed(() => def.value?.icon);
 
 provide(SETTING_ROW_BARE_KEY, true);
 </script>
@@ -55,7 +56,11 @@ provide(SETTING_ROW_BARE_KEY, true);
       </span>
       <div class="flex min-w-0 flex-col gap-1">
         <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
-          {{ t("alerts.sections.eyebrow", { n: index, total }) }}
+          {{
+            def?.optional
+              ? t("alerts.sections.eyebrowOptional", { n: index, total })
+              : t("alerts.sections.eyebrow", { n: index, total })
+          }}
         </span>
         <h2
           class="text-text-heading m-0 text-2xl font-semibold focus:outline-none"

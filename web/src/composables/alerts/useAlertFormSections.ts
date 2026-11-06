@@ -146,11 +146,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     switch (id) {
       case "watch": {
         if (mode.value === "composite") {
-          const count = fd.children?.length ?? 0;
-          return {
-            missing: count === 0,
-            summary: t("alerts.sections.watch.childCount", { count }, count),
-          };
+          return { missing: false, summary: t("alerts.sections.whenCombined") };
         }
         return {
           missing: !hasValue(fd.stream_name),
@@ -159,8 +155,16 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
             : t("alerts.sections.watch.pickStream"),
         };
       }
-      case "condition":
+      case "condition": {
+        const count = fd.children?.length ?? 0;
+        if (mode.value === "composite" && count === 0) {
+          return {
+            missing: true,
+            summary: t("alerts.sections.watch.childCount", { count }, count),
+          };
+        }
         return { missing: false, summary: conditionPhrase(fd) };
+      }
       case "notify": {
         const count = notifyCount(fd);
         return {
@@ -186,7 +190,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   const items = computed<SectionNavItem[]>(() => {
     const fd = input.formData.value ?? {};
-    return ALERT_SECTIONS.map(({ id, navKey }) => {
+    return ALERT_SECTIONS.map(({ id, navKey, optional }) => {
       const facts = sectionFacts(id, fd);
       const errors = errorCounts.value[id];
       const seen = input.isEditing.value || (input.visited?.value.has(id) ?? true);
@@ -206,7 +210,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (seen && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
-      return { id, title: t(navKey), summary: facts.summary, state, stateLabel };
+      const tag = optional ? t("alerts.sections.optional.tag") : undefined;
+      return { id, title: t(navKey), tag, summary: facts.summary, state, stateLabel };
     });
   });
 
