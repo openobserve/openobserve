@@ -97,6 +97,9 @@ const alerts = {
     }
     return options ? http().get(url, options) : http().get(url);
   },
+  /** Every folder's alerts carrying all the given tags; the backend ANDs them. */
+  listByTags: (org_identifier: string, tags: string[]) =>
+    http().get(`/api/v2/${org_identifier}/alerts`, { params: { tags: tags.join(",") } }),
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)

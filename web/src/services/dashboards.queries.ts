@@ -27,6 +27,13 @@ export const dashboardsByFolderQuery = (org: string, folderId: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export const dashboardDetailQuery = (org: string, id: string, folderId: string) =>
+  queryOptions({
+    queryKey: dashboardKeys.detail(org, id),
+    queryFn: async () => (await dashboards.get_Dashboard(org, id, folderId)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export interface DashboardSearchHit {
   dashboardId: string;
   title: string;
@@ -77,5 +84,12 @@ export const createDashboardMutation = (org: string) =>
     mutationFn: (vars: { json: any; folderId: string }) =>
       dashboards.create(org, vars.json, vars.folderId),
     // The tile composes its own per-integration success and failure toasts.
+    meta: { invalidates: [dashboardKeys.all(org)], silentError: true },
+  });
+
+export const deleteDashboardMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { dashboardId: string; folderId: string }) =>
+      dashboards.delete(org, vars.dashboardId, vars.folderId),
     meta: { invalidates: [dashboardKeys.all(org)], silentError: true },
   });

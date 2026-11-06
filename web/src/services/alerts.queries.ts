@@ -73,6 +73,13 @@ export const alertsListQuery = (
     staleTime: LIVE_STALE_TIME,
   });
 
+export const alertsByTagsQuery = (org: string, tags: string[]) =>
+  queryOptions({
+    queryKey: alertKeys.byTags(org, tags),
+    queryFn: async (): Promise<any[]> => (await alerts.listByTags(org, tags)).data?.list ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
 /**
  * The dependency graph's alert read: every folder, with the destination and
  * template refs the default path omits. Cached so the graph shares one entry
@@ -232,6 +239,13 @@ export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
         ? alerts.update_by_alert_id(org, vars.payload, vars.folderId)
         : alerts.create_by_alert_id(org, vars.payload, vars.folderId),
     // Callers compose their own per-row or per-batch outcome messages.
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
+export const deleteAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { alertId: string; folderId?: string }) =>
+      alerts.delete_by_alert_id(org, vars.alertId, vars.folderId),
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });
 
