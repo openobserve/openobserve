@@ -48,7 +48,7 @@ import {
   type Severity,
 } from "../data/facts";
 import type { LogEntry } from "./useDecisions";
-import type { ChangeKind } from "./changes";
+import type { LookKind } from "./changes";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export type { Autonomy, HistoryKind, Outcome, RequestKind, Scenario, Severity };
@@ -104,7 +104,7 @@ export interface RequestCopy {
   headline: I18nText;
   why: I18nText | null;
   tags: { label: I18nText; variant: BadgeVariant }[];
-  look: ChangeKind;
+  look: LookKind;
 }
 
 export interface Request {

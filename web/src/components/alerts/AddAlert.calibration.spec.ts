@@ -19,6 +19,7 @@ import { defineComponent, h } from "vue";
 import { RouterView, createMemoryHistory, createRouter, type Router } from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import { queryClient } from "@/composables/query/queryClient";
@@ -236,8 +237,23 @@ const editSilence = async (value: number) => {
   await flushPromises();
 };
 
+// The handoff is an Alert Calibration feature: the enterprise build flag and the server switch must both be on.
+const calibration = {
+  enterprise: config.isEnterprise,
+  enabled: store.state.zoConfig.alert_calibration_enabled,
+};
+const setCalibration = (on: boolean) => {
+  config.isEnterprise = on ? "true" : "false";
+  store.state.zoConfig.alert_calibration_enabled = on;
+};
+const restoreCalibration = () => {
+  config.isEnterprise = calibration.enterprise;
+  store.state.zoConfig.alert_calibration_enabled = calibration.enabled;
+};
+
 describe("AddAlert calibration handoff", () => {
   beforeEach(() => {
+    setCalibration(true);
     localStorage.clear();
     sessionStorage.clear();
     vi.mocked(toast).mockClear();
@@ -250,6 +266,7 @@ describe("AddAlert calibration handoff", () => {
   });
 
   afterEach(() => {
+    restoreCalibration();
     vi.restoreAllMocks();
     wrapper?.unmount();
     wrapper = null;
@@ -541,5 +558,43 @@ describe("AddAlert calibration handoff", () => {
     await flushPromises();
     expect(vm().formData.pending_period_sec).toBe(1);
     expect(bannerText()).toBe("");
+  });
+});
+
+describe("AddAlert calibration handoff without Alert Calibration (OSS build)", () => {
+  beforeEach(() => {
+    setCalibration(false);
+    localStorage.clear();
+    sessionStorage.clear();
+    queryClient.clear();
+    vi.mocked(alertsService.get_by_alert_id).mockImplementation(
+      async () => ({ data: structuredClone(serverAlert) }) as any,
+    );
+    vi.mocked(destinationService.list).mockImplementation(serverDestinations as any);
+  });
+
+  afterEach(() => {
+    restoreCalibration();
+    vi.restoreAllMocks();
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("a pasted prefill=calibration URL reserves no strip and applies nothing", async () => {
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+
+    expect(banner()).toBeNull();
+    expect(vm().formData.pending_period_sec).toBe(1);
+    expect(vm().formData.destinations).toEqual([]);
+  });
+
+  it("stays off on an enterprise build with calibration turned off", async () => {
+    config.isEnterprise = "true";
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+
+    expect(banner()).toBeNull();
+    expect(vm().formData.pending_period_sec).toBe(1);
   });
 });

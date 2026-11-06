@@ -784,7 +784,7 @@ pub async fn zo_config(
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         query_history_enabled: cfg.limit.query_history_enabled,
         query_history_retention_days: cfg.limit.query_history_retention_days,
-        alert_transitions_retention_days: cfg.limit.alert_transitions_retention_days,
+        alert_transitions_retention_days: transitions_retention_days(&cfg),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -873,6 +873,15 @@ async fn org_admin(org_id: &str, user_id: &str) -> bool {
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
             .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
+}
+
+/// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.
+fn transitions_retention_days(cfg: &Config) -> i64 {
+    if cfg!(feature = "enterprise") {
+        cfg.limit.alert_transitions_retention_days
+    } else {
+        0
+    }
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -2789,10 +2798,12 @@ mod tests {
     #[tokio::test]
     async fn test_zo_config_serves_the_transitions_retention() {
         let json = zo_config_json().await;
-        assert_eq!(
-            json["alert_transitions_retention_days"],
+        let served = if cfg!(feature = "enterprise") {
             get_config().limit.alert_transitions_retention_days
-        );
+        } else {
+            0
+        };
+        assert_eq!(json["alert_transitions_retention_days"], served);
     }
 
     async fn zo_config_json() -> serde_json::Value {

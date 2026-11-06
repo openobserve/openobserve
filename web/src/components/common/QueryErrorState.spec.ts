@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -290,7 +291,28 @@ describe("QueryErrorState block icon", () => {
   });
 });
 
+// Alert Calibration is enterprise-only: the build flag and the server switch must both be on.
+const withCalibration = (on: boolean) => {
+  const before = {
+    enterprise: config.isEnterprise,
+    enabled: store.state.zoConfig.alert_calibration_enabled,
+  };
+  beforeEach(() => {
+    config.isEnterprise = on ? "true" : "false";
+    store.state.zoConfig.alert_calibration_enabled = on;
+  });
+  afterEach(() => {
+    config.isEnterprise = before.enterprise;
+    store.state.zoConfig.alert_calibration_enabled = before.enabled;
+  });
+};
+
+const PROTECTED_MSG =
+  "Stream _o2_alert_calibration_digests holds internal records and cannot be searched";
+
 describe("QueryErrorState protected-stream refusal", () => {
+  withCalibration(true);
+
   it("the protected-stream refusal is a red denied state with the way to the records", async () => {
     const page = { template: "<div />" };
     const router = createRouter({
@@ -337,6 +359,29 @@ describe("QueryErrorState protected-stream refusal", () => {
       "text-status-error-text",
     );
     expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("broken-panel");
+    expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
+  });
+});
+
+describe("QueryErrorState protected-stream refusal without Alert Calibration (OSS build)", () => {
+  withCalibration(false);
+
+  it("shows a neutral red refusal with no card to a page the build lacks", () => {
+    const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG, aiEnabled: true });
+    const title = wrapper.get('[data-test="query-error-title"]');
+    expect(title.text()).toBe("Internal records can't be searched here");
+    expect(title.classes()).toContain("text-status-error-text");
+    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
+    expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Alert Calibration");
+  });
+
+  it("stays neutral on an enterprise build with calibration turned off", () => {
+    config.isEnterprise = "true";
+    const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG });
+    expect(wrapper.get('[data-test="query-error-title"]').text()).toBe(
+      "Internal records can't be searched here",
+    );
     expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
   });
 });

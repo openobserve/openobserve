@@ -38,6 +38,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import type { I18nKey } from "@/types/i18n";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { explainQueryError, type QueryErrorExplanation } from "@/utils/query/queryErrorExplain";
+import { useAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,8 @@ export interface QueryErrorResult {
   illustration: ComputedRef<IllustrationName | undefined>;
   /** "error" when the code is a refusal, which the hero title shows in the error colour. */
   tone: ComputedRef<"error" | undefined>;
+  /** Whether a protected-stream refusal may point at the Alert Calibration page. */
+  calibrationEnabled: ComputedRef<boolean>;
   /** UI toggle for the expandable detail section. */
   showDetail: Ref<boolean>;
   /** Copy all error detail to the clipboard. */
@@ -149,6 +152,14 @@ const ERROR_META: Record<
     titleKey: "queryError.serverError",
     descKey: "queryError.serverErrorDesc",
   },
+};
+
+// Without Alert Calibration (an OSS build, or turned off) the refusal names no feature the user lacks.
+const PROTECTED_INTERNAL: (typeof ERROR_META)[number] = {
+  titleKey: "queryError.protectedStreamInternal",
+  descKey: "queryError.protectedStreamInternalDesc",
+  illustration: "lock",
+  tone: "error",
 };
 
 // ── Composable ─────────────────────────────────────────────────────────────
@@ -237,13 +248,16 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
 
   // ── Title / description ────────────────────────────────────────────────
 
-  const meta = computed<(typeof ERROR_META)[number]>(
-    () =>
+  const calibrationEnabled = useAlertCalibrationEnabled();
+  const meta = computed<(typeof ERROR_META)[number]>(() => {
+    if (errorCode.value === 20014 && !calibrationEnabled.value) return PROTECTED_INTERNAL;
+    return (
       ERROR_META[errorCode.value] ?? {
         titleKey: "queryError.generic",
         descKey: "queryError.genericDesc",
-      },
-  );
+      }
+    );
+  });
   const illustration = computed(() => meta.value.illustration);
   const tone = computed(() => meta.value.tone);
 
@@ -279,6 +293,7 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     explanation,
     illustration,
     tone,
+    calibrationEnabled,
     showDetail,
     copyErrorDetails,
   };

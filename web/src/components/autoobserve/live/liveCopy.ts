@@ -325,6 +325,25 @@ export const whereText = (
   return only ? raw(only) : null;
 };
 
+// Labels key the coverage rows, so a missing part is named in words, never drawn as a dash.
+export const serviceLabel = (
+  t: TranslateFn,
+  name: string,
+  where: { cluster?: string | null; namespace?: string | null },
+  withCluster: boolean,
+): I18nText => {
+  const namespace = where.namespace
+    ? raw(where.namespace)
+    : t("autoobserveLive.coverage.noNamespace");
+  if (!withCluster)
+    return t("autoobserveLive.coverage.labelNamespace", { name: raw(name), namespace });
+  return t("autoobserveLive.coverage.labelPlace", {
+    name: raw(name),
+    cluster: where.cluster ? raw(where.cluster) : t("autoobserveLive.coverage.noCluster"),
+    namespace,
+  });
+};
+
 export type LiveCoverageState = "watched" | "gap";
 
 const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {

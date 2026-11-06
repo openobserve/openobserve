@@ -24,11 +24,24 @@ export const LINE_HEIGHT = 1.15;
 const MIN_FONT = 9;
 const FONT_STEP = 1.5;
 const ELLIPSIS = "…";
+// A 1-2 character line reads as a typo ("svc-" over "e", demo bug 7), so every wrapped line keeps 3.
+const MIN_PART = 3;
 
-// Hyphen- or underscore-separated parts, each keeping its trailing separator.
-const segments = (name: string) => name.match(/[^-_]+[-_]*|[-_]+/g) ?? [name];
+// Coverage labels join a name and its place ("svc-a · ns-b"); a line never ends on the joiner.
+const PLACE = " · ";
 
-// Every way to group the parts into at most `max` consecutive lines.
+const places = (name: string) =>
+  name.split(PLACE).map((part, i, all) => (i < all.length - 1 ? `${part}${PLACE}` : part));
+
+// Hyphen- or underscore-separated parts of the name, each keeping its separator; a place is never split.
+const segments = (name: string) =>
+  places(name).flatMap((part, i) => (i ? [part] : (part.match(/[^-_]+[-_]*|[-_]+/g) ?? [part])));
+
+const visible = (line: string) => line.replace(/[-_\s·]/g, "").length;
+
+const unjoin = (line: string) => (line.endsWith(PLACE) ? line.slice(0, -PLACE.length) : line);
+
+// Every way to group the parts into at most `max` consecutive lines, none of them a stub.
 const groupings = (parts: string[], max: number): string[][] => {
   const out: string[][] = [];
   const cuts = parts.length - 1;
@@ -38,20 +51,29 @@ const groupings = (parts: string[], max: number): string[][] => {
       if (mask & (1 << (i - 1))) lines.push(parts[i]);
       else lines[lines.length - 1] += parts[i];
     }
-    if (lines.length <= max) out.push(lines);
+    if (lines.length > max) continue;
+    if (lines.length === 1 || lines.every((l) => visible(l) >= MIN_PART))
+      out.push(lines.map(unjoin));
   }
   return out;
 };
 
 // Fewest lines that fit, most balanced among those; otherwise the narrowest grouping.
 const best = (name: string, font: number, max: number, room: number, measure: MeasureText) => {
-  const all = groupings(segments(name), max).map((lines) => ({
-    lines,
-    wide: Math.max(...lines.map((l) => measure(l, font))),
-  }));
+  const scored = (parts: string[]) =>
+    groupings(parts, max).map((lines) => ({
+      lines,
+      wide: Math.max(...lines.map((l) => measure(l, font))),
+    }));
+  const pick = (fits: { lines: string[]; wide: number }[]) =>
+    fits.sort((a, b) => a.lines.length - b.lines.length || a.wide - b.wide)[0];
+  // Name and place stay whole whenever they fit, as m1 draws them.
+  const whole = scored(places(name)).filter((g) => g.wide <= room);
+  if (whole.length) return pick(whole);
+  const all = scored(segments(name));
   const fits = all.filter((g) => g.wide <= room);
   if (!fits.length) return all.sort((a, b) => a.wide - b.wide)[0];
-  return fits.sort((a, b) => a.lines.length - b.lines.length || a.wide - b.wide)[0];
+  return pick(fits);
 };
 
 const shorten = (text: string, font: number, room: number, measure: MeasureText) => {

@@ -35,6 +35,7 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+#[cfg(feature = "enterprise")]
 mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
 mod cloud;
@@ -1562,7 +1563,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
-    // Not job-cluster gated for the same reason: each region reaps its own transitions.
+    // Not job-cluster gated for the same reason; OSS builds keep every level change.
+    #[cfg(feature = "enterprise")]
     alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
