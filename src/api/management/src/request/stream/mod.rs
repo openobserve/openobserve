@@ -65,7 +65,7 @@ use crate::common::{
         ("limit" = Option<u32>, Query, description = "Pagination limit (default: 0 = all)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::stream::Stream),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -165,7 +165,7 @@ pub async fn schema(
     ),
     request_body(content = inline(StreamCreate), description = "Stream create", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -220,7 +220,7 @@ pub async fn create(
     ),
     request_body(content = inline(UpdateStreamSettings), description = "Stream settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -282,7 +282,7 @@ pub async fn update_settings(
     ),
     request_body(content = inline(StreamUpdateFields), description = "Update stream fields to a specific data type", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = Object),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})), 
@@ -351,7 +351,7 @@ pub async fn update_fields(
     ),
     request_body(content = inline(StreamDeleteFields), description = "Stream delete fields", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
@@ -404,7 +404,7 @@ pub async fn delete_fields(
         ("delete_all" = bool, Query, description = "Delete all related feature resources"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -750,7 +750,7 @@ fn stream_comparator(
         ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -911,7 +911,7 @@ pub async fn delete_stream_data_by_time_range(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::compactor_manual_jobs::CompactorManualJobStatusRes),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})), 

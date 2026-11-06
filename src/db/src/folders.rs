@@ -36,7 +36,7 @@ use crate::authz::{remove_ownership, set_ownership};
 pub enum FolderError {
     /// An error that occurs while interacting with the database through the
     /// [infra] crate.
-    #[error("InfraError# Internal error")]
+    #[error("InfraError# {0}")]
     InfraError(#[from] infra::errors::Error),
 
     /// An error that occurs while interacting with reports through the [infra::table::reports]
@@ -127,6 +127,10 @@ pub async fn save_folder(
         return Err(FolderError::UpdateDefaultFolder);
     }
 
+    if claims_default_name(&folder.folder_id, &folder.name) {
+        return Err(FolderError::FolderNameAlreadyExists);
+    }
+
     if folder.folder_id != DEFAULT_FOLDER {
         folder.folder_id = ider::generate();
     }
@@ -214,6 +218,10 @@ pub async fn update_folder(
 ) -> Result<Folder, FolderError> {
     if folder_id.eq(DEFAULT_FOLDER) {
         return Err(FolderError::UpdateDefaultFolder);
+    }
+
+    if claims_default_name(folder_id, &folder.name) {
+        return Err(FolderError::FolderNameAlreadyExists);
     }
 
     folder.folder_id = folder_id.to_string();
@@ -335,6 +343,18 @@ pub async fn delete_folder(
             let params = ListAlertsParams::new(org_id).in_folder(folder_id);
             let alerts = table::alerts::list(client, params).await?;
             if !alerts.is_empty() {
+                return Err(FolderError::DeleteWithAlerts);
+            }
+            // Composites keep the folder slug; anomaly configs keep the `folders.id` key.
+            if table::alert_composites::count_in_folder(client, org_id, folder_id).await? > 0 {
+                return Err(FolderError::DeleteWithAlerts);
+            }
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && table::anomaly_detection::config::count_in_folder(client, org_id, &folder_pk)
+                    .await?
+                    > 0
+            {
                 return Err(FolderError::DeleteWithAlerts);
             }
         }
@@ -601,6 +621,12 @@ async fn permitted_folders(
     Ok(folder_list)
 }
 
+/// Whether a non-built-in folder would take the built-in one's name, blocking its creation. [pure]
+fn claims_default_name(folder_id: &str, name: &str) -> bool {
+    // Exact, like the case-sensitive unique index on (org, type, name) that the clash comes from.
+    folder_id != DEFAULT_FOLDER && name == DEFAULT_FOLDER
+}
+
 /// Drops the folder's ownership tuples and tells other regions; both only log a failure.
 async fn forget_folder(org_id: &str, folder_id: &str, folder_type: FolderType) {
     remove_ownership(
@@ -625,6 +651,162 @@ mod tests {
     use config::meta::folder::FolderType;
 
     use super::*;
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    fn alert_folder(slug: &str) -> Folder {
+        Folder {
+            folder_id: slug.to_string(),
+            name: slug.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_alert_folder_holding_a_composite_is_not_deleted() {
+        use infra::table::entity::alert_composites;
+        use sea_orm::ActiveValue::Set;
+        use svix_ksuid::KsuidLike;
+
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("folder_guard_c_{}", config::utils::time::now_micros());
+        let conn = get_orm_client_rw().await;
+
+        table::folders::get_or_create(&org, alert_folder("holds_composite"), FolderType::Alerts)
+            .await
+            .unwrap();
+        let composite = alert_composites::ActiveModel {
+            id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+            org: Set(org.clone()),
+            folder_id: Set("holds_composite".to_string()),
+            name: Set("composite".to_string()),
+            description: Set(None),
+            expression: Set("true".to_string()),
+            warning_counts_as_firing: Set(false),
+            stale_child_policy: Set(0),
+            destinations: Set(serde_json::json!([])),
+            template: Set(None),
+            context_attributes: Set(None),
+            enabled: Set(true),
+            silence_seconds: Set(0),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            priority: Set(None),
+            tags: Set(None),
+            owner: Set(None),
+            last_edited_by: Set(None),
+            updated_at: Set(None),
+            evaluation_generation: Set(0),
+            pending_period_sec: Set(0),
+            incident_title_template: Set(None),
+        };
+        table::alert_composites::create_with_children(conn, composite, vec![])
+            .await
+            .unwrap();
+        assert!(matches!(
+            delete_folder(&org, "holds_composite", FolderType::Alerts).await,
+            Err(FolderError::DeleteWithAlerts)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_alert_folder_holding_an_anomaly_config_is_not_deleted() {
+        use infra::table::entity::anomaly_detection_config;
+
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("folder_guard_a_{}", config::utils::time::now_micros());
+        let conn = get_orm_client_rw().await;
+        let (pk, ..) =
+            table::folders::get_or_create(&org, alert_folder("holds_anomaly"), FolderType::Alerts)
+                .await
+                .unwrap();
+        let anomaly = anomaly_detection_config::Model {
+            anomaly_id: format!("{org}_anomaly"),
+            org_id: org.clone(),
+            stream_name: "default".to_string(),
+            stream_type: "logs".to_string(),
+            enabled: true,
+            name: "anomaly".to_string(),
+            description: None,
+            query_mode: "sql".to_string(),
+            filters: None,
+            custom_sql: None,
+            detection_function: "rcf".to_string(),
+            histogram_interval: "1h".to_string(),
+            schedule_interval: "5m".to_string(),
+            detection_window_seconds: 3600,
+            training_window_days: 7,
+            retrain_interval_days: 1,
+            threshold: 95,
+            alert_budget_per_day: None,
+            level_half_width_seconds: None,
+            band_width: None,
+            alert_direction: None,
+            alert_window_buckets: None,
+            alert_window_fire_pct: None,
+            alert_window_recover_pct: None,
+            band_grouping: None,
+            band_k: None,
+            seasonality: "none".to_string(),
+            is_trained: false,
+            training_started_at: None,
+            training_completed_at: None,
+            last_error: None,
+            last_processed_timestamp: None,
+            current_model_version: 0,
+            rcf_num_trees: 50,
+            rcf_tree_size: 256,
+            rcf_shingle_size: 8,
+            alert_enabled: false,
+            alert_destinations: None,
+            folder_id: pk.to_string(),
+            owner: None,
+            priority: None,
+            tags: None,
+            status: 0,
+            retries: 0,
+            last_failed_at: None,
+            last_alert_fired_at: None,
+            last_recovery_notified_at: None,
+            template: None,
+            detection_lease_us: None,
+            last_updated: 0,
+            created_at: 1_000_000,
+            updated_at: 1_000_000,
+        };
+        table::anomaly_detection::config::create(conn, anomaly)
+            .await
+            .unwrap();
+        assert!(matches!(
+            delete_folder(&org, "holds_anomaly", FolderType::Alerts).await,
+            Err(FolderError::DeleteWithAlerts)
+        ));
+
+        table::folders::get_or_create(&org, alert_folder("empty"), FolderType::Alerts)
+            .await
+            .unwrap();
+        delete_folder(&org, "empty", FolderType::Alerts)
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn test_folder_error_variants() {
@@ -845,5 +1027,47 @@ mod tests {
         // Test reports params
         let reports_params = ListReportsParams::new(org_id).in_folder(folder_id);
         assert_eq!(reports_params.org_id, org_id);
+    }
+
+    #[test]
+    fn only_the_built_in_folder_may_take_the_default_name() {
+        for (folder_id, name, expected) in [
+            ("abc", "default", true),
+            ("abc", "Default", false),
+            ("abc", " default", false),
+            ("abc", "default_1", false),
+            ("abc", "my default", false),
+            (DEFAULT_FOLDER, "default", false),
+        ] {
+            assert_eq!(
+                claims_default_name(folder_id, name),
+                expected,
+                "{folder_id:?} {name:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn create_and_rename_refuse_the_default_name_before_writing() {
+        let folder = |name: &str| Folder {
+            folder_id: String::new(),
+            name: name.to_string(),
+            ..Default::default()
+        };
+        let created = save_folder("o1", folder(" default "), FolderType::Alerts, false).await;
+        assert!(matches!(created, Err(FolderError::FolderNameAlreadyExists)));
+        let renamed = update_folder("o1", "abc", FolderType::Alerts, folder("default")).await;
+        assert!(matches!(renamed, Err(FolderError::FolderNameAlreadyExists)));
+    }
+
+    #[test]
+    fn infra_error_display_keeps_the_cause() {
+        let err = FolderError::InfraError(infra::errors::Error::Message(
+            "UNIQUE constraint failed: folders.name".to_string(),
+        ));
+        assert!(
+            err.to_string().contains("UNIQUE constraint failed"),
+            "{err}"
+        );
     }
 }

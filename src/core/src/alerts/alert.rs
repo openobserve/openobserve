@@ -592,6 +592,40 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
     Ok(())
 }
 
+/// The template and destinations a firing needs; a missing one fails every firing later.
+pub(crate) async fn validate_template_and_destinations(
+    org_id: &str,
+    template: Option<&str>,
+    destinations: &[String],
+) -> Result<(), AlertError> {
+    if let Some(template_name) = template.filter(|name| !name.is_empty()) {
+        let template = db::alerts::templates::get(org_id, template_name)
+            .await
+            .map_err(|_| AlertError::AlertTemplateNotFound {
+                template: template_name.to_string(),
+            })?;
+        check_alert_template(template_name, &template)?;
+    }
+
+    for dest in destinations {
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
+                        d.module,
+                    )));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
 pub(crate) async fn validate_jira_destinations(
     org_id: &str,
@@ -876,34 +910,8 @@ async fn prepare_alert(
         }
     }
 
-    // Validate alert-level template if specified
-    if let Some(ref template_name) = alert.template
-        && !template_name.is_empty()
-    {
-        let template = db::alerts::templates::get(org_id, template_name)
-            .await
-            .map_err(|_| AlertError::AlertTemplateNotFound {
-                template: template_name.clone(),
-            })?;
-        check_alert_template(template_name, &template)?;
-    }
-
-    for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
-            Ok(d) => {
-                if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
-                        d.module,
-                    )));
-                }
-            }
-            Err(_) => {
-                return Err(AlertError::AlertDestinationNotFound {
-                    dest: dest.to_string(),
-                });
-            }
-        }
-    }
+    validate_template_and_destinations(org_id, alert.template.as_deref(), &alert.destinations)
+        .await?;
 
     #[cfg(feature = "enterprise")]
     for workflow in alert.workflows.iter() {
@@ -3520,11 +3528,7 @@ pub(crate) async fn send_http_notification(
         .into());
     }
 
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let build_req = |body: String| {
@@ -3744,11 +3748,7 @@ pub(crate) async fn send_discord_with_attachment(
         ))
         .into());
     }
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
+    let builder = send::destination_client_builder(endpoint.skip_tls_verify);
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
@@ -5074,7 +5074,7 @@ mod send_path_tests {
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server, truncated_server},
+        ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
     };
 
     #[test]
@@ -5361,6 +5361,32 @@ mod send_path_tests {
     fn assert_sends_and_failures(seen: &[Result<String, String>]) {
         let delivered: Vec<bool> = seen.iter().map(Result::is_ok).collect();
         assert_eq!(delivered, [true, false, true, false, false], "{seen:?}");
+    }
+
+    #[test]
+    fn a_destination_that_never_answers_fails_at_the_notification_timeout() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_never_answers_fails_at_the_notification_timeout"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_ALERT_NOTIFICATION_TIMEOUT", "1"),
+            ],
+            || async {
+                let base = hanging_server().await;
+                let limit = std::time::Duration::from_secs(10);
+                let hanging = endpoint(&base, "/hang");
+                let http = send_http_notification(&hanging, "{}".into());
+                let http = tokio::time::timeout(limit, http).await;
+                assert!(http.expect("the HTTP send has no limit").is_err());
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let discord = send_discord_with_attachment(&hanging, "{}".into(), png);
+                let discord = tokio::time::timeout(limit, discord).await;
+                assert!(discord.expect("the multipart send has no limit").is_err());
+            },
+        );
     }
 
     #[test]

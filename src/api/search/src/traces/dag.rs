@@ -83,7 +83,8 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get the span DAG (nodes and parent-child edges) for a specific trace by trace_id.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "Get the span DAG (nodes and parent-child edges) for a specific trace by trace_id.", "category": "traces"})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_trace_dag(

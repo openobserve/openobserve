@@ -1802,7 +1802,7 @@ pub async fn get_incident_events(_path: Path<(String, String)>) -> Response {
     ),
     request_body(content = CommentRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -1847,7 +1847,7 @@ pub async fn post_incident_comment(
     ),
     request_body(content = CommentRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),

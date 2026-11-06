@@ -347,7 +347,8 @@ impl HistoryFilter {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"}))
     )
 )]
 pub async fn get_report_history(

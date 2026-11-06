@@ -90,6 +90,14 @@ enum RetryOutcome {
     FinishOnce,
 }
 
+/// What a derived stream trigger's key says about the stored pipeline.
+enum TriggerKeyCheck {
+    Current(config::meta::pipeline::Pipeline),
+    /// The only trigger of a renamed pipeline: it runs, then moves to this full key.
+    MoveAfterRun(config::meta::pipeline::Pipeline, String),
+    Deleted,
+}
+
 /// Why a stored pipeline's scheduled source cannot run.
 #[derive(Debug)]
 enum Unrunnable {
@@ -581,6 +589,7 @@ async fn dispatch_per_group(
     rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
     triggered_at: i64,
+    handler_started_at: i64,
 ) -> Option<GroupDispatchOutcome> {
     use config::meta::alerts::dispatch::{plan_dispatch, rows_by_group_key};
 
@@ -751,6 +760,25 @@ async fn dispatch_per_group(
     for item in items {
         // The plan already moved muted groups out; this only guards a send.
         if muted_groups.contains_key(&item.group_key) {
+            continue;
+        }
+        // A failed delivery opens no silence window, so a later evaluation sends this group.
+        if config::meta::alerts::dispatch::group_firing_deadline_passed(
+            handler_started_at,
+            now_micros(),
+        ) {
+            let err_msg = format!(
+                "not sent: the {}s firing deadline passed",
+                config::meta::alerts::dispatch::GROUP_FIRING_DEADLINE_SECS
+            );
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: {err_msg}",
+                item.group_key
+            );
+            errors.push(format!("group {}: {err_msg}", item.group_key));
+            failed += 1;
+            let record = infra::table::alert_states::DeliveryOutcome::Failed { at: now_micros() };
+            record_group_delivery(alert, &alert_id, trace_id, item, record, None).await;
             continue;
         }
         // Chosen before the send: a resolve only closes a ticket opened under the key it quotes.
@@ -2187,18 +2215,29 @@ fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOut
     trigger.data = td.to_json_string();
 }
 
-/// Parse a detection interval string like "5m", "1h" into microseconds.
-/// Defaults to 5 minutes on parse failure.
+/// Parse a stored schedule into microseconds, at the floor or above; an unusable one keeps the
+/// 5 minute default.
 fn parse_detection_interval_to_micros(interval: &str) -> i64 {
+    const DEFAULT_MICROS: i64 = 5 * 60 * 1_000_000;
     let s = interval.trim();
-    let secs: i64 = if let Some(n) = s.strip_suffix('h') {
-        n.trim().parse::<i64>().unwrap_or(1) * 3600
-    } else if let Some(n) = s.strip_suffix('m') {
-        n.trim().parse::<i64>().unwrap_or(5) * 60
-    } else {
-        s.parse::<i64>().unwrap_or(5) * 60
+    // Old rows stored bare minutes; every other form is the grammar the validator accepted.
+    let secs = match s.parse::<i64>() {
+        Ok(minutes) => minutes.checked_mul(60),
+        Err(_) => config::utils::time::parse_interval(s).ok(),
     };
-    secs * 1_000_000
+    match secs
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs.max(config::utils::time::MIN_ANOMALY_SCHEDULE_SECONDS))
+        .and_then(|secs| secs.checked_mul(1_000_000))
+    {
+        Some(micros) => micros,
+        None => {
+            log::warn!(
+                "[anomaly_detection] unusable schedule_interval '{interval}', using the 5 minute default"
+            );
+            DEFAULT_MICROS
+        }
+    }
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
@@ -4317,6 +4356,7 @@ async fn handle_alert_triggers(
                 eval_level,
                 Some(start_time),
                 triggered_at,
+                now,
             )
             .await
         {
@@ -5313,6 +5353,18 @@ async fn handle_derived_stream_triggers(
         }
     };
 
+    let (pipeline, move_to) = match check_trigger_key(&trigger, pipeline).await? {
+        TriggerKeyCheck::Current(pipeline) => (pipeline, None),
+        TriggerKeyCheck::MoveAfterRun(pipeline, full_key) => (pipeline, Some(full_key)),
+        TriggerKeyCheck::Deleted => {
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] deleted stale trigger {}",
+                trigger.module_key
+            );
+            return Ok(());
+        }
+    };
+
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
@@ -5921,7 +5973,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
+    if let Err(e) = write_derived_stream_run_end(new_trigger, move_to, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             pipeline.org,
@@ -5930,6 +5982,75 @@ async fn handle_derived_stream_triggers(
         );
     }
 
+    Ok(())
+}
+
+/// Compares full keys, because a parsed key holds only the first part of a name with a slash.
+async fn check_trigger_key(
+    trigger: &db::scheduler::Trigger,
+    pipeline: config::meta::pipeline::Pipeline,
+) -> Result<TriggerKeyCheck, anyhow::Error> {
+    if pipeline.scheduler_module_key().as_deref() == Some(trigger.module_key.as_str()) {
+        return Ok(TriggerKeyCheck::Current(pipeline));
+    }
+    // The cache can be old, and an unchecked row must not run: it could repeat the current row.
+    let pipeline = infra::pipeline::get_by_id(&pipeline.id)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "trigger {} differs from its cached pipeline, and the read failed: {e}",
+                trigger.module_key
+            )
+        })?;
+    crate::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
+    let full_key = pipeline.scheduler_module_key();
+    if full_key.as_deref() == Some(trigger.module_key.as_str()) {
+        return Ok(TriggerKeyCheck::Current(pipeline));
+    }
+    if let Some(full_key) = full_key
+        && pipeline.enabled
+        && !db::scheduler::exists(
+            &trigger.org,
+            db::scheduler::TriggerModule::DerivedStream,
+            &full_key,
+        )
+        .await
+    {
+        return Ok(TriggerKeyCheck::MoveAfterRun(pipeline, full_key));
+    }
+    db::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::DerivedStream,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(TriggerKeyCheck::Deleted)
+}
+
+async fn write_derived_stream_run_end(
+    new_trigger: db::scheduler::Trigger,
+    move_to: Option<String>,
+    trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    let Some(full_key) = move_to else {
+        db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+        return Ok(());
+    };
+    // The background path only queues the write, and rename_key would then still see Processing.
+    db::scheduler::update_trigger(new_trigger.clone(), false, trace_id).await?;
+    let moved = db::scheduler::rename_key(
+        &new_trigger.org,
+        new_trigger.module,
+        &new_trigger.module_key,
+        &full_key,
+    )
+    .await?;
+    if !moved {
+        log::warn!(
+            "[SCHEDULER] trigger {} did not move to {full_key}; its next run retries",
+            new_trigger.module_key
+        );
+    }
     Ok(())
 }
 
@@ -7432,6 +7553,110 @@ mod tests {
 
     use super::*;
 
+    #[tokio::test]
+    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
+        use config::meta::alerts::{
+            Aggregation,
+            grouping::{GroupObservation, classify_groups_by, group_key},
+            level::AlertLevel,
+        };
+        use svix_ksuid::KsuidLike;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+
+        let org = format!("deadline_{}", now_micros());
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(
+            &org,
+            folder,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .unwrap();
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.org_id = org.clone();
+        alert.name = "deadline".to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.destinations = vec!["deadline-dest".to_string()];
+        alert.query_condition.aggregation = Some(
+            serde_json::from_value::<Aggregation>(serde_json::json!({
+                "group_by": ["host"],
+                "function": "count",
+                "having": {"column": "value", "operator": ">", "value": 1},
+                "multi_alert": true,
+            }))
+            .unwrap(),
+        );
+        // Group rows are written only for a stored alert that still has multi_alert on.
+        let alert = infra::table::alerts::create(
+            infra::db::get_orm_client_rw().await,
+            &org,
+            "default",
+            alert,
+            false,
+        )
+        .await
+        .unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        let hosts = ["a", "b"];
+        let labels = |host: &str| std::collections::BTreeMap::from([("host".into(), host.into())]);
+        let observations = hosts
+            .iter()
+            .map(|host| GroupObservation::new(labels(host), 5.0))
+            .collect();
+        let classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), 100);
+        let records: Vec<_> = hosts
+            .iter()
+            .map(|host| {
+                serde_json::json!({"host": host, "value": 5})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+        let now = now_micros();
+        let outcome = dispatch_per_group(
+            &alert,
+            "default",
+            "trace",
+            Some(&classification),
+            &records,
+            now,
+            Some(AlertLevel::Critical),
+            None,
+            now,
+            now - 1_801 * 1_000_000,
+        )
+        .await
+        .expect("a classified alert with an id dispatches");
+
+        assert_eq!(outcome.failed, 2, "{:?}", outcome.errors);
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert!(
+            outcome.errors.iter().all(|e| e.contains("deadline")),
+            "{:?}",
+            outcome.errors
+        );
+        for host in hosts {
+            let state = infra::table::alert_states::get(&alert_id, &group_key(&labels(host)))
+                .await
+                .unwrap()
+                .expect("the plan wrote the group row");
+            assert_eq!(state.silenced_until, None);
+            assert_eq!(state.last_outcome, Some(RunOutcome::NotifyFailed));
+        }
+    }
+
     #[test]
     fn a_scheduled_run_refuses_a_pipeline_bound_to_another_org() {
         let query = |org: &str| {
@@ -8564,31 +8789,31 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_detection_interval_invalid_suffix_defaults_to_five_minutes() {
-        // Unknown suffix falls through to the bare-number branch which tries parse().
-        // "abc" parse fails → unwrap_or(5) * 60 * 1_000_000
-        let result = parse_detection_interval_to_micros("abcm");
-        // "abcm".strip_suffix('m') = Some("abc"), parse::<i64>() fails → unwrap_or(5)
-        assert_eq!(result, 5 * 60 * 1_000_000);
+    fn test_parse_detection_interval_days_and_seconds_keep_what_the_user_saved() {
+        assert_eq!(parse_detection_interval_to_micros("1d"), 86_400 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("90s"), 90 * 1_000_000);
     }
 
     #[test]
-    fn test_parse_detection_interval_invalid_hour_defaults_to_one_hour() {
-        // "xh" → strip_suffix('h') = Some("x"), parse fails → unwrap_or(1) * 3600
-        let result = parse_detection_interval_to_micros("xh");
-        assert_eq!(result, 3600 * 1_000_000);
+    fn test_parse_detection_interval_below_the_floor_runs_at_the_floor() {
+        assert_eq!(parse_detection_interval_to_micros("30s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1s"), 60 * 1_000_000);
+        assert_eq!(parse_detection_interval_to_micros("1m"), 60 * 1_000_000);
     }
 
     #[test]
-    fn test_parse_detection_interval_empty_string_defaults() {
-        // Empty string: no suffix matches, parse fails → unwrap_or(5) * 60
-        let result = parse_detection_interval_to_micros("");
-        assert_eq!(result, 5 * 60 * 1_000_000);
+    fn test_parse_detection_interval_unparsable_defaults_to_five_minutes() {
+        for interval in ["abcm", "xh", "", "1w", "9999999999999d", "999999999999999"] {
+            assert_eq!(
+                parse_detection_interval_to_micros(interval),
+                5 * 60 * 1_000_000,
+                "{interval}"
+            );
+        }
     }
 
     #[test]
     fn test_parse_detection_interval_whitespace_trimmed() {
-        // Surrounding whitespace is trimmed before parsing
         let result = parse_detection_interval_to_micros("  3m  ");
         assert_eq!(result, 3 * 60 * 1_000_000);
     }
@@ -8600,16 +8825,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_detection_interval_zero_minutes() {
-        // "0m" → 0 * 60 * 1_000_000 = 0
-        let result = parse_detection_interval_to_micros("0m");
-        assert_eq!(result, 0);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_zero_hours() {
-        let result = parse_detection_interval_to_micros("0h");
-        assert_eq!(result, 0);
+    fn test_parse_detection_interval_zero_or_negative_defaults_to_five_minutes() {
+        for interval in ["0m", "0h", "0", "-5m", "-1"] {
+            assert_eq!(
+                parse_detection_interval_to_micros(interval),
+                5 * 60 * 1_000_000,
+                "{interval}"
+            );
+        }
     }
 
     // ── get_pipeline_info_from_module_key additional edge cases ──────────────

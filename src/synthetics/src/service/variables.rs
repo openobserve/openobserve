@@ -111,7 +111,7 @@ impl std::fmt::Display for NameConflict {
 impl std::error::Error for NameConflict {}
 
 /// What `_resync` actually enqueued, and the environments whose batch could not be built.
-#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct ResyncSummary {
     pub environments: usize,
     pub variables: usize,

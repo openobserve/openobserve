@@ -119,7 +119,13 @@ pub async fn update_org_setting<F>(org_id: &str, apply: F) -> Result<bool, anyho
 where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
-    update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
+    let written = update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await?;
+    // The store write skips `db::put`, so the other regions only see what is queued here.
+    #[cfg(feature = "enterprise")]
+    if let Some(value) = &written {
+        super_cluster::organization_setting_put(org_id, value.clone()).await?;
+    }
+    Ok(written.is_some())
 }
 
 /// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
@@ -445,6 +451,23 @@ mod super_cluster {
         }
         Ok(())
     }
+
+    pub async fn organization_setting_put(
+        org_id: &str,
+        value: bytes::Bytes,
+    ) -> Result<(), anyhow::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let key = format!("{}/{org_id}", super::ORG_SETTINGS_KEY_PREFIX);
+            o2_enterprise::enterprise::super_cluster::queue::put(
+                &key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 fn to_organization(org: organizations::OrganizationRecord) -> Organization {
@@ -456,11 +479,12 @@ fn to_organization(org: organizations::OrganizationRecord) -> Organization {
     }
 }
 
+/// Returns the stored bytes when it wrote, the full value the other regions must receive.
 async fn update_org_setting_in<F>(
     store: &dyn infra::db::Db,
     org_id: &str,
     apply: F,
-) -> Result<bool, anyhow::Error>
+) -> Result<Option<bytes::Bytes>, anyhow::Error>
 where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
@@ -482,8 +506,8 @@ where
                 if !apply(&mut settings) {
                     return Ok(None);
                 }
-                let value = json::to_vec(&settings)?.into();
-                *slot.lock().unwrap() = Some(settings);
+                let value: bytes::Bytes = json::to_vec(&settings)?.into();
+                *slot.lock().unwrap() = Some((settings, value.clone()));
                 // NATS can only create a missing key through the insert slot.
                 Ok(Some(if existed {
                     (Some(value), None)
@@ -493,11 +517,11 @@ where
             }),
         )
         .await?;
-    let Some(settings) = written.lock().unwrap().take() else {
-        return Ok(false);
+    let Some((settings, value)) = written.lock().unwrap().take() else {
+        return Ok(None);
     };
     ORGANIZATION_SETTING.write().await.insert(key, settings);
-    Ok(true)
+    Ok(Some(value))
 }
 
 async fn apply_event(ev: db::Event) {
@@ -729,16 +753,17 @@ mod tests {
         })
         .await
         .unwrap();
-        assert!(created);
+        assert_eq!(created, store.stored.lock().unwrap().clone());
+        assert!(created.is_some());
         let updated = update_org_setting_in(&store, org_id, |s| {
             s.scrape_interval += 1;
             true
         })
         .await
         .unwrap();
-        assert!(updated);
-        let stored: OrganizationSetting =
-            json::from_slice(&store.stored.lock().unwrap().clone().unwrap()).unwrap();
+        let stored_bytes = store.stored.lock().unwrap().clone();
+        assert_eq!(updated, stored_bytes, "regions would get another value");
+        let stored: OrganizationSetting = json::from_slice(&stored_bytes.unwrap()).unwrap();
         assert_eq!(stored.scrape_interval, 8);
         assert_eq!(
             ORGANIZATION_SETTING
@@ -754,7 +779,7 @@ mod tests {
         let unchanged = update_org_setting_in(&store, org_id, |_| false)
             .await
             .unwrap();
-        assert!(!unchanged);
+        assert!(unchanged.is_none(), "a no-op apply has nothing to sync");
         assert!(!store.wrote.load(Ordering::SeqCst), "a no-op apply wrote");
     }
 
