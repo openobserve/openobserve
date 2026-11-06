@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type Ref } from "vue";
-import { useQuery } from "@tanstack/vue-query";
+import { queryOptions, useQuery } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
 import {
   USER_DATA_STREAM_TYPES,
   isUserDataStream,
@@ -28,13 +29,17 @@ import { isSampleStreamName } from "@/utils/sampleData/catalog";
 export const isOwnedStream = (stream: StreamOwnership, type: string) =>
   isUserDataStream(stream, type) && !(stream.name ?? "").startsWith("synthetics_");
 
+// its own cache entry: the header reads on every page load, and that list must not stand in for a page's list later
+const probeQuery = (org: string, type: string) =>
+  queryOptions({ ...streamNameListQuery(org, type), queryKey: streamKeys.hasDataProbe(org, type) });
+
 const userStreamNames = (list: StreamOwnership[] | undefined, type: string) =>
   (list ?? []).filter((s) => isOwnedStream(s, type)).map((s) => s.name ?? "");
 
 /** True when the org has any logs, metrics or traces stream that O2 does not write itself. */
 export const fetchHasUserStreams = async (org: string): Promise<boolean> => {
   const lists = await Promise.all(
-    USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(streamNameListQuery(org, type))),
+    USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(probeQuery(org, type))),
   );
   return lists.some((list, i) => userStreamNames(list, USER_DATA_STREAM_TYPES[i]).length > 0);
 };
@@ -47,7 +52,7 @@ export const useSampleDataPresence = (
   const lists = USER_DATA_STREAM_TYPES.map((type) =>
     useQuery(
       computed(() =>
-        Object.assign(streamNameListQuery(org.value, type), {
+        Object.assign(probeQuery(org.value, type), {
           enabled: !!org.value && enabled.value,
         }),
       ),

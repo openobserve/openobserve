@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
+import { streamKeys } from "@/services/stream.querykeys";
 import { fetchHasUserStreams } from "./useSampleDataPresence";
 
 const STREAMS_URL = `${store.state.API_ENDPOINT}/api/:org/streams`;
@@ -61,5 +62,11 @@ describe("fetchHasUserStreams", () => {
   it("counts a sample stream as data", async () => {
     mockLogs(["o2_demo_app_logs"]);
     expect(await fetchHasUserStreams("default")).toBe(true);
+  });
+
+  it("keeps its read out of the stream list a page uses", async () => {
+    mockLogs(["app_logs"]);
+    await fetchHasUserStreams("default");
+    expect(queryClient.getQueryData(streamKeys.nameList("default", "logs"))).toBeUndefined();
   });
 });
