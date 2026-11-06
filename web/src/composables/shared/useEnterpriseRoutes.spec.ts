@@ -274,6 +274,12 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(names).not.toContain("fleetConfigEditor");
     });
 
+    it("should not register AutoObserve, so its coverage drawer charts never render on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.map((route: any) => route.name)).not.toContain("autoobserve");
+      expect(routes.map((route: any) => route.path)).not.toContain("auto-observe-2");
+    });
+
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
     // private-VPC-agent half stays enterprise, so the pages register in an OSS
     // build and the backend `/config` flag decides whether they are reachable.

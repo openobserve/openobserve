@@ -15,7 +15,14 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import {
+  accessDeniedMessage,
+  accessReason,
+  permissionLabel,
+  viewDenial,
+} from "@/composables/useAccessStore";
 import type { AutoObserveCellState } from "@/services/autoobserve";
+import type { ChartRange } from "../coverageSeries";
 import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
 
 export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
@@ -422,3 +429,91 @@ export const moreText = (t: TranslateFn, locale: string, total: number, shown: n
 
 export const seeAllText = (t: TranslateFn, locale: string, total: number) =>
   t("autoobserveLive.suggestions.seeAll", { total: count(locale, total) }, total);
+
+export type ChartReasonKind =
+  | "empty"
+  | "noSpanStatus"
+  | "noLevel"
+  | "noDuration"
+  | "noTraces"
+  | "noMatch"
+  | "failedQuery"
+  | "failedMatch"
+  | "deniedQuery"
+  | "deniedMatch";
+
+export interface ChartText {
+  reason: I18nText;
+  detail: I18nText | null;
+}
+
+const CHART_REASON: Record<
+  | "noSpanStatus"
+  | "noLevel"
+  | "noDuration"
+  | "noTraces"
+  | "noMatch"
+  | "failedQuery"
+  | "failedMatch",
+  I18nKey
+> = {
+  noSpanStatus: "autoobserveLive.charts.noSpanStatus",
+  noLevel: "autoobserveLive.charts.noLevel",
+  noDuration: "autoobserveLive.charts.noDuration",
+  noTraces: "autoobserveLive.charts.noTraces",
+  noMatch: "autoobserveLive.charts.noMatch",
+  failedQuery: "autoobserveLive.charts.failedQuery",
+  failedMatch: "autoobserveLive.charts.failedMatch",
+};
+
+const CHART_EMPTY: Record<ChartRange, I18nKey> = {
+  "1h": "autoobserveLive.charts.empty1h",
+  "24h": "autoobserveLive.charts.empty24h",
+  "7d": "autoobserveLive.charts.empty7d",
+};
+
+const CHART_EMPTY_PARTIAL: Record<ChartRange, I18nKey> = {
+  "1h": "autoobserveLive.charts.emptyPartial1h",
+  "24h": "autoobserveLive.charts.emptyPartial24h",
+  "7d": "autoobserveLive.charts.emptyPartial7d",
+};
+
+// A denial words itself through the shared access copy, so it reads like every other 403 in the app.
+const deniedText = (t: TranslateFn, stream: string | null): ChartText => {
+  if (stream == null) {
+    const message = accessDeniedMessage([viewDenial("service_streams", "get")], t);
+    const [group] = message.groups;
+    return { reason: message.title, detail: group ? accessReason(group, t) : null };
+  }
+  const resource = raw(stream);
+  return {
+    reason: t("accessBoundary.denied.view", { resource }),
+    detail: t("accessBoundary.denied.missing", {
+      permission: permissionLabel("get", t),
+      resource,
+    }),
+  };
+};
+
+export const chartText = (
+  t: TranslateFn,
+  kind: ChartReasonKind,
+  vars: {
+    service: string;
+    stream: string;
+    range: ChartRange;
+    partial: boolean;
+    message: string | null;
+  },
+): ChartText => {
+  if (kind === "empty") {
+    const keys = vars.partial ? CHART_EMPTY_PARTIAL : CHART_EMPTY;
+    return { reason: t(keys[vars.range], { service: vars.service }), detail: null };
+  }
+  if (kind === "deniedMatch") return deniedText(t, null);
+  if (kind === "deniedQuery") return deniedText(t, vars.stream);
+  return {
+    reason: t(CHART_REASON[kind], { service: vars.service, stream: vars.stream }),
+    detail: vars.message ? raw(vars.message) : null,
+  };
+};

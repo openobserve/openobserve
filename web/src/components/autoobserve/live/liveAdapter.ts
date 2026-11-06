@@ -354,6 +354,13 @@ const toRow = (
     cells,
     checks,
     detectors: new Set(coveringMonitors(row)).size,
+    identity: {
+      serviceId: row.service_id,
+      serviceName: row.service_name,
+      cluster: row.cluster,
+      namespace: row.namespace,
+      streams: row.streams ?? [],
+    },
     status: watched
       ? { state: "watched", label: coverageWord(t, "watched") }
       : { state: "gap", label: coverageWord(t, "gap") },

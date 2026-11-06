@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { gt } from "@/types/i18n";
@@ -24,9 +24,26 @@ import { coverageFor, detectorsOf, type CoverageRow } from "./fixtures";
 import { toCoverageSource } from "./live/liveAdapter";
 import { LIVE_DOT } from "./live/liveCopy";
 
+const api = vi.hoisted(() => ({ correlate: vi.fn(), getStream: vi.fn(), fetch: vi.fn() }));
+
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
+  default: { name: "ChartRenderer", template: "<div />" },
+}));
+vi.mock("@/services/service_streams", () => ({
+  default: { correlate: (...args: unknown[]) => api.correlate(...args) },
+}));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: (...args: unknown[]) => api.getStream(...args) }),
+}));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: (...args: unknown[]) => api.fetch(...args),
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
 }));
 
 const DrawerStub = { template: "<div><slot name='header' /><slot /></div>" };
@@ -45,7 +62,10 @@ const cell = (state: string, by?: string) => ({
   counts: {},
 });
 
-const liveRow = (cells: Record<string, ReturnType<typeof cell>>) =>
+const liveRow = (
+  cells: Record<string, ReturnType<typeof cell>>,
+  streams: { type: string; name: string }[] = [],
+) =>
   toCoverageSource(
     gt,
     {
@@ -55,7 +75,14 @@ const liveRow = (cells: Record<string, ReturnType<typeof cell>>) =>
       quality: null,
       classes: [],
       rows: [
-        { service_name: "checkout", cluster: "prod-eu", namespace: "shop", streams: [], cells },
+        {
+          service_id: "trace/checkout",
+          service_name: "checkout",
+          cluster: "prod-eu",
+          namespace: "shop",
+          streams,
+          cells,
+        },
       ],
     } as unknown as AutoObserveCoverage,
     { status: "ready", retry: () => undefined },
@@ -114,7 +141,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(dot(1)).toContain(LIVE_DOT.problem);
     expect(dot(2)).toContain(LIVE_DOT.covered);
     const charts = wrapper.findAllComponents(ChartStub).map((c) => c.props("def").signal);
-    expect(charts).toEqual(["errors", "latency"]);
+    expect(charts).toEqual(["requests", "errors", "latency"]);
     const other = wrapper.find('[data-test="autoobserve-coverage-drawer-extra"]').text();
     expect(other).toContain("Saturation");
     expect(other).not.toContain("Absence");
@@ -163,7 +190,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(lines).toEqual(["No monitor watches errors, latency, or absence"]);
   });
 
-  it("opens the absence check's detail from its chip, since absence has no chart", async () => {
+  it("opens the absence check's detail from its chip", async () => {
     const row = liveRow({
       errors: cell("none"),
       latency: cell("none"),
@@ -197,6 +224,93 @@ describe("CoverageServiceDrawer in live mode", () => {
         .find('[data-test="autoobserve-coverage-drawer-chip-absence"]')
         .attributes("aria-expanded"),
     ).toBe("true");
+  });
+});
+
+describe("CoverageServiceDrawer live charts", () => {
+  const TRACES = [{ type: "traces", name: "app_traces" }];
+  const mountLive = (row: CoverageRow) =>
+    mount(CoverageServiceDrawer, {
+      props: {
+        row,
+        serviceStates: { [row.service]: "watched" },
+        scenario: "demo",
+        ledger: [],
+        expanded: null,
+        anchor: "body",
+        fix: null,
+        message: "",
+        live: true,
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: { ODrawer: DrawerStub, CoverageSignalDetail: true },
+      },
+    });
+
+  it("charts requests, errors and latency from the service's own data", async () => {
+    api.correlate.mockResolvedValue({
+      data: {
+        service_name: "checkout",
+        matched_dimensions: {},
+        additional_dimensions: {},
+        related_streams: {
+          logs: [],
+          traces: [
+            {
+              stream_name: "app_traces",
+              stream_type: "traces",
+              filters: { service_name: "checkout" },
+            },
+          ],
+          metrics: [],
+          profiles: [],
+        },
+      },
+    });
+    api.getStream.mockResolvedValue({
+      schema: [
+        { name: "span_status", type: "Utf8" },
+        { name: "duration", type: "Int64" },
+      ],
+    });
+    const row = liveRow(
+      {
+        errors: cell("none"),
+        latency: cell("covered", "checkout-p99"),
+        absence: cell("covered", "checkout-heartbeat"),
+      },
+      TRACES,
+    );
+    const wrapper = mountLive(row);
+    await flushPromises();
+    const call = api.fetch.mock.calls[0];
+    if (call) {
+      const step = 15 * 60_000;
+      const t = new Date(Math.floor(Date.now() / step) * step - step).toISOString().slice(0, 19);
+      call[1].data(call[0], {
+        type: "search_response_hits",
+        content: { results: { hits: [{ t, n: 90, e: 9, p95: 120_000 }] } },
+      });
+      call[1].complete(call[0], {});
+    }
+    await flushPromises();
+    const sections = wrapper
+      .findAll('section[data-test^="autoobserve-coverage-chart-"]')
+      .map((s) => s.attributes("data-test"));
+    expect(sections).toEqual([
+      "autoobserve-coverage-chart-requests",
+      "autoobserve-coverage-chart-errors",
+      "autoobserve-coverage-chart-latency",
+    ]);
+    expect(wrapper.find('[data-test^="autoobserve-coverage-chart-nodata-"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Chart not available yet");
+    const value = (signal: string) =>
+      wrapper.find(`[data-test="autoobserve-coverage-chart-value-${signal}"]`).text();
+    expect(value("requests")).toBe("6/min");
+    expect(value("errors")).toBe("10%");
+    expect(value("latency")).toBe("120 ms");
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-range"]').exists()).toBe(true);
   });
 });
 

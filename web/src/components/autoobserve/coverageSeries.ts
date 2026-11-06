@@ -34,16 +34,17 @@ export interface MetricDef {
 }
 
 export interface MetricSeries {
-  points: [number, number][];
+  // A null value is a bucket with nothing to measure, drawn as a gap rather than a zero.
+  points: [number, number | null][];
   band: [number, number, number][] | null;
   anomalies: [number, number][];
-  current: number;
-  previous: number;
+  current: number | null;
+  previous: number | null;
   low: number | null;
   high: number | null;
 }
 
-const STEPS: Record<ChartRange, { count: number; stepMs: number }> = {
+export const STEPS: Record<ChartRange, { count: number; stepMs: number }> = {
   "1h": { count: 60, stepMs: 60_000 },
   "24h": { count: 96, stepMs: 15 * 60_000 },
   "7d": { count: 168, stepMs: 60 * 60_000 },

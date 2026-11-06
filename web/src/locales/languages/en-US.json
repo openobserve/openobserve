@@ -30546,6 +30546,26 @@
       "monitorLine": "{kind} · {state}",
       "noMonitor": "No monitor matches"
     },
+    "charts": {
+      "empty1h": "No data from {service} in the last hour",
+      "empty24h": "No data from {service} in the last 24 h",
+      "empty7d": "No data from {service} in the last 7 days",
+      "emptyPartial1h": "No data from {service} in the searched part of the last hour",
+      "emptyPartial24h": "No data from {service} in the searched part of the last 24 h",
+      "emptyPartial7d": "No data from {service} in the searched part of the last 7 days",
+      "noSpanStatus": "No span status in {stream}",
+      "noLevel": "No log level in {stream}",
+      "noDuration": "No duration field in {stream}",
+      "noTraces": "Latency is charted from traces. {service} sends none.",
+      "noMatch": "This service can't be matched to its streams",
+      "failedQuery": "Couldn't load this chart from {stream}",
+      "failedMatch": "Couldn't look up the streams of {service}",
+      "partial": "Partial data",
+      "wide": "Includes other services that share this stream",
+      "loading": "Loading {metric}",
+      "summary": "{metric}, {value} now",
+      "summaryNone": "{metric}, nothing measured in the newest bucket"
+    },
     "suggestions": {
       "serviceMeta": "{where}, about {traffic} events an hour",
       "trafficOnly": "About {traffic} events an hour",
