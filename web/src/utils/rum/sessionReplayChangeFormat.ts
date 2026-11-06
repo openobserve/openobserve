@@ -32,9 +32,7 @@
  *     (`scope.resetIds()`), so decoding stays deterministic as long as records are
  *     processed in order and each snapshot begins with a FullSnapshot record.
  *   - Strings are de-duplicated via a string table; `AddString` and `AddRoleAnnotatedStrings`
- *     changes append to it, `ClearStrings` empties it (ids restart at 0), and other changes
- *     reference entries by numeric index. SDK v7.10+ always uses `AddRoleAnnotatedStrings`.
- *     The role only tells the intake what kind of data a string is, so playback ignores it.
+ *     changes append to it and other changes reference entries by numeric index.
  *   - An `AddNode` change is `[insertionPoint, nodeName, ...attributeAssignments]`. The
  *     insertion point encodes position relative to already-assigned ids:
  *        null  -> root node (the #document)
@@ -80,10 +78,10 @@ const ChangeType = {
   InputValue: 12,
   InputSelection: 13,
   ClearStrings: 14,
-  // ImageContent (15) points at a canvas image the SDK uploads to a Datadog-only resource endpoint, so it is skipped.
+  // Skipped: references a canvas image uploaded to a resource endpoint OpenObserve does not have.
+  ImageContent: 15,
 } as const;
 
-// InputSelection states.
 const InputSelectionState = {
   Selected: 0,
   Deselected: 1,
@@ -195,14 +193,36 @@ export function createRecordConverter(): RecordConverter {
     return value;
   }
 
-  // AddRoleAnnotatedStrings: each group is [role, ...strings]; ids stay positional, as with AddString.
-  function addRoleAnnotatedStrings(change: any[]) {
-    for (let i = 1; i < change.length; i++) {
-      const roleGroup = change[i];
-      if (!Array.isArray(roleGroup)) continue;
-      for (let j = 1; j < roleGroup.length; j++) {
-        stringTable.push(roleGroup[j] as string);
-      }
+  // Applies a string-table change and returns true, or returns false for any other change type.
+  function applyStringChange(group: any[]): boolean {
+    switch (group[0]) {
+      case ChangeType.AddString:
+        for (let i = 1; i < group.length; i++) {
+          stringTable.push(group[i] as string);
+        }
+        return true;
+      case ChangeType.AddRoleAnnotatedStrings:
+        // Each group is [role, ...strings]; playback ignores the role and ids stay positional.
+        for (let i = 1; i < group.length; i++) {
+          const roleGroup = group[i];
+          if (!Array.isArray(roleGroup)) continue;
+          for (let j = 1; j < roleGroup.length; j++) {
+            stringTable.push(roleGroup[j] as string);
+          }
+        }
+        return true;
+      case ChangeType.ClearStrings:
+        stringTable = [];
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  // Depth-first over descendants; visit returns true to descend into that child.
+  function walkChildren(node: any, visit: (child: any) => boolean) {
+    for (const child of node.childNodes ?? []) {
+      if (visit(child)) walkChildren(child, visit);
     }
   }
 
@@ -212,53 +232,41 @@ export function createRecordConverter(): RecordConverter {
     selected: boolean,
   ): { id: number; text: string; isChecked: boolean; optionId?: number } | null {
     const tracked = nodes.get(nodeId);
-    const node = tracked?.node;
-    const attrs = node?.attributes;
+    if (!tracked) return null;
+    const node = tracked.node;
+    const attrs = node.attributes;
     if (attrs?.type === "checkbox" || attrs?.type === "radio") {
       return { id: nodeId, text: attrs.value ?? "", isChecked: selected };
     }
-    // The SDK records a <select> change as the newly selected <option> (possibly inside an <optgroup>).
-    if (node?.tagName !== "option" || !selected) return null;
-    let parentId = tracked!.parentId;
-    let parent = nodes.get(parentId)?.node;
-    if (parent?.tagName === "optgroup") {
-      parentId = nodes.get(parentId)!.parentId;
-      parent = nodes.get(parentId)?.node;
-    }
-    if (parent?.tagName !== "select") return null;
-    return { id: parentId, text: optionValue(node), isChecked: false, optionId: nodeId };
+    // The SDK records a <select> pick as the selected <option>, which may sit in an <optgroup>.
+    if (node.tagName !== "option" || !selected) return null;
+    let parent = nodes.get(tracked.parentId);
+    if (parent?.node.tagName === "optgroup") parent = nodes.get(parent.parentId);
+    if (parent?.node.tagName !== "select") return null;
+    return { id: parent.node.id, text: optionValue(node), isChecked: false, optionId: nodeId };
   }
 
-  // Like the DOM: an <option> without a value attribute takes the text of its Text descendants
-  // (outside <script>), with ASCII whitespace stripped and collapsed (a non-breaking space is kept).
+  // DOM rule: with no value attribute, the text outside <script> with ASCII whitespace collapsed.
   function optionValue(option: any): string {
     if (option.attributes?.value !== undefined) return option.attributes.value;
     const parts: string[] = [];
-    const collect = (n: any) => {
-      for (const child of n.childNodes ?? []) {
-        if (child.type === NodeType.Text) parts.push(child.textContent ?? "");
-        else if (child.tagName !== "script") collect(child);
-      }
-    };
-    collect(option);
+    walkChildren(option, (child) => {
+      if (child.type === NodeType.Text) parts.push(child.textContent ?? "");
+      return child.tagName !== "script";
+    });
     return parts
       .join("")
       .replace(/[\t\n\f\r ]+/g, " ")
       .replace(/^ | $/g, "");
   }
 
-  // rrweb rebuilds a <select>'s choice from its options' `selected` attributes, not from a value
-  // attribute, so mark the first matching option and, unless the <select> is `multiple`, clear the
-  // rest. No match (for example a masked value) leaves the options as recorded.
+  // rrweb rebuilds a <select> from its options' selected attributes; no match (a masked value) keeps them.
   function selectOption(select: any, isMatch: (option: any) => boolean) {
     const options: any[] = [];
-    const collect = (n: any) => {
-      for (const child of n.childNodes ?? []) {
-        if (child.tagName === "option") options.push(child);
-        else if (child.tagName === "optgroup") collect(child);
-      }
-    };
-    collect(select);
+    walkChildren(select, (child) => {
+      if (child.tagName === "option") options.push(child);
+      return child.tagName === "optgroup";
+    });
     const match = options.findIndex(isMatch);
     if (match === -1) return;
     const multiple = select.attributes?.multiple !== undefined;
@@ -422,7 +430,7 @@ export function createRecordConverter(): RecordConverter {
   }
 
   // Classic scroll and input records reference converter ids, so their latest state belongs in a rebuilt snapshot.
-  function trackClassic(record: any) {
+  function trackClassic(record: any, optionId?: number) {
     if (!record || record.type !== RecordType.IncrementalSnapshot || !record.data) return;
     const d = record.data;
     if (d.source === IncrementalSource.Scroll) {
@@ -430,9 +438,23 @@ export function createRecordConverter(): RecordConverter {
       changeCount++;
     }
     if (d.source === IncrementalSource.Input) {
-      inputs.set(d.id, { text: d.text, isChecked: d.isChecked });
+      inputs.set(d.id, { text: d.text, isChecked: d.isChecked, optionId });
       changeCount++;
     }
+  }
+
+  function inputRecord(
+    timestamp: number,
+    data: { id: number; text: string; isChecked: boolean },
+    optionId?: number,
+  ) {
+    const record = {
+      type: RecordType.IncrementalSnapshot,
+      timestamp,
+      data: { source: IncrementalSource.Input, ...data },
+    };
+    trackClassic(record, optionId);
+    return record;
   }
 
   function applyTracked(root: any) {
@@ -493,22 +515,9 @@ export function createRecordConverter(): RecordConverter {
     let initialOffset = { left: 0, top: 0 };
 
     for (const group of record.data as any[]) {
+      if (applyStringChange(group)) continue;
       const changeType = group[0];
       switch (changeType) {
-        case ChangeType.AddString:
-          for (let i = 1; i < group.length; i++) {
-            stringTable.push(group[i] as string);
-          }
-          break;
-
-        case ChangeType.AddRoleAnnotatedStrings:
-          addRoleAnnotatedStrings(group);
-          break;
-
-        case ChangeType.ClearStrings:
-          stringTable = [];
-          break;
-
         case ChangeType.AddNode:
           for (let i = 1; i < group.length; i++) {
             const change = group[i];
@@ -581,9 +590,7 @@ export function createRecordConverter(): RecordConverter {
           break;
 
         default:
-          // Attribute / Text / RemoveNode / VisualViewport / InputValue / InputSelection are not
-          // expected inside a full snapshot, and unknown types are skipped; ignore them here
-          // (handled in the incremental path).
+          // Mutation, input and viewport changes only arrive in Change records; unknown types are skipped.
           break;
       }
     }
@@ -613,22 +620,9 @@ export function createRecordConverter(): RecordConverter {
     const extraRecords: any[] = [];
 
     for (const group of record.data as any[]) {
+      if (applyStringChange(group)) continue;
       const changeType = group[0];
       switch (changeType) {
-        case ChangeType.AddString:
-          for (let i = 1; i < group.length; i++) {
-            stringTable.push(group[i] as string);
-          }
-          break;
-
-        case ChangeType.AddRoleAnnotatedStrings:
-          addRoleAnnotatedStrings(group);
-          break;
-
-        case ChangeType.ClearStrings:
-          stringTable = [];
-          break;
-
         case ChangeType.AddNode:
           for (let i = 1; i < group.length; i++) {
             const change = group[i];
@@ -784,24 +778,14 @@ export function createRecordConverter(): RecordConverter {
         case ChangeType.InputValue:
           for (let i = 1; i < group.length; i++) {
             const [nodeId, value] = group[i];
-            const input = {
-              type: RecordType.IncrementalSnapshot,
-              timestamp,
-              data: {
-                source: IncrementalSource.Input,
-                id: nodeId,
-                text: decodeStr(value),
-                isChecked: false,
-              },
-            };
-            trackClassic(input);
-            extraRecords.push(input);
+            extraRecords.push(
+              inputRecord(timestamp, { id: nodeId, text: decodeStr(value), isChecked: false }),
+            );
           }
           break;
 
         case ChangeType.InputSelection:
-          // Each change is [state, ...nodeIds]. Checkboxes and radios map to isChecked; a selected
-          // <option> maps to a value change on its <select>. Indeterminate has no classic equivalent.
+          // Each change is [state, ...nodeIds]; Indeterminate has no classic equivalent.
           for (let i = 1; i < group.length; i++) {
             const selection = group[i];
             if (!Array.isArray(selection)) continue;
@@ -815,14 +799,7 @@ export function createRecordConverter(): RecordConverter {
               );
               if (!result) continue;
               const { optionId, ...data } = result;
-              const input = {
-                type: RecordType.IncrementalSnapshot,
-                timestamp,
-                data: { source: IncrementalSource.Input, ...data },
-              };
-              trackClassic(input);
-              if (optionId !== undefined) inputs.get(data.id)!.optionId = optionId;
-              extraRecords.push(input);
+              extraRecords.push(inputRecord(timestamp, data, optionId));
             }
           }
           break;

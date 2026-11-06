@@ -769,8 +769,7 @@ describe("sessionReplayChangeFormat", () => {
           ],
         ]),
       );
-      // The SDK shape: [13, ...[state, ...nodeIds]]. A radio pick is one Selected change for the
-      // clicked radio and one Deselected change for the rest of its group.
+      // A radio pick: Selected for the clicked radio, Deselected for the rest of its group.
       const out = converter.convert(
         change(1100, [[INPUT_SELECTION, [0, 1], [0, 2], [1, 3], [2, 1], [0, 4]]]),
       );
@@ -804,8 +803,7 @@ describe("sessionReplayChangeFormat", () => {
       expect(out.map((r: any) => r.data)).toEqual([
         { source: 5, id: 1, text: "a", isChecked: false },
       ]);
-      // An <option> without a value attribute takes its whitespace-collapsed text; a Deselected
-      // <option> is ignored.
+      // A Deselected <option> is ignored; one without a value attribute yields its collapsed text.
       const out2 = converter.convert(change(1200, [[INPUT_SELECTION, [1, 2], [0, 4]]]));
       expect(out2.map((r: any) => r.data)).toEqual([
         { source: 5, id: 1, text: "Big Bee", isChecked: false },
@@ -917,7 +915,10 @@ describe("sessionReplayChangeFormat", () => {
           [TEXT, [2, 0]],
         ]),
       );
-      expect(out.length).toBeGreaterThan(0);
+      expect(out[0].data.texts).toEqual([
+        { id: 2, value: "first" },
+        { id: 2, value: "second" },
+      ]);
       expect(nodeWithId(converter.snapshot()!.node, 2).textContent).toBe("second");
     });
 
