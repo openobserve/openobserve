@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         width="sm"
         searchable
+        :dropdown-style="FIELD_DROPDOWN_STYLE"
         :aria-label="t('oncall.conditionFieldAria')"
         :data-test="`${testPrefix}-field-${index}`"
         @update:model-value="(v: unknown) => setField(row, v)"
@@ -126,7 +127,8 @@ const props = withDefaults(
   defineProps<{
     /** Read once on mount; a host re-seeds by changing the component's `key`. */
     modelValue?: Record<string, string>;
-    aliases?: { id: string; display?: string }[];
+    /** `fields` are the telemetry fields each group is made of, shown under its label. */
+    aliases?: { id: string; display?: string; fields?: string[] }[];
     catalogue?: DimensionCatalogue;
     /** Their values join the catalogue's as pickable options. */
     signals?: UnroutedSignal[];
@@ -160,6 +162,11 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 let nextKey = 0;
+
+/// How many of a field group's telemetry fields the picker names before "+N more".
+const SOURCES_SHOWN = 3;
+/// Wider than the field so a caption of telemetry fields stays on its one-line row.
+const FIELD_DROPDOWN_STYLE = { minWidth: "24rem" };
 
 /// What discovery saw, or the whole vocabulary when it saw nothing; fields signals and rules carry are always added.
 const fieldIds = computed<string[]>(() => {
@@ -240,11 +247,21 @@ function labelOf(id: string): I18nText {
   return raw(fieldLabel(id, props.aliases));
 }
 
+function sourcesOf(id: string): I18nText | undefined {
+  const fields = props.aliases.find((alias) => alias.id === id)?.fields ?? [];
+  if (!fields.length) return undefined;
+  const shown = raw(fields.slice(0, SOURCES_SHOWN).join(", "));
+  const more = fields.length - SOURCES_SHOWN;
+  return more > 0 ? t("oncall.ruleEditorFieldSourcesMore", { fields: shown, count: more }) : shown;
+}
+
 function fieldOptionsFor(row: ConditionRow) {
   const taken = new Set(rows.value.filter((other) => other !== row).map((other) => other.name));
   const ids =
     row.name && !fieldIds.value.includes(row.name) ? [...fieldIds.value, row.name] : fieldIds.value;
-  return ids.filter((id) => !taken.has(id)).map((id) => ({ label: labelOf(id), value: id }));
+  return ids
+    .filter((id) => !taken.has(id))
+    .map((id) => ({ label: labelOf(id), subLabel: sourcesOf(id), value: id }));
 }
 
 const operatorOptions = computed(() => [
