@@ -10419,7 +10419,6 @@
       "eyebrow": "Step {n} of {total}",
       "eyebrowOptional": "Step {n} of {total} · Optional",
       "optional": {
-        "tag": "Optional",
         "title": "Optional",
         "help": "Skip these unless you need them. The defaults work for most alerts."
       },
@@ -10450,7 +10449,7 @@
         "ne": "anything but"
       },
       "next": "Next: {title}",
-      "back": "Back",
+      "back": "Back: {title}",
       "needsFix": "{count} thing to fix | {count} things to fix",
       "howItChecks": "How it checks",
       "everyMinutes": "Every {count} min",
@@ -10526,7 +10525,9 @@
         "help": "Pick a name you will recognize in a notification. Everything else is optional.",
         "name": "Name",
         "folder": "Folder",
-        "unnamed": "Add a name"
+        "unnamed": "Add a name",
+        "autoName": "Suggested from your settings. It updates as you change them, until you type your own.",
+        "useSuggestion": "Use suggested name: {name}"
       },
       "rows": {
         "streamTypeLabel": "Type of data",

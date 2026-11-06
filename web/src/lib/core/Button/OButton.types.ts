@@ -86,6 +86,7 @@ export type ButtonSize =
   | "icon-md"
   | "icon-lg"
   | "icon-circle"
+  | "icon-circle-lg"
   | "icon-circle-sm"
   // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
   | "icon-toolbar"

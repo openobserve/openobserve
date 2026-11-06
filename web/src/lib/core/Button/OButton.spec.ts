@@ -225,6 +225,13 @@ describe("OButton", () => {
     expect(classes).toContain("rounded-full");
   });
 
+  it("applies icon-circle-lg size classes with rounded-full", () => {
+    const wrapper = mount(OButton, { props: { size: "icon-circle-lg" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("size-10");
+    expect(classes).toContain("rounded-full");
+  });
+
   it("applies icon-sm size classes (h-8 w-8)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-sm" } });
     const classes = wrapper.classes().join(" ");

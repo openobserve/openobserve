@@ -1167,21 +1167,18 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
-    it("gives Next the one primary action while creating, and Save on the last step", async () => {
+    it("keeps Save outlined while stepping and primary on the last step", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      const save = wrapper.findComponent('[data-test="add-alert-submit-btn"]');
-      const next = () => wrapper.findComponent('[data-test="add-alert-step-next-btn"]');
+      const save = () => wrapper.findComponent('[data-test="add-alert-submit-btn"]');
       wrapper.vm.activeSection = "watch";
       await flushPromises();
-      expect(wrapper.vm.guidesToNext).toBe(true);
-      expect(next().exists()).toBe(true);
+      expect(save().props("variant")).toBe("outline");
 
       wrapper.vm.activeSection = "details";
       await flushPromises();
-      expect(wrapper.vm.guidesToNext).toBe(false);
-      expect(next().exists()).toBe(false);
-      expect(save.exists()).toBe(true);
+      expect(save().props("variant")).toBe("primary");
+      expect(wrapper.find('[data-test="add-alert-footer"]').text()).not.toContain("Next");
     });
 
     it("does not save the alert when Enter commits the name", () => {
@@ -1232,24 +1229,25 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(false);
     });
 
-    it("steps from the footer: Back from the second section, Next names the following one", async () => {
+    it("steps from each section header: Back from the second step, Next names the following one", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      const back = '[data-test="add-alert-step-back-btn"]';
-      const next = '[data-test="add-alert-step-next-btn"]';
-      wrapper.vm.activeSection = "watch";
-      await flushPromises();
-      expect(wrapper.find(back).exists()).toBe(false);
-      expect(wrapper.find(next).text()).toBe("Next: When to alert");
+      const btn = (id: string, dir: string) => `[data-test="add-alert-section-${id}-${dir}"]`;
+      expect(wrapper.find(btn("watch", "prev")).exists()).toBe(false);
+      expect(wrapper.find(btn("watch", "next")).attributes("aria-label")).toBe(
+        "Next: When to alert",
+      );
+      expect(wrapper.find(btn("notify", "next")).attributes("aria-label")).toBe(
+        "Next: How often to check",
+      );
+      expect(wrapper.find(btn("details", "next")).exists()).toBe(false);
 
-      wrapper.vm.activeSection = "notify";
-      await flushPromises();
-      expect(wrapper.find(back).exists()).toBe(true);
-      expect(wrapper.find(next).text()).toBe("Next: How often to check");
-
-      wrapper.vm.activeSection = "details";
-      await flushPromises();
-      expect(wrapper.find(next).exists()).toBe(false);
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await wrapper.find(btn("notify", "next")).trigger("click");
+      expect(scrollToSection).toHaveBeenCalledWith("schedule");
+      await wrapper.find(btn("notify", "prev")).trigger("click");
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
     });
 
     it("names the alert types as ways of checking, keeping their ids", async () => {
@@ -1366,12 +1364,27 @@ describe("AddAlert (OForm owner)", () => {
       expect(found("cooldown")).toContain("cooldown");
     });
 
-    it("shows the name read-only in section 5; the header keeps the one editable field", async () => {
+    it("names the alert in a text field in section 5, offering the suggestion back once renamed", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-details-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(false);
+
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
+
+      const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      await input.setValue("checkout errors");
+      await flushPromises();
+      expect(wrapper.vm.formData.name).toBe("checkout_errors");
+      await input.setValue("checkout#errors");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
+      const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
+      await suggest.trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.formData.name).toBe(wrapper.vm.alertNameSuggestion);
     });
   });
 

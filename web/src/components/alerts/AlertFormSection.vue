@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, provide } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
 
@@ -30,10 +32,14 @@ const props = defineProps<{
   help: I18nText;
 }>();
 
+const emit = defineEmits<{ go: [id: AlertSectionId] }>();
+
 const { t } = useI18nTyped();
 const total = ALERT_SECTIONS.length;
 const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
 const icon = computed(() => def.value?.icon);
+const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
+const next = computed(() => ALERT_SECTIONS[props.index]);
 
 provide(SETTING_ROW_BARE_KEY, true);
 </script>
@@ -54,7 +60,7 @@ provide(SETTING_ROW_BARE_KEY, true);
       >
         <OIcon :name="icon" size="md" />
       </span>
-      <div class="flex min-w-0 flex-col gap-1">
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
           {{
             def?.optional
@@ -74,9 +80,33 @@ provide(SETTING_ROW_BARE_KEY, true);
           {{ help }}
         </p>
       </div>
+      <OButton
+        v-if="previous"
+        class="shrink-0 max-md:hidden"
+        variant="primary"
+        size="icon-circle-lg"
+        icon-left="arrow-upward"
+        :aria-label="t('alerts.sections.back', { title: t(previous.navKey) })"
+        :data-test="`add-alert-section-${id}-prev`"
+        @click="emit('go', previous.id)"
+      >
+        <OTooltip side="left" :content="t('alerts.sections.back', { title: t(previous.navKey) })" />
+      </OButton>
     </header>
     <div class="flex flex-1 flex-col ps-20 pe-6 pb-6 max-lg:ps-6 max-md:px-4">
       <slot />
+      <div v-if="next" class="sticky bottom-4 mt-auto flex justify-end pt-6 max-md:hidden">
+        <OButton
+          variant="primary"
+          size="icon-circle-lg"
+          icon-left="arrow-downward"
+          :aria-label="t('alerts.sections.next', { title: t(next.navKey) })"
+          :data-test="`add-alert-section-${id}-next`"
+          @click="emit('go', next.id)"
+        >
+          <OTooltip side="left" :content="t('alerts.sections.next', { title: t(next.navKey) })" />
+        </OButton>
+      </div>
     </div>
   </section>
 </template>

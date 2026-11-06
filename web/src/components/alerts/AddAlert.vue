@@ -244,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="1"
             :title="t('alerts.sections.watch.title')"
             :help="t('alerts.sections.watch.help')"
+            @go="goToSection"
           >
             <OSettingRow
               :label="t('alerts.sections.howItChecks')"
@@ -307,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="2"
             :title="t('alerts.sections.condition.title')"
             :help="t('alerts.sections.condition.help')"
+            @go="goToSection"
           >
             <div data-test="add-alert-query-card" data-snap-stop>
               <CompositeAlertForm
@@ -461,6 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="3"
             :title="t('alerts.sections.notify.title')"
             :help="t('alerts.sections.notify.help')"
+            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <div
@@ -510,6 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="4"
             :title="t('alerts.sections.schedule.title')"
             :help="t('alerts.sections.schedule.help')"
+            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <div
@@ -543,6 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="5"
             :title="t('alerts.sections.details.title')"
             :help="t('alerts.sections.details.help')"
+            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <OSettingRow
@@ -552,19 +557,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill
                 data-snap-stop
               >
-                <div class="flex min-w-0 items-center gap-2">
-                  <OTruncatedText
-                    class="text-text-heading min-w-0 text-sm font-medium"
-                    data-test="add-alert-details-name"
-                    >{{ formData.name || t("alerts.sections.details.unnamed") }}</OTruncatedText
+                <div
+                  class="flex max-w-120 min-w-0 flex-col gap-1.5"
+                  @input="onNameInput"
+                  @focusin="onNameFocus"
+                  @focusout="alertAutoName.onCommit(formData.name ?? '')"
+                >
+                  <OFormInput
+                    name="name"
+                    :placeholder="t('alerts.alertNamePlaceholder')"
+                    :aria-label="t('alerts.sections.details.name')"
+                    data-test="add-alert-details-name-input"
+                  />
+                  <span
+                    v-if="nameHasUnsupportedChars"
+                    class="text-status-error-text text-xs"
+                    role="alert"
+                    data-test="add-alert-details-name-error"
+                    >{{ t("alerts.nameNoSpecialChars") }}</span
+                  >
+                  <span
+                    v-if="alertAutoName.isAuto.value && formData.name"
+                    class="text-text-secondary text-xs"
+                    data-test="add-alert-details-name-auto"
+                    >{{ t("alerts.sections.details.autoName") }}</span
                   >
                   <OButton
+                    v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
+                    class="self-start"
                     variant="ghost-primary"
-                    size="sm"
-                    icon-left="edit"
-                    data-test="add-alert-details-rename-btn"
-                    @click="focusNameField"
-                    >{{ t("alerts.plain.rename") }}</OButton
+                    size="xs"
+                    data-test="add-alert-details-name-suggest"
+                    @click="alertAutoName.resetToAuto"
+                    >{{
+                      t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
+                    }}</OButton
                   >
                 </div>
               </OSettingRow>
@@ -738,16 +765,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-alert-footer"
       >
         <div class="me-auto flex min-w-0 items-center gap-4">
-          <OButton
-            v-if="previousSection"
-            class="max-md:hidden"
-            variant="outline"
-            size="sm-action"
-            icon-left="arrow-back"
-            data-test="add-alert-step-back-btn"
-            @click="goToSection(previousSection.id)"
-            >{{ t("alerts.sections.back") }}</OButton
-          >
           <AlertUnsavedChanges
             v-if="isEditingAlert"
             :changes="unsavedChanges"
@@ -777,16 +794,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("alerts.editMode.saveChanges")
                 : t("alerts.save")
           }}</OButton
-        >
-        <OButton
-          v-if="nextSection"
-          class="max-md:hidden"
-          :variant="guidesToNext ? 'primary' : 'outline'"
-          size="sm-action"
-          icon-right="arrow-forward"
-          data-test="add-alert-step-next-btn"
-          @click="goToSection(nextSection.id)"
-          >{{ t("alerts.sections.next", { title: t(nextSection.navKey) }) }}</OButton
         >
       </div>
     </OPageLayout>
@@ -895,6 +902,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { ALERT_NAME_UNSUPPORTED_CHARS } from "./AddAlert.schema";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useAutoName } from "@/composables/useAutoName";
@@ -1005,6 +1014,7 @@ export default defineComponent({
     OTooltip,
     OForm,
     OFormInlineEdit,
+    OFormInput,
     OFormSelect,
     OPageHeader,
     OTruncatedText,
@@ -1338,18 +1348,13 @@ export default defineComponent({
     watch(activeSection, (_, left) => {
       visitedSections.value = new Set([...visitedSections.value, left]);
     });
-    const sectionPosition = computed(() =>
-      Math.max(
-        0,
-        ALERT_SECTIONS.findIndex((section) => section.id === activeSection.value),
-      ),
-    );
-    const previousSection = computed(() => ALERT_SECTIONS[sectionPosition.value - 1]);
-    const nextSection = computed(() => ALERT_SECTIONS[sectionPosition.value + 1]);
+
     // Creating walks forward, so Next holds the one primary action until the last step.
     const guidesToNext = computed(
       () =>
-        !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value && !!nextSection.value,
+        !alertForm.beingUpdated.value &&
+        !alertForm.anomalyEditMode.value &&
+        activeSection.value !== ALERT_SECTIONS[ALERT_SECTIONS.length - 1].id,
     );
 
     // Filled by template refs after mount; until then every step renders its slices inline.
@@ -1566,9 +1571,6 @@ export default defineComponent({
       reveal: (el) => snapScrollRef.value?.revealElement(el),
     });
 
-    const focusNameField = () =>
-      (alertForm.step1Ref.value as { focus?: () => void } | null)?.focus?.();
-
     // A section opens all its settings while they fit the view; a group the user toggled is left alone.
     const userToggledTiers = new Set<AlertSectionId>();
     const autoOpenedTiers = reactive(new Set<AlertSectionId>());
@@ -1707,6 +1709,21 @@ export default defineComponent({
       apply: (name: string) => alertForm.setF("name", name),
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
+    const nameHasUnsupportedChars = computed(() =>
+      ALERT_NAME_UNSUPPORTED_CHARS.test(String(alertForm.formData.value?.name ?? "")),
+    );
+    // A generated name is a placeholder the user usually replaces, so focusing it selects it whole.
+    const onNameFocus = (event: FocusEvent) => {
+      if (alertAutoName.isAuto.value && event.target instanceof HTMLInputElement) {
+        event.target.select();
+      }
+    };
+    // Names cannot hold spaces, so a typed space becomes the underscore the error would ask for.
+    const onNameInput = () => {
+      alertAutoName.markManual();
+      const name = String(alertForm.formData.value?.name ?? "");
+      if (/\s/.test(name)) alertForm.setF("name", name.replace(/\s/g, "_"));
+    };
 
     return {
       raw,
@@ -1734,9 +1751,6 @@ export default defineComponent({
       activeSection,
       goToSection,
       ALERT_SECTIONS,
-      sectionPosition,
-      previousSection,
-      nextSection,
       guidesToNext,
       sectionTargets,
       setSectionTarget,
@@ -1755,7 +1769,10 @@ export default defineComponent({
       onTierToggle,
       autoOpenedTiers,
       settingFind,
-      focusNameField,
+      alertNameSuggestion,
+      nameHasUnsupportedChars,
+      onNameInput,
+      onNameFocus,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,
