@@ -56,6 +56,8 @@ const rows = computed(() => sortRows(props.pods, (p) => p.cpuCores, true));
 
 const containersOf = (pod: PodRow) => pod.containers.filter((c) => !c.init);
 
+const readyCount = (pod: PodRow) => containersOf(pod).filter((c) => c.running).length;
+
 const readyText = (pod: PodRow) => {
   const containers = containersOf(pod);
   return `${containers.filter((c) => c.running).length}/${containers.length}`;
@@ -95,7 +97,7 @@ const columns = computed<OTableColumnDef<PodRow>[]>(() => [
     header: raw(""),
     accessorFn: (p) => p.warnings.length,
     size: 40,
-    sortable: true,
+    sortable: false,
   },
   {
     id: "node",
@@ -110,7 +112,13 @@ const columns = computed<OTableColumnDef<PodRow>[]>(() => [
     accessorFn: (p) => p.namespace,
     sortable: true,
   },
-  { id: "ready", header: t("infra.k8s2.factReady"), accessorFn: readyText, size: 80 },
+  {
+    id: "ready",
+    header: t("infra.k8s2.factReady"),
+    accessorFn: readyCount,
+    size: 80,
+    sortable: true,
+  },
   {
     id: "cpu",
     header: t("infra.k8s2.columnCpu"),

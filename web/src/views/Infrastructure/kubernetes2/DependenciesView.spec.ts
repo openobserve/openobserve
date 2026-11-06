@@ -684,6 +684,32 @@ describe("DependenciesView", () => {
       expect(nodes().some((n: any) => n.id === API_ID)).toBe(true);
     });
 
+    it("moves focus to the expanded namespace's collapse chip, then onward on collapse", async () => {
+      await mountView({}, document.body);
+      await setMode("collapsed");
+      chart().vm.$emit("select", edges()[0].id);
+      await flushPromises();
+      await testId("k8s2-deps-edge-target").trigger("click");
+      await flushPromises();
+      const chip = testId("k8s2-deps-group-collapse");
+      expect(chip.attributes("data-ns-id")).toBe("prod/backend");
+      expect(document.activeElement).toBe(chip.element);
+      await chip.trigger("click");
+      await flushPromises();
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="k8s2-deps-collapse-mode"]')
+          .element.contains(document.activeElement),
+      ).toBe(true);
+    });
+
+    it("shows the grouping control as Expanded while a filter disables it", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      await setMode("collapsed");
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("modelValue")).toBe("expanded");
+    });
+
     it("clears the selected edge when expanding removes it", async () => {
       await mountView();
       await setMode("collapsed");

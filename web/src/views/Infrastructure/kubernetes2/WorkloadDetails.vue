@@ -229,6 +229,9 @@ const when = (us: number | null) => {
   return t("infra.k8s2.drawerAgoAt", { age: age(us), date });
 };
 
+// Ready sorts first, desired breaks ties; the base exceeds any realistic replica count.
+const PODS_SORT_BASE = 1_000_000;
+
 const revisionColumns = computed<OTableColumnDef<ReplicaSetRow>[]>(() => {
   const rs = revisions.value;
   const colName = t("infra.k8s2.columnName");
@@ -246,7 +249,13 @@ const revisionColumns = computed<OTableColumnDef<ReplicaSetRow>[]>(() => {
       sortable: true,
       meta: { flex: true },
     },
-    { id: "warn", header: raw(""), accessorFn: (r) => r.warnings.length, size: 40, sortable: true },
+    {
+      id: "warn",
+      header: raw(""),
+      accessorFn: (r) => r.warnings.length,
+      size: 40,
+      sortable: false,
+    },
     {
       id: "namespace",
       header: colNs,
@@ -260,19 +269,20 @@ const revisionColumns = computed<OTableColumnDef<ReplicaSetRow>[]>(() => {
     {
       id: "pods",
       header: t("infra.k8s2.columnPods"),
-      accessorFn: (r) => `${n(r.ready)}/${n(r.desired)}`,
+      accessorFn: (r) => (r.ready ?? 0) * PODS_SORT_BASE + (r.desired ?? 0),
       size: 90,
       sortable: true,
     },
     {
       id: "age",
       header: colAge,
-      accessorFn: (r) => age(r.createdAt),
+      accessorFn: (r) => r.createdAt ?? undefined,
       size: fitColumnSize(
         String(colAge),
         rs.map((r) => age(r.createdAt)),
       ),
       sortable: true,
+      sortUndefined: "last",
     },
   ];
 });
@@ -310,12 +320,13 @@ const jobColumns = computed<OTableColumnDef<JobEntry>[]>(() => {
     {
       id: "age",
       header: colAge,
-      accessorFn: (j) => age(j.job?.createdAt ?? null),
+      accessorFn: (j) => j.job?.createdAt ?? undefined,
       size: fitColumnSize(
         String(colAge),
         entries.map((j) => age(j.job?.createdAt ?? null)),
       ),
       sortable: true,
+      sortUndefined: "last",
     },
   ];
 });
@@ -538,6 +549,12 @@ const phase = computed(() =>
             </OTooltip>
           </span>
         </template>
+        <template #cell-pods="{ row: rs }">
+          <span class="tabular-nums">{{ raw(`${n(rs.ready)}/${n(rs.desired)}`) }}</span>
+        </template>
+        <template #cell-age="{ row: rs }">
+          <span class="tabular-nums">{{ raw(age(rs.createdAt)) }}</span>
+        </template>
       </OTable>
     </section>
 
@@ -559,6 +576,9 @@ const phase = computed(() =>
           <OButton variant="ghost-primary" size="xs" @click.stop="open('job', j.name)">{{
             raw(j.name)
           }}</OButton>
+        </template>
+        <template #cell-age="{ row: j }">
+          <span class="tabular-nums">{{ raw(age(j.job?.createdAt ?? null)) }}</span>
         </template>
       </OTable>
     </section>
