@@ -365,7 +365,8 @@ jobs:
           if [ "$RESULT" = "success" ]; then CONCLUSION=success
           elif [ "$RESULT" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=failure; fi
-          export CONCLUSION STREAM=ci_regression SUITE=api_regression
+          # MIRROR_STREAM also lands the run in ci_test_runs, so the run-health dashboard can pick suite=api_regression like UI regression.
+          export CONCLUSION STREAM=ci_regression SUITE=api_regression MIRROR_STREAM=ci_test_runs
           EXTRA_JSON=""
           if [ -d junit-xml ]; then
             COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
