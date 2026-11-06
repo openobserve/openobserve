@@ -39,7 +39,7 @@ pub struct GetAlertResponseBody {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
-    /// The run state could not be read, so the rows' live fields are blank.
+    /// A live read failed, so the rows' live fields may be blank or incomplete.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub status_unavailable: bool,
 }

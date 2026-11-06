@@ -3578,19 +3578,27 @@ async fn group_acks(
         .collect()
 }
 
-/// Whether the run state could not be read, leaving every row's live fields blank.
+/// Whether any live read failed, leaving the rows' live fields blank or incomplete.
 async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) -> bool {
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-    let rollups = match load_run_state(org_id, list).await {
-        Ok(rollups) => rollups,
+    match read_live_fields(org_id, list).await {
+        Ok(()) => false,
         Err(e) => {
             log::warn!("failed to load alert run state for list: {e}");
-            return true;
+            true
         }
-    };
+    }
+}
+
+/// Run state, acks and incidents onto every row.
+async fn read_live_fields(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+) -> Result<(), infra::errors::Error> {
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let rollups = load_run_state(org_id, list).await?;
     #[cfg(feature = "enterprise")]
-    enrich_with_incidents(org_id, list, &rollups).await;
-    false
+    enrich_with_incidents(org_id, list, &rollups).await?;
+    Ok(())
 }
 
 /// Run state and acks onto every row, returning the rollups by alert id.
@@ -3630,7 +3638,7 @@ async fn load_run_state(
             item.firing_started_at = state.firing_started_at;
         }
     }
-    enrich_with_acks(org_id, list, &by_id).await;
+    enrich_with_acks(org_id, list, &by_id).await?;
     Ok(by_id)
 }
 
@@ -3639,15 +3647,9 @@ async fn enrich_with_acks(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
     rollups: &StdHashMap<String, AlertState>,
-) {
+) -> Result<(), infra::errors::Error> {
     let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
-    let acks = match infra::table::alert_acks::list_for_alerts(org_id, &ids).await {
-        Ok(a) => a,
-        Err(e) => {
-            log::warn!("failed to load alert acks for list: {e}");
-            return;
-        }
-    };
+    let acks = infra::table::alert_acks::list_for_alerts(org_id, &ids).await?;
     let mut by_alert: std::collections::HashMap<String, Vec<config::meta::alerts::ack::AlertAck>> =
         Default::default();
     for a in acks {
@@ -3667,12 +3669,11 @@ async fn enrich_with_acks(
         }
         if acks.iter().any(|a| !a.group_key.is_empty()) {
             let keys: Vec<String> = acks.iter().map(|a| a.group_key.clone()).collect();
-            if let Ok(rows) = infra::table::alert_states::firing_groups(&id, Some(&keys)).await {
-                firing.extend(rows);
-            }
+            firing.extend(infra::table::alert_states::firing_groups(&id, Some(&keys)).await?);
         }
         item.ack = openobserve_core::alerts::ack::summary(acks, &firing);
     }
+    Ok(())
 }
 
 /// The incident each firing alert's current episode belongs to (MK-1's Incident tile).
@@ -3681,7 +3682,7 @@ async fn enrich_with_incidents(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
     rollups: &StdHashMap<String, AlertState>,
-) {
+) -> Result<(), infra::errors::Error> {
     use crate::models::alerts::responses::AlertIncidentLink;
 
     let firing: Vec<_> = list
@@ -3698,19 +3699,10 @@ async fn enrich_with_incidents(
         .filter(|(_, e)| e.is_none())
         .map(|(id, _)| id.clone())
         .collect();
-    let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes)
-        .await
-        .unwrap_or_else(|e| {
-            log::warn!("failed to load episode incidents for alert list: {e}");
-            Default::default()
-        });
+    let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes).await?;
     let by_alert =
         infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
-            .await
-            .unwrap_or_else(|e| {
-                log::warn!("failed to load open incidents for alert list: {e}");
-                Default::default()
-            });
+            .await?;
     let links: StdHashMap<String, AlertIncidentLink> = firing
         .into_iter()
         .filter_map(|(id, episode)| {
@@ -3733,6 +3725,7 @@ async fn enrich_with_incidents(
             item.incident = Some(link.clone());
         }
     }
+    Ok(())
 }
 
 /// EnableAlert
