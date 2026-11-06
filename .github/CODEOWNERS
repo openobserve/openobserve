@@ -1,6 +1,7 @@
 /.github/CODEOWNERS @hengfeiyang @oasisk
 
-/src/main.rs @hengfeiyang @haohuaijin
+/src/lib.rs @hengfeiyang @oasisk
+/src/main.rs @hengfeiyang @oasisk
 
 /src/compaction/ @hengfeiyang @haohuaijin
 /src/flight/ @hengfeiyang @haohuaijin
