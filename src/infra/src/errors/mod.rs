@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use async_nats::{error::Error as NatsError, jetstream};
-use config::utils::json;
+use config::{meta::feature::Feature, utils::json};
 use thiserror::Error as ThisError;
 pub mod grpc;
 
@@ -412,7 +414,14 @@ impl ErrorCodes {
                 "Another turn is already running in this conversation".to_string()
             }
             ErrorCodes::LicenseFeatureNotEntitled(features) => {
-                format!("Features not included in your license: {features}")
+                let names: Vec<&str> = features
+                    .split(", ")
+                    .map(|key| Feature::from_str(key).map_or(key, |f| f.display_name()))
+                    .collect();
+                format!(
+                    "Features not included in your license: {}",
+                    names.join(", ")
+                )
             }
         }
     }
@@ -591,12 +600,22 @@ mod tests {
         assert_eq!(err.get_error_detail(), "oncall, workflows");
         assert_eq!(
             err.get_message(),
-            "Features not included in your license: oncall, workflows"
+            "Features not included in your license: On-Call, Workflows"
         );
         match ErrorCodes::from_json(&err.to_json()).unwrap() {
             ErrorCodes::LicenseFeatureNotEntitled(keys) => assert_eq!(keys, "oncall, workflows"),
             other => panic!("round trip lost the variant: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_license_feature_not_entitled_keeps_an_unknown_key() {
+        let err = ErrorCodes::LicenseFeatureNotEntitled("rum, not_a_feature".into());
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your license: Real User Monitoring, not_a_feature"
+        );
+        assert_eq!(err.get_error_detail(), "rum, not_a_feature");
     }
 
     #[test]

@@ -26,7 +26,11 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use config::meta::feature::Feature;
 use config::meta::oncall::{PriorityRung, Rotation};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::license::check_features;
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
@@ -68,6 +72,15 @@ const VOICE_ORG_INACTIVE: &str = "<Response><Say>This organization is no longer 
 #[cfg(feature = "enterprise")]
 const VOICE_ORG_UNREADABLE: &str = "<Response><Say>The organization could not be checked. \
      The page was not acknowledged.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const VOICE_UNLICENSED: &str = "<Response><Say>On-Call is not included in this installation's \
+     license. The page was not acknowledged and stays open. No further calls will be \
+     made.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const ACK_UNLICENSED: &str =
+    "On-Call is not included in this installation's license. This page was not acknowledged.";
 
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
@@ -2046,12 +2059,16 @@ fn broken_link(status: StatusCode, reason: &str) -> Response {
     html_page(status, ack_page::broken_link_html(reason, &pages))
 }
 
-/// The ack link's refusal for an inactive or unreadable org: the same HTML page, never JSON.
+/// The ack link's refusal for a locked license or a bad org: the same HTML page, never JSON.
 #[cfg(feature = "enterprise")]
 fn ack_status_refusal(
     org_id: &str,
+    licensed: bool,
     active: Result<bool, impl std::fmt::Display>,
 ) -> Option<Response> {
+    if !licensed {
+        return Some(broken_link(StatusCode::FORBIDDEN, ACK_UNLICENSED));
+    }
     match active {
         Ok(true) => None,
         Ok(false) => Some(broken_link(
@@ -2113,10 +2130,12 @@ pub async fn acknowledge(
             Ok(c) => c,
             Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
-        // After the signature, so an unsigned caller cannot probe whether the org exists.
-        if let Some(refusal) =
-            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
-        {
+        // After the signature, so an unsigned caller cannot probe the license or the org.
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
             return refusal;
         }
         // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
@@ -2215,9 +2234,11 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
             Ok(c) => c,
             Err(e) => return broken_link(StatusCode::UNAUTHORIZED, &e.to_string()),
         };
-        if let Some(refusal) =
-            ack_status_refusal(&org_id, db::org_status::read_active(&org_id).await)
-        {
+        if let Some(refusal) = ack_status_refusal(
+            &org_id,
+            check_features(&[Feature::Oncall]),
+            db::org_status::read_active(&org_id).await,
+        ) {
             return refusal;
         }
         let record =
@@ -2271,19 +2292,29 @@ pub async fn voice_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // An unsigned token skips the status read and is refused by the ack path itself.
-        let active = if voice_token_is_signed_for(&org_id, &token).await {
-            db::org_status::read_active(&org_id).await
-        } else {
-            Ok(true)
-        };
-        voice_ack_if_active(&org_id, &token, form, active).await
+        voice_ack_entitled(&org_id, &token, form, check_features(&[Feature::Oncall])).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
+}
+
+/// An unsigned token learns neither the org's status nor the license; the ack path refuses it.
+#[cfg(feature = "enterprise")]
+async fn voice_ack_entitled(
+    org_id: &str,
+    token: &str,
+    form: VoiceAckForm,
+    entitled: bool,
+) -> Response {
+    let (active, licensed) = if voice_token_is_signed_for(org_id, token).await {
+        (db::org_status::read_active(org_id).await, entitled)
+    } else {
+        (Ok(true), true)
+    };
+    voice_ack_if_active(org_id, token, form, active, licensed).await
 }
 
 /// Signature and org only; membership is left to the ack path, which reads it anyway.
@@ -2306,8 +2337,9 @@ async fn voice_ack_if_active(
     token: &str,
     form: VoiceAckForm,
     active: Result<bool, impl std::fmt::Display>,
+    licensed: bool,
 ) -> Response {
-    let twiml = match voice_status_refusal(org_id, active) {
+    let twiml = match voice_status_refusal(org_id, licensed, active) {
         Some(refusal) => refusal.to_string(),
         None => {
             o2_enterprise::enterprise::oncall::service::voice_acknowledge(
@@ -2420,12 +2452,16 @@ async fn end_ack_by_phone(
     .map_err(|e| anyhow::anyhow!("end the ack after a resolve by phone: {e:?}"))
 }
 
-/// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
+/// TwiML refusal for a locked license or a bad org, as `ack_status_refusal` refuses email acks.
 #[cfg(feature = "enterprise")]
 fn voice_status_refusal(
     org_id: &str,
+    licensed: bool,
     active: Result<bool, impl std::fmt::Display>,
 ) -> Option<&'static str> {
+    if !licensed {
+        return Some(VOICE_UNLICENSED);
+    }
     match active {
         Ok(true) => None,
         Ok(false) => Some(VOICE_ORG_INACTIVE),
@@ -6180,7 +6216,7 @@ mod tests {
                 StatusCode::INTERNAL_SERVER_ERROR,
             ),
         ] {
-            let resp = ack_status_refusal("ack-org", active).expect("refused");
+            let resp = ack_status_refusal("ack-org", true, active).expect("refused");
             assert_eq!(resp.status(), status);
             assert_eq!(
                 resp.headers()[axum::http::header::CONTENT_TYPE],
@@ -6191,7 +6227,36 @@ mod tests {
                 .unwrap();
             assert!(String::from_utf8_lossy(&body).contains("This link no longer works"));
         }
-        assert!(ack_status_refusal("ack-org", Ok::<_, String>(true)).is_none());
+        assert!(ack_status_refusal("ack-org", true, Ok::<_, String>(true)).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ack_link_on_a_locked_license_is_refused_with_html() {
+        let resp = ack_status_refusal("ack-org", false, Ok::<_, String>(true)).expect("refused");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/html; charset=utf-8"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains(ACK_UNLICENSED));
+    }
+
+    /// No test can lock a license, so the source pins that a bad signature is answered first.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_ack_links_read_the_license_only_after_the_signature() {
+        let source = include_str!("mod.rs");
+        for handler in ["pub async fn acknowledge(", "pub async fn ack_page("] {
+            let start = source.find(handler).unwrap();
+            let body = &source[start..start + source[start..].find("\n}\n").unwrap()];
+            let signature = body.find("service::ack_claims(").unwrap();
+            let license = body.find("check_features(&[Feature::Oncall])").unwrap();
+            assert!(signature < license, "{handler}");
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -6200,8 +6265,30 @@ mod tests {
         let form = VoiceAckForm {
             digits: Some("1".to_string()),
         };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false)).await;
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false), true).await;
         assert_eq!(voice_reply(resp).await, VOICE_ORG_INACTIVE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_a_signed_token_on_a_locked_license_is_refused_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp =
+            voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), false).await;
+        assert_eq!(voice_reply(resp).await, VOICE_UNLICENSED);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_an_unsigned_token_does_not_reveal_a_locked_license() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_entitled("voice-org", "leaked", form, false).await;
+        assert_ne!(voice_reply(resp).await, VOICE_UNLICENSED);
     }
 
     #[cfg(feature = "enterprise")]
@@ -6210,7 +6297,7 @@ mod tests {
         let form = VoiceAckForm {
             digits: Some("1".to_string()),
         };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down")).await;
+        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down"), true).await;
         assert_eq!(voice_reply(resp).await, VOICE_ORG_UNREADABLE);
     }
 
@@ -6218,7 +6305,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_ack_of_an_active_org_reaches_the_ack_path() {
         let form = VoiceAckForm { digits: None };
-        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true)).await;
+        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true), true).await;
         let twiml = voice_reply(resp).await;
         let expected = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
             "voice-org",
