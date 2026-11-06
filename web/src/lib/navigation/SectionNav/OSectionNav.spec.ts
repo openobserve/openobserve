@@ -28,6 +28,17 @@ describe("OSectionNav", () => {
     ]);
   });
 
+  it("shows a section's tag beside its title", () => {
+    const wrapper = mount(OSectionNav, {
+      props: {
+        items: [{ id: "a", title: raw("First"), tag: raw("Optional") }, ...items.slice(1)],
+        label: raw("Sections"),
+      },
+    });
+    expect(wrapper.get('[data-test="o-section-nav-tag-a"]').text()).toBe("Optional");
+    expect(wrapper.find('[data-test="o-section-nav-tag-b"]').exists()).toBe(false);
+  });
+
   it("marks only the active item as the current location", () => {
     const wrapper = mountNav("b");
     expect(wrapper.find('[data-test="o-section-nav-item-b"]').attributes("aria-current")).toBe(

@@ -47,6 +47,8 @@ export interface AlertSectionDef {
   /** One sentence under the heading that tells the user how little this step asks. */
   helpKey: I18nKey;
   icon: IconName;
+  /** The defaults work, so a user can skip the whole step. */
+  optional?: boolean;
 }
 
 export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
@@ -55,21 +57,22 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
     titleKey: "alerts.sections.watch.title",
     navKey: "alerts.sections.watch.nav",
     helpKey: "alerts.sections.watch.help",
-    icon: "visibility",
+    icon: "shield-alert-outline",
   },
   {
     id: "condition",
     titleKey: "alerts.sections.condition.title",
     navKey: "alerts.sections.condition.nav",
     helpKey: "alerts.sections.condition.help",
-    icon: "notifications-active",
+    icon: "rule",
   },
   {
     id: "notify",
     titleKey: "alerts.sections.notify.title",
     navKey: "alerts.sections.notify.nav",
     helpKey: "alerts.sections.notify.help",
-    icon: "send",
+    icon: "location-on",
+    optional: true,
   },
   {
     id: "schedule",
@@ -77,6 +80,7 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
     navKey: "alerts.sections.schedule.nav",
     helpKey: "alerts.sections.schedule.help",
     icon: "schedule",
+    optional: true,
   },
   {
     id: "details",
@@ -87,6 +91,17 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
   },
 ];
 
+/** One-click starting points for an event-count limit. */
+export const ALERT_CONDITION_PRESETS: readonly {
+  id: string;
+  labelKey: I18nKey;
+  threshold: number;
+}[] = [
+  { id: "any", labelKey: "alerts.sections.presets.any", threshold: 1 },
+  { id: "few", labelKey: "alerts.sections.presets.few", threshold: 5 },
+  { id: "burst", labelKey: "alerts.sections.presets.burst", threshold: 50 },
+];
+
 /** Change-tracking key for the measure on/off switch, which lives beside the form values. */
 export const AGGREGATION_ENABLED_FIELD = "aggregation_enabled";
 
@@ -95,17 +110,7 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["stream_type", "watch"],
   ["stream_name", "watch"],
   ["is_real_time", "watch"],
-  ["children", "watch"],
-  ["query_condition.conditions", "watch"],
-  ["query_condition.sql", "watch"],
-  ["query_condition.promql_condition", "condition"],
-  ["query_condition.promql_warning_value", "condition"],
-  ["query_condition.promql_rule_mode", "condition"],
-  ["query_condition.promql_multi_alert", "condition"],
-  ["query_condition.promql", "watch"],
-  ["query_condition.type", "watch"],
-  ["query_condition.vrl_function", "watch"],
-  ["query_condition.search_event_type", "watch"],
+  ["children", "condition"],
   ["query_condition", "condition"],
   ["logGroupBy", "condition"],
   ["composite_condition", "condition"],

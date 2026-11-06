@@ -1300,12 +1300,12 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
     });
 
-    it("asks how it checks in the schedule section, not the watch section", async () => {
+    it("asks the alert type first, because it decides the fields that follow", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const tabs = '[data-test="add-alert-type-tabs"]';
-      expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(true);
-      expect(wrapper.find(`[data-test="add-alert-section-watch"] ${tabs}`).exists()).toBe(false);
+      expect(wrapper.find(`[data-test="add-alert-section-watch"] ${tabs}`).exists()).toBe(true);
+      expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(false);
     });
 
     it("steps from the footer: Back from the second section, Next names the following one", async () => {
@@ -1332,7 +1332,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-type-tab-false"]').text()).toContain(
-        "Every 10 min",
+        "On a schedule",
       );
       expect(wrapper.find('[data-test="add-alert-type-tab-true"]').text()).toContain(
         "As it happens",

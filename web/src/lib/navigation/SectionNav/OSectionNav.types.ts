@@ -18,6 +18,8 @@ export interface SectionNavItem {
   id: string;
   /** Section title. */
   title: I18nText;
+  /** A quiet word beside the title, such as that the section is optional. */
+  tag?: I18nText;
   /** One short phrase describing what the section holds now. */
   summary?: I18nText;
   /** Completion state. Default: 'none' */
