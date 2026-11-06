@@ -849,6 +849,88 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
   });
 
+  it("create: sends a picked prebuilt_default as the template override", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    form.setFieldValue("template", "prebuilt_default");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][5]).toBe("prebuilt_default");
+  });
+
+  it("EDIT mode: a saved prebuilt_default survives the update", async () => {
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "old-slack",
+        url: VALID_SLACK,
+        type: "http",
+        method: "post",
+        destination_type_name: "slack",
+        template: "prebuilt_default",
+        skip_tls_verify: false,
+        headers: {},
+        metadata: { prebuilt_type: "slack", credential_channel: "#ops" },
+      } as any,
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockUpdatePrebuilt.mock.calls[0][6]).toBe("prebuilt_default");
+  });
+
+  it("email: prebuilt_default survives create, and a saved one reopens as custom and keeps it", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    let form = getForm(wrapper);
+    form.setFieldValue("destination_type", "email");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("name", "ops-mail");
+    form.setFieldValue("credentials", { recipients: ["ops@acme.co"] });
+    form.setFieldValue("template", "prebuilt_default");
+    await flushPromises();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][0]).toBe("email");
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][5]).toBe("prebuilt_default");
+    wrapper.unmount();
+
+    wrapper = mountComp({
+      isAlerts: true,
+      templates: [
+        { name: "prebuilt_default", type: "http", kind: "content", isPrebuilt: true, body: "" },
+      ],
+      destination: {
+        name: "ops-mail",
+        type: "email",
+        emails: ["ops@acme.co"],
+        template: "prebuilt_default",
+        metadata: {},
+      } as any,
+    });
+    await flushPromises();
+    form = getForm(wrapper);
+    expect(form.state.values.destination_type).toBe("custom");
+    expect(wrapper.vm.getFormattedTemplates).toContain("prebuilt_default");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).not.toHaveBeenCalled();
+    const saved = (destinationService.update as any).mock.calls[0][0].data;
+    expect(saved.template).toBe("prebuilt_default");
+    expect(saved.emails).toEqual(["ops@acme.co"]);
+  });
+
   it("EDIT mode: a custom webhook to a ServiceNow URL stays custom and keeps its token header", async () => {
     const headers = { Authorization: "Bearer tok" };
     const customServiceNow: any = {

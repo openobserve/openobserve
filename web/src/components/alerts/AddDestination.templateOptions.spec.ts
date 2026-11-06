@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The Template dropdown of a prebuilt destination: the channel's own
-// `prebuilt_<type>` first, the unified `prebuilt_default` card second, then the
-// user templates that fit the channel. Edit mode keeps a saved `prebuilt_default`.
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
@@ -41,8 +37,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 const UNIFIED = "prebuilt_default";
 const UNIFIED_LABEL = "Unified default (prebuilt_default)";
 
-// What the templates API returns: both prebuilt rows carry isPrebuilt, so the
-// generic filter drops them and the component adds the system entries itself.
+// The generic filter drops isPrebuilt rows, so the component adds the system entries itself.
 const TEMPLATES = [
   { name: "prebuilt_slack", type: "http", kind: "content", isPrebuilt: true, body: "" },
   { name: UNIFIED, type: "http", kind: "content", isPrebuilt: true, body: "" },
