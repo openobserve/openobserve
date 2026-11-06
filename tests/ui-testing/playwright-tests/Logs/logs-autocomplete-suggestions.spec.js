@@ -1142,7 +1142,7 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
 
         // A trigger answered before the editor's update:query debounce lists stale FROM-context stream names.
-        const suggestions = await triggerSuggestionsWithRetry(page, pm, /AND|OR|NOT|IN|LIKE|BETWEEN|IS/i);
+        const suggestions = await triggerSuggestionsWithRetry(page, pm, /^(AND|OR|NOT|IN|LIKE|BETWEEN|IS)$|^kubernetes_/i);
 
         testLogger.info(`Cold start suggestions: ${suggestions.slice(0, 10).join(', ')}`);
 
