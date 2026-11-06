@@ -167,6 +167,22 @@ describe("a run pulled again", () => {
     expect(limitationsOf(gt, record())).toEqual([]);
     expect(limitationsOf(gt, record({ limitations: "plain" }))).toEqual([]);
   });
+
+  it("names the searched window from its column and never guesses one the record left out", () => {
+    const searched = JSON.stringify(["searched_window", "scan_truncated"]);
+    expect(
+      limitationsOf(
+        gt,
+        record({ limitations: searched, evidence_notworking_searched_secs: 7 * 86_400 }),
+      ),
+    ).toEqual([
+      "Searched only the last 7 days; rarer matching rows are not ruled out.",
+      "Wider searches timed out, so the empty answer covers less than the full 7 days.",
+    ]);
+    expect(limitationsOf(gt, record({ limitations: searched }))).toEqual([
+      "Wider searches timed out, so the empty answer covers less than the full 7 days.",
+    ]);
+  });
 });
 
 describe("a run's verdict", () => {
@@ -485,6 +501,15 @@ describe("a version-2 finding's typed columns", () => {
       "evidence_notworking_evaluations",
       "evidence_notworking_checked_at_micros",
     ]);
+    const empty = {
+      pattern: "empty_scope",
+      evidence_notworking_checked_at_micros: 1_762_000_000_000_000,
+    };
+    expect(columns(v2({ ...empty, evidence_notworking_searched_secs: 604_800 }))).toEqual([
+      "evidence_notworking_searched_secs",
+      "evidence_notworking_checked_at_micros",
+    ]);
+    expect(columns(v2(empty))).toEqual(["evidence_notworking_checked_at_micros"]);
     // Version 2 writes no v1 failure column, so a record with no pattern it knows shows the error rows.
     const unclassified = {
       evidence_notworking_evaluation_errors: 30,

@@ -15,6 +15,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import { formatSeconds } from "./format";
 import { ADVICE_LABEL, LIMITATION_LABEL, QUALITY_REASON_LABEL } from "./rules";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
@@ -161,10 +162,16 @@ const isReviewFocus = (value: unknown): value is ReviewFocus =>
   typeof value === "string" && (REVIEW_FOCI as string[]).includes(value);
 
 /** Codes this build can name; an unknown one shows nothing. */
-export const limitationsOf = (t: TranslateFn, record: DigestRecord): I18nText[] =>
-  textItems(record.limitations).flatMap((code) =>
-    Object.hasOwn(LIMITATION_LABEL, code) ? [t(LIMITATION_LABEL[code])] : [],
-  );
+export function limitationsOf(t: TranslateFn, record: DigestRecord): I18nText[] {
+  return textItems(record.limitations).flatMap((code): I18nText[] => {
+    if (!Object.hasOwn(LIMITATION_LABEL, code)) return [];
+    if (code !== "searched_window") return [t(LIMITATION_LABEL[code])];
+    // A window the record never stated is not guessed.
+    const secs = Number(record.evidence_notworking_searched_secs);
+    if (!(secs > 0)) return [];
+    return [t(LIMITATION_LABEL[code], { window: formatSeconds(t, secs) })];
+  });
+}
 
 export const qualityReasonsOf = (t: TranslateFn, record: DigestRecord): I18nText[] =>
   textItems(record.quality_reasons).flatMap((code) =>

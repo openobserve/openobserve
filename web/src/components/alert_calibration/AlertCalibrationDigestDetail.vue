@@ -180,8 +180,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-calibration-digest-none-found"
       />
 
+      <AlertCalibrationSkipGroup
+        title-key="alertCalibration.notChecked.title"
+        why-key="alertCalibration.notChecked.why"
+        :rows="notCheckedRows"
+        :next-for="notCheckedNext"
+        :cta-for="reviewQueryCta"
+      />
+
       <div
-        v-if="skips.length"
+        v-if="flatSkips.length || (skips.length && (skipsCapped || omittedRoutine > 0))"
         class="flex flex-col gap-2"
         data-test="alert-calibration-digest-skips"
       >
@@ -205,11 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             })
           }}</span>
         </OText>
-        <OCard variant="glass">
+        <OCard v-if="flatSkips.length" variant="glass">
           <OCardSection role="body" class="flex flex-col gap-1.5 py-2">
             <div
               v-for="{ skip, detail } in skipRows"
-              :key="`${skip.rule_id}:${skip.alert_id}`"
+              :key="skipKey(skip)"
               class="flex min-w-0 flex-wrap items-baseline gap-x-2"
               data-test="alert-calibration-digest-skip"
             >
@@ -241,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -262,7 +270,14 @@ import { useActiveDismissals } from "@/composables/alertCalibration/useDismissal
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { readErrorCopy } from "@/services/alert_calibration";
+import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
+import AlertCalibrationSkipGroup, {
+  type SkipGroupCta,
+  type SkipGroupRow,
+} from "./AlertCalibrationSkipGroup.vue";
+import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
+import { toEditHandoff, type ReviewAlertAction } from "./applySuggestion";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
   countOrDash,
@@ -278,7 +293,16 @@ import {
   type RuleId,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, skipDetailLabel, skipReasonLabel } from "./format";
+import {
+  COVERAGE_BADGE,
+  formatMinutes,
+  NOT_CHECKED_CAUSES,
+  notCheckedCause,
+  notCheckedCopy,
+  skipDetailLabel,
+  skipReasonLabel,
+  type NotCheckedCause,
+} from "./format";
 import { isRuleId, ruleLabelKey, rulesOfVersion } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
@@ -314,9 +338,62 @@ const run = computed(() => records.data.value?.run ?? null);
 const version = computed(() => run.value?.schema_version ?? 1);
 const findings = computed(() => records.data.value?.findings ?? []);
 const skips = computed(() => records.data.value?.skips ?? []);
+/** Two rules share `failure`, so one alert can carry two skips that differ only in reason. */
+const skipKey = (skip: DigestRecord) => `${skip.rule_id}:${skip.alert_id}:${skip.skip_reason}`;
+const isNotChecked = (skip: DigestRecord) => skip.skip_reason === "definition_not_checked";
+const flatSkips = computed(() => skips.value.filter((skip) => !isNotChecked(skip)));
 const skipRows = computed(() =>
-  skips.value.map((skip) => ({ skip, detail: skipDetailLabel(t, skip.skip_detail) })),
+  flatSkips.value.map((skip) => ({ skip, detail: skipDetailLabel(t, skip.skip_detail) })),
 );
+const notChecked = computed(() =>
+  skips.value
+    .filter(isNotChecked)
+    .map((skip) => ({ skip, cause: notCheckedCause(skip.skip_detail) }))
+    .sort(
+      (a, b) =>
+        NOT_CHECKED_CAUSES.indexOf(a.cause) - NOT_CHECKED_CAUSES.indexOf(b.cause) ||
+        (a.skip.alert_name ?? "").localeCompare(b.skip.alert_name ?? ""),
+    ),
+);
+const notCheckedByKey = computed(
+  () => new Map(notChecked.value.map(({ skip }) => [skipKey(skip), skip])),
+);
+const notCheckedRows = computed<SkipGroupRow[]>(() =>
+  notChecked.value.map(({ skip, cause }) => ({
+    key: skipKey(skip),
+    group: cause,
+    label: raw(skip.alert_name ?? skip.alert_id ?? ""),
+    why: notCheckedCopy(t, cause).cause,
+  })),
+);
+const notCheckedNext = (row: SkipGroupRow): I18nText =>
+  notCheckedCopy(t, row.group as NotCheckedCause).next;
+
+const reviewing = ref<string | null>(null);
+let unmounted = false;
+onBeforeUnmount(() => {
+  unmounted = true;
+});
+const reviewQuery = async (key: string) => {
+  const skip = notCheckedByKey.value.get(key);
+  if (reviewing.value || !skip?.alert_id) return;
+  const action: ReviewAlertAction = {
+    type: "review_alert",
+    alert_id: skip.alert_id,
+    focus: "query",
+  };
+  reviewing.value = key;
+  const folder = await alertFolderOf(orgId.value, skip.alert_id, skip.alert_name);
+  reviewing.value = null;
+  if (unmounted) return;
+  writeAlertEditHandoff(toEditHandoff(action, skip));
+  void router.push(editAlertRoute(orgId.value, skip.alert_id, folder));
+};
+const reviewQueryCta = (row: SkipGroupRow): SkipGroupCta => ({
+  label: t("alertCalibration.insightActions.reviewQuery"),
+  run: () => void reviewQuery(row.key),
+  pending: reviewing.value === row.key,
+});
 /** Floors not met are only counted by a version-2 run; a version-1 run has no split. */
 const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0);
 /** A rule from a newer writer is named generically, never by its stored id. */

@@ -256,6 +256,7 @@ const SKIP_REASON_LABEL: Record<string, I18nKey> = {
   sentinel_by_design: "alertCalibration.skipReason.sentinelByDesign",
   enrichment_timeout: "alertCalibration.skipReason.enrichmentTimeout",
   healthy_silence: "alertCalibration.skipReason.healthySilence",
+  definition_not_checked: "alertCalibration.skipReason.definitionNotChecked",
 };
 
 /** A reason from a newer writer is named generically, never by its stored name. */
@@ -293,6 +294,63 @@ export function skipDetailLabel(t: TranslateFn, detail: string | undefined): I18
   }
   return t("alertCalibration.detail.declinedDetailOther");
 }
+
+export const NOT_CHECKED_CAUSES = [
+  "budget_exhausted",
+  "probe_timeout",
+  "probe_error",
+  "probe_rejected",
+  "unsupported_query",
+  "other",
+] as const;
+export type NotCheckedCause = (typeof NOT_CHECKED_CAUSES)[number];
+
+const NOT_CHECKED_COPY: Record<NotCheckedCause, { cause: I18nKey; next: I18nKey }> = {
+  budget_exhausted: {
+    cause: "alertCalibration.notChecked.cause.budgetExhausted",
+    next: "alertCalibration.notChecked.next.retry",
+  },
+  probe_timeout: {
+    cause: "alertCalibration.notChecked.cause.probeTimeout",
+    next: "alertCalibration.notChecked.next.retry",
+  },
+  probe_error: {
+    cause: "alertCalibration.notChecked.cause.probeError",
+    next: "alertCalibration.notChecked.next.retry",
+  },
+  probe_rejected: {
+    cause: "alertCalibration.notChecked.cause.probeRejected",
+    next: "alertCalibration.notChecked.next.query",
+  },
+  unsupported_query: {
+    cause: "alertCalibration.notChecked.cause.unsupportedQuery",
+    next: "alertCalibration.notChecked.next.query",
+  },
+  other: {
+    cause: "alertCalibration.notChecked.cause.other",
+    next: "alertCalibration.notChecked.next.retry",
+  },
+};
+
+/** The cause in a `definition_not_checked` skip's detail; one this build cannot name is `other`. */
+export function notCheckedCause(detail: string | undefined): NotCheckedCause {
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(detail ?? "");
+  } catch {
+    parsed = null;
+  }
+  const cause =
+    typeof parsed === "object" && parsed !== null && "cause" in parsed ? parsed.cause : null;
+  return typeof cause === "string" && cause !== "other" && Object.hasOwn(NOT_CHECKED_COPY, cause)
+    ? (cause as NotCheckedCause)
+    : "other";
+}
+
+export const notCheckedCopy = (t: TranslateFn, cause: NotCheckedCause) => ({
+  cause: t(NOT_CHECKED_COPY[cause].cause),
+  next: t(NOT_CHECKED_COPY[cause].next),
+});
 
 export const COVERAGE_BADGE: Record<
   CoverageVerdict,

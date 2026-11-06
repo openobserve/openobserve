@@ -305,6 +305,7 @@ async fn analyse(
             &trigger.module_key,
             trigger.next_run_at,
             config.window_minutes,
+            tokio::time::Instant::now() + time_left,
         ),
     )
     .await

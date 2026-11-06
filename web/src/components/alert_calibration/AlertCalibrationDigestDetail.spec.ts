@@ -26,6 +26,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AlertCalibrationDigestDetail from "./AlertCalibrationDigestDetail.vue";
 import { SEARCH_SIZE, type DigestRecord } from "./digests";
+import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -33,6 +34,13 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/aws-exports")>();
   return { default: { ...actual.default, isEnterprise: "true" } };
+});
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listByFolderId: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+  });
 });
 
 vi.mock("@/services/alert_calibration", async (importOriginal) => {
@@ -118,6 +126,7 @@ const mountDetail = async (records: DigestRecord[]) => {
         component: { template: "<div />" },
       },
       { path: "/alerts", name: "alertList", component: { template: "<div />" } },
+      { path: "/alerts/edit/:alert_id", name: "editAlert", component: { template: "<div />" } },
     ],
   });
   await router.push({
@@ -134,6 +143,85 @@ const mountDetail = async (records: DigestRecord[]) => {
   await flushPromises();
   return wrapper;
 };
+
+const notChecked = (written: number, n: number, cause: string): DigestRecord =>
+  skip(written, n, {
+    rule_id: "failure",
+    skip_reason: "definition_not_checked",
+    skip_detail: JSON.stringify({ cause }),
+  });
+
+const GROUP = '[data-test="alert-calibration-skip-group"]';
+
+describe("AlertCalibrationDigestDetail definition not checked", () => {
+  beforeEach(() => {
+    queryClient.clear();
+    sessionStorage.clear();
+  });
+
+  it("shows no group when no skip is a not-checked definition", async () => {
+    const wrapper = await mountDetail([skip(1, 1)]);
+    expect(wrapper.find(GROUP).exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="alert-calibration-digest-skip"]')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("moves them out of the declined list into one group by cause, in words only", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const wrapper = await mountDetail([
+      notChecked(4, 1, "unsupported_query"),
+      notChecked(4, 2, "warp_drive"),
+      notChecked(4, 3, "probe_timeout"),
+      skip(4, 3, { rule_id: "failure", skip_reason: "insufficient_history" }),
+    ]);
+    const group = wrapper.get(GROUP);
+    expect(group.get('[data-test="alert-calibration-skip-group-title"]').text()).toBe(
+      "Definition not checked",
+    );
+    expect(group.get('[data-test="alert-calibration-skip-group-count"]').text()).toBe("3");
+    const causes = group.findAll('[data-test="alert-calibration-skip-group-cause"]');
+    const why = '[data-test="alert-calibration-skip-group-cause-why"]';
+    expect(causes.map((c) => c.get(why).text())).toEqual([
+      "The check timed out.",
+      "The check can't read this kind of query yet.",
+      "The check did not finish.",
+    ]);
+    expect(causes[0].text()).toContain("It is checked again within a day.");
+    expect(causes[1].text()).toContain("Review the query:");
+    for (const code of [
+      "probe_timeout",
+      "unsupported_query",
+      "warp_drive",
+      "definition_not_checked",
+    ]) {
+      expect(wrapper.text()).not.toContain(code);
+    }
+    expect(wrapper.findAll('[data-test="alert-calibration-digest-skip"]')).toHaveLength(1);
+    expect(warn.mock.calls.flat().join(" ")).not.toContain("Duplicate keys");
+    warn.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("Review query opens the alert editor at the query with the skip as its handoff", async () => {
+    const wrapper = await mountDetail([notChecked(1, 7, "probe_rejected")]);
+    const button = wrapper.get(`${GROUP} [data-test="alert-calibration-skip-group-row"] button`);
+    expect(button.text()).toBe("Review query");
+    await button.trigger("click");
+    await flushPromises();
+    expect(JSON.parse(sessionStorage.getItem(ALERT_PREFILL_KEY)!)).toMatchObject({
+      source: "calibration",
+      target: { alertId: "a7", findingId: "" },
+      focus: "query",
+    });
+    const router = wrapper.vm.$router;
+    expect(router.currentRoute.value.name).toBe("editAlert");
+    expect(router.currentRoute.value.query).toMatchObject({
+      org_identifier: "default",
+      prefill: "calibration",
+    });
+    wrapper.unmount();
+  });
+});
 
 describe("AlertCalibrationDigestDetail declined list", () => {
   beforeEach(() => {

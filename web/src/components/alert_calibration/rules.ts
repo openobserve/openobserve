@@ -380,7 +380,14 @@ export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
     },
     CHECKED_AT,
   ],
-  empty_scope: [CHECKED_AT],
+  empty_scope: [
+    {
+      column: "evidence_notworking_searched_secs",
+      labelKey: "alertCalibration.evidence.searchedWindow",
+      format: "seconds",
+    },
+    CHECKED_AT,
+  ],
   source_inactive: [
     STREAM,
     {
@@ -440,8 +447,8 @@ export const ADVICE_LABEL: Record<string, I18nKey> = {
   reduce_query_memory: "alertCalibration.advice.reduceQueryMemory",
 };
 
-/** Limitation codes (ENT not_working.rs `LIMIT_*`). */
 export const LIMITATION_LABEL: Record<string, I18nKey> = {
+  searched_window: "alertCalibration.limitation.searchedWindow",
   quiet_source: "alertCalibration.limitation.quietSource",
   scan_truncated: "alertCalibration.limitation.scanTruncated",
   no_success_in_window: "alertCalibration.limitation.noSuccessInWindow",
