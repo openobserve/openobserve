@@ -82,9 +82,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #cell-headline="{ row }">
           <span class="text-text-heading text-pretty">{{ row.headline }}</span>
+          <span
+            v-if="row.note"
+            class="text-text-secondary mt-0.5 block text-xs leading-snug text-pretty"
+            :data-test="`autoobserve2-suggestions-note-${row.id}`"
+            >{{ row.note }}</span
+          >
         </template>
         <template #cell-kind="{ row }">
-          <OTag variant="default-soft" size="xs" :label="row.kind" />
+          <OTag
+            :variant="row.kindVariant"
+            size="xs"
+            :label="row.kind"
+            :data-test="`autoobserve2-suggestions-kind-${row.id}`"
+          />
         </template>
         <template #cell-severity="{ row }">
           <OTag

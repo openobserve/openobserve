@@ -28,6 +28,7 @@ import {
   type EditHandoffPlan,
 } from "@/utils/alerts/alertEditHandoff";
 import { applyCopy, type ApplyCopy } from "@/components/alert_calibration/applySuggestion";
+import { isAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
 type AlertForm = ReturnType<typeof useAlertForm>;
 
@@ -52,8 +53,12 @@ export const useCalibrationHandoff = ({
 }: UseCalibrationHandoffOptions) => {
   const { t, locale } = useI18nTyped();
   const route = form.router.currentRoute;
-  /** The banner's row is held from first paint, so the form never moves when the banner arrives. */
-  const reserved = computed(() => route.value.query.prefill === CALIBRATION_PREFILL);
+  /** The banner's row is held from first paint, so the form never moves when the banner arrives; without calibration nothing is held. */
+  const reserved = computed(
+    () =>
+      isAlertCalibrationEnabled(form.store.state.zoConfig) &&
+      route.value.query.prefill === CALIBRATION_PREFILL,
+  );
   const banner = shallowRef<CalibrationBanner | null>(null);
   let active = true;
   onBeforeUnmount(() => {

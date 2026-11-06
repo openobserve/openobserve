@@ -2996,7 +2996,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_TRANSITIONS_RETENTION_DAYS",
         default = 97,
-        help = "How long alert state changes (alert_state_transitions: the level-change history and the input to alert calibration) are kept, in days. Alert calibration reads up to 90 days, so values below 97 shorten its history. 0 or less disables the reaper."
+        help = "Enterprise builds only: how long alert state changes (alert_state_transitions, the level-change history) are kept, in days. Enterprise alert calibration reads up to 90 days, so values below 97 shorten its history. 0 or less disables the reaper; open-source builds never delete them."
     )]
     pub alert_transitions_retention_days: i64,
     #[env_config(

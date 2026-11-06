@@ -30,6 +30,8 @@ import type { FixPhase } from "./useDecisions";
 
 export type ChangeFilter = "all" | "fixes" | "watching" | "tuning";
 export type ChangeKind = "fix" | "permission" | "watching" | "tuning";
+// A suggestion that notifies no one is a failure, a look no ledger change ever wears.
+export type LookKind = ChangeKind | "notify";
 export type ChangeState = "applying" | "worked" | "done" | "review" | "didntHelp" | "undone";
 
 export interface Change {
@@ -53,7 +55,7 @@ export const FILTER_LABEL: Record<ChangeFilter, I18nKey> = {
   tuning: "autoobserve2.activityPage.filters.tuning",
 };
 
-export const KIND_LOOK: Record<ChangeKind, { icon: IconName; badge: string; accent: string }> = {
+export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent: string }> = {
   fix: {
     icon: "build",
     badge:
@@ -77,6 +79,12 @@ export const KIND_LOOK: Record<ChangeKind, { icon: IconName; badge: string; acce
     badge:
       "from-badge-amber-soft-bg to-ingest-accent-amber/25 text-badge-amber-soft-text ring-ingest-accent-amber/30",
     accent: "bg-ingest-accent-amber",
+  },
+  notify: {
+    icon: "notifications",
+    badge:
+      "from-badge-error-soft-bg to-status-error-text/25 text-badge-error-soft-text ring-badge-error-ol-border",
+    accent: "bg-status-error-text",
   },
 };
 

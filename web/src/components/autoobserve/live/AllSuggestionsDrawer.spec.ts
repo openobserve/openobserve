@@ -301,3 +301,50 @@ describe("AllSuggestionsDrawer (journey 3)", () => {
     expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
   });
 });
+
+describe("AllSuggestionsDrawer: a monitor that notifies no one (demo bug 4)", () => {
+  beforeEach(() => {
+    api.mockReset();
+    setOrg("org-a");
+  });
+
+  afterEach(() => {
+    store.commit("setSelectedOrganization", originalOrg);
+  });
+
+  it("shows the kind in red and the why and next under the headline", async () => {
+    api.mockResolvedValueOnce({
+      data: {
+        suggestions: [
+          suggestion("gap"),
+          {
+            ...suggestion("silent"),
+            kind: "silent_coverage",
+            subject: { kind: "alert", key_dims: { entity_id: "a1" } },
+            evidence: {
+              monitor_name: "svc-no-data",
+              classes: ["absence"],
+              services: ["svc-y"],
+              service_count: 1,
+            },
+          },
+        ],
+        total: 2,
+        limit: 25,
+        offset: 0,
+      },
+    } as never);
+    const wrapper = mountDrawer();
+    await flushPromises();
+    const kind = wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-silent"]');
+    expect(kind.text()).toBe("Notifies no one");
+    expect(kind.props("variant")).toBe("error-soft");
+    expect(
+      wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-gap"]').props("variant"),
+    ).toBe("default-soft");
+    expect(wrapper.get('[data-test="autoobserve2-suggestions-note-silent"]').text()).toBe(
+      "svc-no-data would notice svc-y stopping, but it notifies no one. Give it a destination.",
+    );
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-note-gap"]').exists()).toBe(false);
+  });
+});

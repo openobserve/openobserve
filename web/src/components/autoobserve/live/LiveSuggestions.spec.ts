@@ -200,3 +200,35 @@ describe("LiveSuggestions rail when decisions empty the first page", () => {
     expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').exists()).toBe(true);
   });
 });
+
+describe("LiveSuggestions rail: a monitor that notifies no one (demo bug 4)", () => {
+  const silent: AutoObserveSuggestion = {
+    ...suggestion("s-silent"),
+    kind: "silent_coverage",
+    subject: { kind: "alert", key_dims: { entity_id: "a1" } },
+    evidence: {
+      monitor_name: "svc-y-errors",
+      classes: ["errors"],
+      services: ["svc-y"],
+      service_count: 1,
+      undeliverable: ["ops-pager"],
+      undeliverable_count: 1,
+    },
+  };
+
+  it("draws the card red and says why and what next", () => {
+    const wrapper = mountRail(
+      rail(0, 1, {
+        requests: toRequests(gt, { locale: "en-US", timeZone: "UTC" }, [silent]),
+      }),
+    );
+    const card = wrapper.get('[data-test^="autoobserve2-request-"]');
+    expect(card.find("article > span").classes()).toContain("bg-status-error-text");
+    expect(card.find("article > span").classes()).not.toContain("bg-ingest-accent-amber");
+    expect(card.text()).toContain("Notifies no one");
+    expect(card.text()).toContain("svc-y-errors can't reach ops-pager");
+    expect(card.text()).toContain(
+      "ops-pager takes tickets, not alerts. Add a webhook or email next to it; ops-pager stays.",
+    );
+  });
+});

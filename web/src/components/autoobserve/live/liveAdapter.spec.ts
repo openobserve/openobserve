@@ -19,6 +19,7 @@ import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveSuggestion } from "@/services/autoobserve";
 import { toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
 import { detectorsOf } from "../fixtures";
+import { KIND_LOOK } from "../v2/changes";
 
 const DAY_US = 86_400_000_000;
 // The snapshot that first missed coverage: 2026-10-30T02:30Z.
@@ -109,9 +110,16 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
       kind: "Coverage gap",
+      kindVariant: "default-soft",
+      note: null,
       severity: { label: "High", variant: "warning-soft" },
     });
-    expect(rows[1]).toMatchObject({ where: "—", kind: "Silent coverage", severity: null });
+    expect(rows[1]).toMatchObject({
+      where: "—",
+      kind: "Notifies no one",
+      kindVariant: "error-soft",
+      severity: null,
+    });
   });
 });
 
@@ -409,17 +417,15 @@ describe("toCoverageSource service names", () => {
     ).rows.map((r) => r.service);
 
   it("keeps a service really named like a generated label apart from the one it reads like", () => {
-    expect(names([svc("api", "prod"), svc("api", "dev"), svc("api (prod)", "other")])).toEqual([
-      "api (prod/ns)",
-      "api (dev)",
-      "api (prod)",
-    ]);
+    expect(
+      names([svc("api", "prod", "ns-a"), svc("api", "prod", "ns-b"), svc("api · ns-a", "x", "y")]),
+    ).toEqual(["api · prod · ns-a", "api · ns-b", "api · ns-a"]);
   });
 
   it("numbers services that share a name, cluster and namespace", () => {
     expect(names([svc("api", "prod"), svc("api", "prod"), svc("web", "prod")])).toEqual([
-      "api (prod/ns) #1",
-      "api (prod/ns) #2",
+      "api · prod · ns #1",
+      "api · prod · ns #2",
       "web",
     ]);
   });
@@ -428,10 +434,147 @@ describe("toCoverageSource service names", () => {
     const labels = names([
       svc("api", "prod"),
       svc("api", "prod", "other"),
-      svc("api (prod/ns)", "elsewhere"),
-      svc("api (prod/ns) #1", "elsewhere"),
+      svc("api · ns", "elsewhere", "x"),
+      svc("api · prod · ns #1", "elsewhere", "x"),
     ]);
     expect(new Set(labels).size).toBe(4);
-    expect(labels[3]).toBe("api (prod/ns) #1");
+    expect(labels[3]).toBe("api · prod · ns #1");
+  });
+
+  // Demo bug 7 (F94): labels read "svc-a · ns-b" or "no namespace", never "(—/—)".
+  it("tells the same name apart by namespace first", () => {
+    expect(names([svc("api", "prod", "ns-a"), svc("api", "prod", "ns-b")])).toEqual([
+      "api · ns-a",
+      "api · ns-b",
+    ]);
+  });
+
+  it("adds the cluster only when the namespace is shared too", () => {
+    expect(names([svc("api", "prod"), svc("api", "dev")])).toEqual([
+      "api · prod · ns",
+      "api · dev · ns",
+    ]);
+  });
+
+  it("names a missing namespace or cluster in words", () => {
+    const none = null as unknown as string;
+    expect(names([svc("api", none, none), svc("api", "prod", "ns")])).toEqual([
+      "api · no namespace",
+      "api · ns",
+    ]);
+    expect(names([svc("api", none, "ns"), svc("api", "prod", "ns")])).toEqual([
+      "api · no cluster · ns",
+      "api · prod · ns",
+    ]);
+    expect(names([svc("api", none, none), svc("api", "", "")])).toEqual([
+      "api · no cluster · no namespace #1",
+      "api · no cluster · no namespace #2",
+    ]);
+  });
+
+  it("keeps a lone service's bare name", () => {
+    expect(names([svc("api", "prod")])).toEqual(["api"]);
+  });
+
+  it("gives 50 services sharing names a unique label each, with no dash or bracket", () => {
+    const rows = Array.from({ length: 50 }, (_, i) =>
+      svc(`svc-${i % 4}`, ["prod", "dev", "", "stage"][i % 3], ["ns-a", "", "ns-b"][(i % 5) % 3]),
+    );
+    const labels = names(rows);
+    expect(new Set(labels).size).toBe(50);
+    for (const label of labels) expect(label).not.toMatch(/[—()/]/);
+  });
+});
+
+describe("silent_coverage: Notifies no one (demo bug 4)", () => {
+  const ID = "alert-7f3a";
+  const NAMES = Array.from({ length: 12 }, (_, i) => `svc-${String.fromCharCode(97 + i)}`);
+  const DESTS = Array.from({ length: 12 }, (_, i) => (i ? `pager-${i}` : "ops-pager"));
+  const silent = (evidence: Record<string, unknown>) =>
+    suggestion({
+      id: "s-silent",
+      kind: "silent_coverage",
+      subject: { kind: "alert", key_dims: { entity_id: ID } },
+      evidence: { monitor_name: "svc-y-errors", classes: ["errors"], ...evidence },
+    });
+  // ENT sends at most 10 names and the full count beside them.
+  const withServices = (n: number) =>
+    silent({ services: NAMES.slice(0, Math.min(n, 10)), service_count: n });
+  const withDests = (n: number) =>
+    silent({
+      services: ["svc-y"],
+      service_count: 1,
+      undeliverable: DESTS.slice(0, Math.min(n, 10)),
+      undeliverable_count: n,
+    });
+  const card = (s: AutoObserveSuggestion) => toRequests(gt, EAST, [s])[0].copy!;
+  const row = (s: AutoObserveSuggestion) => toSuggestionRows(gt, EAST, [s])[0];
+
+  it("is red on the card and in the drawer, never the amber tuning look", () => {
+    const s = withServices(1);
+    expect(card(s).label).toBe("Notifies no one");
+    expect(card(s).look).toBe("notify");
+    expect(KIND_LOOK[card(s).look].badge).toContain("error");
+    expect(KIND_LOOK[card(s).look].accent).toContain("error");
+    expect(row(s)).toMatchObject({ kind: "Notifies no one", kindVariant: "error-soft" });
+  });
+
+  it.each([
+    [0, "svc-y-errors would notice a service stopping, but it notifies no one."],
+    [1, "svc-y-errors would notice svc-a stopping, but it notifies no one."],
+    [3, "svc-y-errors would notice svc-a, svc-b, and svc-c stopping, but it notifies no one."],
+    [
+      12,
+      "svc-y-errors would notice svc-a, svc-b, svc-c, and 9 more stopping, but it notifies no one.",
+    ],
+  ])("with %i services says why and what next", (n, why) => {
+    const s = withServices(n);
+    expect(card(s).why).toBe(`${why} Give it a destination.`);
+    expect(row(s).note).toBe(card(s).why);
+  });
+
+  it.each([
+    [
+      1,
+      "svc-y-errors can't reach ops-pager",
+      "ops-pager takes tickets, not alerts. Add a webhook or email next to it; ops-pager stays.",
+    ],
+    [
+      3,
+      "svc-y-errors can't reach ops-pager and 2 more",
+      "ops-pager and 2 more take tickets, not alerts. Add a webhook or email next to them; ops-pager and 2 more stay.",
+    ],
+    [
+      12,
+      "svc-y-errors can't reach ops-pager and 11 more",
+      "ops-pager and 11 more take tickets, not alerts. Add a webhook or email next to them; ops-pager and 11 more stay.",
+    ],
+  ])("with %i undeliverable destinations names the first and counts the rest", (n, head, why) => {
+    const s = withDests(n);
+    expect(card(s).headline).toBe(head);
+    expect(card(s).why).toBe(why);
+    expect(row(s).headline).toBe(head);
+    expect(row(s).note).toBe(why);
+    expect(why.match(/tickets/g)).toHaveLength(1);
+  });
+
+  it("with no destination names falls back to the plain silent wording", () => {
+    const s = silent({
+      services: ["svc-a"],
+      service_count: 1,
+      undeliverable: [],
+      undeliverable_count: 0,
+    });
+    expect(card(s).headline).toBe("svc-y-errors watches errors on 1 service but notifies no one");
+    expect(card(s).why).toContain("Give it a destination.");
+  });
+
+  it("shows no internal key or id", () => {
+    for (const s of [withServices(0), withServices(12), withDests(1), withDests(12)]) {
+      const text = [card(s).label, card(s).headline, card(s).why, row(s).note, row(s).kind].join(
+        " ",
+      );
+      expect(text).not.toMatch(/autoobserveLive|silent_coverage|undeliverable|_count|alert-7f3a/);
+    }
   });
 });

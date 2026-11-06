@@ -11266,7 +11266,7 @@
     "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type.",
     "SearchSQLExecuteError": "Error: Search SQL execute error.",
     "SearchSQLCancelled": "Error: Search SQL was cancelled.",
-    "SearchStreamProtected": "Error: Alert calibration records can't be searched in Logs."
+    "SearchStreamProtected": "Error: This stream holds internal records and can't be searched in Logs."
   },
   "alertCalibration": {
     "title": "Alert Calibration",
@@ -21060,6 +21060,8 @@
     "protectedStreamDesc": "They are shown on the Alert Calibration page, filtered to the alerts you can access.",
     "openCalibration": "Open Alert Calibration",
     "openCalibrationDesc": "See the runs and findings you have access to",
+    "protectedStreamInternal": "Internal records can't be searched here",
+    "protectedStreamInternalDesc": "This stream holds records OpenObserve keeps for its own use, so search leaves it out.",
     "generic": "Query error",
     "genericDesc": "An error occurred while processing your query.",
     "configureResource": "Configure stream",
@@ -28765,7 +28767,11 @@
         "mixed": "{watching} {gaps}"
       },
       "gapNone": "No monitor watches {checks}",
-      "searchPlaceholder": "Search service, cluster or namespace"
+      "searchPlaceholder": "Search service, cluster or namespace",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "no namespace",
+      "noCluster": "no cluster"
     },
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
@@ -28814,7 +28820,7 @@
       "kinds": {
         "coverage_gap": "Coverage gap",
         "no_absence_check": "No absence check",
-        "silent_coverage": "Silent coverage",
+        "silent_coverage": "Notifies no one",
         "coverage_lost": "Coverage lost",
         "blind_guardrail": "Blind monitor",
         "discovery_unusable": "Discovery quality",
@@ -28836,6 +28842,12 @@
         "noAbsenceSilent": "The check that would notice {service} going quiet notifies no one",
         "noAbsenceBlind": "The check that would notice {service} going quiet can't see its data",
         "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
+        "silentWhy": "{monitor} would notice {services} stopping, but it notifies no one.",
+        "silentWhyNoNames": "{monitor} would notice a service stopping, but it notifies no one.",
+        "silentNext": "Give it a destination.",
+        "undeliverable": "{monitor} can't reach {destination}",
+        "undeliverableWhy": "{destination} takes tickets, not alerts. | {destination} take tickets, not alerts.",
+        "undeliverableNext": "Add a webhook or email next to it; {destination} stays. | Add a webhook or email next to them; {destination} stay.",
         "coverageLost": "{service} lost {classes} coverage on {day}",
         "blindStreamMissing": "{monitor} reads {detail}, which doesn't exist",
         "blindNoData": "{monitor} reads {detail}, which has no recent data",
@@ -28871,6 +28883,8 @@
       "loading": "Loading suggestions",
       "loaded": "Suggestions loaded",
       "more": "and {count} more | and {count} more",
+      "moreNames": "{count} more | {count} more",
+      "whyNext": "{why} {next}",
       "seeAll": "See all {total} | See all {total}",
       "drawerTitle": "Suggestions",
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",

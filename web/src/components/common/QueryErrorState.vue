@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emit('widen-range')"
           />
           <EmptyStateActionCard
-            v-else-if="errorCode === 20014"
+            v-else-if="errorCode === 20014 && calibrationEnabled"
             icon="open-in-new"
             :label="t('queryError.openCalibration')"
             :sublabel="t('queryError.openCalibrationDesc')"
@@ -424,6 +424,7 @@ const {
   explanation,
   illustration: codeIllustration,
   tone,
+  calibrationEnabled,
   showDetail,
   copyErrorDetails,
 } = useQueryError({

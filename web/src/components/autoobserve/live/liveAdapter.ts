@@ -34,12 +34,13 @@ import {
   type Signal,
 } from "../fixtures";
 import type { Msg, Request, RequestCopy } from "../v2/fixtures";
-import type { ChangeKind } from "../v2/changes";
+import type { LookKind } from "../v2/changes";
 import { TIER_LABEL } from "@/components/alert_calibration/format";
 import {
   agoText,
   coverageWord,
   formatDay,
+  serviceLabel,
   whereText,
   type LiveFailure,
   type LiveStale,
@@ -84,6 +85,9 @@ export interface SuggestionRow {
   headline: I18nText;
   where: I18nText;
   kind: I18nText;
+  kindVariant: BadgeVariant;
+  // Why and next, shown under the headline only for kinds that say what to do.
+  note: I18nText | null;
   severity: { label: I18nText; variant: BadgeVariant } | null;
   detail: Msg;
 }
@@ -151,7 +155,7 @@ const MONITOR_KIND_LABEL: Record<string, I18nKey> = {
   synthetic: "autoobserveLive.monitorKinds.synthetic",
 };
 
-const SUGGESTION_KIND: Record<string, { label: I18nKey; look: ChangeKind }> = {
+const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: BadgeVariant }> = {
   discovery_unusable: {
     label: "autoobserveLive.suggestions.kinds.discovery_unusable",
     look: "watching",
@@ -162,7 +166,12 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: ChangeKind }> = {
     label: "autoobserveLive.suggestions.kinds.no_absence_check",
     look: "watching",
   },
-  silent_coverage: { label: "autoobserveLive.suggestions.kinds.silent_coverage", look: "tuning" },
+  // Nobody hears this monitor fire, so it reads as a failure, not as tuning.
+  silent_coverage: {
+    label: "autoobserveLive.suggestions.kinds.silent_coverage",
+    look: "notify",
+    tag: "error-soft",
+  },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
   alert_not_working: { label: "alertCalibration.rules.notWorking", look: "fix" },
 };
@@ -276,9 +285,9 @@ const streamText = (row: AutoObserveCoverageRow) => {
 };
 
 const NAME_TIERS = [
-  (r: AutoObserveCoverageRow) => r.service_name,
-  (r: AutoObserveCoverageRow) => `${r.service_name} (${r.cluster || "—"})`,
-  (r: AutoObserveCoverageRow) => `${r.service_name} (${r.cluster || "—"}/${r.namespace || "—"})`,
+  (_t: TranslateFn, r: AutoObserveCoverageRow): string => r.service_name,
+  (t: TranslateFn, r: AutoObserveCoverageRow): string => serviceLabel(t, r.service_name, r, false),
+  (t: TranslateFn, r: AutoObserveCoverageRow): string => serviceLabel(t, r.service_name, r, true),
 ];
 
 const groupBy = (labels: string[]) =>
@@ -288,9 +297,9 @@ const groupBy = (labels: string[]) =>
   );
 
 // The design keys rows by name, so every label must be unique, even against a real name that reads like a generated one.
-const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
+const uniqueNames = (t: TranslateFn, rows: AutoObserveCoverageRow[]) => {
   const tier = rows.map(() => 0);
-  const labelOf = (i: number) => NAME_TIERS[Math.min(tier[i], NAME_TIERS.length - 1)](rows[i]);
+  const labelOf = (i: number) => NAME_TIERS[Math.min(tier[i], NAME_TIERS.length - 1)](t, rows[i]);
   for (let round = 0; round < NAME_TIERS.length; round++) {
     const clashes = [...groupBy(rows.map((_, i) => labelOf(i))).values()].filter(
       (g) => g.length > 1,
@@ -391,7 +400,7 @@ export const toCoverageSource = (
   const base = { busy: false, failure: null, detail: raw(""), stale: null, ...state };
   if (!data)
     return { ...base, rows: [], totals: EMPTY_TOTALS, planned: new Set(), passMinutes: null };
-  const names = uniqueNames(data.rows);
+  const names = uniqueNames(t, data.rows);
   const minutes = minutesSince(data.pass_at, now);
   const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
@@ -472,8 +481,34 @@ const NO_DETAIL: Msg = { key: "autoobserveLive.suggestions.detail.none" };
 interface Parts {
   headline: I18nText;
   why: I18nText | null;
+  next?: I18nText;
   body: Msg;
 }
+
+const nameList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v !== "") : [];
+
+// Names past the cap fold into "N more", so one sentence reads the same for 1 name or 12.
+const cappedList = (
+  t: TranslateFn,
+  locale: string,
+  list: string[],
+  total: number,
+  cap: number,
+): I18nText => {
+  const shown: I18nText[] = list.slice(0, cap).map((name) => raw(name));
+  const rest = Math.max(total, list.length) - shown.length;
+  return listOf(
+    locale,
+    rest > 0
+      ? [...shown, t("autoobserveLive.suggestions.moreNames", { count: rest }, rest)]
+      : shown,
+  );
+};
+
+// The approved copy names the first destination and counts the rest, and up to three services.
+const DESTINATION_CAP = 1;
+const SERVICE_CAP = 3;
 
 const blindParts = (
   t: TranslateFn,
@@ -501,24 +536,44 @@ const blindParts = (
 
 const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): Parts => {
   const count = num(s.evidence.service_count) ?? 0;
-  const services = ((s.evidence.services ?? []) as string[]).map((name) => raw(name));
+  const monitor = raw(str(s.evidence.monitor_name));
+  const services = nameList(s.evidence.services);
+  const body: Msg = services.length
+    ? {
+        key: "autoobserveLive.suggestions.detail.services",
+        params: {
+          services: listOf(
+            locale,
+            services.map((name) => raw(name)),
+          ),
+        },
+      }
+    : NO_DETAIL;
+  const undeliverable = nameList(s.evidence.undeliverable);
+  if (undeliverable.length) {
+    const total = Math.max(num(s.evidence.undeliverable_count) ?? 0, undeliverable.length);
+    const destination = cappedList(t, locale, undeliverable, total, DESTINATION_CAP);
+    return {
+      headline: t("autoobserveLive.suggestions.body.undeliverable", { monitor, destination }),
+      why: t("autoobserveLive.suggestions.body.undeliverableWhy", { destination }, total),
+      next: t("autoobserveLive.suggestions.body.undeliverableNext", { destination }, total),
+      body,
+    };
+  }
   return {
     headline: t(
       "autoobserveLive.suggestions.body.silentCoverage",
-      {
-        monitor: raw(str(s.evidence.monitor_name)),
-        classes: classList(t, locale, (s.evidence.classes ?? []) as string[]),
-        count,
-      },
+      { monitor, classes: classList(t, locale, (s.evidence.classes ?? []) as string[]), count },
       count,
     ),
-    why: null,
-    body: services.length
-      ? {
-          key: "autoobserveLive.suggestions.detail.services",
-          params: { services: listOf(locale, services) },
-        }
-      : NO_DETAIL,
+    why: services.length
+      ? t("autoobserveLive.suggestions.body.silentWhy", {
+          monitor,
+          services: cappedList(t, locale, services, count, SERVICE_CAP),
+        })
+      : t("autoobserveLive.suggestions.body.silentWhyNoNames", { monitor }),
+    next: t("autoobserveLive.suggestions.body.silentNext"),
+    body,
   };
 };
 
@@ -590,6 +645,14 @@ const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion, nowMs?: 
   return { headline: t("autoobserveLive.suggestions.body.other"), why: null, body: NO_DETAIL };
 };
 
+// Card and drawer row have one line for the reason, so the next step follows it there.
+const whyAndNext = (t: TranslateFn, parts: Parts): I18nText | null => {
+  if (!parts.next) return parts.why;
+  return parts.why
+    ? t("autoobserveLive.suggestions.whyNext", { why: parts.why, next: parts.next })
+    : parts.next;
+};
+
 const kindOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
   const kind = SUGGESTION_KIND[s.kind];
   return kind ? t(kind.label) : t("autoobserveLive.suggestions.kinds.other");
@@ -644,7 +707,7 @@ export const toRequests = (
       copy: {
         label: kindOf(t, s),
         headline: parts.headline,
-        why: parts.why,
+        why: whyAndNext(t, parts),
         tags: tagsFor(t, s),
         look: SUGGESTION_KIND[s.kind]?.look ?? "watching",
       },
@@ -667,6 +730,8 @@ export const toSuggestionRows = (
       headline: parts.headline,
       where: whereOf(t, s),
       kind: kindOf(t, s),
+      kindVariant: SUGGESTION_KIND[s.kind]?.tag ?? "default-soft",
+      note: parts.next ? whyAndNext(t, parts) : null,
       severity: severityTag(t, s),
       detail: parts.body,
     };
