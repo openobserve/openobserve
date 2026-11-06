@@ -880,8 +880,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await expect(infoIcon).toBeVisible();
     await infoIcon.hover();
 
-    // Verify tooltip appears with expected text
-    const tooltip = pm.dashboardPanelConfigs.infoTooltip;
+    // The expand-all button's tooltip can still be open from openConfigPanel, so match this one by text.
+    const tooltip = pm.dashboardPanelConfigs.infoTooltip.filter({ hasText: 'default number of records' });
     await expect(tooltip).toBeVisible();
     const tooltipText = await tooltip.textContent();
     expect(tooltipText).toContain('default number of records');
