@@ -214,6 +214,16 @@ impl KvWritePort for KvAdapter {
     async fn delete(&self, org: &str, key: &str) -> anyhow::Result<()> {
         crate::kv::delete(org, key).await
     }
+
+    async fn compare_and_set(
+        &self,
+        org: &str,
+        key: &str,
+        expected: Option<&[u8]>,
+        value: Vec<u8>,
+    ) -> anyhow::Result<bool> {
+        crate::kv::compare_and_set(org, key, expected, bytes::Bytes::from(value)).await
+    }
 }
 
 /// Reads the node's stats and schema caches; no query runs.

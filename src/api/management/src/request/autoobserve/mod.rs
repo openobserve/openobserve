@@ -16,6 +16,7 @@
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
 pub mod incidents;
+pub mod review;
 
 use std::{
     collections::{BTreeSet, HashMap},
