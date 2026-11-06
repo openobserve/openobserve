@@ -473,22 +473,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </template>
 
-              <!-- Tags (PT-6). Three visible + overflow count, so an alert
-                   carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
-                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
-                  <OTag
-                    v-for="tag in row.tags.slice(0, 3)"
-                    :key="tag"
-                    type="exampleChip"
-                    value="dim"
-                    :label="tag"
-                    :data-test="`alert-list-${row.name}-tag`"
-                  />
-                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
-                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
-                  </OTooltip>
-                </div>
+                <FitItems v-if="row.tags?.length" :items="row.tags">
+                  <template #default="{ item }">
+                    <OTag
+                      type="exampleChip"
+                      value="dim"
+                      class="max-w-full"
+                      :data-test="`alert-list-${row.name}-tag`"
+                    >
+                      <span class="truncate">{{ item }}</span>
+                    </OTag>
+                  </template>
+                  <template #more="{ count }">
+                    <OTooltip :content="row.tags.join(', ')">
+                      <span class="text-text-secondary text-2xs">+{{ count }}</span>
+                    </OTooltip>
+                  </template>
+                </FitItems>
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
@@ -1306,6 +1308,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1374,6 +1377,7 @@ export default defineComponent({
     OUserCell,
     OTag,
     OTruncatedText,
+    FitItems,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
