@@ -269,6 +269,7 @@ import {
   type FiringRow,
 } from "@/utils/alerts/firingAlerts";
 import {
+  OPENING_RUN_MARGIN_US,
   deliveredNames,
   failedDelivery,
   flapCount,
@@ -346,7 +347,7 @@ const historyQuery = computed(() => {
   const id = props.alertId ?? "";
   return {
     ...(isAnomaly.value ? { anomaly_id: id } : { alert_id: id }),
-    start_time: Math.min(historyEndUs.value - FLAP_WINDOW_US, started),
+    start_time: Math.min(historyEndUs.value - FLAP_WINDOW_US, started - OPENING_RUN_MARGIN_US),
     end_time: historyEndUs.value,
     from: 0,
     size: HISTORY_SIZE,

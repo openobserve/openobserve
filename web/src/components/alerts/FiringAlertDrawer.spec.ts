@@ -24,6 +24,7 @@ import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { FiringRow } from "@/utils/alerts/firingAlerts";
 import { FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
+import { OPENING_RUN_MARGIN_US } from "@/utils/alerts/firingHistory";
 import FiringAlertDrawer from "./FiringAlertDrawer.vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -429,7 +430,27 @@ describe("FiringAlertDrawer", () => {
   it("reads back far enough to cover the firing and the flap window", async () => {
     await mountDrawer({ ...baseRow, firing_started_at: NOW_US - 24 * 3_600_000_000 });
     const query = getHistory.mock.calls[0][1];
-    expect(query.start_time).toBe(NOW_US - 24 * 3_600_000_000);
+    expect(query.start_time).toBe(NOW_US - 24 * 3_600_000_000 - OPENING_RUN_MARGIN_US);
     expect(query.size).toBe(1000);
+  });
+
+  it("confirms the single opening send of a firing older than the flap window", async () => {
+    const started = NOW_US - 8 * 3_600_000_000;
+    const opening = {
+      timestamp: started - 30_000_000,
+      status: "firing",
+      success_response: "destination slack ok;",
+    };
+    getHistory.mockImplementation(async (_org: string, query: { start_time: number }) => ({
+      data: { hits: opening.timestamp >= query.start_time ? [opening] : [] },
+    }));
+    const wrapper = await mountDrawer({ ...baseRow, firing_started_at: started });
+    const section = wrapper.find('[data-section="notified"]');
+    expect(
+      section
+        .find('[data-group="confirmed"] [data-test="alerts-firing-drawer-dest-slack"]')
+        .exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="alerts-firing-drawer-flaps"]').text()).toContain("0");
   });
 });

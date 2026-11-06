@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  OPENING_RUN_MARGIN_US,
   deliveredNames,
   failedDelivery,
   flapCount,
@@ -153,6 +154,24 @@ describe("deliveredNames", () => {
     expect(deliveredNames(hits.slice(0, 2), ["slack"], at(3))).toEqual([]);
   });
 
+  it("does not count a previous firing past a pending run, which leaves no ok row", () => {
+    const hits = [run(9, "firing", sent("slack")), run(5, "pending"), run(1, "firing")];
+    expect(deliveredNames(hits, ["slack"], at(3))).toEqual([]);
+    const close = [run(3.5, "firing", sent("slack")), run(3.2, "pending"), run(1, "firing")];
+    expect(deliveredNames(close, ["slack"], at(3))).toEqual([]);
+  });
+
+  it("counts a run behind the start only within the opening margin", () => {
+    const within = OPENING_RUN_MARGIN_US / MIN;
+    const hits = (minutesAhead: number) => [run(3 + minutesAhead, "firing", sent("slack"))];
+    expect(deliveredNames(hits(within), ["slack"], at(3))).toEqual(["slack"]);
+    expect(deliveredNames(hits(within + 1), ["slack"], at(3))).toEqual([]);
+  });
+
+  it("stays unconfirmed when a capped read lost the opening run", () => {
+    expect(deliveredNames([run(2, "firing"), run(1, "firing")], ["slack"], at(3))).toEqual([]);
+  });
+
   it("lets a failed opening run stand against nothing newer", () => {
     expect(deliveredNames([run(4, "notify_failed", failed("slack"))], ["slack"], at(3))).toEqual(
       [],
@@ -161,6 +180,14 @@ describe("deliveredNames", () => {
 });
 
 describe("statusBar", () => {
+  it("ignores a row read just behind an old firing's start", () => {
+    const window = { startUs: at(480), nowUs: NOW, firingStartedAt: at(480) };
+    const runs = [run(470, "firing"), run(1, "firing")];
+    const opening = [...runs, run(481, "firing"), run(483, "normal")];
+    expect(statusBar(opening, window)).toEqual(statusBar(runs, window));
+    expect(flapCount(opening, at(360))).toBe(flapCount(runs, at(360)));
+  });
+
   it("splits the window into firing and ok with their totals", () => {
     const bar = statusBar(
       [run(30, "firing"), run(60, "normal"), run(90, "firing"), run(100, "normal")],

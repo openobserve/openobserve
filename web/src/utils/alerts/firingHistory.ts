@@ -66,6 +66,9 @@ interface Change {
   run: AlertRun;
 }
 
+// Well over the default 90 s run lease (ZO_ALERT_SCHEDULE_TIMEOUT), the widest gap between a run's row and the firing's start.
+export const OPENING_RUN_MARGIN_US = 5 * 60_000_000;
+
 const FAILED_DESTINATION = /destination (.+?) err: /g;
 const NO_CONDITION = "—";
 const EVENTS_SHOWN = 5;
@@ -128,11 +131,15 @@ export const failedNames = (run: AlertRun): string[] =>
 const sentNames = (run: AlertRun, destinations: string[]): string[] =>
   destinations.filter((name) => (run.success_response ?? "").includes(`destination ${name} `));
 
+const closesFiring = (run: AlertRun) =>
+  stateOf(run) !== null || outcomeBucket(run.status) === "pending";
+
 // A run's row is stamped before its send and the firing's start after it, so the opening run sits just behind the start.
 const runsOfFiring = (hits: AlertRun[], sinceUs: number): AlertRun[] => {
   const runs = descending(hits);
-  const behind = runs.find((run) => run.timestamp < sinceUs && stateOf(run) !== null);
-  const opening = behind && stateOf(behind) === "firing" ? behind : undefined;
+  const behind = runs.find((run) => run.timestamp < sinceUs && closesFiring(run));
+  const adjacent = behind && sinceUs - behind.timestamp <= OPENING_RUN_MARGIN_US;
+  const opening = adjacent && stateOf(behind) === "firing" ? behind : undefined;
   return runs.filter((run) => run.timestamp >= sinceUs || run === opening);
 };
 
