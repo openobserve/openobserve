@@ -128,11 +128,18 @@ export const failedNames = (run: AlertRun): string[] =>
 const sentNames = (run: AlertRun, destinations: string[]): string[] =>
   destinations.filter((name) => (run.success_response ?? "").includes(`destination ${name} `));
 
-/** Destinations whose newest delivery since `sinceUs` is a recorded success. */
+// A run's row is stamped before its send and the firing's start after it, so the opening run sits just behind the start.
+const runsOfFiring = (hits: AlertRun[], sinceUs: number): AlertRun[] => {
+  const runs = descending(hits);
+  const behind = runs.find((run) => run.timestamp < sinceUs && stateOf(run) !== null);
+  const opening = behind && stateOf(behind) === "firing" ? behind : undefined;
+  return runs.filter((run) => run.timestamp >= sinceUs || run === opening);
+};
+
+/** Destinations whose newest delivery in the firing that began at `sinceUs` is a recorded success. */
 export const deliveredNames = (hits: AlertRun[], destinations: string[], sinceUs = 0): string[] => {
   const newest = new Map<string, boolean>();
-  for (const run of descending(hits)) {
-    if (run.timestamp < sinceUs) break;
+  for (const run of runsOfFiring(hits, sinceUs)) {
     for (const name of failedNames(run)) if (!newest.has(name)) newest.set(name, false);
     for (const name of sentNames(run, destinations)) if (!newest.has(name)) newest.set(name, true);
   }
@@ -260,11 +267,16 @@ export const historyEvents = (
     windowStartUs?: number;
   },
 ): HistoryEvent[] => {
+  const { firingStartedAt } = options;
+  // The open firing outranks its runs, as on the bar, so an ok run after its start ended nothing.
+  const changes = eventChanges(hits, options.windowStartUs).filter(
+    (change) => firingStartedAt === undefined || change.at <= firingStartedAt,
+  );
   const events: HistoryEvent[] = [
-    ...eventChanges(hits, options.windowStartUs).map(stateEvent),
+    ...changes.map(stateEvent),
     ...ascending(hits).flatMap((run) => runEvent(run, options.destinations) ?? []),
   ];
-  anchorOpenFiring(events, options.firingStartedAt);
+  anchorOpenFiring(events, firingStartedAt);
   events.sort((a, b) => a.at - b.at);
   withDurations(events, options.nowUs);
   return withoutRepeats(events).slice(-EVENTS_SHOWN).reverse();

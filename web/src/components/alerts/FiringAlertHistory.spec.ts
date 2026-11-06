@@ -55,7 +55,9 @@ describe("FiringAlertHistory", () => {
       hits: [{ timestamp: NOW - 30 * MIN, status: "firing" }],
       partial: true,
     });
-    expect(wrapper.find('[data-test="alerts-firing-history-segment-unknown"]').exists()).toBe(true);
+    const unknown = wrapper.find('[data-test="alerts-firing-history-segment-unknown"]');
+    expect(unknown.exists()).toBe(true);
+    expect(unknown.classes()).toEqual(expect.arrayContaining(["bg-hatched", "border-dashed"]));
     expect(wrapper.text()).toContain("1h 30m not read");
     expect(wrapper.findAll('[data-test="alerts-firing-history-event"]')).toHaveLength(0);
   });

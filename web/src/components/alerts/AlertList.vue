@@ -4183,6 +4183,9 @@ export default defineComponent({
                 : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
+        queryClient.invalidateQueries({
+          queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
+        });
         // Refresh alerts
         await getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
@@ -4297,6 +4300,7 @@ export default defineComponent({
           const org = String(store.state.selectedOrganization.identifier);
           const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
+          queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);

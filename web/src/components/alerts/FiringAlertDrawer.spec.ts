@@ -311,6 +311,7 @@ describe("FiringAlertDrawer", () => {
       data: {
         hits: [
           { timestamp: NOW_US - 1000, status: "firing", success_response: "destination pd ok;" },
+          { timestamp: started - 500, status: "normal" },
           {
             timestamp: started - 1000,
             status: "firing",
@@ -320,11 +321,32 @@ describe("FiringAlertDrawer", () => {
       },
     });
     const wrapper = await mountDrawer({ ...baseRow, firing_started_at: started });
-    expect(wrapper.find('[data-section="notified"]').text()).toContain("Notified");
-    const confirmed = (id: string) =>
-      wrapper.find(`[data-test="alerts-firing-drawer-dest-${id}"]`).html();
-    expect(confirmed("pd")).toContain("success");
-    expect(confirmed("slack")).not.toContain("success");
+    const section = wrapper.find('[data-section="notified"]');
+    const dest = (group: string, id: string) =>
+      section.find(`[data-group="${group}"] [data-test="alerts-firing-drawer-dest-${id}"]`);
+    expect(section.text()).toContain("Notified");
+    expect(section.text()).toContain("Destinations");
+    expect(dest("confirmed", "pd").html()).toContain("success");
+    expect(dest("unconfirmed", "slack").html()).not.toContain("success");
+    expect(dest("unconfirmed", "pd").exists()).toBe(false);
+  });
+
+  it("drops the neutral label once every destination is confirmed", async () => {
+    getHistory.mockResolvedValue({
+      data: {
+        hits: [
+          {
+            timestamp: NOW_US - 1000,
+            status: "firing",
+            success_response: "destination pd ok; destination slack ok;",
+          },
+        ],
+      },
+    });
+    const wrapper = await mountDrawer(baseRow);
+    const section = wrapper.find('[data-section="notified"]');
+    expect(section.text()).toContain("Notified");
+    expect(section.text()).not.toContain("Destinations");
   });
 
   it("shows a firing with no history as destinations, none confirmed", async () => {

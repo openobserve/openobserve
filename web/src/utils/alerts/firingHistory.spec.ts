@@ -125,7 +125,38 @@ describe("deliveredNames", () => {
       run(4, "firing", sent("pd")),
     ];
     expect(deliveredNames(hits, ["slack", "pd"])).toEqual(["pd"]);
-    expect(deliveredNames(hits, ["slack", "pd"], at(3))).toEqual([]);
+    expect(deliveredNames([...hits, run(3, "normal")], ["slack", "pd"], at(2))).toEqual([]);
+  });
+
+  it("counts the run that opened the firing, whose row predates the firing's start", () => {
+    const hits = [run(10, "normal"), run(4, "firing", sent("slack"))];
+    expect(deliveredNames(hits, ["slack"], at(3))).toEqual(["slack"]);
+  });
+
+  it("finds the opening run past rows that say nothing about the state", () => {
+    const hits = [
+      run(4, "firing", sent("slack")),
+      run(3.5, "ack_event", { acked_by: "a@x" }),
+      run(3.2, "skipped"),
+    ];
+    expect(deliveredNames(hits, ["slack"], at(3))).toEqual(["slack"]);
+  });
+
+  it("does not count a previous firing's sends, even with a later send of this one", () => {
+    const hits = [
+      run(9, "firing", sent("slack")),
+      run(5, "normal"),
+      run(4, "firing", sent("pd")),
+      run(1, "firing"),
+    ];
+    expect(deliveredNames(hits, ["slack", "pd"], at(3))).toEqual(["pd"]);
+    expect(deliveredNames(hits.slice(0, 2), ["slack"], at(3))).toEqual([]);
+  });
+
+  it("lets a failed opening run stand against nothing newer", () => {
+    expect(deliveredNames([run(4, "notify_failed", failed("slack"))], ["slack"], at(3))).toEqual(
+      [],
+    );
   });
 });
 
@@ -227,6 +258,12 @@ describe("historyEvents", () => {
   it("anchors the open firing to its start when the read does not reach it", () => {
     const events = historyEvents([run(1, "firing")], { ...opts, firingStartedAt: at(5000) });
     expect(events.map((e) => [e.kind, e.at])).toEqual([["started", at(5000)]]);
+  });
+
+  it("never leaves a recovery newest and open under a firing that began before it", () => {
+    const hits = [run(800, "firing"), run(600, "normal"), run(600.5, "skipped"), run(10, "firing")];
+    const events = historyEvents(hits, { ...opts, firingStartedAt: at(900) });
+    expect(events.map((e) => [e.kind, e.at, e.open])).toEqual([["started", at(900), true]]);
   });
 
   it("keeps the latest five", () => {

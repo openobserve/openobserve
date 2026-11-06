@@ -105,7 +105,7 @@ const WINDOW_US = 2 * 3_600_000_000;
 const segmentClass = {
   firing: "bg-badge-error-solid-bg",
   ok: "bg-border-strong",
-  unknown: "bg-border-default",
+  unknown: "bg-hatched border-border-strong border border-dashed",
 };
 
 const props = defineProps<{

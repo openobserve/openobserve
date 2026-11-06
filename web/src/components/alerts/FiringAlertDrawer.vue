@@ -62,30 +62,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1"
           data-section="notified"
         >
-          <OText variant="meta">
-            {{
-              delivered.length ? t("alerts.firing.drawer.notified") : t("alerts.destinationsLabel")
-            }}
-          </OText>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <OTag
-              v-for="name in reached"
-              :key="name"
-              :variant="delivered.includes(name) ? 'success-soft' : 'default-soft'"
-              :icon="delivered.includes(name) ? 'check' : undefined"
-              size="sm"
-              :label="raw(name)"
-              :data-test="`alerts-firing-drawer-dest-${name}`"
-            />
-            <OTag
-              v-for="name in delivery?.names ?? []"
-              :key="name"
-              variant="error-soft"
-              size="sm"
-              :label="t('alerts.firing.drawer.notDeliveredTo', { name: raw(name) })"
-              :data-test="`alerts-firing-drawer-failed-${name}`"
-            />
-          </div>
+          <template v-if="confirmed.length">
+            <OText variant="meta">{{ t("alerts.firing.drawer.notified") }}</OText>
+            <div class="flex flex-wrap items-center gap-1.5" data-group="confirmed">
+              <OTag
+                v-for="name in confirmed"
+                :key="name"
+                variant="success-soft"
+                icon="check"
+                size="sm"
+                :label="raw(name)"
+                :data-test="`alerts-firing-drawer-dest-${name}`"
+              />
+            </div>
+          </template>
+          <template v-if="unconfirmed.length || delivery?.names.length">
+            <OText variant="meta">{{ t("alerts.destinationsLabel") }}</OText>
+            <div class="flex flex-wrap items-center gap-1.5" data-group="unconfirmed">
+              <OTag
+                v-for="name in unconfirmed"
+                :key="name"
+                variant="default-soft"
+                size="sm"
+                :label="raw(name)"
+                :data-test="`alerts-firing-drawer-dest-${name}`"
+              />
+              <OTag
+                v-for="name in delivery?.names ?? []"
+                :key="name"
+                variant="error-soft"
+                size="sm"
+                :label="t('alerts.firing.drawer.notDeliveredTo', { name: raw(name) })"
+                :data-test="`alerts-firing-drawer-failed-${name}`"
+              />
+            </div>
+          </template>
           <OText
             v-if="delivery && !delivery.names.length && delivery.error"
             variant="meta"
@@ -344,7 +355,7 @@ const historyQuery = computed(() => {
 const historyRead = useQuery(() =>
   Object.assign(alertHistoryQuery(orgId.value, historyQuery.value), {
     enabled: !!props.alertId,
-    // Each refresh mints a new key and so a new read; another alert's runs must never show here.
+    // A window change keeps the shown runs until the new read lands; another alert's runs must never show here.
     placeholderData: (previous: any, query: any) => {
       const read = query?.queryKey.at(-1);
       return (read?.alert_id ?? read?.anomaly_id) === props.alertId ? previous : undefined;
@@ -512,6 +523,8 @@ const delivered = computed(() =>
         firing.value ? (view.value?.firing_started_at ?? 0) : 0,
       ),
 );
+const confirmed = computed(() => reached.value.filter((name) => delivered.value.includes(name)));
+const unconfirmed = computed(() => reached.value.filter((name) => !delivered.value.includes(name)));
 
 const logsAlert = computed(() => {
   const alert = detail.value;

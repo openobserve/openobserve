@@ -2487,6 +2487,37 @@ describe("AlertList - editor drafts", () => {
     queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
   });
 
+  it("refreshes the Firing read after a bulk pause", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    wrapper.vm.filteredResults[0].enabled = true;
+    await wrapper.vm.$nextTick();
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalled();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
+  it("refreshes the Firing read when a bulk delete answers in an unknown shape", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper, vm } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    await wrapper.vm.$nextTick();
+    alertsSvc.bulkDelete.mockResolvedValueOnce({ data: {} });
+
+    await vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
   it("keeps the draft when the delete fails", async () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 500 } });
