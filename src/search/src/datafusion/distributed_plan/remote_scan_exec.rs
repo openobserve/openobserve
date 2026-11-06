@@ -105,6 +105,10 @@ impl RemoteScanExec {
         &self.remote_scan_node.search_infos.plan
     }
 
+    pub fn remote_scan_node(&self) -> &RemoteScanNode {
+        &self.remote_scan_node
+    }
+
     pub fn with_state(mut self, state: RemoteScanState) -> Self {
         self.state = state;
         self
@@ -291,7 +295,7 @@ async fn get_remote_batch(
         }
     }
 
-    let mut recorder = if remote_scan_node.search_infos.is_analyze {
+    let recorder = if remote_scan_node.search_infos.is_analyze {
         NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
     } else {
         NodeProfileRecorder::default()
@@ -318,7 +322,8 @@ async fn get_remote_batch(
     }
 
     let mut request = remote_scan_node.get_flight_search_request(partition);
-    request.set_job_id(generate_random_string(7));
+    let job_id = generate_random_string(7);
+    request.set_job_id(job_id.clone());
     request.set_partition(partition);
     request.search_info.timeout = timeout as i64;
     request.query_identifier.enrich_mode = enrich_mode;
@@ -341,6 +346,7 @@ async fn get_remote_batch(
     {
         Ok((client, request)) => (client, request),
         Err(e) => {
+            recorder.mark_failed(&e);
             return Ok(get_empty_stream(empty_stream.with_error(e)));
         }
     };
@@ -349,10 +355,15 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
+    recorder.mark_sent();
     // runs outside the planner span, so the gRPC CLIENT span takes its parent from this context
     let stream = match client.do_get(request).with_context(context.clone()).await {
-        Ok(stream) => stream,
+        Ok(stream) => {
+            recorder.mark_streaming(job_id);
+            stream
+        }
         Err(e) => {
+            recorder.mark_failed(&e);
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
@@ -399,6 +410,7 @@ async fn get_remote_batch(
                         start.elapsed().as_millis(),
                     );
                     process_partial_err(partial_err, e);
+                    stream.mark_timed_out();
                     break;
                 }
             }

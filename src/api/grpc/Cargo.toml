@@ -56,6 +56,7 @@ prost.workspace = true
 proto.workspace = true
 search.workspace = true
 search_service.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true

@@ -40,6 +40,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::profile::{ProfileNode, RemoteNodeProfile};
 
+/// Flight action that fetches a node's report on one finished run.
+pub const QUERY_PROFILE_ACTION: &str = "query_profile";
+
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
     /// Time in nanos to execute child operator and fetch batches
@@ -209,6 +212,11 @@ pub struct MetricsInfo {
     pub plan: Arc<dyn ExecutionPlan>,
     /// Passed in because it lives in the search crate, which depends on this one.
     pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
+}
+
+/// The id a node keys one run by: the query's trace id and the caller's job id for that call.
+pub fn job_trace_id(trace_id: &str, job_id: &str) -> String {
+    format!("{trace_id}-{job_id}")
 }
 
 fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {

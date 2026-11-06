@@ -60,6 +60,11 @@ impl FlightDecoderStream {
         }
     }
 
+    /// Records that the caller's deadline, not the node, ended this stream.
+    pub fn mark_timed_out(&self) {
+        self.query_context.node_profile.mark_timed_out();
+    }
+
     pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
