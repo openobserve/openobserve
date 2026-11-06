@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import config from "@/aws-exports";
 import {
   ALERT_PREFILL_VERSION,
   type AlertEditFocus,
@@ -22,6 +23,9 @@ import {
 
 /** The `?prefill=` value of a calibration handoff; not an `ALERT_SOURCES` id, which lists create surfaces. */
 export const CALIBRATION_PREFILL = "calibration";
+
+/** The `?prefill=` value of an AutoObserve edit handoff; on the add route the same value names a create prefill. */
+export const AUTOOBSERVE_PREFILL = "autoobserve";
 
 export const PATCH_KEYS = [
   "pendingPeriodSecs",
@@ -55,6 +59,8 @@ const FOCUS_IDS: AlertEditFocus[] = [
 const HANDOFF_KEYS = ["version", "source", "target", "focus", "patch"];
 
 export type PatchKey = (typeof PATCH_KEYS)[number];
+
+export type EditHandoffPrefill = typeof CALIBRATION_PREFILL | typeof AUTOOBSERVE_PREFILL;
 
 export type PatchValue = number | string[];
 
@@ -111,6 +117,11 @@ export function isValidChange(key: PatchKey, change: unknown): boolean {
   if (!VALID_TO[key](change.from, change.to)) return false;
   return !sameValue(change.from as PatchValue, change.to as PatchValue);
 }
+
+/** Whether the route's `prefill` asks the editor to read an edit handoff rather than seed a new alert. */
+export const isEditHandoffPrefill = (prefill: unknown, editing: boolean): boolean =>
+  prefill === CALIBRATION_PREFILL ||
+  (editing && prefill === AUTOOBSERVE_PREFILL && config.isEnterprise === "true");
 
 /** Every key known, every value typed and in range, and at least one change; anything else drops the whole patch. */
 export function isValidPatch(patch: unknown): patch is AlertFieldPatch {

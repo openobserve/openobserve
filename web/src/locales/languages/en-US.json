@@ -13923,6 +13923,11 @@
         "ai": {
           "label": "Create alert",
           "toast": "Imported from AI Observability: \"{sourceLabel}\""
+        },
+        "autoobserve": {
+          "label": "Add alert",
+          "toast": "{sourceLabel}. Nothing is saved until you save.",
+          "sourceLabel": "Suggested by AutoObserve for {service}"
         }
       },
       "warnings": {
@@ -13972,7 +13977,19 @@
         "tracesNoMatches": "No matching spans yet, so the alert fires as soon as one appears.",
         "tracesStoredSpans": "Counts are of stored spans, so sampled traffic reads lower than it really is.",
         "tracesPeriodCapped": "The alert window was capped at {minutes} minutes to keep each check fast.",
-        "tracesNotRun": "This search has not been run yet, so the alert uses the filter in the editor."
+        "tracesNotRun": "This search has not been run yet, so the alert uses the filter in the editor.",
+        "autoobserve": {
+          "noService": "No service was named, so there is nothing to scope this alert to.",
+          "noServiceField": "{stream} has no service field, so this alert cannot be scoped to {service}.",
+          "scopeServiceOnly": "The stream's fields were not known, so this alert is scoped to {service} only, not to its cluster or namespace.",
+          "noBaseline": "No usual value is known for {service} yet, so the threshold is empty. Set it before saving.",
+          "latencyUnit": "{field} is read as milliseconds. Check its unit before saving.",
+          "noWorkload": "{stream} has no field naming the workload, so this alert cannot count restarts for {service} only.",
+          "noServiceLabel": "{stream} has no service or workload label, so this alert cannot be scoped to {service}.",
+          "noCluster": "{service}'s cluster is not known for {stream}, so this node alert would watch every cluster.",
+          "outageOther": "This alert covers {source} only; {count} other source stopped at the same time.",
+          "outageOthers": "This alert covers {source} only; {count} other sources stopped at the same time."
+        }
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -33976,5 +33993,23 @@
     "recentRow": "Recent search",
     "deletedQuery": "Deleted {query}",
     "undo": "Undo"
+  },
+  "insight": {
+    "targets": {
+      "origin": "Created from an AutoObserve suggestion for {service} on {date}.",
+      "syntheticName": "{service} health",
+      "team": {
+        "none": "No team yet",
+        "folderReason": "Where {service}'s alert lives. | Where {service}'s {count} alerts live.",
+        "defaultReason": "No owner is known for {service}, so it uses the org default folder."
+      },
+      "notify": {
+        "reason": "{service}'s alert notifies {destination}. | {service}'s {count} alerts notify {destination}."
+      },
+      "editor": {
+        "review": "Opened from an AutoObserve suggestion.",
+        "applied": "Suggested by AutoObserve: {changes}. Review, then click Save."
+      }
+    }
   }
 }

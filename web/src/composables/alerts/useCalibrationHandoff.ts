@@ -24,11 +24,13 @@ import type { AlertEditHandoff, AlertFieldPatch } from "@/ts/interfaces/alertPre
 import { takeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import {
   CALIBRATION_PREFILL,
+  isEditHandoffPrefill,
   planEditHandoff,
   type EditHandoffPlan,
 } from "@/utils/alerts/alertEditHandoff";
 import { applyCopy, type ApplyCopy } from "@/components/alert_calibration/applySuggestion";
 import { isAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
+import { handoffCopy } from "@/components/autoobserve/insight/targets/editTargets";
 
 type AlertForm = ReturnType<typeof useAlertForm>;
 
@@ -53,12 +55,13 @@ export const useCalibrationHandoff = ({
 }: UseCalibrationHandoffOptions) => {
   const { t, locale } = useI18nTyped();
   const route = form.router.currentRoute;
-  /** The banner's row is held from first paint, so the form never moves when the banner arrives; without calibration nothing is held. */
-  const reserved = computed(
-    () =>
-      isAlertCalibrationEnabled(form.store.state.zoConfig) &&
-      route.value.query.prefill === CALIBRATION_PREFILL,
-  );
+  /** The banner's row is held from first paint, so the form never moves when the banner arrives; a calibration handoff holds it only with calibration on. */
+  const reserved = computed(() => {
+    const prefill = route.value.query.prefill;
+    if (prefill === CALIBRATION_PREFILL && !isAlertCalibrationEnabled(form.store.state.zoConfig))
+      return false;
+    return isEditHandoffPrefill(prefill, typeof route.value.params.alert_id === "string");
+  });
   const banner = shallowRef<CalibrationBanner | null>(null);
   let active = true;
   onBeforeUnmount(() => {
@@ -151,7 +154,7 @@ export const useCalibrationHandoff = ({
     const alert = handoff.patch ? await freshAlert(alertId) : (modelValue() ?? {});
     if (!active) return;
     const plan = planEditHandoff(handoff, alert ?? {}, names ?? []);
-    const copy = applyCopy(t, locale.value);
+    const copy = handoffCopy(route.value.query.prefill, applyCopy(t, locale.value));
     const unchecked = names === null && ["apply", "missing_destination"].includes(plan.status);
     const checked: EditHandoffPlan = unchecked ? { ...plan, status: "invalid" } : plan;
     const result = await outcome(handoff, checked, copy);

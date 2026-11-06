@@ -104,7 +104,7 @@ import type {
   AlertPrefill,
   AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
-import { CALIBRATION_PREFILL } from "@/utils/alerts/alertEditHandoff";
+import { isEditHandoffPrefill } from "@/utils/alerts/alertEditHandoff";
 import {
   forecastModeFields,
   parseForecastAlertPromql,
@@ -372,6 +372,17 @@ export const formForecastOf = (alert: any): ForecastAlert | null =>
   alert?.query_condition?.type === "promql"
     ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
     : null;
+
+/** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
+export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
+  if (typeof meta?.description === "string" && meta.description)
+    data.description = meta.description;
+  const destinations = Array.isArray(meta?.destinations)
+    ? meta.destinations.filter((name): name is string => typeof name === "string" && name !== "")
+    : [];
+  if (destinations.length) data.destinations = [...new Set(destinations)];
+  return data;
+};
 
 /** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
 export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
@@ -1873,6 +1884,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         data.query_condition.aggregation = cloneDeep(prefill.aggregation);
       }
 
+      if (getAlertSource(prefill.source).metaSettings) applyMetaSettings(data, prefill.meta);
+
       if (prefill.vrlFunction) {
         showVrlFunction.value = true;
         data.query_condition.vrl_function = prefill.vrlFunction;
@@ -2598,7 +2611,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     const route = router.currentRoute.value;
     // A calibration handoff edits the loaded alert after the draft guard starts; it never seeds a new one.
-    const hasPrefill = !!route.query.prefill && route.query.prefill !== CALIBRATION_PREFILL;
+    const hasPrefill =
+      !!route.query.prefill && !isEditHandoffPrefill(route.query.prefill, !!props.isUpdated);
 
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
