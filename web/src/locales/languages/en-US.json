@@ -22734,6 +22734,8 @@
       "noResults": "No icons match your search",
       "groups": {
         "results": "Results",
+        "icons": "Icons",
+        "monoLogos": "Logos",
         "status": "Status",
         "services": "Services",
         "ai": "AI",

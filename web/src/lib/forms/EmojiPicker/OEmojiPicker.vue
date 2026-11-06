@@ -13,6 +13,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OGlyph from "./OGlyph.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { EMOJI_GROUPS } from "./emojiCatalog";
+import { FLAT_ICON_GROUPS, isFlatIconToken } from "./flatIconCatalog";
+import { isMonoLogoToken } from "./monoLogoRegistry";
 import type { EmojiPickerProps, EmojiPickerEmits, EmojiOption } from "./OEmojiPicker.types";
 
 const { t } = useI18nTyped();
@@ -51,10 +53,21 @@ const triggerClasses: Record<NonNullable<EmojiPickerProps["size"]>, string> = {
 
 const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 
+const ALL_GROUPS = [...FLAT_ICON_GROUPS, ...EMOJI_GROUPS];
+
+// Flat and mono options share keywords with emoji and colour logos, so their test ids key on the token instead.
+function optionTestId(option: EmojiOption): string {
+  const suffix =
+    isFlatIconToken(option.token) || isMonoLogoToken(option.token)
+      ? option.token.replace(":", "-")
+      : option.keywords[0];
+  return `emoji-picker-option-${suffix}`;
+}
+
 /** Groups to render — collapses to a single result group while searching. */
 const visibleGroups = computed(() => {
-  if (!normalizedQuery.value) return EMOJI_GROUPS;
-  const matches = EMOJI_GROUPS.flatMap((group) =>
+  if (!normalizedQuery.value) return ALL_GROUPS;
+  const matches = ALL_GROUPS.flatMap((group) =>
     group.emojis.filter((option) =>
       option.keywords.some((keyword) => keyword.includes(normalizedQuery.value)),
     ),
@@ -196,7 +209,7 @@ watch(flatEmojis, (list) => {
                 :key="option.token"
                 type="button"
                 data-emoji-cell
-                :data-test="`emoji-picker-option-${option.keywords[0]}`"
+                :data-test="optionTestId(option)"
                 :tabindex="indexOf(option) === activeIndex ? 0 : -1"
                 :aria-label="option.keywords[0]"
                 :aria-pressed="option.token === modelValue"
