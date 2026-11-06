@@ -1257,7 +1257,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-footer"]').text()).not.toContain("Next");
     });
 
-    it("does not save the alert when Enter commits the name", () => {
+    it("saves the alert when Enter is pressed in the name, as before the redesign", () => {
       wrapper = mountAlert(
         {},
         {
@@ -1269,7 +1269,7 @@ describe("AddAlert (OForm owner)", () => {
         },
       );
       const name = wrapper.findComponent(OFormInlineEdit);
-      expect(name.props("submitOnEnter")).toBe(false);
+      expect(name.props("submitOnEnter")).toBe(true);
     });
 
     it("ticks a section with a value once the user moves past it", async () => {
@@ -1456,10 +1456,25 @@ describe("AddAlert (OForm owner)", () => {
       await input.setValue("checkout#errors");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
+      wrapper.vm.form.setFieldMeta("name", (meta: object) => ({
+        ...meta,
+        errorMap: { onSubmit: "invalid" },
+      }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(false);
       const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
       await suggest.trigger("click");
       await flushPromises();
       expect(wrapper.vm.formData.name).toBe(wrapper.vm.alertNameSuggestion);
+
+      const submit = vi
+        .spyOn(HTMLFormElement.prototype, "requestSubmit")
+        .mockImplementation(() => {});
+      await wrapper
+        .get('[data-test="add-alert-details-name-input"] input')
+        .trigger("keydown.enter");
+      expect(submit).toHaveBeenCalledTimes(1);
+      submit.mockRestore();
     });
   });
 
