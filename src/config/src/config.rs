@@ -166,6 +166,8 @@ pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
 pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
+const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
 // for older files.
@@ -2733,11 +2735,17 @@ pub struct Limit {
     pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_ON_DISK",
+        default = 0,
+        help = "MB, per wal file size limit on disk, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_on_disk: usize,
-    // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
+    #[env_config(
+        name = "ZO_MAX_FILE_SIZE_IN_MEMORY",
+        default = 0,
+        help = "MB, per memtable size limit, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / 4, between 32 MB and 512 MB"
+    )]
     pub max_file_size_in_memory: usize,
     // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
     #[env_config(
@@ -2787,7 +2795,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_MEM_TABLE_BUCKET_NUM",
         default = 0,
-        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 2, between 1 and the cpu num"
+        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 4, between 1 and the cpu num"
     )]
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
@@ -4440,18 +4448,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
-    // check max_file_size_on_disk to MB
-    if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_on_disk *= 1024 * 1024;
-    }
-    // check max_file_size_in_memory to MB
-    if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.max_file_size_in_memory *= 1024 * 1024;
-    }
     cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
         0 => 50,
         v => v,
@@ -4872,6 +4868,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
+    cfg.limit.max_file_size_in_memory = match cfg.limit.max_file_size_in_memory {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
+    cfg.limit.max_file_size_on_disk = match cfg.limit.max_file_size_on_disk {
+        0 => default_max_file_size(cfg.limit.mem_table_max_size),
+        mb => mb * 1024 * 1024,
+    };
     if cfg.limit.mem_table_bucket_num == 0 {
         cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
             cfg.limit.mem_table_max_size,
@@ -4982,14 +4986,20 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
     path.to_string_lossy()
 }
 
-/// Half of what the budget holds, so full memtables can rotate out while the next ones fill.
+/// A quarter of what the budget holds, so each bucket can keep two full memtables in memory.
 fn default_mem_table_bucket_num(
     mem_table_max_size: usize,
     max_file_size_in_memory: usize,
     cpu_num: usize,
 ) -> usize {
-    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 2;
+    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 4;
     by_memory.clamp(1, cpu_num.max(1))
+}
+
+/// A quarter of the memtable budget in whole MB, clamped to 32..512 MB.
+fn default_max_file_size(mem_table_max_size: usize) -> usize {
+    let mb = 1024 * 1024;
+    (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -6474,21 +6484,16 @@ mod tests {
     #[test]
     fn test_default_mem_table_bucket_num() {
         let mb = 1024 * 1024;
-        // 32 GB holds 64 memtables of 512 MB; half of that, then the core count caps it
+        // 32 GB holds 64 memtables of 512 MB; a quarter of that, then the core count caps it
         assert_eq!(
             default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
-            32
-        );
-        assert_eq!(
-            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 28),
-            28
-        );
-        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 4);
-        assert_eq!(
-            default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28),
             16
         );
-        // a budget of one memtable or less still gets one bucket
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 8), 8);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 2);
+        assert_eq!(default_mem_table_bucket_num(2 * 1024 * mb, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28), 8);
+        // a budget of under four memtables still gets one bucket
         assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
@@ -6496,34 +6501,44 @@ mod tests {
     }
 
     #[test]
-    fn test_check_memory_config_derives_mem_table_bucket_num() {
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 8);
+    fn test_default_max_file_size() {
+        let mb = 1024 * 1024;
+        assert_eq!(default_max_file_size(64 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(2 * 1024 * mb), 512 * mb);
+        assert_eq!(default_max_file_size(1024 * mb), 256 * mb);
+        assert_eq!(default_max_file_size(512 * mb), 128 * mb);
+        assert_eq!(default_max_file_size(1000 * mb + 123), 250 * mb);
+        assert_eq!(default_max_file_size(64 * mb), 32 * mb);
+        assert_eq!(default_max_file_size(0), 32 * mb);
+    }
 
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 2 * 1024;
-        cfg.limit.mem_table_bucket_num = 0;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 2);
-
-        // an explicit value is kept as is
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
-        cfg.limit.mem_table_max_size = 8 * 1024;
-        cfg.limit.mem_table_bucket_num = 3;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.mem_table_bucket_num, 3);
+    #[test]
+    fn test_check_memory_config_derives_mem_table_sizes() {
+        let mb = 1024 * 1024;
+        let derive = |mem_table_max_size_mb: usize, file_size_mb: usize, bucket_num: usize| {
+            let mut cfg = Config::default();
+            cfg.common.node_role = "all".to_string();
+            cfg.limit.cpu_num = 8;
+            cfg.limit.mem_table_max_size = mem_table_max_size_mb;
+            cfg.limit.max_file_size_in_memory = file_size_mb;
+            cfg.limit.max_file_size_on_disk = file_size_mb;
+            cfg.limit.mem_table_bucket_num = bucket_num;
+            check_memory_config(&mut cfg).unwrap();
+            (
+                cfg.limit.mem_table_bucket_num,
+                cfg.limit.max_file_size_in_memory,
+                cfg.limit.max_file_size_on_disk,
+            )
+        };
+        // 8 GB local mode: 2 GB budget keeps 512 MB files in one bucket
+        assert_eq!(derive(2 * 1024, 0, 0), (1, 512 * mb, 512 * mb));
+        // 4 GB local mode: 1 GB budget shrinks the files so a bucket still holds four
+        assert_eq!(derive(1024, 0, 0), (1, 256 * mb, 256 * mb));
+        assert_eq!(derive(8 * 1024, 0, 0), (4, 512 * mb, 512 * mb));
+        assert_eq!(derive(32 * 1024, 0, 0), (8, 512 * mb, 512 * mb));
+        // explicit values are kept as is
+        assert_eq!(derive(8 * 1024, 256, 3), (3, 256 * mb, 256 * mb));
+        assert_eq!(derive(1024, 512, 0), (1, 512 * mb, 512 * mb));
     }
 
     #[test]
