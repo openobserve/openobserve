@@ -186,7 +186,7 @@ impl ExecutionPlan for AggregateTopkExec {
                 self.sort_field.clone(),
                 self.descending,
                 inflated_limit,
-            ))
+            )?)
         } else {
             Box::pin(sort::TopKSortStream::new(
                 self.input.schema(),
