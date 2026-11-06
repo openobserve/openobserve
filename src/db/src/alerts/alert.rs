@@ -708,6 +708,7 @@ mod tests {
             slo_id: None,
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             query_slo_condition: None,
             trigger_frequency_type: 1,
             trigger_frequency_seconds: 300,
