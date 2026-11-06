@@ -111,10 +111,10 @@ describe("MainLayout — empty-data check", () => {
   it.each([
     ["/", true, "/"],
     ["/logs", true, "/logs"],
-    ["/alerts", true, "/ingestion"],
+    ["/alerts", true, "/alerts"],
     ["/alerts", false, "/alerts"],
   ])(
-    "records an empty org on %s (flag %s) and lands on %s, as in-app navigation would",
+    "records an empty org on %s (flag %s) and stays on %s with no redirect",
     async (path, flagOn, landing) => {
       const flag = store.state.zoConfig.restricted_routes_on_empty_data;
       store.state.zoConfig.restricted_routes_on_empty_data = flagOn;

@@ -289,12 +289,7 @@ import AppHeader from "../components/Header.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { resetAccess } from "@/composables/useAccessStore";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  useLocalOrganization,
-  getImageURL,
-  shouldPaywallRoute,
-  isEmptyDataExempt,
-} from "../utils/zincutils";
+import { useLocalOrganization, getImageURL, shouldPaywallRoute } from "../utils/zincutils";
 import { isPaywalledDestination } from "@/utils/auth";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
@@ -1307,21 +1302,12 @@ export default defineComponent({
       // getStreams reads the store's org when it starts, so the list belongs to that org even if the selection moves on
       const listOrg: string = store.state.selectedOrganization?.identifier ?? "";
       await getStreams("", false).then((response: any) => {
-        const listIsCurrent = listOrg === (store.state.selectedOrganization?.identifier ?? "");
         store.dispatch("setSelectedOrganization", {
           ...selectedOrgData,
         });
         layoutStreams.value = { org: listOrg, list: response.list ?? [] };
         if (userDataStreams(response.list).length === 0) {
           store.dispatch("setIsDataIngested", false);
-          // a deep link or reload ran the route guard before the flag or this list was known
-          if (
-            store.state.zoConfig?.restricted_routes_on_empty_data === true &&
-            listIsCurrent &&
-            !isEmptyDataExempt(router.currentRoute.value)
-          ) {
-            router.push({ name: "ingestion", query: { org_identifier: listOrg } });
-          }
         } else {
           store.dispatch("setIsDataIngested", true);
         }

@@ -657,7 +657,7 @@ describe("routeGuard", () => {
     });
 
     // Same name as the flagged fixture above, no flag: fails if the name ever does the exempting.
-    it("does not exempt a general-named route at an uncovered path", async () => {
+    it("records the empty org and opens an unflagged general-named route", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
         data: { streams: { num_streams: 0 } },
@@ -667,10 +667,10 @@ describe("routeGuard", () => {
 
       await routeGuard({ name: "general", path: "/settings/organization/general" }, {}, mockNext);
 
-      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+      expect(mockNext).toHaveBeenCalledWith();
     });
 
-    it("redirects to /ingestion when num_streams is 0", async () => {
+    it("records an empty org and opens the page when num_streams is 0", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
         data: { streams: { num_streams: 0 } },
@@ -690,7 +690,7 @@ describe("routeGuard", () => {
       await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
 
       expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", false);
-      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+      expect(mockNext).toHaveBeenCalledWith();
     });
 
     it("dispatches setIsDataIngested(true) and calls next() when num_streams > 0", async () => {
@@ -716,7 +716,7 @@ describe("routeGuard", () => {
       expect(mockNext).toHaveBeenCalledTimes(1);
     });
 
-    it("redirects to /ingestion when the org's only streams are ones O2 writes itself", async () => {
+    it("records an empty org and opens the page when its only streams are ones O2 writes itself", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
         data: { streams: { num_streams: 1, num_user_streams: 0 } },
@@ -727,7 +727,7 @@ describe("routeGuard", () => {
       await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
 
       expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", false);
-      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+      expect(mockNext).toHaveBeenCalledWith();
     });
 
     it("lets the org through when it has a user data stream", async () => {
@@ -830,12 +830,12 @@ describe("routeGuard", () => {
         },
       });
 
-    // Settings children carry no flag, so they stay gated even though they show no data.
+    // An empty org opens unflagged routes too.
     it.each([
       ["organizationSettings", "/settings/organization"],
       ["license", "/settings/license"],
       ["cipherKeys", "/settings/cipher_keys"],
-    ])("still redirects %s to /ingestion", async (name, path) => {
+    ])("records an empty org and opens %s with no redirect", async (name, path) => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
         data: { streams: { num_streams: 0 } },
@@ -845,7 +845,7 @@ describe("routeGuard", () => {
 
       await routeGuard({ name, path }, {}, mockNext);
 
-      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+      expect(mockNext).toHaveBeenCalledWith();
     });
 
     // Synthetics produces an empty org's first data and on-call is set up before any flows.
@@ -985,7 +985,7 @@ describe("routeGuard", () => {
       expect(mockNext).toHaveBeenCalledWith();
     });
 
-    // Only the meta flag exempts; a matching name or path prefix does not.
+    // No route is redirected on an empty org, flagged or not.
     it.each([
       ["an unflagged general route", { name: "general", path: "/settings/general" }],
       ["an unflagged route on a synthetics path", { name: "x", path: "/synthetics/foo" }],
@@ -997,7 +997,7 @@ describe("routeGuard", () => {
         { name: "curl", path: "/ingestion/custom/logs/curl" },
       ],
       ["the unflagged settings shell", { name: "settings", path: "/settings" }],
-    ])("redirects %s to /ingestion", async (_label, route) => {
+    ])("records an empty org and opens %s with no redirect", async (_label, route) => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
         data: { streams: { num_streams: 0 } },
@@ -1008,7 +1008,7 @@ describe("routeGuard", () => {
       await routeGuard(route, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledTimes(1);
-      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+      expect(mockNext).toHaveBeenCalledWith();
     });
   });
 });

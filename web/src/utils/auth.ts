@@ -158,13 +158,9 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       // Shares the Usage tab's cached summary — this runs on every guarded
       // navigation, so an uncached read here re-requested on each one.
       const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
-      if (!summaryHasUserData(data)) {
-        store.dispatch("setIsDataIngested", false);
-        next({ path: "/ingestion" });
-      } else {
-        store.dispatch("setIsDataIngested", true);
-        next();
-      }
+      // Records the flag only: an empty org may open any page, the first-data panels guide it.
+      store.dispatch("setIsDataIngested", summaryHasUserData(data));
+      next();
     } catch (error) {
       console.warn("Failed to fetch organization summary:", error);
       store.dispatch("setIsDataIngested", true);
