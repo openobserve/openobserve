@@ -22,6 +22,7 @@ import { rcaCellModel } from "@/utils/incidents/rcaCell";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
 import {
   analysisLine,
+  sharedAnalysis,
   analysisLink,
   anyLive,
   failedDetail,
@@ -163,7 +164,7 @@ describe("analysisLine", () => {
     for (const [reason, label, tone, detail] of reasons) {
       for (const rcaEnabled of [true, false]) {
         const line = analysisLine(gt, withRun(4, { not_run_reason: reason }), rcaEnabled);
-        expect(line).toEqual({ label, tone, detail, hasRun: false, spinner: false });
+        expect(line).toMatchObject({ label, tone, detail, hasRun: false, spinner: false });
         expect(`${line.label} ${line.detail}`).not.toMatch(
           /rca_disabled|ai_unavailable|quota_exceeded|cooling_down|start_failed/,
         );
@@ -277,5 +278,50 @@ describe("row text", () => {
     expect(anyLive({ ...FIXTURE, items: FIXTURE.items.slice(1) })).toBe(false);
     expect(anyLive({ ...FIXTURE, items: [withRun(1, { state: "waiting_input" })] })).toBe(true);
     expect(anyLive(undefined)).toBe(false);
+  });
+});
+
+describe("sharedAnalysis", () => {
+  const off = (reason: string | null, id = "x") =>
+    analysisLine(
+      gt,
+      {
+        ...item(4),
+        incident: { ...item(4).incident, id },
+        investigation: {
+          run_id: null,
+          state: null,
+          outcome: null,
+          summary: null,
+          not_run_reason: reason,
+        },
+      } as AutoObserveIncidentItem,
+      true,
+    );
+
+  it("says nothing for no rows or one row", () => {
+    expect(sharedAnalysis([])).toBeNull();
+    expect(sharedAnalysis([off("rca_disabled")])).toBeNull();
+  });
+
+  it("states a reason shared by every row once, in the plural", () => {
+    const three = ["a", "b", "c"].map((id) => off("rca_disabled", id));
+    expect(String(sharedAnalysis(three))).toBe("AI analysis was off when these incidents opened.");
+    const many = Array.from({ length: 12 }, (_, i) => off("ai_unavailable", `m${i}`));
+    expect(String(sharedAnalysis(many))).toBe(
+      "AI analysis wasn't available when these incidents opened.",
+    );
+  });
+
+  it("says nothing when any row differs or a reason has no shared form", () => {
+    expect(sharedAnalysis([off("rca_disabled"), off(null)])).toBeNull();
+    const blocked = withRun(0, {
+      state: "waiting_input",
+      summary: { ...item(0).investigation.summary!, detail: "Needs change history" },
+    });
+    const line = analysisLine(gt, blocked, true);
+    expect(sharedAnalysis([line, line])).toBeNull();
+    const running = analysisLine(gt, item(0), true);
+    expect(sharedAnalysis([running, running])).toBeNull();
   });
 });

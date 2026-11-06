@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <nav class="flex flex-wrap items-center gap-1" data-test="autoobserve2-nav">
       <ViewSwitch class="me-1" />
       <div
-        v-if="!live"
         class="items-center"
         :class="searchOpen ? 'flex' : 'hidden sm:flex'"
         data-test="autoobserve2-nav-search"
@@ -74,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OInput>
       </div>
       <OButton
-        v-if="!live && !searchOpen"
+        v-if="!searchOpen"
         variant="ghost-muted"
         size="icon-sm"
         class="sm:hidden"
@@ -85,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="search" size="sm" />
       </OButton>
       <OButton
-        v-if="!live"
         variant="ghost-muted"
         size="sm"
         icon-left="history"
@@ -95,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoobserve2.nav.history") }}
       </OButton>
       <OButton
-        v-if="!live"
         variant="ghost-muted"
         size="icon-sm"
         :aria-label="t('autoobserve2.nav.settings')"

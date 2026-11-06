@@ -27,7 +27,8 @@ import {
   isStoredNotRunReason,
   type RcaCellTone,
 } from "@/utils/incidents/rcaCell";
-import { agoText, formatWhen } from "./liveCopy";
+import type { IssuesRange } from "../v2/fixtures";
+import { agoText, dayKey, formatWhen } from "./liveCopy";
 
 export interface AnalysisLine {
   label: I18nText;
@@ -35,6 +36,7 @@ export interface AnalysisLine {
   detail: I18nText;
   spinner: boolean;
   hasRun: boolean;
+  shared: I18nText;
 }
 
 export interface IncidentRoute {
@@ -55,6 +57,13 @@ export const MAX_SKELETON_ROWS = 3;
 // The incident list's poll while a run on its page is live (RCA_LIVE_POLL_MS).
 export const PAGED_POLL_MS = 30_000;
 
+// AutoObserve pages are rare (paging is per-org opt-in), so the newest 500 cover any range.
+export const ISSUES_CAP = 500;
+
+export const ISSUES_PAGE_SIZE = 100;
+
+const DAY_MS = 86_400_000;
+
 const FINDING_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_silence: "autoobserveLive.incidents.finding.stream_silence",
   stream_drop: "autoobserveLive.incidents.finding.stream_drop",
@@ -67,6 +76,22 @@ const STATUS_KEY: Record<Incident["status"], I18nKey> = {
   resolved: "alerts.incidents.statusResolved",
 };
 
+const RANGE_DAYS: Record<IssuesRange, number> = { "7d": 7, "30d": 30, "90d": 90 };
+
+const RANGE_WITHIN: Record<IssuesRange, I18nKey> = {
+  "7d": "autoobserve2.issuesPage.within.week",
+  "30d": "autoobserve2.issuesPage.within.month",
+  "90d": "autoobserve2.issuesPage.within.quarter",
+};
+
+const SHARED_NOT_RUN: Record<keyof typeof NOT_RUN, I18nKey> = {
+  rca_disabled: "autoobserveLive.issues.shared.rcaDisabled",
+  ai_unavailable: "autoobserveLive.issues.shared.aiUnavailable",
+  quota_exceeded: "autoobserveLive.issues.shared.quotaExceeded",
+  cooling_down: "autoobserveLive.issues.shared.coolingDown",
+  start_failed: "autoobserveLive.issues.shared.startFailed",
+};
+
 const EMPTY = raw("");
 
 const line = (
@@ -75,7 +100,12 @@ const line = (
   hasRun: boolean,
   detail: I18nText = EMPTY,
   spinner = false,
-): AnalysisLine => ({ label, tone, detail, spinner, hasRun });
+): AnalysisLine => ({ label, tone, detail, spinner, hasRun, shared: EMPTY });
+
+const sharedAs = (analysis: AnalysisLine, shared: I18nText): AnalysisLine => ({
+  ...analysis,
+  shared,
+});
 
 const isFindingKind = (kind: string | null): kind is AutoObserveFindingKind =>
   kind !== null && Object.prototype.hasOwnProperty.call(FINDING_KEY, kind);
@@ -93,38 +123,47 @@ const notRunLine = (
   rcaEnabled: boolean,
 ): AnalysisLine => {
   const reason = item.investigation.not_run_reason;
-  if (reason === "l0_off")
-    return line(
-      t("alerts.incidents.aiAnalysis.rcaOff"),
-      "muted",
-      false,
-      t("alerts.incidents.aiAnalysis.noAiSreFor", {
-        severity: raw(String(item.incident.severity).toUpperCase()),
-      }),
-    );
+  if (reason === "l0_off") {
+    const detail = t("alerts.incidents.aiAnalysis.noAiSreFor", {
+      severity: raw(String(item.incident.severity).toUpperCase()),
+    });
+    return sharedAs(line(t("alerts.incidents.aiAnalysis.rcaOff"), "muted", false, detail), detail);
+  }
   if (isStoredNotRunReason(reason)) {
     const notRun = NOT_RUN[reason];
-    return line(t(notRun.label), notRun.tone, false, t(notRun.detail));
+    return sharedAs(
+      line(t(notRun.label), notRun.tone, false, t(notRun.detail)),
+      t(SHARED_NOT_RUN[reason]),
+    );
   }
   if (reason)
-    return line(
-      t("alerts.incidents.aiAnalysis.rcaOff"),
-      "muted",
-      false,
-      t("autoobserveLive.incidents.analysis.offOther"),
+    return sharedAs(
+      line(
+        t("alerts.incidents.aiAnalysis.rcaOff"),
+        "muted",
+        false,
+        t("autoobserveLive.incidents.analysis.offOther"),
+      ),
+      t("autoobserveLive.issues.shared.offOther"),
     );
   if (!rcaEnabled)
-    return line(
-      t("alerts.incidents.aiAnalysis.rcaDisabled"),
+    return sharedAs(
+      line(
+        t("alerts.incidents.aiAnalysis.rcaDisabled"),
+        "muted",
+        false,
+        t("autoobserveLive.incidents.analysis.disabledDetail"),
+      ),
+      t("autoobserveLive.issues.shared.disabled"),
+    );
+  return sharedAs(
+    line(
+      t("alerts.incidents.aiAnalysis.notAnalyzed"),
       "muted",
       false,
-      t("autoobserveLive.incidents.analysis.disabledDetail"),
-    );
-  return line(
-    t("alerts.incidents.aiAnalysis.notAnalyzed"),
-    "muted",
-    false,
-    t("autoobserveLive.incidents.analysis.notRunDetail"),
+      t("autoobserveLive.incidents.analysis.notRunDetail"),
+    ),
+    t("autoobserveLive.issues.shared.notRun"),
   );
 };
 
@@ -153,17 +192,30 @@ export const analysisLine = (
       return line(t(known.key), known.tone, true, detail);
     }
     case "failed":
-      return line(
-        t("alerts.incidents.aiAnalysis.failed"),
-        "err",
-        true,
-        t("autoobserveLive.incidents.analysis.failedDetail"),
+      return sharedAs(
+        line(
+          t("alerts.incidents.aiAnalysis.failed"),
+          "err",
+          true,
+          t("autoobserveLive.incidents.analysis.failedDetail"),
+        ),
+        t("autoobserveLive.issues.shared.failed"),
       );
     case "cancelled":
       return line(t("alerts.incidents.rcaRun.state.cancelled"), "err", true);
     default:
       return notRunLine(t, item, rcaEnabled);
   }
+};
+
+// Two or more rows with one reason state it once, so the same sentence never repeats down the table.
+export const sharedAnalysis = (lines: readonly AnalysisLine[]): I18nText | null => {
+  const [first] = lines;
+  if (lines.length < 2 || !first.shared) return null;
+  const same = lines.every(
+    (l) => l.label === first.label && l.detail === first.detail && l.shared === first.shared,
+  );
+  return same ? first.shared : null;
 };
 
 // The server's error text can name internal hosts, so the details give only the status and the time.
@@ -245,3 +297,112 @@ export const incidentListLink = (org: string): IncidentRoute => ({
 
 export const anyLive = (list: AutoObserveIncidentList | undefined): boolean =>
   !!list?.items.some((item) => isLiveRca(item.investigation));
+
+// Range start in microseconds, the unit of `first_seen_at`.
+export const issuesRangeStart = (range: IssuesRange, nowMs: number): number =>
+  (nowMs - RANGE_DAYS[range] * DAY_MS) * 1000;
+
+const loadedCount = (pages: readonly AutoObserveIncidentList[]): number =>
+  pages.reduce((n, page) => n + page.items.length, 0);
+
+// The list runs newest first, so a page whose oldest row predates the range is the last one needed.
+export const nextIssuesOffset = (
+  pages: readonly AutoObserveIncidentList[],
+  startUs: number,
+  cap = ISSUES_CAP,
+): number | undefined => {
+  const last = pages.at(-1);
+  const oldest = last?.items.at(-1);
+  const loaded = loadedCount(pages);
+  if (!last?.has_more || !oldest || loaded >= cap || oldest.finding.first_seen_at < startUs)
+    return undefined;
+  return loaded;
+};
+
+// Capped only when the cap cut off rows that may still fall inside the range.
+export const issuesCapped = (
+  pages: readonly AutoObserveIncidentList[],
+  startUs: number,
+  cap = ISSUES_CAP,
+): boolean => {
+  const loaded = loadedCount(pages);
+  const more = loaded > cap || (loaded === cap && !!pages.at(-1)?.has_more);
+  const oldest = pages.flatMap((page) => page.items)[cap - 1];
+  return more && !!oldest && oldest.finding.first_seen_at >= startUs;
+};
+
+// The Issues table's fixed words, so the component holds no key of its own.
+export const issuesCopy = (t: TranslateFn) => ({
+  searchLabel: t("autoobserve.issues.searchLabel"),
+  searchPlaceholder: t("autoobserveLive.issues.searchPlaceholder"),
+  priorityLabel: t("autoobserve2.recent.priorityLabel"),
+  allPriorities: t("autoobserve2.recent.all"),
+  open: t("autoobserve.issues.open"),
+  resolved: t("autoobserve.issues.recent"),
+  allStatuses: t("autoobserve.issues.all"),
+  colIncident: t("autoobserveLive.issues.columns.incident"),
+  colSeverity: t("autoobserveLive.issues.columns.severity"),
+  colStatus: t("autoobserveLive.issues.columns.status"),
+  colStream: t("autoobserveLive.issues.columns.stream"),
+  colOpened: t("autoobserveLive.issues.columns.opened"),
+  colAnalysis: t("autoobserveLive.issues.columns.analysis"),
+  clearSearch: t("autoobserve.issues.clearSearch"),
+  emptyDesc: t("autoobserveLive.incidents.empty.desc"),
+  offTitle: t("autoobserveLive.incidents.emptyOff.title"),
+  offDesc: t("autoobserveLive.incidents.emptyOff.desc"),
+  filterEmptyTitle: t("autoobserve.issues.emptyTitle"),
+  filterEmptyDesc: t("autoobserve.issues.emptyDescription"),
+});
+
+export const issuesEmptyTitle = (t: TranslateFn, range: IssuesRange): I18nText =>
+  t("autoobserveLive.issues.emptyRange", { within: t(RANGE_WITHIN[range]) });
+
+export const issuesNoMatch = (t: TranslateFn, term: string): I18nText =>
+  t("autoobserve.issues.noMatch", { query: raw(term) });
+
+export const issuesMatchText = (t: TranslateFn, n: number): I18nText =>
+  t("autoobserve.issues.matchCount", { count: n }, n);
+
+export const issuesCountText = (t: TranslateFn, locale: string, n: number): I18nText =>
+  t("autoobserveLive.issues.count", { count: count(locale, n) }, n);
+
+export const capNote = (t: TranslateFn, locale: string, cap = ISSUES_CAP): I18nText =>
+  t("autoobserveLive.issues.capNote", { count: count(locale, cap) });
+
+// A "+" says more rows exist than were loaded, so the count is a floor.
+export const openBadge = (locale: string, n: number, more: boolean): I18nText =>
+  raw(`${new Intl.NumberFormat(locale).format(n)}${more ? "+" : ""}`);
+
+export const issuesOpenedText = (
+  t: TranslateFn,
+  locale: string,
+  createdMs: number,
+  now: number,
+): I18nText => agoText(t, locale, Math.max(0, Math.floor((now - createdMs) / 60_000)));
+
+export const issuesStreamType = (t: TranslateFn, type: string | null): I18nText | undefined =>
+  type ? t("autoobserveLive.issues.streamType", { type: raw(type) }) : undefined;
+
+export const issuesDayKey = (us: number, timeZone: string): string => dayKey(us / 1000, timeZone);
+
+export const issuesDayLabel = (
+  t: TranslateFn,
+  locale: string,
+  timeZone: string,
+  us: number,
+  now: number,
+): I18nText => {
+  const key = issuesDayKey(us, timeZone);
+  if (key === dayKey(now, timeZone)) return t("autoobserveLive.issues.today");
+  if (key === dayKey(now - DAY_MS, timeZone)) return t("autoobserveLive.issues.yesterday");
+  const sameYear = key.slice(0, 4) === dayKey(now, timeZone).slice(0, 4);
+  return raw(
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: sameYear ? undefined : "numeric",
+      timeZone,
+    }).format(new Date(us / 1000)),
+  );
+};

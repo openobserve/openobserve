@@ -30726,6 +30726,56 @@
       },
       "loading": "Loading paged findings…",
       "loaded": "Paged findings loaded"
+    },
+    "issues": {
+      "searchPlaceholder": "Search what happened or a stream",
+      "columns": {
+        "incident": "What happened",
+        "severity": "Severity",
+        "status": "Status",
+        "stream": "Stream",
+        "opened": "Opened",
+        "analysis": "Analysis"
+      },
+      "count": "No issues | {count} issue | {count} issues",
+      "capNote": "Showing the newest {count} issues. Narrow the range to see older ones.",
+      "emptyRange": "No issues {within}",
+      "streamType": "{type} stream",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "shared": {
+        "rcaDisabled": "AI analysis was off when these incidents opened.",
+        "aiUnavailable": "AI analysis wasn't available when these incidents opened.",
+        "quotaExceeded": "The organization had reached its AI analysis limit when these incidents opened.",
+        "coolingDown": "An analysis had just run, so no new one started for these incidents.",
+        "startFailed": "The analyses couldn't start.",
+        "offOther": "Automatic analysis did not run for these incidents.",
+        "disabled": "AI analysis is turned off for this deployment.",
+        "notRun": "No analysis has started. Open an incident to start one.",
+        "failed": "These analyses stopped before they finished. View one for details."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "No changes yet",
+        "desc": "AutoObserve suggests fixes but hasn't changed any alert or setting. When it makes a change, it shows here with whether it worked. For now, review its suggestions and apply the ones you want.",
+        "action": "Review suggestions"
+      },
+      "history": {
+        "title": "No history yet",
+        "desc": "What AutoObserve finds, what it changes and what you decide will be listed here, newest first. Today its findings open incidents, which are on the Issues page.",
+        "action": "Open issues"
+      },
+      "scenario": {
+        "tag": "Live data",
+        "text": "You're seeing this organization's live data. Sample scenarios aren't shown here.",
+        "action": "How it works"
+      },
+      "settings": {
+        "title": "Nothing to set here yet",
+        "desc": "An administrator turns AutoObserve and its paging on for this deployment. Who it notifies and how far it acts on its own will be set here once those controls exist.",
+        "action": "How it works"
+      }
     }
   },
   "autoobserve2": {

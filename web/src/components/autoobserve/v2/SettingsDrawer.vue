@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         saved ? t("autoobserve2.settingsDrawer.saved") : ""
       }}</span>
     </template>
-    <div class="flex flex-col gap-8 pb-8">
+    <slot v-if="$slots.empty" name="empty" />
+    <div v-else class="flex flex-col gap-8 pb-8">
       <DrawerSection
         :title="t('autoobserve2.settingsDrawer.reach')"
         data-test="autoobserve2-settings-reach"

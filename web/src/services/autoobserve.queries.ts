@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/vue-query";
 import autoobserve, {
   type AutoObserveCoverage,
   type AutoObserveCoverageView,
@@ -22,7 +22,13 @@ import autoobserve, {
 } from "./autoobserve";
 import { autoobserveKeys } from "./autoobserve.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
-import { PAGED_POLL_MS, anyLive } from "@/components/autoobserve/live/incidentsCopy";
+import type { IssuesRange } from "@/components/autoobserve/v2/fixtures";
+import {
+  PAGED_POLL_MS,
+  anyLive,
+  issuesRangeStart,
+  nextIssuesOffset,
+} from "@/components/autoobserve/live/incidentsCopy";
 
 export const autoobserveCoverageQuery = (org: string, view: AutoObserveCoverageView) =>
   queryOptions({
@@ -55,4 +61,23 @@ export const autoobserveIncidentsPageQuery = (org: string, limit: number, offset
       (await autoobserve.incidents(org, { limit, offset })).data,
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => (anyLive(query.state.data) ? PAGED_POLL_MS : false),
+  });
+
+// Pages newest first until one reaches past the range start or the cap; polls like the single page.
+export const autoobserveIncidentsPagesQuery = (
+  org: string,
+  range: IssuesRange,
+  pageSize: number,
+  cap: number,
+) =>
+  infiniteQueryOptions({
+    queryKey: autoobserveKeys.incidentsPages(org, range, pageSize, cap),
+    queryFn: async ({ pageParam }): Promise<AutoObserveIncidentList> =>
+      (await autoobserve.incidents(org, { limit: pageSize, offset: pageParam })).data,
+    initialPageParam: 0,
+    getNextPageParam: (_last, pages) =>
+      nextIssuesOffset(pages, issuesRangeStart(range, Date.now()), cap),
+    staleTime: LIVE_STALE_TIME,
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((page) => anyLive(page)) ? PAGED_POLL_MS : false,
   });

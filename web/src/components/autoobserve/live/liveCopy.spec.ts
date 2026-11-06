@@ -33,6 +33,7 @@ import {
   liveLookWord,
   liveLoadText,
   liveNotice,
+  liveSurfaceEmpty,
   moreCount,
   moreText,
   refreshFailedText,
@@ -487,5 +488,23 @@ describe("whereText (a service's Kubernetes location)", () => {
     expect(whereText(gt, "", "payments")).toBe("payments");
     expect(whereText(gt, "", "")).toBeNull();
     expect(whereText(gt, undefined, null)).toBeNull();
+  });
+
+  it("each live empty surface is neutral, says what will appear and offers one next step", () => {
+    const seen = new Set<string>();
+    for (const surface of ["changes", "history", "settings"] as const) {
+      const { notice, action } = liveSurfaceEmpty(gt, surface);
+      expect(notice.severity, surface).toBe("neutral");
+      expect(notice.retry, surface).toBe(false);
+      expect(notice.details, surface).toBe(false);
+      for (const text of [notice.title, notice.description, action])
+        expect(String(text), surface).not.toMatch(/autoobserveLive\./);
+      expect(String(notice.description), surface).toMatch(/will (appear|be|show)|shows here/);
+      seen.add(String(notice.title));
+    }
+    expect(seen.size).toBe(3);
+    expect(String(liveSurfaceEmpty(gt, "changes").action)).toBe("Review suggestions");
+    expect(String(liveSurfaceEmpty(gt, "history").action)).toBe("Open issues");
+    expect(String(liveSurfaceEmpty(gt, "settings").action)).toBe("How it works");
   });
 });

@@ -36,11 +36,16 @@ describe("TopBar", () => {
     expect(wrapper.text()).toContain("Checked 2 minutes ago");
   });
 
-  it("live mode hides the fixture-only controls", () => {
+  it("live mode keeps search, History, Settings and How it works", () => {
     const wrapper = mountBar({ live: true, date: TODAY, checked: { kind: "none" } });
-    for (const name of ["nav-search", "nav-search-open", "nav-history", "nav-settings"])
-      expect(has(wrapper, name), name).toBe(false);
-    expect(has(wrapper, "nav-how-it-works")).toBe(true);
+    for (const name of [
+      "nav-search",
+      "nav-search-open",
+      "nav-history",
+      "nav-settings",
+      "nav-how-it-works",
+    ])
+      expect(has(wrapper, name), name).toBe(true);
     expect(wrapper.text()).toContain("Thursday, November 5");
   });
 

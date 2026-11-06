@@ -29,6 +29,8 @@ export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
 
 export type LiveSurface = "coverage" | "suggestions" | "incidents";
 
+export type LiveEmptySurface = "changes" | "history" | "settings";
+
 export type LivePhase = "idle" | "loading" | "loaded";
 
 export interface LiveNoticeView {
@@ -42,6 +44,17 @@ export interface LiveNoticeView {
 
 export interface LiveNotice extends LiveNoticeView {
   failure: LiveFailure;
+}
+
+export interface LiveSurfaceEmpty {
+  notice: LiveNoticeView;
+  action: I18nText;
+}
+
+export interface LiveScenarioNote {
+  tag: I18nText;
+  text: I18nText;
+  action: I18nText;
 }
 
 export interface LiveStale {
@@ -141,6 +154,30 @@ const NOTICE_LOOK: Record<LiveFailure, Omit<LiveNotice, "failure" | "title" | "d
   failed: { severity: "error", retry: true, details: true, icon: "error-outline" },
 };
 
+const EMPTY_KEY: Record<LiveEmptySurface, { title: I18nKey; desc: I18nKey; action: I18nKey }> = {
+  changes: {
+    title: "autoobserveLive.surfaces.changes.title",
+    desc: "autoobserveLive.surfaces.changes.desc",
+    action: "autoobserveLive.surfaces.changes.action",
+  },
+  history: {
+    title: "autoobserveLive.surfaces.history.title",
+    desc: "autoobserveLive.surfaces.history.desc",
+    action: "autoobserveLive.surfaces.history.action",
+  },
+  settings: {
+    title: "autoobserveLive.surfaces.settings.title",
+    desc: "autoobserveLive.surfaces.settings.desc",
+    action: "autoobserveLive.surfaces.settings.action",
+  },
+};
+
+const EMPTY_ICON: Record<LiveEmptySurface, IconName> = {
+  changes: "history",
+  history: "schedule",
+  settings: "tune",
+};
+
 export const statusOf = (error: unknown) =>
   (error as { response?: { status?: unknown } } | null | undefined)?.response?.status;
 
@@ -160,6 +197,29 @@ export const liveNotice = (
   const keys = NOTICE_KEY[surface][failure];
   return { failure, title: t(keys.title), description: t(keys.desc), ...NOTICE_LOOK[failure] };
 };
+
+// A surface with no backend yet says what will appear and what to do now, never sample data.
+export const liveSurfaceEmpty = (t: TranslateFn, surface: LiveEmptySurface): LiveSurfaceEmpty => {
+  const keys = EMPTY_KEY[surface];
+  return {
+    notice: {
+      title: t(keys.title),
+      description: t(keys.desc),
+      severity: "neutral",
+      retry: false,
+      details: false,
+      icon: EMPTY_ICON[surface],
+    },
+    action: t(keys.action),
+  };
+};
+
+// The demo scenario picker has no live meaning, so live mode says what is shown instead of hiding the spot.
+export const liveScenarioNote = (t: TranslateFn): LiveScenarioNote => ({
+  tag: t("autoobserveLive.surfaces.scenario.tag"),
+  text: t("autoobserveLive.surfaces.scenario.text"),
+  action: t("autoobserveLive.surfaces.scenario.action"),
+});
 
 export const liveLoadText = (t: TranslateFn, surface: LiveSurface, phase: LivePhase): I18nText =>
   phase === "idle" ? raw("") : t(LOAD_KEY[surface][phase]);
@@ -188,7 +248,7 @@ export const formatDay = (us: number, locale: string, timeZone: string): I18nTex
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(new Date(us / 1000)),
   );
 
-const dayKey = (ms: number, timeZone: string) =>
+export const dayKey = (ms: number, timeZone: string) =>
   new Intl.DateTimeFormat("en-CA", { dateStyle: "short", timeZone }).format(new Date(ms));
 
 // A time from another day carries its date, so yesterday's data never reads as today's.

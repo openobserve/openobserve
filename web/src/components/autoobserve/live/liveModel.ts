@@ -73,9 +73,17 @@ export const SKELETON_DELAY_MS = 300;
 
 export const SKELETON_HOLD_MS = 300;
 
-export const useLiveMode = () => {
+// A production bundle can never show sample data, whatever the URL says.
+export const fixtureAllowed = (): boolean => import.meta.env.DEV || import.meta.env.MODE === "test";
+
+export const useFixtureMode = () => {
   const route = useRoute();
-  return computed(() => route.query.live === "1");
+  return computed(() => fixtureAllowed() && route.query.fixture === "1");
+};
+
+export const useLiveMode = () => {
+  const fixture = useFixtureMode();
+  return computed(() => !fixture.value);
 };
 
 // A wait under the delay never shows a skeleton; once shown it stays for the hold, so it never flashes.
