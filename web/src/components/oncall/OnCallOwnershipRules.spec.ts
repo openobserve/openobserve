@@ -67,23 +67,31 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 describe("OnCallOwnershipRules", () => {
-  it("lists rules in a table, most specific first, numbered in that order", async () => {
+  /// The server sorts by the engine's own precedence, which ranks a service above a longer-named cluster.
+  it("lists rules in the order the server sent, numbered in that order", async () => {
     const wrapper = render({
       rules: [
-        rule(),
+        rule({ dimensions: { service: "pay" } }),
         rule({
           rule_id: "r2",
           team_id: "team_2",
-          dimensions: { service: "cart", "k8s-namespace": "shop" },
+          dimensions: { "k8s-cluster": "production-us-east" },
         }),
       ],
     });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-ownership-table"]').exists()).toBe(true);
-    const rows = wrapper.findAll('[data-test^="oncall-routing-says-"]');
-    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
-      "oncall-routing-says-r2",
-      "oncall-routing-says-r1",
+    const rows = wrapper
+      .findAll("tbody tr")
+      .filter((row) => row.find('[data-test^="oncall-routing-says-"]').exists());
+    expect(
+      rows.map((row) => [
+        row.find('[data-test^="oncall-routing-says-"]').attributes("data-test"),
+        row.findAll("td")[0].text(),
+      ]),
+    ).toEqual([
+      ["oncall-routing-says-r1", "1"],
+      ["oncall-routing-says-r2", "2"],
     ]);
     expect(wrapper.text()).toContain("Order");
   });
@@ -93,12 +101,12 @@ describe("OnCallOwnershipRules", () => {
     const wrapper = render({
       teamId: "team_1",
       rules: [
-        rule(),
         rule({
           rule_id: "r2",
           team_id: "team_2",
           dimensions: { service: "cart", "k8s-namespace": "shop" },
         }),
+        rule(),
       ],
     });
     await flushPromises();
