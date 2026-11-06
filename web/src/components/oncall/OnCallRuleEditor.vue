@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="title"
     :primary-button-label="t('oncall.saveRule')"
     :secondary-button-label="t('oncall.cancel')"
-    :primary-button-disabled="!!saveProblem"
+    :primary-button-disabled="!!saveProblem || !!duplicateOf"
     :primary-button-loading="saving"
     data-test="oncall-rule-editor"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -86,6 +86,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="rules"
           @update:incomplete="(v: boolean) => (conditionsIncomplete = v)"
         />
+        <i18n-t
+          v-if="fieldGroupsLinked"
+          keypath="oncall.ruleEditorFieldsHelp"
+          tag="span"
+          scope="global"
+          class="text-text-secondary text-xs"
+          data-test="oncall-rule-editor-fields-help"
+        >
+          <template #link>
+            <OButton
+              as="a"
+              :href="fieldGroupsHref"
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="ghost-primary"
+              size="xs"
+              icon-right="open-in-new"
+              data-test="oncall-rule-editor-field-groups-link"
+            >
+              {{ t("oncall.ruleEditorManageFieldGroups") }}
+            </OButton>
+          </template>
+        </i18n-t>
+        <OText v-else variant="meta" data-test="oncall-rule-editor-fields-help">
+          {{ t("oncall.ruleEditorFieldsSource") }}
+        </OText>
       </div>
 
       <div class="flex flex-col gap-1">
@@ -116,7 +142,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </i18n-t>
       </div>
 
-      <OText v-if="outcome" variant="body" data-test="oncall-rule-editor-outcome">
+      <!-- Not OText: its meta colour would override the warning token. -->
+      <span
+        v-if="duplicateOf"
+        class="text-status-warning-text text-xs"
+        data-test="oncall-rule-editor-outcome"
+      >
+        {{ duplicateOf }}
+      </span>
+      <OText v-else-if="outcome" variant="body" data-test="oncall-rule-editor-outcome">
         {{ outcome }}
       </OText>
     </div>
@@ -132,11 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallStartOption from "@/components/oncall/OnCallStartOption.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -153,6 +189,7 @@ import type {
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
 import {
   START_PICKER_DROPDOWN_STYLE,
@@ -184,7 +221,7 @@ const props = withDefaults(
     /** The default team of a new rule; a claim passes the team the signal already fell to. */
     teamId?: string;
     teams?: { id: string; name: string }[];
-    aliases?: { id: string; display?: string }[];
+    aliases?: { id: string; display?: string; fields?: string[] }[];
     catalogue?: DimensionCatalogue;
     /** Services discovery has seen, offered as values of the service field. */
     services?: DiscoveredService[];
@@ -222,6 +259,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 
 const draftDimensions = ref<Record<string, string>>({});
 /// Bumped to re-seed the condition rows: on open, and when starting from a signal.
@@ -309,6 +347,23 @@ function startFrom(value: unknown) {
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
+/// Linked only where the correlation page would open, never to a locked or hidden page.
+const fieldGroupsLinked = computed(
+  () =>
+    checkFeatureAccess("correlationSettings", buildFeatureGateContext(store.state.zoConfig))
+      .allowed && !correlationLocked.value,
+);
+
+/// Opened in a new tab so the draft in this dialog survives.
+const fieldGroupsHref = computed(
+  () =>
+    router.resolve({
+      name: "correlationSettings",
+      params: { tab: "field-aliases" },
+      query: { org_identifier: orgId.value },
+    }).href,
+);
+
 const onCallQuery = useQuery(() =>
   Object.assign(whoIsOnCallQuery(orgId.value, team.value), {
     enabled: props.open && !!team.value && !!orgId.value,
@@ -344,6 +399,17 @@ const matchedCount = computed(() =>
       ).length
     : 0,
 );
+
+/// The server refuses a second rule on one path; the edited rule holding its own path is no duplicate.
+const duplicateOf = computed<I18nText | "">(() => {
+  const current = holder.value;
+  if (!conditionCount.value || !current) return "";
+  if (current.path !== ownershipPath(draftDimensions.value) || current.path === props.rule?.path) {
+    return "";
+  }
+  if (current.teamId === team.value) return t("oncall.ruleEditorDuplicatePathSameTeam");
+  return t("oncall.ruleEditorDuplicatePath", { team: raw(teamNameOf(current.teamId)) });
+});
 
 /// One line: who loses alerts to this rule if anyone, else how much of the queue it drains.
 const outcome = computed<I18nText | "">(() => {
@@ -393,7 +459,7 @@ const saveProblem = computed<I18nText | "">(() => {
 });
 
 function save() {
-  if (saveProblem.value) return;
+  if (saveProblem.value || duplicateOf.value) return;
   emit("save", { dimensions: { ...draftDimensions.value }, team_id: team.value });
 }
 </script>

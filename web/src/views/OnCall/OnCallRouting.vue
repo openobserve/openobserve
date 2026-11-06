@@ -464,7 +464,7 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const teams = ref<OnCallTeam[]>([]);
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
-const aliases = ref<{ id: string; display?: string }[]>([]);
+const aliases = ref<{ id: string; display?: string; fields?: string[] }[]>([]);
 /// Who holds the path the rule editor drafts; separate from the tester's preview, which answers the reader's question.
 const conflict = ref<RoutingPreview | null>(null);
 
