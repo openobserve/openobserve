@@ -395,6 +395,8 @@ jobs:
           O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          BUILD_JOB_NAME: build_api_binary
+          SHARD_PREFIX: "api_regression / "
           # The SUMMARY, not the test job: this job now also runs when the build failed,
           # and in that case the test job is `skipped` — which read as success and would
           # post a broken run to ci_test_runs as green. Anything that is not an explicit
