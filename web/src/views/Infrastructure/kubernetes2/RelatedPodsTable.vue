@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { TABLE_MAX_HEIGHT } from "./tableSizing";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -147,8 +148,10 @@ const openNode = (p: PodRow) =>
     row-key="key"
     dense
     virtual-scroll
-    max-height="41.25rem"
+    :max-height="TABLE_MAX_HEIGHT"
     pagination="none"
+    sorting="client"
+    enable-column-resize
     :frame="false"
     :show-global-filter="false"
     data-test="k8s2-related-pods"
