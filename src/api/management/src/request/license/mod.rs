@@ -32,16 +32,20 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2_LICENSE_KEY environment variable, and that key stays in use. Only a newer key for the same license, such as one carrying new waivers, can be pasted over it. To use any other key, put it in O2_LICENSE_KEY and restart.";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 struct LicenseResponse {
     key: Option<String>,
+    #[schema(value_type = Option<Object>)]
     license: Option<License>,
     installation_id: String,
     expired: bool,
     ingestion_used: f64,
     ingestion_exceeded: u8,
+    #[schema(value_type = Vec<Object>)]
     waivers: Vec<Waiver>,
+    #[schema(value_type = Object)]
     decision: LicenseDecision,
+    #[schema(value_type = Object)]
     base: LicenseDecision,
     evaluated_at: i64,
     env_key_active: bool,
@@ -238,7 +242,7 @@ fn env_key_in_use(env_key: &str, live_key: Option<&str>) -> bool {
     summary = "Get license information",
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = LicenseResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "License", "operation": "get"})),

@@ -50,6 +50,10 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::report_request_usage_stats;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AnyOfBuilder, ArrayBuilder, ObjectBuilder, Schema, SchemaType, Type},
+};
 #[cfg(feature = "cloud")]
 use {
     axum::http::StatusCode as AxumStatusCode,
@@ -70,6 +74,34 @@ use crate::{
     },
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
+
+/// Only documents `_search_multi`: with `per_query_response` each hit is one query's rows.
+struct MultiSearchResponse;
+
+impl utoipa::PartialSchema for MultiSearchResponse {
+    fn schema() -> RefOr<Schema> {
+        let mut schema = <search::Response as utoipa::PartialSchema>::schema();
+        if let RefOr::T(Schema::Object(response)) = &mut schema {
+            let row = || ObjectBuilder::new().schema_type(Type::Object);
+            // A ResultArray VRL may put non-object values inside a per-query group.
+            let any_value = ObjectBuilder::new().schema_type(SchemaType::AnyValue);
+            let hit = AnyOfBuilder::new()
+                .item(row())
+                .item(ArrayBuilder::new().items(any_value));
+            let hits = ArrayBuilder::new().items(hit).description(Some(
+                "Rows, or with `per_query_response` one array of values per query",
+            ));
+            response.properties.insert("hits".to_string(), hits.into());
+        }
+        schema
+    }
+}
+
+impl utoipa::ToSchema for MultiSearchResponse {
+    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
+        <search::Response as utoipa::ToSchema>::schemas(schemas);
+    }
+}
 
 /// SearchStreamData
 #[utoipa::path(
@@ -104,7 +136,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = MultiSearchResponse,
             example = json!({
             "took": 155,
             "hits": [
@@ -672,7 +704,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = Object,
+            body = config::meta::search::SearchPartitionResponse,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -853,7 +885,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::Response, example = json!({
             "took": 155,
             "hits": [
                 {

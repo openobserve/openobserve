@@ -92,7 +92,8 @@ use super::{models::*, service::*};
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List monitored databases with call totals, latency and calling services", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "List monitored databases with call totals, latency and calling services", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_databases(
@@ -147,7 +148,8 @@ pub async fn get_dbm_databases(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List top database query fingerprints with call counts and latency", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "List top database query fingerprints with call counts and latency", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_queries(
@@ -199,7 +201,8 @@ pub async fn get_dbm_queries(
         (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Time series of calls and latency for one database query fingerprint", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Time series of calls and latency for one database query fingerprint", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_query_history(
@@ -242,7 +245,8 @@ pub async fn get_dbm_query_history(
         (status = 400, description = "Missing fingerprint/stream", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Services and endpoints that call one database query fingerprint", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Services and endpoints that call one database query fingerprint", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_query_endpoints(
@@ -305,7 +309,8 @@ pub async fn get_dbm_query_endpoints(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Slowest database calls in a window, with trace ids", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Slowest database calls in a window, with trace ids", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_samples(
@@ -360,7 +365,8 @@ pub async fn get_dbm_samples(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Database deadlock events with participants", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Database deadlock events with participants", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -429,7 +435,8 @@ pub async fn get_dbm_deadlocks(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Database blocking samples and root-blocker chains", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Database blocking samples and root-blocker chains", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -487,7 +494,8 @@ pub async fn get_dbm_blocking(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Sampled active database sessions and wait-event breakdown", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Sampled active database sessions and wait-event breakdown", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_activity(
@@ -539,7 +547,8 @@ pub async fn get_dbm_activity(
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_query_server_metrics(
@@ -587,7 +596,8 @@ pub async fn get_dbm_query_server_metrics(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Statements ranked by the database's own counters (pg_stat_statements etc.)", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Statements ranked by the database's own counters (pg_stat_statements etc.)", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_server_queries(
@@ -630,7 +640,8 @@ pub async fn get_dbm_server_queries(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Slowest executions captured by the database's own logging", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Slowest executions captured by the database's own logging", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_server_samples(
@@ -667,7 +678,8 @@ pub async fn get_dbm_server_samples(
     description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first and last seen. Not the plan Postgres executed, and carries no per-plan latency.",
     security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_query_plans(
@@ -726,7 +738,8 @@ pub async fn get_dbm_query_plans(
         (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Captured plans and server-side counters for one database query fingerprint", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Captured plans and server-side counters for one database query fingerprint", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_query_insights(
@@ -762,7 +775,8 @@ pub async fn get_dbm_query_insights(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List database instances known to the org", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "List database instances known to the org", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 // NOT enterprise-gated, deliberately. This is the scope filter's instance
@@ -821,7 +835,8 @@ pub async fn get_dbm_instances(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Database table size, bloat and vacuum state", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Database table size, bloat and vacuum state", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -888,7 +903,8 @@ pub async fn get_dbm_table_health(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_badges(
@@ -922,7 +938,8 @@ pub async fn get_dbm_badges(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Database instance health: connections, cache hit ratio, replication lag, deadlocks", "category": "db_monitoring"}))
+        ("x-o2-mcp" = json!({"description": "Database instance health: connections, cache hit ratio, replication lag, deadlocks", "category": "db_monitoring"})),
+        ("x-o2-ratelimit" = json!({"module": "DB Monitoring", "operation": "list"}))
     )
 )]
 pub async fn get_dbm_instance_metrics(

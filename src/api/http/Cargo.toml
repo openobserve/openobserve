@@ -96,6 +96,9 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+jsonschema = { version = "0.38", default-features = false }
+opentelemetry-proto.workspace = true
+openobserve-synthetics.workspace = true
 sea-orm.workspace = true
 svix-ksuid.workspace = true
 tracing.workspace = true

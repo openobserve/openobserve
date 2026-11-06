@@ -439,6 +439,7 @@ pub async fn handle_mcp_get(
         (status = 200, description = "Success", content_type = "application/json"),
         (status = 404, description = "Not Found - OAuth discovery requires Dex to be enabled", content_type = "application/json"),
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -470,6 +471,7 @@ pub async fn oauth_authorization_server_metadata() -> Response {
     responses(
         (status = 404, description = "Not Found - OAuth discovery is only available in enterprise edition", content_type = "application/json"),
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )

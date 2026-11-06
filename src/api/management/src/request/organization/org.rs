@@ -58,7 +58,7 @@ use crate::common::meta::{
 #[cfg(not(feature = "cloud"))]
 const NOT_SUPPORTED_HERE: &str = "Not supported on this deployment";
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 struct CleanupTaskView {
     #[serde(flatten)]
     task: infra::table::org_cleanup_tasks::CleanupTask,
@@ -82,7 +82,8 @@ struct CleanupTaskView {
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
     )
 )]
 pub async fn organizations(
@@ -371,7 +372,7 @@ pub async fn all_organizations(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::organization::OrgSummary),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"})),
@@ -849,6 +850,10 @@ fn paid_overage_unavailable(error: impl std::fmt::Display) -> Response {
         (status = 400, description = "Unknown or unsupported quota feature"),
         (status = 503, description = "Billing or quota state unavailable"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
+    )
 )]
 pub async fn get_paid_overage_status(
     Path((org_id, feature)): Path<(String, String)>,
@@ -887,6 +892,10 @@ pub async fn get_paid_overage_status(
         (status = 409, description = "Organization is not eligible for paid overage"),
         (status = 503, description = "Billing or quota state unavailable"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"}))
+    )
 )]
 pub async fn set_paid_overage_status(
     Path((org_id, feature)): Path<(String, String)>,
@@ -1282,6 +1291,10 @@ pub async fn enable_org_storage(
     request_body(content = inline(OrgRenameBody), description = "Organization new name", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"}))
     )
 )]
 pub async fn rename_org(
@@ -1645,7 +1658,7 @@ pub async fn cluster_info(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "delete"})),
@@ -1694,7 +1707,7 @@ pub async fn initiate_org_deletion(
         ("target_org_id" = String, Path, description = "Target org id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
@@ -1732,7 +1745,7 @@ pub async fn resurrect_org_deletion(
         ("target_org_id" = String, Path, description = "Target org id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
@@ -1759,7 +1772,7 @@ pub async fn resurrect_org_deletion(
         ("target_org_id" = String, Path, description = "Target org id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<CleanupTaskView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
@@ -1804,7 +1817,7 @@ pub async fn list_org_cleanup_tasks(
         ("target_org_id" = String, Path, description = "Target org id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
@@ -1838,7 +1851,7 @@ pub async fn retry_org_cleanup(
         ("target_org_id" = String, Path, description = "Target org id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),

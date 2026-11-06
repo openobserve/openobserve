@@ -60,7 +60,7 @@ use crate::{
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::PaginatedResponse, example = json!({
             "took": 155,
             "total": 2,
             "from": 0,
@@ -80,7 +80,8 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM users from a trace stream: user_id, event count, token usage, cost.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "List recent LLM users from a trace stream: user_id, event count, token usage, cost.", "category": "traces"})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_latest_users(
