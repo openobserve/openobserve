@@ -23,7 +23,9 @@ use common::{
 };
 use config::{
     get_config,
-    meta::stream::{DataRetentionDefaults, RETENTION_STREAM_TYPES, StreamType},
+    meta::stream::{
+        DataRetentionDefaults, MAX_DATA_RETENTION_DAYS, RETENTION_STREAM_TYPES, StreamType,
+    },
     utils::json,
 };
 use infra::{
@@ -39,9 +41,6 @@ use crate as db;
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
-
-// Date math in the retention callers overflows past this; no stored data can be that old.
-const MAX_EFFECTIVE_RETENTION_DAYS: i64 = 10_000_000;
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
@@ -620,7 +619,7 @@ async fn data_stream_retention_days(
     stream_days: i64,
 ) -> Result<i64, Error> {
     if stream_days > 0 {
-        return Ok(stream_days.min(MAX_EFFECTIVE_RETENTION_DAYS));
+        return Ok(stream_days.min(MAX_DATA_RETENTION_DAYS));
     }
     let org = org_retention_defaults(org_id).await?;
     Ok(default_retention_days(
@@ -679,8 +678,13 @@ fn longest_source_retention_days(
     org: &DataRetentionDefaults,
     global: &DataRetentionDefaults,
 ) -> i64 {
-    let sources = [StreamType::Logs, StreamType::Metrics, StreamType::Traces]
-        .map(|source| default_retention_days(source, org, global));
+    let sources = [
+        StreamType::Logs,
+        StreamType::Metrics,
+        StreamType::Traces,
+        StreamType::Profiles,
+    ]
+    .map(|source| default_retention_days(source, org, global));
     if sources.contains(&0) {
         0
     } else {
@@ -692,7 +696,7 @@ fn first_positive(levels: &[i64]) -> i64 {
     levels
         .iter()
         .find(|days| **days > 0)
-        .map_or(0, |days| (*days).min(MAX_EFFECTIVE_RETENTION_DAYS))
+        .map_or(0, |days| (*days).min(MAX_DATA_RETENTION_DAYS))
 }
 
 #[cfg(test)]
@@ -1114,7 +1118,7 @@ mod tests {
         let none = levels(0, 0, 0, 0);
         assert_eq!(
             default_retention_days(StreamType::Logs, &levels(i64::MAX, 0, 0, 0), &none),
-            MAX_EFFECTIVE_RETENTION_DAYS
+            MAX_DATA_RETENTION_DAYS
         );
     }
 
@@ -1195,14 +1199,23 @@ mod tests {
     fn metadata_treats_keep_forever_as_longer_than_any_number_of_days() {
         let none = levels(0, 0, 0, 0);
         let metadata = |org, global| default_retention_days(StreamType::Metadata, &org, &global);
+        let sources = |logs, metrics, traces, profiles| DataRetentionDefaults {
+            logs,
+            metrics,
+            traces,
+            profiles,
+            ..Default::default()
+        };
         // every source is finite: the longest wins
-        assert_eq!(metadata(none, levels(0, 30, 180, 7)), 180);
+        assert_eq!(metadata(none, sources(30, 180, 7, 14)), 180);
+        assert_eq!(metadata(none, sources(30, 180, 7, 400)), 400);
         // a numeric maximum would give 180 and expire metadata before the logs it describes
-        assert_eq!(metadata(none, levels(0, 0, 180, 7)), 0);
-        assert_eq!(metadata(none, levels(0, 30, 0, 7)), 0);
-        assert_eq!(metadata(none, levels(0, 30, 180, 0)), 0);
+        assert_eq!(metadata(none, sources(0, 180, 7, 14)), 0);
+        assert_eq!(metadata(none, sources(30, 0, 7, 14)), 0);
+        assert_eq!(metadata(none, sources(30, 180, 0, 14)), 0);
+        assert_eq!(metadata(none, sources(30, 180, 7, 0)), 0);
         // the org layer can close the gap that left a source forever
-        assert_eq!(metadata(levels(0, 400, 0, 0), levels(0, 0, 180, 7)), 400);
+        assert_eq!(metadata(sources(400, 0, 0, 0), sources(0, 180, 7, 14)), 400);
     }
 
     #[test]

@@ -6673,6 +6673,17 @@ mod tests {
     }
 
     #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
+    }
+
+    #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
         cfg.compact.data_retention_spec = "3".to_string();

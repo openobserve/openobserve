@@ -110,6 +110,8 @@ impl PartialEq for DataField {
 
 pub const MIN_DATA_RETENTION_DAYS: i64 = 3;
 pub const DEFAULT_DATA_RETENTION_DAYS: i64 = 3650;
+// Date math in the retention callers overflows past this; no stored data can be that old.
+pub const MAX_DATA_RETENTION_DAYS: i64 = 10_000_000;
 /// The stream types a default retention can be set for.
 pub const RETENTION_STREAM_TYPES: [StreamType; 5] = [
     StreamType::Logs,
@@ -332,7 +334,7 @@ impl FromStr for DataRetentionDefaults {
                 format!(
                     "unknown stream type {key}, expected logs, metrics, traces, profiles or metadata"
                 )
-            })? = days;
+            })? = days.min(MAX_DATA_RETENTION_DAYS);
             if !seen.insert(key.clone()) {
                 return Err(format!("{key} is given twice"));
             }
@@ -2861,6 +2863,10 @@ mod tests {
         assert_eq!(parsed("metrics:180"), Ok(with(3650, 0, 180)));
         assert_eq!(parsed("30,metrics:0"), Ok(with(30, 0, 0)));
         assert_eq!(parsed("metrics:1000000"), Ok(with(3650, 0, 1_000_000)));
+        assert_eq!(
+            parsed(&format!("{MAX_DATA_RETENTION_DAYS},logs:{}", i64::MAX)),
+            Ok(with(MAX_DATA_RETENTION_DAYS, MAX_DATA_RETENTION_DAYS, 0))
+        );
         assert_eq!(parsed(""), Ok(with(3650, 0, 0)));
         let all = parsed("traces:3,profiles:4,metadata:5").unwrap();
         assert_eq!((all.traces, all.profiles, all.metadata), (3, 4, 5));
