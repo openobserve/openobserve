@@ -1275,6 +1275,11 @@ export class AlertsPage {
             .filter({ hasText: label })
             .first()
             .click();
+        // Focus returns to the trigger as the select closes, so an Enter pressed before that would reopen it.
+        await expect(
+            this.page.locator(`${this.locators.prioritySelect} [data-test$="-trigger"]`).first()
+        ).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 });
+        await expect(this.page.locator('[data-test="alert-priority-select-popover"]')).toHaveCount(0, { timeout: 5000 });
         testLogger.info('Selected alert priority', { label });
     }
 
