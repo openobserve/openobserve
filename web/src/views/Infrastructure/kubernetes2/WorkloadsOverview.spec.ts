@@ -25,8 +25,8 @@ import WorkloadsOverview from "./WorkloadsOverview.vue";
 const tooltipStub = defineComponent({
   name: "OTooltip",
   props: ["content"],
-  setup(props) {
-    return () => h("span", { "data-test": "tooltip" }, props.content);
+  setup(props, { slots }) {
+    return () => h("span", { "data-test": "tooltip" }, [props.content, slots.default?.()]);
   },
 });
 

@@ -587,6 +587,24 @@ describe("ClusterOverview", () => {
       );
     });
 
+    it("caps the table at 70% of the viewport, sorts and resizes", async () => {
+      await mountView();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("maxHeight")).toBe("70vh");
+      expect(table.props("enableColumnResize")).toBe(true);
+      expect(table.props("sorting")).toBe("client");
+      const cols = table.props("columns") as any[];
+      expect(cols.every((c) => c.sortable)).toBe(true);
+      expect(cols.find((c) => c.id === "message").meta.flex).toBe(true);
+    });
+
+    it("sizes the Object column to its longest name", async () => {
+      await mountView();
+      const cols = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const size = (id: string) => cols.find((c) => c.id === id).size;
+      expect(size("object")).toBeGreaterThan(size("age"));
+    });
+
     it("opens the drawer on a row click when the kind has one", async () => {
       await mountView();
       await wrapper
