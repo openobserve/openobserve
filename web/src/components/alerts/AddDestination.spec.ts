@@ -862,7 +862,10 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     await wrapper.find(previewBtn).trigger("click");
     await flushPromises();
 
-    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("prebuilt_default");
+    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("prebuilt_default", {
+      type: "slack",
+      credentials: { webhookUrl: VALID_SLACK, channel: "alerts" },
+    });
     expect(hoisted.mockGeneratePreview).not.toHaveBeenCalled();
     expect(preview.props("templateContent")).toBe('{"text": "unified"}');
     expect(preview.props("showBody")).toBe(true);
@@ -877,6 +880,30 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     expect(hoisted.mockGeneratePreview).toHaveBeenCalledTimes(1);
     expect(hoisted.mockRenderTemplateBody).not.toHaveBeenCalled();
     expect(preview.props("showBody")).toBe(false);
+  });
+
+  it("test: a picked prebuilt_default goes to testDestination, the channel default does not", async () => {
+    hoisted.mockTestPrebuilt.mockResolvedValue({ success: true });
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    const testBtn = '[data-test="destination-test-button"]';
+    const credentials = { webhookUrl: VALID_SLACK, channel: "alerts" };
+
+    form.setFieldValue("template", "prebuilt_default");
+    await nextTick();
+    await wrapper.find(testBtn).trigger("click");
+    await flushPromises();
+    expect(hoisted.mockTestPrebuilt).toHaveBeenLastCalledWith(
+      "slack",
+      credentials,
+      "prebuilt_default",
+    );
+
+    form.setFieldValue("template", "prebuilt_slack");
+    await nextTick();
+    await wrapper.find(testBtn).trigger("click");
+    await flushPromises();
+    expect(hoisted.mockTestPrebuilt).toHaveBeenLastCalledWith("slack", credentials, undefined);
   });
 
   it("create: sends a picked prebuilt_default as the template override", async () => {

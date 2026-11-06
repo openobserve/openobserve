@@ -1277,6 +1277,14 @@ const templateNameFor = (type: string): string => {
 
 const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value));
 
+const pickedPrebuiltTemplate = computed(() =>
+  isPrebuiltDestination.value &&
+  templateVal.value &&
+  templateVal.value !== defaultPrebuiltTemplateName.value
+    ? templateVal.value
+    : undefined,
+);
+
 // A Content template fits every transport, so every prebuilt type offers it.
 const UNIFIED_DEFAULT_TEMPLATE_NAME = "prebuilt_default";
 
@@ -1361,7 +1369,7 @@ const handleTestDestination = async () => {
   if (!isPrebuiltDestination.value) return;
 
   try {
-    await testDestination(dtVal.value, prebuiltCredentials.value);
+    await testDestination(dtVal.value, prebuiltCredentials.value, pickedPrebuiltTemplate.value);
   } catch {
     // testDestination owns user-facing sanitized error state.
   }
@@ -1369,11 +1377,8 @@ const handleTestDestination = async () => {
 
 // Show template preview
 const showPreview = async () => {
-  const pickedTemplate =
-    isPrebuiltDestination.value && templateVal.value !== defaultPrebuiltTemplateName.value
-      ? templateVal.value
-      : undefined;
-  const customTemplate = isCustomWebhook.value ? templateVal.value : pickedTemplate;
+  const pickedTemplate = pickedPrebuiltTemplate.value;
+  const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
   if (isCustomWebhook.value && !customTemplate) {
     toast({ variant: "error", message: t("alerts.validation.templateRequired") });
     return;
@@ -1385,9 +1390,17 @@ const showPreview = async () => {
     previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = customTemplate
-      ? await renderTemplateBody(customTemplate)
-      : await generatePreview(dtVal.value, prebuiltCredentials.value);
+    let preview: string;
+    if (pickedTemplate) {
+      preview = await renderTemplateBody(pickedTemplate, {
+        type: dtVal.value,
+        credentials: prebuiltCredentials.value,
+      });
+    } else if (customTemplate) {
+      preview = await renderTemplateBody(customTemplate);
+    } else {
+      preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+    }
     previewContent.value = preview;
     previewShowsBody.value = !!pickedTemplate;
 
