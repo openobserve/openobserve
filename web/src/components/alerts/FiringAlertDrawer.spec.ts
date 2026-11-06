@@ -287,6 +287,62 @@ describe("FiringAlertDrawer", () => {
     expect(has(await mountDrawer(baseRow), "alerts-firing-drawer-logs")).toBe(false);
   });
 
+  it("re-reads history on a refresh inside the same minute, whose key does not change", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: 1_700_000_040_000 });
+    try {
+      const wrapper = await mountDrawer(baseRow);
+      expect(getHistory).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(1_700_000_045_000);
+      await wrapper.setProps({ refreshedAt: 1 });
+      await flushPromises();
+      expect(getHistory).toHaveBeenCalledTimes(2);
+      expect(getHistory.mock.calls[1][1].end_time).toBeGreaterThan(
+        getHistory.mock.calls[0][1].end_time,
+      );
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("confirms a destination only from a recorded send of this firing", async () => {
+    const started = NOW_US - 120_000_000;
+    getHistory.mockResolvedValue({
+      data: {
+        hits: [
+          { timestamp: NOW_US - 1000, status: "firing", success_response: "destination pd ok;" },
+          {
+            timestamp: started - 1000,
+            status: "firing",
+            success_response: "destination slack ok;",
+          },
+        ],
+      },
+    });
+    const wrapper = await mountDrawer({ ...baseRow, firing_started_at: started });
+    expect(wrapper.find('[data-section="notified"]').text()).toContain("Notified");
+    const confirmed = (id: string) =>
+      wrapper.find(`[data-test="alerts-firing-drawer-dest-${id}"]`).html();
+    expect(confirmed("pd")).toContain("success");
+    expect(confirmed("slack")).not.toContain("success");
+  });
+
+  it("shows a firing with no history as destinations, none confirmed", async () => {
+    getHistory.mockResolvedValue({ data: { hits: [] } });
+    const wrapper = await mountDrawer(baseRow);
+    const section = wrapper.find('[data-section="notified"]');
+    expect(section.text()).not.toContain("Notified");
+    expect(section.html()).not.toContain("success");
+  });
+
+  it("marks the flap count incomplete when the read stops inside its window", async () => {
+    getHistory.mockResolvedValue({
+      data: { total: 5000, hits: [{ timestamp: NOW_US - 1000, status: "firing" }] },
+    });
+    const wrapper = await mountDrawer(baseRow);
+    expect(wrapper.find('[data-test="alerts-firing-drawer-flaps"]').text()).toContain("0+");
+  });
+
   it("names the failed destination of a Notify Failed alert", async () => {
     getHistory.mockResolvedValue({
       data: {

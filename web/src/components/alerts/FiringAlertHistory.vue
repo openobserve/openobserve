@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="segment in bar.segments"
           :key="segment.startUs"
-          :class="segment.state === 'firing' ? 'bg-badge-error-solid-bg' : 'bg-border-strong'"
+          :class="segmentClass[segment.state]"
           :style="{ width: `${segment.pct}%` }"
           :data-test="`alerts-firing-history-segment-${segment.state}`"
         />
@@ -102,6 +102,11 @@ import {
 import { formatInZone } from "@/utils/oncall";
 
 const WINDOW_US = 2 * 3_600_000_000;
+const segmentClass = {
+  firing: "bg-badge-error-solid-bg",
+  ok: "bg-border-strong",
+  unknown: "bg-border-default",
+};
 
 const props = defineProps<{
   hits: AlertRun[];
@@ -111,6 +116,8 @@ const props = defineProps<{
   /** Absent for what has no detail page to send the user to. */
   viewAll?: RouteLocationRaw;
   failed?: boolean;
+  /** The read holds only the newest runs of a longer history. */
+  partial?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -125,11 +132,13 @@ const bar = computed(() =>
     startUs: startUs.value,
     nowUs: props.nowUs,
     firingStartedAt: props.firingStartedAt,
+    partial: props.partial,
   }),
 );
 const events = computed(() =>
   historyEvents(props.hits, {
-    windowStartUs: startUs.value,
+    // The oldest row of a partial read is the read's edge, not a firing's real start.
+    windowStartUs: props.partial ? undefined : startUs.value,
     destinations: props.destinations,
     nowUs: props.nowUs,
     firingStartedAt: props.firingStartedAt,
@@ -152,6 +161,11 @@ const legend = computed(() => {
   }
   if (bar.value.okMs) {
     spans.push(t("alerts.firing.drawer.barOk", { span: raw(durationLabel(bar.value.okMs)) }));
+  }
+  if (bar.value.unknownMs) {
+    spans.push(
+      t("alerts.firing.drawer.barUnknown", { span: raw(durationLabel(bar.value.unknownMs)) }),
+    );
   }
   return raw(spans.join(" · "));
 });

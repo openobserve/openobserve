@@ -205,10 +205,10 @@ describe("FiringAlerts", () => {
     wrapper.unmount();
   });
 
-  it("reports a partial bulk acknowledge in one toast", async () => {
+  it("reports a bulk failure apart from skips, with its reason", async () => {
     ackAlert
       .mockResolvedValueOnce({ data: { changed: true, acks: [] } })
-      .mockRejectedValueOnce({ response: { status: 403 } });
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: "firing_changed" } } });
     const wrapper = await mountPage();
     const table = wrapper.findComponent({ name: "OTable" });
     table.vm.$emit("update:selectedIds", ["1", "2", "3"]);
@@ -218,8 +218,9 @@ describe("FiringAlerts", () => {
     await ack.trigger("click");
     await flushPromises();
     expect(ackAlert).toHaveBeenCalledTimes(2);
-    expect(toast).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast).mock.calls[0][0].message).toBe("1 acknowledged, 2 skipped");
+    const messages = vi.mocked(toast).mock.calls.map(([call]) => call.message);
+    expect(messages[0]).toBe("1 acknowledged, 1 skipped, 1 failed");
+    expect(messages[1]).toBe(i18n.global.t("alerts.ack.errors.firingChanged"));
     wrapper.unmount();
   });
 

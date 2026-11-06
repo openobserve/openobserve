@@ -276,6 +276,7 @@ import AlertSectionTabs from "./AlertSectionTabs.vue";
 import AckChip from "./AckChip.vue";
 import FiringAlertDrawer from "./FiringAlertDrawer.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
+import { useAlertActions } from "@/composables/alerts/useAlertActions";
 import { useFiringAlerts, FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
@@ -492,23 +493,33 @@ const selectedRows = computed(() =>
 );
 
 const bulkAck = useMutation(() => ackAlertsMutation(orgId.value));
+const { reportAckFailure } = useAlertActions();
 
 const acknowledgeSelected = async () => {
   // The ack refetches the list, which would shrink the selection under this count.
   const batch = selectedRows.value.length;
-  const targets = selectedRows.value.filter(canAcknowledge).map((row) => ({
+  const rows = selectedRows.value.filter(canAcknowledge);
+  const targets = rows.map((row) => ({
     alertId: row.alert_id,
     folderId: row.folder_id,
     body: ackBody(row),
   }));
-  const { acked } = await bulkAck.mutateAsync(targets);
-  const skipped = batch - acked;
+  const { acked, failures } = await bulkAck.mutateAsync(targets);
+  const failed = failures.length;
+  const skipped = batch - acked - failed;
   toast({
-    variant: acked ? "success" : "warning",
-    message: skipped
-      ? t("toastMessages.alerts.firing.bulkResult", { acked, skipped })
-      : t("toastMessages.alerts.firing.bulkAllAcked", { acked }),
+    variant: acked && !failed ? "success" : "warning",
+    message: failed
+      ? t("toastMessages.alerts.firing.bulkResultFailed", { acked, skipped, failed })
+      : skipped
+        ? t("toastMessages.alerts.firing.bulkResult", { acked, skipped })
+        : t("toastMessages.alerts.firing.bulkAllAcked", { acked }),
   });
+  const [first] = failures;
+  if (first) {
+    const name = rows.find((row) => row.alert_id === first.alertId)?.name ?? first.alertId;
+    reportAckFailure(first.error, name);
+  }
   selectedIds.value = [];
 };
 

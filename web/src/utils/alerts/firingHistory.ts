@@ -28,7 +28,9 @@ export interface AlertRun extends AckHistoryFields {
   error?: string | null;
 }
 
-export type BarState = "firing" | "ok";
+type RunState = "firing" | "ok";
+
+export type BarState = RunState | "unknown";
 
 export interface BarSegment {
   state: BarState;
@@ -41,6 +43,7 @@ export interface StatusBar {
   segments: BarSegment[];
   firingMs: number;
   okMs: number;
+  unknownMs: number;
 }
 
 export type HistoryEventKind = "started" | "recovered" | "notified" | "failed" | "ack";
@@ -58,7 +61,7 @@ export interface HistoryEvent {
 }
 
 interface Change {
-  state: BarState;
+  state: RunState;
   at: number;
   run: AlertRun;
 }
@@ -72,7 +75,7 @@ const ascending = (hits: AlertRun[]) => [...hits].sort(byTime);
 const descending = (hits: AlertRun[]) => ascending(hits).reverse();
 
 // Suppressed, skipped and errored runs observed no new state, so the last one stands.
-const stateOf = (run: AlertRun): BarState | null => {
+const stateOf = (run: AlertRun): RunState | null => {
   if (isAckEventRow(run)) return null;
   const bucket = outcomeBucket(run.status);
   return bucket === "firing" || bucket === "ok" ? bucket : null;
@@ -122,20 +125,34 @@ export const latestState = (hits: AlertRun[]): string | undefined =>
 export const failedNames = (run: AlertRun): string[] =>
   [...(run.error ?? "").matchAll(FAILED_DESTINATION)].map((match) => match[1]);
 
+const sentNames = (run: AlertRun, destinations: string[]): string[] =>
+  destinations.filter((name) => (run.success_response ?? "").includes(`destination ${name} `));
+
+/** Destinations whose newest delivery since `sinceUs` is a recorded success. */
+export const deliveredNames = (hits: AlertRun[], destinations: string[], sinceUs = 0): string[] => {
+  const newest = new Map<string, boolean>();
+  for (const run of descending(hits)) {
+    if (run.timestamp < sinceUs) break;
+    for (const name of failedNames(run)) if (!newest.has(name)) newest.set(name, false);
+    for (const name of sentNames(run, destinations)) if (!newest.has(name)) newest.set(name, true);
+  }
+  return destinations.filter((name) => newest.get(name));
+};
+
 /** Who the newest failed run could not reach; `names` is empty when it failed before naming one. */
 export const failedDelivery = (hits: AlertRun[]): { names: string[]; error: string } | null => {
   const run = descending(hits).find((row) => row.status === "notify_failed");
   return run ? { names: failedNames(run), error: run.error ?? "" } : null;
 };
 
-/** The window as firing and ok spans; an open firing is red from its start whatever its runs say. */
+/** The window as firing and ok spans; an open firing is red from its start whatever its runs say, and a `partial` read leaves the time before its runs unknown. */
 export const statusBar = (
   hits: AlertRun[],
-  window: { startUs: number; nowUs: number; firingStartedAt?: number },
+  window: { startUs: number; nowUs: number; firingStartedAt?: number; partial?: boolean },
 ): StatusBar => {
-  const { startUs, nowUs, firingStartedAt } = window;
+  const { startUs, nowUs, firingStartedAt, partial } = window;
   const points: { state: BarState; at: number }[] = [
-    { state: "ok", at: startUs },
+    { state: partial ? "unknown" : "ok", at: startUs },
     ...changesOf(hits).filter(
       (change) => firingStartedAt === undefined || change.at < firingStartedAt,
     ),
@@ -165,7 +182,12 @@ export const statusBar = (
     segments
       .filter((segment) => segment.state === state)
       .reduce((sum, segment) => sum + (segment.endUs - segment.startUs) / 1000, 0);
-  return { segments, firingMs: spent("firing"), okMs: spent("ok") };
+  return {
+    segments,
+    firingMs: spent("firing"),
+    okMs: spent("ok"),
+    unknownMs: spent("unknown"),
+  };
 };
 
 const conditionOf = (run: AlertRun): string | undefined => {
@@ -196,7 +218,7 @@ const runEvent = (run: AlertRun, destinations: string[]): HistoryEvent | null =>
   }
   const body = run.success_response ?? "";
   if (!body.includes("destination ")) return null;
-  const names = destinations.filter((name) => body.includes(`destination ${name} `));
+  const names = sentNames(run, destinations);
   return { kind: "notified", at: run.timestamp, key: `notified:${names}`, run, names };
 };
 

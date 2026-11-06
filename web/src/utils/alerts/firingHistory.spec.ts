@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  deliveredNames,
   failedDelivery,
   flapCount,
   historyEvents,
@@ -102,6 +103,32 @@ describe("failedDelivery", () => {
   });
 });
 
+describe("deliveredNames", () => {
+  const sent = (name: string) => ({ success_response: `destination ${name} ok;` });
+  const failed = (name: string) => ({
+    error: `Error sending notification for destination ${name} err: 500;`,
+  });
+
+  it("confirms only destinations a run recorded as sent", () => {
+    expect(deliveredNames([run(1, "firing", sent("slack"))], ["slack", "pd"])).toEqual(["slack"]);
+  });
+
+  it("confirms nothing from runs without a delivery", () => {
+    expect(deliveredNames([], ["slack"])).toEqual([]);
+    expect(deliveredNames([run(1, "firing")], ["slack"])).toEqual([]);
+  });
+
+  it("lets the newest attempt decide, and ignores runs before the firing", () => {
+    const hits = [
+      run(9, "firing", sent("slack")),
+      run(5, "notify_failed", failed("slack")),
+      run(4, "firing", sent("pd")),
+    ];
+    expect(deliveredNames(hits, ["slack", "pd"])).toEqual(["pd"]);
+    expect(deliveredNames(hits, ["slack", "pd"], at(3))).toEqual([]);
+  });
+});
+
 describe("statusBar", () => {
   it("splits the window into firing and ok with their totals", () => {
     const bar = statusBar(
@@ -128,6 +155,17 @@ describe("statusBar", () => {
       firingStartedAt: at(200),
     });
     expect(bar.segments.map((s) => s.state)).toEqual(["firing"]);
+  });
+
+  it("leaves the time before a partial read unknown, not ok", () => {
+    const bar = statusBar([run(20, "normal")], {
+      startUs: at(60),
+      nowUs: NOW,
+      partial: true,
+    });
+    expect(bar.segments.map((segment) => segment.state)).toEqual(["unknown", "ok"]);
+    expect(bar.unknownMs).toBe(40 * 60_000);
+    expect(bar.okMs).toBe(20 * 60_000);
   });
 
   it("clips what began before the window", () => {

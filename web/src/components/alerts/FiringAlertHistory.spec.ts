@@ -50,6 +50,16 @@ describe("FiringAlertHistory", () => {
     expect(wrapper.findAll('[data-test="alerts-firing-history-segment-firing"]')).toHaveLength(1);
   });
 
+  it("marks what a partial read did not reach and invents no start at its edge", () => {
+    const wrapper = mountHistory({
+      hits: [{ timestamp: NOW - 30 * MIN, status: "firing" }],
+      partial: true,
+    });
+    expect(wrapper.find('[data-test="alerts-firing-history-segment-unknown"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("1h 30m not read");
+    expect(wrapper.findAll('[data-test="alerts-firing-history-event"]')).toHaveLength(0);
+  });
+
   it("covers the last 2h otherwise", () => {
     const wrapper = mountHistory({ hits: [{ timestamp: NOW - MIN, status: "normal" }] });
     expect(wrapper.text()).toContain("last 2h");

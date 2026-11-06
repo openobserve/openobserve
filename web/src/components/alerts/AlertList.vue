@@ -3399,7 +3399,6 @@ export default defineComponent({
       // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
       void queryClient.invalidateQueries({
         queryKey: alertKeys.detail(org, id),
-        exact: true,
         refetchType: "none",
       });
     };
@@ -3450,8 +3449,9 @@ export default defineComponent({
         return next.length === cached.length ? undefined : next;
       });
       gone.forEach((id: string) =>
-        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id) }),
       );
+      queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
 
       // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
       if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });

@@ -974,7 +974,10 @@ describe("AlertList - row actions", () => {
     ).toBeUndefined();
     // No refetch: reloading the folder would blank the table behind its skeleton
     // and a loading toast for a row the server already confirmed gone.
-    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    const folderReads = (alertsSvc.listByFolderId as any).mock.calls.filter(
+      (call: unknown[]) => call[6] !== undefined,
+    );
+    expect(folderReads).toHaveLength(0);
     // The store cache backs a folder revisit, so the row must leave it too or it
     // reappears the moment the user navigates away and back.
     const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
@@ -1287,7 +1290,8 @@ describe("AlertList - folder and state interactions", () => {
     await wrapper.vm.updateAcrossFolders("default", "default");
     await flushPromises();
 
-    expect(spy).toHaveBeenCalledTimes(2);
+    // The section tabs' Firing badge reads every folder on its own schedule.
+    expect(spy.mock.calls.filter((call) => call[6] === "default")).toHaveLength(2);
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1403,6 +1407,21 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
+  });
+
+  it("toggleAlertState marks the folder-keyed detail entry stale", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, row.alert_id), "folder-1"];
+    queryClient.setQueryData(key, { name: row.name });
+
+    await wrapper.vm.toggleAlertState(row);
+    await flushPromises();
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: key, exact: true });
   });
 });
 
@@ -2444,6 +2463,28 @@ describe("AlertList - editor drafts", () => {
     expect(readEditorDraft(scope("alert-1"))).toBeNull();
     expect(readEditorDraft(scope("alert-1", "teammate@example.com"))).toBeNull();
     expect(readEditorDraft(scope("alert-2"))).not.toBeNull();
+  });
+
+  it("drops the deleted alert's folder-keyed detail and refreshes the Firing read", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, "alert-1"), "folder-1"];
+    const otherKey = alertKeys.detail(org, "alert-2");
+    queryClient.setQueryData(key, { name: "Scheduled Alert A" });
+    queryClient.setQueryData(otherKey, { name: "Scheduled Alert B" });
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { vm } = await mountDraftList();
+
+    await vm.showDeleteDialogFn({
+      row: { alert_id: "alert-1", name: "Scheduled Alert A" },
+    });
+    await vm.deleteAlertByAlertId();
+    await flushPromises();
+
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(queryClient.getQueryData(otherKey)).toBeDefined();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: otherKey, exact: true });
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
   });
 
   it("keeps the draft when the delete fails", async () => {

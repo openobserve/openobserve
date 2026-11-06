@@ -11507,6 +11507,7 @@
         "historyFailed": "History could not be loaded.",
         "barFiring": "{span} firing",
         "barOk": "{span} ok",
+        "barUnknown": "{span} not read",
         "eventStarted": "Started firing",
         "eventRecovered": "Recovered",
         "eventNotified": "Notified",
@@ -23343,6 +23344,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} acknowledged, {skipped} skipped",
+        "bulkResultFailed": "{acked} acknowledged, {skipped} skipped, {failed} failed",
         "bulkAllAcked": "{acked} acknowledged"
       },
       "failedToNavigateToAlert": "Failed to navigate to alert",

@@ -62,13 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1"
           data-section="notified"
         >
-          <OText variant="meta">{{ t("alerts.firing.drawer.notified") }}</OText>
+          <OText variant="meta">
+            {{
+              delivered.length ? t("alerts.firing.drawer.notified") : t("alerts.destinationsLabel")
+            }}
+          </OText>
           <div class="flex flex-wrap items-center gap-1.5">
             <OTag
               v-for="name in reached"
               :key="name"
-              :variant="deliveryUnknown ? 'default-soft' : 'success-soft'"
-              :icon="deliveryUnknown ? undefined : 'check'"
+              :variant="delivered.includes(name) ? 'success-soft' : 'default-soft'"
+              :icon="delivered.includes(name) ? 'check' : undefined"
               size="sm"
               :label="raw(name)"
               :data-test="`alerts-firing-drawer-dest-${name}`"
@@ -205,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :firing-started-at="view.firing_started_at"
           :view-all="viewAll"
           :failed="historyRead.isError.value && !hits.length"
+          :partial="partialRead"
         />
       </div>
     </div>
@@ -220,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -253,6 +258,7 @@ import {
   type FiringRow,
 } from "@/utils/alerts/firingAlerts";
 import {
+  deliveredNames,
   failedDelivery,
   flapCount,
   latestReading,
@@ -346,6 +352,16 @@ const historyRead = useQuery(() =>
   }),
 );
 const hits = computed<AlertRun[]>(() => historyRead.data.value?.hits ?? []);
+const partialRead = computed(() => (historyRead.data.value?.total ?? 0) > hits.value.length);
+
+// A same-minute refresh keeps the bucketed key, so nothing else would re-read; an in-flight read is reused.
+watch(
+  () => props.refreshedAt,
+  async () => {
+    await nextTick();
+    if (props.alertId) void historyRead.refetch({ cancelRefetch: false });
+  },
+);
 
 // A row the chip dropped still opens from a link, so its live fields come from history and acks.
 const fromDetail = computed<FiringRow | null>(() => {
@@ -418,6 +434,14 @@ const incidentLink = computed(() => ({
 }));
 
 const reading = computed(() => latestReading(hits.value));
+const flaps = computed(() => {
+  if (!hits.value.length) return "—";
+  const sinceUs = nowUs.value - FLAP_WINDOW_US;
+  const count = flapCount(hits.value, sinceUs);
+  return partialRead.value && !hits.value.some((run) => run.timestamp <= sinceUs)
+    ? `${count}+`
+    : count;
+});
 const tiles = computed<
   {
     key: string;
@@ -454,7 +478,7 @@ const tiles = computed<
     {
       key: "flaps",
       label: t("alerts.firing.drawer.flaps"),
-      value: hits.value.length ? flapCount(hits.value, nowUs.value - FLAP_WINDOW_US) : "—",
+      value: flaps.value,
       sub: t("alerts.firing.drawer.flapsUnit"),
       dataTest: "alerts-firing-drawer-flaps",
     },
@@ -477,6 +501,16 @@ const deliveryUnknown = computed(
 );
 const reached = computed(() =>
   destinations.value.filter((name) => !delivery.value?.names.includes(name)),
+);
+// A firing's own runs are the only evidence for it; earlier sends say nothing about this one.
+const delivered = computed(() =>
+  deliveryUnknown.value
+    ? []
+    : deliveredNames(
+        hits.value,
+        destinations.value,
+        firing.value ? (view.value?.firing_started_at ?? 0) : 0,
+      ),
 );
 
 const logsAlert = computed(() => {
