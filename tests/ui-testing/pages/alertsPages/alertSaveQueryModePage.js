@@ -3,7 +3,12 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-import { expandAlertSettingGroups, goToAlertSection, settleIntoView } from './alertSectionHelpers.js';
+import {
+  expandAlertSettingGroups,
+  goToAlertSection,
+  pickAlertDestination,
+  settleIntoView,
+} from './alertSectionHelpers.js';
 
 /**
  * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
@@ -29,7 +34,6 @@ export class AlertSaveQueryModePage {
       nameTrigger: '[data-test="add-alert-name-input-trigger"]',
       nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
-      destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
       addCondition: '[data-test="alert-conditions-add-condition-btn"]',
       conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
       conditionValue: '[data-test="alert-conditions-value-input-field"]',
@@ -37,7 +41,7 @@ export class AlertSaveQueryModePage {
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
       watchSectionTitle: '[data-test="add-alert-section-watch-title"]',
-      streamTypeTrigger: '[data-test="add-alert-stream-type-select-dropdown-trigger"]',
+      streamTypeCard: (type) => `[data-test="add-alert-stream-type-card-${type}"]`,
       // Compare-with-Past is a tucked setting of "When is it a problem?".
       multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
       multiWindowDelete: '[data-test="multi-time-range-alerts-delete-btn"]',
@@ -94,10 +98,8 @@ export class AlertSaveQueryModePage {
     await this.#pickFromDropdown(this.locators.streamTrigger, streamName);
   }
 
-  /** Multi-select: the popover stays open after a pick, so it needs dismissing. */
   async selectDestination(destinationName) {
-    await this.#pickFromDropdown(this.locators.destinationTrigger, destinationName);
-    await this.page.keyboard.press('Escape');
+    await pickAlertDestination(this.page, destinationName);
   }
 
   async addBuilderCondition(column, value) {
@@ -130,7 +132,7 @@ export class AlertSaveQueryModePage {
   }
 
   async selectStreamType(streamType) {
-    await this.#pickFromDropdown(this.locators.streamTypeTrigger, streamType);
+    await this.page.locator(this.locators.streamTypeCard(streamType.toLowerCase())).click();
   }
 
   async openAdvancedTab() {

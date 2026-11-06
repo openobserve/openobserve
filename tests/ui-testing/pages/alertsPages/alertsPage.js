@@ -20,7 +20,15 @@ import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
-import { expandAlertSettingGroups, goToAlertSection, openAlertSectionForTab, revealAlertSetting, settleIntoView } from './alertSectionHelpers.js';
+import {
+    destinationsShowAsList,
+    expandAlertSettingGroups,
+    goToAlertSection,
+    openAlertSectionForTab,
+    pickAlertDestination,
+    revealAlertSetting,
+    settleIntoView,
+} from './alertSectionHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -76,9 +84,7 @@ export class AlertsPage {
 
             // Step 1: Alert Setup selectors (v3 UI)
             // OSelect: trigger wrapper + `${parent}-popover` + `${parent}-option` with `data-test-value="<value>"` (§4)
-            streamTypeDropdown: '[data-test="add-alert-stream-type-select-dropdown"]',
-            streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
-            streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
+            streamTypeCards: '[data-test="add-alert-stream-type-cards"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             queryEditorDialog: '[data-test="query-editor-dialog"]',
             queryResultLabel: 'Query Result',
@@ -1307,6 +1313,11 @@ export class AlertsPage {
 
     /** Open the destinations select and pick the first available option. */
     async selectFirstDestination() {
+        if (await destinationsShowAsList(this.page)) {
+            await this.page.locator('[data-test="alert-destinations-list-option"]').first().click();
+            testLogger.info('Selected first available destination');
+            return;
+        }
         const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
         await dropdown.waitFor({ state: 'visible', timeout: 10000 });
         await openOSelectDropdown(this.page, dropdown);
@@ -1323,16 +1334,7 @@ export class AlertsPage {
      * and deleted before save, which surfaces as a 404 "destination not found".
      */
     async selectDestinationByName(name) {
-        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
-        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, dropdown);
-        const option = this.page
-            .locator('[data-test$="-popover"] [data-test$="-option"]')
-            .filter({ hasText: name })
-            .first();
-        await expect(option).toBeVisible({ timeout: 5000 });
-        await option.click();
-        await this.page.keyboard.press('Escape');
+        await pickAlertDestination(this.page, name);
         testLogger.info('Selected destination by name', { name });
     }
 
@@ -3224,9 +3226,7 @@ export class AlertsPage {
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
      */
     async selectStreamType(streamType) {
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="${streamType}"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-${streamType}"]`).click();
         testLogger.info('Selected stream type', { streamType });
     }
 

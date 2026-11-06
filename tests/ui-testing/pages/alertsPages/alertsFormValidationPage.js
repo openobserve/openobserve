@@ -117,10 +117,9 @@ export class AlertsFormValidationPage {
     this.alertTriggerThresholdError   = '[data-test="alert-trigger-threshold-input-error"]';
 
     // ── Alert wizard step 1 stream selectors ─────────────────────────────────
-    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
+    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-cards"]';
     this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
     // OSelect popovers — options carry `data-test-value` for value-specific picks
-    this.wizardStreamTypePopover      = '[data-test="add-alert-stream-type-select-dropdown-popover"]';
     this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
 
     // ── FilterCondition — condition row elements ──────────────────────────────
@@ -467,7 +466,7 @@ export class AlertsFormValidationPage {
   // OSelect option factories — pick by `data-test-value` (§4) rather than text.
   getWizardStreamTypeOption(value) {
     return this.page.locator(
-      `[data-test="add-alert-stream-type-select-dropdown-option"][data-test-value="${value}"]`,
+      `[data-test="add-alert-stream-type-card-${value}"]`,
     );
   }
 
@@ -481,8 +480,6 @@ export class AlertsFormValidationPage {
     testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
     // streamTypes are the lowercase values logs/metrics/traces (AddAlert.vue)
     const value = typeLabel.trim().toLowerCase();
-    await this.page.locator(this.wizardStreamTypeDropdown).click();
-    await this.page.locator(this.wizardStreamTypePopover).waitFor({ state: 'visible', timeout: 10000 });
     await this.getWizardStreamTypeOption(value).click();
   }
 
