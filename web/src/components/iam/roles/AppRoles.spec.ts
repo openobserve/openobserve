@@ -822,11 +822,35 @@ describe("AppRoles - member counts split", () => {
     expect([editor.user_count, editor.service_account_count]).toEqual([0, 0]);
   });
 
-  it("hides both counts when the service account list cannot load", async () => {
+  it("keeps system accounts out of both counts", async () => {
+    vi.mocked(users.getAllUserRoles).mockResolvedValue({
+      data: { ...members, "sre@o2.ai": ["Admin"] },
+    } as any);
+    vi.mocked(serviceAccounts.list).mockResolvedValue({
+      data: { data: [{ email: "svc@o2.ai" }, { email: "sre@o2.ai", is_system: true }] },
+    } as any);
+    const wrapper = await mountAppRoles();
+    const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
+    expect([admin.user_count, admin.service_account_count]).toEqual([2, 1]);
+  });
+
+  it("opens the role edit page on the clicked tab", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).editRole({ role_name: "Admin" }, "serviceAccounts");
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "editRole",
+        query: expect.objectContaining({ tab: "serviceAccounts" }),
+      }),
+    );
+  });
+
+  it("keeps all members as users when the service account list cannot load", async () => {
     vi.mocked(serviceAccounts.list).mockRejectedValue(new Error("boom"));
     const wrapper = await mountAppRoles();
     const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
-    expect([admin.user_count, admin.service_account_count]).toEqual([null, null]);
+    expect([admin.user_count, admin.service_account_count]).toEqual([3, null]);
   });
 
   it("keeps all members as users and hides the column when service accounts are off", async () => {

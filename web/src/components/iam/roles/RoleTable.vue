@@ -103,7 +103,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (hasServiceAccountCounts.value) {
     cols.push({
       id: "service_account_count",
-      header: t("iam.roleServiceAccounts"),
+      header: t("iam.serviceAccounts"),
       accessorKey: "service_account_count",
       sortable: true,
       resizable: true,
@@ -203,31 +203,31 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
 
     <!-- An empty role is muted, not coloured: a cleanup candidate, not an error. -->
     <template #cell-user_count="{ row }">
-      <button
+      <OButton
         v-if="typeof row.user_count === 'number'"
-        type="button"
-        class="tabular-nums hover:underline focus-visible:underline"
-        :class="isUnusedRole(row) ? 'text-text-muted' : 'text-text-body'"
+        variant="ghost-primary"
+        size="xs"
+        class="tabular-nums"
         :aria-label="`${row.role_name}: ${row.user_count} ${t('iam.roleUsers')}`"
         :data-test="`iam-roles-${row.role_name}-users-link`"
         @click.stop="emit('edit', row, 'users')"
       >
         {{ row.user_count }}
-      </button>
+      </OButton>
       <span v-else class="text-text-muted tabular-nums">—</span>
     </template>
     <template #cell-service_account_count="{ row }">
-      <button
+      <OButton
         v-if="typeof row.service_account_count === 'number'"
-        type="button"
-        class="tabular-nums hover:underline focus-visible:underline"
-        :class="row.service_account_count === 0 ? 'text-text-muted' : 'text-text-body'"
-        :aria-label="`${row.role_name}: ${row.service_account_count} ${t('iam.roleServiceAccounts')}`"
+        variant="ghost-primary"
+        size="xs"
+        class="tabular-nums"
+        :aria-label="`${row.role_name}: ${row.service_account_count} ${t('iam.serviceAccounts')}`"
         :data-test="`iam-roles-${row.role_name}-service-accounts-link`"
         @click.stop="emit('edit', row, 'serviceAccounts')"
       >
         {{ row.service_account_count }}
-      </button>
+      </OButton>
       <span v-else class="text-text-muted tabular-nums">—</span>
     </template>
     <template #toolbar-trailing>

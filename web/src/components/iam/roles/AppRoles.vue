@@ -341,13 +341,18 @@ const forbidden = computed(() => {
 const roleUserCounts = ref<Record<string, number> | null>(null);
 const roleServiceAccountCounts = ref<Record<string, number> | null>(null);
 
-// null when service accounts are off; a failed fetch throws so the split is never half-applied.
-const loadServiceAccountEmails = async (): Promise<Set<string> | null> => {
+// Members of a service-account list we cannot read stay counted as users, so the Users column survives a 403.
+const loadServiceAccounts = async (): Promise<any[] | null> => {
   if (!store.state.zoConfig?.service_account_enabled) return null;
-  const list = await queryClient.fetchQuery(
-    serviceAccountsQuery(store.state.selectedOrganization.identifier),
-  );
-  return new Set((list ?? []).map((account: any) => String(account?.email ?? "")));
+  try {
+    return (
+      (await queryClient.fetchQuery(
+        serviceAccountsQuery(store.state.selectedOrganization.identifier),
+      )) ?? []
+    );
+  } catch {
+    return null;
+  }
 };
 
 const loadRoleUserCounts = async (force = false) => {
@@ -355,19 +360,30 @@ const loadRoleUserCounts = async (force = false) => {
   try {
     const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
     if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: options.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
+      await Promise.all(
+        [
+          options.queryKey,
+          serviceAccountsQuery(store.state.selectedOrganization.identifier).queryKey,
+        ].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" }),
+        ),
+      );
     }
-    const res = await queryClient.fetchQuery(options);
-    const serviceAccountEmails = await loadServiceAccountEmails();
+    const [res, serviceAccounts] = await Promise.all([
+      queryClient.fetchQuery(options),
+      loadServiceAccounts(),
+    ]);
+    const accountByEmail = new Map(
+      (serviceAccounts ?? []).map((a: any) => [String(a?.email ?? ""), a]),
+    );
     const counts: Record<string, number> = {};
     const saCounts: Record<string, number> = {};
     // Response is a map of member email -> role list; service accounts share it with users.
     Object.entries(res ?? {}).forEach(([email, roles]: [string, any]) => {
-      const target = serviceAccountEmails?.has(email) ? saCounts : counts;
+      const account = accountByEmail.get(email);
+      // System accounts are hidden from the Service Accounts tab, so they stay out of both counts.
+      if (account?.is_system === true) return;
+      const target = account ? saCounts : counts;
       (Array.isArray(roles) ? roles : []).forEach((role: any) => {
         const key = String(role ?? "").trim();
         if (!key) return;
@@ -375,7 +391,7 @@ const loadRoleUserCounts = async (force = false) => {
       });
     });
     roleUserCounts.value = counts;
-    roleServiceAccountCounts.value = serviceAccountEmails ? saCounts : null;
+    roleServiceAccountCounts.value = serviceAccounts ? saCounts : null;
   } catch {
     // Silent: member counts are context. The list stays fully usable without them.
     roleUserCounts.value = null;
