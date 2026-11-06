@@ -12,6 +12,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, listUsers, createRole, getPerms, makeTracker,
@@ -87,7 +88,7 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
         await navigateToBase(page);
         pm = new PageManager(page);
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
@@ -163,7 +164,7 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
         await expect(pm.rolesPage.unsavedCount).toContainText('1', { timeout: 15000 });
 
         // A sidebar link is an in-app route change, which is what onBeforeRouteLeave guards.
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await expect(pm.rolesPage.leaveConfirm, 'leaving with staged changes did not prompt')
             .toBeVisible({ timeout: 15000 });
 
@@ -181,7 +182,7 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
 
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await expect(pm.rolesPage.leaveConfirm).toBeVisible({ timeout: 15000 });
         await pm.rolesPage.leaveConfirmCancel.click();
 
