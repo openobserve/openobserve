@@ -3567,12 +3567,14 @@
       "autoLearnedHelp": "abcf514ddd277aec",
       "autoLearning": "6acaed647241a1bf",
       "autoLevel": "aafd72683ffefb9a",
+      "autoNotApplicableHelp": "9cf52e03b0d1d354",
       "autoRetrainFailedHelp": "f65ca03fc635bad3",
       "autoRetrainingHelp": "6fbe8776ac7c311f",
       "autoTrainingHelp": "9040e5eec64367a9",
       "autoUnavailable": "ca184496974204a0",
       "autoUnconfirmedHelp": "2ef3f29df5a7d862",
       "autoUntrainedHelp": "e79d03d7bac7bf12",
+      "autoWaitingForDataHelp": "47cc7706a33f1a81",
       "bandCaption": "100aeebd42b7f4af",
       "bandGrouping": "b3c6e63fa9679a23",
       "bandGroupingGlobal": "8001c27439650c5c",
@@ -3590,10 +3592,13 @@
       "budgetPeriod": "42f97902a8bd9e5c",
       "budgetRange": "179a79c296b0534d",
       "chartsTab": "f91cf6c6263dc004",
+      "checkDataNow": "2937cffb37abce97",
+      "checkDataNowTooltip": "bd00ac6a3b1331c8",
       "checkEvery": "4415b9ab79abee43",
       "checkEveryTooltip": "1d060aeac4423111",
       "currentLevel": "5918a52c57299daa",
       "customSensitivity": "44b3ed67ced1c69b",
+      "dataReadinessReason": "f81ab834de5f8491",
       "daysUnit": "ab51004e9d71a485",
       "detectionAlreadyRunning": "2789eb3a6fa86845",
       "detectionCharts": "bff6c2f71314f27d",
@@ -8274,11 +8279,13 @@
         "active": "92340695899bd2d8",
         "disabled": "75081b593d15cf6e",
         "failed": "031a8f0f659df890",
+        "notApplicable": "5237c96ac1a23b98",
         "paused": "e159b06187d369a0",
         "ready": "5fa7aac5375c5815",
         "running": "f4ccae29e1bb0c20",
         "training": "36a798e3f39239cc",
-        "waiting": "6e293a8c009e0011"
+        "waiting": "6e293a8c009e0011",
+        "waitingForData": "f5e39f01aef1aa42"
       },
       "alertType": {
         "anomalydetection": "71b2f039a57ca6f0",
@@ -8291,9 +8298,11 @@
         "active": "92340695899bd2d8",
         "disabled": "75081b593d15cf6e",
         "failed": "031a8f0f659df890",
+        "notApplicable": "5237c96ac1a23b98",
         "ready": "5fa7aac5375c5815",
         "training": "36a798e3f39239cc",
-        "waiting": "6e293a8c009e0011"
+        "waiting": "6e293a8c009e0011",
+        "waitingForData": "f5e39f01aef1aa42"
       },
       "authType": {
         "native": "d509e493885298a2"

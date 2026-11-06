@@ -430,7 +430,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
                   <OTag type="alertStatus" :value="row.status" />
                   <OTooltip
-                    v-if="row.status === 'failed' && row.last_error"
+                    v-if="
+                      (row.status === 'failed' || isAnomalyDataReadinessStatus(row.status)) &&
+                      row.last_error
+                    "
                     :max-width="'25rem'"
                     :content="row.last_error"
                   />
@@ -1323,6 +1326,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import {
@@ -4452,6 +4456,7 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       isMutedFiring,
+      isAnomalyDataReadinessStatus,
       isAckedFiring,
       canAcknowledgeRow,
       acknowledgeRow,

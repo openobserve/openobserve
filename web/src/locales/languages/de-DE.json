@@ -12456,6 +12456,9 @@
       "noDestinationsFound": "Keine Ziele gefunden",
       "noDetectionResults": "Noch keine Erkennungsergebnisse in diesem Zeitraum",
       "noFieldsFound": "Keine Felder gefunden",
+      "checkDataNow": "Jetzt prüfen",
+      "checkDataNowTooltip": "Die aktuellen Daten jetzt erneut auswerten, statt auf die nächste automatische Prüfung zu warten.",
+      "dataReadinessReason": "Grund",
       "noticeRetrain": "Automatisches Neutraining",
       "noticeRetrainTooltip": "Das gespeicherte Modell konnte nach einem Upgrade nicht gelesen werden, daher wurde es verworfen und die Konfiguration automatisch für ein Neutraining vorgemerkt. Es ist keine Aktion erforderlich; die Erkennung wird fortgesetzt, sobald das Training abgeschlossen ist.",
       "noticeSkipAbsence": "Die Abwesenheitsbewertung ist hinter das Look-Back-Fenster zurückgefallen; der Span, der nicht mehr abgerufen werden konnte, wurde übersprungen und protokolliert.",
@@ -12490,6 +12493,8 @@
       "autoUntrainedHelp": "Auto lernt eine Stufe aus Ihrem Verlauf.",
       "autoTrainingHelp": "Die Stufe wird angezeigt, sobald das Training abgeschlossen ist.",
       "autoFailedHelp": "Training fehlgeschlagen. Noch keine gelernte Stufe. Prüfen Sie den Trainingsfehler oben.",
+      "autoWaitingForDataHelp": "Noch nicht genügend geeignete Trainingsdaten. Bis dahin kein gelernter Wert. Der Detektor bleibt aktiviert und wird automatisch erneut geprüft.",
+      "autoNotApplicableHelp": "Die aktuellen Daten können kein Anomaliemodell stützen. Dies ist kein Fehler. Der Detektor bleibt aktiviert und wird automatisch erneut geprüft.",
       "autoRetrainingHelp": "Erneutes Training. Die zuletzt gelernte Stufe wird angezeigt; die Modellverfügbarkeit ist nicht bestätigt.",
       "autoRetrainFailedHelp": "Erneutes Training fehlgeschlagen. Die zuletzt gelernte Stufe wird angezeigt; die Modellverfügbarkeit ist nicht bestätigt. Prüfen Sie den Trainingsfehler oben.",
       "autoUnconfirmedHelp": "Die zuletzt gelernte Stufe wird angezeigt; ein aktives Modell wurde nicht bestätigt.",
@@ -22569,7 +22574,9 @@
         "ready": "Bereit",
         "running": "Läuft",
         "training": "Training",
-        "waiting": "Wartet"
+        "waiting": "Wartet",
+        "waitingForData": "Warten auf Daten",
+        "notApplicable": "Nicht anwendbar"
       },
       "anomalyStatus": {
         "active": "Aktiv",
@@ -22577,7 +22584,9 @@
         "training": "Training",
         "failed": "Fehlgeschlagen",
         "waiting": "Wartend",
-        "disabled": "Deaktiviert"
+        "disabled": "Deaktiviert",
+        "waitingForData": "Warten auf Daten",
+        "notApplicable": "Nicht anwendbar"
       },
       "aiToolsetKind": {
         "skill": "Fähigkeit",

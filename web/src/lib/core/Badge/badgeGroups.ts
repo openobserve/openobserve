@@ -157,6 +157,15 @@ export const BADGE_GROUPS = {
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
       failed: { variant: "error-soft", labelKey: "components.badge.alertStatus.failed" },
       disabled: { variant: "default-soft", labelKey: "components.badge.alertStatus.disabled" },
+      // Expected data states of an anomaly config: enabled and re-evaluated, so never error colours.
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.notApplicable",
+      },
       paused: { variant: "warning-soft", labelKey: "components.badge.alertStatus.paused" },
     },
   },
@@ -1476,6 +1485,14 @@ export const BADGE_GROUPS = {
       failed: { variant: "error-soft", labelKey: "components.badge.anomalyStatus.failed" },
       waiting: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.waiting" },
       disabled: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.disabled" },
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.notApplicable",
+      },
     },
   },
 
