@@ -1240,7 +1240,7 @@ import {
   toRaw,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type { Component, Ref } from "vue";
+import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -1377,7 +1377,7 @@ export default defineComponent({
     OUserCell,
     OTag,
     OTruncatedText,
-    FitItems: FitItems as unknown as Component,
+    FitItems,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
