@@ -14591,6 +14591,7 @@
     "separator_placeholder": "Ayırıcı girin (ör. {'|'}, \\n, \\t, boşluk)",
     "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
     "templateDefaultOption": "Varsayılan ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Standart {type} şablonunu ({name}) kullanmak için varsayılan olarak bırakın veya özel bir şablon seçin.",
     "loadingData": "Hedef verileri yükleniyor...",
     "noEmailTemplates": "Henüz hiçbir E-posta Şablonu oluşturmamışsınız gibi görünüyor.",

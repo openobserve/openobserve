@@ -14591,6 +14591,7 @@
     "separator_placeholder": "Wprowadź separator (np. {'|'}, \\n, \\t, spacja)",
     "separator_hint": "Ciąg separatora używany między rekordami (spacje dozwolone)",
     "templateDefaultOption": "Domyślny ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Pozostaw domyślny, aby użyć standardowego szablonu {type} ({name}), lub wybierz niestandardowy.",
     "loadingData": "Ładowanie danych miejsca docelowego...",
     "noEmailTemplates": "Wygląda na to, że nie utworzyłeś jeszcze żadnych szablonów e-mail.",

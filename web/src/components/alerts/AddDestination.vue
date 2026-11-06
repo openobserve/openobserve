@@ -1275,10 +1275,15 @@ const templateNameFor = (type: string): string => {
 
 const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value));
 
+// The compiled unified Content template. It fits every transport, so every
+// prebuilt destination type offers it as the second system option.
+const UNIFIED_DEFAULT_TEMPLATE_NAME = "prebuilt_default";
+
 // Template choices for a prebuilt destination: the API-sourced prebuilt
-// template for this type as the first (default) option, followed by any
-// user-created templates that fit the channel (email or content for email).
-// Other prebuilt types are excluded to prevent cross-type mismatches.
+// template for this type as the first (default) option, the unified
+// `prebuilt_default` card second, followed by any user-created templates that
+// fit the channel (email or content for email). Other prebuilt types are
+// excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
   const matching = props.templates.filter((template) => {
@@ -1295,6 +1300,15 @@ const prebuiltTemplateOptions = computed(() => {
     });
     options.push({ label: raw(defaultLabel), value: defaultPrebuiltTemplateName.value });
   }
+
+  options.push({
+    label: raw(
+      t("alert_destinations.templateUnifiedDefaultOption", {
+        name: UNIFIED_DEFAULT_TEMPLATE_NAME,
+      }),
+    ),
+    value: UNIFIED_DEFAULT_TEMPLATE_NAME,
+  });
 
   matching.forEach((template) => {
     options.push({ label: raw(template.name), value: template.name });

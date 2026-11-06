@@ -1734,6 +1734,7 @@ describe("AddDestination — email destinations", () => {
     await toPrebuiltEmail(wrapper);
     expect(wrapper.vm.prebuiltTemplateOptions.map((o: any) => o.value)).toEqual([
       "prebuilt_email",
+      "prebuilt_default",
       "email_tpl",
       "content_tpl",
     ]);
