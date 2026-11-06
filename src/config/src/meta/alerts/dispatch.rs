@@ -559,6 +559,30 @@ pub fn row_group_labels(row: &Map<String, Value>, group_by: &[String]) -> BTreeM
         .collect()
 }
 
+// Re-exported so callers building episodes from a state row cannot get the
+// pairing wrong.
+impl DeliveryEpisode {
+    /// The episode a state row is currently in, if it has a classified level,
+    /// snapshotting its delivery state as the attempt anchor.
+    pub fn of(state: &AlertState) -> Option<Self> {
+        Some(Self {
+            level: state.level?,
+            // A classified row always has `level_since` (`apply_outcome` sets
+            // them together). Defaulting a missing one to 0 would mint an
+            // episode the guarded UPDATE can never match — the delivery would
+            // never be recorded and the group would re-page every cycle — so a
+            // row that cannot name its episode gets none.
+            level_since: state.level_since?,
+            notified_at_enqueue: (state.last_notified_level, state.silenced_until),
+        })
+    }
+}
+
+/// Whether a firing claimed at `started_at` must stop sending; a claim with no start never does.
+pub fn group_firing_deadline_passed(started_at: i64, now: i64) -> bool {
+    started_at > 0 && now.saturating_sub(started_at) > GROUP_FIRING_DEADLINE_SECS * 1_000_000
+}
+
 fn undelivered_note(
     keys: &[String],
     cause: &str,
@@ -587,30 +611,6 @@ fn undelivered_note(
         "{} firing group(s) not notified, {cause}: {named}{rest}",
         keys.len()
     ))
-}
-
-// Re-exported so callers building episodes from a state row cannot get the
-// pairing wrong.
-impl DeliveryEpisode {
-    /// The episode a state row is currently in, if it has a classified level,
-    /// snapshotting its delivery state as the attempt anchor.
-    pub fn of(state: &AlertState) -> Option<Self> {
-        Some(Self {
-            level: state.level?,
-            // A classified row always has `level_since` (`apply_outcome` sets
-            // them together). Defaulting a missing one to 0 would mint an
-            // episode the guarded UPDATE can never match — the delivery would
-            // never be recorded and the group would re-page every cycle — so a
-            // row that cannot name its episode gets none.
-            level_since: state.level_since?,
-            notified_at_enqueue: (state.last_notified_level, state.silenced_until),
-        })
-    }
-}
-
-/// Whether a firing claimed at `started_at` must stop sending; a claim with no start never does.
-pub fn group_firing_deadline_passed(started_at: i64, now: i64) -> bool {
-    started_at > 0 && now.saturating_sub(started_at) > GROUP_FIRING_DEADLINE_SECS * 1_000_000
 }
 
 #[cfg(test)]

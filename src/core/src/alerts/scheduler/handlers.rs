@@ -7573,24 +7573,28 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
-        use config::meta::alerts::{
-            Aggregation,
-            grouping::{GroupObservation, classify_groups_by, group_key},
-            level::AlertLevel,
-        };
+    /// A stored multi-alert grouped by host; `None` without the meta store CI configures.
+    async fn stored_host_alert(
+        name: &str,
+        destinations: &[&str],
+        pending_period_sec: i64,
+    ) -> Option<config::meta::alerts::alert::Alert> {
+        use config::meta::alerts::Aggregation;
         use svix_ksuid::KsuidLike;
 
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         if std::env::var("ZO_META_STORE").is_err() {
             eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
-            return;
+            return None;
         }
-        std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
-        infra::db_init().await.expect("meta store");
-        infra::table::migrate().await.expect("migrations");
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
 
-        let org = format!("deadline_{}", now_micros());
+        let org = format!("{name}_{}", now_micros());
         let folder = config::meta::folder::Folder {
             folder_id: "default".to_string(),
             name: "default".to_string(),
@@ -7605,9 +7609,10 @@ mod tests {
         .unwrap();
         let mut alert = config::meta::alerts::alert::Alert::default();
         alert.org_id = org.clone();
-        alert.name = "deadline".to_string();
+        alert.name = name.to_string();
         alert.id = Some(svix_ksuid::Ksuid::new(None, None));
-        alert.destinations = vec!["deadline-dest".to_string()];
+        alert.destinations = destinations.iter().map(ToString::to_string).collect();
+        alert.pending_period_sec = pending_period_sec;
         alert.query_condition.aggregation = Some(
             serde_json::from_value::<Aggregation>(serde_json::json!({
                 "group_by": ["host"],
@@ -7618,24 +7623,41 @@ mod tests {
             .unwrap(),
         );
         // Group rows are written only for a stored alert that still has multi_alert on.
-        let alert = infra::table::alerts::create(
-            infra::db::get_orm_client_rw().await,
-            &org,
-            "default",
-            alert,
-            false,
+        Some(
+            infra::table::alerts::create(
+                infra::db::get_orm_client_rw().await,
+                &org,
+                "default",
+                alert,
+                false,
+            )
+            .await
+            .unwrap(),
         )
-        .await
-        .unwrap();
-        let alert_id = alert.id.unwrap().to_string();
-        let hosts = ["a", "b"];
-        let labels = |host: &str| std::collections::BTreeMap::from([("host".into(), host.into())]);
+    }
+
+    fn host_labels(host: &str) -> std::collections::BTreeMap<String, String> {
+        std::collections::BTreeMap::from([("host".into(), host.into())])
+    }
+
+    fn critical_hosts(hosts: &[&str]) -> config::meta::alerts::grouping::GroupClassification {
+        use config::meta::alerts::grouping::{GroupObservation, classify_groups_by};
+
         let observations = hosts
             .iter()
-            .map(|host| GroupObservation::new(labels(host), 5.0))
+            .map(|host| GroupObservation::new(host_labels(host), 5.0))
             .collect();
-        let classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), 100);
-        let records: Vec<_> = hosts
+        classify_groups_by(
+            observations,
+            |_| Some(config::meta::alerts::level::AlertLevel::Critical),
+            100,
+        )
+    }
+
+    fn host_rows(
+        hosts: &[&str],
+    ) -> Vec<config::utils::json::Map<String, config::utils::json::Value>> {
+        hosts
             .iter()
             .map(|host| {
                 serde_json::json!({"host": host, "value": 5})
@@ -7643,7 +7665,132 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect();
+            .collect()
+    }
+
+    async fn dispatch_critical(
+        alert: &config::meta::alerts::alert::Alert,
+        classification: &config::meta::alerts::grouping::GroupClassification,
+        records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    ) -> GroupDispatchOutcome {
+        let now = now_micros();
+        dispatch_per_group(
+            alert,
+            "default",
+            "trace",
+            Some(classification),
+            records,
+            now,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            None,
+            now,
+            now,
+        )
+        .await
+        .expect("a classified alert with an id dispatches")
+    }
+
+    fn assert_stays_firing_with_note(outcome: &GroupDispatchOutcome) {
+        assert_eq!(outcome.history_status(), None);
+        assert_eq!(outcome.rollup_rewrite(), None);
+        let mut row = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        outcome.record_downtime(&mut row);
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(
+            outcome.record_error().as_deref(),
+            Some(
+                "1 firing group(s) not notified, missing state or payload row or a duplicate \
+                 key: host=unpaged"
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unpaged_group_beside_a_pending_one_keeps_the_record_firing() {
+        let Some(alert) = stored_host_alert("beside_pending", &["dest"], 60).await else {
+            return;
+        };
+        let classification = critical_hosts(&["held", "unpaged"]);
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["held"])).await;
+
+        assert_eq!((outcome.fired, outcome.pending), (1, 1));
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn an_unpaged_group_beside_an_acked_one_keeps_the_record_firing() {
+        let Some(alert) = stored_host_alert("beside_acked", &["dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let classification = critical_hosts(&["acked", "unpaged"]);
+        persist_alert_run_state_deferred(
+            &alert,
+            &alert_id,
+            &RunOutcome::Firing,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            Some(&classification),
+            None,
+            &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
+        )
+        .await
+        .expect("the plan commits");
+        let acked_key = config::meta::alerts::grouping::group_key(&host_labels("acked"));
+        let firing_started_at = infra::table::alert_states::get(&alert_id, &acked_key)
+            .await
+            .unwrap()
+            .and_then(|state| state.firing_started_at)
+            .expect("the plan started the group's firing");
+        infra::table::alert_acks::put_with_outbox(&config::meta::alerts::ack::AlertAck {
+            org_id: alert.org_id.clone(),
+            alert_id: alert_id.clone(),
+            group_key: acked_key,
+            firing_started_at,
+            acked_by: "oncall@example.com".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["acked"])).await;
+
+        assert_eq!(outcome.fired, 1);
+        assert_eq!(outcome.acked_by.as_deref(), Some("oncall@example.com"));
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn an_alert_with_no_delivery_target_notes_no_unpaged_group() {
+        let Some(alert) = stored_host_alert("no_target", &[], 0).await else {
+            return;
+        };
+        let classification = critical_hosts(&["with_row", "unpaged"]);
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["with_row"])).await;
+
+        assert_eq!(outcome.fired, 2);
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_eq!(outcome.history_status(), None);
+        assert_eq!(outcome.record_error(), None);
+    }
+
+    #[tokio::test]
+    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
+        use config::meta::alerts::{grouping::group_key, level::AlertLevel};
+
+        let Some(alert) = stored_host_alert("deadline", &["deadline-dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let hosts = ["a", "b"];
+        let classification = critical_hosts(&hosts);
+        let records = host_rows(&hosts);
         let now = now_micros();
         let outcome = dispatch_per_group(
             &alert,
@@ -7668,7 +7815,7 @@ mod tests {
             outcome.errors
         );
         for host in hosts {
-            let state = infra::table::alert_states::get(&alert_id, &group_key(&labels(host)))
+            let state = infra::table::alert_states::get(&alert_id, &group_key(&host_labels(host)))
                 .await
                 .unwrap()
                 .expect("the plan wrote the group row");
