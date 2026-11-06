@@ -2886,7 +2886,7 @@ describe("PanelContainer", () => {
       },
     });
 
-    it("shows a quiet indicator naming the failed source while the panel still renders", async () => {
+    it("shows a focusable indicator naming the failed source while the panel still renders", async () => {
       wrapper = createWrapper({}, rendererWithFailures(["Incidents"]));
       await flushPromises();
       const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-error"]');
@@ -2894,7 +2894,7 @@ describe("PanelContainer", () => {
       expect(indicator.attributes("aria-label")).toBe(
         "Annotation source Incidents failed to load. Panel data is unaffected.",
       );
-      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.element.tagName).toBe("BUTTON");
       expect(indicator.attributes("aria-hidden")).toBeUndefined();
       expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
     });
@@ -2917,7 +2917,7 @@ describe("PanelContainer", () => {
       },
     });
 
-    it("shows a quiet indicator naming a source showing only its latest 500 markers", async () => {
+    it("shows a focusable indicator naming a source showing only its latest 500 markers", async () => {
       wrapper = createWrapper({}, rendererWithTruncation(["Incidents"]));
       await flushPromises();
       const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]');
@@ -2925,7 +2925,7 @@ describe("PanelContainer", () => {
       expect(indicator.attributes("aria-label")).toBe(
         "Annotation source Incidents is showing only the latest 500 markers in this range.",
       );
-      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.element.tagName).toBe("BUTTON");
       expect(indicator.attributes("aria-hidden")).toBeUndefined();
       expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
     });

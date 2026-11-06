@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
-                icon-left="info-outline"
+                icon-left="manage-search"
               >
                 <OTooltip
                   side="left"
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 variant="outline"
                 size="sm"
-                icon-left="info-outline"
+                icon-left="manage-search"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
                 >{{ t("dashboard.addPanel.queryInspector") }}</OButton

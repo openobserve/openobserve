@@ -1948,6 +1948,7 @@
     "billings": "Billing",
     "rum": "RUM",
     "settings": "Settings",
+    "allSettings": "All settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
