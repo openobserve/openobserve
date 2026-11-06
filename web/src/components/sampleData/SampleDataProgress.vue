@@ -97,13 +97,11 @@ import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import {
-  useSampleDataSession,
-  type SampleStepStatus,
-} from "@/composables/sampleData/useSampleDataSession";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { SAMPLE_STEPS, type SampleCounts, type SampleStepId } from "@/utils/sampleData/loader";
 import { prefersReducedMotion } from "@/components/ingestion/setupCard/useStreamDetect";
 import SampleLivePreview from "./SampleLivePreview.vue";
+import { chipClass, stepIcon, stepIconClass } from "./sampleStepStyle";
 
 const TWEEN_MS = 600;
 const COUNT_KEYS = ["logs", "spans", "metrics"] as const;
@@ -170,22 +168,4 @@ const steps = computed(() =>
     status: session.steps[id],
   })),
 );
-
-const stepIcon = (s: SampleStepStatus): IconName => {
-  if (s === "done") return "check-circle";
-  if (s === "failed") return "error";
-  if (s === "running") return "progress-activity";
-  return "radio-button-unchecked";
-};
-const stepIconClass = (s: SampleStepStatus) => {
-  if (s === "done") return "text-status-success-text";
-  if (s === "failed") return "text-status-error-text";
-  if (s === "running") return "text-accent animate-spin";
-  return "text-text-muted";
-};
-const chipClass = (s: SampleStepStatus) => {
-  if (s === "running") return "border-accent/40 bg-accent/5 text-text-body";
-  if (s === "pending") return "border-border-default text-text-secondary";
-  return "border-border-default text-text-body";
-};
 </script>

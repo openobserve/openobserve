@@ -30752,6 +30752,35 @@
       "spans": "Spans",
       "metrics": "Metric Points"
     },
+    "removeSteps": {
+      "alerts": "Alerts",
+      "alertDelivery": "Alert template and webhook",
+      "dashboards": "Dashboards",
+      "pipeline": "Pipeline",
+      "functions": "Functions",
+      "streams": "Streams"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Removing sample data",
+        "body": "This takes a few seconds. You can close this dialog, but keep this tab open until it ends.",
+        "label": "Removing sample data…"
+      },
+      "done": {
+        "title": "Sample data removed",
+        "body": "The server finishes deleting the stored data in a few minutes. You can load sample data again after that.",
+        "label": "Removal complete",
+        "done": "Done",
+        "keptLabel": "Kept, because something else uses them:"
+      },
+      "failed": {
+        "title": "Could not remove all sample data",
+        "body": "Try again: items that are already gone are skipped.",
+        "label": "Removal stopped",
+        "close": "Close",
+        "tryAgain": "Try Again"
+      }
+    },
     "removeConfirm": {
       "title": "Delete sample data?",
       "message": "This deletes the sample streams, dashboards, alerts, functions and enrichment table. Your own data is not touched."
@@ -30760,7 +30789,7 @@
       "loaded": "Sample data loaded. Happy exploring!",
       "loadFailed": "Could not load sample data",
       "removed": "Sample data removed",
-      "removedWithKept": "Sample data removed. {count} sample function stays because a pipeline uses it. | Sample data removed. {count} sample functions stay because pipelines use them.",
+      "removedWithKept": "Sample data removed. {count} sample item stays because something else uses it. | Sample data removed. {count} sample items stay because something else uses them.",
       "removeFailed": "Could not remove all sample data",
       "removeWhileLoading": "Wait for sample data to finish loading."
     },

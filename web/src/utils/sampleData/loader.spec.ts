@@ -31,7 +31,7 @@ import {
   SAMPLE_PIPELINE,
   SAMPLE_STREAMS,
 } from "./catalog";
-import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
+import { SAMPLE_REMOVE_STEPS, loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
 
 const accepted = (rows: unknown[]) => ({
   data: { code: 200, status: [{ name: "s", successful: rows.length, failed: 0 }] },
@@ -358,6 +358,49 @@ describe("loadSampleData", () => {
 
 describe("removeSampleData", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  describe("onStep", () => {
+    const record = () => {
+      const events: [string, string][] = [];
+      return { events, onStep: (id: string, st: string) => events.push([id, st]) };
+    };
+
+    it("reports running then done for each step, in order", async () => {
+      const { events, onStep } = record();
+      await removeSampleData("acme", onStep as any);
+      expect(events).toEqual(
+        SAMPLE_REMOVE_STEPS.flatMap((id) => [
+          [id, "running"],
+          [id, "done"],
+        ]),
+      );
+    });
+
+    it("reports a failed step and still runs the later ones", async () => {
+      const down = { response: { status: 500 } };
+      vi.mocked(jsTransformService.delete).mockRejectedValueOnce(down);
+      const { events, onStep } = record();
+      await expect(removeSampleData("acme", onStep as any)).rejects.toBe(down);
+      expect(events).toContainEqual(["functions", "failed"]);
+      expect(events).not.toContainEqual(["functions", "done"]);
+      expect(events.at(-1)).toEqual(["streams", "done"]);
+    });
+
+    it("reports a kept (409) template and destination as done", async () => {
+      vi.mocked(destinationService.delete).mockRejectedValueOnce({ response: { status: 409 } });
+      vi.mocked(templateService.delete).mockRejectedValueOnce({ response: { status: 409 } });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { events, onStep } = record();
+      await removeSampleData("acme", onStep as any);
+      warn.mockRestore();
+      expect(events).toContainEqual(["alertDelivery", "done"]);
+      expect(events.some(([, st]) => st === "failed")).toBe(false);
+    });
+
+    it("works without a callback", async () => {
+      await expect(removeSampleData("acme")).resolves.toEqual([]);
+    });
+  });
 
   it("deletes the state after the streams", async () => {
     await removeSampleData("acme");

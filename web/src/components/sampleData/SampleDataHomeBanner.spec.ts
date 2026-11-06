@@ -20,7 +20,10 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import SampleDataHomeBanner from "./SampleDataHomeBanner.vue";
-import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import {
+  SampleLoadRunningError,
+  useSampleDataSession,
+} from "@/composables/sampleData/useSampleDataSession";
 import { loadSampleData, removeSampleData } from "@/utils/sampleData/loader";
 
 const ORG = "test-org";
@@ -108,13 +111,12 @@ describe("SampleDataHomeBanner", () => {
     w.unmount();
   });
 
-  it("says how many sample functions stayed because pipelines use them", async () => {
-    vi.mocked(removeSampleData).mockResolvedValue(["fn_a"]);
+  it("removes in the progress dialog after the confirmation", async () => {
     await confirmRemove();
-    expect(toastMock).toHaveBeenCalledWith({
-      variant: "success",
-      message: "Sample data removed. 1 sample function stays because a pipeline uses it.",
-    });
+    expect(removeSampleData).toHaveBeenCalledWith(ORG, expect.any(Function));
+    expect(session.removeDialogOpen.value).toBe(true);
+    expect(toastMock).not.toHaveBeenCalled();
+    session.closeRemoveDialog();
   });
 
   it("puts the focus on Cancel in the delete confirmation", () => {
@@ -133,17 +135,16 @@ describe("SampleDataHomeBanner", () => {
     expect(removeBtn().attributes("disabled")).toBeUndefined();
   });
 
-  it("says to wait for the load when Remove is confirmed while this org's load runs", async () => {
+  it("ends failed in the dialog when Remove is confirmed while this org's load runs", async () => {
     const load = deferred<{ counts: object; failedSteps: string[] }>();
     vi.mocked(loadSampleData).mockReturnValue(load.promise as never);
     const loading = session.start(ORG);
     await flushPromises();
     await confirmRemove();
     expect(removeSampleData).not.toHaveBeenCalled();
-    expect(toastMock).toHaveBeenCalledWith({
-      variant: "error",
-      message: "Wait for sample data to finish loading.",
-    });
+    expect(session.removePhase.value).toBe("failed");
+    expect(session.removeError.value).toBeInstanceOf(SampleLoadRunningError);
+    session.closeRemoveDialog();
     load.resolve({ counts: { logs: 0, spans: 0, metrics: 0 }, failedSteps: [] });
     await loading;
   });

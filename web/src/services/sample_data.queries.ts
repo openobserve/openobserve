@@ -21,6 +21,7 @@ import { sampleDataKeys } from "./sample_data.querykeys";
 import {
   loadSampleData,
   removeSampleData,
+  type SampleRemoveStepId,
   type SampleLoadResult,
   type SampleProgress,
 } from "@/utils/sampleData/loader";
@@ -45,8 +46,12 @@ export const loadSampleDataMutation = (org: string) =>
     meta: { invalidates: [orgKey(org)], silentError: true },
   });
 
+export interface RemoveSampleDataVars {
+  onStep?: (id: SampleRemoveStepId, status: "running" | "done" | "failed") => void;
+}
+
 export const removeSampleDataMutation = (org: string) =>
   mutationOptions({
-    mutationFn: () => removeSampleData(org),
+    mutationFn: (vars?: RemoveSampleDataVars) => removeSampleData(org, vars?.onStep),
     meta: { invalidates: [orgKey(org)], removes: [orgKey(org)], silentError: true },
   });

@@ -21,7 +21,6 @@ import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import { queryClient } from "@/composables/query/queryClient";
 import SampleDataHeaderChip from "./SampleDataHeaderChip.vue";
-import { SampleLoadRunningError } from "@/composables/sampleData/useSampleDataSession";
 
 const ORG = "test-org";
 
@@ -69,13 +68,13 @@ vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
   };
 });
 
-const remove = vi.fn();
+const removeInDialog = vi.fn();
 const startTourAndShow = vi.fn();
 const loadInDialog = vi.fn();
 vi.mock("@/composables/sampleData/useSampleDataSession", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/sampleData/useSampleDataSession")>()),
   useSampleDataSession: () => ({
-    remove,
+    removeInDialog,
     startTourAndShow,
     loadInDialog,
     status: { value: data.loadingHere || data.loadingElsewhere ? "loading" : "idle" },
@@ -165,8 +164,7 @@ describe("SampleDataHeaderChip", () => {
       removing: false,
       state: "loaded",
     });
-    remove.mockReset();
-    remove.mockResolvedValue(undefined);
+    removeInDialog.mockReset();
     mountChip();
   });
 
@@ -294,30 +292,18 @@ describe("SampleDataHeaderChip", () => {
     expect(wrapper.find(".confirm").exists()).toBe(false);
     await deleteItem().trigger("click");
     expect(wrapper.find(".confirm").text()).toContain("Delete sample data?");
-    expect(remove).not.toHaveBeenCalled();
+    expect(removeInDialog).not.toHaveBeenCalled();
     await wrapper.find(".cancel").trigger("click");
     expect(wrapper.find(".confirm").exists()).toBe(false);
-    expect(remove).not.toHaveBeenCalled();
+    expect(removeInDialog).not.toHaveBeenCalled();
   });
 
-  it("deletes on confirm and says so", async () => {
+  it("deletes on confirm in the progress dialog", async () => {
     await deleteItem().trigger("click");
     await wrapper.find(".ok").trigger("click");
     await flushPromises();
-    expect(remove).toHaveBeenCalledWith(ORG);
-    expect(toastMock).toHaveBeenCalledWith({ variant: "success", message: "Sample data removed" });
+    expect(removeInDialog).toHaveBeenCalledWith(ORG);
     expect(wrapper.find(".confirm").exists()).toBe(false);
-  });
-
-  it("says how many sample functions stayed because pipelines use them", async () => {
-    remove.mockResolvedValue(["fn_a", "fn_b"]);
-    await deleteItem().trigger("click");
-    await wrapper.find(".ok").trigger("click");
-    await flushPromises();
-    expect(toastMock).toHaveBeenCalledWith({
-      variant: "success",
-      message: "Sample data removed. 2 sample functions stay because pipelines use them.",
-    });
   });
 
   it("never deletes the sample data of an org selected after the confirmation opened", async () => {
@@ -327,7 +313,7 @@ describe("SampleDataHeaderChip", () => {
     expect(wrapper.find(".confirm").exists()).toBe(false);
     wrapper.findComponent(ConfirmStub).vm.$emit("update:ok");
     await flushPromises();
-    expect(remove).not.toHaveBeenCalledWith("other-org");
+    expect(removeInDialog).not.toHaveBeenCalledWith("other-org");
   });
 
   it("disables Delete while a removal runs", () => {
@@ -335,24 +321,5 @@ describe("SampleDataHeaderChip", () => {
     data.removing = true;
     mountChip();
     expect(deleteItem().attributes("disabled")).toBeDefined();
-  });
-
-  it("says to wait for the load when Delete is confirmed while it runs", async () => {
-    remove.mockRejectedValue(new SampleLoadRunningError());
-    await deleteItem().trigger("click");
-    await wrapper.find(".ok").trigger("click");
-    await flushPromises();
-    expect(toastMock).toHaveBeenCalledWith({
-      variant: "error",
-      message: "Wait for sample data to finish loading.",
-    });
-  });
-
-  it("shows the server's message when deleting fails", async () => {
-    remove.mockRejectedValue({ response: { data: { message: "stream locked" } } });
-    await deleteItem().trigger("click");
-    await wrapper.find(".ok").trigger("click");
-    await flushPromises();
-    expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: "stream locked" });
   });
 });

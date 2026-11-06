@@ -530,34 +530,60 @@ const SAMPLE_STREAM_SET: { name: string; type: string }[] = [
   ...Object.values(SAMPLE_METRICS).map((name) => ({ name, type: "metrics" })),
 ];
 
+export const SAMPLE_REMOVE_STEPS = [
+  "alerts",
+  "alertDelivery",
+  "dashboards",
+  "pipeline",
+  "functions",
+  "streams",
+] as const;
+export type SampleRemoveStepId = (typeof SAMPLE_REMOVE_STEPS)[number];
+
 /**
  * Deletes everything the loader creates; each asset is found by its sample name, so it works from any browser.
  * Resolves to the sample assets it kept because something of the user's still uses them.
  */
-export const removeSampleData = async (org: string): Promise<string[]> => {
+export const removeSampleData = async (
+  org: string,
+  onStep?: (id: SampleRemoveStepId, status: "running" | "done" | "failed") => void,
+): Promise<string[]> => {
   const kept: string[] = [];
   const failures: unknown[] = [];
-  await attempt(failures, () => removeAlerts(org, failures));
-  await removeAlertDelivery(org, kept, failures);
-  await attempt(failures, () => removeDashboards(org, failures));
-  await attempt(failures, async () => {
-    const pipelineId = await findPipelineId(org);
-    if (pipelineId) {
-      await ignoreMissing(() =>
-        pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
+  // a step failed when it added to the failures, so a kept (409) asset still counts as done
+  const step = async (id: SampleRemoveStepId, fn: () => Promise<unknown>) => {
+    const before = failures.length;
+    onStep?.(id, "running");
+    await fn();
+    onStep?.(id, failures.length > before ? "failed" : "done");
+  };
+  await step("alerts", () => attempt(failures, () => removeAlerts(org, failures)));
+  await step("alertDelivery", () => removeAlertDelivery(org, kept, failures));
+  await step("dashboards", () => attempt(failures, () => removeDashboards(org, failures)));
+  await step("pipeline", () =>
+    attempt(failures, async () => {
+      const pipelineId = await findPipelineId(org);
+      if (pipelineId) {
+        await ignoreMissing(() =>
+          pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
+        );
+      }
+    }),
+  );
+  await step("functions", async () => {
+    for (const name of SAMPLE_FUNCTIONS) {
+      await attempt(failures, () =>
+        deleteUnlessInUse(name, kept, () => jsTransformService.delete(org, name)),
       );
     }
   });
-  for (const name of SAMPLE_FUNCTIONS) {
-    await attempt(failures, () =>
-      deleteUnlessInUse(name, kept, () => jsTransformService.delete(org, name)),
-    );
-  }
   // the sample alerts and pipeline are gone by name; the cascade would also take the user's own
-  await Promise.all(
-    SAMPLE_STREAM_SET.map((s) =>
-      attempt(failures, () =>
-        ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
+  await step("streams", () =>
+    Promise.all(
+      SAMPLE_STREAM_SET.map((s) =>
+        attempt(failures, () =>
+          ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
+        ),
       ),
     ),
   );

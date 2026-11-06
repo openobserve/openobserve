@@ -108,13 +108,9 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
-import {
-  SampleLoadRunningError,
-  useSampleDataSession,
-} from "@/composables/sampleData/useSampleDataSession";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -161,24 +157,8 @@ const startTour = () => session.startTourAndShow(org.value, () => org.value, rou
 // the assets of an earlier run are reused, so this also finishes a stopped load
 const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_allowed_upto);
 
-const removeAll = async () => {
+const removeAll = () => {
   confirmRemove.value = false;
-  try {
-    const kept = await session.remove(removeOrg);
-    toast({
-      variant: "success",
-      message: kept?.length
-        ? t("sampleData.toast.removedWithKept", kept.length)
-        : t("sampleData.toast.removed"),
-    });
-  } catch (e: any) {
-    toast({
-      variant: "error",
-      message:
-        e instanceof SampleLoadRunningError
-          ? t("sampleData.toast.removeWhileLoading")
-          : raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
-    });
-  }
+  void session.removeInDialog(removeOrg);
 };
 </script>

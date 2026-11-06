@@ -64,12 +64,8 @@ import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  SampleLoadRunningError,
-  useSampleDataSession,
-} from "@/composables/sampleData/useSampleDataSession";
+import { useI18nTyped } from "@/types/i18n";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 
 // the banner and its confirm dialog are siblings, so the parent's class goes to the banner
@@ -90,24 +86,8 @@ const mode = computed<"cleanup" | null>(() => {
   return session.cleanupDismissed(org.value) ? null : "cleanup";
 });
 
-const removeAll = async () => {
+const removeAll = () => {
   confirmRemove.value = false;
-  try {
-    const kept = await session.remove(org.value);
-    toast({
-      variant: "success",
-      message: kept?.length
-        ? t("sampleData.toast.removedWithKept", kept.length)
-        : t("sampleData.toast.removed"),
-    });
-  } catch (e: any) {
-    toast({
-      variant: "error",
-      message:
-        e instanceof SampleLoadRunningError
-          ? t("sampleData.toast.removeWhileLoading")
-          : raw(e?.response?.data?.message) || t("sampleData.toast.removeFailed"),
-    });
-  }
+  void session.removeInDialog(org.value);
 };
 </script>

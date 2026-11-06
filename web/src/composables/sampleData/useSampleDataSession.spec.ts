@@ -31,7 +31,7 @@ vi.mock("@/services/sample_data.queries", async (importOriginal) => {
     }),
     removeSampleDataMutation: (org: string) => ({
       ...real.removeSampleDataMutation(org),
-      mutationFn: () => mocks.remove(org),
+      mutationFn: (vars: unknown) => mocks.remove(org, vars),
     }),
   };
 });
@@ -85,7 +85,7 @@ describe("useSampleDataSession remove", () => {
     await flushPromises();
     await session.remove("org-b");
 
-    expect(mocks.remove).toHaveBeenCalledWith("org-b");
+    expect(mocks.remove).toHaveBeenCalledWith("org-b", expect.anything());
     expect(session.status.value).toBe("loading");
     expect(session.loadingOrg.value).toBe("org-a");
     expect(session.counts.logs).toBe(10);
@@ -146,6 +146,62 @@ describe("useSampleDataSession remove", () => {
 
     expect(session.status.value).toBe("idle");
     expect(session.counts.logs).toBe(0);
+  });
+
+  it("removeInDialog opens the dialog and ends done with the kept names", async () => {
+    mocks.remove.mockResolvedValue(["fn_a"]);
+    await session.removeInDialog("org-a");
+    expect(session.removeDialogOpen.value).toBe(true);
+    expect(session.removePhase.value).toBe("done");
+    expect(session.removeKept.value).toEqual(["fn_a"]);
+    expect(session.removeOrg.value).toBe("org-a");
+  });
+
+  it("removeInDialog ends failed without throwing", async () => {
+    const boom = new Error("boom");
+    mocks.remove.mockRejectedValue(boom);
+    await expect(session.removeInDialog("org-a")).resolves.toBeUndefined();
+    expect(session.removePhase.value).toBe("failed");
+    expect(session.removeError.value).toBe(boom);
+  });
+
+  it("removeInDialog does not run a second removal while one runs", async () => {
+    let settle!: () => void;
+    mocks.remove.mockReturnValue(new Promise<void>((r) => (settle = r)));
+    const first = session.removeInDialog("org-a");
+    await flushPromises();
+    await session.removeInDialog("org-a");
+    expect(mocks.remove).toHaveBeenCalledTimes(1);
+    settle();
+    await first;
+  });
+
+  it("closeRemoveDialog closes and resets once the removal is done", async () => {
+    await session.removeInDialog("org-a");
+    session.closeRemoveDialog();
+    expect(session.removeDialogOpen.value).toBe(false);
+    expect(session.removePhase.value).toBe("idle");
+    expect(session.removeKept.value).toEqual([]);
+  });
+
+  it("removeFraction counts done and failed steps", async () => {
+    mocks.remove.mockImplementation(async (_org, vars) => {
+      vars.onStep("alerts", "running");
+      vars.onStep("alerts", "done");
+      vars.onStep("alertDelivery", "failed");
+      vars.onStep("dashboards", "running");
+      expect(session.removeFraction.value).toBe(2 / 6);
+      return [];
+    });
+    await session.removeInDialog("org-a");
+    expect(session.removeSteps.value.map((s) => s.status)).toEqual([
+      "done",
+      "failed",
+      "running",
+      "pending",
+      "pending",
+      "pending",
+    ]);
   });
 });
 

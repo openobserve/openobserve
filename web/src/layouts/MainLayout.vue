@@ -257,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <SampleDataWelcome />
+    <SampleDataRemoveDialog />
     <SampleDataTour />
     <SampleDataProgressDock />
     <EditorDraftSignOutDialog
@@ -339,6 +340,7 @@ import type { FirstSourceId } from "@/components/login/firstSourceOptions";
 import { flowsKnown, onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
+import SampleDataRemoveDialog from "@/components/sampleData/SampleDataRemoveDialog.vue";
 import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
 import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDock.vue";
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
@@ -409,6 +411,7 @@ export default defineComponent({
     ShortcutCheatsheet,
     CommunitySlackInvite,
     SampleDataWelcome,
+    SampleDataRemoveDialog,
     SampleDataTour,
     SampleDataProgressDock,
     ODrawer,

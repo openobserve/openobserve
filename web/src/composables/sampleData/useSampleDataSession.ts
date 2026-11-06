@@ -20,16 +20,19 @@ import { orgKey } from "@/composables/query/keys";
 import { queryClient } from "@/composables/query/queryClient";
 import { loadSampleDataMutation, removeSampleDataMutation } from "@/services/sample_data.queries";
 import {
+  SAMPLE_REMOVE_STEPS,
   SAMPLE_STEPS,
   type SampleCounts,
   type SampleLogLine,
   type SampleProgress,
+  type SampleRemoveStepId,
   type SampleStepId,
 } from "@/utils/sampleData/loader";
 import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 
 export type SampleStepStatus = "pending" | "running" | "done" | "failed";
 export type SampleLoadStatus = "idle" | "loading" | "loaded" | "failed";
+export type SampleRemovePhase = "idle" | "removing" | "done" | "failed";
 
 interface TourState {
   org: string;
@@ -70,6 +73,20 @@ const tour = ref<TourState | null>(readTour());
 const removals = ref({ org: "", count: 0 });
 // the header and the Home banner can both delete, so both stay disabled while one removal runs
 const removing = ref(false);
+const freshRemoveSteps = () =>
+  SAMPLE_REMOVE_STEPS.map((id) => ({ id, status: "pending" as SampleStepStatus }));
+const removeSteps = ref<{ id: SampleRemoveStepId; status: SampleStepStatus }[]>(freshRemoveSteps());
+const removeFraction = computed(
+  () =>
+    removeSteps.value.filter((s) => s.status === "done" || s.status === "failed").length /
+    removeSteps.value.length,
+);
+const removePhase = ref<SampleRemovePhase>("idle");
+const removeKept = ref<string[]>([]);
+const removeError = ref<unknown>(null);
+const removeDialogOpen = ref(false);
+// Try Again in the dialog needs the org the failed removal ran for
+const removeOrg = ref("");
 const flagCache = ref<Record<string, boolean>>({});
 
 const readStorage = (key: string) => {
@@ -172,9 +189,15 @@ const remove = async (org: string): Promise<string[]> => {
     throw new SampleLoadRunningError("Sample data is still loading");
   }
   removing.value = true;
+  removeSteps.value = freshRemoveSteps();
   try {
     const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
-    const keptFunctions = await observer.mutate();
+    const keptFunctions = await observer.mutate({
+      onStep: (id, stepStatus) => {
+        const row = removeSteps.value.find((s) => s.id === id);
+        if (row) row.status = stepStatus;
+      },
+    });
     removals.value = { org, count: removals.value.count + 1 };
     // the progress belongs to the last load's org; a load running elsewhere keeps it
     if (loadingOrg.value === org) {
@@ -186,6 +209,33 @@ const remove = async (org: string): Promise<string[]> => {
     return keptFunctions;
   } finally {
     removing.value = false;
+  }
+};
+
+/** Removes with its progress on screen; never throws, the outcome is in removePhase. */
+const removeInDialog = async (org: string) => {
+  if (removePhase.value === "removing" || removing.value) return;
+  removeDialogOpen.value = true;
+  removeOrg.value = org;
+  removePhase.value = "removing";
+  removeKept.value = [];
+  removeError.value = null;
+  try {
+    removeKept.value = await remove(org);
+    removePhase.value = "done";
+  } catch (e) {
+    removeError.value = e;
+    removePhase.value = "failed";
+  }
+};
+
+const closeRemoveDialog = () => {
+  removeDialogOpen.value = false;
+  if (removePhase.value === "done" || removePhase.value === "failed") {
+    removePhase.value = "idle";
+    removeSteps.value = freshRemoveSteps();
+    removeKept.value = [];
+    removeError.value = null;
   }
 };
 
@@ -270,6 +320,15 @@ export const useSampleDataSession = () => ({
   removing,
   start,
   remove,
+  removeSteps,
+  removeFraction,
+  removePhase,
+  removeKept,
+  removeError,
+  removeDialogOpen,
+  removeOrg,
+  removeInDialog,
+  closeRemoveDialog,
   startTour,
   startTourAndShow,
   stopTour,
