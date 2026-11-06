@@ -28,14 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1 flex-col" data-test="alerts-firing-page">
       <OBanner
-        v-if="refreshFailed"
+        v-if="refreshFailed || statusUnavailable"
         variant="warning"
         inline-actions
         dense
         role="alert"
-        :content="
-          t('alerts.firing.refreshFailed', { reason: refreshFailedReason, time: updatedTime })
-        "
+        :content="bannerContent"
         data-test="alerts-firing-stale-banner"
       >
         <template #actions>
@@ -64,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :error="loadError"
         :forbidden="forbidden"
         forbidden-resource="alert_folders"
-        :selection="state === 'recovered' ? 'none' : 'multiple'"
+        selection="multiple"
         v-model:selected-ids="selectedIds"
         pagination="client"
         sorting="client"
@@ -214,23 +212,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <template v-if="truncated" #footer-note>
-          <span data-test="alerts-firing-truncated">
-            {{ t("alerts.firing.truncated", { count: rows.length, total }) }}
-          </span>
-        </template>
-
         <template #empty>
-          <div v-if="!loading" class="contents" data-test="alerts-firing-empty">
+          <div
+            v-if="!loading && !statusUnavailable"
+            class="contents"
+            data-test="alerts-firing-empty"
+          >
             <OEmptyState
               size="hero"
               icon="notifications-active"
               :title="filtered ? undefined : emptyTitle"
-              :description="filtered ? undefined : emptyDescription"
               :filtered="filtered"
-              :action-label="state === 'firing' ? t('alerts.firing.viewRecovered') : undefined"
-              :hide-action="state !== 'firing' && !filtered"
-              @action="onEmptyAction"
+              :hide-action="!filtered"
+              @action="clearFilters"
             />
           </div>
         </template>
@@ -244,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <FiringAlertDrawer
       :alert-id="selectedAlertId"
       :row="selectedRow"
+      :refreshed-at="updatedAt"
       @close="closeAlert"
       @changed="refresh"
     />
@@ -281,7 +276,7 @@ import AlertSectionTabs from "./AlertSectionTabs.vue";
 import AckChip from "./AckChip.vue";
 import FiringAlertDrawer from "./FiringAlertDrawer.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
-import { useFiringAlerts, FIRING_POLL_MS } from "@/composables/alerts/useFiringAlerts";
+import { useFiringAlerts, FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -290,7 +285,6 @@ import { ackAlertsMutation } from "@/services/alerts.queries";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { formatInZone } from "@/utils/oncall";
-import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import {
   ackBody,
   canAcknowledge,
@@ -306,11 +300,6 @@ const CHIPS: { value: FiringState; labelKey: I18nKey; emptyKey: I18nKey }[] = [
   { value: "acked", labelKey: "alerts.firing.chipAcked", emptyKey: "alerts.firing.emptyAcked" },
   { value: "muted", labelKey: "alerts.firing.chipMuted", emptyKey: "alerts.firing.emptyMuted" },
   { value: "failed", labelKey: "alerts.firing.chipFailed", emptyKey: "alerts.firing.emptyFailed" },
-  {
-    value: "recovered",
-    labelKey: "alerts.firing.chipRecovered",
-    emptyKey: "alerts.firing.emptyRecovered",
-  },
 ];
 
 const { t } = useI18nTyped();
@@ -332,9 +321,7 @@ const selectedAlertId = computed(() =>
 const {
   rows,
   counts,
-  lastRecovered,
-  truncated,
-  total,
+  statusUnavailable,
   loading,
   fetching,
   updatedAt,
@@ -345,11 +332,11 @@ const {
   refresh,
 } = useFiringAlerts(state, selectedAlertId);
 
-// A failed poll leaves updatedAt alone, so Firing for needs its own clock.
+// Rows only change on a refresh, so Firing for needs its own clock to keep moving.
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  clock = setInterval(() => (now.value = Date.now()), FIRING_POLL_MS);
+  clock = setInterval(() => (now.value = Date.now()), FIRING_CLOCK_MS);
 });
 onBeforeUnmount(() => clearInterval(clock));
 
@@ -462,6 +449,14 @@ const refreshFailedReason = computed(() =>
     : raw(error.value?.response?.data?.message ?? error.value?.message) ||
       t("alerts.firing.refreshFailedReason"),
 );
+const bannerContent = computed(() =>
+  refreshFailed.value
+    ? t("alerts.firing.refreshFailed", {
+        reason: refreshFailedReason.value,
+        time: updatedTime.value,
+      })
+    : t("alerts.firing.statusUnavailable"),
+);
 const loadError = computed(() =>
   error.value && !refreshFailed.value && !forbidden.value
     ? (error.value?.response?.data?.message ?? error.value?.message ?? "")
@@ -472,14 +467,6 @@ const emptyTitle = computed(() => {
   const chip = CHIPS.find((candidate) => candidate.value === state.value);
   return chip ? t(chip.emptyKey) : undefined;
 });
-const emptyDescription = computed(() =>
-  state.value === "firing" && lastRecovered.value
-    ? t("alerts.firing.lastRecovered", {
-        age: raw(formatTimeAgoUs(lastRecovered.value.at)),
-        name: raw(lastRecovered.value.name),
-      })
-    : undefined,
-);
 
 const clearFilters = () => {
   search.value = "";
@@ -491,13 +478,8 @@ const selectState = (value: unknown) => {
   if (value) state.value = value as FiringState;
 };
 
-const onEmptyAction = (id?: string) => {
-  if (id === "clear-filters") clearFilters();
-  else state.value = "recovered";
-};
-
 watch(state, () => (selectedIds.value = []));
-// A row a poll or a filter took away must not stay in the batch.
+// A row a refresh or a filter took away must not stay in the batch.
 watch(visibleRows, (next) => {
   const ids = new Set(next.map((row) => row.alert_id));
   if (selectedIds.value.some((id) => !ids.has(id))) {

@@ -23,6 +23,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { FiringRow } from "@/utils/alerts/firingAlerts";
+import { FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
 import FiringAlertDrawer from "./FiringAlertDrawer.vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -225,6 +226,23 @@ describe("FiringAlertDrawer", () => {
     expect(held.find('[data-test="alerts-firing-drawer-incident"]').text()).toContain(
       "Taking over here takes over the whole incident.",
     );
+  });
+
+  it("re-reads history on a list refresh, not on the label clock", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    try {
+      const wrapper = await mountDrawer(baseRow);
+      expect(getHistory).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(FIRING_CLOCK_MS * 3);
+      await flushPromises();
+      expect(getHistory).toHaveBeenCalledTimes(1);
+      await wrapper.setProps({ refreshedAt: 1 });
+      await flushPromises();
+      expect(getHistory).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("has no incident note outside an incident", async () => {

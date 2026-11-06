@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -234,7 +234,7 @@ import AlertGroupChart from "./AlertGroupChart.vue";
 import FiringAlertHistory from "./FiringAlertHistory.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import { useAlertActions } from "@/composables/alerts/useAlertActions";
-import { FIRING_POLL_MS } from "@/composables/alerts/useFiringAlerts";
+import { FIRING_CLOCK_MS } from "@/composables/alerts/useFiringAlerts";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { useOrgId } from "@/composables/query";
@@ -273,6 +273,8 @@ const props = defineProps<{
   alertId: string | null;
   /** That alert's row from any live view, or null when none has listed it. */
   row: FiringRow | null;
+  /** When the list last came back, so a refresh re-reads the history too. */
+  refreshedAt?: number;
 }>();
 
 const emit = defineEmits<{
@@ -294,7 +296,7 @@ const nowMs = ref(Date.now());
 const nowUs = computed(() => nowMs.value * 1000);
 let clock: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  clock = setInterval(() => (nowMs.value = Date.now()), FIRING_POLL_MS);
+  clock = setInterval(() => (nowMs.value = Date.now()), FIRING_CLOCK_MS);
 });
 onBeforeUnmount(() => clearInterval(clock));
 
@@ -316,13 +318,19 @@ const acksRead = useQuery(() =>
   }),
 );
 
+// The label clock must not reach the query key, or every tick would be a fresh read.
+const historyEndUs = ref(nowUs.value);
+watch([() => props.alertId, () => props.refreshedAt], () => {
+  historyEndUs.value = Date.now() * 1000;
+});
+
 const historyQuery = computed(() => {
-  const started = props.row?.firing_started_at ?? nowUs.value;
+  const started = props.row?.firing_started_at ?? historyEndUs.value;
   const id = props.alertId ?? "";
   return {
     ...(isAnomaly.value ? { anomaly_id: id } : { alert_id: id }),
-    start_time: Math.min(nowUs.value - FLAP_WINDOW_US, started),
-    end_time: nowUs.value,
+    start_time: Math.min(historyEndUs.value - FLAP_WINDOW_US, started),
+    end_time: historyEndUs.value,
     from: 0,
     size: HISTORY_SIZE,
   };
@@ -330,7 +338,7 @@ const historyQuery = computed(() => {
 const historyRead = useQuery(() =>
   Object.assign(alertHistoryQuery(orgId.value, historyQuery.value), {
     enabled: !!props.alertId,
-    // Each clock tick mints a new key and so a new read; another alert's runs must never show here.
+    // Each refresh mints a new key and so a new read; another alert's runs must never show here.
     placeholderData: (previous: any, query: any) => {
       const read = query?.queryKey.at(-1);
       return (read?.alert_id ?? read?.anomaly_id) === props.alertId ? previous : undefined;

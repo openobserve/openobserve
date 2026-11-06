@@ -30,13 +30,11 @@ import type {
   MuteAlertRequest,
   UnackAlertRequest,
 } from "@/ts/interfaces/alert";
-import type { FiringPage, FiringState } from "@/utils/alerts/firingAlerts";
+import type { FiringPage } from "@/utils/alerts/firingAlerts";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 type AlertSqlSource = { stream_name: string; stream_type: string; query_condition: unknown };
 
-const RECOVERED_WINDOW_MS = 86_400_000;
-const STATE_PAGE_SIZE = 1000;
 const BULK_ACK_CONCURRENCY = 10;
 
 export const alertsListQuery = (
@@ -91,26 +89,12 @@ export const alertDependenciesQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-const readFiringPage = async (
-  org: string,
-  state: FiringState,
-  pageSize: number,
-): Promise<FiringPage> =>
-  (await alerts.listByState(org, state, (Date.now() - RECOVERED_WINDOW_MS) * 1000, pageSize)).data;
-
-/** One read of a live view: filters, groups and paging run on these rows in the page. */
-export const firingAlertsQuery = (org: string, state: FiringState) =>
+/** One read of every folder: the views, counts and sort all run on these rows in the page. */
+export const firingAlertsQuery = (org: string) =>
   queryOptions({
-    queryKey: alertKeys.state(org, state),
-    queryFn: () => readFiringPage(org, state, STATE_PAGE_SIZE),
-    staleTime: LIVE_STALE_TIME,
-  });
-
-/** The view's counts alone: the server totals before it pages, so an empty page still counts. */
-export const firingCountsQuery = (org: string) =>
-  queryOptions({
-    queryKey: alertKeys.state(org, "counts"),
-    queryFn: () => readFiringPage(org, "firing", 0),
+    queryKey: alertKeys.firing(org),
+    queryFn: async (): Promise<FiringPage> =>
+      (await alerts.listByFolderId(1, 0, "name", false, "", org)).data,
     staleTime: LIVE_STALE_TIME,
   });
 

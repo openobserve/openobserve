@@ -24,7 +24,7 @@ import store from "@/test/unit/helpers/store";
 import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import { queryClient } from "@/composables/query/queryClient";
 import alerts from "@/services/alerts";
-import { firingAlertsQuery, firingCountsQuery } from "@/services/alerts.queries";
+import { firingAlertsQuery } from "@/services/alerts.queries";
 
 // A router with just the sibling routes: the app router pulls in every view and
 // runs the real auth guard, neither of which this component depends on.
@@ -64,37 +64,40 @@ describe("AlertSectionTabs", () => {
 
   it("badges Firing with the unacked firing count, Muted excluded", async () => {
     const org = store.state.selectedOrganization.identifier;
-    queryClient.setQueryData(firingCountsQuery(org).queryKey, {
+    const firing = { name: "a", last_outcome: "firing" };
+    queryClient.setQueryData(firingAlertsQuery(org).queryKey, {
+      list: [
+        { ...firing, alert_id: "1" },
+        { ...firing, alert_id: "2" },
+        { ...firing, alert_id: "3", active_downtime: { id: "d" } },
+        { alert_id: "4", name: "b", last_outcome: "normal" },
+      ],
+    } as any);
+    const wrapper = mountTabs();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("2");
+  });
+
+  it("hides the badge when the run state is unavailable, rather than showing 0", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(firingAlertsQuery(org).queryKey, {
       list: [],
-      counts: { firing: 7, acked: 1, muted: 3, failed: 1, recovered: 0 },
-      total: 0,
+      status_unavailable: true,
     });
     const wrapper = mountTabs();
     await flushPromises();
-    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("7");
+    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').exists()).toBe(false);
   });
 
-  it("asks for counts alone away from the Firing page", async () => {
-    const read = vi.spyOn(alerts, "listByState").mockResolvedValue({
-      data: { list: [], counts: { firing: 2 }, total: 2 },
-    } as any);
+  it("shares one list read with the Firing page", async () => {
+    const read = vi
+      .spyOn(alerts, "listByFolderId")
+      .mockResolvedValue({ data: { list: [] } } as any);
+    mountTabs();
     mountTabs();
     await flushPromises();
     expect(read).toHaveBeenCalledTimes(1);
-    expect(read.mock.calls[0][3]).toBe(0);
-  });
-
-  it("reads the Firing page's own entry on that page", async () => {
-    const org = store.state.selectedOrganization.identifier;
-    queryClient.setQueryData(firingAlertsQuery(org, "firing").queryKey, {
-      list: [],
-      counts: { firing: 9, acked: 0, muted: 0, failed: 0, recovered: 0 },
-      total: 0,
-    });
-    await router.push({ name: "alertFiring" });
-    const wrapper = mountTabs();
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("9");
+    expect(read.mock.calls[0][6]).toBeUndefined();
   });
 
   it("keeps a hidden section's saved place when another tab is dragged", async () => {

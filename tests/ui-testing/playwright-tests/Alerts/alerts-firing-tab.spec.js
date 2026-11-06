@@ -182,17 +182,12 @@ test.describe('Alerts Firing tab', { tag: ['@alerts', '@alerts-firing', '@P1'] }
     await page.evaluate(() => localStorage.removeItem('o2_alert_section_tab_order'));
   });
 
-  test('it keeps polling, and a failed refresh keeps the rows behind a Retry banner', async ({ page }) => {
+  test('a failed refresh keeps the rows behind a Retry banner', async ({ page }) => {
     const { p1 } = fixtures.alerts;
-    const reads = [];
-    page.on('request', (r) => {
-      if (firing.listRequests('firing')(new URL(r.url()))) reads.push(Date.now());
-    });
     await firing.open();
     await expect(firing.rowName(p1.id)).toBeVisible({ timeout: 30000 });
-    await expect.poll(() => reads.length, { timeout: 70_000 }).toBeGreaterThanOrEqual(2);
 
-    const pattern = (url) => firing.listRequests('firing')(url);
+    const pattern = (url) => firing.isListRequest(url);
     await page.route(pattern, (route) => route.abort());
     await firing.refresh.click();
     await expect(firing.banner).toBeVisible({ timeout: 15000 });

@@ -31,7 +31,6 @@ import type {
   UnackAlertRequest,
   UnackAlertResponse,
 } from "@/ts/interfaces/alert";
-import type { FiringPage } from "@/utils/alerts/firingAlerts";
 
 const alertPath = (org: string, alertId: string) =>
   `/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`;
@@ -92,10 +91,6 @@ const alerts = {
     }
     return http().get(url);
   },
-  listByState: (org_identifier: string, state: string, since: number, page_size: number) =>
-    http().get<FiringPage>(`/api/v2/${org_identifier}/alerts`, {
-      params: { state, since, page_size, page_idx: 0 },
-    }),
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)

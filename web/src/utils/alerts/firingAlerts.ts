@@ -16,8 +16,8 @@
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { AckAlertRequest, AlertListAck } from "@/ts/interfaces/alert";
 
-export type FiringState = "firing" | "acked" | "muted" | "failed" | "recovered";
-export type FiringStateTag = "firing" | "notify_failed" | "acknowledged" | "muted" | "normal";
+export type FiringState = "firing" | "acked" | "muted" | "failed";
+export type FiringStateTag = "firing" | "notify_failed" | "acknowledged" | "muted";
 
 export type FiringCounts = Record<FiringState, number>;
 
@@ -43,9 +43,8 @@ export interface FiringRow {
 
 export interface FiringPage {
   list: FiringRow[];
-  counts: FiringCounts;
-  total: number;
-  last_recovered?: { name: string; at: number };
+  /** The run state could not be read, so every row's live fields are blank. */
+  status_unavailable?: boolean;
 }
 
 export interface FiringFilters {
@@ -83,12 +82,66 @@ export const isFiringNow = (row: FiringRow): boolean =>
   row.firing_started_at != null ||
   (row.last_outcome === "error" && (row.groups_firing ?? 0) > 0);
 
+const isNotDelivered = (row: FiringRow): boolean => row.last_outcome === "notify_failed";
+
+// Partly acked stays actionable: a page keeps paging while any group is unacked.
+const isFullyAcked = (row: FiringRow): boolean => {
+  const acked = row.ack?.groups_acked ?? 0;
+  if (acked <= 0) return false;
+  if (row.groups_firing == null) return true;
+  return row.groups_firing_is_lower_bound !== true && acked >= row.groups_firing;
+};
+
+/** Which views a row belongs to; they overlap, so a row can be in several. */
+export const isInState = (row: FiringRow, state: FiringState): boolean => {
+  const muted = row.active_downtime != null;
+  switch (state) {
+    case "firing":
+      return isFiringNow(row) && !isFullyAcked(row) && !muted;
+    case "acked":
+      return isFiringNow(row) && isFullyAcked(row);
+    case "muted":
+      return isFiringNow(row) && muted;
+    case "failed":
+      return isNotDelivered(row);
+  }
+};
+
+export const countStates = (rows: FiringRow[]): FiringCounts => {
+  const count = (state: FiringState) => rows.filter((row) => isInState(row, state)).length;
+  return {
+    firing: count("firing"),
+    acked: count("acked"),
+    muted: count("muted"),
+    failed: count("failed"),
+  };
+};
+
+const compare = <T extends number | string>(a: T, b: T): number => (a < b ? -1 : a > b ? 1 : 0);
+
+const compareOptional = (a: number | null | undefined, b: number | null | undefined): number => {
+  if (a == null || b == null) return Number(a == null) - Number(b == null);
+  return compare(a, b);
+};
+
+/** Not delivered, then P1..P5 with unset last, then the earliest firing with unknown last. */
+export const compareTriage = (a: FiringRow, b: FiringRow): number =>
+  Number(isNotDelivered(b)) - Number(isNotDelivered(a)) ||
+  compareOptional(a.priority, b.priority) ||
+  compareOptional(a.firing_started_at, b.firing_started_at) ||
+  compare(a.name, b.name) ||
+  compare(a.folder_name, b.folder_name) ||
+  compare(a.alert_id, b.alert_id);
+
+/** One view's rows in triage order. */
+export const rowsInState = (rows: FiringRow[], state: FiringState): FiringRow[] =>
+  rows.filter((row) => isInState(row, state)).sort(compareTriage);
+
 // Views overlap, so the chip decides the word: an acked failed delivery is listed under both.
 export const stateTag = (row: FiringRow, state: FiringState): FiringStateTag => {
-  if (state === "recovered") return "normal";
   if (state === "muted") return "muted";
   if (state === "acked") return "acknowledged";
-  return row.last_outcome === "notify_failed" ? "notify_failed" : "firing";
+  return isNotDelivered(row) ? "notify_failed" : "firing";
 };
 
 const isMultiAlert = (row: FiringRow): boolean =>

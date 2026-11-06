@@ -11522,17 +11522,16 @@
       "chipAcked": "Acknowledged",
       "chipMuted": "Muted",
       "chipFailed": "Not delivered",
-      "chipRecovered": "Recovered",
       "searchPlaceholder": "Search alerts",
       "priorityAll": "Priority",
       "priorityLabel": "Priority",
       "priorityUnset": "No priority",
       "folderAll": "Folder: all",
       "folderLabel": "Folder",
-      "updated": "Updated {time}",
       "stale": "stale",
       "refreshFailed": "Couldn't refresh firing alerts ({reason}). Showing data from {time}.",
       "refreshFailedReason": "request failed",
+      "statusUnavailable": "Alert status is unavailable right now, so firing alerts can't be shown.",
       "retry": "Retry",
       "columnPriority": "Priority",
       "columnState": "State",
@@ -11542,14 +11541,10 @@
       "acknowledgeCount": "Acknowledge {count}",
       "mute": "Mute",
       "clear": "Clear",
-      "truncated": "Showing the first {count} of {total} alerts.",
       "emptyFiring": "Nothing firing",
       "emptyAcked": "Nothing acknowledged",
       "emptyMuted": "Nothing muted",
-      "emptyFailed": "Nothing undelivered",
-      "emptyRecovered": "Nothing recovered in the last 24h",
-      "lastRecovered": "Last alert recovered {age} ({name}).",
-      "viewRecovered": "View recovered · 24h"
+      "emptyFailed": "Nothing undelivered"
     },
     "moreActions": "More actions",
     "promRuleMode": "Rule mode",
@@ -23347,8 +23342,6 @@
     },
     "alerts": {
       "firing": {
-        "oneRecovered": "{name} recovered",
-        "manyRecovered": "{count} alert recovered | {count} alerts recovered",
         "bulkResult": "{acked} acknowledged, {skipped} skipped",
         "bulkAllAcked": "{acked} acknowledged"
       },

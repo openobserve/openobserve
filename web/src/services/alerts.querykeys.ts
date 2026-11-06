@@ -35,8 +35,8 @@ export const alertKeys = {
           type: alertType || "all",
         })
       : orgKey(org, "alerts", "list", folderId, alertType || "all"),
-  /** One live view across every folder the caller may see. */
-  state: (org: string, state: string) => orgKey(org, "alerts", "state", state),
+  /** Every folder's alerts with live state: the Firing tab, its badge and its drawer share it. */
+  firing: (org: string) => orgKey(org, "alerts", "firing"),
   detail: (org: string, id: string) => orgKey(org, "alerts", "detail", id),
   acks: (org: string, id: string) => orgKey(org, "alerts", "acks", id),
   /** Every folder's alerts with their destination/template refs — the dep graph. */

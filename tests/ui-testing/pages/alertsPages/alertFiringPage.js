@@ -68,7 +68,8 @@ export class AlertFiringPage {
     await this.tab(from).locator('[data-otab-grip]').dragTo(this.tab(to), { targetPosition: { x: 4, y: 10 } });
   }
 
-  listRequests(state) {
-    return (url) => url.pathname.endsWith('/alerts') && url.searchParams.get('state') === state;
+  // The no-folder list read that feeds the tab, its badge and the drawer.
+  isListRequest(url) {
+    return url.pathname.endsWith('/alerts') && !url.searchParams.has('folder');
   }
 }

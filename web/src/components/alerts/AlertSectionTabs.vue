@@ -76,8 +76,9 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import { firingAlertsQuery, firingCountsQuery } from "@/services/alerts.queries";
+import { firingAlertsQuery } from "@/services/alerts.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { countStates } from "@/utils/alerts/firingAlerts";
 import { featureState } from "@/utils/featureGate";
 
 const TAB_ORDER_KEY = "o2_alert_section_tab_order";
@@ -194,20 +195,17 @@ const onReorder = (move: { from: string | number; to: string | number; before: b
   }
 };
 
-// On the Firing page the badge shares its entry, so the two move on the same poll.
 const firingList = useQuery(() =>
-  Object.assign(
-    router.currentRoute?.value?.name === "alertFiring"
-      ? firingAlertsQuery(orgIdentifier.value, "firing")
-      : firingCountsQuery(orgIdentifier.value),
-    {
-      enabled:
-        !!orgIdentifier.value &&
-        featureState(store.state.zoConfig?.features, "alerts") === "enabled",
-    },
-  ),
+  Object.assign(firingAlertsQuery(orgIdentifier.value), {
+    enabled:
+      !!orgIdentifier.value && featureState(store.state.zoConfig?.features, "alerts") === "enabled",
+  }),
 );
-const firingCount = computed(() => firingList.data.value?.counts?.firing ?? null);
+// Blank run state would read as a confident zero, so the badge hides instead.
+const firingCount = computed(() => {
+  const page = firingList.data.value;
+  return page && !page.status_unavailable ? countStates(page.list).firing : null;
+});
 
 // Empty on any other route, so a page that renders this strip outside the
 // siblings highlights nothing rather than lying about where you are.

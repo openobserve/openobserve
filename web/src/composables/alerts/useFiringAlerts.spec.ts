@@ -13,39 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, ref, type Ref } from "vue";
-import { focusManager } from "@tanstack/vue-query";
 import { createStore } from "vuex";
 import alerts from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { firingAlertsQuery } from "@/services/alerts.queries";
 import type { FiringState } from "@/utils/alerts/firingAlerts";
-import { FIRING_POLL_MS, useFiringAlerts } from "./useFiringAlerts";
+import { useFiringAlerts } from "./useFiringAlerts";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: {} });
 });
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const store = createStore({
   state: { selectedOrganization: { identifier: "acme" }, userInfo: { email: "me@acme.io" } },
 });
 
-const counts = { firing: 0, acked: 0, muted: 0, failed: 0, recovered: 0 };
-const page = (list: { alert_id: string; name: string }[]) => ({
-  data: { list, counts: { ...counts, firing: list.length }, total: list.length },
+const firing = (alert_id: string, over = {}) => ({
+  alert_id,
+  name: alert_id,
+  folder_name: "f",
+  last_outcome: "firing",
+  ...over,
 });
-const listByState = vi.fn();
+const page = (list: object[], extra = {}) => ({ data: { list, ...extra } });
+const listByFolderId = vi.fn();
 
-const mountComposable = (state: Ref<FiringState> = ref("firing")) => {
+const mountComposable = (
+  state: Ref<FiringState> = ref("firing"),
+  selected: Ref<string | null> = ref(null),
+) => {
   let api: ReturnType<typeof useFiringAlerts> | undefined;
   mount(
     defineComponent({
       setup() {
-        api = useFiringAlerts(state);
+        api = useFiringAlerts(state, selected);
         return () => null;
       },
     }),
@@ -54,115 +59,110 @@ const mountComposable = (state: Ref<FiringState> = ref("firing")) => {
   return api!;
 };
 
-const tick = async () => {
-  await vi.advanceTimersByTimeAsync(FIRING_POLL_MS);
-  await flushPromises();
-};
-
 describe("useFiringAlerts", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     queryClient.clear();
-    listByState.mockReset();
-    vi.mocked(toast).mockClear();
-    (alerts as any).listByState = listByState;
+    listByFolderId.mockReset();
+    (alerts as any).listByFolderId = listByFolderId;
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("keeps polling while the browser tab is hidden", async () => {
-    listByState.mockResolvedValue(page([]));
-    const state = ref<FiringState>("acked");
-    mountComposable(state);
+  it("reads once across folders, without a page size, whichever chip is open", async () => {
+    listByFolderId.mockResolvedValue(page([firing("a")]));
+    const state = ref<FiringState>("firing");
+    const api = mountComposable(state);
     await flushPromises();
-    focusManager.setFocused(false);
-    const before = listByState.mock.calls.length;
-    await tick();
-    focusManager.setFocused(undefined);
-    expect(listByState.mock.calls.length).toBeGreaterThan(before);
+    state.value = "acked";
+    await flushPromises();
+    expect(listByFolderId).toHaveBeenCalledTimes(1);
+    const [, , , , , org, folder] = listByFolderId.mock.calls[0];
+    expect(org).toBe("acme");
+    expect(folder).toBeUndefined();
+    expect(api.rows.value).toEqual([]);
   });
 
-  it("keeps polling every 30s even with nothing firing", async () => {
-    listByState.mockResolvedValue(page([]));
-    mountComposable();
+  it("derives the rows and counts of the open chip from that one read", async () => {
+    listByFolderId.mockResolvedValue(
+      page([
+        firing("late", { priority: 3 }),
+        firing("ok", { last_outcome: "normal" }),
+        firing("early", { priority: 1 }),
+        firing("acked", {
+          ack: { acked_by: "p", acked_at: 1, ack_source: "ui", groups_acked: 1 },
+        }),
+      ]),
+    );
+    const state = ref<FiringState>("firing");
+    const api = mountComposable(state);
     await flushPromises();
-    expect(listByState).toHaveBeenCalledTimes(1);
-    await tick();
-    await tick();
-    expect(listByState).toHaveBeenCalledTimes(3);
+    expect(api.rows.value.map((r) => r.alert_id)).toEqual(["early", "late"]);
+    expect(api.counts.value).toEqual({ firing: 2, acked: 1, muted: 0, failed: 0 });
+    state.value = "acked";
+    expect(api.rows.value.map((r) => r.alert_id)).toEqual(["acked"]);
   });
 
-  it("polls Firing and the open chip, so a recovery is seen from any chip", async () => {
-    listByState.mockResolvedValue(page([]));
-    mountComposable(ref<FiringState>("acked"));
+  it("gives no counts when the server could not read the run state", async () => {
+    listByFolderId.mockResolvedValue(
+      page([firing("a", { last_outcome: undefined })], {
+        status_unavailable: true,
+      }),
+    );
+    const api = mountComposable();
     await flushPromises();
-    const states = () => listByState.mock.calls.map((call) => call[1]);
-    expect(states().sort()).toEqual(["acked", "firing"]);
-    await tick();
-    expect(states().filter((s) => s === "acked")).toHaveLength(2);
-    expect(states().filter((s) => s === "firing")).toHaveLength(2);
+    expect(api.statusUnavailable.value).toBe(true);
+    expect(api.counts.value).toBeNull();
+  });
+
+  it("does not poll: only a manual refresh reads again", async () => {
+    const { refetchInterval } = firingAlertsQuery("acme") as { refetchInterval?: unknown };
+    expect(refetchInterval).toBeUndefined();
+    listByFolderId.mockResolvedValue(page([]));
+    const api = mountComposable();
+    await flushPromises();
+    await api.refresh();
+    expect(listByFolderId).toHaveBeenCalledTimes(2);
+  });
+
+  it("finds the selected row in any view, or none", async () => {
+    listByFolderId.mockResolvedValue(page([firing("a"), firing("ok", { last_outcome: "normal" })]));
+    const selected = ref<string | null>("ok");
+    const api = mountComposable(ref("firing"), selected);
+    await flushPromises();
+    expect(api.selectedRow.value?.alert_id).toBe("ok");
+  });
+
+  it("keeps the last known row once the list drops it", async () => {
+    listByFolderId.mockResolvedValue(page([firing("a")]));
+    const api = mountComposable(ref("firing"), ref("a"));
+    await flushPromises();
+    listByFolderId.mockResolvedValue(page([]));
+    await api.refresh();
+    await flushPromises();
+    expect(api.selectedRow.value?.alert_id).toBe("a");
   });
 
   it("keeps the last rows and reports a failed refresh", async () => {
-    listByState.mockResolvedValueOnce(page([{ alert_id: "1", name: "disk" }]));
+    listByFolderId.mockResolvedValueOnce(page([firing("1")]));
     const api = mountComposable();
     await flushPromises();
-    listByState.mockRejectedValue({ response: { status: 500 }, message: "timeout" });
-    await vi.advanceTimersByTimeAsync(FIRING_POLL_MS + 10_000);
+    listByFolderId.mockRejectedValue({ response: { status: 500 }, message: "timeout" });
+    await api.refresh();
     await flushPromises();
     expect(api.refreshFailed.value).toBe(true);
     expect(api.rows.value.map((r) => r.alert_id)).toEqual(["1"]);
   });
 
-  it("toasts a row that left Firing and is recovered", async () => {
-    listByState.mockImplementation(async (_org: string, state: string) =>
-      state === "recovered"
-        ? page([{ alert_id: "1", name: "disk" }])
-        : listByState.mock.calls.length === 1
-          ? page([
-              { alert_id: "1", name: "disk" },
-              { alert_id: "2", name: "cert" },
-            ])
-          : page([{ alert_id: "2", name: "cert" }]),
-    );
-    mountComposable();
-    await flushPromises();
-    await tick();
-    expect(toast).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast).mock.calls[0][0]).toMatchObject({
-      variant: "success",
-      message: "disk recovered",
-    });
-  });
-
-  it("stays quiet for a row that left Firing by being acknowledged", async () => {
-    listByState.mockImplementation(async (_org: string, state: string) =>
-      state === "recovered"
-        ? page([])
-        : listByState.mock.calls.length === 1
-          ? page([{ alert_id: "1", name: "disk" }])
-          : page([]),
-    );
-    mountComposable();
-    await flushPromises();
-    await tick();
-    expect(toast).not.toHaveBeenCalled();
-  });
-
   it("treats a 403 on first read as forbidden", async () => {
-    listByState.mockRejectedValue({ response: { status: 403 } });
+    listByFolderId.mockRejectedValue({ response: { status: 403 } });
     const api = mountComposable();
-    await tick();
-    expect(api.forbidden.value).toBe(true);
+    await flushPromises();
+    await vi.waitFor(() => expect(api.forbidden.value).toBe(true));
   });
 
   it("keeps the last data when a refresh is refused", async () => {
-    listByState.mockResolvedValue(page([{ alert_id: "a", name: "a" }]));
+    listByFolderId.mockResolvedValue(page([firing("a")]));
     const api = mountComposable();
     await flushPromises();
-    listByState.mockRejectedValue({ response: { status: 403 } });
+    listByFolderId.mockRejectedValue({ response: { status: 403 } });
     await api.refresh();
     await flushPromises();
     expect(api.forbidden.value).toBe(false);
