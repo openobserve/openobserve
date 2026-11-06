@@ -17,6 +17,12 @@ describe("fitColumnSize", () => {
     expect(fitColumnSize("a", ["x".repeat(500)], { max: 300 })).toBe(300);
   });
 
+  it("counts full-width glyphs as two characters", () => {
+    expect(fitColumnSize("a", ["日本語のメッセージ"])).toBeGreaterThan(
+      fitColumnSize("a", ["abcdefghi"]),
+    );
+  });
+
   it("ignores nullish values", () => {
     expect(fitColumnSize("Node", [null, undefined, "ip-10-0-1-5"])).toBe(
       fitColumnSize("Node", ["ip-10-0-1-5"]),

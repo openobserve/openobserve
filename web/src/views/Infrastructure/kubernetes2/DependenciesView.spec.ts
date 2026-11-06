@@ -646,6 +646,18 @@ describe("DependenciesView", () => {
       expect(nodes().some((n: any) => n.group === true)).toBe(false);
     });
 
+    it("disables the grouping control and says why while a search is set", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("disabled")).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-deps-collapse-off"]').exists()).toBe(true);
+    });
+
+    it("keeps the grouping control enabled with no filter", async () => {
+      await mountView();
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("disabled")).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-deps-collapse-off"]').exists()).toBe(false);
+    });
+
     it("counts the header total over grouped connections too", async () => {
       await mountView();
       await setMode("collapsed");
