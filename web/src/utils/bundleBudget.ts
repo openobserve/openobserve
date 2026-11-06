@@ -25,13 +25,13 @@ export interface BundleBudgetResult {
 // Assets the browser fetches before the app can render: module scripts, modulepreloads and stylesheets.
 export function entryAssets(html: string): string[] {
   const assets = new Set<string>();
-  const tags = html.match(/<(?:script|link)\b[^>]*>/g) ?? [];
+  const tags = html.match(/<(?:script|link)\b[^>]*>/gi) ?? [];
   for (const tag of tags) {
-    const isScript = tag.startsWith("<script") && /type=["']module["']/.test(tag);
-    const isPreload = /rel=["']modulepreload["']/.test(tag);
-    const isStyle = /rel=["']stylesheet["']/.test(tag);
+    const isScript = /^<script\b/i.test(tag) && /type=["']module["']/i.test(tag);
+    const isPreload = /rel=["']modulepreload["']/i.test(tag);
+    const isStyle = /rel=["']stylesheet["']/i.test(tag);
     if (!isScript && !isPreload && !isStyle) continue;
-    const src = tag.match(/(?:src|href)=["']([^"']+)["']/)?.[1];
+    const src = tag.match(/(?:src|href)=["']([^"']+)["']/i)?.[1];
     if (src) assets.add(src);
   }
   return [...assets];

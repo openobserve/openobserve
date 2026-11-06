@@ -19,7 +19,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const indexHtml = readFileSync(resolve(__dirname, "../../index.html"), "utf8");
-const inlineScripts = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+const inlineScripts = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script\s*>/gi)].map((m) => m[1]);
 const fastPathSource = inlineScripts.find((src) => src.includes("__o2SsoFastPath"));
 
 interface Env {

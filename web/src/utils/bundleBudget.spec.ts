@@ -37,6 +37,14 @@ describe("entryAssets", () => {
     ]);
   });
 
+  it("matches upper-case tags and attributes", () => {
+    const page = html(
+      '<SCRIPT TYPE="module" SRC="./assets/index.a.js"></SCRIPT>',
+      '<LINK REL="modulepreload" HREF="./assets/echarts.b.js">',
+    );
+    expect(entryAssets(page)).toEqual(["./assets/index.a.js", "./assets/echarts.b.js"]);
+  });
+
   it("ignores icons, font preloads and classic scripts", () => {
     const page = html(
       '<link rel="icon" href="/favicon.ico">',
