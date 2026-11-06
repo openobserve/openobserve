@@ -48,16 +48,19 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 
 const TargetsStub = defineComponent({
   name: "AlertTargetsSelect",
-  props: ["workflowOptions", "workflowsEnabled", "placeholder"],
+  props: ["workflowOptions", "workflowsEnabled", "placeholder", "lockedWorkflowNames"],
   emits: ["refresh"],
   template: "<div />",
 });
 
-function mountField(props: Record<string, unknown> = {}) {
+function mountField(
+  props: Record<string, unknown> = {},
+  zoConfig: Record<string, unknown> = { workflows_enabled: true },
+) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "test-org" },
-      zoConfig: { workflows_enabled: true },
+      zoConfig,
     },
   });
   return mount(AlertDestinationsField, {
@@ -150,12 +153,96 @@ describe("AlertDestinationsField status line", () => {
   });
 
   // The team lives on the Advanced tab, so the picker cannot show it.
-  it("falls back to the on-call team when the parent says there is a target but none is picked", () => {
-    expect(mountField({ showStatus: true }).find(STATUS).text()).toBe(
-      t("alerts.alertSettings.sendsToStatus", {
-        targets: t("alerts.alertSettings.oncallTeamTarget"),
-      }),
-    );
+  it("names the on-call team only when one is set and on-call is on", () => {
+    const sendsToTeam = t("alerts.alertSettings.sendsToStatus", {
+      targets: t("alerts.alertSettings.oncallTeamTarget"),
+    });
+    expect(
+      mountField({ showStatus: true, oncallTeam: "tm" }, { oncall_enabled: true })
+        .find(STATUS)
+        .text(),
+    ).toBe(sendsToTeam);
+  });
+
+  describe("locked targets in the status line", () => {
+    const LOCK_WORKFLOWS = '[data-test="alert-settings-destinations-lock-workflows"]';
+    const LOCK_ONCALL = '[data-test="alert-settings-destinations-lock-oncall"]';
+    const features = (locked: string[]) => ({
+      features: Object.fromEntries(locked.map((key) => [key, "locked"])),
+      feature_names: { workflows: "Workflows", oncall: "On-Call" },
+    });
+
+    it("never claims an on-call team for a locked workflow-only alert", () => {
+      const status = mountField(
+        { showStatus: true, workflows: ["wf-1"] },
+        features(["workflows"]),
+      ).find(STATUS);
+      expect(status.text()).not.toContain(t("alerts.alertSettings.oncallTeamTarget"));
+      expect(status.find(LOCK_WORKFLOWS).text()).toBe("Locked: needs Workflows");
+      expect(status.find(LOCK_ONCALL).exists()).toBe(false);
+    });
+
+    it("shows the on-call lock for a kept team, and no claim that it pages", () => {
+      const status = mountField(
+        { showStatus: true, oncallTeam: "tm" },
+        { ...features(["oncall"]), oncall_enabled: false, workflows_enabled: true },
+      ).find(STATUS);
+      expect(status.text()).toBe("Locked: needs On-Call");
+      expect(status.find(LOCK_ONCALL).exists()).toBe(true);
+    });
+
+    it("separates two locks and shows no sends-to sentence", () => {
+      const status = mountField(
+        { showStatus: true, workflows: ["wf-1"], oncallTeam: "tm" },
+        features(["workflows", "oncall"]),
+      ).find(STATUS);
+      expect(status.findAll("span").map((span) => span.text())).toEqual([
+        "Locked: needs Workflows",
+        "·",
+        "Locked: needs On-Call",
+      ]);
+    });
+
+    it("keeps the sentence for a destination beside a locked workflow", () => {
+      const status = mountField(
+        { showStatus: true, destinations: ["slack-critical"], workflows: ["wf-1"] },
+        features(["workflows"]),
+      ).find(STATUS);
+      expect(status.text().replace(/\s+/g, " ")).toBe(
+        `${t("alerts.alertSettings.sendsToStatus", { targets: "slack-critical" })} Locked: needs Workflows`,
+      );
+    });
+
+    it("shows no lock for a locked feature the alert does not use", () => {
+      const status = mountField(
+        { showStatus: true, destinations: ["slack-critical"] },
+        features(["workflows", "oncall"]),
+      ).find(STATUS);
+      expect(status.find(LOCK_WORKFLOWS).exists()).toBe(false);
+      expect(status.find(LOCK_ONCALL).exists()).toBe(false);
+    });
+
+    it("gives an operator-off target the no-destination note and no lock", () => {
+      const note = t("alerts.alertSettings.noDestinationNote");
+      const offWorkflow = mountField(
+        { showStatus: true, workflows: ["wf-1"] },
+        { workflows_enabled: false, oncall_enabled: false },
+      ).find(STATUS);
+      expect(offWorkflow.text()).toBe(note);
+      expect(offWorkflow.find(LOCK_WORKFLOWS).exists()).toBe(false);
+
+      const offTeam = mountField(
+        { showStatus: true, oncallTeam: "tm" },
+        { workflows_enabled: true, oncall_enabled: false },
+      ).find(STATUS);
+      expect(offTeam.text()).toBe(note);
+    });
+
+    it("hands the names to the picker", () => {
+      const names = { "wf-1": "Restart pods" };
+      const wrapper = mountField({ lockedTargetNames: names }, features(["workflows"]));
+      expect(wrapper.findComponent(TargetsStub).props("lockedWorkflowNames")).toEqual(names);
+    });
   });
 
   it("stays quiet unless asked, as on the recovery field", () => {

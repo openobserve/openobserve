@@ -66,6 +66,42 @@ impl Feature {
     pub fn all() -> impl Iterator<Item = Feature> {
         <Self as IntoEnumIterator>::iter()
     }
+
+    /// Product name; `infra` has no access to the definition, so a parity test pins these to it.
+    pub const fn display_name(self) -> &'static str {
+        match self {
+            Feature::AiObservability => "AI Observability",
+            Feature::AiAssistant => "AI Assistant",
+            Feature::Workflows => "Workflows",
+            Feature::Oncall => "On-Call",
+            Feature::Incidents => "Incidents",
+            Feature::Logs => "Logs",
+            Feature::Metrics => "Metrics",
+            Feature::Traces => "Traces",
+            Feature::Rum => "Real User Monitoring",
+            Feature::ProductAnalytics => "Product Analytics",
+            Feature::Synthetics => "Synthetics",
+            Feature::DbMonitoring => "Database Monitoring",
+            Feature::Correlation => "Correlation",
+            Feature::Dashboards => "Dashboards",
+            Feature::Reports => "Reports",
+            Feature::Alerts => "Alerts",
+            Feature::Pipelines => "Pipelines",
+            Feature::AiToolsets => "AI Toolsets",
+            Feature::Mcp => "MCP Server",
+            Feature::Ratelimit => "Rate Limiting",
+            Feature::AnomalyDetection => "Anomaly Detection",
+            Feature::ContinuousProfiling => "Continuous Profiling",
+            Feature::KubernetesMonitoring => "Kubernetes Monitoring",
+            Feature::HostMonitoring => "Host Monitoring",
+            Feature::Sso => "Single Sign-On",
+            Feature::Rbac => "Role-Based Access Control",
+            Feature::AuditTrail => "Audit Trail",
+            Feature::QueryManagement => "Query Management",
+            Feature::SuperCluster => "Super Cluster",
+            Feature::Byob => "Bring Your Own Bucket",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Serialize)]

@@ -18,8 +18,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
+import * as toastModule from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import serviceStreamsService from "@/services/service_streams";
 import store from "@/test/unit/helpers/store";
@@ -46,6 +48,7 @@ vi.mock("@/services/oncall", () => ({
     unroutedSignals: vi.fn(),
     getRoutingConfig: vi.fn(),
     whoIsOnCall: vi.fn(),
+    testPage: vi.fn(),
   },
 }));
 
@@ -121,6 +124,7 @@ describe("OnCallOwnership", () => {
   beforeEach(() => {
     queryClient.clear();
     __resetOnCallRoutingConfig();
+    resetOnCallPermissions();
     vi.clearAllMocks();
     routingConfig(null);
     service.ownershipStats.mockResolvedValue({
@@ -133,6 +137,107 @@ describe("OnCallOwnership", () => {
     correlation.getSemanticGroups.mockResolvedValue({ data: [] } as never);
     correlation.getServicesList.mockResolvedValue({ data: [] } as never);
     correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as never);
+  });
+
+  describe("a license denial", () => {
+    const DENIAL = { response: { status: 403, data: { code: 40001, error_detail: "oncall" } } };
+
+    it.each(["ownershipStats", "unroutedSignals", "getRoutingConfig"] as const)(
+      "tells the page when the license refuses %s",
+      async (read) => {
+        service[read].mockRejectedValueOnce(DENIAL as never);
+        const wrapper = render();
+        await settle();
+
+        expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+      },
+    );
+
+    it.each(["OnCallRoutingSimulator", "OnCallRuleEditor"])(
+      "passes on a denial from the %s",
+      async (name) => {
+        const wrapper = render();
+        await settle();
+        await wrapper.find('[data-test="oncall-routing-test-checkout"]').trigger("click");
+        await settle();
+
+        wrapper.findComponent({ name }).vm.$emit("licenseDenied", ["oncall"]);
+
+        expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+      },
+    );
+
+    it("tells the page, with no error toast, when a routing test is denied", async () => {
+      const wrapper = render();
+      await settle();
+      await wrapper.find('[data-test="oncall-routing-test-checkout"]').trigger("click");
+      await settle();
+      const errors = vi.spyOn(toastModule, "toast");
+
+      service.previewRouting.mockRejectedValueOnce(DENIAL as never);
+      wrapper
+        .findComponent({ name: "OnCallRoutingSimulator" })
+        .vm.$emit("run", { dimensions: { service: "checkout" }, priority: "P1" });
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+      expect(errors).not.toHaveBeenCalled();
+    });
+
+    /// A denied write leaves the page up, the same as on the team's other tabs.
+    it.each([
+      {
+        write: "saving a rule",
+        act: (wrapper: ReturnType<typeof render>) => {
+          service.createOwnershipRule.mockRejectedValueOnce(DENIAL as never);
+          wrapper
+            .findComponent({ name: "OnCallRuleEditor" })
+            .vm.$emit("save", { team_id: "team_1", dimensions: { service: "new" } });
+        },
+      },
+      {
+        write: "removing a rule",
+        act: async (wrapper: ReturnType<typeof render>) => {
+          service.deleteOwnershipRule.mockRejectedValueOnce(DENIAL as never);
+          wrapper
+            .findComponent({ name: "OnCallOwnershipRules" })
+            .vm.$emit("remove", rule("checkout", "team_1"));
+          await flushPromises();
+          wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+        },
+      },
+      {
+        write: "sending a test page",
+        act: (wrapper: ReturnType<typeof render>) => {
+          service.testPage.mockRejectedValueOnce(DENIAL as never);
+          wrapper
+            .findComponent({ name: "OnCallRoutingSimulator" })
+            .vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+        },
+      },
+    ])("toasts and does not lock when $write is denied", async ({ act }) => {
+      const wrapper = render();
+      await settle();
+      await wrapper.find('[data-test="oncall-routing-test-checkout"]').trigger("click");
+      await settle();
+      const errors = vi.spyOn(toastModule, "toast");
+      errors.mockClear();
+
+      await act(wrapper);
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toBeUndefined();
+      expect(errors).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    /// Service streams are not an on-call read, and manual entry still works without them.
+    it("leaves a denied service catalogue to its own degraded state", async () => {
+      correlation.getSemanticGroups.mockRejectedValueOnce(DENIAL as never);
+      const wrapper = render();
+      await settle();
+
+      expect(wrapper.emitted("licenseDenied")).toBeUndefined();
+    });
   });
 
   it("titles the tab with the team and states the same precedence as org Routing", async () => {

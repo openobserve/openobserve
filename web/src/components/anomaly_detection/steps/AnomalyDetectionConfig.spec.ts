@@ -1252,6 +1252,50 @@ describe("AnomalyDetectionConfig", () => {
       expect(getForm(wrapper).state.isValid).toBe(false);
     });
 
+    it("refuses a schedule under one minute and accepts one minute", async () => {
+      const shape = {
+        schedule_interval_unit: "s",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 1,
+        detection_window_unit: "h",
+      };
+      wrapper = await submitted({ ...shape, schedule_interval_value: 59 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toContain("1m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, schedule_interval_value: 60 });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBeUndefined();
+    });
+
+    it("refuses a window over the server's 100,000 bucket limit and names the longest one", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 365,
+        detection_window_unit: "d",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1d 3h 46m 40s");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts a window at exactly the bucket limit", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 1,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 1,
+        histogram_interval_unit: "s",
+        detection_window_value: 100000,
+        detection_window_unit: "s",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
+
     it("accepts exactly the floor and refuses one bucket under it", async () => {
       const shape = {
         schedule_interval_value: 5,
@@ -1301,6 +1345,43 @@ describe("AnomalyDetectionConfig", () => {
       await flushPromises();
       return w;
     };
+
+    it("tells the editor which changes retrain, only on the edit screen", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').text()).toContain(
+        "retrains this detector",
+      );
+      wrapper.unmount();
+      wrapper = mountConfig(matchingConfig);
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-retrain-note"]').exists()).toBe(false);
+    });
+
+    it("a schedule-only edit leaves an over-limit row editable", async () => {
+      wrapper = mountConfig(
+        {
+          schedule_interval_value: 1,
+          schedule_interval_unit: "m",
+          histogram_interval_value: 1,
+          histogram_interval_unit: "s",
+          detection_window_value: 365,
+          detection_window_unit: "d",
+        },
+        {
+          storedIntervals: {
+            histogram: { raw: "1s", value: 1, unit: "s", parsed: true },
+            schedule: { raw: "1m", value: 1, unit: "m", parsed: true },
+            window: { raw: 31536000, value: 365, unit: "d", parsed: true },
+          },
+        },
+      );
+      await flushPromises();
+      getForm(wrapper).setFieldValue("schedule_interval_value", 2);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+    });
 
     it("an untouched below-floor triple passes: a description-only edit saves", async () => {
       wrapper = await mountStored(storedBelowFloor());

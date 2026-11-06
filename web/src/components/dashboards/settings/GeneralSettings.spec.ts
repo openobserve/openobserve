@@ -702,6 +702,16 @@ describe("GeneralSettings", () => {
       expect(refreshSelect().props("modelValue")).toBe(0);
     });
 
+    it("hides the relative-time note in the settings control", async () => {
+      wrapper = await createWrapper();
+
+      refreshSelect().vm.btnRefreshInterval = true;
+      await flushPromises();
+
+      expect(document.body.querySelector('[data-test="auto-refresh-panel"]')).not.toBeNull();
+      expect(document.body.querySelector('[data-test="auto-refresh-footer"]')).toBeNull();
+    });
+
     it("writes the interval picked in the control into the form", async () => {
       wrapper = await createWrapper();
       refreshSelect().vm.$emit("update:modelValue", 900);
@@ -719,7 +729,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       expect(formValues().defaultRefreshInterval).toBe(300);
-      expect(refreshSelect().text()).toContain("5 min");
+      expect(refreshSelect().text()).toContain("5m");
     });
 
     it("shows the effective value when the saved one is below the server minimum", async () => {
@@ -731,8 +741,8 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       expect(formValues().defaultRefreshInterval).toBe(30);
-      expect(helpText()).toContain("10 sec");
-      expect(helpText()).toContain("30 sec");
+      expect(helpText()).toContain("10s");
+      expect(helpText()).toContain("30s");
     });
 
     it("saves the picked interval in seconds", async () => {

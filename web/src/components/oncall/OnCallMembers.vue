@@ -344,6 +344,7 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatInZone, listInLocale, rotationMembers } from "@/utils/oncall";
 import { serverMessageOf, statusOf } from "@/utils/slackLink";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -382,7 +383,16 @@ const props = withDefaults(
     canConfigure: true,
   },
 );
-const emit = defineEmits<{ changed: []; "open-schedule": [] }>();
+const emit = defineEmits<{
+  changed: [];
+  "open-schedule": [];
+  licenseDenied: [features: string[]];
+}>();
+
+function noteDenial(err: unknown) {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+}
 
 const { t, locale } = useI18nTyped();
 const { noteConfigurationDenied } = useOnCallPermissions();
@@ -428,7 +438,8 @@ async function fetchAbsences() {
     absences.value = await queryClient.fetchQuery(
       unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY),
     );
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     absences.value = [];
   }
 }
@@ -458,7 +469,8 @@ async function fetchSegments() {
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
     );
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     segments.value = [];
   }
 }
@@ -849,7 +861,8 @@ async function reportPlacement(emails: string[], before: Rotation[]) {
   try {
     after =
       (await queryClient.fetchQuery(teamScheduleQuery(orgId.value, props.teamId)))?.rotations ?? [];
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     after = null;
   }
   toast({
@@ -957,7 +970,8 @@ async function reportOnCallAfterRemove(email: string) {
   let positions: OnCallPosition[];
   try {
     positions = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
-  } catch {
+  } catch (err) {
+    noteDenial(err);
     toast({ variant: "success", message: t("oncall.memberRemoved", { name }) });
     return;
   }

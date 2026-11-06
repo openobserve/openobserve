@@ -253,7 +253,7 @@ pub async fn token_validator(
                                 delegation: None,
                             })
                         } else {
-                            Err(AuthError::Forbidden("Forbidden".to_string()))
+                            Err(AuthError::RoleRefused("Forbidden".to_string()))
                         }
                     }
                     _ => Err(AuthError::Unauthorized("Unauthorized Access".to_string())),

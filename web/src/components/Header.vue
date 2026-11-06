@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
-              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" />
+              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 v-if="aiAccess.allowed"
                 side="bottom"
