@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Veri saklama varsayılanları",
-      "about": "Kendi saklama süresi olmayan akışlar için. Boş veya 0, bir üst düzeyi devralır; aksi halde en az 3 gün.",
+      "about": "Kendi saklama ayarı olmayan akışlar için. Boş veya 0, genel değeri kullanır; aksi takdirde en az 3 gün.",
       "defaultDays": "Varsayılan (gün)",
       "streamType": "Akış türü",
       "days": "Gün",
       "addType": "Akış türü ekle",
       "removeType": "Bu akış türünü kaldır",
-      "otherTypes": "Diğer akış türleri",
-      "inherit": "Devral",
-      "resolved": "Akışların kullanımı: {value}",
+      "globalDefault": "Genel: {value}",
+      "globalType": "Genel {type}: {value}",
       "daysValue": "{days} gün",
       "forever": "sonsuza kadar sakla",
-      "invalid": "0 veya en az 3 gün kullanın",
-      "confirmTitle": "Veri saklama süresi düşürülsün mü?",
-      "confirmMessage": "Bu, varsayılan saklama süresini kısaltır: {changes}.",
-      "change": "{type} {from} değerinden {to} değerine",
-      "confirmWarning": "Şu anda bu varsayılanları devralan akış yok. | {count} akış bu varsayılanları devralıyor. Yeni saklama süresini aşan veriler bir sonraki saklama çalıştırmasında silinir ve kurtarılamaz. | {count} akış bu varsayılanları devralıyor. Yeni saklama süresini aşan veriler bir sonraki saklama çalıştırmasında silinir ve kurtarılamaz.",
-      "confirmOk": "Saklama süresini düşür"
+      "invalid": "0 veya en az 3 gün kullanın"
     },
     "organizationSettings": {
       "fieldNameHelp": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluk olmadan.",

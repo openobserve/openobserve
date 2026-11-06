@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "데이터 보존 기본값",
-      "about": "자체 보존 설정이 없는 스트림에 적용됩니다. 비워 두거나 0이면 다음 수준을 상속하고, 그렇지 않으면 최소 3일입니다.",
+      "about": "자체 보존 기간이 없는 스트림의 경우. 비어 있거나 0이면 전역 값을 사용하며, 그렇지 않으면 최소 3일입니다.",
       "defaultDays": "기본값(일)",
       "streamType": "스트림 유형",
       "days": "일",
       "addType": "스트림 유형 추가",
       "removeType": "이 스트림 유형 제거",
-      "otherTypes": "기타 스트림 유형",
-      "inherit": "상속",
-      "resolved": "스트림 적용값: {value}",
+      "globalDefault": "전역: {value}",
+      "globalType": "전역 {type}: {value}",
       "daysValue": "{days}일",
       "forever": "영구 보존",
-      "invalid": "0 또는 최소 3일을 사용하세요",
-      "confirmTitle": "데이터 보존 기간을 줄일까요?",
-      "confirmMessage": "기본 보존 기간이 단축됩니다: {changes}.",
-      "change": "{type}: {from} → {to}",
-      "confirmWarning": "현재 이 기본값을 상속하는 스트림이 없습니다. | {count}개 스트림이 이 기본값을 상속합니다. 새 보존 기간을 초과한 데이터는 다음 보존 실행 시 삭제되며 복구할 수 없습니다. | {count}개 스트림이 이 기본값을 상속합니다. 새 보존 기간을 초과한 데이터는 다음 보존 실행 시 삭제되며 복구할 수 없습니다.",
-      "confirmOk": "보존 기간 줄이기"
+      "invalid": "0 또는 최소 3일을 사용하세요"
     },
     "organizationSettings": {
       "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",

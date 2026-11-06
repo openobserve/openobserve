@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Predefinições de retenção de dados",
-      "about": "Para streams sem retenção própria. Vazio ou 0 herda o nível seguinte; caso contrário, pelo menos 3 dias.",
+      "about": "Para streams sem retenção própria. Vazio ou 0 utiliza o valor global; caso contrário, pelo menos 3 dias.",
       "defaultDays": "Predefinição (dias)",
       "streamType": "Tipo de stream",
       "days": "Dias",
       "addType": "Adicionar tipo de stream",
       "removeType": "Remover este tipo de stream",
-      "otherTypes": "Outros tipos de stream",
-      "inherit": "Herdar",
-      "resolved": "Os streams usam: {value}",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
       "daysValue": "{days} dias",
       "forever": "manter para sempre",
-      "invalid": "Utilize 0 ou pelo menos 3 dias",
-      "confirmTitle": "Reduzir a retenção de dados?",
-      "confirmMessage": "Isto reduz a retenção predefinida: {changes}.",
-      "change": "{type} de {from} para {to}",
-      "confirmWarning": "Nenhum stream herda estas predefinições neste momento. | {count} stream herda estas predefinições. Os dados que ultrapassam a nova retenção são eliminados na próxima execução da retenção e não podem ser recuperados. | {count} streams herdam estas predefinições. Os dados que ultrapassam a nova retenção são eliminados na próxima execução da retenção e não podem ser recuperados.",
-      "confirmOk": "Reduzir retenção"
+      "invalid": "Utilize 0 ou pelo menos 3 dias"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use apenas caracteres alfanuméricos e '+=,.{'@'}-_', sem espaços.",

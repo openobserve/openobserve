@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "数据保留默认值",
-      "about": "适用于没有自身保留设置的数据流。留空或填 0 将继承下一级设置；否则至少为 3 天。",
+      "about": "适用于没有自身保留设置的数据流。留空或填 0 则使用全局值；否则至少为 3 天。",
       "defaultDays": "默认（天）",
       "streamType": "数据流类型",
       "days": "天",
       "addType": "添加数据流类型",
       "removeType": "移除此数据流类型",
-      "otherTypes": "其他数据流类型",
-      "inherit": "继承",
-      "resolved": "数据流使用：{value}",
+      "globalDefault": "全局：{value}",
+      "globalType": "全局 {type}：{value}",
       "daysValue": "{days} 天",
       "forever": "永久保留",
-      "invalid": "请填 0 或至少 3 天",
-      "confirmTitle": "降低数据保留期？",
-      "confirmMessage": "这会缩短默认保留期：{changes}。",
-      "change": "{type} 从 {from} 变为 {to}",
-      "confirmWarning": "当前没有数据流继承这些默认值。 | {count} 个数据流继承这些默认值。超出新保留期的数据将在下次执行保留策略时删除，且无法恢复。 | {count} 个数据流继承这些默认值。超出新保留期的数据将在下次执行保留策略时删除，且无法恢复。",
-      "confirmOk": "降低保留期"
+      "invalid": "请填 0 或至少 3 天"
     },
     "organizationSettings": {
       "fieldNameHelp": "仅使用字母数字和 '+=,.{'@'}-_' 字符，不要空格。",

@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Valeurs par défaut de conservation des données",
-      "about": "Pour les flux qui n'ont pas leur propre durée de conservation. Vide ou 0 hérite du niveau suivant ; sinon, au moins 3 jours.",
+      "about": "Pour les flux sans rétention propre. Vide ou 0 utilise la valeur globale ; sinon au moins 3 jours.",
       "defaultDays": "Par défaut (jours)",
       "streamType": "Type de flux",
       "days": "Jours",
       "addType": "Ajouter un type de flux",
       "removeType": "Supprimer ce type de flux",
-      "otherTypes": "Autres types de flux",
-      "inherit": "Hériter",
-      "resolved": "Les flux utilisent : {value}",
+      "globalDefault": "Global : {value}",
+      "globalType": "Global {type} : {value}",
       "daysValue": "{days} jours",
       "forever": "conserver indéfiniment",
-      "invalid": "Utilisez 0 ou au moins 3 jours",
-      "confirmTitle": "Réduire la conservation des données ?",
-      "confirmMessage": "Cela réduit la conservation par défaut : {changes}.",
-      "change": "{type} de {from} à {to}",
-      "confirmWarning": "Aucun flux n'hérite de ces valeurs par défaut pour le moment. | {count} flux hérite de ces valeurs par défaut. Les données au-delà de la nouvelle durée de conservation sont supprimées lors de la prochaine exécution de la conservation et ne peuvent pas être récupérées. | {count} flux héritent de ces valeurs par défaut. Les données au-delà de la nouvelle durée de conservation sont supprimées lors de la prochaine exécution de la conservation et ne peuvent pas être récupérées.",
-      "confirmOk": "Réduire la conservation"
+      "invalid": "Utilisez 0 ou au moins 3 jours"
     },
     "organizationSettings": {
       "fieldNameHelp": "Utilisez uniquement des caractères alphanumériques et '+=,.{'@'}-_', sans espaces.",

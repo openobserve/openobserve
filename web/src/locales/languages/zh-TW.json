@@ -15498,23 +15498,17 @@
     },
     "dataRetentionDefaults": {
       "title": "資料保留預設值",
-      "about": "適用於沒有自身保留設定的串流。留空或 0 會繼承下一層級；否則至少 3 天。",
+      "about": "適用於沒有自身保留設定的串流。留空或 0 會使用全域值；否則至少 3 天。",
       "defaultDays": "預設（天）",
       "streamType": "串流類型",
       "days": "天",
       "addType": "新增串流類型",
       "removeType": "移除此串流類型",
-      "otherTypes": "其他串流類型",
-      "inherit": "繼承",
-      "resolved": "串流使用：{value}",
+      "globalDefault": "全域：{value}",
+      "globalType": "全域 {type}：{value}",
       "daysValue": "{days} 天",
       "forever": "永久保留",
-      "invalid": "使用 0 或至少 3 天",
-      "confirmTitle": "降低資料保留期限？",
-      "confirmMessage": "這會縮短預設保留期限：{changes}。",
-      "change": "{type} 從 {from} 變更為 {to}",
-      "confirmWarning": "目前沒有串流繼承這些預設值。 | {count} 個串流繼承這些預設值。超過新保留期限的資料會在下次保留作業執行時刪除，且無法復原。 | {count} 個串流繼承這些預設值。超過新保留期限的資料會在下次保留作業執行時刪除，且無法復原。",
-      "confirmOk": "降低保留期限"
+      "invalid": "使用 0 或至少 3 天"
     },
     "organizationSettings": {
       "fieldNameHelp": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不要包含空格。",

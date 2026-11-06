@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Standardwerte für die Datenaufbewahrung",
-      "about": "Für Streams ohne eigene Aufbewahrung. Leer oder 0 erbt die nächste Ebene; andernfalls mindestens 3 Tage.",
+      "about": "Für Streams ohne eigene Aufbewahrung. Leer oder 0 verwendet den globalen Wert; andernfalls mindestens 3 Tage.",
       "defaultDays": "Standard (Tage)",
       "streamType": "Stream-Typ",
       "days": "Tage",
       "addType": "Stream-Typ hinzufügen",
       "removeType": "Diesen Stream-Typ entfernen",
-      "otherTypes": "Andere Stream-Typen",
-      "inherit": "Erben",
-      "resolved": "Streams verwenden: {value}",
+      "globalDefault": "Global: {value}",
+      "globalType": "Global {type}: {value}",
       "daysValue": "{days} Tage",
       "forever": "unbegrenzt aufbewahren",
-      "invalid": "0 oder mindestens 3 Tage verwenden",
-      "confirmTitle": "Datenaufbewahrung verkürzen?",
-      "confirmMessage": "Dies verkürzt die Standardaufbewahrung: {changes}.",
-      "change": "{type} von {from} auf {to}",
-      "confirmWarning": "Aktuell erbt kein Stream diese Standardwerte. | {count} Stream erbt diese Standardwerte. Daten, die über die neue Aufbewahrung hinausgehen, werden beim nächsten Aufbewahrungslauf gelöscht und können nicht wiederhergestellt werden. | {count} Streams erben diese Standardwerte. Daten, die über die neue Aufbewahrung hinausgehen, werden beim nächsten Aufbewahrungslauf gelöscht und können nicht wiederhergestellt werden.",
-      "confirmOk": "Aufbewahrung verkürzen"
+      "invalid": "0 oder mindestens 3 Tage verwenden"
     },
     "organizationSettings": {
       "fieldNameHelp": "Verwenden Sie nur alphanumerische Zeichen und '+=,.{'@'}-_', ohne Leerzeichen.",

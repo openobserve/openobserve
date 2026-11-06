@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Mặc định lưu giữ dữ liệu",
-      "about": "Dành cho các stream không có thời gian lưu giữ riêng. Để trống hoặc 0 sẽ kế thừa cấp tiếp theo; nếu không, tối thiểu 3 ngày.",
+      "about": "Áp dụng cho các stream không có thời hạn lưu riêng. Để trống hoặc 0 sẽ dùng giá trị toàn cục; nếu không, tối thiểu 3 ngày.",
       "defaultDays": "Mặc định (ngày)",
       "streamType": "Loại stream",
       "days": "Ngày",
       "addType": "Thêm loại stream",
       "removeType": "Xóa loại stream này",
-      "otherTypes": "Các loại stream khác",
-      "inherit": "Kế thừa",
-      "resolved": "Các stream sử dụng: {value}",
+      "globalDefault": "Toàn cục: {value}",
+      "globalType": "Toàn cục {type}: {value}",
       "daysValue": "{days} ngày",
       "forever": "lưu giữ vĩnh viễn",
-      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày",
-      "confirmTitle": "Giảm thời gian lưu giữ dữ liệu?",
-      "confirmMessage": "Thao tác này rút ngắn thời gian lưu giữ mặc định: {changes}.",
-      "change": "{type} từ {from} thành {to}",
-      "confirmWarning": "Hiện không có stream nào kế thừa các mặc định này. | {count} stream kế thừa các mặc định này. Dữ liệu vượt quá thời gian lưu giữ mới sẽ bị xóa trong lần chạy lưu giữ tiếp theo và không thể khôi phục. | {count} stream kế thừa các mặc định này. Dữ liệu vượt quá thời gian lưu giữ mới sẽ bị xóa trong lần chạy lưu giữ tiếp theo và không thể khôi phục.",
-      "confirmOk": "Giảm thời gian lưu giữ"
+      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày"
     },
     "organizationSettings": {
       "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",

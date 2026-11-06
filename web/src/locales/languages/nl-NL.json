@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Standaardwaarden voor gegevensretentie",
-      "about": "Voor streams zonder eigen retentie. Leeg of 0 neemt het volgende niveau over; anders minimaal 3 dagen.",
+      "about": "Voor streams zonder eigen retentie. Leeg of 0 gebruikt de globale waarde; anders ten minste 3 dagen.",
       "defaultDays": "Standaard (dagen)",
       "streamType": "Streamtype",
       "days": "Dagen",
       "addType": "Streamtype toevoegen",
       "removeType": "Dit streamtype verwijderen",
-      "otherTypes": "Andere streamtypen",
-      "inherit": "Overnemen",
-      "resolved": "Streams gebruiken: {value}",
+      "globalDefault": "Globaal: {value}",
+      "globalType": "Globaal {type}: {value}",
       "daysValue": "{days} dagen",
       "forever": "voor altijd bewaren",
-      "invalid": "Gebruik 0 of minimaal 3 dagen",
-      "confirmTitle": "Gegevensretentie verlagen?",
-      "confirmMessage": "Dit verkort de standaardretentie: {changes}.",
-      "change": "{type} van {from} naar {to}",
-      "confirmWarning": "Geen enkele stream neemt deze standaardwaarden op dit moment over. | {count} stream neemt deze standaardwaarden over. Gegevens die buiten de nieuwe retentie vallen, worden bij de volgende retentierun verwijderd en kunnen niet worden hersteld. | {count} streams nemen deze standaardwaarden over. Gegevens die buiten de nieuwe retentie vallen, worden bij de volgende retentierun verwijderd en kunnen niet worden hersteld.",
-      "confirmOk": "Retentie verlagen"
+      "invalid": "Gebruik 0 of minimaal 3 dagen"
     },
     "organizationSettings": {
       "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",

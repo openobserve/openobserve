@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Valori predefiniti di conservazione dei dati",
-      "about": "Per gli stream senza una propria conservazione. Vuoto o 0 eredita il livello successivo; altrimenti almeno 3 giorni.",
+      "about": "Per gli stream che non hanno una conservazione propria. Vuoto o 0 utilizza il valore globale; altrimenti almeno 3 giorni.",
       "defaultDays": "Predefinito (giorni)",
       "streamType": "Tipo di stream",
       "days": "Giorni",
       "addType": "Aggiungi tipo di stream",
       "removeType": "Rimuovi questo tipo di stream",
-      "otherTypes": "Altri tipi di stream",
-      "inherit": "Eredita",
-      "resolved": "Gli stream usano: {value}",
+      "globalDefault": "Globale: {value}",
+      "globalType": "Globale {type}: {value}",
       "daysValue": "{days} giorni",
       "forever": "conserva per sempre",
-      "invalid": "Usa 0 o almeno 3 giorni",
-      "confirmTitle": "Ridurre la conservazione dei dati?",
-      "confirmMessage": "Questo riduce la conservazione predefinita: {changes}.",
-      "change": "{type} da {from} a {to}",
-      "confirmWarning": "Nessuno stream eredita attualmente questi valori predefiniti. | {count} stream eredita attualmente questi valori predefiniti. I dati oltre la nuova conservazione vengono eliminati alla prossima esecuzione della conservazione e non possono essere recuperati. | {count} stream ereditano attualmente questi valori predefiniti. I dati oltre la nuova conservazione vengono eliminati alla prossima esecuzione della conservazione e non possono essere recuperati.",
-      "confirmOk": "Riduci conservazione"
+      "invalid": "Usa 0 o almeno 3 giorni"
     },
     "organizationSettings": {
       "fieldNameHelp": "Usa solo caratteri alfanumerici e '+=,.{'@'}-_', senza spazi.",

@@ -15503,23 +15503,17 @@
     },
     "dataRetentionDefaults": {
       "title": "Domyślne ustawienia retencji danych",
-      "about": "Dla strumieni bez własnej retencji. Pusta wartość lub 0 oznacza dziedziczenie następnego poziomu; w przeciwnym razie co najmniej 3 dni.",
+      "about": "Dla strumieni bez własnego okresu przechowywania. Pusta wartość lub 0 oznacza użycie wartości globalnej; w przeciwnym razie co najmniej 3 dni.",
       "defaultDays": "Domyślne (dni)",
       "streamType": "Typ strumienia",
       "days": "Dni",
       "addType": "Dodaj typ strumienia",
       "removeType": "Usuń ten typ strumienia",
-      "otherTypes": "Inne typy strumieni",
-      "inherit": "Dziedzicz",
-      "resolved": "Stosowane w strumieniach: {value}",
+      "globalDefault": "Globalnie: {value}",
+      "globalType": "Globalny {type}: {value}",
       "daysValue": "{days} dni",
       "forever": "przechowuj bezterminowo",
-      "invalid": "Użyj 0 lub co najmniej 3 dni",
-      "confirmTitle": "Skrócić retencję danych?",
-      "confirmMessage": "Spowoduje to skrócenie domyślnej retencji: {changes}.",
-      "change": "{type}: z {from} na {to}",
-      "confirmWarning": "Żaden strumień nie dziedziczy obecnie tych ustawień domyślnych. | {count} strumień dziedziczy te ustawienia domyślne. Dane starsze niż nowy okres retencji są usuwane podczas następnego uruchomienia retencji i nie można ich odzyskać. | Liczba strumieni dziedziczących te ustawienia domyślne: {count}. Dane starsze niż nowy okres retencji są usuwane podczas następnego uruchomienia retencji i nie można ich odzyskać.",
-      "confirmOk": "Skróć retencję"
+      "invalid": "Użyj 0 lub co najmniej 3 dni"
     },
     "organizationSettings": {
       "fieldNameHelp": "Używaj tylko znaków alfanumerycznych oraz '+=,.{'@'}-_', bez spacji.",
