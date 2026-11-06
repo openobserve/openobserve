@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use config::{
-    cluster::{LOCAL_NODE, LOCAL_NODE_STATUS},
+    cluster::{LOCAL_NODE, LOCAL_NODE_SCHEDULED, LOCAL_NODE_STATUS},
     get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
@@ -26,8 +26,6 @@ use config::{
 use infra::{cluster::*, errors::*};
 
 mod nats;
-
-static LOCAL_NODE_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
 /// Register and keep alive the node to cluster
 pub async fn register_and_keep_alive() -> Result<()> {

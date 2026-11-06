@@ -29,8 +29,6 @@ use infra::{
 };
 use tokio::task;
 
-use super::LOCAL_NODE_SCHEDULED;
-
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
     // if local node is single node or cluster coordinator is not nats, return ok
