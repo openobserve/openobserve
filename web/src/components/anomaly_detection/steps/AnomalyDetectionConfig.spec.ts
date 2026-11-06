@@ -76,6 +76,7 @@ import {
   anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
   isAnomalyDataReadinessStatus,
+  anomalyCanCheckDataNow,
   anomalySensitivityModel,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
@@ -1475,6 +1476,12 @@ describe("data readiness statuses", () => {
     expect(model.state).toBe(state);
     expect(model.current).toBe(false);
     expect(model.level).toBeNull();
+  });
+
+  it("offers Check now only on an enabled data state", () => {
+    expect(anomalyCanCheckDataNow({ status: "not_applicable", enabled: true })).toBe(true);
+    expect(anomalyCanCheckDataNow({ status: "waiting_for_data", enabled: false })).toBe(false);
+    expect(anomalyCanCheckDataNow({ status: "failed", enabled: true })).toBe(false);
   });
 
   it.each(["failed", "waiting", "ready", "training", undefined])(

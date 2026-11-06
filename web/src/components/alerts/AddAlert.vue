@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </OTooltip>
               <OTooltip
-                v-else-if="isAnomalyDataReadinessStatus(anomalyConfig.status)"
+                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
                 :content="t('alerts.anomaly.checkDataNowTooltip')"
               >
                 <OButton
@@ -680,6 +680,7 @@ import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import {
   anomalyNoticeBadgeKeys,
+  anomalyCanCheckDataNow,
   isAnomalyDataReadinessStatus,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -1081,6 +1082,7 @@ export default defineComponent({
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
       isAnomalyDataReadinessStatus,
+      anomalyCanCheckDataNow,
       alertTypeOptions,
       anomalyLockedReason,
       alertTabs,

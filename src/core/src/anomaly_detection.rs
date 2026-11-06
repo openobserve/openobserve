@@ -1075,7 +1075,7 @@ pub async fn update_config(
 
     let mut updated = active_model.update(db).await?;
 
-    // After the save, so the training it queues reads the repaired config.
+    // After the save, so the training it queues reads the repaired config, even over a claim.
     if retryable_change
         && o2_enterprise::enterprise::anomaly_detection::scheduler::requeue_data_readiness(
             db,
