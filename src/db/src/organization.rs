@@ -666,7 +666,7 @@ async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result
         );
         return Ok(0);
     };
-    let source_days = stored_retention_days(org_id, source, source_type).await;
+    let source_days = stored_retention_days(org_id, source, source_type).await?;
     if source_type == StreamType::Metadata {
         return metadata_stream_retention_days(org_id, source, source_days).await;
     }
@@ -685,14 +685,22 @@ async fn metadata_stream_retention_days(
     let Some((source, source_type)) = metadata_stream_source(metadata_stream) else {
         return data_stream_retention_days(org_id, StreamType::Metadata, 0).await;
     };
-    let source_days = stored_retention_days(org_id, source, source_type).await;
+    let source_days = stored_retention_days(org_id, source, source_type).await?;
     data_stream_retention_days(org_id, source_type, source_days).await
 }
 
-async fn stored_retention_days(org_id: &str, stream: &str, stream_type: StreamType) -> i64 {
-    infra::schema::get_settings(org_id, stream, stream_type)
-        .await
-        .map_or(0, |settings| settings.data_retention)
+/// A stream with no stored schema has no value; a failed read is an error, never a default.
+async fn stored_retention_days(
+    org_id: &str,
+    stream: &str,
+    stream_type: StreamType,
+) -> Result<i64, Error> {
+    let key = format!("{org_id}/{stream_type}/{stream}");
+    if let Some(settings) = infra::schema::get_stream_settings_atomic(&key) {
+        return Ok(settings.data_retention);
+    }
+    let schema = infra::schema::get(org_id, stream, stream_type).await?;
+    Ok(infra::schema::unwrap_stream_settings(&schema).map_or(0, |s| s.data_retention))
 }
 
 /// Index streams are named `<source stream>_<source type>`.
@@ -1289,6 +1297,42 @@ mod tests {
                 .await
                 .unwrap(),
             5
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_source_fails_instead_of_falling_back_to_a_default() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = "unreadable_source_org";
+        let key = infra::schema::mk_key(org, StreamType::Traces, "app");
+        infra::db::get_db()
+            .await
+            .put(&key, "not json".into(), infra::db::NO_NEED_WATCH, None)
+            .await
+            .unwrap();
+
+        for (stream_type, stream) in [
+            (StreamType::Metadata, "trace_time_index_app"),
+            (StreamType::Metadata, "distinct_values_traces_app"),
+            (StreamType::Index, "app_traces"),
+        ] {
+            assert!(
+                stream_retention_days(org, stream_type, stream, 0)
+                    .await
+                    .is_err(),
+                "{stream}"
+            );
+        }
+        // a source that was never written has nothing to read, so it is no failure
+        assert!(
+            stream_retention_days(org, StreamType::Metadata, "trace_time_index_absent", 0)
+                .await
+                .is_ok()
         );
     }
 

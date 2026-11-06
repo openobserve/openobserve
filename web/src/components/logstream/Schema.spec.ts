@@ -508,6 +508,16 @@ describe("Schema Component Tests", () => {
       store.state.zoConfig.data_retention_days = before;
     });
 
+    it("should prefer the backend's inherited retention over the type default", () => {
+      wrapper.vm.dataRetentionDays = "";
+      wrapper.vm.serverInheritedRetention = 90;
+      expect(wrapper.vm.inheritedRetention).toBe(90);
+      wrapper.vm.serverInheritedRetention = 0;
+      wrapper.vm.calculateDateRange();
+      expect(wrapper.vm.minDate).toBeNull();
+      wrapper.vm.serverInheritedRetention = undefined;
+    });
+
     // Test 26: openPatternAssociationDialog function
     it("should open pattern association dialog", () => {
       wrapper.vm.patternAssociations = {

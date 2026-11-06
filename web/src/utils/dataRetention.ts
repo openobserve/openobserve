@@ -25,31 +25,18 @@ interface RetentionState {
   organizationData?: {
     organizationSettings?: { resolved_data_retention?: ResolvedDataRetention };
   };
-  zoConfig?: { data_retention_defaults?: ResolvedDataRetention };
+  zoConfig?: { resolved_data_retention?: ResolvedDataRetention };
 }
 
-const metadataSourceType = (streamName: string): RetentionStreamType | undefined => {
-  if (streamName.startsWith("trace_time_index_")) return "traces";
-  if (!streamName.startsWith("distinct_values_")) return undefined;
-  const typedName = streamName.slice("distinct_values_".length);
-  return RETENTION_STREAM_TYPES.find((type) => typedName.startsWith(`${type}_`));
-};
-
-export const retentionKeyFor = (streamType: string, streamName = ""): RetentionKey => {
-  if (streamType === "metadata") return metadataSourceType(streamName) ?? "default";
-  return (RETENTION_STREAM_TYPES as readonly string[]).includes(streamType)
+export const retentionKeyFor = (streamType: string): RetentionKey =>
+  (RETENTION_STREAM_TYPES as readonly string[]).includes(streamType)
     ? (streamType as RetentionStreamType)
     : "default";
-};
 
 /** Days a stream with no value of its own keeps data, 0 for forever; the backend owns the ordering. */
-export const inheritedRetentionDays = (
-  state: RetentionState,
-  streamType: string,
-  streamName = "",
-): number => {
+export const inheritedRetentionDays = (state: RetentionState, streamType: string): number => {
   const resolved =
     state.organizationData?.organizationSettings?.resolved_data_retention ??
-    state.zoConfig?.data_retention_defaults;
-  return Number(resolved?.[retentionKeyFor(streamType, streamName)] ?? 0);
+    state.zoConfig?.resolved_data_retention;
+  return Number(resolved?.[retentionKeyFor(streamType)] ?? 0);
 };

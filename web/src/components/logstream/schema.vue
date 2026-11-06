@@ -1480,6 +1480,7 @@ export default defineComponent({
       // Populate stream-level cross-links
       streamCrossLinks.value = streamResponse.settings?.cross_links || [];
 
+      serverInheritedRetention.value = streamResponse.inherited_retention_days;
       if (showDataRetention.value)
         dataRetentionDays.value = streamResponse.settings.data_retention || "";
       calculateDateRange();
@@ -1831,8 +1832,13 @@ export default defineComponent({
 
     const showDataRetention = computed(() => modelValue.stream_type !== "enrichment_tables");
 
-    const inheritedRetention = computed(() =>
-      inheritedRetentionDays(store.state, String(modelValue.stream_type), String(modelValue.name)),
+    const serverInheritedRetention = ref<number | undefined>();
+
+    // A metadata stream follows its source stream's own value, which only the backend can see.
+    const inheritedRetention = computed(
+      () =>
+        serverInheritedRetention.value ??
+        inheritedRetentionDays(store.state, String(modelValue.stream_type)),
     );
 
     const disableOptions = (schema: any, option: any) => {
@@ -2590,6 +2596,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       inheritedRetention,
+      serverInheritedRetention,
       storeOriginalData,
       enableDistinctFields,
       approxPartition,

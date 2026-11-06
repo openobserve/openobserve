@@ -99,6 +99,13 @@ pub async fn schema(
         )
             .into_response();
     };
+    schema.inherited_retention_days =
+        db::organization::stream_retention_days(&org_id, stream_type, &stream_name, 0)
+            .await
+            .inspect_err(|e| {
+                log::warn!("[RETENTION] stream {org_id}/{stream_name} default unreadable: {e}")
+            })
+            .ok();
     if !schema.settings.defined_schema_fields.is_empty() {
         let mut schema_fields = schema
             .schema
@@ -1156,6 +1163,7 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
             is_internal: false,
+            inherited_retention_days: None,
         }
     }
 

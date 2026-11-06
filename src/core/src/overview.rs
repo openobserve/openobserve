@@ -884,6 +884,7 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
             is_internal: false,
+            inherited_retention_days: None,
         }
     }
 

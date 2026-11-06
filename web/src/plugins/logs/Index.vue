@@ -3976,7 +3976,7 @@ export default defineComponent({
           );
           const days =
             Number(entry?.settings?.data_retention ?? 0) ||
-            inheritedRetentionDays(store.state, searchObj.data.stream.streamType, stream);
+            inheritedRetentionDays(store.state, searchObj.data.stream.streamType);
           return days > 0 ? days : null;
         },
       };

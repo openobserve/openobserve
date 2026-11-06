@@ -42,19 +42,16 @@ describe("retentionKeyFor", () => {
 describe("inheritedRetentionDays", () => {
   const state = {
     organizationData: { organizationSettings: { resolved_data_retention: resolved } },
-    zoConfig: { data_retention_defaults: { ...resolved, logs: 3650 } },
+    zoConfig: { resolved_data_retention: { ...resolved, logs: 3650 } },
   };
 
   it("looks the value up by stream type", () => {
     expect(inheritedRetentionDays(state, "metrics")).toBe(30);
     expect(inheritedRetentionDays(state, "metadata")).toBe(10);
-    expect(inheritedRetentionDays(state, "metadata", "trace_time_index_app")).toBe(40);
-    expect(inheritedRetentionDays(state, "metadata", "distinct_values_metrics_app")).toBe(30);
-    expect(inheritedRetentionDays(state, "metadata", "distinct_values_unknown_app")).toBe(10);
     expect(inheritedRetentionDays(state, "service_graph")).toBe(10);
   });
 
-  it("falls back to the global values until org settings have loaded", () => {
+  it("falls back to the org config when org settings can't be read", () => {
     expect(inheritedRetentionDays({ zoConfig: state.zoConfig }, "logs")).toBe(3650);
     expect(inheritedRetentionDays({ zoConfig: state.zoConfig }, "metrics")).toBe(30);
     expect(inheritedRetentionDays({}, "logs")).toBe(0);
