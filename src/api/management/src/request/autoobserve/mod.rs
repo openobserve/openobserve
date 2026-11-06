@@ -146,10 +146,11 @@ struct Subject<'a> {
 
 impl<'a> Subject<'a> {
     fn of(subject: &'a EntityRef) -> Self {
-        let resource = if subject.kind == kinds::SYNTHETIC {
-            "synthetics"
-        } else {
-            "alerts"
+        // A stream subject quotes its log lines, so it needs org-wide logs read.
+        let resource = match subject.kind.as_str() {
+            kinds::SYNTHETIC => "synthetics",
+            kinds::STREAM => "logs",
+            _ => "alerts",
         };
         let alert_id = (subject.kind == ENTITY_TYPE_ALERT)
             .then(|| subject.key_dims.get(dims::ENTITY_ID).map(String::as_str))
@@ -960,6 +961,32 @@ mod tests {
             ),
             (1, 0),
             "no grant, so no alert's folder is read"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_stream_subject_needs_org_wide_logs_read() {
+        let stream = EntityRef::new(kinds::STREAM, &[(dims::STREAM_NAME, "app")]);
+        let alert = EntityRef::new(ENTITY_TYPE_ALERT, &[(dims::ENTITY_ID, "a0")]);
+        let subjects = [Subject::of(&stream), Subject::of(&alert)];
+        let alerts_only = CountingAuthority {
+            org_wide: HashMap::from([("alerts", true), ("logs", false)]),
+            ..Default::default()
+        };
+        assert_eq!(readable_mask(&alerts_only, &subjects).await, [false, true]);
+        let logs_too = CountingAuthority {
+            org_wide: HashMap::from([("alerts", true), ("logs", true)]),
+            ..Default::default()
+        };
+        assert_eq!(readable_mask(&logs_too, &subjects).await, [true, true]);
+        let logs_only = CountingAuthority {
+            org_wide: HashMap::from([("logs", true)]),
+            ..Default::default()
+        };
+        assert_eq!(
+            readable_mask(&logs_only, &subjects).await,
+            [true, false],
+            "an alert subject still needs alerts read"
         );
     }
 
