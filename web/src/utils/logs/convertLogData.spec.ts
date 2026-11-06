@@ -148,16 +148,18 @@ describe("convertLogData.ts", () => {
       expect(options.yAxis.splitNumber).toBe(3);
     });
 
-    it("yAxis axisLabel formatter formats values using the 'numbers' unit", () => {
+    it("yAxis shows whole-number count ticks and abbreviates large counts", () => {
       const { options } = convertLogData([1], [10], {
         title: "",
         unparsed_x_data: [],
         timezone: "UTC",
         itemStyle: null,
       });
-      // Small values keep 2 decimals with no unit suffix
-      expect(options.yAxis.axisLabel.formatter(10.7)).toBe("10.70");
-      expect(options.yAxis.axisLabel.formatter(0)).toBe("0.00");
+      expect(options.yAxis.minInterval).toBe(1);
+      expect(options.yAxis.axisLabel.formatter(0)).toBe("0");
+      expect(options.yAxis.axisLabel.formatter(1)).toBe("1");
+      expect(options.yAxis.axisLabel.formatter(2)).toBe("2");
+      expect(options.yAxis.axisLabel.formatter(999)).toBe("999");
       // Large values are abbreviated (K / M / B / T / Q)
       expect(options.yAxis.axisLabel.formatter(1500)).toBe("1.50K");
       expect(options.yAxis.axisLabel.formatter(2_500_000)).toBe("2.50M");
@@ -346,6 +348,14 @@ describe("convertLogData.ts", () => {
       ]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.series).toHaveLength(3);
+    });
+
+    it("uses whole-number count ticks on the yAxis", () => {
+      const bd = makeBreakdown([["error", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.yAxis.minInterval).toBe(1);
+      expect(options.yAxis.axisLabel.formatter(2)).toBe("2");
+      expect(options.yAxis.axisLabel.formatter(1500)).toBe("1.50K");
     });
 
     it("stacks all series on 'total'", () => {
