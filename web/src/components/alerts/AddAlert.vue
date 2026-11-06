@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="step1Ref"
               name="name"
               :readonly="beingUpdated || anomalyEditMode"
-              :submit-on-enter="false"
               :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
               :placeholder="
                 isAnomalyMode
@@ -561,6 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex max-w-120 min-w-0 flex-col gap-1.5"
                   @input="onNameInput"
                   @focusin="onNameFocus"
+                  @keydown.enter="onNameEnter"
                   @focusout="alertAutoName.onCommit(formData.name ?? '')"
                 >
                   <OFormInput
@@ -1709,14 +1709,26 @@ export default defineComponent({
       apply: (name: string) => alertForm.setF("name", name),
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
-    const nameHasUnsupportedChars = computed(() =>
-      ALERT_NAME_UNSUPPORTED_CHARS.test(String(alertForm.formData.value?.name ?? "")),
+    const nameFieldErrors = alertForm.form.useStore(
+      (state) => (state.fieldMeta as FieldMetaMap).name?.errors?.length ?? 0,
+    );
+    // The live hint covers typing; once a save has validated the field, its own error says it instead.
+    const nameHasUnsupportedChars = computed(
+      () =>
+        nameFieldErrors.value === 0 &&
+        ALERT_NAME_UNSUPPORTED_CHARS.test(String(alertForm.formData.value?.name ?? "")),
     );
     // A generated name is a placeholder the user usually replaces, so focusing it selects it whole.
     const onNameFocus = (event: FocusEvent) => {
       if (alertAutoName.isAuto.value && event.target instanceof HTMLInputElement) {
         event.target.select();
       }
+    };
+    // Enter in the name saves the alert, the same as Enter in the header name.
+    const onNameEnter = (event: KeyboardEvent) => {
+      if (!(event.target instanceof HTMLInputElement)) return;
+      event.preventDefault();
+      event.target.form?.requestSubmit();
     };
     // Names cannot hold spaces, so a typed space becomes the underscore the error would ask for.
     const onNameInput = () => {
@@ -1773,6 +1785,7 @@ export default defineComponent({
       nameHasUnsupportedChars,
       onNameInput,
       onNameFocus,
+      onNameEnter,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,
