@@ -64,7 +64,7 @@ use o2_openfga::{
 use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use search::{
-    datafusion::plan::projections::get_result_schema,
+    datafusion::logical_plan::projections::get_result_schema,
     sql::{RE_ONLY_SELECT, Sql},
 };
 use svix_ksuid::Ksuid;

@@ -15,7 +15,7 @@
 
 use ::search::{
     CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-    cache::streaming_agg::STREAMING_AGGS_CACHE_DIR,
+    datafusion::physical_plan::streaming_aggs_exec::files::STREAMING_AGGS_CACHE_DIR,
 };
 use bytes::Bytes;
 use config::{

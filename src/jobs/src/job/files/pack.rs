@@ -42,7 +42,7 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge::{self, MergeMode, MergeOutput, MergedFile};
+use search::merge::{self, MergeMode, MergeOutput, MergedFile};
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::sync::{Mutex, RwLock};
 

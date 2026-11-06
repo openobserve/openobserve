@@ -15,7 +15,7 @@
 
 use std::time::Instant;
 
-use ::search::{QueryDelta, SearchResultType, datafusion::distributed_plan::streaming_aggs_exec};
+use ::search::{QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec};
 use config::meta::{
     search::{
         PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -474,7 +474,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = &partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(streaming_id)
+        streaming_aggs_exec::registry::remove_cache(streaming_id)
     }
 
     Ok(())
@@ -998,7 +998,7 @@ pub async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && let Some(streaming_id) = partition_resp.streaming_id {
-        streaming_aggs_exec::remove_cache(&streaming_id)
+        streaming_aggs_exec::registry::remove_cache(&streaming_id)
     }
 
     Ok(())
