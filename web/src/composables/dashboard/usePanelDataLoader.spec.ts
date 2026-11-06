@@ -1656,6 +1656,52 @@ describe("usePanelDataLoader", () => {
 
       expect(payloads.map((p: any) => p.queryReq.query.start_time)).toEqual([4_000_000]);
     });
+
+    it("stops a stale run that resumes before the newer one searches", async () => {
+      // The shared mock never flips signal.aborted, which is what supersedes a run.
+      global.AbortController = RealAbortController;
+      const releases: ((v: unknown) => void)[] = [];
+      mockGetStream.mockImplementation(() => new Promise((resolve) => releases.push(resolve)));
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      const stats = { stats: { doc_time_min: 5_000_000, doc_time_max: 5_000_000 } };
+
+      const staleLoad = loader.loadData();
+      await vi.waitFor(() => expect(releases).toHaveLength(1));
+      const newestLoad = loader.loadData();
+      await vi.waitFor(() => expect(releases).toHaveLength(2));
+      releases[0](stats);
+      await staleLoad;
+      expect(payloads).toHaveLength(0);
+      releases[1](stats);
+      await newestLoad;
+
+      expect(payloads).toHaveLength(1);
+    });
   });
 
   describe("superseded runs", () => {

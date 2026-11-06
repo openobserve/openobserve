@@ -534,7 +534,10 @@ export const usePanelDataLoader = (
       }
 
       // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
+      const runSignal = abortController.signal;
       const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+      // A newer run started during the lookup; resuming would abort it after it cleared the panel's data.
+      if (runSignal.aborted) return;
       if (tableRange) {
         startISOTimestamp = tableRange.from;
         endISOTimestamp = tableRange.to;
