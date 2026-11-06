@@ -33,6 +33,13 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 });
 
 // Mock services before importing component (follow reference style)
+// Monaco's real stylesheet makes every jsdom getComputedStyle match hundreds of rules, and a tooltip calls it per mount.
+vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
+  editor: { colorize: vi.fn().mockResolvedValue("") },
+  languages: {},
+}));
+vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
 }));
