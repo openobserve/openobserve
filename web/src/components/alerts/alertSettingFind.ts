@@ -330,7 +330,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "details",
     tier: "shown",
     groupKey: "alerts.find.groups.details",
-    targets: ["add-alert-details-rename-btn"],
+    targets: ["add-alert-details-name-input"],
   },
   {
     id: "folder",
