@@ -1313,8 +1313,7 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
 }
 
 pub fn is_result_cache_allowed(stream_type: StreamType) -> bool {
-    // An enrichment table ignores the time range, so a cached result plus its delta window repeats
-    // every row.
+    // Enrichment tables ignore the time range, so a cached result plus its delta repeats rows.
     stream_type != StreamType::EnrichmentTables
 }
 
