@@ -29,7 +29,7 @@ use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct SourceMapRepr {
     pub service: Option<String>,
     pub env: Option<String>,
@@ -48,7 +48,7 @@ pub struct StacktraceRequest {
     stacktrace: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct StacktraceResponse {
     stacktrace: TranslatedStack,
 }
@@ -84,7 +84,7 @@ struct SourcemapUploadForm {
         ("version" = Option<String>, Query, description = "Version filter"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<SourceMapRepr>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
@@ -142,7 +142,7 @@ pub async fn list(
         ("version" = Option<String>, Query, description = "Version filter"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "delete"})),
@@ -183,7 +183,7 @@ pub async fn delete(
       ),
     request_body(content = inline(StacktraceRequest), description = "Minified stacktrace and the sourcemap group to translate it with", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = StacktraceResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "create"})),
@@ -353,7 +353,7 @@ pub async fn upload_maps(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = db_sourcemaps::ParamValues),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),

@@ -410,7 +410,7 @@ pub async fn update(
         ("model_id" = String, Path, description = "Model pricing definition ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found"),
     ),
     extensions(
@@ -475,7 +475,7 @@ pub struct BuiltInModelPricingEntry {
 }
 
 /// BuiltInModelPricingResponse
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct BuiltInModelPricingResponse {
     pub models: Vec<BuiltInModelPricingEntry>,
     pub source_url: String,
@@ -503,7 +503,7 @@ pub struct BuiltInModelPricingResponse {
         ("metadata_only" = Option<bool>, Query, description = "Return seed/sync metadata without loading the catalogue"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = BuiltInModelPricingResponse),
         (status = 500, description = "Internal server error"),
     ),
     extensions(
@@ -607,7 +607,7 @@ fn map_set_error(e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_builtins::model_pricing::SyncResult),
         (status = 500, description = "Internal server error"),
     ),
     extensions(

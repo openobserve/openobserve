@@ -53,6 +53,7 @@ use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
+    security(("Authorization" = [])),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -100,6 +101,7 @@ pub struct RetrieveQuery {
         (status = 200, description = "JSON response when type=ui", body = String, content_type = "application/json"),
         (status = 404, description = "Short URL not found", content_type = "text/plain")
     ),
+    security(("Authorization" = [])),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "get"})),
         ("x-o2-mcp" = json!({"enabled": false}))

@@ -29,6 +29,19 @@ use crate::{
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
+// Only documents o2_openfga's Resource, which borrows its strings and has no ToSchema.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct ResourceView {
+    key: String,
+    display_name: String,
+    order: u8,
+    parent: String,
+    visible: bool,
+    has_entities: bool,
+    top_level: bool,
+}
+
 #[cfg(feature = "enterprise")]
 /// CreateRoles
 #[utoipa::path(
@@ -47,7 +60,7 @@ use crate::{
     ),
     request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid, standard or already existing role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -108,11 +121,12 @@ pub async fn create_role(
     ),
     request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn create_role(
@@ -140,7 +154,7 @@ pub async fn create_role(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -278,11 +292,12 @@ pub async fn delete_role_bulk(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
     )
 )]
 pub async fn delete_role(Path(_path): Path<(String, String)>) -> Response {
@@ -378,7 +393,8 @@ pub async fn get_roles(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
@@ -404,7 +420,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     ),
     request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid role name, permission or user id; nothing is applied if any entry is invalid", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -459,8 +475,12 @@ pub async fn update_role(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
     )
 )]
 pub async fn update_role(
@@ -492,6 +512,10 @@ pub async fn update_role(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "get"}))
     )
 )]
 pub async fn get_role_permissions(
@@ -527,6 +551,10 @@ pub async fn get_role_permissions(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, String)>) -> Response {
@@ -558,6 +586,10 @@ pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, Str
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 pub async fn get_all_role_permissions(Path(_path): Path<(String, String)>) -> Response {
@@ -584,6 +616,10 @@ pub async fn get_all_role_permissions(Path(_path): Path<(String, String)>) -> Re
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "get"}))
     )
 )]
 pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -> Response {
@@ -611,6 +647,10 @@ pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>) -> Response {
@@ -642,6 +682,10 @@ pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Response {
@@ -652,7 +696,7 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
 /// GetUserRoles
 #[utoipa::path(
     get,
-    path = "/{org_id}/users/{user_email}/roles",
+    path = "/{org_id}/users/{user_id}/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserRoles",
@@ -663,12 +707,16 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_email" = String, Path, description = "User email address"),
+        ("user_id" = String, Path, description = "User email address"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 400, description = "Invalid user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
@@ -684,7 +732,7 @@ pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/users/{user_email}/roles",
+    path = "/{org_id}/users/{user_id}/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserRoles",
@@ -695,11 +743,15 @@ pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_email" = String, Path, description = "User email address"),
+        ("user_id" = String, Path, description = "User email address"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_roles_for_user(Path(_path): Path<(String, String)>) -> Response {
@@ -725,6 +777,10 @@ pub async fn get_roles_for_user(Path(_path): Path<(String, String)>) -> Response
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_roles_for_all_users(Path(org_id): Path<String>) -> Response {
@@ -752,6 +808,10 @@ pub async fn get_roles_for_all_users(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_roles_for_all_users(Path(_path): Path<String>) -> Response {
@@ -762,7 +822,7 @@ pub async fn get_roles_for_all_users(Path(_path): Path<String>) -> Response {
 /// GetUserGroups
 #[utoipa::path(
     get,
-    path = "/{org_id}/users/{user_email}/groups",
+    path = "/{org_id}/users/{user_id}/groups",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserGroups",
@@ -773,12 +833,16 @@ pub async fn get_roles_for_all_users(Path(_path): Path<String>) -> Response {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_email" = String, Path, description = "User email address"),
+        ("user_id" = String, Path, description = "User email address"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 400, description = "Invalid user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_groups_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
@@ -794,7 +858,7 @@ pub async fn get_groups_for_user(Path((org_id, user_email)): Path<(String, Strin
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/users/{user_email}/groups",
+    path = "/{org_id}/users/{user_id}/groups",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserGroups",
@@ -805,11 +869,15 @@ pub async fn get_groups_for_user(Path((org_id, user_email)): Path<(String, Strin
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_email" = String, Path, description = "User email address"),
+        ("user_id" = String, Path, description = "User email address"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Response {
@@ -834,9 +902,13 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
     ),
     request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid group name or user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "create"}))
     )
 )]
 pub async fn create_group(
@@ -882,8 +954,12 @@ pub async fn create_group(
     ),
     request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "create"}))
     )
 )]
 pub async fn create_group(
@@ -912,9 +988,13 @@ pub async fn create_group(
     ),
     request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid group name, user id or role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "update"}))
     )
 )]
 pub async fn update_group(
@@ -978,8 +1058,12 @@ pub async fn update_group(
     ),
     request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "update"}))
     )
 )]
 pub async fn update_group(
@@ -1008,6 +1092,10 @@ pub async fn update_group(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "list"}))
     )
 )]
 pub async fn get_groups(
@@ -1072,6 +1160,10 @@ pub async fn get_groups(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "list"}))
     )
 )]
 pub async fn get_groups(Path(_path): Path<String>) -> Response {
@@ -1099,6 +1191,10 @@ pub async fn get_groups(Path(_path): Path<String>) -> Response {
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
         (status = 400, description = "Invalid group name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "get"}))
     )
 )]
 pub async fn get_group_details(Path((org_id, group_name)): Path<(String, String)>) -> Response {
@@ -1130,6 +1226,10 @@ pub async fn get_group_details(Path((org_id, group_name)): Path<(String, String)
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "get"}))
     )
 )]
 pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response {
@@ -1153,7 +1253,7 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<ResourceView>),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1202,7 +1302,7 @@ pub async fn get_resources(Path(org_id): Path<String>) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<ResourceView>),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1232,9 +1332,13 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
         ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Invalid group name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
 pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) -> Response {
@@ -1270,7 +1374,8 @@ pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) ->
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
 pub async fn delete_group_bulk(
@@ -1337,7 +1442,8 @@ pub async fn delete_group_bulk(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
 pub async fn delete_group_bulk(
@@ -1365,8 +1471,12 @@ pub async fn delete_group_bulk(
         ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
 pub async fn delete_group(Path(_path): Path<(String, String)>) -> Response {
@@ -2274,5 +2384,19 @@ mod tests {
         let on = hide_slack_unless_enabled(all.clone(), true);
         assert!(keys(&on).contains(&"slack_integration".to_string()));
         assert_eq!(on.len(), all.len());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn resource_view_names_the_fields_resource_sends() {
+        use utoipa::PartialSchema;
+        let sent = serde_json::to_value(o2_openfga::meta::mapping::Resource::default()).unwrap();
+        let schema = serde_json::to_value(ResourceView::schema()).unwrap();
+        let mut documented: Vec<&String> =
+            schema["properties"].as_object().unwrap().keys().collect();
+        let mut serialized: Vec<&String> = sent.as_object().unwrap().keys().collect();
+        documented.sort();
+        serialized.sort();
+        assert_eq!(documented, serialized);
     }
 }

@@ -56,6 +56,17 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
+// Only documents get_latest_traces' answer: an empty search response until traces are found.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum LatestTracesVariants {
+    Empty(Box<config::meta::search::Response>),
+    Page(PaginatedResponse),
+}
+
+config::any_of_schema!(LatestTracesAnswer, LatestTracesVariants);
+
 pub(crate) async fn check_stream_permissions(
     org_id: &str,
     stream_name: &str,
@@ -123,8 +134,8 @@ pub(crate) async fn check_sql_permissions(
     ),
     request_body(description = "ExportTraceServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "ExportTraceServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
-        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 200, description = "ExportTraceServiceResponse", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpTracesExportJson = "application/json"))),
+        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((common::meta::otlp::OtlpTracesExportJson = "application/json"))),
         (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
@@ -221,7 +232,7 @@ pub async fn traces_write(
         ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = LatestTracesAnswer, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -239,7 +250,8 @@ pub async fn traces_write(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent traces with summaries (trace_id, span count, service names, duration). Supports filter and sort by start_time/duration.", "category": "traces", "pinned": true}))
+        ("x-o2-mcp" = json!({"description": "List recent traces with summaries (trace_id, span count, service names, duration). Supports filter and sort by start_time/duration.", "category": "traces", "pinned": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_latest_traces(

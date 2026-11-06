@@ -15,11 +15,14 @@
 
 //! CI guard: every route in `router/mod.rs` is published or excluded, and published ops are valid.
 
+mod response_bodies;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
 };
 
+use openobserve_mcp::tools::{McpExtension, enabled_tool_names};
 use regex::Regex;
 use serde_json::Value;
 use utoipa::OpenApi;
@@ -31,6 +34,7 @@ const EXCLUDED_ROUTES: &str = include_str!("excluded_routes.txt");
 const RATELIMIT_EXEMPT: &str = include_str!("ratelimit_exempt.txt");
 const BASELINE: &str = include_str!("baseline.txt");
 const MCP_ENABLED: &str = include_str!("mcp_enabled.txt");
+const UNTYPED_BODIES: &str = include_str!("untyped_bodies.txt");
 
 // Sits just below the real counts, so a parser regression that loses routes fails loudly.
 const MIN_PARSED_ROUTES: usize = 900;
@@ -47,31 +51,15 @@ const RATELIMIT_OPERATIONS: &[&str] = &[
     "list", "get", "create", "update", "delete", "post", "put", "patch",
 ];
 
-/// Where each router function ends up; a new one must be added here or the guard panics.
-const ROUTER_PREFIXES: &[(&str, &str)] = &[
-    ("basic_routes", ""),
-    ("proxy_routes", ""),
-    ("other_service_routes", ""),
-    ("splunk_collector_routes", ""),
-    ("config_routes", "/config"),
-    ("node_routes", "/node"),
-    ("service_route_table", "/api"),
-    ("search_routes_with", "/api"),
-    ("public_dashboard_admin_routes", "/api"),
-    ("ai_chat_routes", "/api"),
-    ("alert_calibration_routes", "/api"),
-    ("downtime_routes", "/api"),
-    ("report_routes", "/api"),
-    ("oncall_routes", "/api"),
-    ("fleet_router", "/api"),
-    ("slack_routes", "/api"),
-    ("service_streams_routes", "/api"),
-    ("es_compat_routes", "/api"),
-    ("workflow_hook_routes", ""),
-];
+/// The root router of a serving node; every routed function must be reachable from it.
+const ROUTER_ROOT: &str = "local_routes";
 
 /// Only serves UI redirects, computed from `base_uri` at startup.
 const UNSCANNED_ROUTERS: &[&str] = &["create_app_router"];
+
+/// Runtime `if` conditions in the router that are fixed per edition, with the cfg each reduces to.
+const EDITION_GATES: &[(&str, &str)] =
+    &[("http_trigger::hooks_enabled()", r#"not(feature = "cloud")"#)];
 
 /// What a handler really answers on success: edition, method, path, status, content type, shape.
 const SUCCESS_CONTRACTS: &[ContractRow] = &[
@@ -239,6 +227,22 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
     ),
     (
         "all",
+        "GET",
+        "/api/{org_id}/prometheus/api/v1/query_range",
+        "200",
+        JSON,
+        "object",
+    ),
+    (
+        "all",
+        "GET",
+        "/api/{org_id}/prometheus/api/v1/query_range",
+        "200",
+        "text/event-stream",
+        "none",
+    ),
+    (
+        "all",
         "POST",
         "/api/{org_id}/prometheus/api/v1/query_range",
         "200",
@@ -323,8 +327,8 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "302",
-        "",
-        "none",
+        "text/html",
+        "string",
     ),
     (
         "cloud",
@@ -392,7 +396,7 @@ const MULTIPART_UPLOADS: &[(&str, &str, &str)] = &[
         "/api/{org_id}/datasets/{dataset_id}/items/import",
         "file",
     ),
-    ("all", "/api/{org_id}/settings/logo", "file"),
+    ("ent", "/api/{org_id}/settings/logo", "file"),
 ];
 
 /// Query parameters (edition, method, path, name) the handler rejects a request without.
@@ -472,6 +476,10 @@ const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
 const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
     ("noncloud", "GET", "/api/invites"),
     ("noncloud", "DELETE", "/api/invites/{token}"),
+    ("oss", "POST", "/api/{org_id}/settings/logo"),
+    ("oss", "DELETE", "/api/{org_id}/settings/logo"),
+    ("oss", "POST", "/api/{org_id}/settings/logo/text"),
+    ("oss", "DELETE", "/api/{org_id}/settings/logo/text"),
 ];
 
 /// `Option<Json<T>>` bodies and their schema: leaving the body out works, a JSON `null` is a 422.
@@ -596,6 +604,9 @@ type ContractRow = (
     &'static str,
 );
 
+/// A text range a router mount covers: its span, its prefix and whether the mount is compiled in.
+type MountSpan = (Range<usize>, String, bool);
+
 type BodyFieldsRow = (
     &'static str,
     &'static str,
@@ -707,8 +718,8 @@ fn attrs_above(source: &str, at: usize) -> Vec<String> {
         .collect()
 }
 
-fn router_functions() -> Vec<RouterFn> {
-    let source = strip_comments(ROUTER_SOURCE);
+fn router_functions(source: &str) -> Vec<RouterFn> {
+    let source = strip_comments(source);
     let (production, _) = source
         .split_once("\n#[cfg(test)]\nmod tests {")
         .expect("router source must end with its tests module");
@@ -717,7 +728,7 @@ fn router_functions() -> Vec<RouterFn> {
     for found in header.captures_iter(production) {
         let whole = found.get(0).unwrap();
         let body = &production[whole.end()..close_of(production, whole.end())];
-        if body.contains(".route(") && !UNSCANNED_ROUTERS.contains(&&found[1]) {
+        if !UNSCANNED_ROUTERS.contains(&&found[1]) {
             functions.push(RouterFn {
                 name: found[1].to_string(),
                 cfgs: attrs_above(production, whole.start()),
@@ -789,28 +800,56 @@ fn cfg_spans(body: &str) -> Vec<(Range<usize>, String)> {
         let stop = block.map_or_else(|| statement_end(body, next), |open| close_of(body, open));
         spans.push((next..stop, predicate));
     }
+    spans.extend(edition_gate_spans(body));
     spans
 }
 
-/// Text ranges mounted under a nested prefix: an inline router or a `let` router variable.
-fn nest_spans(body: &str) -> Vec<(Range<usize>, String)> {
+/// The block each `EDITION_GATES` condition guards, under the cfg it reduces to.
+fn edition_gate_spans(body: &str) -> Vec<(Range<usize>, String)> {
     let mut spans = Vec::new();
-    for (at, _) in body.match_indices(".nest(") {
-        let open = at + ".nest".len();
+    for (gate, predicate) in EDITION_GATES {
+        for (at, _) in body.match_indices(gate) {
+            let condition_end = at + gate.len();
+            let Some(brace) = body[condition_end..].find('{') else {
+                continue;
+            };
+            let open = condition_end + brace;
+            if body[condition_end..open].contains(';') {
+                continue;
+            }
+            spans.push((open..close_of(body, open), (*predicate).to_string()));
+        }
+    }
+    spans
+}
+
+/// Text ranges a nest or merge mounts, with its prefix and whether that mount site is compiled in.
+fn mount_spans(body: &str, cfgs: &[(Range<usize>, String)]) -> Vec<MountSpan> {
+    let mut spans = Vec::new();
+    for (method, at) in [".nest(", ".merge("]
+        .iter()
+        .flat_map(|method| body.match_indices(method).map(move |(at, _)| (*method, at)))
+    {
+        let open = at + method.len() - 1;
         let args = &body[open + 1..close_of(body, open) - 1];
-        let (prefix, target) = args.split_once(',').expect("nest takes two arguments");
+        let (prefix, target) = match method {
+            ".nest(" => args.split_once(',').expect("nest takes two arguments"),
+            _ => ("", args),
+        };
         let prefix = prefix.trim().trim_matches('"').to_string();
         let target = target.trim();
-        if target.starts_with("Router::new()") {
-            spans.push((open..open + args.len(), prefix));
+        if !target.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            spans.push((open..open + args.len(), prefix, true));
             continue;
         }
+        let gated = cfgs
+            .iter()
+            .filter(|(span, _)| span.contains(&at))
+            .all(|(_, cfg)| cfg_holds(cfg));
         let binding = Regex::new(&format!(r"let (?:mut )?{target}\b")).unwrap();
         for found in binding.find_iter(body) {
-            spans.push((
-                found.start()..statement_end(body, found.start()),
-                prefix.clone(),
-            ));
+            let span = found.start()..statement_end(body, found.start());
+            spans.push((span, prefix.clone(), gated));
         }
     }
     spans
@@ -834,15 +873,72 @@ fn bound_verbs(expression: &str) -> Vec<String> {
     verbs
 }
 
-fn routes_of(function: &RouterFn) -> Vec<ParsedRoute> {
-    let base = ROUTER_PREFIXES
+/// The nested prefix and the compiled-in state of the text at `at` inside a function body.
+fn mount_at(cfgs: &[(Range<usize>, String)], mounts: &[MountSpan], at: usize) -> (String, bool) {
+    let covering: Vec<&MountSpan> = mounts
         .iter()
-        .find(|(name, _)| *name == function.name)
-        .unwrap_or_else(|| panic!("add {} to ROUTER_PREFIXES", function.name))
-        .1;
+        .filter(|(span, ..)| span.contains(&at))
+        .collect();
+    let inner = covering
+        .iter()
+        .map(|(_, prefix, _)| prefix.as_str())
+        .collect();
+    let active = cfgs
+        .iter()
+        .filter(|(span, _)| span.contains(&at))
+        .all(|(_, cfg)| cfg_holds(cfg))
+        && covering.iter().all(|(.., gated)| *gated);
+    (inner, active)
+}
+
+/// Router functions a function calls, with the prefix and compiled-in state of each call site.
+fn calls_of(function: &RouterFn, names: &BTreeSet<&str>) -> Vec<(String, String, bool)> {
     let body = function.body.as_str();
-    let (cfgs, nests) = (cfg_spans(body), nest_spans(body));
-    let fn_active = function.cfgs.iter().all(|cfg| cfg_holds(cfg));
+    let cfgs = cfg_spans(body);
+    let nests = mount_spans(body, &cfgs);
+    // the preceding char is checked by hand so `outer(inner())` still yields `inner`
+    let call = Regex::new(r"(\w+)\s*\(").unwrap();
+    call.captures_iter(body)
+        .filter(|found| {
+            let start = found.get(1).unwrap().start();
+            !body[..start].ends_with([':', '.'])
+        })
+        .filter(|found| names.contains(&found[1]) && found[1] != *function.name)
+        .map(|found| {
+            let (inner, active) = mount_at(&cfgs, &nests, found.get(1).unwrap().start());
+            (found[1].to_string(), inner, active)
+        })
+        .collect()
+}
+
+/// Every (function index, prefix, active) mount reachable from `ROUTER_ROOT`.
+fn mounts(functions: &[RouterFn]) -> Vec<(usize, String, bool)> {
+    let names: BTreeSet<&str> = functions.iter().map(|f| f.name.as_str()).collect();
+    let mut found: Vec<(usize, String, bool)> = Vec::new();
+    let mut pending = vec![(ROUTER_ROOT.to_string(), String::new(), true)];
+    while let Some((name, prefix, active)) = pending.pop() {
+        for (index, function) in functions.iter().enumerate() {
+            if function.name != name {
+                continue;
+            }
+            let active = active && function.cfgs.iter().all(|cfg| cfg_holds(cfg));
+            let mount = (index, prefix.clone(), active);
+            if found.contains(&mount) {
+                continue;
+            }
+            found.push(mount);
+            for (callee, inner, gated) in calls_of(function, &names) {
+                pending.push((callee, format!("{prefix}{inner}"), active && gated));
+            }
+        }
+    }
+    found
+}
+
+fn routes_of(function: &RouterFn, base: &str, fn_active: bool) -> Vec<ParsedRoute> {
+    let body = function.body.as_str();
+    let cfgs = cfg_spans(body);
+    let nests = mount_spans(body, &cfgs);
     let mut routes = Vec::new();
     for (at, _) in body.match_indices(".route(") {
         let open = at + ".route".len();
@@ -850,32 +946,40 @@ fn routes_of(function: &RouterFn) -> Vec<ParsedRoute> {
         let (path, handler) = args.split_once(',').expect("route takes two arguments");
         let path = path.trim();
         assert!(path.starts_with('"'), "non-literal route path: {path}");
-        let inner: String = nests
-            .iter()
-            .filter(|(span, _)| span.contains(&at))
-            .map(|(_, prefix)| prefix.as_str())
-            .collect();
-        let active = fn_active
-            && cfgs
-                .iter()
-                .filter(|(span, _)| span.contains(&at))
-                .all(|(_, cfg)| cfg_holds(cfg));
+        let (inner, gated) = mount_at(&cfgs, &nests, at);
         for method in bound_verbs(handler) {
             routes.push(ParsedRoute {
                 method,
                 path: format!("{base}{inner}{}", path.trim_matches('"')),
-                active,
+                active: fn_active && gated,
             });
         }
     }
     routes
 }
 
-fn parsed_routes() -> Vec<ParsedRoute> {
-    let mut routes: Vec<ParsedRoute> = router_functions().iter().flat_map(routes_of).collect();
+/// Routes of every function reached from `ROUTER_ROOT`; a routed function it never reaches panics.
+fn parse_router(source: &str) -> Vec<ParsedRoute> {
+    let functions = router_functions(source);
+    let mounts = mounts(&functions);
+    for (index, function) in functions.iter().enumerate() {
+        assert!(
+            !function.body.contains(".route(") || mounts.iter().any(|(at, ..)| *at == index),
+            "{} has routes but is never mounted from {ROUTER_ROOT}",
+            function.name
+        );
+    }
+    let mut routes: Vec<ParsedRoute> = mounts
+        .iter()
+        .flat_map(|(index, prefix, active)| routes_of(&functions[*index], prefix, *active))
+        .collect();
     routes.sort();
     routes.dedup();
     routes
+}
+
+fn parsed_routes() -> Vec<ParsedRoute> {
+    parse_router(ROUTER_SOURCE)
 }
 
 /// A path with its parameter names erased and no trailing slash.
@@ -998,12 +1102,21 @@ fn has_success_body(op: &Value) -> bool {
     responses.iter().any(|(status, response)| {
         // 204 has no body to describe, and a redirect handler succeeds with a 302.
         status == "204"
+            || (status.starts_with('2') && says_empty_body(response))
             || (status == "302" && response["headers"]["Location"].is_object())
             || ((status.starts_with('2') || status == "302")
                 && response["content"]
                     .as_object()
                     .is_some_and(|content| !content.is_empty()))
     })
+}
+
+// A bodyless 2xx documents its success only when its description says the body is empty.
+fn says_empty_body(response: &Value) -> bool {
+    response.get("content").is_none()
+        && response["description"]
+            .as_str()
+            .is_some_and(|text| text.to_lowercase().contains("empty body"))
 }
 
 fn find_op<'a>(ops: &'a [PublishedOp], method: &str, path: &str) -> Option<&'a Value> {
@@ -1026,9 +1139,10 @@ fn row_op<'a>(
     Some(op.unwrap_or_else(|| panic!("{edition} row {method} {path} is not published")))
 }
 
-/// `x-o2-mcp` absent, unparsable or without `enabled: false` leaves the MCP tool on.
-fn is_mcp_enabled(op: &Value) -> bool {
-    op["x-o2-mcp"]["enabled"] != false
+/// An `x-o2-mcp` the MCP runtime can read; an unreadable one silently leaves the tool on.
+fn has_valid_mcp(op: &Value) -> bool {
+    op["x-o2-mcp"].is_object()
+        && serde_json::from_value::<McpExtension>(op["x-o2-mcp"].clone()).is_ok()
 }
 
 fn is_nullable(schema: &Value) -> bool {
@@ -1167,7 +1281,7 @@ fn broken_rules(
 ) -> Vec<&'static str> {
     let op = &published.op;
     let mut broken = Vec::new();
-    if !op["x-o2-mcp"].is_object() {
+    if !has_valid_mcp(op) {
         broken.push("mcp");
     }
     if !exempt && !has_valid_ratelimit(op) {
@@ -1208,6 +1322,51 @@ fn broken_rules(
     broken
 }
 
+/// A schema that names no field: a bare object, one that accepts any JSON, or an array of them.
+fn is_untyped(spec: &Value, schema: &Value) -> bool {
+    let schema = resolved(spec, schema);
+    let Some(keys) = schema.as_object() else {
+        return false;
+    };
+    let bare = keys
+        .keys()
+        .all(|key| ["type", "description", "example", "examples"].contains(&key.as_str()));
+    // `body = serde_json::Value` or `()` publishes `{}` / `{"default": null}`, which validates
+    // anything.
+    let unrestricted = !keys.keys().any(|key| {
+        [
+            "type",
+            "properties",
+            "$ref",
+            "allOf",
+            "anyOf",
+            "oneOf",
+            "enum",
+            "const",
+        ]
+        .contains(&key.as_str())
+    });
+    unrestricted
+        || (schema["type"] == "object" && bare)
+        || (schema["type"] == "array" && is_untyped(spec, &schema["items"]))
+}
+
+/// `METHOD /path` of every published op whose 2xx JSON body names no field.
+fn untyped_success_bodies(spec: &Value) -> BTreeSet<String> {
+    let untyped = |op: &Value| {
+        let responses = op["responses"].as_object().into_iter().flatten();
+        responses
+            .filter(|(status, _)| status.starts_with('2'))
+            .flat_map(|(_, response)| media_of(response))
+            .any(|(media, entry)| media.ends_with("json") && is_untyped(spec, &entry["schema"]))
+    };
+    published_ops(spec)
+        .iter()
+        .filter(|published| untyped(&published.op))
+        .map(|published| format!("{} {}", published.method, published.path))
+        .collect()
+}
+
 fn assert_no_difference(found: &BTreeSet<String>, expected: &BTreeSet<String>, context: &str) {
     let new: Vec<_> = found.difference(expected).collect();
     let stale: Vec<_> = expected.difference(found).collect();
@@ -1241,6 +1400,91 @@ fn the_route_parser_reads_the_whole_router() {
             "{method} {path} was not parsed"
         );
     }
+}
+
+#[test]
+fn routes_take_the_prefix_and_cfg_of_their_mount() {
+    let source = r#"
+fn local_routes() -> Router {
+    let mut router = Router::new().nest("/api", api_routes());
+    #[cfg(feature = "cloud")]
+    {
+        router = router.merge(cloud_routes());
+    }
+    let node = node_router().layer(layer);
+    let billing = billing_routes();
+    #[cfg(feature = "cloud")]
+    {
+        router = router.nest("/billing", billing);
+    }
+    router.nest("/node", node)
+}
+
+fn billing_routes() -> Router {
+    Router::new().route("/b", get(b))
+}
+
+fn api_routes() -> Router {
+    gated_routes(Router::new().route("/a", get(a)))
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn gated_routes(router: Router) -> Router {
+    router.route("/oss", get(b))
+}
+
+fn cloud_routes() -> Router {
+    Router::new().route("/c", post(c))
+}
+
+fn node_router() -> Router {
+    Router::new().route("/n", put(n))
+}
+
+#[cfg(test)]
+mod tests {}
+"#;
+    let route = |method: &str, path: &str, active: bool| ParsedRoute {
+        method: method.to_string(),
+        path: path.to_string(),
+        active,
+    };
+    let mut expected = vec![
+        route("GET", "/api/a", true),
+        route("GET", "/api/oss", cfg!(not(feature = "enterprise"))),
+        route("POST", "/c", cfg!(feature = "cloud")),
+        route("PUT", "/node/n", true),
+        route("GET", "/billing/b", cfg!(feature = "cloud")),
+    ];
+    expected.sort();
+    assert_eq!(parse_router(source), expected);
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn workflow_hook_routes_are_active_only_outside_cloud() {
+    let states: Vec<bool> = parsed_routes()
+        .into_iter()
+        .filter(|route| {
+            route.path.contains("/http_trigger") || route.path.contains("/workflows/hooks/")
+        })
+        .map(|route| route.active)
+        .collect();
+    assert_eq!(states.len(), 9, "{states:?}");
+    assert!(
+        states
+            .iter()
+            .all(|active| *active == cfg!(not(feature = "cloud"))),
+        "{states:?}"
+    );
+}
+
+#[test]
+#[should_panic(expected = "orphan_routes has routes but is never mounted")]
+fn an_unmounted_router_function_fails() {
+    parse_router(
+        "fn local_routes() -> Router {\n    Router::new()\n}\n\nfn orphan_routes() -> Router {\n    Router::new().route(\"/x\", get(x))\n}\n\n#[cfg(test)]\nmod tests {}\n",
+    );
 }
 
 #[test]
@@ -1400,12 +1644,12 @@ fn success_responses_match_their_handlers() {
         let media = &response["content"][*content_type];
         assert!(media.is_object(), "{method} {path}: not {content_type}");
         assert!(
-            schema_has_shape(&media["schema"], shape),
+            schema_has_shape(resolved(&spec, &media["schema"]), shape),
             "{method} {path}: not {shape}: {}",
             media["schema"]
         );
     }
-    let floor = build_floor(16, 30, 41);
+    let floor = build_floor(18, 32, 43);
     assert!(
         checked >= floor,
         "only {checked} of {floor} contract rows checked"
@@ -1432,7 +1676,7 @@ fn multipart_uploads_name_their_parts() {
         );
     }
     assert!(
-        checked >= build_floor(2, 3, 3),
+        checked >= build_floor(1, 3, 3),
         "only {checked} uploads checked"
     );
 }
@@ -1479,46 +1723,65 @@ fn prometheus_forms_name_their_fields() {
     );
 }
 
+/// Status and media type the range query handler answers for one method and streaming flag.
+#[cfg(not(feature = "enterprise"))]
+async fn range_query_answer(method: &str, streaming: bool) -> (axum::http::StatusCode, String) {
+    use axum::extract::{Path, Query};
+    use openobserve_api_search::promql::{query_range_get, query_range_post};
+    let request = || {
+        serde_json::from_value::<config::meta::promql::RequestRangeQuery>(serde_json::json!({
+            "query": "up", "start": "1700000000", "end": "1700000060", "step": "15s",
+            "use_streaming": streaming,
+        }))
+        .unwrap()
+    };
+    let user = || {
+        openobserve_api_common::extractors::Headers(openobserve_core::auth::UserEmail {
+            user_id: "u@example.com".to_string(),
+        })
+    };
+    let org = || Path("org".to_string());
+    let headers = axum::http::HeaderMap::new;
+    let response = if method == "GET" {
+        query_range_get(org(), Query(request()), user(), headers()).await
+    } else {
+        query_range_post(
+            org(),
+            Query(request()),
+            user(),
+            headers(),
+            axum::Form(request()),
+        )
+        .await
+    };
+    let media = response.headers()[axum::http::header::CONTENT_TYPE]
+        .to_str()
+        .unwrap()
+        .to_string();
+    (response.status(), media)
+}
+
 // Enterprise answers 403 first: the metric permission check needs a stored user.
 #[cfg(not(feature = "enterprise"))]
 #[tokio::test]
-async fn range_query_post_declares_what_the_handler_sends() {
+async fn range_queries_declare_what_the_handlers_send() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    let op = find_op(&ops, "POST", "/api/{org_id}/prometheus/api/v1/query_range").unwrap();
-    for streaming in [true, false] {
-        let request = || {
-            serde_json::from_value::<config::meta::promql::RequestRangeQuery>(serde_json::json!({
-                "query": "up", "start": "1700000000", "end": "1700000060", "step": "15s",
-                "use_streaming": streaming,
-            }))
-            .unwrap()
-        };
-        let response = openobserve_api_search::promql::query_range_post(
-            axum::extract::Path("org".to_string()),
-            axum::extract::Query(request()),
-            openobserve_api_common::extractors::Headers(openobserve_core::auth::UserEmail {
-                user_id: "u@example.com".to_string(),
-            }),
-            axum::http::HeaderMap::new(),
-            axum::Form(request()),
-        )
-        .await;
-        let status = response.status();
-        let media = response.headers()[axum::http::header::CONTENT_TYPE]
-            .to_str()
-            .unwrap()
-            .to_string();
-        // The JSON branch errors without stored metrics, so only its media type is checked.
-        assert!(
-            status.is_success() || !streaming,
-            "use_streaming=true answered {status}"
-        );
-        let declared = &op["responses"]["200"]["content"][media.as_str()];
-        assert!(
-            declared.is_object(),
-            "use_streaming={streaming}: {media} is not published for 200"
-        );
+    for method in ["GET", "POST"] {
+        let op = find_op(&ops, method, "/api/{org_id}/prometheus/api/v1/query_range").unwrap();
+        for streaming in [true, false] {
+            let (status, media) = range_query_answer(method, streaming).await;
+            // The JSON branch errors without stored metrics, so only its media type is checked.
+            assert!(
+                status.is_success() || !streaming,
+                "{method} use_streaming=true answered {status}"
+            );
+            let declared = &op["responses"]["200"]["content"][media.as_str()];
+            assert!(
+                declared.is_object(),
+                "{method} use_streaming={streaming}: {media} is not published for 200"
+            );
+        }
     }
 }
 
@@ -1557,7 +1820,7 @@ fn unsupported_stubs_document_their_403() {
         );
     }
     assert!(
-        checked >= build_floor(2, 2, 0),
+        checked >= build_floor(6, 2, 0),
         "only {checked} stubs checked"
     );
 }
@@ -1624,19 +1887,116 @@ fn usage_details_are_null_without_stripe_billing() {
     );
 }
 
+/// Whether `body` has a form's required keys and no key the form closes off.
+fn fits_form(form: &Value, body: &Value) -> bool {
+    let keys = body.as_object().unwrap();
+    let required = form["required"].as_array().into_iter().flatten();
+    let closed = form["additionalProperties"] == false;
+    required
+        .filter_map(Value::as_str)
+        .all(|name| keys.contains_key(name))
+        && (!closed || keys.keys().all(|name| form["properties"][name].is_object()))
+}
+
+#[cfg(feature = "cloud")]
 #[test]
-fn location_create_takes_one_or_a_batch() {
+fn billing_redirects_publish_location_and_the_html_fallback() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    for path in [
+        "/api/{org_id}/billings/hosted_subscription_url",
+        "/api/{org_id}/billings/checkout_session_detail",
+    ] {
+        let redirect = &find_op(&ops, "GET", path).unwrap()["responses"]["302"];
+        assert!(redirect["headers"]["Location"].is_object(), "{redirect}");
+        let html = &redirect["content"]["text/html"]["schema"];
+        assert_eq!(resolved(&spec, html)["type"], "string", "{redirect}");
+    }
+}
+
+#[test]
+fn untyped_success_bodies_have_a_reason() {
+    let spec = published_spec();
+    let mut listed = BTreeSet::new();
+    for entry in edition_entries(UNTYPED_BODIES) {
+        let (route, reason) = entry.split_once(" | ").expect("entry needs ` | reason`");
+        assert!(!reason.trim().is_empty(), "entry without a reason: {entry}");
+        listed.insert(route.to_string());
+    }
+    assert_no_difference(
+        &untyped_success_bodies(&spec),
+        &listed,
+        "type the success body, or list the op in untyped_bodies.txt with why it stays generic",
+    );
+}
+
+#[test]
+fn a_serde_json_value_body_is_untyped_and_a_named_type_is_not() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let success = |path: &str| {
+        let op = find_op(&ops, "POST", path).unwrap();
+        op["responses"]["200"]["content"][JSON]["schema"].clone()
+    };
+    let any_json = success("/api/{org_id}/streams/{stream_name}/patterns/extract");
+    assert!(is_untyped(&spec, &any_json), "{any_json}");
+    let listed = serde_json::json!({"type": "array", "items": any_json});
+    assert!(is_untyped(&spec, &listed), "{listed}");
+    let typed = success("/api/v2/{org_id}/reports");
+    assert!(!is_untyped(&spec, &typed), "{typed}");
+}
+
+#[test]
+fn location_create_forms_follow_the_handler_discriminator() {
+    use openobserve_synthetics::service::CreateLocationRequest;
+
     let spec = published_spec();
     let ops = published_ops(&spec);
     let op = find_op(&ops, "POST", "/api/{org_id}/synthetics/locations").unwrap();
     let body = &op["requestBody"]["content"][JSON]["schema"];
-    let forms = body["oneOf"].as_array().expect("two body forms");
-    let has = |field: &str| {
-        forms
-            .iter()
-            .any(|form| resolved(&spec, form)["properties"][field].is_object())
-    };
-    assert!(has("region") && has("locations"), "{body}");
+    let forms: Vec<&Value> = body["oneOf"]
+        .as_array()
+        .expect("two body forms")
+        .iter()
+        .map(|form| resolved(&spec, form))
+        .collect();
+    let one = serde_json::json!({"region": "r", "label": "l"});
+    for sent in [
+        one.clone(),
+        serde_json::json!({"region": "r", "label": "l", "kind": "private", "enabled": false}),
+        serde_json::json!({"locations": [one]}),
+        serde_json::json!({"locations": [one], "region": "r", "label": "l"}),
+    ] {
+        let fitting: Vec<&&Value> = forms.iter().filter(|form| fits_form(form, &sent)).collect();
+        assert_eq!(fitting.len(), 1, "{sent} fits {} forms", fitting.len());
+        // create_location takes the batch branch whenever the key is present.
+        let batch = sent.get("locations").is_some();
+        assert_eq!(
+            fitting[0]["properties"]["locations"].is_object(),
+            batch,
+            "{sent}"
+        );
+        let parsed = match sent.get("locations") {
+            Some(items) => {
+                serde_json::from_value::<Vec<CreateLocationRequest>>(items.clone()).map(drop)
+            }
+            None => serde_json::from_value::<CreateLocationRequest>(sent.clone()).map(drop),
+        };
+        assert!(parsed.is_ok(), "{sent}: {parsed:?}");
+    }
+    let single = forms
+        .iter()
+        .find(|form| form["additionalProperties"] == false)
+        .unwrap();
+    for (name, _) in single["properties"].as_object().unwrap() {
+        let mut sent = serde_json::json!({"region": "r", "label": "l"});
+        sent.as_object_mut().unwrap().remove(name);
+        let required = single["required"]
+            .as_array()
+            .is_some_and(|required| required.contains(&Value::from(name.as_str())));
+        let parsed = serde_json::from_value::<CreateLocationRequest>(sent);
+        assert_eq!(parsed.is_err(), required, "{name}: {parsed:?}");
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1706,6 +2066,36 @@ fn eval_job_and_provider_nulls_fit_their_schemas() {
     );
 }
 
+// An org without storage configured answers 200 with `data: null`.
+#[cfg(feature = "enterprise")]
+#[test]
+fn org_storage_data_can_be_null() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let op = find_op(&ops, "GET", "/api/{org_id}/storage").unwrap();
+    let body = resolved(&spec, &op["responses"]["200"]["content"][JSON]["schema"]);
+    assert!(is_nullable(&body["properties"]["data"]), "{body}");
+    assert!(is_nullable(&body["properties"]["provider"]), "{body}");
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn token_exchange_answer_names_the_dex_fields() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let op = find_op(&ops, "POST", "/config/token").unwrap();
+    let schema = resolved(&spec, &op["responses"]["200"]["content"][JSON]["schema"]);
+    let sent = serde_json::to_value(o2_dex::meta::auth::TokenExchangeResponse {
+        access_token: "a".to_string(),
+        token_type: "b".to_string(),
+        expires_in: 1,
+        issued_token_type: "c".to_string(),
+    })
+    .unwrap();
+    let names = |value: &Value| sorted_names(value.as_object().unwrap().keys().cloned());
+    assert_eq!(names(&schema["properties"]), names(&sent), "{schema}");
+}
+
 #[cfg(feature = "enterprise")]
 #[test]
 fn cancel_queries_takes_and_returns_a_list() {
@@ -1735,11 +2125,9 @@ fn oncall_policy_priorities_are_integers() {
 
 #[test]
 fn enabled_mcp_tools_match_the_snapshot() {
-    let spec = published_spec();
-    let enabled: BTreeSet<String> = published_ops(&spec)
-        .iter()
-        .filter(|published| is_mcp_enabled(&published.op))
-        .map(|published| published.op["operationId"].as_str().unwrap().to_string())
+    let enabled: BTreeSet<String> = enabled_tool_names(&ApiDoc::openapi())
+        .unwrap()
+        .into_iter()
         .collect();
     assert!(enabled.len() >= 300, "only {} MCP tools", enabled.len());
     assert_no_difference(
