@@ -252,20 +252,18 @@
       </template>
 
       <template #cell-tags="{ row }">
-        <OTruncatedText
-          as="div"
-          class="flex flex-wrap gap-1"
-          :tooltip="raw((row.tags || []).join(', '))"
-        >
-          <OTag
-            v-for="tag in (row.tags || []).slice(0, 2)"
-            :key="tag"
-            variant="default-soft"
-            size="xs"
-            :label="raw(tag)"
-          />
-          <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </OTruncatedText>
+        <OTooltip v-if="row.tags?.length" :content="raw(row.tags.join(', '))">
+          <FitItems :items="row.tags">
+            <template #default="{ item }">
+              <OTag variant="default-soft" size="xs" class="max-w-full">
+                <span class="truncate">{{ item }}</span>
+              </OTag>
+            </template>
+            <template #more="{ count }">
+              <span class="text-text-secondary">+{{ count }}</span>
+            </template>
+          </FitItems>
+        </OTooltip>
       </template>
 
       <template #cell-folder="{ row }">
@@ -576,6 +574,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";

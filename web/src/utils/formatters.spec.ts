@@ -8,6 +8,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 import {
+  formatMs,
   b64EncodeUnicode,
   b64DecodeUnicode,
   b64DecodeUnicodeSafe,
@@ -727,5 +728,19 @@ describe("formatUtcWindowsInTz", () => {
     expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});
+
+describe("formatMs", () => {
+  it("uses ms under a second and two-decimal seconds from a second up", () => {
+    expect(formatMs(0)).toBe("0 ms");
+    expect(formatMs(85)).toBe("85 ms");
+    expect(formatMs(999)).toBe("999 ms");
+    expect(formatMs(1000)).toBe("1.00 s");
+    expect(formatMs(62579)).toBe("62.58 s");
+  });
+
+  it("shows a dash for no value", () => {
+    expect(formatMs(null)).toBe("—");
   });
 });
