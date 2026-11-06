@@ -148,7 +148,7 @@ pub async fn create_ingestion_token(
     ),
     request_body(content = inline(OrgIngestionTokenEnableRequest)),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ()),
+        (status = 200, description = "Success; `message` holds the JSON-encoded {message, splunk_token}", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
     ),

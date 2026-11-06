@@ -1,0 +1,148 @@
+# Published ops whose 2xx JSON body names no field, and why it stays generic.
+# Format: edition METHOD /path | reason, edition is all, oss, ent or cloud.
+
+cloud DELETE /api/invites/{token} | the handler answers serde_json::json!({message, remaining}) built in place
+ent POST /api/license/refresh | RefreshBody flattens o2-enterprise RefreshReport, which derives no schema
+ent POST /api/license/rotate_key | RefreshBody flattens o2-enterprise RefreshReport, which derives no schema
+ent GET /api/v2/{org_id}/alert_calibration/digests | the rows are SQL search hits over the digest stream, each a serde_json::Value
+ent GET /api/v2/{org_id}/alert_calibration/digests/alerts | the rows are SQL search hits over the digest stream, each a serde_json::Value
+ent GET /api/v2/{org_id}/alert_calibration/digests/records | the rows are SQL search hits over the digest stream, each a serde_json::Value
+ent GET /api/v2/{org_id}/alert_calibration/digests/rules | the rows are SQL search hits over the digest stream, each a serde_json::Value
+all GET /api/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload | the handler answers serde_json::json!({id, detected_source, source_url, first_seen_at, last_seen_at, last_payload}) built in place, last_payload being the raw webhook body
+all GET /api/v2/{org_id}/alerts/incidents/{incident_id}/events | the handler answers serde_json::json!({events, partial_reconstruction}) built in place
+all PATCH /api/v2/{org_id}/alerts/{alert_id}/trigger | an HttpResponse for a scheduled alert, or the anomaly detection run as a serde_json::Value
+all POST /api/v2/{org_id}/incidents/events | the handler answers serde_json::json!({accepted, rejected, errors}) built in place
+all POST /api/v2/{org_id}/incidents/events/{token} | the handler answers serde_json::json!({accepted, rejected, errors}) built in place
+all POST /api/v2/{org_id}/incidents/integrations/{integration_id}/rotate | the handler answers serde_json::json!({token}) built in place
+all GET /api/v2/{org_id}/incidents/integrations/{integration_id}/senders | the handler answers serde_json::json!({senders}) built in place
+ent DELETE /api/{org_id}/ai/chats | the handler answers serde_json::json!({deleted}) built in place
+ent DELETE /api/{org_id}/ai/chats/{session_id} | the handler answers serde_json::json!({deleted}) built in place
+ent PATCH /api/{org_id}/ai/chats/{session_id} | the handler answers serde_json::json!({title}) built in place
+ent POST /api/{org_id}/ai/chats/{session_id}/cancel | the handler answers serde_json::json!({cancelled, active}) built in place
+ent POST /api/{org_id}/ai/confirm/{session_id} | the AI agent's JSON reply is passed through as a serde_json::Value
+ent POST /api/{org_id}/ai/feedback | the AI agent client returns its reply as a serde_json::Value
+ent DELETE /api/{org_id}/ai/shares/{share_id} | the handler answers serde_json::json!({revoked}) built in place
+all POST /api/{org_id}/alerts/destinations/jira/setup | core jira::setup returns a serde_json::Value
+all GET /api/{org_id}/alerts/slo-eligible | the handler answers serde_json::json!({list}) built in place
+all GET /api/{org_id}/announcements | enterprise answers o2-enterprise AnnouncementsResponse, OSS an empty json!({banners, now}); one annotation serves both builds
+all GET /api/{org_id}/announcements/config | the stored banner document is returned as the serde_json::Value it was saved as
+all PUT /api/{org_id}/announcements/config | the handler answers serde_json::json!({message, resolved, revision}) built in place
+ent GET /api/{org_id}/anomaly_detection | core anomaly_detection::list_configs returns Vec<serde_json::Value>
+ent POST /api/{org_id}/anomaly_detection | core anomaly_detection::create_config returns a serde_json::Value
+ent GET /api/{org_id}/anomaly_detection/{config_id} | core anomaly_detection::get_config returns a serde_json::Value
+ent PUT /api/{org_id}/anomaly_detection/{config_id} | core anomaly_detection::update_config returns a serde_json::Value
+ent POST /api/{org_id}/anomaly_detection/{config_id}/detect | core anomaly_detection::detect_anomalies returns a serde_json::Value
+ent POST /api/{org_id}/anomaly_detection/{config_id}/train | core anomaly_detection::train_model returns a serde_json::Value
+cloud GET /api/{org_id}/aws-marketplace/activation-status | o2-enterprise build_activation_status_response returns a serde_json::Value
+all GET /api/{org_id}/cipher_keys | KeyListResponse lives in the enterprise-only cipher module; OSS publishes this op too
+all GET /api/{org_id}/cipher_keys/{key_name} | KeyGetResponse lives in the enterprise-only cipher module; OSS publishes this op too
+all DELETE /api/{org_id}/dashboards/{dashboard_id}/public_links/{link_id} | the handler answers serde_json::json!({deleted}) built in place
+all GET /api/{org_id}/db_monitoring/activity | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/badges | the db_monitoring service assembles this body as a serde_json::Value
+ent GET /api/{org_id}/db_monitoring/blocking | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/databases | the db_monitoring service assembles this body as a serde_json::Value
+ent GET /api/{org_id}/db_monitoring/deadlocks | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/instance_metrics | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/instances | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/queries | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/query/endpoints | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/query/history | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/query/insights | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/samples | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/server_queries | the db_monitoring service assembles this body as a serde_json::Value
+all GET /api/{org_id}/db_monitoring/server_samples | the db_monitoring service assembles this body as a serde_json::Value
+ent GET /api/{org_id}/db_monitoring/table_health | the db_monitoring service assembles this body as a serde_json::Value
+cloud POST /api/{org_id}/external_contract | the handler answers serde_json::json!({status}) built in place
+cloud PUT /api/{org_id}/external_contract | the handler answers serde_json::json!({status}) built in place
+cloud DELETE /api/{org_id}/external_contract/{target_org_id} | the handler answers serde_json::json!({status}) built in place
+ent GET /api/{org_id}/oncall/analytics/causes | the handler answers serde_json::json!({from, to, team_id, total, causes}) built in place
+ent DELETE /api/{org_id}/oncall/contacts/{user_email} | the handler answers serde_json::json!({deleted}) built in place
+ent GET /api/{org_id}/oncall/contacts/{user_email} | contact_body serializes the Contact to a serde_json::Value and adds derived keys
+ent PUT /api/{org_id}/oncall/contacts/{user_email} | contact_body serializes the Contact to a serde_json::Value and adds derived keys
+ent POST /api/{org_id}/oncall/contacts/{user_email}/verify/confirm | the handler answers serde_json::json!({phone_verified_at}) built in place
+ent GET /api/{org_id}/oncall/coverage-gaps | the handler answers serde_json::json!({at, total, teams}) built in place
+ent GET /api/{org_id}/oncall/my/deliveries | the handler answers serde_json::json!({total, unread, deliveries}) built in place
+ent POST /api/{org_id}/oncall/my/deliveries/read | the handler answers serde_json::json!({updated, unread}) built in place
+ent GET /api/{org_id}/oncall/my/teams | the handler answers serde_json::json!({at, user_email, teams}) built in place
+ent GET /api/{org_id}/oncall/responses | with_page_details serializes each record to a serde_json::Value and adds runbook and run keys
+ent GET /api/{org_id}/oncall/responses/escalation | the handler answers serde_json::json!({progress}) built in place, each item the escalation progress with response_id inserted
+ent GET /api/{org_id}/oncall/responses/{response_id} | the handler answers serde_json::json!({response, events}) built in place
+ent POST /api/{org_id}/oncall/responses/{response_id}/acknowledge | page_with_ack serializes the record to a serde_json::Value and adds an ack key
+ent GET /api/{org_id}/oncall/responses/{response_id}/deliveries | the handler answers serde_json::json!({total, deliveries}) built in place
+ent POST /api/{org_id}/oncall/responses/{response_id}/escalate | the handler answers serde_json::json!({escalated_to, response, rung_micros, recipients, chased, deduplicated}) built in place
+ent POST /api/{org_id}/oncall/responses/{response_id}/promote | the handler answers serde_json::json!({oncall_subject_type, oncall_source_id, oncall_response_id, incident_id, severity, response}) built in place
+ent GET /api/{org_id}/oncall/responses/{response_id}/report | the handler answers serde_json::json!({report, model, generated_at}) built in place
+ent POST /api/{org_id}/oncall/responses/{response_id}/unacknowledge | page_with_ack serializes the record to a serde_json::Value and adds an ack key
+ent GET /api/{org_id}/oncall/routing/config | the handler answers serde_json::json!({org_id, default_team_id, default_team_name, updated_at}) built in place
+ent PUT /api/{org_id}/oncall/routing/config | the handler answers serde_json::json!({org_id, default_team_id, default_team_name, updated_at}) built in place
+ent POST /api/{org_id}/oncall/routing/preview | the handler answers serde_json::json!({decision, team_id, reason, landed_on_default, notes, ladder, current_responder, covered_now, also_matched}) built in place
+ent GET /api/{org_id}/oncall/teams/context | the handler answers serde_json::json!({teams}) built in place, each team a map that leaves out any field whose read failed
+ent GET /api/{org_id}/oncall/teams/{team_id}/config-risks | the handler answers serde_json::json!({team_id, horizon_days, total, risks}) built in place
+ent DELETE /api/{org_id}/oncall/teams/{team_id}/overrides/{override_id} | the handler answers serde_json::json!({deleted}) built in place
+ent POST /api/{org_id}/oncall/teams/{team_id}/test-page | the handler answers serde_json::json!({reached_anyone, not_sent_because, channels, attempts}) built in place
+ent DELETE /api/{org_id}/oncall/unavailability/{unavailability_id} | the handler answers serde_json::json!({deleted}) built in place
+ent GET /api/{org_id}/oncall/unrouted | with_description serializes each UnroutedSignal to a serde_json::Value and adds a description
+ent DELETE /api/{org_id}/oncall/unrouted/{signal_id} | with_description serializes the UnroutedSignal to a serde_json::Value and adds a description
+all POST /api/{org_id}/prometheus/api/v1/parse_tree | ApiFuncResponse envelope around the PromQL parse tree, built as a serde_json::Value
+all GET /api/{org_id}/prometheus/api/v1/series | ApiFuncResponse<Vec<serde_json::Value>>: core get_series builds each series label map as a serde_json::Value
+all POST /api/{org_id}/prometheus/api/v1/series | ApiFuncResponse<Vec<serde_json::Value>>: core get_series builds each series label map as a serde_json::Value
+all GET /api/{org_id}/ratelimit/module_list | o2_ratelimit API group info, an enterprise type; OSS publishes this op too
+all GET /api/{org_id}/ratelimit/role_list | o2_ratelimit API group info, an enterprise type; OSS publishes this op too
+all GET /api/{org_id}/roles/{role_id}/permissions | o2_openfga permission lookups, an enterprise type; OSS publishes this op too
+all GET /api/{org_id}/roles/{role_id}/permissions/{resource} | o2_openfga permission lookups, an enterprise type; OSS publishes this op too
+all POST /api/{org_id}/settings | the handler answers serde_json::json!({successful}) built in place
+ent DELETE /api/{org_id}/settings/logo | the handler answers serde_json::json!({successful}) built in place
+ent POST /api/{org_id}/settings/logo | the handler answers serde_json::json!({successful}) built in place
+ent DELETE /api/{org_id}/settings/logo/text | the handler answers serde_json::json!({successful}) built in place
+ent POST /api/{org_id}/settings/logo/text | the handler answers serde_json::json!({successful}) built in place
+all DELETE /api/{org_id}/settings/v2/user/{user_id}/{key} | the handler answers serde_json::json!({deleted}) built in place
+all DELETE /api/{org_id}/settings/v2/{key} | the handler answers serde_json::json!({deleted}) built in place
+all POST /api/{org_id}/slack/connection/confirm | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/connectivity | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/install/exchange | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/install/start | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all DELETE /api/{org_id}/slack/installations/{installation_id} | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/channel-defaults | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id} | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all PUT /api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id} | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/channels | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all DELETE /api/{org_id}/slack/installations/{installation_id}/connection | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/connection | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/connection/start | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all PUT /api/{org_id}/slack/installations/{installation_id}/credentials | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/help-contact | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all PUT /api/{org_id}/slack/installations/{installation_id}/help-contact | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/install-url | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/link-all | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/linking | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all PUT /api/{org_id}/slack/installations/{installation_id}/linking | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/links/matches | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/oncall-unlinked | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/installations/{installation_id}/org-access | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all PUT /api/{org_id}/slack/installations/{installation_id}/org-access | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/installations/{installation_id}/test | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/link-requests/confirm | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all POST /api/{org_id}/slack/link-requests/{request_id}/start | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/links | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/links/me | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/manifest | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slack/prerequisites | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+all GET /api/{org_id}/slos/{slo_id}/groups | the handler answers serde_json::json!({list}) built in place
+all POST /api/{org_id}/status_pages/{id}/rotate_slug | the handler answers serde_json::json!({slug}) built in place
+all DELETE /api/{org_id}/streams/{stream_name}/data_by_time_range | the handler answers serde_json::json!({id}) built in place
+all POST /api/{org_id}/streams/{stream_name}/patterns/extract | the enterprise extractor's result arrives as StreamResponses::PatternExtractionResult { patterns: serde_json::Value }
+all GET /api/{org_id}/synthetics/agent-tokens | the handler answers serde_json::json!({tokens}) built in place
+all PATCH /api/{org_id}/synthetics/agent-tokens/{name} | the handler answers serde_json::json!({message}) built in place
+all POST /api/{org_id}/synthetics/jobs/lease | o2-enterprise synthetics job_api::LeaseResponse; OSS publishes this op too
+all DELETE /api/{org_id}/synthetics/locations/{id} | the handler answers serde_json::json!({deleted}) built in place
+all GET /api/{org_id}/synthetics/{id}/referenced-by | the handler answers serde_json::json!({references, hidden_reference_count}) built in place
+ent DELETE /api/{org_id}/telephony | the handler answers serde_json::json!({deleted}) built in place
+ent GET /api/{org_id}/traces/agent_signals | the handler answers serde_json::json!({signals}) built in place
+ent POST /api/{org_id}/traces/agent_signals/compare | the handler answers serde_json::json!({cost, error_diff, note}) built in place
+all GET /api/{org_id}/users/roles/all | o2_openfga role lookups, an enterprise type; OSS publishes this op too
+all GET /api/{org_id}/{stream_name}/traces/{trace_id}/dag | the handler builds a HashMap<&str, serde_json::Value>
+all GET /api/{org_id}/overview | core::overview::Overview nests a generic Section<T> over four section types that derive no schema
+all DELETE /api/{org_id}/service_streams/_reset | the handler answers serde_json::json!({deleted_count, message, note}) built in place

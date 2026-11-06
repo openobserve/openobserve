@@ -29,7 +29,7 @@ TARGETS = [
     ("playwright.yml", "ci_test_runs", "ui", False, None, None),
     ("api-testing.yml", "ci_test_runs", "api", False, None, None),
     ("playwright_bugfix_regression.yml", "ci_regression", "regression", True, "e2e /", "build_binary"),
-    ("api_bugfix_regression.yml", "ci_test_runs", "api", True, "api_regression /", "build_api_binary"),
+    ("api_bugfix_regression.yml", "ci_regression", "api_regression", True, "api_regression /", "build_api_binary"),
 ]
 
 def gh(path):

@@ -371,7 +371,7 @@ pub async fn review_annotation_queue_item(
         ("queue_item_id" = String, Path, description = "Annotation Queue Item ID"),
     ),
     responses(
-        (status = 200, description = "Complete review submissions", content_type = "application/json", body = Object),
+        (status = 200, description = "Complete review submissions", content_type = "application/json", body = ListQueueReviewsResponseBody),
         (status = 404, description = "Queue or Queue Item not found", body = ()),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),

@@ -1580,7 +1580,7 @@ fn reached_rung_at_least(
 }
 
 /// What a team's last N days looked like, in six numbers.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct TeamPageStats {
     /// Records opened in the window.
     pub pages: i64,
