@@ -65,7 +65,7 @@ class AnomalyDetectionPage {
             nameInput: '[data-test="add-anomaly-name-input-input"]',
             nameValue: '[data-test="add-anomaly-name-input-value"]',
             nameError: '[data-test="add-anomaly-name-input-error"]',
-            streamTypeSelect: '[data-test="add-alert-stream-type-select-dropdown"]',
+            streamTypeSelect: '[data-test="add-alert-stream-type-cards"]',
             streamNameSelect: '[data-test="add-alert-stream-name-select-dropdown"]',
 
             // Wizard chrome
@@ -306,7 +306,7 @@ class AnomalyDetectionPage {
     }
 
     async selectStreamType(streamType = 'logs') {
-        await this.selectOptionByValue(this.selectors.streamTypeSelect, streamType);
+        await this.page.locator(`[data-test="add-alert-stream-type-card-${streamType}"]`).click();
     }
 
     async selectStreamName(streamName) {

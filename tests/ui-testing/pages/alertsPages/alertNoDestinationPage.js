@@ -6,7 +6,7 @@ import os from 'os';
 import path from 'path';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-import { expandAlertSettingGroups, settleIntoView } from './alertSectionHelpers.js';
+import { clearAlertDestinations, expandAlertSettingGroups } from './alertSectionHelpers.js';
 const {
   simpleAlert, createAlert, findAlertId, getAlert, deleteAlertInFolder,
 } = require('../../playwright-tests/utils/alerts-api-helpers.js');
@@ -21,8 +21,6 @@ export class AlertNoDestinationPage {
     this.page = page;
     this.createdAlertIds = [];
     this.locators = {
-      destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
-      selectedOption: '[role="option"][aria-selected="true"]',
       noDestinationNote: '[data-test="alert-settings-destinations-note"]',
       destinationStatus: '[data-test="alert-settings-destinations-status"]',
       destinationError: '[data-test="alert-settings-destinations-error"]',
@@ -82,14 +80,7 @@ export class AlertNoDestinationPage {
 
   /** Unpicks every selected destination; the multi-select toggles an option off when it is re-picked. */
   async clearDestinations() {
-    await settleIntoView(this.page, this.page.locator(this.locators.destinationTrigger));
-    await this.page.locator(this.locators.destinationTrigger).click();
-    const selected = this.page.locator(this.locators.selectedOption);
-    await expect(selected.first()).toBeVisible({ timeout: 15000 });
-    while (await selected.count()) {
-      await selected.first().click();
-    }
-    await this.page.keyboard.press('Escape');
+    await clearAlertDestinations(this.page);
   }
 
   async expectNoDestinationNote() {
