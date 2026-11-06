@@ -87,7 +87,7 @@ pub mod work_group;
 
 use ::search::{
     bloom_pruner,
-    datafusion::{self, distributed_plan::streaming_aggs_exec},
+    datafusion::{self, physical_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
 #[cfg(feature = "enterprise")]

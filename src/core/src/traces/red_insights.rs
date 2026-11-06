@@ -1219,7 +1219,7 @@ mod tests {
             prelude::{SessionConfig, SessionContext},
         };
         use search::datafusion::{
-            optimizer::physical_optimizer::aggregate_topk::AggregateTopkRule,
+            physical_optimizer::aggregate_topk::AggregateTopkRule,
             table_provider::empty_table::NewEmptyTable,
         };
 

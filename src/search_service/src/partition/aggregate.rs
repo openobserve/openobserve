@@ -19,7 +19,7 @@ use ::search::{
         discover_cache_for_query, generate_optimal_partitions,
         get_aggregation_cache_key_from_request,
     },
-    datafusion::distributed_plan::streaming_aggs_exec,
+    datafusion::physical_plan::streaming_aggs_exec,
     sql::visitor::streaming_aggregate,
 };
 use config::{

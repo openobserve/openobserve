@@ -20,7 +20,7 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 use flight::common::NodeRole;
-use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+use search::datafusion::distributed::remote_scan_exec::RemoteScanExec;
 pub use search::datafusion::plan_metrics::get_peak_memory_from_ctx;
 
 /// Only a super cluster's cluster leader runs a plan with a remote scan in it.

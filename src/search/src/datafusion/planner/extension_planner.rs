@@ -28,9 +28,11 @@ use datafusion::{
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
 
-use crate::datafusion::plan::{
-    deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
-    shared_subplan::SharedSubplanNode, shared_subplan_exec::SharedSubplanMarkerExec,
+use crate::datafusion::{
+    logical_plan::{deduplication::DeduplicationLogicalNode, shared_subplan::SharedSubplanNode},
+    physical_plan::{
+        deduplication_exec::DeduplicationExec, shared_subplan_exec::SharedSubplanMarkerExec,
+    },
 };
 
 // A query planner that wrap datafusion's default planner with extension planner

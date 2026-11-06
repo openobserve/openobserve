@@ -38,7 +38,7 @@ use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
     datafusion::{
-        distributed_plan::{
+        distributed::{
             node::{RemoteScanNode, SearchInfos},
             remote_scan_exec::RemoteScanExec,
         },
@@ -282,7 +282,7 @@ mod tests {
         arrow::datatypes::{DataType, Field},
         common::tree_node::TreeNode,
     };
-    use search::datafusion::distributed_plan::NewEmptyExecVisitor;
+    use search::datafusion::physical_plan::empty_exec::NewEmptyExecVisitor;
 
     use super::*;
 

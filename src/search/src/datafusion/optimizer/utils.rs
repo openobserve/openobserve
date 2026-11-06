@@ -30,7 +30,6 @@ use datafusion::{
     logical_expr::{
         Limit, LogicalPlan, Projection, Sort, SortExpr, TableScanBuilder, TableSource, col,
     },
-    physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
 };
@@ -336,15 +335,6 @@ pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
         .unwrap_or(true)
-}
-
-pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.exists(|plan| {
-        Ok(plan.name() == "PlaceholderRowExec"
-            || plan.name() == "EmptyExec"
-            || plan.name() == "DataSourceExec")
-    })
-    .unwrap_or(true)
 }
 
 #[cfg(test)]

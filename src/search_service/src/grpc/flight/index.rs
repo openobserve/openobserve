@@ -29,7 +29,7 @@ use proto::cluster_rpc::IndexInfo;
 
 use super::scan::StreamSearchSettings;
 use crate::{
-    datafusion::optimizer::physical_optimizer::{
+    datafusion::physical_optimizer::{
         index::IndexRule, index_optimizer::FollowerIndexOptimizerRule,
         rewrite_match::RewriteMatchPhysical,
     },
@@ -179,7 +179,7 @@ mod tests {
     use super::*;
     use crate::{
         datafusion::{
-            optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
+            optimizer::rewrite_histogram::RewriteHistogram,
             table_provider::empty_table::NewEmptyTable, udf::time::histogram,
         },
         index::Condition,

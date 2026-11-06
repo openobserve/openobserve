@@ -28,7 +28,7 @@ use datafusion::{
 };
 
 use crate::datafusion::{
-    distributed_plan::enrich_exec::EnrichExec, table_provider::helpers::apply_combined_filter,
+    physical_plan::enrich_exec::EnrichExec, table_provider::helpers::apply_combined_filter,
 };
 
 /// An enrich table that is used for loading enrichment data from database.

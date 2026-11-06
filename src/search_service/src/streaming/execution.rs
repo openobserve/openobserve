@@ -15,7 +15,7 @@
 
 use std::time::Instant;
 
-use ::search::{QueryDelta, SearchResultType, datafusion::distributed_plan::streaming_aggs_exec};
+use ::search::{QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec};
 use config::meta::{
     search::{
         PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,

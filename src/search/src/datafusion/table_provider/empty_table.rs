@@ -26,7 +26,7 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::datafusion::{distributed_plan::empty_exec::NewEmptyExec, sort_order::FileSortOrder};
+use crate::datafusion::{physical_plan::empty_exec::NewEmptyExec, sort_order::FileSortOrder};
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.

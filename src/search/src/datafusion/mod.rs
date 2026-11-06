@@ -15,14 +15,14 @@
 
 use std::str::FromStr;
 
-pub mod aggregates;
 pub mod context;
-pub mod distributed_plan;
+pub mod distributed;
 pub mod exec;
-pub mod merge;
+pub mod logical_plan;
 pub mod optimizer;
 pub mod peak_memory_pool;
-pub mod plan;
+pub mod physical_optimizer;
+pub mod physical_plan;
 pub mod plan_metrics;
 pub mod planner;
 pub mod sort_order;

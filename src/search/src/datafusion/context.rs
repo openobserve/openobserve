@@ -22,9 +22,9 @@ use infra::errors::Result;
 use super::{
     exec::{DataFusionContextBuilder, register_udf},
     optimizer::{
-        context::PhysicalOptimizerContext, generate_analyzer_rules, generate_optimizer_rules,
-        generate_physical_optimizer_rules,
+        generate_analyzer_rules, generate_optimizer_rules, generate_physical_optimizer_rules,
     },
+    physical_optimizer::context::PhysicalOptimizerContext,
     sort_order::FileSortOrder,
     table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
 };
