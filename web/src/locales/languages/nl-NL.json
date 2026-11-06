@@ -29693,7 +29693,7 @@
   "onboarding": {
     "guideAbout": {
       "linux": "Logs, metrieken en traces van elke Linux-server.",
-      "windows": "Gebeurtenislogboeken en metrieken van Windows-servers.",
+      "windows": "Gebeurtenislogs en metrieken van Windows-servers.",
       "macos": "Logs en metrieken van Mac-machines.",
       "aws": "Logs en metrieken van je AWS-services.",
       "googleCloud": "Logs van je {gcp}-projecten, via een {pubSub}-pushabonnement.",
