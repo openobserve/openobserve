@@ -130,8 +130,13 @@ async fn classify_stream(
         return Ok(());
     }
     // a day retention has deleted reads as empty and would keep a busy stream from moving back
-    let retention_days =
-        crate::retention::retention_days(&settings, get_config().compact.data_retention_days);
+    let retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        settings.data_retention,
+    )
+    .await?;
     let Some(window) = window.within_retention(retention_days) else {
         return Ok(());
     };

@@ -673,6 +673,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -3973,7 +3974,9 @@ export default defineComponent({
           const entry = (searchObj.data.streamResults?.list ?? []).find(
             (item: any) => item?.name === stream,
           );
-          const days = Number(entry?.settings?.data_retention ?? 0);
+          const days =
+            Number(entry?.settings?.data_retention ?? 0) ||
+            inheritedRetentionDays(store.state, searchObj.data.stream.streamType);
           return days > 0 ? days : null;
         },
       };

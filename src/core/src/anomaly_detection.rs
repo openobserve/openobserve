@@ -7297,6 +7297,20 @@ mod tests {
         }
 
         #[test]
+        fn the_context_gives_jira_the_detector_id_and_kind() {
+            let c = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::PartialDrop));
+            let attribute = |key: &str| {
+                c.context_attributes
+                    .iter()
+                    .find(|(k, _)| k == key)
+                    .map(|(_, v)| v.as_str())
+            };
+            assert_eq!(attribute("anomaly_id"), Some("id1"));
+            assert_eq!(attribute("anomaly_kind"), Some("partial_drop"));
+            assert!(c.alert_id.is_empty() && c.incident_id.is_empty());
+        }
+
+        #[test]
         fn the_context_is_keyed_by_the_anomaly_id_and_the_recovery_resolves() {
             use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
             let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));

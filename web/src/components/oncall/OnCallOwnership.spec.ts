@@ -29,7 +29,7 @@ import store from "@/test/unit/helpers/store";
 const push = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vue-router")>()),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, resolve: () => ({ href: "" }) }),
 }));
 vi.mock("@/services/service_streams", () => ({
   default: {

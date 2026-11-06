@@ -232,8 +232,8 @@
       class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon me-0.5 text-[smaller]">
-        {{ "🕑" }}
+      <span class="lastRefreshedAtIcon me-0.5 inline-flex align-middle">
+        <OIcon name="schedule" size="xs" data-test="panel-last-refreshed-icon" />
         <OTooltip side="bottom" align="end">
           <template #content
             >{{ t("dashboard.panelErrorButtons.lastRefreshed")

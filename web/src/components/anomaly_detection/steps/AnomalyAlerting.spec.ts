@@ -112,7 +112,7 @@ describe("AnomalyAlerting - destinations", () => {
     expect(selectEl.exists()).toBe(true);
   });
 
-  it("leaves Jira destinations out of the options", async () => {
+  it("lists Jira destinations in the options", async () => {
     const w = await mountComp({
       destinations: [...makeDestinations(), { name: "jira-ops", destination_type_name: "jira" }],
     });
@@ -122,6 +122,7 @@ describe("AnomalyAlerting - destinations", () => {
     expect(select?.props("options").map((d: { name: string }) => d.name)).toEqual([
       "slack-dest",
       "pagerduty-dest",
+      "jira-ops",
     ]);
   });
 });

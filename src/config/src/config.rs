@@ -39,7 +39,7 @@ use crate::{
     meta::{
         cluster,
         meta_store::MetaStore,
-        stream::{QueryPartitionStrategy, StreamType},
+        stream::{DataRetentionDefaults, QueryPartitionStrategy, StreamType},
     },
     utils::{str::redact_dsn, sysinfo},
 };
@@ -172,12 +172,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-// Uncompressed total per upload; the request body cap only bounds compressed bytes.
-pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
-pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
-// max file size for individual sourcemap. We temp cache these in mem,
-// so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
@@ -2487,6 +2481,12 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
+        name = "ZO_SAMPLE_DATA_ONBOARDING_ENABLED",
+        default = false,
+        help = "Greet a new user with the first-run welcome dialog that loads sample data in one click. When off, a new cloud user gets the full-page onboarding instead; other builds show Home as usual."
+    )]
+    pub sample_data_onboarding_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -2739,6 +2739,26 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
+    // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
+    #[env_config(
+        name = "ZO_SOURCEMAP_FILE_MAX_SIZE",
+        default = 50,
+        help = "Maximum size in MB of one source map file in an upload; 0 means 50"
+    )]
+    pub sourcemap_file_max_size: u64,
+    // MB, uncompressed total per upload; the request body cap only bounds compressed bytes
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_SIZE",
+        default = 500,
+        help = "Maximum total uncompressed size in MB of one source map upload; 0 means 500"
+    )]
+    pub sourcemap_zip_max_size: u64,
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_ENTRIES",
+        default = 5000,
+        help = "Maximum number of source map files in one upload; 0 means 5000"
+    )]
+    pub sourcemap_zip_max_entries: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2944,7 +2964,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
         default = 0,
-        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged and noted on the evaluation's history record."
     )]
     pub alert_max_group_notifications_per_eval: usize,
     #[env_config(
@@ -3432,7 +3452,15 @@ pub struct Compact {
         help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
     )]
     pub dynamic_partition_window_days: i64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_DAYS",
+        default = "3650",
+        help = "Default retention in days for streams with no value of their own: a plain number (30), optionally with per-type values (30,logs:21,metrics:180). Types: logs, metrics, traces, profiles. Without a plain number the default is 3650; 0 keeps data forever and <type>:0 inherits the plain number. A positive value must be at least 3."
+    )]
+    pub data_retention_spec: String,
+    // Both parsed from data_retention_spec in check_compact_config.
+    #[env_config(parse, default = "0")]
+    pub data_retention: DataRetentionDefaults,
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
@@ -4424,6 +4452,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
+    cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
+        0 => 50,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    cfg.limit.sourcemap_zip_max_size = match cfg.limit.sourcemap_zip_max_size {
+        0 => 500,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    if cfg.limit.sourcemap_zip_max_entries == 0 {
+        cfg.limit.sourcemap_zip_max_entries = 5000;
+    }
     cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
     // check for metrics limit
@@ -5083,11 +5124,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
-        return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
-        ));
-    }
+    cfg.compact.data_retention = cfg
+        .compact
+        .data_retention_spec
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid ZO_COMPACT_DATA_RETENTION_DAYS: {e}"))?;
+    cfg.compact.data_retention_days = cfg.compact.data_retention.default;
     parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
     if cfg.compact.dynamic_partition_window_days == 0 {
         cfg.compact.dynamic_partition_window_days = 7;
@@ -5931,13 +5973,12 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention_days = 10;
+        cfg.compact.data_retention_spec = "10".to_string();
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
@@ -6129,6 +6170,37 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_sourcemap_limits_default_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_zero_falls_back_to_default() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 0;
+        cfg.limit.sourcemap_zip_max_size = 0;
+        cfg.limit.sourcemap_zip_max_entries = 0;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_mb_converted_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 7;
+        cfg.limit.sourcemap_zip_max_size = 9;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 7 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 9 * 1024 * 1024);
     }
 
     #[test]
@@ -6610,7 +6682,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 0;
+        cfg.compact.data_retention_spec = "0".to_string();
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
@@ -6641,18 +6713,47 @@ mod tests {
     #[test]
     fn test_check_compact_config_retention_too_short() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 1;
+        cfg.compact.data_retention_spec = "1".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
-        cfg.compact.data_retention_days = 2;
+        cfg.compact.data_retention_spec = "2".to_string();
         assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_parses_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = "30,logs:21,metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 30);
+        assert_eq!(cfg.compact.data_retention.logs, 21);
+        assert_eq!(cfg.compact.data_retention.metrics, 180);
+
+        cfg.compact.data_retention_spec = "metrics:180".to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.data_retention_days, 3650);
+
+        cfg.compact.data_retention_spec = "30,index:7".to_string();
+        let err = check_compact_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("ZO_COMPACT_DATA_RETENTION_DAYS"), "{err}");
+    }
+
+    #[test]
+    fn test_check_compact_config_caps_the_retention_spec() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_spec = i64::MAX.to_string();
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.compact.data_retention_days,
+            crate::meta::stream::MAX_DATA_RETENTION_DAYS
+        );
     }
 
     #[test]
     fn test_check_compact_config_valid_retention() {
         let mut cfg = Config::default();
-        cfg.compact.data_retention_days = 3;
+        cfg.compact.data_retention_spec = "3".to_string();
         assert!(check_compact_config(&mut cfg).is_ok());
-        cfg.compact.data_retention_days = 0; // 0 means disabled
+        cfg.compact.data_retention_spec = "0".to_string(); // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
     }
 
