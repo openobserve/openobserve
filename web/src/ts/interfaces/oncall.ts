@@ -476,9 +476,6 @@ export interface PriorityRung {
   channels: Channel[];
 }
 
-/** What happens when the ladder runs out and nobody has acknowledged. */
-export type PolicyFinalAction = "notify_default_team" | "stop";
-
 /** How the L0 agent relates to paging at one severity. */
 export type L0Mode =
   /** The agent runs alongside a page that has already gone out. */
@@ -543,9 +540,6 @@ export interface OnCallPolicy {
   p1_parallel?: boolean;
   /** Off by default — a P4 that wakes somebody is a severity bug. */
   p4_pages?: boolean;
-  /** How many full passes the ladder runs before `final_action`. 1 = once; there is no zero. */
-  repeat_count?: number;
-  final_action?: PolicyFinalAction;
   /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
   l0?: L0Policy;
   /** Template override for this team's on-call messages; null uses each destination's. */
@@ -794,8 +788,6 @@ export interface EscalationPreview {
   pages_anyone: boolean;
   channels: Channel[];
   rungs: PreviewRung[];
-  repeat_count?: number | null;
-  final_action?: PolicyFinalAction | null;
   /** What happens when the ladder runs out. A finished sentence. */
   ends_with: string;
   /** How a page can leave this team, automatically or by hand. Sentences. */
@@ -852,8 +844,6 @@ export interface TeamOverview {
   covered_now: boolean;
   on_call_now: string[];
   rungs: TeamRungSummary[];
-  repeat_count?: number | null;
-  final_action?: PolicyFinalAction | null;
   /** Micros. */
   from: number;
   /** Micros. */
@@ -1078,8 +1068,6 @@ export interface RoutingPreview {
   notes?: string[];
   /** Every priority's shape on the team this resolves to, silent ones included. */
   ladder?: TeamRungSummary[];
-  repeat_count?: number;
-  final_action?: string;
   /** Who holds it this instant, and whether a page to them would land. */
   current_responder?: PreviewRecipient | null;
   /** False when the winning team has nobody on call right now. */
