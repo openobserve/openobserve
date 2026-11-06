@@ -2964,7 +2964,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
         default = 0,
-        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged and noted on the evaluation's history record."
     )]
     pub alert_max_group_notifications_per_eval: usize,
     #[env_config(
