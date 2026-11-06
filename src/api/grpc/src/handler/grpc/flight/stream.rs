@@ -13,20 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, pin::Pin, task::Poll};
+use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll};
 
 use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
-use datafusion::execution::SendableRecordBatchStream;
-use flight::{common::NodeMessages, encoder::FlightDataEncoder};
+use datafusion::{execution::SendableRecordBatchStream, physical_plan::ExecutionPlan};
+use flight::{
+    common::NodeMessages,
+    encoder::FlightDataEncoder,
+    profile::{NodeReport, NodeStatus},
+};
 use futures::{Stream, StreamExt};
+use search::datafusion::distributed_plan::profile::{
+    REMOTE_PROFILE_TIMEOUT, build_profile, complete_remote_profiles,
+};
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEncoderStream};
+use crate::handler::grpc::flight::{
+    SessionGuard, partition_encoder::PartitionEncoderStream, report_registry::ReportSlot,
+};
 
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
@@ -40,6 +49,7 @@ pub struct FlightEncoderStreamBuilder {
     defer_lock: Option<DeferredLock>,
     session_guard: Option<SessionGuard>,
     start: std::time::Instant,
+    report: Option<RunReport>,
 }
 
 impl FlightEncoderStreamBuilder {
@@ -51,6 +61,7 @@ impl FlightEncoderStreamBuilder {
             defer_lock: None,
             session_guard: Some(session_guard),
             start: std::time::Instant::now(),
+            report: None,
         }
     }
 
@@ -71,6 +82,11 @@ impl FlightEncoderStreamBuilder {
 
     pub fn with_start(mut self, start: std::time::Instant) -> Self {
         self.start = start;
+        self
+    }
+
+    pub(crate) fn with_report(mut self, report: Option<RunReport>) -> Self {
+        self.report = report;
         self
     }
 
@@ -122,6 +138,7 @@ impl FlightEncoderStreamBuilder {
             node_messages: self.node_messages,
             first_data: true,
             done: false,
+            report: self.report,
             ctx: StreamContext {
                 trace_id: self.trace_id,
                 is_super: self.is_super,
@@ -142,6 +159,8 @@ impl FlightEncoderStreamBuilder {
 enum FlightSource {
     Channel(mpsc::Receiver<Result<Vec<FlightData>, FlightError>>),
     Inline(Box<PartitionEncoderStream>),
+    /// Left behind when the run's report takes the source, to drop it before reading metrics.
+    Closed,
 }
 
 pub struct FlightEncoderStream {
@@ -153,6 +172,8 @@ pub struct FlightEncoderStream {
     node_messages: NodeMessages,
     first_data: bool,
     done: bool,
+    /// Set only for EXPLAIN ANALYZE.
+    report: Option<RunReport>,
     /// query context + resources consumed by the stream's `Drop` teardown.
     ctx: StreamContext,
     /// per-message logging.
@@ -214,7 +235,35 @@ impl EventLog {
     }
 }
 
+/// What an EXPLAIN ANALYZE run reports once its stream ends, and how it ended.
+pub(crate) struct RunReport {
+    slot: ReportSlot,
+    plan: Arc<dyn ExecutionPlan>,
+    status: NodeStatus,
+}
+
+impl RunReport {
+    pub(crate) fn new(slot: ReportSlot, plan: Arc<dyn ExecutionPlan>) -> Self {
+        Self {
+            slot,
+            plan,
+            status: NodeStatus::EarlyStopped,
+        }
+    }
+}
+
 impl FlightEncoderStream {
+    /// Records that the caller's deadline ended the run, not the caller.
+    pub(crate) fn mark_timed_out(&mut self) {
+        self.set_status(NodeStatus::TimedOut);
+    }
+
+    fn set_status(&mut self, status: NodeStatus) {
+        if let Some(report) = &mut self.report {
+            report.status = status;
+        }
+    }
+
     /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
     fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
         let mut messages = Vec::new();
@@ -237,6 +286,7 @@ impl FlightEncoderStream {
         e: impl std::string::ToString,
     ) -> Poll<Option<Result<FlightData, tonic::Status>>> {
         self.done = true;
+        self.set_status(NodeStatus::Failed);
         self.queue.clear();
         Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))))
     }
@@ -249,6 +299,7 @@ impl FlightEncoderStream {
         match &mut self.source {
             FlightSource::Channel(rx) => rx.poll_recv(cx),
             FlightSource::Inline(stream) => stream.poll_next_unpin(cx),
+            FlightSource::Closed => Poll::Ready(None),
         }
     }
 }
@@ -317,6 +368,7 @@ impl Stream for FlightEncoderStream {
                         return this.fail(e);
                     }
                     this.done = true;
+                    this.set_status(NodeStatus::Completed);
                     continue;
                 }
                 Poll::Pending => return Poll::Pending,
@@ -327,9 +379,12 @@ impl Stream for FlightEncoderStream {
 
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
+        let report = self.report.take();
+        if report.is_none() {
+            // Stop partition tasks before clearing session data they may still read.
+            self.ctx.tasks.abort_all();
+        }
         let ctx = &mut self.ctx;
-        // Stop partition tasks before clearing session data they may still read.
-        ctx.tasks.abort_all();
 
         let trace_id = &ctx.trace_id;
         let is_super = ctx.is_super;
@@ -353,12 +408,39 @@ impl Drop for FlightEncoderStream {
             .inc();
 
         // the defer only covers the work group slot, so it never gates the session release
-        drop(ctx.defer_lock.take());
-        drop(ctx.session_guard.take());
+        let guards = (ctx.defer_lock.take(), ctx.session_guard.take());
+        match report {
+            None => drop(guards),
+            Some(report) => {
+                let source = std::mem::replace(&mut self.source, FlightSource::Closed);
+                let tasks = std::mem::take(&mut self.ctx.tasks);
+                tokio::spawn(report_run(source, tasks, guards, report));
+            }
+        }
         log::info!(
-            "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+            "[trace_id {}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+            self.ctx.trace_id,
         );
     }
+}
+
+/// Waits until the run's partitions have stopped, then reports its final profile.
+async fn report_run(
+    source: FlightSource,
+    mut tasks: JoinSet<()>,
+    guards: (Option<DeferredLock>, Option<SessionGuard>),
+    report: RunReport,
+) {
+    drop(source);
+    tasks.shutdown().await;
+    drop(guards);
+    let RunReport { slot, plan, status } = report;
+    // A cluster leader must finish its own fetches within its caller's wait.
+    complete_remote_profiles(plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+    slot.complete(NodeReport {
+        status,
+        plan: Some(build_profile(plan.as_ref())),
+    });
 }
 
 fn write_options() -> IpcWriteOptions {
@@ -374,12 +456,39 @@ mod tests {
 
     use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::search::ScanStats;
-    use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-    use flight::common::{CustomMessage, NodeRole};
+    use config::meta::{cluster::NodeInfo, search::ScanStats};
+    use datafusion::physical_plan::{
+        ExecutionPlan, empty::EmptyExec, stream::RecordBatchStreamAdapter,
+    };
+    use flight::{
+        common::{CustomMessage, NodeRole},
+        profile::{NodeStatus, ProfileInputs},
+    };
     use futures::TryStreamExt;
+    use search::datafusion::distributed_plan::{
+        node::RemoteScanNode, remote_scan_exec::RemoteScanExec,
+    };
 
     use super::*;
+    use crate::handler::grpc::flight::report_registry::ReportRegistry;
+
+    #[derive(Debug)]
+    struct ClusterNode;
+
+    impl NodeInfo for ClusterNode {
+        fn get_grpc_addr(&self) -> String {
+            "http://127.0.0.1:1".to_string()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "q-0".to_string()
+        }
+        fn is_local(&self) -> bool {
+            false
+        }
+    }
 
     fn make_builder() -> FlightEncoderStreamBuilder {
         FlightEncoderStreamBuilder::new(
@@ -475,6 +584,93 @@ mod tests {
             futures::stream::empty(),
         ));
         assert_eq!(message_kinds(empty).await, ["ScanStats", "PeakMemory"]);
+    }
+
+    #[tokio::test]
+    async fn test_run_reports_how_its_stream_ended() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1, 2]))])
+                .unwrap();
+        let partition = |items: Vec<datafusion::common::Result<RecordBatch>>| {
+            Box::pin(RecordBatchStreamAdapter::new(
+                schema.clone(),
+                futures::stream::iter(items),
+            )) as SendableRecordBatchStream
+        };
+        let error = || {
+            Err(datafusion::common::DataFusionError::Execution(
+                "boom".into(),
+            ))
+        };
+        let batches = |n| (0..n).map(|_| Ok(batch.clone())).collect::<Vec<_>>();
+        let cases = [
+            ("read to the end", batches(1), 100, NodeStatus::Completed),
+            (
+                "dropped after one message",
+                batches(4),
+                1,
+                NodeStatus::EarlyStopped,
+            ),
+            ("partition error", vec![error()], 100, NodeStatus::Failed),
+            ("timed out", batches(4), 0, NodeStatus::TimedOut),
+        ];
+        let registry = ReportRegistry::new(std::time::Duration::from_secs(60));
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
+        for (name, items, read, expected) in cases {
+            let slot = registry.open(name);
+            let mut stream = make_builder()
+                .with_report(Some(RunReport::new(slot, Arc::clone(&plan))))
+                .build(vec![partition(items)], tracing::Span::none());
+            for _ in 0..read {
+                if !matches!(stream.next().await, Some(Ok(_))) {
+                    break;
+                }
+            }
+            if expected == NodeStatus::TimedOut {
+                stream.mark_timed_out();
+            }
+            drop(stream);
+            let report = registry.fetch(name).await.unwrap();
+            assert_eq!(report.status, expected, "{name}");
+            assert_eq!(report.plan.unwrap().name, "EmptyExec", "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_leader_report_lists_its_own_nodes() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let scan = RemoteScanExec::new(
+            Arc::new(EmptyExec::new(schema.clone())),
+            RemoteScanNode {
+                nodes: vec![Arc::new(ClusterNode)],
+                opentelemetry_context: opentelemetry::Context::current(),
+                query_identifier: Default::default(),
+                search_infos: Default::default(),
+                index_info: Default::default(),
+                super_cluster_info: Default::default(),
+            },
+        )
+        .unwrap();
+        let registry = ReportRegistry::new(std::time::Duration::from_secs(60));
+        let partition = Box::pin(RecordBatchStreamAdapter::new(
+            schema,
+            futures::stream::empty(),
+        )) as SendableRecordBatchStream;
+        let stream = make_builder()
+            .with_report(Some(RunReport::new(
+                registry.open("leader"),
+                Arc::new(scan),
+            )))
+            .build(vec![partition], tracing::Span::none());
+        drop(stream);
+        let plan = registry.fetch("leader").await.unwrap().plan.unwrap();
+        let ProfileInputs::Remote(nodes) = plan.inputs else {
+            panic!("expected the leader's own remote scan");
+        };
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].node_name, "q-0");
+        assert_eq!(nodes[0].status, NodeStatus::NotExecuted);
     }
 
     #[test]

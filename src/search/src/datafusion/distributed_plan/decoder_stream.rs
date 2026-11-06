@@ -60,11 +60,17 @@ impl FlightDecoderStream {
         }
     }
 
+    /// Records that the caller's deadline, not the node, ended this stream.
+    pub fn mark_timed_out(&self) {
+        self.query_context.node_profile.mark_timed_out();
+    }
+
     pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
                 self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
+                self.query_context.node_profile.add_scan_stats(&stats);
             }
             CustomMessage::Metrics(metrics) => {
                 self.query_context.node_profile.record_plan(metrics);
@@ -132,7 +138,9 @@ impl Stream for FlightDecoderStream {
                         self.query_context.is_querier,
                         self.query_context.start.elapsed().as_millis(),
                     );
-                    process_partial_err(self.query_context.partial_err.clone(), e.into());
+                    let status = e.into();
+                    self.query_context.node_profile.mark_failed(&status);
+                    process_partial_err(self.query_context.partial_err.clone(), status);
                     poll = Poll::Ready(None);
                     break;
                 }
@@ -192,9 +200,6 @@ impl Stream for FlightDecoderStream {
 impl Drop for FlightDecoderStream {
     fn drop(&mut self) {
         let scan_stats = self.scan_stats;
-        self.query_context
-            .node_profile
-            .finish(&self.metrics, scan_stats);
         let QueryContext {
             trace_id,
             node,
@@ -257,4 +262,75 @@ fn record_poll(
         metrics.record_output(batch);
     }
     poll
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::Arc, time::Duration};
+
+    use arrow_flight::{Ticket, flight_service_client::FlightServiceClient};
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::physical_plan::{empty::EmptyExec, metrics::ExecutionPlanMetricsSet};
+    use flight::profile::{NodeReport, NodeStatus, ProfileNode};
+    use infra::client::grpc::get_cached_channel;
+    use proto::cluster_rpc::QueryIdentifier;
+
+    use super::*;
+    use crate::datafusion::distributed_plan::{
+        node::RemoteScanNode,
+        profile::{NodeProfileRecorder, complete_remote_profiles},
+        remote_scan_exec::RemoteScanExec,
+        utils::tests::{StubFlight, serve},
+    };
+
+    #[tokio::test]
+    async fn test_stream_error_keeps_failed_over_the_fetched_report() {
+        let node = serve(StubFlight {
+            report: Some(NodeReport {
+                status: NodeStatus::Completed,
+                plan: Some(ProfileNode {
+                    name: "FilterExec".to_string(),
+                    ..Default::default()
+                }),
+            }),
+        })
+        .await;
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let remote = RemoteScanExec::new(
+            Arc::new(EmptyExec::new(schema.clone())),
+            RemoteScanNode {
+                nodes: vec![Arc::clone(&node)],
+                opentelemetry_context: opentelemetry::Context::current(),
+                query_identifier: QueryIdentifier {
+                    trace_id: "test-stream-error".to_string(),
+                    org_id: "default".to_string(),
+                    ..Default::default()
+                },
+                search_infos: Default::default(),
+                index_info: Default::default(),
+                super_cluster_info: Default::default(),
+            },
+        )
+        .unwrap();
+        let recorder = NodeProfileRecorder::start(remote.state.node_profiles.clone(), 0, &*node);
+        let channel = get_cached_channel(&node.get_grpc_addr()).await.unwrap();
+        let mut client = FlightServiceClient::new(channel);
+        recorder.mark_sent();
+        let response = client.do_get(Ticket::default()).await.unwrap();
+        recorder.mark_streaming("j0".to_string());
+
+        let query_context = QueryContext::new(Arc::clone(&node)).with_node_profile(recorder);
+        let partial_err = query_context.partial_err.clone();
+        let metrics = RemoteScanMetrics::new(0, &ExecutionPlanMetricsSet::new());
+        let mut stream =
+            FlightDecoderStream::new(response.into_inner(), schema, metrics, query_context);
+        assert!(stream.next().await.is_none());
+        drop(stream);
+        assert!(partial_err.lock().contains("node lost"));
+
+        complete_remote_profiles(&remote, Duration::from_secs(5)).await;
+        let profiles = remote.state.node_profiles.lock();
+        assert_eq!(profiles[&0].status, NodeStatus::Failed);
+        assert_eq!(profiles[&0].plan.as_ref().unwrap().name, "FilterExec");
+    }
 }

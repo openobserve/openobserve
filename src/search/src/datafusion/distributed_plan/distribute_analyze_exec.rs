@@ -32,11 +32,12 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::profile::{ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
+use flight::profile::{NodeStatus, ProfileInputs, ProfileNode, QueryProfile, RemoteNodeProfile};
 use futures::StreamExt;
 
 use crate::datafusion::distributed_plan::{
-    display::DisplayableExecutionPlan, profile::build_profile,
+    display::DisplayableExecutionPlan,
+    profile::{REMOTE_PROFILE_TIMEOUT, build_profile, complete_remote_profiles},
 };
 
 /// EXPLAIN ANALYZE across nodes: one text row per node that ran a plan, phase = its depth.
@@ -103,11 +104,11 @@ impl DistributeAnalyzeExec {
 
         let mut remote_rows = Vec::new();
         collect_remote_rows(&profile.plan, 1, &mut remote_rows);
-        for (stage, node, plan) in remote_rows {
+        for (stage, node) in remote_rows {
             phase_builder.append_value(stage);
             address_builder.append_value(&node.node_address);
             name_builder.append_value(&node.node_name);
-            plan_builder.append_value(plan.to_text());
+            plan_builder.append_value(remote_text(node));
         }
 
         if self.verbose {
@@ -220,8 +221,8 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             while let Some(batch) = stream.next().await.transpose()? {
                 total_rows += batch.num_rows();
             }
-            // remote nodes publish their profiles when their streams are dropped
             drop(stream);
+            complete_remote_profiles(exec.input.as_ref(), REMOTE_PROFILE_TIMEOUT).await;
 
             let duration = std::time::Instant::now() - start;
             let profile = QueryProfile {
@@ -242,11 +243,11 @@ impl ExecutionPlan for DistributeAnalyzeExec {
     }
 }
 
-/// Lists, depth first, each remote node that sent back its plan, with its stage below the leader.
+/// Lists, depth first, each remote node called but not skipped, with its stage below the leader.
 fn collect_remote_rows<'a>(
     node: &'a ProfileNode,
     stage: i32,
-    rows: &mut Vec<(i32, &'a RemoteNodeProfile, &'a ProfileNode)>,
+    rows: &mut Vec<(i32, &'a RemoteNodeProfile)>,
 ) {
     match &node.inputs {
         ProfileInputs::Children(children) => {
@@ -255,14 +256,29 @@ fn collect_remote_rows<'a>(
             }
         }
         ProfileInputs::Remote(remotes) => {
-            for (remote, plan) in remotes
-                .iter()
-                .filter_map(|r| r.plan.as_ref().map(|plan| (r, plan)))
-            {
-                rows.push((stage, remote, plan));
-                collect_remote_rows(plan, stage + 1, rows);
+            for remote in remotes {
+                if remote.status == NodeStatus::Skipped {
+                    continue;
+                }
+                rows.push((stage, remote));
+                if let Some(plan) = &remote.plan {
+                    collect_remote_rows(plan, stage + 1, rows);
+                }
             }
         }
+    }
+}
+
+/// A remote node's text row: its plan, headed by its status unless it completed.
+fn remote_text(remote: &RemoteNodeProfile) -> String {
+    let plan = remote
+        .plan
+        .as_ref()
+        .map(ProfileNode::to_text)
+        .unwrap_or_default();
+    match remote.status {
+        NodeStatus::Completed => plan,
+        status => format!("status={}\n{plan}", status.as_str()),
     }
 }
 
@@ -346,9 +362,10 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_remote_rows_nests_stages_and_skips_nodes_without_plan() {
-        let node = |name: &str, plan: Option<ProfileNode>| RemoteNodeProfile {
+    fn test_collect_remote_rows_nests_stages_and_hides_skipped_nodes() {
+        let node = |name: &str, status, plan: Option<ProfileNode>| RemoteNodeProfile {
             node_name: name.to_string(),
+            status,
             plan,
             ..Default::default()
         };
@@ -359,15 +376,18 @@ mod tests {
         };
         let cluster_leader = node(
             "b-querier-0",
+            NodeStatus::Completed,
             Some(scan(vec![node(
                 "b-querier-1",
+                NodeStatus::Completed,
                 Some(ProfileNode::default()),
             )])),
         );
         let root = ProfileNode {
             inputs: ProfileInputs::Children(vec![scan(vec![
                 cluster_leader,
-                node("skipped", None),
+                node("skipped", NodeStatus::Skipped, None),
+                node("unstarted", NodeStatus::NotExecuted, None),
             ])]),
             ..Default::default()
         };
@@ -375,8 +395,41 @@ mod tests {
         collect_remote_rows(&root, 1, &mut rows);
         let rows: Vec<_> = rows
             .iter()
-            .map(|(stage, node, _)| (*stage, node.node_name.as_str()))
+            .map(|(stage, node)| (*stage, node.node_name.as_str()))
             .collect();
-        assert_eq!(rows, vec![(1, "b-querier-0"), (2, "b-querier-1")]);
+        assert_eq!(
+            rows,
+            vec![(1, "b-querier-0"), (2, "b-querier-1"), (1, "unstarted")]
+        );
+    }
+
+    #[test]
+    fn test_remote_text_states_any_status_but_completed() {
+        let plan = ProfileNode {
+            detail: "FilterExec".to_string(),
+            ..Default::default()
+        };
+        let remote = |status, plan: Option<ProfileNode>| RemoteNodeProfile {
+            status,
+            plan,
+            ..Default::default()
+        };
+        let cases = [
+            (
+                remote(NodeStatus::Completed, Some(plan.clone())),
+                "FilterExec, metrics=[]\n",
+            ),
+            (
+                remote(NodeStatus::EarlyStopped, Some(plan)),
+                "status=early_stopped\nFilterExec, metrics=[]\n",
+            ),
+            (
+                remote(NodeStatus::Unavailable, None),
+                "status=unavailable\n",
+            ),
+        ];
+        for (remote, expected) in cases {
+            assert_eq!(remote_text(&remote), expected);
+        }
     }
 }

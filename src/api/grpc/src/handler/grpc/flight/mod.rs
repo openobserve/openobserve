@@ -27,7 +27,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{MetricsInfo, NodeMessages};
+use flight::common::{MetricsInfo, NodeMessages, NodeRole, QUERY_PROFILE_ACTION, job_trace_id};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
@@ -47,12 +47,14 @@ use {
 use crate::handler::grpc::{
     MetadataMap,
     flight::{
-        stream::FlightEncoderStreamBuilder,
+        report_registry::REPORTS,
+        stream::{FlightEncoderStreamBuilder, RunReport},
         visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
 
 mod partition_encoder;
+mod report_registry;
 mod stream;
 pub mod visitor;
 
@@ -100,10 +102,7 @@ impl FlightService for FlightServiceImpl {
             parent_cx,
             &req.query_identifier.trace_id,
         );
-        let trace_id = format!(
-            "{}-{}",
-            req.query_identifier.trace_id, req.query_identifier.job_id
-        );
+        let trace_id = job_trace_id(&req.query_identifier.trace_id, &req.query_identifier.job_id);
         let session_guard = SessionGuard::new(trace_id.clone());
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
@@ -163,15 +162,19 @@ impl FlightService for FlightServiceImpl {
         }
 
         let start = std::time::Instant::now();
+        let role = node_role(&plan);
+        // A cluster leader's profile needs its own nodes' reports, so its caller always fetches it.
+        let send_profile = req.search_info.is_analyze && matches!(role, NodeRole::Follower);
         let node_messages = NodeMessages {
             scan_stats,
             peak_memory: get_peak_memory_from_ctx(&ctx),
-            profile: req.search_info.is_analyze.then(|| MetricsInfo {
+            profile: send_profile.then(|| MetricsInfo {
                 plan: plan.clone(),
                 build_profile: profile::build_profile,
             }),
-            role: node_role(&plan),
+            role,
         };
+        let report_plan = plan.clone();
 
         // One stream per output partition so they encode in parallel
         let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
@@ -180,12 +183,18 @@ impl FlightService for FlightServiceImpl {
             );
             Status::internal(e.to_string())
         })?;
+        // Opened only once the call returns a stream, which is when its caller expects a report.
+        let report = req
+            .search_info
+            .is_analyze
+            .then(|| RunReport::new(REPORTS.open(&trace_id), report_plan));
 
         let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
             .with_trace_id(trace_id.to_string())
             .with_is_super(is_super_cluster)
             .with_defer_lock(lock)
             .with_start(start)
+            .with_report(report)
             .build(streams, span);
 
         let stream = async_stream::stream! {
@@ -202,6 +211,7 @@ impl FlightService for FlightServiceImpl {
                     }
                     _ = &mut timeout => {
                         log::info!("[trace_id {trace_id}] flight->search: timeout");
+                        stream.mark_timed_out();
                         break;
                     }
                 }
@@ -255,9 +265,26 @@ impl FlightService for FlightServiceImpl {
 
     async fn do_action(
         &self,
-        _request: Request<Action>,
+        request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
-        Err(Status::unimplemented("Implement do_action"))
+        let action = request.into_inner();
+        if action.r#type != QUERY_PROFILE_ACTION {
+            return Err(Status::unimplemented(format!(
+                "unknown action: {}",
+                action.r#type
+            )));
+        }
+        let key = std::str::from_utf8(&action.body)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let report = REPORTS
+            .fetch(key)
+            .await
+            .ok_or_else(|| Status::not_found(format!("no profile for {key}")))?;
+        let body = serde_json::to_vec(&report).map_err(|e| Status::internal(e.to_string()))?;
+        let reply = arrow_flight::Result { body: body.into() };
+        Ok(Response::new(
+            futures::stream::once(async { Ok(reply) }).boxed(),
+        ))
     }
 
     async fn list_actions(
@@ -341,10 +368,153 @@ fn clear_session_data(trace_id: &str) {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
+    use arrow_flight::flight_service_server::FlightServiceServer;
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::cluster::NodeInfo;
+    use datafusion::physical_plan::empty::EmptyExec;
+    use flight::profile::{NodeReport, NodeStatus, ProfileNode};
+    use proto::cluster_rpc::QueryIdentifier;
+    use search::datafusion::distributed_plan::{
+        node::RemoteScanNode,
+        profile::{NodeProfileRecorder, complete_remote_profiles},
+        remote_scan_exec::RemoteScanExec,
+    };
+    use tonic::transport::server::TcpIncoming;
+
     use super::*;
+
+    #[derive(Debug)]
+    struct LoopbackNode(String);
+
+    impl NodeInfo for LoopbackNode {
+        fn get_grpc_addr(&self) -> String {
+            self.0.clone()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "q-0".to_string()
+        }
+        fn is_local(&self) -> bool {
+            true
+        }
+    }
 
     #[test]
     fn test_flight_service_impl_default() {
         let _impl = FlightServiceImpl;
+    }
+
+    fn action(r#type: &str, body: &str) -> Request<Action> {
+        Request::new(Action {
+            r#type: r#type.to_string(),
+            body: body.as_bytes().to_vec().into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn test_do_action_rejects_unknown_actions() {
+        let err = FlightServiceImpl
+            .do_action(action("drop_everything", ""))
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(err.code(), tonic::Code::Unimplemented);
+    }
+
+    #[tokio::test]
+    async fn test_do_action_returns_a_finished_runs_report_once() {
+        let key = job_trace_id("test-do-action", "job1");
+        REPORTS.open(&key).complete(NodeReport {
+            status: NodeStatus::TimedOut,
+            plan: None,
+        });
+        let mut replies = FlightServiceImpl
+            .do_action(action(QUERY_PROFILE_ACTION, &key))
+            .await
+            .unwrap()
+            .into_inner();
+        let reply = replies.next().await.unwrap().unwrap();
+        let report: NodeReport = serde_json::from_slice(&reply.body).unwrap();
+        assert_eq!(report.status, NodeStatus::TimedOut);
+        assert!(replies.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_caller_fetches_the_reports_its_streams_did_not_deliver() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let grpc_addr = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            tonic::transport::Server::builder()
+                .add_service(FlightServiceServer::new(FlightServiceImpl))
+                .serve_with_incoming(TcpIncoming::from(listener)),
+        );
+        let trace_id = "test-fetch-path";
+        let node: Arc<dyn NodeInfo> = Arc::new(LoopbackNode(grpc_addr));
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let remote = RemoteScanExec::new(
+            Arc::new(EmptyExec::new(schema)),
+            RemoteScanNode {
+                nodes: vec![Arc::clone(&node); 4],
+                opentelemetry_context: opentelemetry::Context::current(),
+                query_identifier: QueryIdentifier {
+                    trace_id: trace_id.to_string(),
+                    org_id: "default".to_string(),
+                    ..Default::default()
+                },
+                search_infos: Default::default(),
+                index_info: Default::default(),
+                super_cluster_info: Default::default(),
+            },
+        )
+        .unwrap();
+        // 0 stopped early, 1 hit the caller's deadline, 2 has no report held, 3 never started.
+        for (partition, job) in ["j0", "j1", "j2"].into_iter().enumerate() {
+            let recorder =
+                NodeProfileRecorder::start(remote.state.node_profiles.clone(), partition, &*node);
+            recorder.mark_sent();
+            recorder.mark_streaming(job.to_string());
+            if partition == 1 {
+                recorder.mark_timed_out();
+            }
+        }
+        for job in ["j0", "j1"] {
+            REPORTS
+                .open(&job_trace_id(trace_id, job))
+                .complete(NodeReport {
+                    status: NodeStatus::EarlyStopped,
+                    plan: Some(ProfileNode {
+                        name: job.to_string(),
+                        ..Default::default()
+                    }),
+                });
+        }
+
+        let start = Instant::now();
+        complete_remote_profiles(&remote, Duration::from_secs(5)).await;
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "a missing report must not stall"
+        );
+        let outcomes = remote
+            .state
+            .node_profiles
+            .lock()
+            .values()
+            .map(|p| (p.status, p.plan.as_ref().map(|plan| plan.name.clone())))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            outcomes,
+            [
+                (NodeStatus::EarlyStopped, Some("j0".to_string())),
+                (NodeStatus::TimedOut, Some("j1".to_string())),
+                (NodeStatus::Unavailable, None),
+                (NodeStatus::NotExecuted, None),
+            ]
+        );
+        server.abort();
     }
 }

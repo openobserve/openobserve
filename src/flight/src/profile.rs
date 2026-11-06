@@ -47,7 +47,7 @@
 //! caller stores it under the remote scan that made the call.
 //!
 //! The leader also renders the text rows of EXPLAIN ANALYZE from this tree, one per
-//! node that sent back its plan, which is why `ProfileMetric::display` keeps each
+//! node it called that was not skipped, which is why `ProfileMetric::display` keeps each
 //! value exactly as DataFusion prints it.
 
 use std::fmt::Write;
@@ -166,10 +166,57 @@ pub struct RemoteNodeProfile {
     pub output_batches: u64,
     pub output_bytes: u64,
     pub decode_ns: u64,
+    #[serde(default)]
+    pub status: NodeStatus,
+    /// Same as `status == Skipped`; the UI still reads this instead of `status`.
+    #[serde(default)]
     pub skipped: bool,
+    /// Identifies the call, so the caller can fetch the report a stream did not deliver.
+    #[serde(skip)]
+    pub job_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan_stats: Option<ScanStats>,
     /// The plan this node ran; its own remote scans nest the nodes below it the same way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<ProfileNode>,
+}
+
+/// How one remote node's run ended, as its caller knows it.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeStatus {
+    Completed,
+    /// The caller stopped reading before the end, for example once a LIMIT was met.
+    EarlyStopped,
+    Failed,
+    TimedOut,
+    /// Not called: the node had no files to scan.
+    Skipped,
+    /// The request never reached the node: the caller finished before sending it.
+    NotExecuted,
+    /// No report reached the caller; a placeholder until fetched, final if the fetch fails.
+    #[default]
+    Unavailable,
+}
+
+impl NodeStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::EarlyStopped => "early_stopped",
+            Self::Failed => "failed",
+            Self::TimedOut => "timed_out",
+            Self::Skipped => "skipped",
+            Self::NotExecuted => "not_executed",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// A node's own account of a finished run, fetched by its caller after the stream.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeReport {
+    pub status: NodeStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<ProfileNode>,
 }
@@ -218,6 +265,37 @@ mod tests {
             panic!("expected remote inputs");
         };
         assert_eq!(remote[0].node_name, "q-0");
+    }
+
+    #[test]
+    fn test_remote_status_serializes_and_job_id_stays_internal() {
+        let remote = RemoteNodeProfile {
+            job_id: "abc".to_string(),
+            status: NodeStatus::EarlyStopped,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&remote).unwrap();
+        assert!(json.contains(r#""status":"early_stopped""#), "{json}");
+        assert!(!json.contains("abc"), "{json}");
+        let mut value = serde_json::to_value(&remote).unwrap();
+        value.as_object_mut().unwrap().remove("status");
+        let back: RemoteNodeProfile = serde_json::from_value(value).unwrap();
+        assert_eq!(back.status, NodeStatus::Unavailable);
+    }
+
+    #[test]
+    fn test_node_report_round_trip() {
+        let report = NodeReport {
+            status: NodeStatus::TimedOut,
+            plan: Some(ProfileNode {
+                name: "FilterExec".to_string(),
+                ..Default::default()
+            }),
+        };
+        let back: NodeReport =
+            serde_json::from_slice(&serde_json::to_vec(&report).unwrap()).unwrap();
+        assert_eq!(back.status, NodeStatus::TimedOut);
+        assert_eq!(back.plan.unwrap().name, "FilterExec");
     }
 
     #[test]
