@@ -1627,12 +1627,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="ms-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="18.75rem">
-            <template #content>
-              <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
-            </template>
-          </OTooltip>
+          <OButton
+            variant="ghost"
+            size="icon-chip"
+            icon-left="info-outline"
+            class="ms-1 align-middle"
+            :aria-label="t('search.noOfRecordsTooltip')"
+            data-test="search-scheduler-records-info"
+          >
+            <OTooltip side="right" align="center" max-width="18.75rem">
+              <template #content>
+                <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
+              </template>
+            </OTooltip>
+          </OButton>
         </div>
         <OInput
           type="number"

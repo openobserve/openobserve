@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
+import {
+  computed,
+  getCurrentInstance,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  useAttrs,
+  useId,
+} from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
@@ -494,6 +502,17 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+const instance = getCurrentInstance();
+const ACTION_LISTENERS = ["onClick", "onPointerdown", "onMousedown", "onPointerup"];
+
+// A plain button with no listener does nothing on click, so a child tooltip may claim the click to open.
+function isInert(): boolean {
+  if (props.as !== "button" || props.asChild || props.type !== "button") return false;
+  if (attrs["aria-haspopup"] !== undefined || attrs["aria-expanded"] !== undefined) return false;
+  const vnodeProps = instance?.vnode.props ?? {};
+  return !ACTION_LISTENERS.some((name) => vnodeProps[name]);
+}
+
 function handleClick(event: MouseEvent): void {
   if (isDisabled.value || props.loading) {
     if (unavailable.value || lockedLink.value) {
@@ -522,6 +541,7 @@ function handleClick(event: MouseEvent): void {
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
+    :data-o2-inert="isInert() || undefined"
     v-bind="$attrs"
     :aria-describedby="unavailable ? reasonId : (attrs['aria-describedby'] as string | undefined)"
     @keydown.capture="handleKeydown"
