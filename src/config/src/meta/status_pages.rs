@@ -56,7 +56,7 @@ const MICROS_PER_DAY: i64 = 86_400 * 1_000_000;
 
 /// Day-cell grade, Statuspage-style: one confirmed blip colors a day yellow at
 /// most, never solid red.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Grade {
     Ok,
@@ -67,7 +67,8 @@ pub enum Grade {
     NoData,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = StatusPageImpact)]
 #[serde(rename_all = "snake_case")]
 pub enum Impact {
     None = 0,
@@ -76,7 +77,7 @@ pub enum Impact {
     MajorOutage = 3,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NoticeKind {
     Incident = 0,
@@ -84,7 +85,7 @@ pub enum NoticeKind {
     Info = 2,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NoticeState {
     Scheduled = 0,
@@ -95,7 +96,9 @@ pub enum NoticeState {
 /// Component status by notice precedence: Major > Partial > Degraded >
 /// Maintenance > Operational. NoData is orthogonal (a dead probe is gray, not
 /// green — and not an outage either).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ComponentStatus {
     Operational = 0,
@@ -208,7 +211,7 @@ pub struct UpdatePageRequest {
 
 /// Admin view of a page. Deliberately omits `password_hash`; carries only
 /// whether a password is set.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct PageAdminView {
     pub id: String,
     pub name: String,
@@ -240,7 +243,7 @@ pub struct PageAdminView {
     pub components: Option<Vec<ComponentView>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct PageListResponse {
     pub pages: Vec<PageAdminView>,
     pub total: i64,
@@ -248,7 +251,7 @@ pub struct PageListResponse {
 
 /// A component as returned by the admin GET (id + name + its mapped check ids),
 /// so the edit UI can render the existing mapping. The list view omits this.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ComponentView {
     pub id: String,
     pub name: String,
@@ -321,7 +324,7 @@ pub struct MarkFalsePositiveRequest {
 /// Admin view of a notice: unlike [`PublicNotice`], this carries the internal
 /// id and mapped component ids the edit UI needs to round-trip — it must
 /// never be reachable from the public plane.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct NoticeAdminView {
     pub id: String,
     pub kind: i32,
@@ -339,7 +342,7 @@ pub struct NoticeAdminView {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct NoticeUpdateView {
     pub id: String,
     pub body: String,
@@ -351,7 +354,7 @@ pub struct NoticeUpdateView {
 // Adding a field here means publishing it to the internet; the allowlist test
 // at the bottom is the merge gate.
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct PublicNotice {
     // No internal notice id — the public page never addresses a notice, and a
     // snowflake id is needless IDOR surface (pentest finding, 2026-08-22).
@@ -368,13 +371,13 @@ pub struct PublicNotice {
     pub updates: Vec<PublicNoticeUpdate>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct PublicNoticeUpdate {
     pub body: String,
     pub at: i64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct CurrentComponent {
     /// Per-page opaque key ("c0", "c1", …) that joins current↔history on the
     /// client. Deliberately NOT the internal component id — that id is a
@@ -385,7 +388,7 @@ pub struct CurrentComponent {
 }
 
 /// The hot snapshot half: rewritten on state change (~1-2KB).
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct SnapshotCurrent {
     pub overall: ComponentStatus,
     pub generated_at: i64,
@@ -393,7 +396,7 @@ pub struct SnapshotCurrent {
     pub notices: Vec<PublicNotice>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct DayBucket {
     pub date: String,
     pub downtime_min: i64,
@@ -401,7 +404,7 @@ pub struct DayBucket {
     pub grade: Grade,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct UptimeWindows {
     pub d1: Option<f64>,
     pub d7: Option<f64>,
@@ -409,7 +412,7 @@ pub struct UptimeWindows {
     pub d90: Option<f64>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct HistoryComponent {
     /// Same per-page opaque key as `CurrentComponent.key` — the client join
     /// handle, never the internal component id.
@@ -420,7 +423,7 @@ pub struct HistoryComponent {
 }
 
 /// The cold snapshot half: rewritten on day rollover or notice change (~30KB).
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct SnapshotHistory {
     pub generated_at: i64,
     pub components: Vec<HistoryComponent>,
@@ -429,7 +432,8 @@ pub struct SnapshotHistory {
 /// The admin preview response: both snapshot halves through the exact same
 /// serializer the public plane uses, so preview cannot diverge from what
 /// visitors will see once published.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = StatusPagePreview)]
 pub struct PreviewResponse {
     pub current: SnapshotCurrent,
     pub history: SnapshotHistory,
@@ -443,7 +447,7 @@ pub struct CreateDomainRequest {
 /// The DNS TXT record the admin needs to create — `txt_name`/`txt_value`
 /// spelled out because the raw `domain` + `verification_token` pairing isn't
 /// self-explanatory to a non-engineer reading it off an API response.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CreateDomainResponse {
     pub id: String,
     pub domain: String,
@@ -451,7 +455,7 @@ pub struct CreateDomainResponse {
     pub txt_value: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct DomainAdminView {
     pub id: String,
     pub domain: String,

@@ -143,12 +143,12 @@ bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
 # API runs have no matching shard jobs, so this is a no-op there. Row schema:
 #   run_id, repo, suite, workflow, ingest_source, shard_name, module (shard minus SHARD_PREFIX),
 #   conclusion, duration_sec. _timestamp left unset -> ingest time (aligned with the run doc).
-# Notes: THIS_JOBS is the jobs API object {jobs:[...]}, piped in (so .jobs[]); workflow:"test" is
-# fixed to match the run doc's tag; duration clamped to >=0 to guard against runner clock skew.
+# Notes: THIS_JOBS is the jobs API object {jobs:[...]}, piped in (so .jobs[]); workflow is
+# the run doc's tag; duration clamped to >=0 to guard against runner clock skew.
 SHARD_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_shards.XXXXXX")
-shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" --arg pfx "$SHARD_PREFIX" \
+shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" --arg wf "$WORKFLOW_TAG" --arg pfx "$SHARD_PREFIX" \
   '[.jobs[]? | select(.name|startswith($pfx)) | {
-     run_id:$run_id, repo:$repo, suite:$suite, workflow:"test", ingest_source:"live",
+     run_id:$run_id, repo:$repo, suite:$suite, workflow:$wf, ingest_source:"live",
      shard_name:.name, module:(.name|sub("^"+$pfx;"")), conclusion:.conclusion,
      duration_sec: (if (.completed_at and .started_at) then ([((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)|floor), 0] | max) else null end)
    }]' 2>/dev/null) && printf '%s' "$shard_rows" > "$SHARD_FILE" || { echo '[]' > "$SHARD_FILE"; echo "::warning::shard-row extraction failed — skipping ${STREAM}_shards"; }

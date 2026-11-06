@@ -49,6 +49,7 @@ sea-orm-migration.workspace = true
 reqwest.workspace = true
 url.workspace = true
 urlencoding.workspace = true
+utoipa.workspace = true
 tonic.workspace = true
 tonic-tracing-opentelemetry.workspace = true
 tower.workspace = true

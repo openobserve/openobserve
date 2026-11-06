@@ -27,6 +27,7 @@ pub mod hash;
 pub mod inverted_index;
 pub mod json;
 pub mod md5;
+pub mod openapi;
 pub mod parquet;
 pub mod password;
 pub mod pausable_job;

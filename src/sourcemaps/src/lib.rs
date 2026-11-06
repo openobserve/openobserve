@@ -38,7 +38,7 @@ struct ParsedLine {
     col: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct SourceData {
     pub source: String,
     pub source_line_start: u32,
@@ -47,13 +47,13 @@ pub struct SourceData {
     pub stack_col: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct TranslatedStackLine {
     pub line: String,
     pub source_info: Option<SourceData>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct TranslatedStack {
     error: String,
     stack: Vec<TranslatedStackLine>,

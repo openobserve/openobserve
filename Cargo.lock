@@ -4135,6 +4135,7 @@ dependencies = [
  "tonic",
  "tracing",
  "transform",
+ "utoipa",
  "vrl",
 ]
 
@@ -6055,6 +6056,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
+ "utoipa",
 ]
 
 [[package]]
@@ -8122,6 +8124,7 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingestion-common",
+ "jsonschema",
  "log",
  "o2_dex",
  "o2_enterprise",
@@ -8133,7 +8136,9 @@ dependencies = [
  "openobserve-api-search",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-synthetics",
  "openobserve-tls",
+ "opentelemetry-proto",
  "rand 0.10.2",
  "regex",
  "reqwest 0.13.4",
@@ -8211,6 +8216,7 @@ dependencies = [
  "infra",
  "ingester",
  "itertools 0.14.0",
+ "jsonschema",
  "log",
  "mime",
  "o2_dex",
@@ -8573,6 +8579,7 @@ dependencies = [
  "sourcemap",
  "tokio",
  "tonic",
+ "utoipa",
  "zip 9.1.3",
 ]
 

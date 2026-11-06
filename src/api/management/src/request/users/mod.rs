@@ -79,6 +79,17 @@ pub struct UserDetailsResponse {
     pub lockout: LockoutState,
 }
 
+// Only documents save's answer: a service account also gets its token back.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum SaveUserVariants {
+    ServiceAccount(crate::common::meta::service_account::ServiceAccountCreateResponse),
+    User(MetaHttpResponse),
+}
+
+config::any_of_schema!(SaveUserAnswer, SaveUserVariants);
+
 /// ListUsers
 #[utoipa::path(
     get,
@@ -98,7 +109,7 @@ pub struct UserDetailsResponse {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = common::meta::user::UserList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
@@ -261,7 +272,7 @@ fn validate_org_id(org_id: &str) -> Option<&'static str> {
     ),
     request_body(content = inline(PostUserRequest), description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = SaveUserAnswer),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
@@ -338,11 +349,12 @@ pub async fn save(
     ),
     request_body(content = inline(UpdateUser), description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Update user details", "category": "users"}))
     )
 )]
 pub async fn update(
@@ -440,11 +452,12 @@ pub async fn update(
     ),
     request_body(content = inline(UserRoleRequest), description = "User role", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Add user to organization", "category": "users"}))
     )
 )]
 pub async fn add_user_to_org(
@@ -519,12 +532,13 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
         ("email_id" = String, Path, description = "User name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
     )
 )]
 pub async fn delete(
@@ -564,7 +578,7 @@ pub async fn delete(
       ),
     request_body(content = BulkDeleteRequest, description = "Emails of the users to remove", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -824,7 +838,7 @@ pub struct PresignedURLGenerator {
     exp_in: u32,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 struct PresignedURLGeneratorResponse {
     url: String,
 }
@@ -844,7 +858,7 @@ const fn default_exp_in() -> u32 {
         ("exp_in" = Option<u32>, Query, description = "URL lifetime in seconds, 600 by default"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PresignedURLGeneratorResponse),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -1247,7 +1261,7 @@ async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = common::meta::user::UserInviteList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),

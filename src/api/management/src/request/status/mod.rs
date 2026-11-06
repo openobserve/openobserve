@@ -145,7 +145,7 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
 }
 
 /// Authenticated full UI configuration (`GET /api/{org_id}/config`).
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,
@@ -280,7 +280,7 @@ struct ConfigResponse<'a> {
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseConfig {
     license_expiry: i64,
     license_server_url: String,
@@ -293,7 +293,7 @@ struct LicenseConfig {
 
 /// Cloud never shows the license search banner, so it does not serve these fields.
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseSearchConfig {
     license_search_allowed: bool,
     license_waiver_until: Option<i64>,
@@ -333,7 +333,8 @@ struct ConfigBootstrapResponse {
     editor_suggest_mode: String,
 }
 
-#[derive(Serialize, serde::Deserialize)]
+#[derive(Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[schema(as = RumConfig)]
 struct Rum {
     pub enabled: bool,
     pub client_token: String,
@@ -378,6 +379,7 @@ impl Rum {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -489,7 +491,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ConfigResponse<'static>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
