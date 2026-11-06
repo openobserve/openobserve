@@ -16,12 +16,15 @@
 import { computed, toValue, type MaybeRefOrGetter } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
+import { timezoneSearchMatcher } from "@/utils/timezoneSearch";
 
 export type TimezoneOption = {
   label: I18nText;
   value: string;
   /** The zone's legacy names, so a search for `Calcutta` still finds `Asia/Kolkata`. */
   searchText?: string;
+  /** Also finds the zone by abbreviation (`IST`) or UTC offset (`UTC+5:30`, `GMT-8`). */
+  matchSearch?: (term: string) => boolean;
 };
 
 export interface UseTimezoneOptionsConfig {
@@ -60,15 +63,19 @@ export function useTimezoneOptions(config: UseTimezoneOptionsConfig = {}) {
 
   // A legacy stored name shows under its canonical name, so one zone never reads two ways.
   const timezoneOptions = computed<TimezoneOption[]>(() =>
-    zones.value.map((tz) =>
-      tz === browserTimeValue
-        ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-        : {
-            label: raw(canonicalTimezone(tz)),
-            value: tz,
-            searchText: timezoneSearchText(canonicalTimezone(tz)),
-          },
-    ),
+    zones.value.map((tz) => {
+      if (tz === browserTimeValue) {
+        const label = t("common.browserTimeWithZone", { zone: browserTz });
+        return { label, value: tz, matchSearch: timezoneSearchMatcher(browserTz, label) };
+      }
+      const zone = canonicalTimezone(tz);
+      return {
+        label: raw(zone),
+        value: tz,
+        searchText: timezoneSearchText(zone),
+        matchSearch: timezoneSearchMatcher(tz, zone),
+      };
+    }),
   );
 
   return { browserTz, browserTimeValue, zones, timezoneOptions };

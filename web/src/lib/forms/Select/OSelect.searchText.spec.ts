@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
+import type { SelectOption } from "./OSelect.types";
 
 // JSDOM has no layout, so the real virtualizer renders no rows; render them all.
 vi.mock("@tanstack/vue-virtual", async () => {
@@ -29,7 +30,7 @@ vi.mock("@tanstack/vue-virtual", async () => {
   };
 });
 
-const OPTIONS = [
+const OPTIONS: SelectOption[] = [
   { label: "Asia/Kolkata", value: "Asia/Kolkata", searchText: "Asia/Kolkata Asia/Calcutta" },
   { label: "Europe/Kyiv", value: "Europe/Kyiv", searchText: "Europe/Kyiv Europe/Kiev" },
   { label: "UTC", value: "UTC" },
@@ -47,11 +48,11 @@ describe("OSelect option searchText", () => {
       `[data-test="unit-option"][data-test-value="${value}"]`,
     );
 
-  const searchFor = async (term: string) => {
+  const searchFor = async (term: string, options: SelectOption[] = OPTIONS) => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
       attrs: { "data-test": "unit" },
-      props: { options: OPTIONS, searchable: true },
+      props: { options, searchable: true },
     });
     await wrapper.find("button").trigger("click");
     await flushPromises();
@@ -72,5 +73,14 @@ describe("OSelect option searchText", () => {
     await searchFor("utc");
     expect(option("UTC")).not.toBeNull();
     expect(option("Asia/Kolkata")).toBeNull();
+  });
+
+  it("lets an option's matchSearch replace the label match", async () => {
+    await searchFor("ist", [
+      { label: "Asia/Kolkata", value: "Asia/Kolkata", matchSearch: (term) => term === "ist" },
+      { label: "Asia/Istanbul", value: "Asia/Istanbul", matchSearch: () => false },
+    ]);
+    expect(option("Asia/Kolkata")).not.toBeNull();
+    expect(option("Asia/Istanbul")).toBeNull();
   });
 });

@@ -326,8 +326,11 @@ const resolvedSearchPlaceholder = computed(
   () => props.searchPlaceholder ?? t("common.searchEllipsis"),
 );
 
-const matchesTerm = (opt: NormalizedOption, term: string) =>
-  opt.label.toLowerCase().includes(term) || !!opt.searchText?.includes(term);
+const matchesTerm = (opt: NormalizedOption, term: string) => {
+  const matchSearch = opt.source?.matchSearch;
+  if (typeof matchSearch === "function") return matchSearch(term);
+  return opt.label.toLowerCase().includes(term) || !!opt.searchText?.includes(term);
+};
 
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;

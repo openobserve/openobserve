@@ -452,6 +452,7 @@ import {
   type ParsedSingleDateTime,
 } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
+import { timezoneSearchMatcher } from "@/utils/timezoneSearch";
 import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
@@ -736,14 +737,18 @@ export default defineComponent({
         const offset = zoneOffset(zone);
         const suffix = offset ? raw(`UTC${offset}`) : undefined;
         if (isBrowser) {
-          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
+          const label = t("common.browserTimeWithZone", { zone: browserTz });
+          return { label, suffix, value: tz, matchSearch: timezoneSearchMatcher(zone, label) };
         }
-        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+        if (tz === "UTC") {
+          return { label: raw(tz), suffix, value: tz, matchSearch: timezoneSearchMatcher(tz, tz) };
+        }
         return {
           label: raw(offset ? `${tz} (UTC${offset})` : tz),
           listLabel: raw(tz),
           suffix,
           value: tz,
+          matchSearch: timezoneSearchMatcher(tz, tz),
         };
       }),
     );
