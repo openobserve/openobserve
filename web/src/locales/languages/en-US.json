@@ -25183,6 +25183,7 @@
       "depsTypeIn": "{type} in {namespace}",
       "depsKindNode": "Node",
       "depsKindExternal": "Other addresses",
+      "depsCollapseFiltering": "Grouping is off while a filter or search is active",
       "depsCollapseHint": "Auto groups workloads by namespace once the map has more than {count} endpoints. Collapsed always groups, Expanded never does.",
       "depsExpandEnd": "Show workloads in {name}: {detail}, {summary}",
       "depsOpenEnd": "Open details for {name}: {detail}, {summary}",

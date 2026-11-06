@@ -24,15 +24,23 @@ interface FitOptions {
   max?: number;
 }
 
+const WIDE_GLYPH = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
+
+const textUnits = (text: string) => {
+  let units = 0;
+  for (const ch of text) units += WIDE_GLYPH.test(ch) ? 2 : 1;
+  return units;
+};
+
 export function fitColumnSize(
   header: string,
   values: ReadonlyArray<string | number | null | undefined>,
   { min = 64, max = 480 }: FitOptions = {},
 ): number {
-  let longest = header.length + HEADER_EXTRA_CHARS;
+  let longest = textUnits(header) + HEADER_EXTRA_CHARS;
   for (const v of values) {
     if (v == null) continue;
-    longest = Math.max(longest, String(v).length);
+    longest = Math.max(longest, textUnits(String(v)));
   }
   return Math.min(max, Math.max(min, Math.round(longest * CHAR_PX + CELL_PAD_PX)));
 }

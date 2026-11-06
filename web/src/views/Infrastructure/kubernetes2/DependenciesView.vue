@@ -554,6 +554,7 @@ function clearFilters() {
         <OToggleGroup
           :model-value="collapseMode"
           :aria-label="t('infra.k8s2.depsCollapseMode')"
+          :disabled="filtering"
           mobile-dropdown
           data-test="k8s2-deps-collapse-mode"
           @update:model-value="setCollapseMode"
@@ -568,6 +569,13 @@ function clearFilters() {
             {{ t(COLLAPSE_LABEL[m]) }}
           </OToggleGroupItem>
         </OToggleGroup>
+        <OText
+          v-if="filtering"
+          tag="span"
+          class="text-text-secondary text-xs"
+          data-test="k8s2-deps-collapse-off"
+          >{{ t("infra.k8s2.depsCollapseFiltering") }}</OText
+        >
       </div>
       <div class="flex items-center gap-1">
         <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
