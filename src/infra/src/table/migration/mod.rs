@@ -264,6 +264,7 @@ mod m20261212_000001_add_templates_to_oncall_response_events;
 mod m20261213_000001_retire_compiled_default_templates;
 mod m20261214_000001_templates_columns_to_text;
 mod m20261215_000001_add_alert_incident_title_template;
+mod m20261216_000001_rename_user_default_folders;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -840,6 +841,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
             Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
+            Box::new(m20261216_000001_rename_user_default_folders::Migration),
         ]
     }
 }
@@ -959,6 +961,7 @@ mod tests {
         (143, "m20261213_000001_retire_compiled_default_templates"),
         (144, "m20261214_000001_templates_columns_to_text"),
         (145, "m20261215_000001_add_alert_incident_title_template"),
+        (146, "m20261216_000001_rename_user_default_folders"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

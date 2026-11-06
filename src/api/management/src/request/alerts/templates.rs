@@ -59,7 +59,7 @@ use crate::{
       ),
     request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -128,7 +128,7 @@ pub async fn save_template(
       ),
     request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -338,7 +338,7 @@ pub async fn list_templates(
         ("template_name" = String, Path, description = "Template name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
@@ -514,7 +514,7 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
     ),
     request_body(content = inline(PreviewRequest), description = "Preview request", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_core::alerts::notifications::preview::PreviewResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(

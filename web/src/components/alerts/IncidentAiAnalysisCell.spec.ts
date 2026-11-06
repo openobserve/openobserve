@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import type * as ConsentModule from "@/composables/usePaidOverageConsent";
 
@@ -62,6 +62,42 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
       ...store.state.selectedOrganization,
       identifier: "default",
     };
+  });
+
+  describe("RCA off", () => {
+    const original = store.state.zoConfig;
+    const mountOff = (aiAssistant: string) => {
+      store.state.zoConfig = {
+        ...original,
+        features: { ai_assistant: aiAssistant },
+        feature_names: { ai_assistant: "AI Assistant" },
+      };
+      return mount(IncidentAiAnalysisCell, {
+        props: { incident, rcaEnabled: false, now: Date.now() },
+        global: { plugins: [store, i18n] },
+      });
+    };
+
+    afterEach(() => {
+      store.state.zoConfig = original;
+    });
+
+    it("a license lock names the feature with a lock icon and no Analyze", () => {
+      const wrapper = mountOff("locked");
+
+      expect(wrapper.get('[data-test="incident-ai-analysis-label"]').text()).toBe(
+        "Locked: needs AI Assistant",
+      );
+      expect(wrapper.find('[data-test="incident-ai-analysis-lock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').exists()).toBe(false);
+    });
+
+    it("AI switched off by the operator stays RCA disabled, with no lock", () => {
+      const wrapper = mountOff("hidden");
+
+      expect(wrapper.get('[data-test="incident-ai-analysis-label"]').text()).toBe("RCA disabled");
+      expect(wrapper.find('[data-test="incident-ai-analysis-lock"]').exists()).toBe(false);
+    });
   });
 
   it("Analyze sends one POST with reanalysis=true and emits started, not open", async () => {

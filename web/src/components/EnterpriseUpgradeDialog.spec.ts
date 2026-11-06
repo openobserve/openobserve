@@ -92,6 +92,39 @@ const buildStore = (overrides: Record<string, any> = {}) => ({
 
 let mockStore = buildStore();
 
+// A serialized LicenseResponse; evaluated_at 0 carries the backend's synthesised decision.
+const licenseResponse = (
+  ingestion: { typ: string; value: number },
+  expired: boolean,
+  evaluatedAt: number,
+  limitTodayGb: number | null,
+) => {
+  const decision = {
+    search_allowed: true,
+    blocks: [],
+    exceeded_days: 0,
+    allowed_days: 3,
+    limit_today_gb: limitTodayGb,
+    used_today_gb: 0,
+    waiver_ids_applied: [],
+  };
+  return {
+    key: "anonymised-key",
+    license: { limits: { Ingestion: ingestion } },
+    installation_id: "inst_test",
+    expired,
+    ingestion_used: 0,
+    ingestion_exceeded: 0,
+    waivers: [],
+    decision,
+    base: decision,
+    evaluated_at: evaluatedAt,
+    env_key_active: false,
+    env_key_in_use: false,
+    can_update_license: true,
+  };
+};
+
 vi.mock("vuex", async () => {
   const actual = await vi.importActual<typeof import("vuex")>("vuex");
   return {
@@ -338,6 +371,33 @@ describe("EnterpriseUpgradeDialog", () => {
       expect((wrapper.vm as any).isLoadingLicense).toBe(false);
     });
 
+    it("badges the limit in force, not the licensed one, once a key has expired", async () => {
+      mockGetLicense.mockResolvedValueOnce({
+        data: {
+          license: { limits: { Ingestion: { value: 200, typ: "PerDayCount" } } },
+          decision: { limit_today_gb: 50 },
+          evaluated_at: 1,
+          ingestion_used: 0,
+        },
+      });
+      const wrapper = createWrapper({ modelValue: false });
+      await wrapper.setProps({ modelValue: true });
+      await flushPromises();
+
+      expect((wrapper.vm as any).dialogConfig.badgeText).toContain("50");
+    });
+
+    it("badges the free limit on an expired Unlimited key before the decision is evaluated", async () => {
+      mockGetLicense.mockResolvedValueOnce({
+        data: licenseResponse({ typ: "Unlimited", value: 0 }, true, 0, null),
+      });
+      const wrapper = createWrapper({ modelValue: false });
+      await wrapper.setProps({ modelValue: true });
+      await flushPromises();
+
+      expect((wrapper.vm as any).dialogConfig.badgeText).toContain("50");
+    });
+
     it("uses unlimited badge text when no ingestion limit is set in license", async () => {
       mockGetLicense.mockResolvedValueOnce({
         data: {
@@ -367,7 +427,7 @@ describe("EnterpriseUpgradeDialog", () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       expect((wrapper.vm as any).licenseData).toEqual({
-        license: { limits: { Ingestion: { value: 0 } } },
+        license: { limits: { Ingestion: { typ: "Unlimited", value: 0 } } },
         ingestion_used: 0,
       });
       expect((wrapper.vm as any).isLoadingLicense).toBe(false);
@@ -696,6 +756,66 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(chart.options.series[0].data.length).toBe(2);
       // dashboardRenderKey should have been bumped at least once.
       expect((wrapper.vm as any).dashboardRenderKey).toBeGreaterThan(0);
+    });
+
+    describe("limit line", () => {
+      const openWithHistory = async (zoConfig: Record<string, unknown>) => {
+        mockStore = buildStore({
+          zoConfig: {
+            meta_org: "default",
+            ingestion_history: [{ ts: "2026-05-01T00:00:00", value: 2048 }],
+            ...zoConfig,
+          },
+        });
+        const wrapper = createWrapper({ modelValue: false });
+        await wrapper.setProps({ modelValue: true });
+        await flushPromises();
+        return wrapper.vm as any;
+      };
+
+      it.each([
+        ["an expired 200 GB key, evaluated", { typ: "PerDayCount", value: 200 }, 1, 50],
+        ["an expired 200 GB key, not evaluated", { typ: "PerDayCount", value: 200 }, 0, null],
+        ["an expired Unlimited key, evaluated", { typ: "Unlimited", value: 0 }, 1, 50],
+        ["an expired Unlimited key, not evaluated", { typ: "Unlimited", value: 0 }, 0, null],
+      ])("agrees with the badge's 50 for %s", async (_name, ingestion, evaluatedAt, limit) => {
+        mockGetLicense.mockResolvedValueOnce({
+          data: licenseResponse(ingestion, true, evaluatedAt, limit),
+        });
+
+        const vm = await openWithHistory({ license_expiry: 1893456000 });
+
+        expect(vm.dialogConfig.badgeText).toContain("50");
+        expect(vm.chartData.options.series[0].markLine.data[0].yAxis).toBe(50);
+        expect(vm.isIngestionUnlimited).toBe(false);
+      });
+
+      it("draws a live 200 GB key at its own limit", async () => {
+        mockGetLicense.mockResolvedValueOnce({
+          data: licenseResponse({ typ: "PerDayCount", value: 200 }, false, 1, 200),
+        });
+
+        const vm = await openWithHistory({ license_expiry: 1893456000 });
+
+        expect(vm.chartData.options.series[0].markLine.data[0].yAxis).toBe(200);
+      });
+
+      it("reads a live Unlimited key as unlimited, with no line", async () => {
+        mockGetLicense.mockResolvedValueOnce({
+          data: licenseResponse({ typ: "Unlimited", value: 0 }, false, 1, null),
+        });
+
+        const vm = await openWithHistory({ license_expiry: 1893456000 });
+
+        expect(vm.isIngestionUnlimited).toBe(true);
+        expect(vm.chartData.options.series[0].markLine).toBeUndefined();
+      });
+
+      it("keeps the 100 fallback when no license is loaded", async () => {
+        const vm = await openWithHistory({ license_expiry: 0 });
+
+        expect(vm.chartData.options.series[0].markLine.data[0].yAxis).toBe(100);
+      });
     });
   });
 

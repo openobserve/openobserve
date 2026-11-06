@@ -149,6 +149,12 @@
       />
     </OContent>
 
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-team-detail-license-denied"
+    />
+
     <OContent v-else-if="teamNotFound" y>
       <OEmptyState
         size="hero"
@@ -247,6 +253,7 @@
             :can-configure="canConfigure"
             @changed="onMembersChanged"
             @open-schedule="activeTab = 'schedule'"
+            @license-denied="lockPage"
           />
         </OTabPanel>
 
@@ -300,6 +307,7 @@
               :window="scheduleWindow"
               :rotations="teamRotations"
               @changed="onCoversChanged"
+              @license-denied="lockPage"
             />
 
             <OnCallSchedulePresets
@@ -310,6 +318,7 @@
               :rotations="teamRotations"
               :start-on="presetsStartOn"
               @applied="onScheduleSaved"
+              @license-denied="lockPage"
             />
 
             <!-- Drawer only: the read view stays underneath. Swapping the tab
@@ -327,6 +336,7 @@
               @intent-handled="scheduleIntent = null"
               @open-members="activeTab = 'members'"
               @open-policy="openPolicyFromRemove"
+              @license-denied="lockPage"
             />
           </OContent>
         </OTabPanel>
@@ -362,6 +372,7 @@
               @saved="onPolicySaved"
               @policy-written="fetchAll()"
               @open-members="activeTab = 'members'"
+              @license-denied="lockPage"
             />
           </OContent>
         </OTabPanel>
@@ -372,6 +383,7 @@
               :team-id="teamId"
               :teams="teams"
               @rules-loaded="(count: number) => (ruleCount = count)"
+              @license-denied="lockPage"
             />
           </OContent>
         </OTabPanel>
@@ -499,6 +511,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
@@ -596,6 +609,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import {
   channelList,
   formatDayRange,
@@ -732,6 +746,7 @@ const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const oncallUnavailable = ref(false);
+const licenseDenied = ref<string[] | null>(null);
 const teamNotFound = ref(false);
 const editOpen = ref(false);
 
@@ -872,7 +887,28 @@ async function read<T>(
       refetchType: "none",
     });
   }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
+  try {
+    return (await queryClient.fetchQuery(options as any)) as T;
+  } catch (err) {
+    // Any read can carry it, because the others may be answered from cache; the callers still see the error.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) lockPage(denied);
+    throw err;
+  }
+}
+
+function lockPage(features: string[]) {
+  // The header reads these three, and its team facts and actions must not outlive the body.
+  team.value = null;
+  members.value = [];
+  loaded.value = false;
+  // A lock drawn behind an open form would be out of sight, and saving there can only be refused.
+  editOpen.value = false;
+  coverOpen.value = false;
+  awayOpen.value = false;
+  testPageOpen.value = false;
+  rotationToDelete.value = null;
+  licenseDenied.value = features;
 }
 
 /// Read-modify-write: an editor writes its record back whole, so its draft starts from the server's copy, never this page's cached one.
@@ -884,6 +920,7 @@ async function readForEdit<T>(
     assign(await read<T>(options, true));
     return true;
   } catch (err: unknown) {
+    if (licenseDenied.value) return false;
     toast({
       variant: "error",
       message: raw(serverMessageOf(err)) || t("oncall.editorReadFailed"),
@@ -909,6 +946,7 @@ function loadFailureOf(err: unknown): string {
 async function fetchAll(force = false) {
   loadError.value = null;
   teamNotFound.value = false;
+  licenseDenied.value = null;
   const org = orgId.value;
   const id = teamId.value;
 
@@ -922,6 +960,8 @@ async function fetchAll(force = false) {
       read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
       read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
     ]);
+
+  if (licenseDenied.value) return;
 
   // The org-level list exists in every on-call build regardless of this team id, so only its failure means the feature is unavailable.
   if (teamsSettled.status === "rejected") {
@@ -1184,7 +1224,7 @@ async function fetchSegments(force = false) {
     );
     void fetchShiftSpans(segments.value);
   } catch (err: unknown) {
-    if (readId !== latestSegmentsRead) return;
+    if (readId !== latestSegmentsRead || licenseDenied.value) return;
     segments.value = [];
     toast({
       variant: "error",
@@ -1305,6 +1345,7 @@ async function openCoverDialog(opts: {
   holder?: string | null;
 }) {
   swapShifts.value = await loadSwapShifts(opts.swapFrom ?? null);
+  if (licenseDenied.value) return;
   coverGap.value = opts.gap ?? null;
   coverDefaultUser.value = opts.user ?? "";
   coverRotation.value = opts.rotation ?? "";
@@ -1357,6 +1398,7 @@ async function realSpan(segment: ResolvedSegment): Promise<{ from: number; to: n
 async function onShiftAction(action: ShiftAction, segment: ResolvedSegment) {
   const who = segment.user_email ?? "";
   const span = await realSpan(segment);
+  if (licenseDenied.value) return;
   if (action === "away") {
     awayEmail.value = who;
     awayWindow.value = fromNow(span);
@@ -1737,6 +1779,6 @@ watch(selectedPriority, () => fetchPreview());
 
 onMounted(() => {
   fetchAll();
-  loadDefaultTeam();
+  loadDefaultTeam().then((denied) => denied && lockPage(denied));
 });
 </script>

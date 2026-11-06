@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The two bucket grids agree only where the interval divides [`DATE_BIN_ORIGIN_SECS`].
+//! `histogram()` buckets count from [`DATE_BIN_ORIGIN_SECS`], not from the Unix epoch.
 
 /// The literal `rewrite_histogram` passes as `date_bin`'s origin argument.
 pub const ORIGIN_LITERAL: &str = "2001-01-01T00:00:00";
@@ -21,7 +21,7 @@ pub const ORIGIN_LITERAL: &str = "2001-01-01T00:00:00";
 /// [`ORIGIN_LITERAL`] as a Unix timestamp in seconds.
 pub const DATE_BIN_ORIGIN_SECS: i64 = 978_307_200;
 
-/// Whether `histogram()` and the tantivy fast path put this interval on the same grid.
+/// Whether this interval puts `histogram()` bucket edges on Unix-epoch multiples too.
 pub fn divides_histogram_origin(interval_secs: i64) -> bool {
     interval_secs > 0 && DATE_BIN_ORIGIN_SECS % interval_secs == 0
 }
@@ -32,6 +32,11 @@ pub fn histogram_origin_skew(interval_secs: i64) -> i64 {
         return 0;
     }
     DATE_BIN_ORIGIN_SECS % interval_secs
+}
+
+/// How far `ts_micros` lies past the `histogram()` bucket edge at or before it, in microseconds.
+pub fn histogram_bucket_offset(ts_micros: i64, interval_micros: i64) -> i64 {
+    (ts_micros - DATE_BIN_ORIGIN_SECS * 1_000_000).rem_euclid(interval_micros)
 }
 
 #[cfg(test)]
@@ -140,5 +145,30 @@ mod tests {
         assert!(!divides_histogram_origin(0));
         assert!(!divides_histogram_origin(-60));
         assert_eq!(histogram_origin_skew(0), 0);
+    }
+
+    #[test]
+    fn a_bucket_offset_is_measured_from_the_histogram_origin() {
+        const DAY: i64 = 86_400_000_000;
+        let origin = DATE_BIN_ORIGIN_SECS * 1_000_000;
+        let cases = [
+            (origin, 30 * DAY, 0),
+            (origin + 7 * 30 * DAY, 30 * DAY, 0),
+            (origin + 7 * 30 * DAY + 5, 30 * DAY, 5),
+            (origin - 1, 30 * DAY, 30 * DAY - 1),
+            (
+                0,
+                30 * DAY,
+                30 * DAY - histogram_origin_skew(30 * 86_400) * 1_000_000,
+            ),
+            (1_757_376_000_000_000, DAY, 0),
+        ];
+        for (ts, interval, expected) in cases {
+            assert_eq!(
+                histogram_bucket_offset(ts, interval),
+                expected,
+                "ts={ts}, interval={interval}"
+            );
+        }
     }
 }

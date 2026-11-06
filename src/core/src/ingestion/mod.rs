@@ -277,7 +277,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             RealtimeMute::Unmuted => None,
             RealtimeMute::Muted(downtime) => Some(downtime.clone()),
         };
-        let delivered = if let Some(downtime) = downtime {
+        let holds_silence = if let Some(downtime) = downtime {
             // Downtime keys are never released, so expired claims are dropped before a new one.
             REALTIME_FLOOR_CLAIMS.retain(|_, (until, _)| *until > now);
             if claim_realtime_floor(
@@ -312,11 +312,11 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             if let Err(e) = &outcome {
                 log::error!("Failed to send notification: {e}");
             }
-            outcome.is_ok()
+            send_holds_silence(&outcome)
         };
         #[cfg(feature = "enterprise")]
         record_realtime_mute(alert, &trigger_data_stream).await;
-        match realtime_silence_micros(alert, &trigger_data_stream, delivered) {
+        match realtime_silence_micros(alert, &trigger_data_stream, holds_silence) {
             Some(silence_micros) => {
                 trigger_data_stream.next_run_at =
                     apply_realtime_silence(alert, module_key, silence_micros, now).await;
@@ -1037,12 +1037,17 @@ fn realtime_alert_is_live(trigger: Option<&db::scheduler::Trigger>) -> bool {
 }
 
 /// A suppressed run silences nothing, so an unmuted service of the same alert still pages.
-fn realtime_silence_micros(alert: &Alert, run: &TriggerData, delivered: bool) -> Option<i64> {
+fn realtime_silence_micros(alert: &Alert, run: &TriggerData, holds_silence: bool) -> Option<i64> {
     match run.status {
         RunOutcome::Suppressed => None,
-        _ if delivered => Some(alert.trigger_condition.effective_silence_micros()),
+        _ if holds_silence => Some(alert.trigger_condition.effective_silence_micros()),
         _ => None,
     }
+}
+
+/// A license denial holds the window too, or every matching request writes a history row.
+fn send_holds_silence(outcome: &Result<NotificationOutcome, AlertError>) -> bool {
+    matches!(outcome, Ok(_) | Err(AlertError::FeatureNotLicensed(_)))
 }
 
 /// Silences the trigger for `silence_micros` and returns the wakeup time it wrote.
@@ -1111,7 +1116,7 @@ fn record_realtime_delivery(
     match outcome {
         Err(e) => {
             trigger_data_stream.status = RunOutcome::NotifyFailed;
-            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+            trigger_data_stream.error = Some(crate::alerts::alert::send_failure_message(e));
         }
         Ok(outcome) => {
             // Any undelivered destination is a failure, even when others succeeded.
@@ -1261,6 +1266,35 @@ mod tests {
         let token = claim_realtime_floor(key, 0, floor).unwrap();
         release_realtime_floor(key, token);
         assert!(claim_realtime_floor(key, 1, floor).is_some());
+    }
+
+    #[test]
+    fn test_a_license_denial_holds_the_silence_a_failed_send_does_not() {
+        let denied = Err(crate::alerts::alert::all_workflows_failed_error(
+            1,
+            1,
+            String::new(),
+        ));
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(send_holds_silence(&denied));
+        assert!(!send_holds_silence(&failed));
+        assert!(send_holds_silence(&Ok(NotificationOutcome::default())));
+
+        // A zero silence still floors, so a denial cannot write one row per request.
+        let alert = Alert::default();
+        assert_eq!(alert.trigger_condition.silence, 0);
+        let mut run = realtime_row();
+        record_realtime_delivery(&mut run, &denied);
+        assert_eq!(
+            run.error.as_deref(),
+            Some(crate::alerts::alert::WORKFLOWS_UNLICENSED_REASON)
+        );
+        assert_eq!(
+            realtime_silence_micros(&alert, &run, send_holds_silence(&denied)),
+            Some(TriggerCondition::min_silence_micros())
+        );
     }
 
     #[test]

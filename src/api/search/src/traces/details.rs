@@ -205,6 +205,10 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         (status = 400, description = "Invalid time range or page parameters"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_trace_details(

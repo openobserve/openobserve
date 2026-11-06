@@ -136,6 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            :oncall-team="formData?.oncall_team"
+            :locked-target-names="formData?._ui?.lockedTargetNames"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -305,6 +307,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            :oncall-team="formData?.oncall_team"
+            :locked-target-names="formData?._ui?.lockedTargetNames"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"

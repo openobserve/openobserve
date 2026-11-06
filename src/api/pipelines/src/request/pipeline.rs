@@ -53,8 +53,9 @@ use crate::{
     ),
     request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The pipeline is running, retry after the run ends", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
@@ -362,7 +363,7 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
         ("pipeline_id" = String, Path, description = "Pipeline ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -473,8 +474,9 @@ pub async fn delete_pipeline_bulk(
     ),
     request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The pipeline is running or changed, refresh and retry", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
@@ -528,7 +530,7 @@ pub async fn update_pipeline(
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -593,7 +595,7 @@ pub async fn enable_pipeline(
     ),
     request_body(content = inline(PipelineBulkEnableRequest), description = "Pipeline id list", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PipelineBulkEnableResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -715,6 +717,14 @@ mod tests {
     fn test_modified_is_conflict() {
         assert_eq!(
             status(PipelineError::Modified("abc".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn test_run_in_progress_is_conflict() {
+        assert_eq!(
+            status(PipelineError::RunInProgress("abc".to_string())),
             StatusCode::CONFLICT
         );
     }

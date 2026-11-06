@@ -199,6 +199,10 @@ pub struct AlertHistoryResponse {
         (status = 404, description = "Alert or anomaly config not found", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_alert_history(
     Path(org_id): Path<String>,
@@ -1062,7 +1066,8 @@ fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Recent detection history for all anomaly detection configs", "category": "anomaly_detection"}))
+        ("x-o2-mcp" = json!({"description": "Recent detection history for all anomaly detection configs", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "list"}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]

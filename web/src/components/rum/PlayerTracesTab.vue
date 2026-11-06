@@ -643,9 +643,15 @@ onUnmounted(() => {
   cancelCorrelatedTracesStream();
 });
 
+// Each fetch takes a number; a fetch that a newer one has replaced (the session changed, or the
+// replay's arrival window came in after the tab opened) stops writing its results.
+let fetchGeneration = 0;
+
 async function fetchTraces() {
   if (!props.sessionId) return;
 
+  const generation = ++fetchGeneration;
+  const replaced = () => generation !== fetchGeneration;
   loading.value = true;
   error.value = null;
   traceSearchWindow.value = null;
@@ -662,6 +668,7 @@ async function fetchTraces() {
     // a stable `_trace_id` so SELECT/GROUP BY and the row reads below stay identical
     // regardless of which spellings are present.
     const rumStream = await getStream("_rumdata", "logs", true);
+    if (replaced()) return;
     const traceIdExpr = rumFieldSql(rumStream?.schema, "trace_id");
     const traceIdSet = rumFieldNotNullSql(rumStream?.schema, "trace_id");
     if (!traceIdExpr || !traceIdSet) {
@@ -695,7 +702,11 @@ async function fetchTraces() {
     const rumQuery = {
       query: {
         sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
-        start_time: props.rumWindowUs?.start ?? searchStartTime,
+        // The arrival window can start after the device start (a RUM batch that arrived before
+        // the first replay row), so take whichever is earlier.
+        start_time: props.rumWindowUs
+          ? Math.min(props.rumWindowUs.start, searchStartTime)
+          : searchStartTime,
         // Rows keep arriving after the last device-clock event, so a re-fetch must reach "now".
         end_time: props.rumWindowUs
           ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
@@ -714,6 +725,7 @@ async function fetchTraces() {
       "RUM",
     );
 
+    if (replaced()) return;
     const rumHits = rumResponse.data?.hits || [];
 
     if (rumHits.length === 0) {
@@ -801,6 +813,7 @@ async function fetchTraces() {
             ),
           ),
         );
+        if (replaced()) return;
         for (const part of metadataPerStream) Object.assign(metadata, part);
 
         // Only keep views whose trace_id exists in the traces stream, sorted by start time
@@ -815,18 +828,19 @@ async function fetchTraces() {
 
         traceMetadata.value = metadata;
       } catch (err: any) {
+        if (replaced()) return;
         metadataError.value = err?.message || t("rum.fetchTraceMetadataFailed");
         console.warn("Trace metadata fetch failed:", err);
       } finally {
-        metadataLoading.value = false;
+        if (!replaced()) metadataLoading.value = false;
       }
     }
 
     correlatedViews.value = filteredViews;
   } catch (err: any) {
-    error.value = err?.message || t("rum.failedToFetchTraces");
+    if (!replaced()) error.value = err?.message || t("rum.failedToFetchTraces");
   } finally {
-    loading.value = false;
+    if (!replaced()) loading.value = false;
   }
 }
 
@@ -886,6 +900,17 @@ watch(
     selectedPages.value = [];
     selectedTrace.value = null;
     closeTraceDetail();
+    fetchTraces();
+  },
+);
+
+// A replay session's arrival window is known only once the session has loaded, which can be
+// after this tab opened and fetched without it. Fetch again when it arrives or changes; the
+// values are compared, so a new object with the same bounds does not re-fetch.
+watch(
+  () => [props.rumWindowUs?.start, props.rumWindowUs?.end],
+  (now, before) => {
+    if (now[0] === before[0] && now[1] === before[1]) return;
     fetchTraces();
   },
 );

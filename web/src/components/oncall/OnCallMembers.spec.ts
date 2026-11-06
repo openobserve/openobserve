@@ -250,6 +250,23 @@ describe("OnCallMembers", () => {
     oncall.getSchedule.mockResolvedValue(ok(null));
   });
 
+  it.each(["listUnavailability", "resolvedSchedule"] as const)(
+    "tells the page when the license refuses %s",
+    async (read) => {
+      queryClient.clear();
+      oncall[read].mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+      });
+      const wrapper = render({
+        members: [member("ana@corp.com")],
+        rotations: [{ id: "rot_a", name: "Primary", shift_rules: [] }],
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    },
+  );
+
   // An empty roster with no way back to the picker reads as a dead end — the
   // action has to actually land the reader in the field, not just describe it.
   it("lands the cursor in the member picker from the empty state's action", async () => {

@@ -8,6 +8,7 @@
 // every caller must skip on a build where the tab is absent — isGroupsAvailable()
 // is the check.
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class GroupsPage {
     constructor(page) {
@@ -116,7 +117,7 @@ export class GroupsPage {
     }
 
     async gotoGroups() {
-        await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.groupsTab.waitFor({ state: 'visible', timeout: 15000 });
         await this.groupsTab.click();
         await expect(this.tableSection).toBeVisible({ timeout: 15000 });

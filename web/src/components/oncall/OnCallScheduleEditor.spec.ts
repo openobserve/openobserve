@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { queryClient } from "@/composables/query/queryClient";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
@@ -277,6 +278,21 @@ describe("OnCallScheduleEditor", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it.each(["listUnavailability", "previewResolvedSchedule"] as const)(
+    "tells the page when the license refuses %s",
+    async (read) => {
+      queryClient.clear();
+      service[read].mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+      });
+      const wrapper = render({ schedule: schedule([rota("Primary")]) });
+      await openRotation(wrapper);
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    },
+  );
 
   // A rotation can only contain people who are on the team, so sending the
   // user to an editor with nothing to pick would be a dead end.

@@ -351,6 +351,11 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
         super::udaf::sequence::SequenceStepMatch::new(),
     ));
     ctx.register_udf(super::udf::time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF.clone());
+    ctx.register_udf(super::udf::ip::ip_cidr_contains::IP_CIDR_CONTAINS_UDF.clone());
+    ctx.register_udf(super::udf::ip::ip_subnet::IP_SUBNET_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_ipv4::IS_IPV4_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_ipv6::IS_IPV6_UDF.clone());
+    ctx.register_udf(super::udf::ip::is_private_ip::IS_PRIVATE_IP_UDF.clone());
 
     #[cfg(feature = "enterprise")]
     {
@@ -988,10 +993,27 @@ mod tests {
             "arrcount",
             "re_match",
             "cast_to_timestamp",
+            "ip_cidr_contains",
+            "ip_subnet",
+            "is_ipv4",
+            "is_ipv6",
+            "is_private_ip",
         ] {
             assert!(
                 names.iter().any(|n| n == expected),
                 "registry is missing the O2 UDF `{expected}`"
+            );
+        }
+    }
+
+    #[test]
+    fn default_functions_are_all_registered() {
+        let names = registered_function_names();
+        for function in crate::datafusion::udf::DEFAULT_FUNCTIONS {
+            assert!(
+                names.iter().any(|n| n == function.name),
+                "DEFAULT_FUNCTIONS lists `{}`, which is not registered",
+                function.name
             );
         }
     }

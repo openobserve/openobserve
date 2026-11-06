@@ -143,7 +143,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
 // 145: add alerts.incident_title_template.
-pub const DB_SCHEMA_VERSION: u64 = 145;
+// 146: rename user folders named default so the built-in default folder can be created.
+pub const DB_SCHEMA_VERSION: u64 = 146;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -171,12 +172,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-// Uncompressed total per upload; the request body cap only bounds compressed bytes.
-pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
-pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
-// max file size for individual sourcemap. We temp cache these in mem,
-// so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
@@ -2738,6 +2733,26 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
+    // MB, every distinct map in a stacktrace is parsed and held in memory for one resolve
+    #[env_config(
+        name = "ZO_SOURCEMAP_FILE_MAX_SIZE",
+        default = 50,
+        help = "Maximum size in MB of one source map file in an upload; 0 means 50"
+    )]
+    pub sourcemap_file_max_size: u64,
+    // MB, uncompressed total per upload; the request body cap only bounds compressed bytes
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_SIZE",
+        default = 500,
+        help = "Maximum total uncompressed size in MB of one source map upload; 0 means 500"
+    )]
+    pub sourcemap_zip_max_size: u64,
+    #[env_config(
+        name = "ZO_SOURCEMAP_ZIP_MAX_ENTRIES",
+        default = 5000,
+        help = "Maximum number of source map files in one upload; 0 means 5000"
+    )]
+    pub sourcemap_zip_max_entries: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2946,6 +2961,12 @@ pub struct Limit {
         help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
     )]
     pub alert_max_group_notifications_per_eval: usize,
+    #[env_config(
+        name = "ZO_ALERT_NOTIFICATION_TIMEOUT",
+        default = 30,
+        help = "Total time limit in seconds for one notification request to a destination, connection included. 0 uses the default of 30."
+    )]
+    pub alert_notification_timeout: u64,
     #[env_config(
         name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
         default = 60,
@@ -4324,6 +4345,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
+    // a zero limit fails every send, so it means the default
+    if cfg.limit.alert_notification_timeout == 0 {
+        cfg.limit.alert_notification_timeout = 30;
+    }
+
     // retain for atleast 1 hour
     if cfg.limit.workflow_error_retention_secs <= 3600 {
         cfg.limit.workflow_error_retention_secs = 3600;
@@ -4411,6 +4437,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
+    }
+    cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
+        0 => 50,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    cfg.limit.sourcemap_zip_max_size = match cfg.limit.sourcemap_zip_max_size {
+        0 => 500,
+        v => v,
+    }
+    .saturating_mul(1024 * 1024);
+    if cfg.limit.sourcemap_zip_max_entries == 0 {
+        cfg.limit.sourcemap_zip_max_entries = 5000;
     }
     cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
@@ -6117,6 +6156,37 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_sourcemap_limits_default_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_zero_falls_back_to_default() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 0;
+        cfg.limit.sourcemap_zip_max_size = 0;
+        cfg.limit.sourcemap_zip_max_entries = 0;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 500 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_entries, 5000);
+    }
+
+    #[test]
+    fn test_sourcemap_limits_mb_converted_to_bytes() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.sourcemap_file_max_size = 7;
+        cfg.limit.sourcemap_zip_max_size = 9;
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.sourcemap_file_max_size, 7 * 1024 * 1024);
+        assert_eq!(cfg.limit.sourcemap_zip_max_size, 9 * 1024 * 1024);
     }
 
     #[test]
