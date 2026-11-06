@@ -16,150 +16,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex items-center">
-    <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <ODropdown v-if="isCompact" v-model:open="btnRefreshInterval" side="bottom" align="start">
+    <OPopover
+      v-model:open="btnRefreshInterval"
+      side="bottom"
+      align="center"
+      content-class="w-80"
+      :aria-label="t('search.autoRefreshTitle')"
+    >
       <template #trigger>
         <OButton
+          v-if="isCompact"
           data-test="logs-search-bar-refresh-interval-btn"
           size="icon-toolbar"
           :variant="variant"
           :active="isAnimating"
+          :aria-label="triggerAriaLabel"
         >
           <OIcon
-            name="update"
+            :name="isOn ? 'update' : 'sync-disabled'"
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="t('search.autoRefreshWithValue', { value: selectedLabel })" />
+          <OTooltip :content="t('search.autoRefreshWithValue', { value: triggerLabel })" />
         </OButton>
-      </template>
-      <div class="w-75 p-2">
-        <div class="flex">
-          <div class="flex w-full flex-col p-2 text-center">
-            <OButton
-              data-test="logs-search-off-refresh-interval"
-              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
-              size="sm"
-              :block="true"
-              @click="
-                () => {
-                  onItemClick({ label: t('common.off'), value: 0 });
-                  btnRefreshInterval = false;
-                }
-              "
-            >
-              {{ t("common.off") }}
-            </OButton>
-          </div>
-        </div>
-        <hr class="border-border-default my-0 border-0 border-t border-solid" />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
-          <div
-            v-for="(item, j) in items"
-            :key="'col_' + i + '_' + j"
-            class="flex w-1/3 flex-col p-2 text-center"
-          >
-            <OButton
-              :data-test="`logs-search-bar-refresh-time-${item.value}`"
-              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
-              size="sm"
-              @click="
-                () => {
-                  onItemClick(item);
-                  btnRefreshInterval = false;
-                }
-              "
-              :disabled="item.disabled"
-            >
-              <OTooltip
-                v-if="item.disabled"
-                side="right"
-                align="center"
-                max-width="18.75rem"
-                :content="raw(minRangeRestrictionMessageVal)"
-              />
-              {{ item.label }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </ODropdown>
-
-    <!-- Full mode: Dropdown with label -->
-    <ODropdown v-else v-model:open="btnRefreshInterval" side="bottom" align="start">
-      <template #trigger>
         <OButton
+          v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          :variant="variant"
+          :variant="isOn ? 'outline-primary' : variant"
           size="sm-toolbar"
+          :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
-            <OIcon
-              left
-              name="update"
-              size="sm"
-              :class="[
-                isAnimating ? 'auto-refresh-icon--spinning' : '',
-                isAnimating ? 'text-primary' : '',
-                'me-0.5',
-              ]"
-            />
-            <div class="text-compact text-center leading-4">{{ selectedLabel }}</div>
+            <OIcon :name="isOn ? 'update' : 'sync-disabled'" size="sm" class="me-1" />
+            <div class="text-compact text-center leading-4">{{ triggerLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
         </OButton>
       </template>
-      <div class="w-75 p-2">
-        <div class="flex">
-          <div class="flex w-full flex-col p-2 text-center">
-            <OButton
-              data-test="logs-search-off-refresh-interval"
-              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
-              size="sm"
-              :block="true"
-              @click="
-                () => {
-                  onItemClick({ label: t('common.off'), value: 0 });
-                  btnRefreshInterval = false;
-                }
-              "
-            >
-              {{ t("common.off") }}
-            </OButton>
+      <div data-test="auto-refresh-panel">
+        <div class="flex items-center justify-between gap-3 px-4 py-3">
+          <div class="min-w-0">
+            <h4 class="text-text-heading text-sm font-semibold">
+              {{ t("search.autoRefreshTitle") }}
+            </h4>
+            <p class="text-text-secondary text-xs italic" data-test="auto-refresh-subtitle">
+              {{
+                isOn
+                  ? t("search.autoRefreshEvery", { value: triggerLabel })
+                  : t("search.autoRefreshPaused")
+              }}
+            </p>
           </div>
+          <OSwitch
+            data-test="logs-search-off-refresh-interval"
+            :model-value="isOn"
+            :disabled="switchDisabled"
+            :aria-label="t('search.autoRefreshTitle')"
+            @update:model-value="onSwitch"
+          />
         </div>
-        <ODropdownSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
-          <div
-            v-for="(item, j) in items"
-            :key="'col_' + i + '_' + j"
-            class="flex w-1/3 flex-col p-2 text-center"
-          >
-            <OButton
-              :data-test="`logs-search-bar-refresh-time-${item.value}`"
-              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
-              size="sm"
-              @click="
-                () => {
-                  onItemClick(item);
-                  btnRefreshInterval = false;
-                }
-              "
-              :disabled="item.disabled"
-            >
-              <OTooltip
-                v-if="item.disabled"
-                side="right"
-                align="center"
-                max-width="18.75rem"
-                :content="raw(minRangeRestrictionMessageVal)"
-              />
-              {{ item.label }}
-            </OButton>
-          </div>
+        <hr class="border-border-default my-0 border-0 border-t border-solid" />
+        <div class="flex flex-col gap-3 px-4 py-3">
+          <section v-for="section in refreshSections" :key="section.key">
+            <h5 class="text-text-secondary mb-2 text-xs font-semibold tracking-wider uppercase">
+              {{ section.label }}
+            </h5>
+            <div class="grid grid-cols-4 gap-2">
+              <OButton
+                v-for="item in section.items"
+                :key="item.value"
+                :data-test="`logs-search-bar-refresh-time-${item.value}`"
+                :variant="Number(modelValue) === item.value ? 'primary' : 'outline'"
+                size="sm"
+                :block="true"
+                :disabled="item.disabled"
+                :aria-pressed="Number(modelValue) === item.value"
+                :aria-label="item.label"
+                @click="onPick(item)"
+              >
+                <OTooltip
+                  v-if="item.disabled"
+                  side="right"
+                  align="center"
+                  max-width="18.75rem"
+                  :content="raw(minRangeRestrictionMessageVal)"
+                />
+                {{ item.shortLabel }}
+              </OButton>
+            </div>
+          </section>
+        </div>
+        <div
+          v-if="!hideRelativeNote"
+          class="bg-surface-subtle border-border-default text-text-secondary flex items-center gap-2 border-0 border-t border-solid px-4 py-2 text-xs italic"
+          data-test="auto-refresh-footer"
+        >
+          <OIcon name="info" size="sm" />
+          {{ t("search.autoRefreshRelativeOnly") }}
         </div>
       </div>
-    </ODropdown>
+    </OPopover>
   </div>
 </template>
 
@@ -171,24 +127,27 @@ import {
   watch,
   onActivated,
   onDeactivated,
-  onMounted,
   onUnmounted,
   type PropType,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
-import { AUTO_REFRESH_INTERVALS, autoRefreshLabel } from "@/utils/dashboard/autoRefresh";
+import {
+  AUTO_REFRESH_INTERVALS,
+  autoRefreshLabel,
+  autoRefreshShortLabel,
+} from "@/utils/dashboard/autoRefresh";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
+  components: { OButton, OPopover, OSwitch, OTooltip, OIcon },
   props: {
     modelValue: {
       type: Number,
@@ -214,6 +173,10 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
       default: "outline",
     },
+    hideRelativeNote: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
@@ -223,22 +186,32 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
-    const refreshTimes = computed(() => {
-      const columns = [
+    const isDisabled = (value: number) => {
+      return value < props.minRefreshInterval;
+    };
+
+    const refreshTimes = computed(() =>
+      [
         AUTO_REFRESH_INTERVALS.filter((v) => v < 60),
         AUTO_REFRESH_INTERVALS.filter((v) => v >= 60 && v < 3600),
         AUTO_REFRESH_INTERVALS.filter((v) => v >= 3600),
-      ];
-      const rowCount = Math.max(...columns.map((c) => c.length));
-      return Array.from({ length: rowCount }, (_, i) =>
-        columns
-          .filter((c) => i < c.length)
-          .map((c) => ({
-            label: autoRefreshLabel(c[i], t),
-            value: c[i] as number,
-            disabled: false,
-          })),
-      );
+      ].map((values) =>
+        values.map((value) => ({
+          label: autoRefreshLabel(value, t),
+          shortLabel: autoRefreshShortLabel(value, t),
+          value: value as number,
+          disabled: isDisabled(value),
+        })),
+      ),
+    );
+
+    const refreshSections = computed(() => {
+      const keys = [
+        ["seconds", t("search.autoRefreshSeconds")],
+        ["minutes", t("search.autoRefreshMinutes")],
+        ["hours", t("search.autoRefreshHours")],
+      ] as const;
+      return keys.map(([key, label], i) => ({ key, label, items: refreshTimes.value[i] }));
     });
 
     // v-model computed value
@@ -272,33 +245,50 @@ export default defineComponent({
       return props.isCompact && selectedValue.value > 0;
     });
 
-    // Default refresh interval (5 seconds)
-    const defaultRefreshInterval = 5;
-    let lastSelectedInterval = 5;
+    const isOn = computed(() => selectedValue.value > 0);
 
-    // Toggle refresh on/off
-    const toggleRefresh = () => {
-      if (selectedValue.value > 0) {
-        // Currently ON, turn it OFF
-        lastSelectedInterval = selectedValue.value;
+    const triggerLabel = computed(() =>
+      isOn.value ? autoRefreshShortLabel(selectedValue.value, t) : t("common.off"),
+    );
+
+    const triggerAriaLabel = computed(() =>
+      isOn.value
+        ? t("search.autoRefreshAriaOn", { value: triggerLabel.value })
+        : t("search.autoRefreshAriaOff"),
+    );
+
+    let lastSelectedInterval = 0;
+    const DEFAULT_INTERVAL = 30;
+
+    // The remembered interval may fall below a minimum raised since it was picked.
+    const resumeInterval = () => {
+      if (lastSelectedInterval && !isDisabled(lastSelectedInterval)) return lastSelectedInterval;
+      if (!isDisabled(DEFAULT_INTERVAL)) return DEFAULT_INTERVAL;
+      return refreshTimes.value.flat().find((it) => !it.disabled)?.value ?? 0;
+    };
+
+    const onSwitch = (on: unknown) => {
+      if (!on) {
+        lastSelectedInterval = selectedValue.value || lastSelectedInterval;
         selectedValue.value = 0;
-      } else {
-        // Currently OFF, turn it ON with last interval or default
-        selectedValue.value = lastSelectedInterval || defaultRefreshInterval;
+        return;
       }
+      selectedValue.value = resumeInterval();
     };
 
-    // Open dropdown for selecting specific interval (for right-click or future use)
-    const openDropdown = () => {
-      btnRefreshInterval.value = true;
-    };
+    // Switching on is impossible when no interval satisfies the minimum.
+    const switchDisabled = computed(() => !isOn.value && resumeInterval() === 0);
 
-    // update model when the selection has changed
-    const onItemClick = (item: any) => {
+    const onItemClick = (item: { value: number }) => {
       selectedValue.value = item.value;
       if (item.value > 0) {
         lastSelectedInterval = item.value;
       }
+    };
+
+    const onPick = (item: { value: number }) => {
+      onItemClick(item);
+      btnRefreshInterval.value = false;
     };
 
     // watch on the selected value and update the timers
@@ -321,34 +311,9 @@ export default defineComponent({
       }, selectedValue.value * 1000);
     };
 
-    const minRangeRestrictionMessageVal = ref("");
-
-    watch(
-      () => props.minRefreshInterval,
-      () => {
-        updateDisabledFlags();
-      },
+    const minRangeRestrictionMessageVal = computed(() =>
+      t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval }),
     );
-
-    const isDisabled = (value: number) => {
-      return value < props.minRefreshInterval;
-    };
-
-    const updateDisabledFlags = () => {
-      refreshTimes.value.forEach((row) => {
-        row.forEach((item) => {
-          item.disabled = isDisabled(item.value);
-        });
-      });
-      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", {
-        interval: props.minRefreshInterval,
-      });
-    };
-
-    onMounted(() => {
-      // Initialize the disabled flags on component mount
-      updateDisabledFlags();
-    });
 
     // on component mount and unmount, update the intervals
     onActivated(() => {
@@ -369,25 +334,25 @@ export default defineComponent({
       router,
       btnRefreshInterval,
       selectedLabel,
+      triggerLabel,
+      isOn,
+      switchDisabled,
+      triggerAriaLabel,
       refreshTimes,
+      refreshSections,
       onItemClick,
+      onPick,
+      onSwitch,
       minRangeRestrictionMessageVal,
       isAnimating,
       selectedValue,
-      toggleRefresh,
-      openDropdown,
     };
   },
 });
 </script>
 
 <style scoped>
-/* keep(keyframes): the spinning refresh icon is used only by this component (both
-   the icon-only and the labelled dropdown trigger share this one class). The
-   `animation` is declared here rather than as a template `[animation:…]` utility
-   so Vue's scoped compiler renames the keyframe and this reference together.
-   The class lands on an OIcon root, which carries this component's scope id too.
-   `!important` is retained from the original `!`-prefixed utilities. */
+/* keep(keyframes): scoped compiler renames the keyframe and this reference together, which a template utility cannot. */
 .auto-refresh-icon--spinning {
   display: inline-block !important;
   transform-origin: center center !important;

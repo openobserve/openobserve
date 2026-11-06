@@ -32,6 +32,8 @@ export interface RcaCellModel {
   /** Warning-text suffix when a newer run did not finish; empty when none. */
   rerunNote: I18nText;
   spinner: boolean;
+  /** The label is a license lock reason. */
+  locked: boolean;
   /** The row shows a ghost "Analyze" on hover (RCA off for this incident). */
   showAnalyzeOnHover: boolean;
 }
@@ -39,6 +41,8 @@ export interface RcaCellModel {
 export interface RcaCellOptions {
   /** `incidents_rca_enabled` from `/config`. */
   rcaEnabled: boolean;
+  /** Why the license keeps RCA off; replaces the disabled label when RCA is off. */
+  lockedReason?: I18nText;
   /** Epoch milliseconds. */
   now: number;
   /** Zone of the "until HH:mm <zone>" answer deadline; UTC when not given. */
@@ -82,6 +86,7 @@ const state = (
   detail,
   rerunNote: extra.rerunNote ?? EMPTY,
   spinner: extra.spinner ?? false,
+  locked: false,
   showAnalyzeOnHover: false,
 });
 
@@ -124,12 +129,16 @@ const steeredByDetail = (rca: RcaSummary): I18nText =>
 
 export function rcaCellModel(
   incident: Pick<Incident, "rca" | "rca_off_reason" | "severity">,
-  { rcaEnabled, now, timezone = "UTC" }: RcaCellOptions,
+  { rcaEnabled, lockedReason, now, timezone = "UTC" }: RcaCellOptions,
 ): RcaCellModel {
   const rca = incident.rca;
 
   if (!rca) {
-    if (!rcaEnabled) return state(gt("alerts.incidents.aiAnalysis.rcaDisabled"), "muted");
+    if (!rcaEnabled) {
+      return lockedReason
+        ? { ...state(lockedReason, "muted"), locked: true }
+        : state(gt("alerts.incidents.aiAnalysis.rcaDisabled"), "muted");
+    }
     if (incident.rca_off_reason === "l0_off") {
       return {
         ...state(
@@ -149,6 +158,7 @@ export function rcaCellModel(
       detail: EMPTY,
       rerunNote: EMPTY,
       spinner: false,
+      locked: false,
       showAnalyzeOnHover: false,
     };
   }

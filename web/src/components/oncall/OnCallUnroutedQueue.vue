@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-unrouted-header"
     >
       <OText variant="panel-title">{{ t("oncall.unroutedTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.unroutedHint") }}</OText>
       <!-- Bulk claim needs a team to claim FOR, so it only renders where the
            host screen supplies one. The org queue claims row by row, because
            "assign everything unowned to one team" is rarely the true intent. -->
       <OButton
         v-if="signals.length && teamName"
-        variant="outline"
-        size="xs"
+        variant="primary"
+        size="sm"
+        icon-left="add"
         class="ms-auto"
         :loading="claiming"
         data-test="oncall-unrouted-claim-all"
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading"
       :error="error || null"
       show-index
+      pagination="client"
       :global-filter="search"
       :show-global-filter="false"
       :row-class="rowClass"
@@ -75,10 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Inside the table, so the host's toolbar — and the way back to the other tab — stays up. -->
       <template #error>
         <OEmptyState
-          size="inline"
-          variant="error"
+          size="block"
+          preset="load-error"
           :title="error || undefined"
-          :action-label="t('oncall.retry')"
           data-test="oncall-unrouted-error"
           @action="emit('retry')"
         />
@@ -101,28 +101,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- The dimensions a rule would be written against, and nothing else.
-           Pod names, node names and status codes are evidence about ONE
-           firing — showing them here made every row an unreadable dump and
-           implied the claim would pin to them. The full set stays a hover
-           away for whoever is identifying the alert. -->
+      <!-- Identity only: pod names and status codes are evidence about one firing, not what a rule pins. -->
       <template #cell-path="{ row }">
-        <code
-          class="text-text-secondary truncate text-xs"
-          :title="pathOf(row)"
+        <OnCallFitChips
+          :items="pathChips(row)"
+          :tooltip="pathChipsText(row)"
           :data-test="`oncall-unrouted-path-${row.id}`"
         >
-          {{ raw(routablePathOf(row)) }}
-        </code>
+          <template #item="{ item }">
+            <ODimensionChip :dim-key="item.name" :key-label="item.label" :value="item.value" />
+          </template>
+        </OnCallFitChips>
       </template>
 
       <template #cell-fires="{ row }">
-        <span class="flex flex-col">
-          <span class="text-text-body">
-            {{ t("oncall.unroutedFires", { count: row.occurrences }, row.occurrences) }}
-          </span>
-          <OTimeCell v-if="row.last_seen_at" :value="row.last_seen_at" unit="us" />
+        <span class="text-text-body tabular-nums" :data-test="`oncall-unrouted-fires-${row.id}`">
+          {{ row.occurrences }}
         </span>
+      </template>
+
+      <template #cell-last="{ row }">
+        <OTimeCell
+          :value="row.last_seen_at"
+          unit="us"
+          :timezone="timezone"
+          :empty-label="raw('—')"
+        />
       </template>
 
       <!-- §G.3: two different emergencies share this queue. A row the default
@@ -132,22 +136,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-outcome="{ row }">
         <OTag
           v-if="row.defaulted_team_id"
-          variant="warning-soft"
+          type="oncallUnroutedOutcome"
+          value="default_team"
           size="sm"
           :data-test="`oncall-unrouted-defaulted-${row.id}`"
         >
           {{ t("oncall.unroutedAbsorbedBy", { team: raw(teamNameOf(row.defaulted_team_id)) }) }}
         </OTag>
-        <OTag v-else variant="error-soft" size="sm" :data-test="`oncall-unrouted-nobody-${row.id}`">
-          {{ t("oncall.unroutedPagedNobody") }}
-        </OTag>
+        <OTag
+          v-else
+          type="oncallUnroutedOutcome"
+          value="nobody"
+          size="sm"
+          :data-test="`oncall-unrouted-nobody-${row.id}`"
+        />
       </template>
 
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-end gap-1">
           <OButton
-            variant="outline"
+            variant="outline-primary"
             size="xs"
+            icon-left="alt-route"
             class="max-md:hidden"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
@@ -159,10 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             icon-left="close"
             class="max-md:hidden"
-            :aria-label="t('oncall.unroutedDismiss')"
+            :aria-label="t('oncall.routingNotOurs')"
             :data-test="`oncall-unrouted-dismiss-${row.id}`"
             @click.stop="emit('dismiss', row)"
-          />
+          >
+            <OTooltip side="bottom" :content="t('oncall.routingNotOurs')" />
+          </OButton>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
@@ -189,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`oncall-unrouted-dismiss-${row.id}-menu`"
               @select="emit('dismiss', row)"
             >
-              <span>{{ t("oncall.unroutedDismiss") }}</span>
+              <span>{{ t("oncall.routingNotOurs") }}</span>
             </ODropdownItem>
           </ODropdown>
         </span>
@@ -199,22 +211,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an empty panel somebody has to interpret. -->
       <template #empty>
         <!-- An empty search result says nothing about whether alerts reached a team. -->
-        <OEmptyState
-          v-if="search"
-          size="hero"
-          preset="no-data"
-          :filtered="!!search"
-          data-test="oncall-unrouted-empty"
-          @action="onEmptyAction"
-        />
-        <OEmptyState
-          v-else
-          size="inline"
-          preset="no-data"
-          :title="t('oncall.unroutedNoneTitle')"
-          :description="t('oncall.unroutedNone')"
-          data-test="oncall-unrouted-empty"
-        />
+        <template v-if="!loading">
+          <OEmptyState
+            v-if="search"
+            size="block"
+            preset="no-oncall-unrouted"
+            filtered
+            data-test="oncall-unrouted-empty"
+            @action="onEmptyAction"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            preset="no-oncall-unrouted"
+            data-test="oncall-unrouted-empty"
+          />
+        </template>
       </template>
     </OTable>
   </div>
@@ -222,7 +234,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
+import OnCallFitChips from "@/components/oncall/OnCallFitChips.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -233,10 +248,18 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { dimensionsSentence, identityDimensions } from "@/utils/oncall";
+import {
+  claimableDimensions,
+  dimensionsSentence,
+  fieldLabel,
+  identityDimensions,
+} from "@/utils/oncall";
+
+/// Beyond this a row grows taller than the rest; the remainder sits behind "+N".
 
 export interface UnroutedFilters {
   landing?: "default_team" | "nobody";
@@ -280,11 +303,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
 const claimLabel = computed<I18nText>(() =>
   props.teamName
     ? t("oncall.unroutedClaimFor", { team: raw(props.teamName) })
-    : t("oncall.unroutedWriteRule"),
+    : t("oncall.unroutedClaimShort"),
 );
 
 const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
@@ -297,9 +322,12 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
   {
     id: "path",
     header: t("oncall.unroutedPath"),
+    size: 280,
+    minSize: 220,
     sortable: false,
     hideable: true,
     accessorFn: (row: UnroutedSignal) => routablePathOf(row),
+    meta: { cellOverflowTooltip: false },
   },
   {
     id: "fires",
@@ -307,6 +335,13 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     size: 150,
     hideable: true,
     accessorFn: (row: UnroutedSignal) => row.occurrences,
+  },
+  {
+    id: "last",
+    header: t("oncall.unroutedLastSeen"),
+    size: 130,
+    hideable: true,
+    accessorFn: (row: UnroutedSignal) => row.last_seen_at ?? 0,
   },
   {
     id: "outcome",
@@ -324,9 +359,10 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     id: "actions",
     header: t("oncall.actions"),
     isAction: true,
+    pinned: "right",
     sortable: false,
-    size: 170,
-    meta: { align: "right", cellClass: "actions-column", actionCount: 2 },
+    size: 160,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
@@ -362,6 +398,21 @@ function teamNameOf(teamId: string): string {
 function routablePathOf(signal: UnroutedSignal): string {
   const kept = identityDimensions(signal.dimensions);
   return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
+}
+
+function pathChips(signal: UnroutedSignal) {
+  const dims = claimableDimensions(signal.dimensions);
+  return Object.keys(dims)
+    .sort()
+    .map((name) => ({ name, label: fieldLabel(name), value: dims[name] }));
+}
+
+function pathChipsText(signal: UnroutedSignal): I18nText {
+  return raw(
+    pathChips(signal)
+      .map((chip) => `${chip.label} ${chip.value}`)
+      .join(" · "),
+  );
 }
 
 function onEmptyAction(id?: string) {

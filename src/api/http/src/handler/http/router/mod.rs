@@ -328,6 +328,14 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
     None
 }
 
+/// Only a refused role learns what is locked; a failed credential must not read the license state.
+fn refusal_response(error: AuthError, denial: Option<Response>) -> Response {
+    match (error, denial) {
+        (AuthError::RoleRefused(_), Some(denied)) => denied,
+        (error, _) => error.into_response(),
+    }
+}
+
 /// The route template axum matched, which a caller cannot shape the way it shapes the path.
 pub(crate) fn matched_route(request: &Request) -> Option<String> {
     request
@@ -365,7 +373,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Validate authentication using extracted data
     let result = match oo_validator(&req_data, &auth_info).await {
         Ok(result) => result,
-        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+        Err(e) => {
+            let denial = auth_info.feature.and_then(license_denial);
+            return maybe_add_mcp_www_authenticate(&uri, refusal_response(e, denial));
+        }
     };
 
     // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
@@ -1059,18 +1070,12 @@ pub fn basic_routes() -> Router {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
-            get(oncall::ack_page)
-                .post(oncall::acknowledge)
-                .route_layer(middleware::from_fn(|req, next| {
-                    require_features(&[Feature::Oncall], req, next)
-                })),
+            get(oncall::ack_page).post(oncall::acknowledge),
         );
         // Unauthenticated like the email link: the signed token in the path is the credential.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack/voice/{token}",
-            post(oncall::voice_ack).route_layer(middleware::from_fn(|req, next| {
-                require_features(&[Feature::Oncall], req, next)
-            })),
+            post(oncall::voice_ack),
         );
     }
 
@@ -5314,6 +5319,172 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    async fn refusal_parts(error: AuthError, denied: bool) -> (StatusCode, String) {
+        let denial = denied.then(|| {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled("workflows".into());
+            (
+                StatusCode::FORBIDDEN,
+                axum::Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        });
+        let response = refusal_response(error, denial);
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn only_a_refused_role_on_a_locked_route_answers_with_the_license_denial() {
+        let role = || AuthError::RoleRefused("Unauthorized Access".to_string());
+        let (status, body) = refusal_parts(role(), true).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(body.contains("40001"), "{body}");
+        assert!(body.contains("Workflows"), "{body}");
+
+        assert_eq!(
+            refusal_parts(role(), false).await,
+            (StatusCode::FORBIDDEN, "Unauthorized Access".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Unauthorized("no".to_string()), true).await,
+            (StatusCode::UNAUTHORIZED, "no".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Forbidden("Not allowed".to_string()), true).await,
+            (StatusCode::FORBIDDEN, "Not allowed".to_string())
+        );
+    }
+
+    /// Paths of the `.route(` calls in `source` that no `require_features` covers.
+    fn routes_without_a_gate(source: &str) -> Vec<String> {
+        const GATE: &str = "require_features";
+        fn call_args(text: &str) -> &str {
+            let mut depth = 1;
+            for (at, c) in text.char_indices() {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    return &text[..at];
+                }
+            }
+            text
+        }
+
+        let code = source
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut ungated = Vec::new();
+        for (at, _) in code.match_indices(".route(") {
+            let rest = &code[at + ".route(".len()..];
+            let args = call_args(rest);
+            let after = &rest[args.len()..];
+            let section_end = ["router = ", "let public"]
+                .iter()
+                .filter_map(|stop| after.find(stop))
+                .min()
+                .unwrap_or(after.len());
+            // A router-level layer covers the routes above it; a sibling's own layer does not.
+            let mut chain = String::new();
+            let mut tail = &after[..section_end];
+            while let Some(next) = tail.find(".route(") {
+                chain.push_str(&tail[..next]);
+                let sibling = &tail[next + ".route(".len()..];
+                tail = &sibling[call_args(sibling).len()..];
+            }
+            chain.push_str(tail);
+            let router_gated = chain
+                .match_indices(".route_layer(")
+                .any(|(at, _)| call_args(&chain[at + ".route_layer(".len()..]).contains(GATE));
+            if !args.contains(GATE) && !router_gated {
+                ungated.push(args.split('"').nth(1).unwrap_or(args).to_string());
+            }
+        }
+        ungated
+    }
+
+    #[test]
+    fn the_route_scan_tells_a_gate_from_a_sibling_gate() {
+        let source = r#"
+            router = router.route("/own", post(a).route_layer(require_features));
+            router = router.route("/none", get(a));
+            router = router.route("/mention_only", get(a)).named(require_features);
+            router = router
+                .route("/before_sibling", get(a))
+                .route("/sibling", get(a).route_layer(require_features));
+            // .route("/commented", get(a));
+            let public = Router::new()
+                .route("/chained", get(a))
+                .route_layer(require_features)
+                .route("/after_layer", get(a));
+            router = router.merge(public);
+        "#;
+        assert_eq!(
+            routes_without_a_gate(source),
+            ["/none", "/mention_only", "/before_sibling", "/after_layer"]
+        );
+    }
+
+    /// The route table cannot see routes served outside `auth_middleware`, so this reads them.
+    #[test]
+    fn every_public_route_has_a_license_gate_or_is_listed() {
+        let mut public_ungated = vec![
+            "/.well-known/oauth-authorization-server",
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-protected-resource/{*resource_path}",
+            "/api/slack/commands",
+            "/api/slack/events",
+            "/api/slack/interactions",
+            "/api/v2/{org_id}/alerts/charts/render",
+            // These four are refused inside their handlers, only after the credential is verified.
+            "/api/v2/{org_id}/oncall/ack",
+            "/api/v2/{org_id}/oncall/ack/voice/{token}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            "/azure",
+            "/docs",
+            "/healthz",
+            "/login",
+            "/marketplace/aws/register",
+            "/metrics",
+            "/presigned-url",
+            "/profile/cpu",
+            "/profile/memory",
+            "/profile/stats",
+            "/schedulez",
+            "/stripe",
+        ];
+        public_ungated.sort_unstable();
+        let src = include_str!("mod.rs");
+        let (production, _) = src
+            .split_once("\n#[cfg(test)]\nmod tests {")
+            .expect("test module marker moved; this scan would read fixtures as routes");
+        let body = |signature: &str| {
+            let start = production
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} moved; point this scan at the new name"));
+            &production[start..start + production[start..].find("\n}\n").unwrap()]
+        };
+        let mut found = routes_without_a_gate(body("pub fn basic_routes() -> Router {"));
+        found.extend(routes_without_a_gate(body(
+            "fn workflow_hook_routes() -> Router {",
+        )));
+        found.sort_unstable();
+        assert_eq!(
+            found, public_ungated,
+            "left is what the source registers without a route gate, right is the allowed list: gate \
+             a new public route, list it if it stays open by design or checks in its handler, and \
+             remove an entry once it has a gate"
+        );
     }
 
     /// Every (method, template) the `/api` tree serves, parsed from this file's production code.

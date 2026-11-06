@@ -1,15 +1,30 @@
 # Published routes with no x-o2-ratelimit, on purpose. Format: METHOD /path | reason
 
+GET /.well-known/oauth-authorization-server | unauthenticated, outside the /api tree
 GET /api/status_pages_public/{slug} | unauthenticated; handler applies its own per-IP limit
 GET /api/status_pages_public/{slug}/badge.svg | unauthenticated; handler applies its own per-IP limit
 GET /api/status_pages_public/{slug}/feed.xml | unauthenticated; handler applies its own per-IP limit
 POST /api/v2/{org_id}/incidents/events | ingest callback authenticated by an integration token
 POST /api/v2/{org_id}/incidents/events/{token} | ingest callback authenticated by an integration token
+POST /api/{org_id}/_bulk | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/_hec | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/ingest/metrics/_json | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/loki/api/v1/push | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/prometheus/api/v1/write | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/synthetics/jobs/ack | probe agent protocol, polled on the agent schedule
+POST /api/{org_id}/synthetics/jobs/lease | probe agent protocol, polled on the agent schedule
+POST /api/{org_id}/synthetics/jobs/resolve | probe agent protocol, polled on the agent schedule
 POST /api/{org_id}/v1/logs | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/v1/metrics | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/v1/profiles | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/v1/traces | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/{stream_name}/_json | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/{stream_name}/_multi | ingest route, kept out of the API rate-limit groups
 GET /auth/presigned-url | credentials checked by the handler, outside the /api tree
 POST /aws/{org_id}/{stream_name}/_kinesis_firehose | ingest push from a delivery stream, outside the /api tree
 POST /config/token | unauthenticated token exchange, outside the /api tree
 POST /gcp/{org_id}/{stream_name}/_sub | ingest push from a subscription, outside the /api tree
+GET /healthz | unauthenticated, outside the /api tree
+POST /rum/v1/{org_id}/logs | ingest route, kept out of the API rate-limit groups
+POST /rum/v1/{org_id}/replay | ingest route, kept out of the API rate-limit groups
+POST /rum/v1/{org_id}/rum | ingest route, kept out of the API rate-limit groups

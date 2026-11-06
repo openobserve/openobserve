@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('oncall.cancel')"
     :form-id="mode === 'swap' ? undefined : FORM_ID"
     :primary-button-loading="saving"
-    :primary-button-disabled="mode === 'swap' && !swapReady"
+    :primary-button-disabled="mode === 'swap' ? !swapReady : false"
     data-test="oncall-cover-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="mode === 'swap' ? submitSwap() : undefined"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="swapB"
         :label="t('oncall.swapSecondShift')"
-        :options="shiftOptions"
+        :options="swapWithOptions"
         data-test="oncall-swap-b"
       />
 
@@ -70,7 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            that says only "Ana and Bo swap" leaves the reader to work out which
            week each of them ends up holding. -->
       <OBanner v-if="swapSummary" variant="info" data-test="oncall-swap-summary">
-        {{ swapSummary }}
+        <i18n-t keypath="oncall.swapSummary" tag="span" scope="global">
+          <template #first><OnCallPersonName :email="swapSummary.first" /></template>
+          <template #second><OnCallPersonName :email="swapSummary.second" /></template>
+          <template #firstWhen>{{ swapSummary.firstWhen }}</template>
+          <template #secondWhen>{{ swapSummary.secondWhen }}</template>
+        </i18n-t>
       </OBanner>
       <p
         v-else-if="swapProblem"
@@ -86,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="user_email"
         :label="t('oncall.coverWho')"
         :options="memberOptions"
-        :help-text="currentlyOnCall"
+        searchable
         required
         data-test="oncall-cover-who"
       />
@@ -99,30 +104,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="rotation_id"
         :label="t('oncall.coverRotation')"
         :options="rotationOptions"
-        :help-text="t('oncall.coverRotationHint')"
         data-test="oncall-cover-rotation"
       />
 
-      <!-- Presets first, because they are the answer almost every time. -->
-      <div class="flex flex-col gap-2">
-        <OText variant="label">{{ t("oncall.coverQuickRanges") }}</OText>
-        <span class="flex flex-wrap gap-2">
-          <OButton
-            v-for="preset in PRESETS"
-            :key="preset.key"
-            variant="outline"
-            size="xs"
-            :data-test="`oncall-cover-preset-${preset.key}`"
-            @click="applyPreset(preset.key)"
-          >
-            {{ t(preset.labelKey) }}
-          </OButton>
-        </span>
-      </div>
+      <i18n-t
+        v-if="holders.length"
+        keypath="oncall.coverHolderLine"
+        tag="p"
+        scope="global"
+        class="text-text-secondary text-sm"
+        data-test="oncall-cover-holder"
+      >
+        <template #name>
+          <template v-for="(email, index) in holders" :key="email">
+            <template v-if="index > 0">{{ raw(", ") }}</template>
+            <OnCallPersonName :email="email" />
+          </template>
+        </template>
+      </i18n-t>
 
-      <!-- Absolute only. A relative period is a question about the past — the
-           picker resolves "Past 30 Minutes" against the moment it is read —
-           and there is no forward-looking reading of it to offer here. -->
+      <!-- Absolute only: a relative period resolves against the moment it is read, and a cover is forward-looking. -->
       <!-- A plain block: straight in the form's flex column, the picker's border stretches past its buttons. -->
       <div>
         <OFormDateTimeRange
@@ -130,19 +131,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('oncall.coverWhen')"
           required
           disable-relative
+          auto-apply
+          :trigger-text="windowLabel"
+          :picker-timezone="pickedZone"
+          hide-clipboard
           show-error
           :min-date="calendarDay(0)"
           :max-date="calendarDay(MAX_AHEAD_MICROS)"
           data-test="oncall-cover-window"
-        />
+          @on:timezone-change="(zone: string) => (pickedZone = zone)"
+        >
+          <template #label-append>
+            <OnCallZoneInfo
+              :timezone="timezone"
+              :viewer-timezone="viewerTimezone"
+              :picked-timezone="pickedZone"
+              :range="windowValue"
+            />
+          </template>
+          <template #above>
+            <span class="flex flex-wrap gap-2" data-test="oncall-cover-presets">
+              <OButton
+                v-for="preset in PRESETS"
+                :key="preset.key"
+                :variant="activePreset === preset.key ? 'outline-primary' : 'outline'"
+                size="xs"
+                :aria-pressed="activePreset === preset.key"
+                :data-test="`oncall-cover-preset-${preset.key}`"
+                @click="applyPreset(preset.key)"
+              >
+                {{ t(preset.labelKey) }}
+              </OButton>
+            </span>
+          </template>
+        </OFormDateTimeRange>
       </div>
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
-        {{ summary }}
-        <span v-if="teamZoneSummary" class="block" data-test="oncall-cover-summary-team-zone">
-          {{ teamZoneSummary }}
-        </span>
+        <i18n-t
+          :keypath="summary.holder ? 'oncall.coverSummaryFor' : 'oncall.coverSummaryOn'"
+          tag="span"
+          scope="global"
+        >
+          <template #name><OnCallPersonName :email="summary.who" /></template>
+          <template v-if="summary.holder" #holder>
+            <OnCallPersonName :email="summary.holder" />
+          </template>
+          <template #rotation>{{ summary.rotation }}</template>
+          <template #when>{{ summary.when }}</template>
+        </i18n-t>
+        {{ raw(" ") }}
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
       </OBanner>
     </OForm>
@@ -153,7 +192,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { DateTimeRangeValue } from "@/lib/forms/DateTime/OFormDateTimeRange.types";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
@@ -164,7 +202,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { OnCallPosition, OnCallTeamMember, ResolvedSegment } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -183,8 +221,19 @@ export interface UpcomingShift extends Shift {
   rotationId: string;
   rotationName: string;
 }
-import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
+import {
+  formatDayRange,
+  formatInZone,
+  formatShiftRange,
+  formatZonedRange,
+  fromZonedInputValue,
+  toZonedInputValue,
+} from "@/utils/oncall";
 import { MAX_AHEAD_MICROS, makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
+import OnCallPersonName from "./OnCallPersonName.vue";
+import OnCallZoneInfo from "./OnCallZoneInfo.vue";
+import { SHIFT_LOOKUP_MICROS, holdersOver } from "./resolvedShifts";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 /**
  * What the cover half of this dialog holds.
@@ -205,21 +254,11 @@ const props = withDefaults(
     members?: OnCallTeamMember[];
     timezone?: string;
     saving?: boolean;
-    /** Who currently holds the shift, so the picker can say who is being relieved. */
+    /** Whose shift a cover opened from a clicked shift relieves; sent as `covering_for`. */
     currentHolder?: string | null;
-    /**
-     * The clock the RANGE CONTROL edits in — the reader's own, which is not
-     * necessarily the team's.
-     *
-     * Passed in rather than read off the store because the picker takes it from
-     * there and this component does not: a summary that quietly restated the
-     * reader's 22:00 as the team's 16:30, with nothing on screen saying which
-     * clock either number was on, is the defect. Both are now named.
-     *
-     * Not fixed by handing the picker `initial-timezone` either — that DISPATCHES
-     * the zone into the store and persists it, so opening this dialog would
-     * change the reader's timezone for the whole app.
-     */
+    /** Who each rotation puts on call now, for the holder line when no shift was clicked. */
+    positions?: OnCallPosition[];
+    /** The reader's own clock; the zone is named in the field, and the window restated in the tooltip, when it is not the team's. */
     viewerTimezone?: string;
     /** Named in the confirmation, because a cover is always a cover OF a team. */
     teamName?: string;
@@ -245,6 +284,15 @@ const props = withDefaults(
      * stored, because a cover over a position nothing staffs pages nobody.
      */
     rotations?: Rotation[];
+    /** Pre-selects the rotation being covered, e.g. from a clicked shift. */
+    defaultRotation?: string;
+    /** Which errand the dialog opens on. */
+    defaultMode?: "cover" | "swap";
+    /** Pre-selects the swap's first shift: the one of this rotation running at `at`. */
+    swapFrom?: { rotationId: string; at: number } | null;
+    /** Reads the resolved schedule of one rotation, so the holder line and `covering_for` follow the picked window. */
+    resolveRuns?:
+      ((rotationId: string, from: number, to: number) => Promise<ResolvedSegment[]>) | null;
   }>(),
   {
     open: false,
@@ -253,11 +301,16 @@ const props = withDefaults(
     viewerTimezone: "UTC",
     saving: false,
     currentHolder: null,
+    positions: () => [],
     teamName: "",
     gap: null,
     defaultUser: "",
     shifts: () => [],
     rotations: () => [],
+    defaultRotation: "",
+    defaultMode: "cover",
+    swapFrom: null,
+    resolveRuns: null,
   },
 );
 
@@ -265,7 +318,13 @@ const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (
     e: "save",
-    value: { user_email: string; start_at: number; end_at: number; rotation_id?: string },
+    value: {
+      user_email: string;
+      start_at: number;
+      end_at: number;
+      rotation_id?: string;
+      covering_for?: string;
+    },
   ): void;
   /**
    * Two covers, one each way — the caller writes both and owns what happens if
@@ -311,23 +370,21 @@ watch(
   (open) => {
     if (!open) return;
     resetForm();
-    // A gap is a hole to fill, never a week to trade — opening on Swap would
-    // answer a question the caller did not ask.
-    mode.value = "cover";
-    swapA.value = "";
+    // Swap only when asked for: a gap is a hole to fill, never a week to trade.
+    mode.value = props.defaultMode === "swap" && props.shifts.length ? "swap" : "cover";
+    swapA.value = mode.value === "swap" ? swapFromKey() : "";
     swapB.value = "";
   },
 );
 
-const memberOptions = computed(() =>
-  props.members.map((member) => ({ label: raw(member.user_email), value: member.user_email })),
-);
+// Opened from a shift, switching to Swap keeps that shift as the one being traded.
+watch(mode, (next) => {
+  if (next === "swap" && !swapA.value) swapA.value = swapFromKey();
+});
 
-const currentlyOnCall = computed<I18nText | undefined>(() =>
-  props.currentHolder
-    ? t("oncall.coverCurrentlyOnCall", { name: raw(props.currentHolder) })
-    : undefined,
-);
+const { nameOf, optionOf } = useOrgUserNames();
+
+const memberOptions = computed(() => props.members.map((member) => optionOf(member.user_email)));
 
 /// A pre-selected person is only honest if the picker can show them: the caller
 /// passes whoever is reading the page, and a reader who is not on this team has
@@ -362,7 +419,10 @@ function initialValues(): OnCallCoverFormValues {
   const now = Date.now() * 1000;
   return {
     user_email: prefilledUser.value,
-    rotation_id: props.rotations[0]?.id ?? "",
+    rotation_id:
+      props.rotations.find((rotation) => rotation.id === props.defaultRotation)?.id ??
+      props.rotations[0]?.id ??
+      "",
     // A cover is arranged for hours that have not happened yet, so the window
     // opens on some. Left undefined, the picker fell back to its log-search
     // default — the past half hour — and emitted it on mount, so a dialog
@@ -397,6 +457,78 @@ const windowValue = form.useStore(
 const userValue = form.useStore(
   (state: { values: OnCallCoverFormValues }) => state.values.user_email,
 );
+const rotationValue = form.useStore(
+  (state: { values: OnCallCoverFormValues }) => state.values.rotation_id,
+);
+
+/// Fallback without a resolved read: the clicked shift's person while its rotation is still picked, else whoever it has on now.
+const fallbackHolder = computed<string>(() => {
+  const rotation = String(rotationValue.value ?? "");
+  if (props.currentHolder && (!props.defaultRotation || rotation === props.defaultRotation)) {
+    return props.currentHolder;
+  }
+  const position =
+    props.positions.find((one) => one.rotation_id === rotation) ??
+    (props.rotations.length <= 1 ? props.positions[0] : undefined);
+  return position?.user_email ?? "";
+});
+
+/// Who the resolved schedule puts on the picked rotation over the picked window, tagged with the read it answers.
+const windowHolders = ref<{ key: string; people: string[]; sole: string | null } | null>(null);
+
+const holderQuery = computed<{ key: string; rotation: string; from: number; to: number } | null>(
+  () => {
+    const window = windowValue.value;
+    const rotation = String(rotationValue.value ?? "");
+    if (!props.open || !props.resolveRuns || !rotation) return null;
+    if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
+    if (window.to <= window.from) return null;
+    return {
+      key: `${rotation}:${window.from}:${window.to}`,
+      rotation,
+      from: window.from,
+      to: window.to,
+    };
+  },
+);
+
+const windowKey = computed<string>(() => holderQuery.value?.key ?? "");
+
+watch(
+  windowKey,
+  async (key) => {
+    const query = holderQuery.value;
+    if (!query || !props.resolveRuns) {
+      windowHolders.value = null;
+      return;
+    }
+    // The server caps one read, so a longer window is read in part and can never prove a sole holder.
+    const readTo = Math.min(query.to, query.from + SHIFT_LOOKUP_MICROS);
+    try {
+      const runs = await props.resolveRuns(query.rotation, query.from, readTo);
+      if (key !== windowKey.value) return;
+      const found = holdersOver(runs, { from: query.from, to: readTo });
+      windowHolders.value = {
+        key,
+        people: found.people,
+        sole: readTo === query.to ? found.sole : null,
+      };
+    } catch {
+      if (key === windowKey.value) windowHolders.value = null;
+    }
+  },
+  { immediate: true },
+);
+
+/// The current read's answer only: a stale one names whoever held the window before it changed.
+const currentHolders = computed(() =>
+  windowHolders.value && windowHolders.value.key === windowKey.value ? windowHolders.value : null,
+);
+
+const holders = computed<string[]>(() => {
+  if (holderQuery.value) return currentHolders.value?.people ?? [];
+  return fallbackHolder.value ? [fallbackHolder.value] : [];
+});
 
 const PRESETS = [
   { key: "rest-of-day", labelKey: "oncall.coverRestOfDay" },
@@ -425,74 +557,94 @@ function zonedInstant(micros: number, zone: string, addDays: number, time = "00:
 /// This used to say so while flooring the instant to a multiple of a day, which
 /// is midnight UTC — so an IST team's "tonight" began at 23:30 and its "rest of
 /// today" ran to half past five the following morning.
-function applyPreset(key: (typeof PRESETS)[number]["key"]) {
-  const now = Date.now() * 1000;
-  const zone = props.timezone;
-  const at = (addDays: number, time?: string) => zonedInstant(now, zone, addDays, time);
+type PresetKey = (typeof PRESETS)[number]["key"];
 
-  const ranges: Record<string, { from: number; to: number }> = {
+function presetRanges(now: number): Record<PresetKey, { from: number; to: number }> {
+  const at = (addDays: number, time?: string) => zonedInstant(now, props.timezone, addDays, time);
+  return {
     "rest-of-day": { from: now, to: at(1) },
     tonight: { from: at(0, "18:00"), to: at(1, "06:00") },
     tomorrow: { from: at(1), to: at(2) },
     "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
   };
+}
+
+function applyPreset(key: PresetKey) {
+  const ranges = presetRanges(Date.now() * 1000);
   // `type` travels with every write into this field, not just the seed: the
   // control is re-read whenever the value changes from outside it, and a range
   // with no type is re-read as a relative period and resolved against `now` —
   // which threw the preset away and put the past half hour back.
   form.setFieldValue("window", { type: "absolute", ...ranges[key] });
+  presetApplied = { key, ...ranges[key] };
 }
+
+/// The picker stores whole minutes, so a preset starting "now" comes back up to a minute off what was written.
+const PRESET_MATCH_MICROS = 60 * 1_000_000;
+
+let presetApplied: { key: PresetKey; from: number; to: number } | null = null;
+
+const near = (a: number, b: number) => Math.abs(a - b) <= PRESET_MATCH_MICROS;
+
+/// Derived from the range the field holds, against the last preset written and each preset as of now.
+const activePreset = computed<PresetKey | null>(() => {
+  const value = windowValue.value;
+  if (typeof value?.from !== "number" || typeof value?.to !== "number") return null;
+  const matches = (range: { from: number; to: number }) =>
+    near(value.from as number, range.from) && near(value.to as number, range.to);
+  if (presetApplied && matches(presetApplied)) return presetApplied.key;
+  const fresh = presetRanges(Date.now() * 1000);
+  return PRESETS.find((preset) => matches(fresh[preset.key]))?.key ?? null;
+});
+
+/// The zone the picker reads its fields in: the team's when it opens, and the reader may pick another.
+const pickedZone = ref(props.timezone);
+watch(
+  () => [props.open, props.timezone] as const,
+  ([isOpen]) => {
+    if (isOpen) pickedZone.value = props.timezone;
+  },
+);
 
 /// The picker's calendar day `aheadMicros` from now, on the clock the picker shows.
 function calendarDay(aheadMicros: number): string {
   const at = Date.now() * 1000 + aheadMicros;
-  return toZonedInputValue(at, props.viewerTimezone).slice(0, 10).replace(/-/g, "/");
+  return toZonedInputValue(at, pickedZone.value).slice(0, 10).replace(/-/g, "/");
 }
 
-/// `timeZoneName` is the whole point: the two ends of a handover mean nothing
-/// without the clock they are on, and a UTC team read from IST is off by five
-/// and a half hours with no way to tell from the numbers.
-const formatRange = (micros: number, zone: string) =>
-  formatInZone(micros, zone, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-
-const summary = computed<I18nText | "">(() => {
+/// The field states the window on the team's clock, naming the zone once, at the end, when the picker is on another one.
+const windowLabel = computed<string>(() => {
   const window = windowValue.value;
-  const who = String(userValue.value ?? "");
-  // A half-picked range is not a sentence yet — the picker reports one end at
-  // a time, and "Sat 18:00 – Invalid Date" is worse than nothing. Nor is a
-  // range with nobody against it.
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
-  if (!who) return "";
-  const fmt = (micros: number) => formatRange(micros, props.viewerTimezone);
-  // The person TAKING the shift. This read `currentHolder` — whoever is being
-  // relieved — so the confirmation named the wrong side of the handover, and
-  // the team was passed as an empty string.
-  return t("oncall.coverSummary", {
-    name: raw(who),
-    team: raw(props.teamName ?? ""),
-    range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
-  });
+  return formatZonedRange(
+    window.from,
+    window.to,
+    props.timezone,
+    props.timezone !== props.viewerTimezone || pickedZone.value !== props.timezone,
+  );
 });
 
-/// The same window on the team's clock, and only when that is a different
-/// clock. A cover is agreed in the team's calendar — somebody arranging one
-/// from another office is still handing over the team's night — but the reader
-/// typed their own wall times into the picker, so showing only the team's would
-/// read as the dialog having changed the answer.
-const teamZoneSummary = computed<I18nText | "">(() => {
+/// Who takes whose shift, on which rotation, over which days; the times are said once, by the field.
+const summary = computed<{
+  who: string;
+  holder?: string;
+  rotation: I18nText;
+  when: I18nText;
+} | null>(() => {
   const window = windowValue.value;
-  if (!summary.value) return "";
-  if (props.timezone === props.viewerTimezone) return "";
-  if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
-  const fmt = (micros: number) => formatRange(micros, props.timezone);
-  return t("oncall.coverSummaryTeamZone", {
-    range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
-  });
+  const who = String(userValue.value ?? "");
+  // A half-picked range is not a cover yet, nor is a range with nobody against it.
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
+  if (!who) return null;
+  const rotationId = String(rotationValue.value ?? "");
+  const rotation = props.rotations.find((one) => one.id === rotationId)?.name ?? props.teamName;
+  return {
+    // The person TAKING the shift; `holder` is whoever is being relieved.
+    who,
+    holder: coveredPerson(who),
+    rotation: raw(rotation ?? ""),
+    when: raw(formatDayRange(window.from, window.to, props.timezone)),
+  };
 });
 
 /// ── Swap ──────────────────────────────────────────────────────────────────
@@ -523,16 +675,24 @@ const rotationOptions = computed(() =>
 /// weeks with the same dates and different positions are otherwise
 /// indistinguishable in the picker, and picking the wrong one writes a cover on
 /// the wrong rotation.
+const SHIFT_STAMP: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
 const shiftLabel = (shift: UpcomingShift): I18nText =>
   t(props.rotations.length > 1 ? "oncall.swapShiftOptionInRotation" : "oncall.swapShiftOption", {
-    name: raw(shift.member),
+    name: raw(nameOf(shift.member)),
     rotation: raw(shift.rotationName),
     range: raw(
-      `${formatInZone(shift.startMicros, props.timezone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      })} – ${formatInZone(shift.endMicros, props.timezone, { day: "numeric", month: "short" })}`,
+      `${formatInZone(shift.startMicros, props.timezone, SHIFT_STAMP)} – ${formatInZone(
+        shift.endMicros,
+        props.timezone,
+        SHIFT_STAMP,
+      )}`,
     ),
   });
 
@@ -542,6 +702,23 @@ const shiftOptions = computed(() =>
     value: shiftKey(shift),
   })),
 );
+
+/// A shift cannot trade with itself, so the picked one is not offered as its partner.
+const swapWithOptions = computed(() =>
+  shiftOptions.value.filter((option) => option.value !== swapA.value),
+);
+watch(swapA, (picked) => {
+  if (swapB.value === picked) swapB.value = "";
+});
+
+function swapFromKey(): string {
+  const from = props.swapFrom;
+  if (!from) return "";
+  const shift = props.shifts.find(
+    (s) => s.rotationId === from.rotationId && s.startMicros <= from.at && s.endMicros > from.at,
+  );
+  return shift ? shiftKey(shift) : "";
+}
 
 const swapPair = computed(() => {
   const first = shiftByKey.value.get(swapA.value);
@@ -569,23 +746,22 @@ const swapReady = computed(() => !!swapPair.value && !swapProblem.value);
 /// Named both ways round on purpose: "Ana and Bo swap" leaves the reader to
 /// work out which week each of them ends up holding, and getting that backwards
 /// is the whole risk of the errand.
-const swapSummary = computed<I18nText | "">(() => {
+const swapSummary = computed<{
+  first: string;
+  second: string;
+  firstWhen: I18nText;
+  secondWhen: I18nText;
+} | null>(() => {
   const pair = swapPair.value;
-  if (!pair || swapProblem.value) return "";
+  if (!pair || swapProblem.value) return null;
   const when = (shift: UpcomingShift) =>
-    raw(
-      formatInZone(shift.startMicros, props.timezone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      }),
-    );
-  return t("oncall.swapSummary", {
-    first: raw(pair.first.member),
-    second: raw(pair.second.member),
+    raw(formatShiftRange(shift.startMicros, shift.endMicros, props.timezone));
+  return {
+    first: pair.first.member,
+    second: pair.second.member,
     firstWhen: when(pair.first),
     secondWhen: when(pair.second),
-  });
+  };
 });
 
 function submitSwap() {
@@ -616,6 +792,19 @@ function close() {
   emit("update:open", false);
 }
 
+/// Whose hours the cover takes: only one person holding the whole window, and never the person covering.
+function coveredPerson(user: string): string | undefined {
+  let sole: string | null | undefined = currentHolders.value?.sole;
+  // Without a read, only a clicked shift says whose shift this is; the holder now may not hold the picked hours.
+  if (!holderQuery.value) {
+    sole =
+      props.currentHolder && fallbackHolder.value === props.currentHolder
+        ? props.currentHolder
+        : null;
+  }
+  return sole && sole !== user ? sole : undefined;
+}
+
 /// Where the form's shape becomes the request's shape. The range picker holds
 /// one `window`; the API takes `start_at` and `end_at`. Mapping here — rather
 /// than asking the schema to validate a pair no control renders — is what makes
@@ -626,11 +815,14 @@ function close() {
 function onSubmit(value: OnCallCoverFormValues) {
   const window = value.window;
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return;
+  const user = String(value.user_email ?? "");
+  const coveringFor = coveredPerson(user);
   emit("save", {
-    user_email: String(value.user_email ?? ""),
+    user_email: user,
     start_at: window.from,
     end_at: window.to,
     rotation_id: String(value.rotation_id ?? "") || undefined,
+    ...(coveringFor ? { covering_for: coveringFor } : {}),
   });
 }
 </script>

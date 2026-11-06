@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #actions>
             <OButton
-              v-if="periodState === 'tooShort'"
+              v-if="periodState === 'tooShort' && pa.canWidenRange.value"
               variant="outline"
               size="md"
               data-test="rum-analytics-retention-widen-range-btn"

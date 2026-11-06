@@ -42,6 +42,12 @@ pub(super) trait SyncDb: Sized {
     async fn row_of(&self, module: TriggerModule) -> (Trigger, Option<i64>);
     /// Inserts a Waiting row of another module under the same org and key.
     async fn insert(&self, module: TriggerModule, next_run_at: i64);
+    /// The backend's `rename_key`.
+    async fn rename(&self, module: TriggerModule, key: &str, new_key: &str) -> bool;
+    /// The row at `key`, if there is one.
+    async fn row_at(&self, module: TriggerModule, key: &str) -> Option<Trigger>;
+    /// Overwrites `data` on every row.
+    async fn set_data(&self, data: &str);
 }
 
 async fn row<D: SyncDb>(db: &D) -> (Trigger, Option<i64>) {
@@ -54,6 +60,43 @@ fn done() -> SlackSyncFinish {
         next_run_at: NOW,
         data: OncallSlackSyncData::default(),
     }
+}
+
+/// #3383: one statement moves a Waiting row whole; other modules and running rows stay.
+pub(super) async fn a_rename_moves_only_a_waiting_row<D: SyncDb>() {
+    let Some(db) = D::fresh().await else {
+        return;
+    };
+    db.insert(TriggerModule::Report, 7).await;
+    db.set_data("cursor").await;
+    let before = db.row_at(TriggerModule::Report, KEY).await.unwrap();
+
+    assert!(db.rename(TriggerModule::Report, KEY, "moved").await);
+    assert!(db.row_at(TriggerModule::Report, KEY).await.is_none());
+    let moved = db.row_at(TriggerModule::Report, "moved").await.unwrap();
+    assert_eq!(moved.id, before.id);
+    assert_eq!(moved.next_run_at, 7);
+    assert_eq!(moved.data, "cursor");
+    assert_eq!(moved.status, TriggerStatus::Waiting);
+    assert!(!db.rename(TriggerModule::Report, KEY, "again").await);
+
+    db.insert(TriggerModule::OncallSlackSync, 8).await;
+    assert!(!db.rename(TriggerModule::Report, KEY, "other").await);
+    db.set(TriggerStatus::Processing, 8).await;
+    assert!(
+        !db.rename(TriggerModule::OncallSlackSync, KEY, "running")
+            .await
+    );
+    let running = db
+        .row_at(TriggerModule::OncallSlackSync, KEY)
+        .await
+        .unwrap();
+    assert_eq!(running.status, TriggerStatus::Processing);
+    assert!(
+        db.row_at(TriggerModule::OncallSlackSync, "running")
+            .await
+            .is_none()
+    );
 }
 
 /// SY-2.2: the arm on a missing, Waiting, Completed and Processing row.

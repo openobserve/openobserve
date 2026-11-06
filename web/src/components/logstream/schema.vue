@@ -557,6 +557,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
 
+                        <div
+                          v-if="showDynamicPartitionSettings"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
+                        >
+                          <span class="flex items-center gap-2">
+                            {{ t("logStream.dynamicPartition") }}
+                            <span class="flex items-center">
+                              <OIcon
+                                name="info"
+                                size="sm"
+                                class="text-text-secondary cursor-pointer"
+                              />
+                              <OTooltip
+                                side="right"
+                                :content="t('logStream.dynamicPartitionTooltip')"
+                              />
+                            </span>
+                          </span>
+                          <OSwitch
+                            data-test="log-stream-dynamic-partition-toggle-btn"
+                            v-model="dynamicPartition"
+                            @update:model-value="formDirtyFlag = true"
+                          />
+                        </div>
+
+                        <div
+                          v-if="showDynamicPartitionSettings && !dynamicPartition"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
+                        >
+                          <span class="flex items-center gap-2">
+                            {{ t("logStream.partitionTimeLevel") }}
+                            <span class="flex items-center">
+                              <OIcon
+                                name="info"
+                                size="sm"
+                                class="text-text-secondary cursor-pointer"
+                              />
+                              <OTooltip
+                                side="right"
+                                :content="t('logStream.partitionTimeLevelTooltip')"
+                              />
+                            </span>
+                          </span>
+                          <OToggleGroup
+                            data-test="log-stream-partition-time-level-toggle"
+                            v-model="partitionTimeLevel"
+                            @update:model-value="formDirtyFlag = true"
+                          >
+                            <OToggleGroupItem value="hourly" size="sm">
+                              {{ t("logStream.partitionTimeLevelHourly") }}
+                            </OToggleGroupItem>
+                            <OToggleGroupItem value="daily" size="sm">
+                              {{ t("logStream.partitionTimeLevelDaily") }}
+                            </OToggleGroupItem>
+                          </OToggleGroup>
+                        </div>
+
                         <div class="text-compact flex items-center justify-between px-3 py-2.5">
                           <span>{{ t("logStream.enableDistinctValues") }}</span>
                           <OSwitch
@@ -1007,6 +1064,14 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const dynamicPartition = ref(false);
+    const partitionTimeLevel = ref("hourly");
+    // only a change is written: the server records a new level from the next day on
+    const savedPartitionTimeLevel = ref("hourly");
+    const showDynamicPartitionSettings = computed(() => {
+      const type = modelValue.stream_type;
+      return type === "logs" || type === "metrics" || type === "traces";
+    });
 
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(
@@ -1430,6 +1495,10 @@ export default defineComponent({
       storeOriginalData.value = streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
+      const partitionLevelSettings = streamResponse.settings.partition_time_level;
+      dynamicPartition.value = partitionLevelSettings?.dynamic ?? false;
+      savedPartitionTimeLevel.value = partitionLevelSettings?.changes?.at(-1)?.level ?? "hourly";
+      partitionTimeLevel.value = savedPartitionTimeLevel.value;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -1520,6 +1589,8 @@ export default defineComponent({
         store_original_data?: boolean;
         enable_distinct_fields?: boolean;
         approx_partition?: boolean;
+        dynamic_partition?: boolean;
+        partition_time_level?: string;
         flatten_level?: number;
       }
       let settings: StreamSettingsPayload = {
@@ -1554,6 +1625,12 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["enable_distinct_fields"] = enableDistinctFields.value;
       settings["approx_partition"] = approxPartition.value;
+      if (showDynamicPartitionSettings.value) {
+        settings["dynamic_partition"] = dynamicPartition.value;
+        if (!dynamicPartition.value && partitionTimeLevel.value !== savedPartitionTimeLevel.value) {
+          settings["partition_time_level"] = partitionTimeLevel.value;
+        }
+      }
 
       if (flattenLevel.value !== undefined) {
         settings["flatten_level"] = Number(flattenLevel.value);
@@ -2520,6 +2597,9 @@ export default defineComponent({
       storeOriginalData,
       enableDistinctFields,
       approxPartition,
+      dynamicPartition,
+      partitionTimeLevel,
+      showDynamicPartitionSettings,
       maxQueryRange,
       flattenLevel,
       showDataRetention,

@@ -64,7 +64,7 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageListResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -91,7 +91,7 @@ pub async fn list_pages(Path(org_id): Path<String>) -> Response {
     ),
     request_body(content = CreatePageRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -125,7 +125,7 @@ pub async fn create_page(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
@@ -154,7 +154,7 @@ pub async fn get_page(Path((org_id, id)): Path<(String, String)>) -> Response {
     ),
     request_body(content = UpdatePageRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -188,7 +188,7 @@ pub async fn update_page(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -259,7 +259,7 @@ pub async fn rotate_slug(
     ),
     request_body(content = SetComponentsRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -316,7 +316,7 @@ pub async fn set_components(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PreviewResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
@@ -346,7 +346,7 @@ pub async fn preview(Path((org_id, id)): Path<(String, String)>) -> Response {
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::NoticeAdminView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -377,7 +377,7 @@ pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Re
     ),
     request_body(content = CreateNoticeRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::NoticeAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -412,7 +412,7 @@ pub async fn create_notice(
     ),
     request_body(content = UpdateNoticeRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::NoticeAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -446,7 +446,7 @@ pub async fn update_notice(
         ("nid" = String, Path, description = "Notice id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -480,7 +480,7 @@ pub async fn delete_notice(
         ("nid" = String, Path, description = "Notice id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::NoticeUpdateView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -508,7 +508,7 @@ pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) ->
     ),
     request_body(content = NoticeUpdateRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -547,7 +547,7 @@ pub async fn add_notice_update(
     ),
     request_body(content = MarkFalsePositiveRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -588,7 +588,7 @@ pub async fn mark_false_positive(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::DomainAdminView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -616,7 +616,7 @@ pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Respons
     ),
     request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::CreateDomainResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -650,7 +650,7 @@ pub async fn create_domain(
         ("did" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -684,7 +684,7 @@ pub async fn delete_domain(
         ("did" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),

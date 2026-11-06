@@ -22,7 +22,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JsonValue as Json, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    JsonValue as Json, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::{
@@ -76,6 +76,20 @@ pub async fn names_using_template<C: ConnectionTrait>(
         .order_by_asc(anomaly_detection_config::Column::Name)
         .into_tuple::<(String, String)>()
         .all(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
+}
+
+/// Configs in a folder, by the `folders.id` key they store.
+pub async fn count_in_folder<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_pk: &str,
+) -> Result<u64> {
+    anomaly_detection_config::Entity::find()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .filter(anomaly_detection_config::Column::FolderId.eq(folder_pk))
+        .count(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
 }
@@ -270,6 +284,9 @@ pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// `Status::Training` in the enterprise scheduler, which owns this column's values.
+const STATUS_TRAINING: i32 = 2;
+
 /// Overwrites every non-PK field of `active` with the values from `src`.
 /// `created_at` is intentionally excluded — it must never be overwritten.
 fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Model) {
@@ -280,6 +297,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
         src.last_processed_timestamp,
         &src.histogram_interval,
     );
+    let shape_changed = model_shape_differs(active, &src);
     active.org_id = Set(src.org_id);
     active.stream_name = Set(src.stream_name);
     active.stream_type = Set(src.stream_type);
@@ -307,7 +325,14 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.band_k = Set(src.band_k);
     active.seasonality = Set(src.seasonality);
     active.is_trained = Set(src.is_trained);
-    active.training_started_at = Set(src.training_started_at);
+    // Both regions claimed the same query: each keeps its token, or neither could publish. A new
+    // query replaces the token, so an attempt on the old query cannot publish against it.
+    if shape_changed
+        || stored_field(&active.status) != Some(STATUS_TRAINING)
+        || src.status != STATUS_TRAINING
+    {
+        active.training_started_at = Set(src.training_started_at);
+    }
     active.training_completed_at = Set(src.training_completed_at);
     active.last_error = Set(src.last_error);
     active.last_processed_timestamp = Set(cursor);
@@ -331,6 +356,24 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
     // pending mark would recover an alert this region's destinations never received.
     // detection_lease_us is NOT patched: it is this region's in-flight detection run.
+    // The old backoff judged a query this row no longer runs, so it must not delay the new one.
+    if shape_changed {
+        active.retries = Set(0);
+        active.last_failed_at = Set(None);
+    }
+}
+
+/// Whether a peer's row changes what the trained model describes.
+fn model_shape_differs(active: &anomaly_detection_config::ActiveModel, src: &Model) -> bool {
+    let rows = |v: Option<&Json>| v.and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    stored_field(&active.query_mode).is_some_and(|mode| mode != src.query_mode)
+        || stored_field(&active.filters)
+            .is_some_and(|filters| rows(filters.as_ref()) != rows(src.filters.as_ref()))
+        || stored_field(&active.custom_sql).is_some_and(|sql| sql != src.custom_sql)
+        || stored_field(&active.detection_function)
+            .is_some_and(|function| function != src.detection_function)
+        || stored_field(&active.histogram_interval)
+            .is_some_and(|interval| interval != src.histogram_interval)
 }
 
 /// D10: a replicated apply never rewinds the cursor; only an interval edit's reset (§4.2) may.
@@ -839,6 +882,9 @@ mod tests {
         let mut active = local.clone().into_active_model();
         patch_all_fields(&mut active, peer.clone());
 
+        // This peer changes the query, so the backoff that judged the old query is cleared.
+        local.retries = 0;
+        local.last_failed_at = None;
         let local_active = local.into_active_model();
         let replicated_expected = into_active_model(peer.clone());
         // Raw, un-normalized: the region-local arm needs the value the peer actually sent.
@@ -1062,6 +1108,84 @@ mod tests {
 
         assert_eq!(active.last_processed_timestamp.unwrap(), None);
         assert_eq!(active.histogram_interval.unwrap(), "5m");
+    }
+
+    fn local_row_in_backoff() -> Model {
+        let mut local = make_model("anom-1", "org");
+        local.retries = 4;
+        local.last_failed_at = Some(1_700_000_000_000_000);
+        local
+    }
+
+    #[test]
+    fn test_patch_all_fields_clears_the_local_backoff_when_the_peer_changes_the_query() {
+        type Edit = (&'static str, fn(&mut Model));
+        let edits: [Edit; 5] = [
+            ("query_mode", |m| m.query_mode = "custom_sql".to_string()),
+            ("filters", |m| {
+                m.filters = Some(serde_json::json!([{ "field": "a" }]))
+            }),
+            ("custom_sql", |m| {
+                m.custom_sql = Some("SELECT 2".to_string())
+            }),
+            ("detection_function", |m| {
+                m.detection_function = "avg(v)".to_string()
+            }),
+            ("histogram_interval", |m| {
+                m.histogram_interval = "5m".to_string()
+            }),
+        ];
+        for (field, edit) in edits {
+            let mut active = local_row_in_backoff().into_active_model();
+            let mut peer = local_row_in_backoff();
+            edit(&mut peer);
+            patch_all_fields(&mut active, peer);
+            assert_eq!(active.retries.clone().unwrap(), 0, "{field}");
+            assert_eq!(active.last_failed_at.clone().unwrap(), None, "{field}");
+        }
+    }
+
+    #[test]
+    fn test_patch_all_fields_keeps_the_local_backoff_on_any_other_replicated_update() {
+        let mut active = local_row_in_backoff().into_active_model();
+        let mut peer = local_row_in_backoff();
+        peer.name = "renamed".to_string();
+        peer.band_width = Some(4.0);
+        peer.training_window_days = 30;
+        peer.status = 2;
+        peer.is_trained = true;
+        peer.filters = Some(serde_json::json!({}));
+        patch_all_fields(&mut active, peer);
+        assert_eq!(active.retries.clone().unwrap(), 4);
+        assert_eq!(
+            active.last_failed_at.clone().unwrap(),
+            Some(1_700_000_000_000_000)
+        );
+    }
+
+    #[test]
+    fn test_patch_all_fields_keeps_the_local_attempt_when_both_regions_claimed() {
+        let mut local = make_model("anom-1", "org");
+        local.status = STATUS_TRAINING;
+        local.training_started_at = Some(100);
+        let mut peer = local.clone();
+        peer.training_started_at = Some(200);
+        let mut active = local.clone().into_active_model();
+        patch_all_fields(&mut active, peer.clone());
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(100));
+
+        // A parallel claim on a new query takes the old attempt's authority away.
+        let mut new_query = peer.clone();
+        new_query.custom_sql = Some("SELECT 2".to_string());
+        let mut active = local.clone().into_active_model();
+        patch_all_fields(&mut active, new_query);
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(200));
+
+        // Any peer row that is not a parallel claim still replaces the token.
+        peer.status = 1;
+        let mut active = local.into_active_model();
+        patch_all_fields(&mut active, peer);
+        assert_eq!(active.training_started_at.clone().unwrap(), Some(200));
     }
 
     /// `put()` inserts unknown rows, so a fresh region starts its own backoff from zero.

@@ -1097,6 +1097,7 @@ pub fn dbm_search_request(
         search_type: None,
         search_event_context: None,
         use_cache,
+        use_index: true,
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,

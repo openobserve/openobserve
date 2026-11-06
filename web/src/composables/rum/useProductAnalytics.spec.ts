@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { flushPromises } from "@vue/test-utils";
+import * as dateUtils from "@/utils/date";
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -465,6 +466,57 @@ describe("useProductAnalytics", () => {
     expect(await pa.eventsGate(() => true)).toBe("ready");
     expect(pa.funnel.value.steps).toEqual(savedFunnel().def.steps);
     expect(pa.deletedEventLink.value).toBe(false);
+  });
+
+  it.each([
+    ["15m", true],
+    ["1d", true],
+    ["7d", true],
+    ["30d", false],
+    ["90d", false],
+  ])("canWidenRange for a relative %s range is %s", (period, expected) => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web" });
+    pa.setScope({
+      datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+    });
+    expect(pa.canWidenRange.value).toBe(expected);
+  });
+
+  it("canWidenRange is false for a relative 30d range that spans 719h across a DST change", () => {
+    const end = Date.now() * 1000;
+    vi.spyOn(dateUtils, "getConsumableRelativeTime").mockReturnValue({
+      startTime: end - (30 * 24 - 1) * 3600 * 1_000_000,
+      endTime: end,
+    });
+    try {
+      const pa = useProductAnalytics();
+      pa.initFromRoute({ app: "web" });
+      pa.setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: "30d", startTime: 0, endTime: 0 },
+      });
+      expect(pa.canWidenRange.value).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it.each([
+    [2, true],
+    [40, false],
+  ])("canWidenRange for an absolute %s-day range is %s", (days, expected) => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web" });
+    const end = Date.now() * 1000;
+    pa.setScope({
+      datetime: {
+        valueType: "absolute",
+        relativeTimePeriod: undefined,
+        startTime: end - days * 24 * 3600 * 1_000_000,
+        endTime: end,
+      },
+    });
+    expect(pa.canWidenRange.value).toBe(expected);
   });
 
   it("the scope key changes with app, range and the identity and exact toggles", () => {

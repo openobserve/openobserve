@@ -27,11 +27,15 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
   installExchangeMutation,
   installStartMutation,
@@ -72,8 +76,10 @@ const props = defineProps<{
 const emit = defineEmits<{ disconnect: []; uninstall: [] }>();
 
 const { t } = useI18nTyped();
+const { nameOf, tooltipOf } = useOrgUserNames();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 const id = computed(() => props.installation.id);
 
 const testMutation = useMutation(() => testInstallationMutation(org.value, id.value));
@@ -121,6 +127,12 @@ const connectedDate = computed(() =>
   formatTimestamp(props.installation.this_org.created_at, "MMM d, yyyy"),
 );
 const showSockets = computed(() => props.installation.mode === "socket" && selfHosted.value);
+const socketsUp = computed(
+  () =>
+    props.installation.health.sockets_want > 0 &&
+    props.installation.health.sockets_up >= props.installation.health.sockets_want,
+);
+const connectionInfoOpen = ref(false);
 // Ten minutes is the age the default `_meta` self-alert pages on.
 const OUTBOUND_SLOW_SECS = 600;
 const outbound = computed(() => {
@@ -222,10 +234,10 @@ const orgColumns = computed<OTableColumnDef<ConnectedOrgRow>[]>(() => [
 ]);
 const orgRows = computed<ConnectedOrgRow[]>(() => [
   {
-    org: t("slackApp.card.thisOrg", { org: org.value }),
+    org: t("slackApp.card.thisOrg", { org: orgName.value }),
     connected: t("slackApp.card.connectedOn", {
       date: connectedDate.value,
-      user: props.installation.this_org.connected_by,
+      user: nameOf(props.installation.this_org.connected_by),
     }),
     destinations: props.installation.this_org.destination_count,
   },
@@ -255,17 +267,21 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
               {{ raw(installation.team_name) }}
             </h2>
             <span class="text-text-secondary text-sm" data-test="slack-workspace-meta">
-              <template v-if="managed">
-                {{ modeLabel }} {{ raw("·") }} {{ t("slackApp.card.managedBy") }}
-              </template>
+              <template v-if="managed">{{ t("slackApp.card.managedBy") }}</template>
               <template v-else>
                 {{
                   t("slackApp.card.connectedBy", {
-                    mode: modeLabel,
-                    user: installation.this_org.connected_by,
+                    user: nameOf(installation.this_org.connected_by),
                     date: connectedDate,
                   })
                 }}
+                <OTooltip
+                  v-if="
+                    nameOf(installation.this_org.connected_by) !==
+                    installation.this_org.connected_by
+                  "
+                  :content="tooltipOf(installation.this_org.connected_by)"
+                />
               </template>
             </span>
           </div>
@@ -311,6 +327,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             v-if="selfHosted"
             variant="outline"
             size="sm-action"
+            icon-left="key"
             @click="credentialsOpen = true"
           >
             {{ t("slackApp.card.updateCredentials") }}
@@ -319,6 +336,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             v-else
             variant="outline"
             size="sm-action"
+            icon-left="refresh"
             :loading="reinstall.connecting.value"
             data-test="slack-credentials-reinstall"
             @click="reinstall.open()"
@@ -359,27 +377,40 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           data-test="slack-workspace-sockets"
         >
           <OIcon
-            :name="
-              installation.health.sockets_up >= installation.health.sockets_want &&
-              installation.health.sockets_want > 0
-                ? 'check-circle'
-                : 'warning-amber'
-            "
+            :name="socketsUp ? 'check-circle' : 'warning-amber'"
             size="sm"
-            :class="
-              installation.health.sockets_up >= installation.health.sockets_want &&
-              installation.health.sockets_want > 0
-                ? 'text-status-positive'
-                : 'text-status-warning-text'
-            "
+            :class="socketsUp ? 'text-status-positive' : 'text-status-warning-text'"
           />
-          {{
-            t("slackApp.card.sockets", {
-              up: installation.health.sockets_up,
-              want: installation.health.sockets_want,
-              time: socketsAsOf,
-            })
-          }}
+          {{ socketsUp ? t("slackApp.card.connectionUp") : t("slackApp.card.connectionDown") }}
+          <OPopover
+            v-model:open="connectionInfoOpen"
+            side="bottom"
+            align="start"
+            :aria-label="t('slackApp.card.aboutConnection')"
+          >
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="xs"
+                icon-left="info-outline"
+                data-test="slack-workspace-connection-info"
+              >
+                <span class="sr-only">{{ t("slackApp.card.aboutConnection") }}</span>
+              </OButton>
+            </template>
+            <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5">
+              <OText variant="meta" data-test="slack-workspace-connection-detail">
+                {{ modeLabel }} {{ raw("·") }}
+                {{
+                  t("slackApp.card.sockets", {
+                    up: installation.health.sockets_up,
+                    want: installation.health.sockets_want,
+                    time: socketsAsOf,
+                  })
+                }}
+              </OText>
+            </p>
+          </OPopover>
         </span>
         <span
           v-if="outbound"
@@ -440,8 +471,9 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           <OIcon name="key" size="sm" class="text-text-secondary" />
           <span class="text-text-secondary">{{ t("slackApp.card.refreshTokenKept") }}</span>
           <OButton
-            variant="ghost-destructive"
-            size="xs"
+            variant="outline-destructive"
+            size="sm"
+            icon-left="delete"
             :loading="credentialsMutation.isPending.value"
             data-test="slack-forget-token"
             @click="forgetOpen = true"
@@ -455,6 +487,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
         <OButton
           variant="outline"
           size="sm-action"
+          icon-left="network-check"
           :loading="testMutation.isPending.value"
           data-test="slack-test-connection"
           @click="runTest"
@@ -465,6 +498,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           v-if="!managed"
           variant="outline"
           size="sm-action"
+          icon-left="refresh"
           :loading="reinstall.connecting.value"
           data-test="slack-reinstall"
           @click="reinstall.open()"
@@ -475,6 +509,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           v-if="ownsInstallation"
           variant="outline"
           size="sm-action"
+          icon-left="key"
           data-test="slack-update-credentials"
           @click="credentialsOpen = true"
         >
@@ -512,14 +547,13 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
       </div>
     </OCard>
 
+    <slot name="oncall" />
+
     <section v-if="!isInstance" class="flex flex-col gap-3" data-test="slack-connected-orgs">
       <div class="flex flex-col gap-0.5">
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.card.connectedOrgs") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.card.connectedOrgsDescription", { team: installation.team_name }) }}
-        </p>
       </div>
       <OTable
         :data="orgRows"
@@ -558,7 +592,6 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           class="min-w-0 flex-1 md:max-w-120"
           :label="t('slackApp.card.helpContact')"
           :placeholder="t('slackApp.card.helpContactPlaceholder')"
-          :help-text="t('slackApp.card.helpContactHelp')"
           :maxlength="HELP_CONTACT_MAX_LENGTH"
           data-test="slack-help-contact"
         />
@@ -579,12 +612,13 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
               {{ t("slackApp.card.disconnectThisOrg") }}
             </span>
             <span class="text-text-secondary text-sm">
-              {{ t("slackApp.card.disconnectDescription", { org }) }}
+              {{ t("slackApp.card.disconnectDescription", { org: orgName }) }}
             </span>
           </div>
           <OButton
             variant="outline-destructive"
             size="sm-action"
+            icon-left="link-off"
             data-test="slack-disconnect-org"
             @click="emit('disconnect')"
           >
@@ -607,6 +641,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           <OButton
             variant="destructive"
             size="sm-action"
+            icon-left="delete"
             data-test="slack-uninstall"
             @click="emit('uninstall')"
           >
@@ -622,7 +657,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
       :title="t('slackApp.card.forgetTitle')"
       message-keypath="slackApp.card.forgetMessage"
       :message-name="installation.team_name"
-      :ok-label="t('slackApp.card.forget')"
+      :ok-label="t('slackApp.card.forgetConfirm')"
       ok-variant="destructive"
       focus-cancel
       @update:ok="forget"

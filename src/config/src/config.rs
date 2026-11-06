@@ -142,7 +142,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 142: add templates to oncall_response_events.
 // 143: fold the retired compiled default templates into prebuilt_default.
 // 144: turn a json templates column from an earlier 141 or 142 into text.
-pub const DB_SCHEMA_VERSION: u64 = 144;
+// 145: add alerts.incident_title_template.
+// 146: rename user folders named default so the built-in default folder can be created.
+pub const DB_SCHEMA_VERSION: u64 = 146;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -446,9 +448,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
-pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
-    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+/// The shortest `ZO_DYNAMIC_PARTITION_WINDOW_DAYS`: fewer days are too little to move a stream on.
+pub const DYNAMIC_PARTITION_MIN_WINDOW_DAYS: i64 = 3;
+
+/// `ZO_DYNAMIC_PARTITION_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static DYNAMIC_PARTITION_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_partition_stream_types(&get_config().compact.dynamic_partition_stream_types)
         .expect("validated at startup")
 });
 
@@ -1947,6 +1952,12 @@ pub struct Search {
     )]
     pub inverted_index_count_optimizer_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_LIKE_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle using the inverted index for `col LIKE '%x%'` and `col ILIKE '%x%'`. When off, these predicates are answered by scanning files."
+    )]
+    pub inverted_index_like_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
         help = "Toggle tantivy result cache."
@@ -2937,6 +2948,12 @@ pub struct Limit {
     )]
     pub alert_max_group_notifications_per_eval: usize,
     #[env_config(
+        name = "ZO_ALERT_NOTIFICATION_TIMEOUT",
+        default = 30,
+        help = "Total time limit in seconds for one notification request to a destination, connection included. 0 uses the default of 30."
+    )]
+    pub alert_notification_timeout: u64,
+    #[env_config(
         name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
         default = 60,
         help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
@@ -3404,11 +3421,17 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
     #[env_config(
-        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        name = "ZO_DYNAMIC_PARTITION_STREAM_TYPES",
         default = "",
-        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+        help = "Comma-separated stream types (logs, metrics, traces) the compactor classifies by volume: a stream whose last ZO_DYNAMIC_PARTITION_WINDOW_DAYS closed days each hold less than ZO_COMPACT_MAX_FILE_SIZE is merged by day from the next day on, one whose days each hold more goes back to hourly. The stream setting `dynamic_partition` overrides this per stream; while it is off the level can be set by hand. Levels already recorded stay in effect. Before downgrading to a version without this setting, set ZO_<TYPE>_QUERY_RETENTION=daily for these types, or queries miss the days already merged by day."
     )]
-    pub dynamic_merge_stream_types: String,
+    pub dynamic_partition_stream_types: String,
+    #[env_config(
+        name = "ZO_DYNAMIC_PARTITION_WINDOW_DAYS",
+        default = 7,
+        help = "Closed days that must all agree before the classifier moves a stream, at least 3; a stream younger than this is not classified."
+    )]
+    pub dynamic_partition_window_days: i64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -4308,6 +4331,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
+    // a zero limit fails every send, so it means the default
+    if cfg.limit.alert_notification_timeout == 0 {
+        cfg.limit.alert_notification_timeout = 30;
+    }
+
     // retain for atleast 1 hour
     if cfg.limit.workflow_error_retention_secs <= 3600 {
         cfg.limit.workflow_error_retention_secs = 3600;
@@ -5060,7 +5088,15 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Data retention is not allowed to be less than 3 days."
         ));
     }
-    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
+    parse_dynamic_partition_stream_types(&cfg.compact.dynamic_partition_stream_types)?;
+    if cfg.compact.dynamic_partition_window_days == 0 {
+        cfg.compact.dynamic_partition_window_days = 7;
+    }
+    if cfg.compact.dynamic_partition_window_days < DYNAMIC_PARTITION_MIN_WINDOW_DAYS {
+        return Err(anyhow::anyhow!(
+            "ZO_DYNAMIC_PARTITION_WINDOW_DAYS is not allowed to be less than {DYNAMIC_PARTITION_MIN_WINDOW_DAYS} days."
+        ));
+    }
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -5114,21 +5150,19 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
-fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+/// Parses `ZO_DYNAMIC_PARTITION_STREAM_TYPES`; only logs, metrics and traces are classified.
+fn parse_dynamic_partition_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
     list.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let stream_type = StreamType::from(s);
-            stream_type
-                .support_dynamic_merge()
-                .then_some(stream_type)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
-                    )
-                })
+        // not `StreamType::from`: it turns an unknown name into logs instead of refusing it
+        .map(|s| match s.to_lowercase().as_str() {
+            "logs" => Ok(StreamType::Logs),
+            "metrics" => Ok(StreamType::Metrics),
+            "traces" => Ok(StreamType::Traces),
+            _ => Err(anyhow::anyhow!(
+                "ZO_DYNAMIC_PARTITION_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+            )),
         })
         .collect()
 }
@@ -6972,15 +7006,34 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_merge_stream_types_accept_only_merged_types() {
-        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+    fn dynamic_partition_window_days_is_at_least_three() {
+        let check = |days| {
+            let mut cfg = Config::default();
+            cfg.compact.dynamic_partition_window_days = days;
+            super::check_compact_config(&mut cfg).map(|_| cfg.compact.dynamic_partition_window_days)
+        };
+        assert_eq!(check(0).unwrap(), 7);
+        assert_eq!(check(3).unwrap(), 3);
+        assert_eq!(check(30).unwrap(), 30);
+        for days in [1, 2, -1] {
+            assert!(check(days).is_err(), "{days}");
+        }
+    }
+
+    #[test]
+    fn dynamic_partition_stream_types_accept_only_supported_types() {
+        let set = super::parse_dynamic_partition_stream_types(" logs, Metrics ,,traces ").unwrap();
         assert_eq!(set.len(), 3);
         assert!(
-            super::parse_dynamic_merge_stream_types("")
+            super::parse_dynamic_partition_stream_types("")
                 .unwrap()
                 .is_empty()
         );
-        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,index").is_err());
+        // unknown names must not fall back to logs
+        assert!(super::parse_dynamic_partition_stream_types("foo").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("log").is_err());
+        assert!(super::parse_dynamic_partition_stream_types("logs,foo").is_err());
     }
 
     #[test]

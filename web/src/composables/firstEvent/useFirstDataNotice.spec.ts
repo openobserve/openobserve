@@ -114,7 +114,7 @@ describe("useFirstDataNotice", () => {
   it("shows the banner after a visit with no data, from the oldest user stream, and fires RUM once", async () => {
     writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
     rows.logs = [
-      userStream("usage", NOW * 1000 - 9 * HOUR_US),
+      { ...userStream("usage", NOW * 1000 - 9 * HOUR_US), is_internal: true },
       userStream("later", NOW * 1000 - HOUR_US),
       userStream("first", NOW * 1000 - 2 * HOUR_US),
     ];
@@ -173,7 +173,11 @@ describe("useFirstDataNotice", () => {
   it("bounds the flag-off source to one limit-1 probe per type and 20-row pages", async () => {
     writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
     rows.metrics = [
-      ...Array.from({ length: 30 }, (_, i) => ({ name: `_o2_internal_${i}`, stats: {} })),
+      ...Array.from({ length: 30 }, (_, i) => ({
+        name: `_o2_internal_${i}`,
+        is_internal: true,
+        stats: {},
+      })),
       userStream("cpu", NOW * 1000 - HOUR_US, "metrics"),
     ];
     noticeOf();

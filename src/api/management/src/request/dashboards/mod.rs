@@ -272,7 +272,7 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
         ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = Object),
+        (status = StatusCode::OK, description = "Success", body = MetaHttpResponse),
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
         (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
@@ -402,7 +402,7 @@ pub async fn delete_dashboard_bulk(
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
+        (status = StatusCode::OK, description = "Dashboard Moved", body = MetaHttpResponse),
         (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
@@ -452,7 +452,7 @@ pub async fn move_dashboard(
     ),
     request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
