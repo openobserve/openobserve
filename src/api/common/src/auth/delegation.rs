@@ -496,8 +496,8 @@ fn signing_keys() -> anyhow::Result<Keys> {
     let auth = &config::get_config().auth;
     let master = o2_enterprise::enterprise::common::config::get_config()
         .encryption
-        .master_key
-        .clone();
+        .oncall_key()
+        .to_string();
     config::utils::delegation::effective_keys(
         &master,
         &auth.delegation_signing_key,
