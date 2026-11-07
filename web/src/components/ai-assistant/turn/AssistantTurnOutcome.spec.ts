@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { computed } from "vue";
 
 import {
@@ -655,9 +655,38 @@ describe("AssistantTurnOutcome: agent refusals (MULTI-AGENT-12)", () => {
       sid: "s1",
       error: error("agent_unreachable", { agent: "generate-query" }),
     });
-    expect(title(w)).toBe("Isn't reachable. Your message wasn't sent.");
+    expect(title(w)).toBe("Query builder isn't reachable right now. Your message wasn't sent.");
     expect(w.find('[data-test="assistant-turn-outcome-action"]').exists()).toBe(false);
     expect(w.find(fallback).exists()).toBe(true);
+  });
+
+  it("sends the bounced message to the fallback agent; a hand-off's pick only sets Next", async () => {
+    const send = vi.fn(async () => ({ state: "done" }));
+    const retry = vi.fn(async () => ({ state: "done" }));
+    const pickAgent = vi.fn();
+    const sessions = { s1: { composer: { text: "something else", chips: [], images: [] } } };
+    setRuntimeHandle({
+      store: { pickAgent, send, retry, state: { sessions } },
+      lifecycle: { signedOutElsewhere: computed(() => false), turnLock: () => null },
+    } as never);
+    onTestFinished(() => setRuntimeHandle(null));
+    const refused = mountOutcome({
+      kind: "refused",
+      sid: "s1",
+      error: error("agent_unreachable", { agent: "sre" }),
+    });
+    await refused.get(fallback).trigger("click");
+    expect(pickAgent).toHaveBeenCalledWith("s1", "o2-ai", "fallback");
+    expect(retry).toHaveBeenCalledWith("s1");
+    expect(send).not.toHaveBeenCalled();
+    const handoff = mountOutcome({
+      kind: "failed",
+      sid: "s1",
+      error: error("handoff_failed", { agent: "sre", handoffFrom: "generate-query" }),
+    });
+    await handoff.get(fallback).trigger("click");
+    expect(pickAgent).toHaveBeenLastCalledWith("s1", "generate-query", "fallback");
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it("has no fallback from the fallback agent, or on a readonly page", () => {

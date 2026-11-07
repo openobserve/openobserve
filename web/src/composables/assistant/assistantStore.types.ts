@@ -497,6 +497,8 @@ export interface HistoryRow {
   /** The server's id of the turn it calls running, when the list payload names one. */
   activeTurnId?: string | null;
   pendingApproval: boolean;
+  /** How the server says the last turn ended; survives a reload, unlike the tab's session. */
+  lastTurnEnd?: "done" | "stopped" | "failed" | null;
   share: ShareSummary | null;
   local: boolean;
   ephemeral: boolean;

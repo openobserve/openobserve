@@ -194,7 +194,13 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
 import AssistantUndoControl from "./AssistantUndoControl.vue";
-import { lowerFirst, readableReason, statusReason } from "./approvalText";
+import {
+  lowerFirst,
+  panelDashboardId,
+  readableCard,
+  readableReason,
+  statusReason,
+} from "./approvalText";
 import {
   assistantApprovalsHostKey,
   type ApprovalCardView,
@@ -334,7 +340,7 @@ const line = computed<I18nText>(() => {
     case "failed":
       return t("assistant.approval.result.failed", { reason: failedReason() });
     case "declined":
-      return t("assistant.approval.record.denied", { name: raw(lowerFirst(headingText())) });
+      return deniedLine();
     case "editing":
       return editingLine();
     case "new_chat":
@@ -483,17 +489,40 @@ const action = computed<{
 
 function cardFacts() {
   const current = card.value;
-  return current ? { ...current, targets: current.targets ?? [] } : null;
+  return current ? readableCard({ ...current, targets: current.targets ?? [] }) : null;
 }
 
-// A toggle card names its object in its arguments, not in `targets`.
+// What the write answered with wins over what the card asked for; a new panel opens its dashboard.
 function targetHref(): string | null {
   const facts = cardFacts();
   if (!facts || facts.kind === "delete") return null;
+  const made = createdHref();
+  if (made) return made;
+  const dashboard = panelDashboardId(facts);
+  if (dashboard) return approvalTargetHref(router, org.value, { type: "dashboard", id: dashboard });
   const id = approvalObjectId(facts);
   const type = facts.targets[0]?.type ?? approvalToolEntity(facts);
   if (!id || !type) return null;
   return approvalTargetHref(router, org.value, { type, id, name: targetName() });
+}
+
+// Only a same-origin link: the record is model-influenced, and Open never leaves the app.
+function createdHref(): string | null {
+  const items = view.value?.result?.items ?? [];
+  const item = items.length === 1 && items[0].status === "done" ? items[0] : null;
+  if (!item) return null;
+  if (item.link) {
+    try {
+      const url = new URL(item.link, window.location.origin);
+      if (url.origin === window.location.origin) return url.pathname + url.search + url.hash;
+    } catch {
+      // An unparsable link falls through to the id.
+    }
+  }
+  const type = item.type || card.value?.targets?.[0]?.type;
+  return item.id && type
+    ? approvalTargetHref(router, org.value, { type, id: item.id, name: item.name })
+    : null;
 }
 
 function targetName(): string {
@@ -501,11 +530,18 @@ function targetName(): string {
   return facts ? (approvalName(facts) ?? "") : "";
 }
 
+// A record read back without its card has no heading; the server's detail is a reason, never the name of what was denied.
+function deniedLine(): I18nText {
+  const name = String(headingText()).trim();
+  if (name) return t("assistant.approval.record.denied", { name: raw(lowerFirst(name)) });
+  const detail = resolved.value?.detail?.trim();
+  if (detail) return t("assistant.approval.record.deniedUnnamedReason", { reason: raw(detail) });
+  return t("assistant.approval.record.deniedUnnamed");
+}
+
 function headingText(): I18nText {
-  const current = card.value;
-  return current
-    ? approvalHeading(t, { ...current, targets: current.targets ?? [] }, total.value)
-    : raw("");
+  const facts = cardFacts();
+  return facts ? approvalHeading(t, facts, total.value) : raw("");
 }
 
 function listHref(): string | null {
@@ -633,8 +669,7 @@ function itemReason(item: ApprovalResultItem): I18nText {
 // The editor is named from the card, so a reload says the same thing.
 function editingLine(): I18nText {
   const editor = card.value ? approvalEditor(card.value, org.value) : null;
-  if (!editor)
-    return t("assistant.approval.record.denied", { name: raw(lowerFirst(headingText())) });
+  if (!editor) return deniedLine();
   return t("assistant.approval.record.moved", {
     editor: t(`assistant.approval.editor.${editor.type}`),
   });

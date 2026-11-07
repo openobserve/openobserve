@@ -1393,6 +1393,23 @@ describe("draft restore after a reload (WP-05)", () => {
     expect(store.takeRestoredDraft(sid)).toBeNull();
   });
 
+  it("brings a thread's kept window back without announcing it as a draft", async () => {
+    const sid = "0190f3a0-0000-7000-8000-000000000098";
+    sessionStorage.setItem("o2.assistant.selected:k1", sid);
+    sessionStorage.setItem(
+      `o2.assistant.draft:k1:${sid}`,
+      JSON.stringify({ text: "", chips: [], timeOverride: { from: 1, to: 2, period: "24h" } }),
+    );
+    const { store } = makeStore();
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.timeOverride).toEqual({
+      from: 1,
+      to: 2,
+      period: "24h",
+    });
+    expect(store.takeRestoredDraft(sid)).toBeNull();
+  });
+
   it.each([
     [{ status: 404 }, false],
     [{ response: { status: 403 } }, false],
@@ -1463,6 +1480,63 @@ describe("draft restore after a reload (WP-05)", () => {
       JSON.parse(sessionStorage.getItem(`o2.assistant.draft:k1:${sid}`) ?? "{}");
     expect(stored(fresh)).toMatchObject({ text: "draft", unsent: true });
     expect(stored(sent)).not.toHaveProperty("unsent");
+  });
+
+  it("remembers a new chat for the reload only once it holds something (no 404 on reload)", () => {
+    const { store } = makeStore();
+    const selected = () => sessionStorage.getItem("o2.assistant.selected:k1");
+    const sent = newSession(store);
+    store.state.sessions[sent].messages.push({ role: "user", content: raw("hi") });
+    store.setActive(sent);
+    expect(selected()).toBe(sent);
+    store.setActive(null);
+    const fresh = store.createSession({ origin: ORIGIN });
+    expect(selected()).toBeNull();
+    store.setDraft(fresh, { text: "half" });
+    expect(selected()).toBe(fresh);
+    store.setDraft(fresh, { text: "" });
+    expect(selected()).toBeNull();
+    store.setTimeOverride(fresh, { from: 1, to: 2, period: "24h" });
+    expect(selected()).toBe(fresh);
+  });
+
+  it("starts a new chat on the previous one's window, but not on an Investigate thread's own", () => {
+    const { store } = makeStore();
+    const home = newSession(store);
+    store.setTimeOverride(home, { from: 1, to: 2, period: "24h" });
+    const next = store.startNewChat({ origin: ORIGIN });
+    expect(next).not.toBe(home);
+    expect(store.state.sessions[next].composer.timeOverride).toEqual({
+      from: 1,
+      to: 2,
+      period: "24h",
+    });
+    const investigate = store.startNewChat({
+      origin: { entryKind: "object_verb", objectKind: "incident", container: "sidebar" },
+    });
+    store.state.sessions[investigate].messages.push({
+      role: "user",
+      content: raw("investigate"),
+      sentWindow: { from: 5, to: 9 },
+    });
+    store.setTimeOverride(investigate, { from: 5, to: 9 });
+    const after = store.startNewChat({ origin: ORIGIN });
+    expect(store.state.sessions[after].composer.timeOverride).toBeNull();
+  });
+
+  it("starts a new chat without an Investigate door's window even before its first send", () => {
+    const { store } = makeStore();
+    const investigate = store.startNewChat({
+      origin: { entryKind: "object_verb", objectKind: "incident", container: "sidebar" },
+    });
+    store.stage(investigate, {
+      chips: [
+        chip("door:time:1", { kind: "time", ref: { type: "time", org: "org1", from: 5, to: 9 } }),
+      ],
+    });
+    expect(store.state.sessions[investigate].composer.timeOverride).toEqual({ from: 5, to: 9 });
+    const after = store.startNewChat({ origin: ORIGIN });
+    expect(store.state.sessions[after].composer.timeOverride).toBeNull();
   });
 
   it("starts empty when the selected chat left no draft", async () => {

@@ -424,7 +424,7 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { isAssistantV2 } from "@/composables/assistant/flags";
-import { onGoToRequest, requestOverviewFocus } from "@/composables/goto/goToRequests";
+import { onGoToRequest } from "@/composables/goto/goToRequests";
 import type { HomeReturnState } from "@/composables/goto/homeReturn";
 import { GO_TO_PAGES } from "@/composables/goto/types";
 import { goToPagesFromMenu } from "@/composables/goto/useGoToIndex";
@@ -437,9 +437,11 @@ const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
 // The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
 const ASSISTANT_INSET_CLASSES = [
   // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the sheet writes
-  "max-lg:pb-[calc(var(--o-assistant-inset-bottom,0)*1px)] max-lg:scroll-pb-[calc(var(--o-assistant-inset-bottom,0)*1px)]",
+  "max-lg:pb-[max(calc(var(--o-assistant-inset-bottom,0)*1px),calc(var(--o-threads-bar-inset,0)*1rem))] max-lg:scroll-pb-[max(calc(var(--o-assistant-inset-bottom,0)*1px),calc(var(--o-threads-bar-inset,0)*1rem))]",
   // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the floating card writes
   "lg:scroll-pe-[calc(var(--o-assistant-inset-end,0)*1px)]",
+  // The Threads bar floats over the page's last row, so the page ends above the band it publishes.
+  "lg:pb-[calc(var(--o-threads-bar-inset,0)*1rem)] lg:scroll-pb-[calc(var(--o-threads-bar-inset,0)*1rem)]",
 ];
 
 let mainLayoutMixin: any = null;
@@ -2079,10 +2081,9 @@ export default defineComponent({
 
     const goToOpen = ref(false);
     const goToHomeReturn = ref<HomeReturnState | null>(null);
-    // On Home the Overview's own field is Go to; Usage or a pinned dashboard has none, so the palette opens.
+    // ⌘K is the one door on every page, Home included; `/` focuses the Home Ask box.
     const openGoTo = () => {
       const onHome = router.currentRoute.value.name === "home";
-      if (onHome && requestOverviewFocus()) return;
       goToHomeReturn.value = onHome ? { focus: "ask" } : null;
       goToOpen.value = true;
     };

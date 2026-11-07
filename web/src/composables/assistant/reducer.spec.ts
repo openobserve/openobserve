@@ -1677,6 +1677,59 @@ describe("reduce: approval cards", () => {
     expect(card.question).toHaveLength(2_000);
   });
 
+  it("keeps a dashboard panel's queries in the args and after, and shows a value cut for depth as a placeholder", () => {
+    const panel = {
+      id: "p1",
+      queries: [
+        {
+          query: "SELECT count(*) FROM logs",
+          fields: {
+            stream: "logs",
+            x: [{ alias: "x_axis_1", args: [{ value: { field: "_timestamp" } }] }],
+            filter: { conditions: [{ column: "k8s_namespace", values: ["checkout"] }] },
+          },
+        },
+      ],
+    };
+    const card = approvalOf({
+      tool: "o2_UpdatePanel",
+      kind: "update",
+      args: { request_body: { dashboard_id: "d1", panel } },
+    });
+    expect(card.args).toEqual({ request_body: { dashboard_id: "d1", panel } });
+    expect(card.after).toEqual({ request_body: { dashboard_id: "d1", panel } });
+
+    let deep: unknown = "leaf";
+    for (let i = 0; i < 30; i++) deep = [deep];
+    const cut = JSON.stringify(approvalOf({ tool: "acme", args: { deep } }).args);
+    expect(cut).toContain('"…"');
+    expect(cut).not.toContain("null");
+  });
+
+  it("keeps top-level ids that follow a bulky arg over the budget, in key order", () => {
+    const queries = Array.from({ length: 40 }, (_, i) => ({ id: `q${i}` }));
+    const panels = Array.from({ length: 40 }, () => ({ queries }));
+    const args = approvalOf({
+      tool: "acme",
+      args: { request_body: { panels }, dashboard_id: "d1", folder: "f1" },
+    }).args!;
+    expect(args.dashboard_id).toBe("d1");
+    expect(args.folder).toBe("f1");
+    expect(Object.keys(args)).toEqual(["request_body", "dashboard_id", "folder"]);
+    expect(JSON.stringify(args.request_body)).toContain('"…"');
+  });
+
+  it("keeps a worst-case wide, long-stringed value under 1 MB", () => {
+    const row = Object.fromEntries(
+      Array.from({ length: 40 }, (_, i) => [`${"k".repeat(60)}${i}`, "v".repeat(5_000)]),
+    );
+    const wide = Array.from({ length: 40 }, () =>
+      Array.from({ length: 40 }, () => Array.from({ length: 40 }, () => row)),
+    );
+    const size = JSON.stringify(approvalOf({ tool: "acme", args: { wide } }).args).length;
+    expect(size).toBeLessThan(1_000_000);
+  });
+
   it("appends the card's block once and hands the frame to the approvals runtime in a live turn", () => {
     const state = makeState();
     const frame = { type: "confirmation_required", tool: "o2_delete", call_id: "c9" };

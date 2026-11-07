@@ -329,9 +329,10 @@ describe("AssistantShell states", () => {
 });
 
 describe("AssistantShell chrome and focus", () => {
-  it("keeps one 40 px bar with Layout and close in the sidebar, and 44 px in the sheet", () => {
+  it("keeps one 40 px bar with the density switch and close in the sidebar, and 44 px in the sheet", () => {
     const { wrapper } = setup();
-    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
       "Close O2 Assistant",
     );
@@ -348,7 +349,7 @@ describe("AssistantShell chrome and focus", () => {
 
   it("leaves the full page by navigating, so it has no ×", () => {
     const { wrapper } = setup({ placement: "full" });
-    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(false);
   });
 
@@ -1211,7 +1212,7 @@ describe("AssistantShell history states", () => {
     expect(header.find('[data-test="assistant-thread-title-button"]').exists()).toBe(true);
   });
 
-  it("orders the bar title, +, Layout, close once a turn exists, and drops + from an empty chat", async () => {
+  it("orders the bar title, +, density, close once a turn exists, and drops + from an empty chat", async () => {
     const { wrapper, store } = setup();
     const sid = open(store);
     store.state.sessions[sid].messages.length = 0;
@@ -1222,11 +1223,11 @@ describe("AssistantShell history states", () => {
         .findAll("[data-test]")
         .map((el) => el.attributes("data-test"))
         .filter((id) =>
-          /^assistant-(thread-(title-button|new)|layout-button|shell-close)$/.test(id ?? ""),
+          /^assistant-(thread-(title-button|new)|density-switch|shell-close)$/.test(id ?? ""),
         );
     expect(order()).toEqual([
       "assistant-thread-title-button",
-      "assistant-layout-button",
+      "assistant-density-switch",
       "assistant-shell-close",
     ]);
     store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
@@ -1234,12 +1235,12 @@ describe("AssistantShell history states", () => {
     expect(order()).toEqual([
       "assistant-thread-title-button",
       "assistant-thread-new",
-      "assistant-layout-button",
+      "assistant-density-switch",
       "assistant-shell-close",
     ]);
   });
 
-  it("reaches Floating window from the bar's Layout menu", async () => {
+  it("reaches Float from the bar's density switch", async () => {
     fake.current = fakeAssistant();
     const { store } = fake.current;
     open(store);
@@ -1253,7 +1254,7 @@ describe("AssistantShell history states", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    await wrapper.get('[data-test="assistant-shell-place-window"]').trigger("click");
+    await wrapper.get('[data-test="assistant-density-float"]').trigger("click");
     expect(store.windowOf(sid)).toMatchObject({ state: "open" });
     expect(store.state.shell.placement.kind).toBe("hidden");
   });

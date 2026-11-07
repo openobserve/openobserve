@@ -341,10 +341,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-function compactId(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
 function valueText(value: unknown): string {
   if (value === undefined) return "—";
   return typeof value === "string" ? value : JSON.stringify(value);
@@ -354,6 +350,7 @@ function valueText(value: unknown): string {
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
@@ -401,7 +398,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
 import AssistantPlanBlock from "./AssistantPlanBlock.vue";
-import { lowerFirst } from "./approvalText";
+import { lowerFirst, panelDashboardId, readableCard } from "./approvalText";
 import {
   assistantApprovalsHostKey,
   type ApprovalCardDecision,
@@ -456,6 +453,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const router = useRouter();
+const store = useStore();
 const idle = useAssistantIdleFocus();
 const metaId = `assistant-approval-meta-${useId()}`;
 
@@ -487,20 +485,9 @@ const planned = computed(
 const count = computed(() =>
   planned.value && props.card.editable ? selected.value.length : total.value,
 );
-// A target named after the tool id carries no name the reader knows, only the verb again in code form.
-const toolNamed = computed(() => {
-  const name = approvalName(props.card);
-  const tool = props.card.tool;
-  return (
-    !!name && [tool, tool.replace(/^[^_]+_/, "")].some((id) => compactId(id) === compactId(name))
-  );
-});
+const shown = computed(() => readableCard(props.card));
 const heading = computed(() => {
-  const verb = approvalVerb(props.card);
-  const text =
-    toolNamed.value && verb && verb !== "delete"
-      ? approvalVerbText(t, props.card)
-      : approvalHeading(t, props.card, count.value);
+  const text = approvalHeading(t, shown.value, count.value);
   return question.value ? raw(stripClaimMarkers(text)) : text;
 });
 const groupName = computed(() =>
@@ -574,8 +561,8 @@ const diff = computed(() => {
 
 // The name could not be resolved, so the id is said once here and never in the heading (D3-n).
 const nameUnknown = computed<I18nText | null>(() => {
-  if (!isApprovalChange(props.card) || (approvalName(props.card) && !toolNamed.value)) return null;
-  const id = approvalObjectId(props.card);
+  if (!isApprovalChange(props.card) || approvalName(shown.value)) return null;
+  const id = approvalObjectId(shown.value);
   if (!id) return null;
   const shortId = id.length > SHORT_ID_CHARS ? `${id.slice(0, SHORT_ID_CHARS)}…` : id;
   return t("assistant.approval.nameUnknown", {
@@ -594,12 +581,18 @@ const endAndScope = computed<I18nText | null>(() => {
   return name ? raw(name) : null;
 });
 
+const dashboardLine = computed<I18nText | null>(() => {
+  const id = panelDashboardId(props.card);
+  const name = id ? dashboardName(id) : null;
+  return name ? t("assistant.approval.onDashboard", { name: raw(name) }) : null;
+});
+
 const metaLine = computed<I18nText | null>(() => {
   const inOrg =
     props.multiOrg && props.orgName
       ? t("assistant.approval.inOrg", { org: raw(props.orgName) })
       : null;
-  const parts = [endAndScope.value, nameUnknown.value, inOrg].filter(Boolean);
+  const parts = [endAndScope.value, dashboardLine.value, nameUnknown.value, inOrg].filter(Boolean);
   return parts.length ? raw(parts.join(" · ")) : null;
 });
 
@@ -645,7 +638,7 @@ const approveLabel = computed(() => {
   const verb = approvalVerb(props.card);
   if (!props.card.destructive)
     return verb && verb !== "delete"
-      ? approvalVerbText(t, props.card)
+      ? approvalVerbText(t, shown.value)
       : t("assistant.approval.approve");
   if (props.card.kind !== "delete") return heading.value;
   const noun = t(`assistant.entity.${entity.value}`, count.value);
@@ -659,6 +652,16 @@ const narrowedNote = computed(() =>
 );
 
 const argsText = computed(() => JSON.stringify(props.card.args ?? {}, null, 2));
+
+// The dashboards list this browser already loaded; the card's arguments carry only the id.
+function dashboardName(id: string): string | null {
+  const byFolder: Record<string, { dashboardId?: string; title?: string }[]> =
+    store?.state?.organizationData?.allDashboardList ?? {};
+  const found = Object.values(byFolder)
+    .flat()
+    .find((dashboard) => dashboard?.dashboardId === id);
+  return found?.title?.trim() || null;
+}
 
 function initialLeft(): number {
   return typeof props.card.expiresAt === "number" ? props.card.expiresAt - Date.now() : Infinity;

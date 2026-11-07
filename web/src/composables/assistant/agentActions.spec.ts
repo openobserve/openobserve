@@ -27,7 +27,13 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 }));
 
 function setup(over: Partial<AssistantSession> = {}, writable = true) {
-  const session = { sid: "s1", messages: [], turnMeta: {}, ...over } as unknown as AssistantSession;
+  const session = {
+    sid: "s1",
+    messages: [],
+    turnMeta: {},
+    composer: { timeOverride: null },
+    ...over,
+  } as unknown as AssistantSession;
   const withdraw = vi.fn().mockResolvedValue(undefined);
   const capability = { agents: [{ id: "sre" }] as unknown[] };
   const persistDraft = vi.fn();
@@ -100,6 +106,16 @@ describe("agentActions", () => {
       { text: "Continue", chips: [], images: [], mentions: [], timeOverride: null },
       "continue",
     );
+  });
+
+  it("asks the hand-off about the window the thread kept", async () => {
+    const h = setup({
+      ...(withTurns as object),
+      composer: { timeOverride: { from: 1, to: 2, period: "24h" } } as never,
+    });
+    h.session.turnMeta.handoffSuggestion = { agent: "sre", reason: "r" };
+    await h.actions.acceptHandoff("s1", "Continue");
+    expect(h.resend.mock.calls[0][1].timeOverride).toEqual({ from: 1, to: 2, period: "24h" });
   });
 
   it("refuses an accept with nothing to accept", async () => {

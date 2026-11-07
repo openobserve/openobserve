@@ -27,8 +27,10 @@ import type {
   AssistantSession,
   Sid,
 } from "./assistantStore.types";
+export type { CreditMode, GateCode } from "./assistantStore.types";
 
 export { isAssistantV2 } from "./flags";
+export { ASSISTANT_SURFACES_SELECTOR } from "./surfaces";
 export {
   ASSISTANT_SET_QUERY_KEY,
   decodeAssistantSet,
@@ -36,6 +38,15 @@ export {
   type AssistantSetField,
 } from "./assistantSet";
 export { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./helperPrefixes";
+export {
+  AI_HOME_TAB,
+  HOME_TAB_QUERY_KEY,
+  THREAD_QUERY_KEY,
+  fullThreadLocation,
+  isFullThreadRoute,
+  threadParam,
+  withoutThread,
+} from "./fullThreadRoute";
 export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
 export { openTabWithoutOpener } from "./openTab";
 export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";

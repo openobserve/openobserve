@@ -481,6 +481,7 @@ import {
 } from "@/composables/assistant";
 import {
   DEFAULT_AGENT,
+  agentIdOf,
   agentName,
   currentAgent,
   nextAgent,
@@ -687,9 +688,11 @@ const busyUntil = computed(() => {
 const errorRow = computed<I18nText | null>(() => {
   if (busyLeft.value > 0)
     return t("assistant.composer.busy", { product: t("assistant.name"), s: busyLeft.value });
-  return refusal.value && !BUSY_CODES.has(refusal.value.code)
-    ? t("assistant.composer.unsent")
-    : null;
+  const error = refusal.value;
+  if (!error || BUSY_CODES.has(error.code)) return null;
+  if (error.code === "offline") return t("assistant.composer.offline");
+  const agent = agentName(agentIdOf(error.agent) ?? shownAgent.value, t);
+  return t("assistant.error.agent_unreachable.title", { agent });
 });
 
 const noAccessLine = computed(() => t("assistant.composer.noAccess"));

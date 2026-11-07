@@ -180,7 +180,7 @@ defineExpose({ onKeydown, activeDescendant });
         :aria-selected="row.index === active"
         class="rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm"
         :class="[
-          row.index === active ? 'bg-dropdown-item-hover-bg' : 'hover:bg-dropdown-item-hover-bg',
+          row.index === active ? 'bg-select-item-selected-bg' : 'hover:bg-dropdown-item-hover-bg',
           row.match.kind === 'ask' ? 'border-border-default mt-1 border-t' : '',
         ]"
         :data-test="`${dataTest}-option-${row.index}`"

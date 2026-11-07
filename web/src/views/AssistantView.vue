@@ -58,7 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :focus-on-mount="arrivedFromLockedPanel"
         @action="onGateAction"
       />
-      <AssistantShell v-else ref="shell" placement="full" density="roomy" />
+      <AssistantShell v-else ref="shell" placement="full" density="roomy">
+        <template #chrome-start>
+          <OButton
+            variant="ghost"
+            size="sm"
+            :icon-left="assistantGlyph.back"
+            data-test="assistant-view-back-home"
+            @click="backToHome"
+          >
+            {{ t("menu.home") }}
+          </OButton>
+        </template>
+      </AssistantShell>
     </div>
     <ODialog
       :open="learnOpen"
@@ -115,7 +127,7 @@ export function chatRef(chatId: string): { sid: string } | { chatId: number } | 
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, provide, ref, watch } from "vue";
+import { computed, onActivated, onBeforeUnmount, provide, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -129,8 +141,14 @@ import AssistantShell, {
 } from "@/components/ai-assistant/shell/AssistantShell.vue";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import { takeLockedMove } from "@/components/ai-assistant/shell/lockedPanel";
-import { useAssistantCapability, useAssistantStore } from "@/composables/assistant";
+import {
+  useAssistantCapability,
+  useAssistantHistory,
+  useAssistantStore,
+} from "@/composables/assistant";
+import { fullThreadLocation, withoutThread } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -138,9 +156,12 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 import Error404 from "@/views/Error404.vue";
 
+const props = withDefaults(defineProps<{ chatId?: string | null }>(), { chatId: null });
+
 const { t } = useI18nTyped();
 const store = useAssistantStore();
 const capability = useAssistantCapability();
+const history = useAssistantHistory();
 const route = useRoute();
 const router = useRouter();
 const vuex = useStore();
@@ -153,6 +174,10 @@ const shell = ref<InstanceType<typeof AssistantShell> | null>(null);
 const arrivedFromLockedPanel = takeLockedMove();
 let entered = false;
 let generation = 0;
+let settled = 0;
+// The chat on screen when the last entry settled or New chat ran, which a superseded open must not replace.
+let settledSid: string | null = null;
+let lastShownSid: string | null = null;
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const view = computed(() => viewFor(capability.gate.value, capability.value.isAdmin));
@@ -162,18 +187,17 @@ const gateReason = computed<GateReason>(() => {
     ? gate
     : "no_permission";
 });
-const chatId = computed(() => {
-  const param = route.params.chatId;
-  return typeof param === "string" && param ? param : null;
-});
+const chatId = computed(() => props.chatId || null);
 
 provide(SHELL_ROUTE_CONTEXT, { state: routeState, newChat });
 
 function newChat(): void {
   routeState.value = "idle";
-  store.setActive(null);
-  createSession();
-  if (chatId.value) void router.replace({ name: "assistant", query: route.query });
+  store.startNewChat({
+    origin: { entryKind: "deep_link", objectKind: "none", container: "full_view" },
+  });
+  settledSid = store.state.shell.activeSid;
+  if (chatId.value) void router.replace(fullThreadLocation(null, withoutThread(route.query)));
 }
 
 function createSession(): void {
@@ -186,8 +210,11 @@ function createSession(): void {
 function onGateAction(cta: GateCta): void {
   if (cta === "learn_more") learnOpen.value = true;
   if (cta !== "close") return;
-  if (window.history.state?.back) router.back();
-  else void router.push("/");
+  backToHome();
+}
+
+function backToHome(): void {
+  void router.push({ name: "home", query: withoutThread(route.query) }).catch(() => undefined);
 }
 
 // Entering decides skeleton or welcome before the first paint; a newer entry supersedes a slow one (`70` §6.2).
@@ -196,23 +223,34 @@ async function enter(): Promise<void> {
   const asked = generation;
   const id = chatId.value;
   const target = id ? chatRef(id) : null;
+  // The URL catching up with the chat on screen (its first save) is not a new entry, but it ends any load it superseded.
+  if (entered && isShown(target)) {
+    routeState.value = "idle";
+    settle(asked);
+    return;
+  }
   if (id) {
     routeState.value = "loading";
     let result: ShellRouteState = "not_found";
+    let opened: string | null = null;
     try {
       if (target) {
-        await store.openSession(target);
+        opened = await store.openSession(target);
         result = "idle";
       }
     } catch (err) {
       result =
         (err as { code?: string } | null)?.code === "deleted_elsewhere" ? "deleted" : "not_found";
     }
-    if (asked !== generation) return;
+    if (asked !== generation) {
+      restoreRouted(opened);
+      return;
+    }
     routeState.value = result;
-  } else if (!store.state.shell.activeSid) {
+  } else if (!store.state.shell.activeSid && !deletedElsewhere()) {
     createSession();
   }
+  settle(asked);
   store.open({ kind: "full" }, { focus: "composer" });
   if (!entered)
     trackAssistant("ai_container_opened", {
@@ -223,6 +261,42 @@ async function enter(): Promise<void> {
     });
   entered = true;
 }
+
+function settle(asked: number): void {
+  settled = asked;
+  settledSid = store.state.shell.activeSid;
+}
+
+// A superseded open still activates its chat, so the chat the URL names (or the one on screen) is brought back.
+function restoreRouted(opened: string | null): void {
+  if (!opened || settled !== generation || store.state.shell.activeSid !== opened) return;
+  const now = chatId.value ? chatRef(chatId.value) : null;
+  if (now) {
+    if (!isShown(now)) void enter();
+    return;
+  }
+  if (settledSid && settledSid !== opened && store.state.sessions[settledSid])
+    store.setActive(settledSid);
+}
+
+// A chat deleted elsewhere keeps its deleted state on screen until New chat clears the notice or another chat shows.
+function deletedElsewhere(): boolean {
+  const notice = history.deletedNotice.value;
+  return !!notice && !notice.opening && notice.sid === lastShownSid;
+}
+
+function isShown(target: ReturnType<typeof chatRef>): boolean {
+  if (!target || !("sid" in target) || store.state.shell.placement.kind !== "full") return false;
+  return target.sid === store.state.shell.activeSid && !!store.state.sessions[target.sid];
+}
+
+watch(
+  () => store.state.shell.activeSid,
+  (sid) => {
+    if (sid) lastShownSid = sid;
+  },
+  { immediate: true },
+);
 
 watch(
   [() => view.value === "shell" && store.state.ready, chatId],
@@ -239,6 +313,11 @@ function leave(): void {
   trackAssistant("ai_container_closed", { reason: "route" });
   store.close("route");
 }
+
+// Home is kept alive, so coming back to a thread re-enters it instead of remounting.
+onActivated(() => {
+  if (entered && view.value === "shell" && store.state.ready) void enter();
+});
 
 onBeforeRouteLeave(() => leave());
 onBeforeUnmount(leave);

@@ -84,6 +84,7 @@ import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from 
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
 import { isAssistantV2 } from "./flags";
+import { isFullThreadRoute } from "./fullThreadRoute";
 import { createIndexedDbHistory } from "./historyDb";
 import { assistantClientId } from "./historyElsewhere";
 import { serverCardOf } from "./historyRecords";
@@ -337,7 +338,11 @@ function buildRuntime(): AssistantRuntime {
       store,
       capability: () => capability.capability.value,
       hosts,
-      routeName: () => String(context.value?.router?.currentRoute.value.name ?? ""),
+      // The full view lives on Home under `?thread=`, so the door still reads it as the assistant view.
+      routeName: () => {
+        const current = context.value?.router?.currentRoute.value;
+        return isFullThreadRoute(current) ? "assistant" : String(current?.name ?? "");
+      },
       pushRoute: (to) => void context.value?.router?.push(to).catch(() => undefined),
       lgUp: () => lgUp.value,
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,

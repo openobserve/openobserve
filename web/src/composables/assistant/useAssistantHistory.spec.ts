@@ -503,6 +503,24 @@ describe("useAssistantHistory in server mode", () => {
     expect(fake.history.searchPartial.value).toBe(true);
   });
 
+  it("keeps an open chat the server search did not return out of the matches", async () => {
+    const list = vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const fake = setup({ persistence: true, historySearch: true });
+    await flushPromises();
+    chat(fake, "Say only the word pineapple.");
+    await vi.waitFor(() => expect(fake.history.rows.value).toHaveLength(1));
+    fake.history.setFilter({ q: "checkoutzzzqqq" });
+    await flushPromises();
+    expect(list).toHaveBeenLastCalledWith(
+      "default",
+      expect.objectContaining({ q: "checkoutzzzqqq" }),
+    );
+    expect(fake.history.visible.value).toEqual([]);
+    fake.history.setFilter({ q: "pineapple" });
+    await flushPromises();
+    expect(fake.history.visible.value).toHaveLength(1);
+  });
+
   it("moves browser chats in batches of ten and deletes a local row only once the server confirms it", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
     const seed = Array.from({ length: IMPORT_BATCH + 2 }, (_, i) => record(i + 1));

@@ -222,6 +222,7 @@ import AssistantGateState, {
   gateLearnOpen,
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
+import { isFullThreadRoute } from "@/composables/assistant/pure";
 import {
   openAssistant,
   openWindowsOf,
@@ -471,7 +472,7 @@ function onClick(): void {
   }
   // A locked user gets the gate where they clicked, never an empty container (D7 decision 2).
   if (current.state === "locked") {
-    if (route.name === "assistant") return;
+    if (isFullThreadRoute(route)) return;
     if (mdUp.value) lockedOpen.value = true;
     else {
       dialogGate.value = lockedGate.value;

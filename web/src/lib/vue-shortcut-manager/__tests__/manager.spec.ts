@@ -7,6 +7,7 @@ import {
   getShortcutDef,
   getShortcutDisplay,
   resolveShortcutKeys,
+  SHORTCUT_REGISTRY,
 } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
 const fakeEvent = (over: Record<string, unknown>) =>
@@ -566,7 +567,46 @@ describe("useShortcuts composable (multiple)", () => {
   });
 });
 
+describe("threadsBarOpen chord", () => {
+  afterEach(() => resetManager());
+
+  it.each([
+    ["mac", { metaKey: true }, true],
+    ["windows", { ctrlKey: true }, false],
+  ])("fires on a real Shift+period keydown (%s)", async (_os, mod, mac) => {
+    const def = getShortcutDef("threadsBarOpen")!;
+    const handler = vi.fn();
+    const TestComponent = defineComponent({
+      setup() {
+        useShortcut((mac ? def.keyForMac : def.keyForWindows)!, handler, { description: "bar" });
+        return () => h("div");
+      },
+    });
+    const wrapper = mount(TestComponent);
+    await nextTick();
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: ">", shiftKey: true, bubbles: true, ...mod }),
+    );
+    expect(handler).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+});
+
 describe("shortcutRegistry", () => {
+  it("matches a registry chord whatever order its modifiers are written in", () => {
+    expect(ShortcutManager.normalizeKey("Meta+Shift+H")).toBe("shift+meta+h");
+    expect(ShortcutManager.normalizeKey("meta+shift+>")).toBe("shift+meta+>");
+    expect(ShortcutManager.normalizeKey("ctrl++")).toBe("ctrl++");
+    expect(ShortcutManager.normalizeKey("g l")).toBe("g l");
+    const keys = SHORTCUT_REGISTRY.flatMap((group) => group.shortcuts).flatMap((entry) =>
+      [entry.keyForMac, entry.keyForWindows].filter((key): key is string => !!key),
+    );
+    for (const key of keys)
+      expect(ShortcutManager.normalizeKey(ShortcutManager.normalizeKey(key))).toBe(
+        ShortcutManager.normalizeKey(key),
+      );
+  });
+
   it("should return a registerable definition by id", () => {
     const def = getShortcutDef("logsRunQuery");
     expect(def).toBeTruthy();

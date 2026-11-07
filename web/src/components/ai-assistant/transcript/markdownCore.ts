@@ -133,6 +133,16 @@ const CLAIM_MARKER = /[ \t]*\[\^([A-Za-z0-9_-]{1,64})\]/g;
 
 const UNRESOLVED_CLAIM = /^\d+$/;
 
+// The model's footnote list: `[^id]: label` lines, and the `: label` lines o2-ai leaves once it removed a marker it could not map.
+const FOOTNOTE_DEF = /^[ \t]{0,3}\[\^([A-Za-z0-9_-]{1,64})\]:/;
+
+const FOOTNOTE_ORPHAN = /^[ \t]{0,3}:[ \t]/;
+
+const FENCE_LINE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
+
+// A space left in front of punctuation where a marker was removed, here or by o2-ai.
+const SPACE_BEFORE_STOP = /[ \t]+(?=[.,](?:\s|$))/g;
+
 // Private-use characters hold a claim's place through escaping until the renderer writes its slot.
 const CLAIM_SLOT = /\uE000(\d{1,3})\uE001/g;
 
@@ -358,7 +368,7 @@ export function parseBlock(request: ParseRequest): ParseResult {
     const open = request.state === "open";
     // Only a streaming block closes its own unterminated fence; a completed one is lexed exactly as sent (X11).
     // The model's own slot characters go before lexing, so no code span or alt text can forge a slot.
-    const source = request.text.replace(SLOT_CHARS, "");
+    const source = withoutFootnotes(request.text.replace(SLOT_CHARS, ""));
     const repaired = open ? repairFence(source) : { text: source, open: false };
     const tokens = instance().lexer(repaired.text);
     // Markers come out of prose only; code keeps `[^0-9]` and every other bracket as written.
@@ -374,6 +384,53 @@ export function parseBlock(request: ParseRequest): ParseResult {
     const rejected = error instanceof OverBudget ? error.risk : undefined;
     return { ...plainResult(request.blockId, request.text), ...(rejected && { rejected }) };
   }
+}
+
+// Chips already cite each step in place; left in, a `[^id]:` line also lexes as a link definition that turns its marker into a link.
+function withoutFootnotes(text: string): string {
+  if (!text.includes(":")) return text;
+  const lines = text.split("\n");
+  const kept: string[] = [];
+  let fence: string | null = null;
+  let footnotes = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    fence = nextFence(fence, line);
+    const open = fence !== null || FENCE_LINE.test(line);
+    const orphan = !open && FOOTNOTE_ORPHAN.test(line);
+    footnotes =
+      !open && (citedDefinition(text, line) || (orphan && (footnotes || orphanTail(lines, i))));
+    if (!footnotes) kept.push(line);
+  }
+  return kept.length === lines.length ? text : kept.join("\n");
+}
+
+// A fence closes only on its own character, at least as long and with no info string (CommonMark).
+function nextFence(fence: string | null, line: string): string | null {
+  const match = FENCE_LINE.exec(line);
+  if (!match) return fence;
+  if (fence === null) return match[2].includes("`") && match[1][0] === "`" ? null : match[1];
+  const closes = match[1][0] === fence[0] && match[1].length >= fence.length && !match[2].trim();
+  return closes ? null : fence;
+}
+
+// Only a definition whose marker the text cites is a footnote; `[^a-z]: matches` in prose stays.
+function citedDefinition(text: string, line: string): boolean {
+  const label = FOOTNOTE_DEF.exec(line)?.[1];
+  if (!label) return false;
+  const marker = `[^${label}]`;
+  for (let at = text.indexOf(marker); at >= 0; at = text.indexOf(marker, at + 1))
+    if (text[at + marker.length] !== ":") return true;
+  return false;
+}
+
+// A closing paragraph of `: label` lines only, which a footnote list becomes when every marker was removed; a definition list mid-text stays.
+function orphanTail(lines: string[], at: number): boolean {
+  if (at > 0 && lines[at - 1].trim()) return false;
+  for (let i = at; i < lines.length; i++)
+    if (lines[i].trim() && !FOOTNOTE_ORPHAN.test(lines[i]) && !FOOTNOTE_DEF.test(lines[i]))
+      return false;
+  return true;
 }
 
 function spend(text: string): string {
@@ -485,6 +542,7 @@ function stripClaims(tokens: Token[], claims: string[], open: boolean): void {
       if (!claims.includes(id)) claims.push(id);
       return `\uE000${claims.indexOf(id)}\uE001`;
     });
+    textLeaf.text = textLeaf.text.replace(SPACE_BEFORE_STOP, "");
   }
   const last = leaves[leaves.length - 1] as Tokens.Text | undefined;
   if (open && last?.type === "text") last.text = last.text.replace(PARTIAL_CLAIM, "");

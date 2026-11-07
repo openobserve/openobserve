@@ -48,6 +48,13 @@ export const LIST_REREAD_MS = 15_000;
 
 const MAX_SHARED_SIDS = 1_000;
 
+const LAST_TURN_END: Record<string, NonNullable<HistoryRow["lastTurnEnd"]>> = {
+  completed: "done",
+  cancelled: "stopped",
+  failed: "failed",
+  interrupted: "failed",
+};
+
 /** The list's own load state; `cached` rows render beside a server error, never a silent empty list. */
 export interface HistoryListState {
   status: "idle" | "loading" | "ready" | "error";
@@ -58,6 +65,11 @@ export interface HistoryListState {
 }
 
 export type HistoryList = ReturnType<typeof createHistoryList>;
+
+/** The server's last-turn status as the Home digest names it; a running or unknown turn has no end. */
+export function lastTurnEndOf(status: string | null | undefined): HistoryRow["lastTurnEnd"] {
+  return status && Object.hasOwn(LAST_TURN_END, status) ? LAST_TURN_END[status] : null;
+}
 
 /** The server pages through TanStack, the browser rows, live sessions, the filter and the search. */
 export function createHistoryList(ctx: HistoryCtx) {
@@ -169,7 +181,9 @@ export function createHistoryList(ctx: HistoryCtx) {
       if (kind === "shared" && !row.share && !sharedSids.value.has(row.sid)) return false;
       if (agent && runAgentKey(row.agentType) !== agent) return false;
       if (started && !startedFrom(row.origin, started)) return false;
-      if (!needle || (ctx.serverMode() && searchOnServer())) return true;
+      if (!needle) return true;
+      // The server already matched its own rows; browser and live rows it never saw still need the needle.
+      if (ctx.serverMode() && searchOnServer() && serverSids.value.has(row.sid)) return true;
       return (
         String(row.title).toLowerCase().includes(needle) || contentMatches(row.sid, needle, ctx)
       );
@@ -368,6 +382,7 @@ function serverRow(summary: ChatSummaryWire, ctx: HistoryCtx): HistoryRow {
     activeTurn: summary.active_turn === true,
     activeTurnId: summary.active_turn_id ?? null,
     pendingApproval: summary.pending_approval === true,
+    lastTurnEnd: lastTurnEndOf(summary.last_turn_status),
     share: null,
     local: false,
     ephemeral: false,
@@ -460,8 +475,9 @@ function liveRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {
 }
 
 function contentMatches(sid: Sid, needle: string, ctx: HistoryCtx): boolean {
-  const record = ctx.localBySid.value.get(sid);
-  return !!record?.messages.some(
+  const session = ctx.deps.store().state.sessions[sid] as AssistantSession | undefined;
+  const messages = ctx.localBySid.value.get(sid)?.messages ?? session?.messages ?? [];
+  return messages.some(
     (message) => message.role === "user" && String(message.content).toLowerCase().includes(needle),
   );
 }
