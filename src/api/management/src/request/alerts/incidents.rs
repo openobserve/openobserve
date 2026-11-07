@@ -1059,7 +1059,7 @@ pub struct SteerRequestBody {
     pub hypothesis_id: Option<String>,
 }
 
-/// The answer for AI switched on but not licensed; AI switched off falls through to the agent check.s 400.
+/// The answer for AI switched on but not licensed; AI switched off falls through to the agent check's 400.
 #[cfg(feature = "enterprise")]
 fn ai_license_denial(ai_enabled: bool, ai_entitled: bool) -> Option<Response> {
     use axum::response::IntoResponse;
