@@ -57,7 +57,7 @@ class SchemaPage {
         this.logsSearchBarRefreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
         this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-state"]');
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-        this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        this.dateTimeRelativeTab = page.locator('[data-test="date-time-quick-ranges"] h3');
         this.logTableExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
 
         // IndexList / stream picker (OSelect in listbox/multiple mode)
@@ -152,7 +152,7 @@ class SchemaPage {
             explorerButton: 'Explore',
             closeButton: 'close',
             dateTimeBtn: '[data-test="date-time-btn"]',
-            dateTimeRelativeTab: '[data-test="date-time-relative-tab"]',
+            dateTimeRelativeTab: '[data-test="date-time-quick-ranges"] h3',
             logTableExpandMenu: '[data-test="o2-table-expand-1"]',
             logsUserDefinedFieldsBtn: '[data-test="logs-user-defined-fields-btn"]',
             logSearchIndexAllFieldBtn: '[data-test="log-search-index-list-interesting-_all-field-btn"]',

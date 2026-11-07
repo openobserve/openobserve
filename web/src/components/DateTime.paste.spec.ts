@@ -60,8 +60,6 @@ describe("DateTime paste", () => {
   const stubReadText = (readText: () => Promise<string>) =>
     Object.assign(navigator.clipboard, { readText });
 
-  const lastToast = () => toastMock.mock.calls[toastMock.mock.calls.length - 1][0];
-
   beforeEach(() => {
     store.state.timezone = "UTC";
     store.state.savedViewFlag = false;
@@ -76,29 +74,41 @@ describe("DateTime paste", () => {
     Reflect.deleteProperty(navigator, "platform");
   });
 
-  it("applies a range pasted with the keyboard while the picker is open", async () => {
+  const menuEl = (id: string) => document.querySelector(`#date-time-menu [data-test="${id}"]`);
+  const emitCount = () => (wrapper!.emitted("on:date-change") ?? []).length;
+
+  it("fills the draft from a keyboard paste and applies it only on Apply", async () => {
     createWrapper();
     await openMenu();
 
-    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+    const emitsBefore = emitCount();
     const event = firePaste(document.querySelector("#date-time-menu")!, PAYLOAD);
     await flushPromises();
 
-    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore + 1);
     expect(event.defaultPrevented).toBe(true);
+    expect(emitCount()).toBe(emitsBefore);
+    expect(wrapper!.vm.panelDraft?.kind).toBe("absolute");
+    expect(wrapper!.vm.draft.start).toMatchObject({ date: "2026-10-27", time: "11:20:00" });
+    expect(menuEl("date-time-range-note")?.getAttribute("data-kind")).toBe("info");
+    expect(menuEl("date-time-range-draft")).not.toBeNull();
+
+    (menuEl("date-time-apply-btn") as HTMLButtonElement).click();
+    await flushPromises();
+
+    expect(emitCount()).toBe(emitsBefore + 1);
     expect(lastEmit()).toMatchObject({
       startTime: START_US,
       endTime: END_US,
+      valueType: "absolute",
       userChangedValue: true,
     });
-    expect(lastToast()).toMatchObject({ variant: "success", message: "Date range pasted" });
+    expect(toastMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the pasted range when a day was clicked before the paste", async () => {
+  it("applies a pasted range on an outside close of an auto-apply picker, even after a pending day", async () => {
     createWrapper();
     await openMenu();
-    wrapper!.vm.selectedType = "absolute";
-    wrapper!.vm.pendingDay = "2026/10/03";
+    wrapper!.vm.onCalendarPending("2026/10/03");
     await flushPromises();
 
     firePaste(document.querySelector("#date-time-menu")!, PAYLOAD);
@@ -111,10 +121,27 @@ describe("DateTime paste", () => {
     expect(lastEmit()).toMatchObject({ startTime: START_US, endTime: END_US });
   });
 
-  it("leaves a paste into one of the picker's own fields alone", async () => {
+  it("hands a paste inside a segment field to the panel instead of inserting it", async () => {
     createWrapper();
     await openMenu();
-    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+    const input = document.querySelector<HTMLInputElement>(
+      '#date-time-menu [data-test="datetime-start-time"] input',
+    )!;
+
+    const event = firePaste(input, "2026-10-27 07:20:00 – 2026-10-27 08:20:00");
+    await flushPromises();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper!.vm.draft.start).toMatchObject({ date: "2026-10-27", time: "07:20:00" });
+    expect(wrapper!.vm.draft.end).toMatchObject({ date: "2026-10-27", time: "08:20:00" });
+    expect(menuEl("date-time-range-note")?.textContent).toContain("Read in UTC");
+    expect(menuEl("date-time-range-note")?.textContent).not.toContain("Read as");
+  });
+
+  it("leaves a paste into one of the picker's other fields alone", async () => {
+    createWrapper();
+    await openMenu();
+    const emitsBefore = emitCount();
     const input = document.createElement("input");
     document.querySelector("#date-time-menu")!.appendChild(input);
 
@@ -122,38 +149,42 @@ describe("DateTime paste", () => {
     await flushPromises();
 
     expect(event.defaultPrevented).toBe(false);
-    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
-    expect(toastMock).not.toHaveBeenCalled();
+    expect(emitCount()).toBe(emitsBefore);
+    expect(wrapper!.vm.selectedType).toBe("relative");
   });
 
-  it("points to the keyboard when the browser blocks reading the clipboard", async () => {
+  it("points to the keyboard in the note when the browser blocks reading the clipboard", async () => {
     Object.defineProperty(navigator, "platform", { value: "Win32", configurable: true });
     stubReadText(() => Promise.reject(new DOMException("denied", "NotAllowedError")));
     createWrapper();
     await openMenu();
 
     await wrapper!.vm.pasteRange();
+    await flushPromises();
 
-    expect(lastToast()).toMatchObject({
-      variant: "error",
-      message:
-        "This browser blocked reading the clipboard. Press Ctrl+V with the picker open to paste.",
-    });
+    const note = menuEl("date-time-range-note")!;
+    expect(note.getAttribute("data-kind")).toBe("error");
+    expect(note.getAttribute("data-reason")).toBe("blocked");
+    expect(note.textContent).toContain(
+      "This browser blocked reading the clipboard. Press Ctrl+V with the picker open to paste.",
+    );
   });
 
-  it("applies a range read from the clipboard by the paste button", async () => {
+  it("fills the draft from the clipboard read by the paste button", async () => {
     stubReadText(() => Promise.resolve(PAYLOAD));
     createWrapper();
     await openMenu();
 
     await wrapper!.vm.pasteRange();
+    await flushPromises();
+    wrapper!.vm.submitDraft();
+    await flushPromises();
 
     expect(lastEmit()).toMatchObject({
       startTime: START_US,
       endTime: END_US,
       userChangedValue: true,
     });
-    expect(lastToast()).toMatchObject({ variant: "success" });
   });
 
   it.each([
@@ -163,41 +194,59 @@ describe("DateTime paste", () => {
     stubReadText(() => Promise.resolve(text));
     createWrapper();
     await openMenu();
-    const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+    const emitsBefore = emitCount();
 
     await wrapper!.vm.pasteRange();
     await flushPromises();
 
-    expect(toastMock).toHaveBeenCalledTimes(1);
-    expect(lastToast()).toMatchObject({
-      variant: "info",
-      message: "Clipboard is empty. Copy a date range first.",
-    });
-    expect(toastMock).not.toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Could not parse date range" }),
-    );
-    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+    const note = menuEl("date-time-range-note")!;
+    expect(note.getAttribute("data-reason")).toBe("empty");
+    expect(note.textContent).toContain("Clipboard is empty. Copy a date range first.");
+    expect(emitCount()).toBe(emitsBefore);
   });
 
-  it("keeps the default focus inside the panel when the rail has nothing to focus", async () => {
-    localStorage.clear();
+  it("says why a paste could not be read and leaves the draft alone", async () => {
+    createWrapper();
+    await openMenu();
+    const before = { ...wrapper!.vm.draft.start };
+
+    wrapper!.vm.onFieldPaste("hello there");
+    await flushPromises();
+
+    const note = menuEl("date-time-range-note")!;
+    expect(note.getAttribute("data-reason")).toBe("no-date");
+    expect(note.textContent).toContain("“hello there”");
+    expect(wrapper!.vm.panelDraft).toBeNull();
+    expect(wrapper!.vm.draft.start.date).toBe(before.date);
+  });
+
+  it("puts the previous draft back on Undo", async () => {
+    createWrapper();
+    await openMenu();
+    const before = JSON.parse(JSON.stringify(wrapper!.vm.draft));
+
+    wrapper!.vm.onFieldPaste(PAYLOAD);
+    await flushPromises();
+    (menuEl("date-time-range-note-undo") as HTMLButtonElement).click();
+    await flushPromises();
+
+    expect(wrapper!.vm.draft).toEqual(before);
+    expect(menuEl("date-time-range-note")).toBeNull();
+  });
+
+  it("opens on the range field with its text selected, so a paste replaces it", async () => {
     createWrapper({ calendarPresets: false });
     await openMenu();
     const autoFocus = new Event("focus", { cancelable: true });
 
     wrapper!.vm.onPopoverOpenAutoFocus(autoFocus);
+    await flushPromises();
 
-    expect(autoFocus.defaultPrevented).toBe(false);
-  });
-
-  it("moves focus to the first rail item when there is one", async () => {
-    createWrapper();
-    await openMenu();
-    const autoFocus = new Event("focus", { cancelable: true });
-
-    wrapper!.vm.onPopoverOpenAutoFocus(autoFocus);
-
+    const input = document.querySelector<HTMLInputElement>(
+      '#date-time-menu [data-test="date-time-range-input"] input',
+    )!;
     expect(autoFocus.defaultPrevented).toBe(true);
-    expect(document.activeElement?.hasAttribute("data-date-time-rail-item")).toBe(true);
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionEnd).toBe(input.value.length);
   });
 });

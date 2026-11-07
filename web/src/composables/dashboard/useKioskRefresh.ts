@@ -70,6 +70,8 @@ export interface UseKioskRefreshOptions {
   cancel: () => unknown;
   /** Cheap liveness check; when it fails no refresh is fired, so panels keep their last render. */
   probe?: () => Promise<boolean>;
+  /** True while a refresh can find nothing new (the range has ended); ticks are skipped, not retried. */
+  isPaused?: () => boolean;
   now?: () => number;
 }
 
@@ -140,6 +142,7 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
   };
 
   const isHidden = () => typeof document !== "undefined" && document.hidden === true;
+  const isRangePaused = () => options.isPaused?.() === true;
   const isOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
   const isUnreachable = () => {
@@ -253,7 +256,7 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
   }
 
   const onTick = () => {
-    if (!options.enabled.value) return;
+    if (!options.enabled.value || isRangePaused()) return;
     if (isHidden()) {
       missedWhileHidden = true;
       return;
@@ -280,7 +283,7 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
     paused.value = isHidden();
     if (!paused.value && missedWhileHidden) {
       missedWhileHidden = false;
-      refreshNow();
+      if (!isRangePaused()) refreshNow();
     }
   };
 

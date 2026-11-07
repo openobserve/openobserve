@@ -853,6 +853,24 @@ describe("Use Logs Composable", () => {
 
       expect(toast).not.toHaveBeenCalled();
     });
+
+    it("shows no live-mode notice for an absolute range that has ended", async () => {
+      wrapper.vm.searchObj.meta.refreshInterval = 5;
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.router.currentRoute.value.name = "logs";
+      wrapper.vm.searchObj.data.datetime = {
+        ...wrapper.vm.searchObj.data.datetime,
+        type: "absolute",
+        startTime: (Date.now() - 7_200_000) * 1000,
+        endTime: (Date.now() - 3_600_000) * 1000,
+      };
+
+      wrapper.vm.refreshData();
+      await flushPromises();
+
+      expect(global.setInterval).toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
+    });
   });
 
   describe("SQL Parsing and Query Building Functions", () => {

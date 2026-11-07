@@ -17,6 +17,7 @@
 
 import { expect } from '@playwright/test';
 import { selectOSelectOption } from '../alertsPages/oselectHelpers.js';
+import { setRelativeCode } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SyntheticsResultsPage {
@@ -94,10 +95,11 @@ export class SyntheticsResultsPage {
   // The picker is auto-apply: choosing a period re-queries immediately.
   async setRelativeWindow(suffix) {
     await this.page.locator(this.locators.dateTimeButton).first().click();
-    const btn = this.page.locator(this.relativePeriod(suffix));
-    await btn.waitFor({ state: 'visible', timeout: 15000 });
-    await btn.click();
-    await this.page.keyboard.press('Escape');
+    await setRelativeCode(this.page, suffix);
+    // A chip or Enter closes the panel; Escape only matters if it is still open.
+    if (await this.page.locator('#date-time-menu').isVisible().catch(() => false)) {
+      await this.page.keyboard.press('Escape');
+    }
   }
 
   async clickStatusFilter(key) {

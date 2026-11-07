@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { setRelativeCode } from "../commonActions.js";
 
 //methods : setRelativeTimeRange
 
@@ -15,12 +16,12 @@ const WAITING_REFRESH_BUTTONS = [
 
 /**
  * Applies the range just picked in the open date-time picker, with or without Auto Run.
- * A picker that still has Apply gets it clicked. Otherwise the picker is closed (which applies with
- * Auto Run on), then the panel editor's Apply runs it, or on a dashboard the Refresh it marked yellow.
+ * A picker still open on a draft has Apply enabled, and gets it clicked. Otherwise the picker is closed
+ * (which applies with Auto Run on), then the panel editor's Apply runs it, or on a dashboard the Refresh it marked yellow.
  */
 export async function applyPickedDateTime(page) {
-  const pickerApply = page.locator('[data-test="date-time-apply-btn"]');
-  if (await pickerApply.count()) {
+  const pickerApply = page.locator('#date-time-menu [data-test="date-time-apply-btn"]');
+  if ((await pickerApply.count()) && (await pickerApply.first().isEnabled().catch(() => false))) {
     await pickerApply.first().evaluate((el) => el.click());
     return;
   }
@@ -51,19 +52,19 @@ export default class DateTimeHelper {
   async setRelativeTimeRange(rangeCode) {
     // Minutes= m	Hours= h	Days= d	Weeks= w	Months= M
 
-    const relBtn = this.page.locator(`[data-test="date-time-relative-${rangeCode}-btn"]`);
+    const rangeField = this.page.locator('#date-time-menu [data-test="date-time-range-input"]');
 
     // ViewDashboard binds the picker's :disable to arePanelsLoading, so a click can land just after it goes disabled and silently never open the popover.
     await expect(async () => {
-      if (!(await relBtn.isVisible())) {
+      if (!(await rangeField.isVisible())) {
         await this.timePickerBtn.click({ timeout: 5000 });
       }
-      await expect(relBtn).toBeVisible({ timeout: 5000 });
+      await expect(rangeField).toBeVisible({ timeout: 5000 });
     // Budget covers maxquery's deliberately slow panels holding arePanelsLoading true; the inner click stays short so a swallowed click is re-tried fast.
     }).toPass({ timeout: 45000, intervals: [250, 500, 1000, 2000] });
 
-    // Use JS click — the dropdown can extend outside the viewport in the new layout
-    await relBtn.evaluate((el) => el.click());
+    // A window with no chip (6 weeks) is typed into the range field.
+    await setRelativeCode(this.page, rangeCode);
     await applyPickedDateTime(this.page);
   }
 }

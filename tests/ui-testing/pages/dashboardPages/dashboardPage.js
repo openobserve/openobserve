@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
-  dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
+  dateTimeButtonLocator, customRangeLocator, setRelative,
   Past30SecondsValue
 } from '../commonActions.js';
 export class DashboardPage {
@@ -104,8 +104,7 @@ export class DashboardPage {
     // Date/Time locators — wrapped to `Locator` instances so methods don't
     // need to call `page.locator(...)` inline.
     this.dateTimeButton = page.locator(dateTimeButtonLocator);
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = page.locator(absoluteTabLocator);
+    this.absoluteTab = page.locator(customRangeLocator);
 
     // Share / view dashboard locators
     this.shareSuccessToast = page.locator('[data-test-variant="success"]');
@@ -413,7 +412,7 @@ export class DashboardPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.dateTimeButton.click();
-    await this.relative30SecondsButton.click();
+    await setRelative(this.page, 30, 's');
   }
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"

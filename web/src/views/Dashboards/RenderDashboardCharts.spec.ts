@@ -934,11 +934,12 @@ describe("RenderDashboardCharts", () => {
         const realPicker = dateTime().findComponent(DateTime);
 
         realPicker.vm.onMenuOpenChange(true);
-        realPicker.vm.selectedType = "absolute";
-        realPicker.vm.selectedDate = { from: "2026/10/13", to: "2026/10/13" };
-        realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+        realPicker.vm.menuOpen = true;
+        realPicker.vm.onDraftEdge("start", { date: "2026-10-13", time: "18:50:30", offset: "" });
+        realPicker.vm.onDraftEdge("end", { date: "2026-10-13", time: "18:25:22", offset: "" });
         await flushPromises();
-        expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+        expect(realPicker.vm.triggerLabel).toBe("Past 1 Hour");
+        expect(realPicker.vm.lineView.range).toBe("Oct 13, 18:50:30 – Oct 13, 18:25:22");
 
         realPicker.vm.onMenuOpenChange(false);
         await flushPromises();
@@ -959,18 +960,20 @@ describe("RenderDashboardCharts", () => {
         endTime: start + 30 * 60e6,
       });
       const realPicker = dateTime().findComponent(DateTime);
-      const appliedLabel = "2026/10/13 10:00:00 - 2026/10/13 10:30:00";
-      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+      const appliedLabel = "Oct 13, 10:00 – 10:30";
+      expect(realPicker.vm.triggerLabel).toBe(appliedLabel);
 
       realPicker.vm.onMenuOpenChange(true);
-      realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+      realPicker.vm.onDraftEdge("start", { ...realPicker.vm.draft.start, time: "18:50:30" });
+      realPicker.vm.onDraftEdge("end", { ...realPicker.vm.draft.end, time: "18:25:22" });
       await flushPromises();
-      expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(realPicker.vm.triggerLabel).toBe(appliedLabel);
+      expect(realPicker.vm.lineView.range).toBe("Oct 13, 18:50:30 – Oct 13, 18:25:22");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+      expect(realPicker.vm.triggerLabel).toBe(appliedLabel);
       expect(panel().props("isTimeRangeWaiting")).toBe(false);
       expect(panelRefreshRequests()).toHaveLength(0);
       expect(replaceSpy).not.toHaveBeenCalled();

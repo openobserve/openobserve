@@ -4,7 +4,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
+import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode, customRangeLocator, setRelative, setRelativeCode } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -96,10 +96,9 @@ export class LogsPage {
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
-        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"]';
-        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"]';
         this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
-        this.absoluteTab = '[data-test="date-time-absolute-tab"]';
+        this.absoluteTab = customRangeLocator;
+        this.rangeInput = '#date-time-menu [data-test="date-time-range-input"] input';
         this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
         this.timeZoneOption = (zone) => `[data-test="timezone-option-${zone}"]`;
@@ -108,8 +107,8 @@ export class LogsPage {
         this.yearSelector = (year) => `[data-test="year-selector-${year}"]`;
         this.startTimeField = '[data-test="datetime-start-time"]';
         this.endTimeField = '[data-test="datetime-end-time"]';
-        this.startTimeInput = '[data-test="datetime-start-time"] input[type="time"]';
-        this.endTimeInput = '[data-test="datetime-end-time"] input[type="time"]';
+        this.startTimeInput = '[data-test="datetime-start-time"] input';
+        this.endTimeInput = '[data-test="datetime-end-time"] input';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
         this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
@@ -196,7 +195,6 @@ export class LogsPage {
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
-        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
         this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
         this.pagination = '[data-test="logs-search-pagination"]';
@@ -1731,7 +1729,7 @@ export class LogsPage {
     // Time and date methods
     async setTimeToPast30Seconds() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator(this.relative30SecondsButton).click();
+        await setRelative(this.page, 30, 's');
     }
 
     async verifyTimeSetTo30Seconds() {
@@ -2916,32 +2914,21 @@ export class LogsPage {
         }, this.queryButton, { timeout }).catch(() => {});
     }
 
+    // Six weeks has no chip, so it is typed into the range field and applied with Enter.
     async clickRelative6WeeksButton() {
-        const btn = this.page.locator(this.relative6WeeksButton);
-        await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // The date picker is a popover anchored to the toolbar; an in-flight auto-search
-        // reflows the toolbar and repositions the popover, so the preset can shift under
-        // the pointer and the click misses (range stays "Past 15 Minutes"). Let the
-        // toolbar settle first, then click (no force), and verify the trigger label
-        // actually updated — retry once if the Reka toggle dropped the click mid-animation.
         await this._waitForQueryButtonIdle();
-        await btn.click();
-        const applied = await this.page
+        await setRelative(this.page, 6, 'w');
+        await this.page
             .locator(this.dateTimeButton)
             .filter({ hasText: 'Past 6 Weeks' })
             .first()
-            .waitFor({ state: 'visible', timeout: 3000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!applied) {
-            await btn.click().catch(() => {});
-        }
+            .waitFor({ state: 'visible', timeout: 5000 });
     }
 
     // Deterministic wait helpers for date-picker popover buttons — replace
     // legacy waitForTimeout buffers used to absorb popover-open animation.
     async waitForRelative6WeeksButtonVisible(timeout = 10000) {
-        await this.page.locator(this.relative6WeeksButton).waitFor({ state: 'visible', timeout });
+        await this.page.locator(this.rangeInput).waitFor({ state: 'visible', timeout });
     }
 
     async waitForRelative15MinButtonVisible(timeout = 10000) {
@@ -2949,7 +2936,7 @@ export class LogsPage {
     }
 
     async waitForPast6DaysButtonVisible(timeout = 10000) {
-        await this.page.locator(this.relative6DaysBtn).waitFor({ state: 'visible', timeout });
+        await this.page.locator(this.rangeInput).waitFor({ state: 'visible', timeout });
     }
 
     // Wait for the log-detail drawer (opened by clickLogTableColumnSource) to be visible
@@ -4830,7 +4817,7 @@ export class LogsPage {
     }
 
     async clickPast6DaysButton() {
-        return await this.page.locator(this.relative6DaysBtn).click();
+        return await setRelative(this.page, 6, 'd');
     }
 
     async clickMenuLink(link) {
@@ -6610,7 +6597,7 @@ export class LogsPage {
     }
 
     async clickAbsoluteTimeTab() {
-        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+        return await this.page.locator(this.absoluteTab).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async fillStartDate(date) {
@@ -7056,8 +7043,8 @@ export class LogsPage {
     }
 
     async clickTimeCell() {
-        // Post-UX-revamp: time input is a native <input type="time"> inside datetime-start-time
-        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        // The time part is one segmented text input inside datetime-start-time.
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input').first();
         await timeInput.waitFor({ state: 'visible', timeout: 5000 });
         return await timeInput.click();
     }
@@ -7065,7 +7052,7 @@ export class LogsPage {
     async fillTimeCellWithInvalidValue(value) {
         // Use fill() with the value and rely on the component's validation to surface
         // the error state, rather than bypassing browser validation via evaluate().
-        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input').first();
         await timeInput.waitFor({ state: 'visible', timeout: 5000 });
         const currentValue = await timeInput.inputValue().catch(() => '');
         await timeInput.fill('');
@@ -8253,9 +8240,7 @@ export class LogsPage {
      */
     async setRelativeTimeRange(suffix) {
         await this.page.locator(this.dateTimeButton).click();
-        const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
-        await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await relativeBtn.click();
+        await setRelativeCode(this.page, suffix);
         await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
@@ -9526,7 +9511,7 @@ export class LogsPage {
     async clickRelativeTimeButton(timeSelector) {
         await this.page.locator(this.dateTimeButton).click();
         await this.page.waitForTimeout(500);
-        await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
+        await setRelativeCode(this.page, timeSelector);
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected relative time: ${timeSelector}`);
     }
@@ -11854,6 +11839,7 @@ export class LogsPage {
             '[data-test="start-time-field"] input',
             '[data-test="end-time-field"] input',
             'input[type="time"]',
+            '[data-test$="-time"] input',
             '[aria-label*="time" i] input',
             '[aria-label*="Time" i]',
         ];

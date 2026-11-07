@@ -1,5 +1,6 @@
 // Backs dashboard-panel-live-preview.spec.js (openobserve#15214).
 import { expect } from "@playwright/test";
+import { setRelative } from "../commonActions.js";
 import {
   ORG,
   createDashboard,
@@ -23,7 +24,7 @@ export default class DashboardLivePreview {
     this.streamSelect = page.locator('[data-test="index-dropdown-stream"]');
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-    this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
+    this.relativeTab = page.locator('[data-test="date-time-quick-ranges"] h3');
     this.pickerApplyBtn = page.locator('[data-test="date-time-apply-btn"]');
     this.panelRuns = null;
   }
@@ -193,8 +194,7 @@ export default class DashboardLivePreview {
   async pickRelativeTime(value, unit) {
     await this.dateTimeBtn.click();
     await this.relativeTab.waitFor({ state: "visible", timeout: 10000 });
-    await this.relativeTab.click();
-    await this.relativeOption(value, unit).click();
+    await setRelative(this.page, value, unit);
   }
 
   async expectNoPickerApply() {

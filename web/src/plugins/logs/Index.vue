@@ -695,6 +695,7 @@ import { hasLineComment } from "@/utils/query/sqlComments";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import { isTabHidden } from "@/composables/useAutoRefreshGate";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
@@ -3929,6 +3930,17 @@ export default defineComponent({
       () => [isResultsStale.value, !!searchObj.meta.autoRunBlocked],
       () => autoRun.engine.checkRefreshResume(),
     );
+
+    // A hidden tab skips refresh ticks; the one it missed runs when the tab shows again.
+    const unregisterHiddenPause = autoRun.engine.registerRefreshPause(isTabHidden);
+    const onLogsVisibilityChange = () => {
+      if (!isTabHidden()) autoRun.engine.checkRefreshResume();
+    };
+    document.addEventListener("visibilitychange", onLogsVisibilityChange);
+    onBeforeUnmount(() => {
+      unregisterHiddenPause();
+      document.removeEventListener("visibilitychange", onLogsVisibilityChange);
+    });
 
     watch(
       () => autoRun.readSignature(),

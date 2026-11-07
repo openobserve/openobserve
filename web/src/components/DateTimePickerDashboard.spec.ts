@@ -574,14 +574,14 @@ describe("DateTimePickerDashboard", () => {
       store.state.timezone = "UTC";
     });
 
-    it("has no Apply button, and a preset stays picked until it is applied", async () => {
+    it("keeps Apply off with no draft, and a preset stays picked until it is applied", async () => {
       wrapper = mount(Host, { attachTo: document.body, global: { plugins: [i18n, store] } });
       await flushPromises();
       const gate = (wrapper.vm as any).gate;
       expect(gate.applied.value.relativeTimePeriod).toBe("15m");
 
       await openPicker(wrapper);
-      expect(inMenu("date-time-apply-btn")).toBeNull();
+      expect((inMenu("date-time-apply-btn") as HTMLButtonElement).disabled).toBe(true);
       inMenu("date-time-relative-1-h-btn")!.click();
       await flushPromises();
 
@@ -601,17 +601,19 @@ describe("DateTimePickerDashboard", () => {
       await flushPromises();
       const label = () => wrapper.find('[data-test="date-time-btn"]').text();
       const realPicker = wrapper.findComponent(DateTime);
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("Oct 13, 10:00 – 10:30");
 
       realPicker.vm.onMenuOpenChange(true);
-      realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+      realPicker.vm.onDraftEdge("start", { ...realPicker.vm.draft.start, time: "18:50:30" });
+      realPicker.vm.onDraftEdge("end", { ...realPicker.vm.draft.end, time: "18:25:22" });
       await flushPromises();
-      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(label()).toContain("Oct 13, 10:00 – 10:30");
+      expect(realPicker.vm.validation.end).toBe("end-before-start");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("Oct 13, 10:00 – 10:30");
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 

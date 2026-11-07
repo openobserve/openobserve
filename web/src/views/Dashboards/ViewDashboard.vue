@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
             calendar-presets
+            page-shortcuts
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
@@ -131,7 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            :range-start-us="fixedRefreshRange?.startUs ?? 0"
+            :range-end-us="fixedRefreshRange?.endUs ?? 0"
+            :busy="arePanelsLoading"
             @trigger="onAutoRefreshTick"
+            @switch-relative="onSwitchRefreshRelative"
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
@@ -312,7 +317,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            :range-start-us="fixedRefreshRange?.startUs ?? 0"
+            :range-end-us="fixedRefreshRange?.endUs ?? 0"
+            :busy="arePanelsLoading"
             @trigger="onAutoRefreshTick"
+            @switch-relative="onSwitchRefreshRelative"
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
@@ -734,6 +743,7 @@ import {
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { fixedRangeOf, rangeHasEnded } from "@/composables/useAutoRefreshGate";
 import reports from "@/services/reports";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import config from "@/aws-exports";
@@ -2049,6 +2059,18 @@ export default defineComponent({
       if (!kioskMode.value) refreshData();
     };
 
+    const fixedRefreshRange = computed(() => fixedRangeOf(selectedDate.value));
+
+    // A paused refresh resumes by turning the ended range into the relative period nearest its length.
+    const onSwitchRefreshRelative = (period: string) => {
+      const picker = dateTimePicker.value as {
+        setSavedDate?: (value: { type: string; relativeTimePeriod: string }) => void;
+        refresh?: () => void;
+      } | null;
+      picker?.setSavedDate?.({ type: "relative", relativeTimePeriod: period });
+      picker?.refresh?.();
+    };
+
     const kioskRefresh = useKioskRefresh({
       enabled: kioskMode,
       intervalSeconds: refreshInterval,
@@ -2057,6 +2079,7 @@ export default defineComponent({
       refresh: () => (dateTimePicker.value ? runRefresh() : undefined),
       cancel: () => cancelQuery(),
       probe: pingBackend,
+      isPaused: () => rangeHasEnded(fixedRefreshRange.value),
     });
     provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
 
@@ -3024,6 +3047,8 @@ export default defineComponent({
       kioskLastSuccessAt: kioskRefresh.lastSuccessAt,
       kioskCountdown: kioskRefresh.countdown,
       onAutoRefreshTick,
+      fixedRefreshRange,
+      onSwitchRefreshRelative,
       kioskTimeRange,
       enterKiosk,
       exitKiosk,

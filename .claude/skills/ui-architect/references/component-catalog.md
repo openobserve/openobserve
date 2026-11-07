@@ -64,7 +64,7 @@ markup — don't guess a prop name.
 | Read form state for conditional rendering            | `useOForm` (owner) / `inject`+`useStore` (child)                                                                     | forms-validation        |
 | Add repeatable/dynamic field rows                    | `z.array` + indexed `name`, `:key="index"`                                                                           | forms-validation        |
 | Pick a color                                         | `OColor`                                                                                                             | forms-specialized       |
-| Pick a date / date-time range / time                 | `ODate` / `ODateTimeRange` / `OTime`                                                                                 | forms-specialized       |
+| Pick a date / date-time range / time                 | `ODate` / `DateTime.vue` (app) / `OTime`                                                                                 | forms-specialized       |
 | Upload a file                                        | `OFile`                                                                                                              | forms-specialized       |
 | Numeric slider / range                               | `OSlider` / `ORange`                                                                                                 | forms-specialized       |
 | Modal task / short form                              | `ODialog` (see form-container rule)                                                                                  | overlay-navigation      |

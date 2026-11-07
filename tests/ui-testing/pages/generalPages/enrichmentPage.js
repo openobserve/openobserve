@@ -92,7 +92,7 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Date-time picker locators (used after `dateTimeBtn` opens the dropdown)
         // ────────────────────────────────────────────────────────────────────
-        this.dateTimeAbsoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+        this.dateTimeAbsoluteTab = page.locator('[data-test="date-time-custom-range"] h3');
         this.dateTimeStartTimeInput = page.locator('[data-test="datetime-start-time"]');
 
         // ────────────────────────────────────────────────────────────────────
@@ -476,9 +476,8 @@ class EnrichmentPage {
     }
 
     async verifyStartTimeVisible() {
-        // After clicking the date-time-btn, the ODropdown opens with a Relative
-        // tab visible by default. Click the Absolute tab to surface the
-        // start/end time fields, then assert the start-time input is visible.
+        // The picker shows Custom range (Start/End) beside Quick ranges; its heading is
+        // the wait target, then the start-time input must be visible.
         await this.dateTimeAbsoluteTab.waitFor({ state: 'visible', timeout: 10000 });
         await this.dateTimeAbsoluteTab.click();
         await expect(this.dateTimeStartTimeInput.first()).toBeVisible({ timeout: 10000 });

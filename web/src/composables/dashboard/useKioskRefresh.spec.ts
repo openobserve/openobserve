@@ -89,6 +89,31 @@ describe("useKioskRefresh", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("skips its ticks while the range has ended", async () => {
+    let ended = true;
+    scope = effectScope();
+    api = scope.run(() =>
+      useKioskRefresh({
+        enabled,
+        intervalSeconds,
+        isLoading,
+        refresh,
+        cancel,
+        isPaused: () => ended,
+      }),
+    )!;
+    enabled.value = true;
+    await nextTick();
+    await finishLoad();
+    refresh.mockClear();
+
+    vi.advanceTimersByTime(30000);
+    expect(refresh).not.toHaveBeenCalled();
+    ended = false;
+    vi.advanceTimersByTime(10000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("skips a tick while a normal slow query is still loading", async () => {
     await setup();
     await finishLoad();

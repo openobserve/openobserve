@@ -129,6 +129,12 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
   return timezone.value;
 };
 
+/** The time range picker's clock, `24h` or `12h`, kept per browser. */
+export const useLocalHourFormat = (val = ""): string | null => {
+  const format = useLocalStorage("o2.hourFormat", val);
+  return typeof format?.value === "string" ? format.value : null;
+};
+
 /** Applies a linked timezone to the store and its stored key, so the picker and every query use it from now on. */
 export const applyTimezone = (
   store: { dispatch: (type: string, payload?: unknown) => unknown },

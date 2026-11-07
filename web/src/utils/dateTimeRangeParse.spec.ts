@@ -14,7 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { parseDateRangeString, parseSingleDateTime } from "./dateTimeRangeParse";
+import {
+  parseDateRangeString,
+  parseRangeInput,
+  parseRangeWithReason,
+  parseSingleDateTime,
+  zoneAbbreviation,
+  type PasteResult,
+  type RangeInputContext,
+  type RangeInputResult,
+} from "./dateTimeRangeParse";
 
 describe("parseDateRangeString", () => {
   describe("copy-emitted JSON object ({start_date, end_date} in epoch µs)", () => {
@@ -577,4 +586,586 @@ describe("parseSingleDateTime", () => {
       });
     },
   );
+});
+
+describe("parseRangeWithReason", () => {
+  const IST = "Asia/Calcutta";
+  const NOW = Date.parse("2026-11-06T14:02:00+05:30");
+  const us = (iso: string) => Date.parse(iso) * 1000;
+  const read = (text: string, zone = IST) => parseRangeWithReason(text, zone, NOW);
+  const range = (result: PasteResult) =>
+    result.ok ? [result.startUs, result.endUs] : [result.reason, result.fragment];
+
+  it.each([
+    [
+      "en dash",
+      "2026-11-04 13:47:03 – 2026-11-06 14:02:03",
+      "2026-11-04T13:47:03+05:30",
+      "2026-11-06T14:02:03+05:30",
+    ],
+    [
+      "to",
+      "2026-11-04 13:47:03 to 2026-11-06 14:02:03",
+      "2026-11-04T13:47:03+05:30",
+      "2026-11-06T14:02:03+05:30",
+    ],
+    [
+      "spanning days label",
+      "Nov 4, 13:47 – Nov 6, 13:47",
+      "2026-11-04T13:47:00+05:30",
+      "2026-11-06T13:47:00+05:30",
+    ],
+    [
+      "label with seconds",
+      "Nov 4, 13:47:03 – Nov 6, 14:02:03",
+      "2026-11-04T13:47:03+05:30",
+      "2026-11-06T14:02:03+05:30",
+    ],
+    [
+      "same-day label",
+      "Nov 4, 13:47 – 15:52",
+      "2026-11-04T13:47:00+05:30",
+      "2026-11-04T15:52:00+05:30",
+    ],
+    ["whole days", "Nov 4 – 6", "2026-11-04T00:00:00+05:30", "2026-11-06T23:59:59+05:30"],
+    [
+      "whole days across months",
+      "Oct 30 – Nov 2",
+      "2026-10-30T00:00:00+05:30",
+      "2026-11-02T23:59:59+05:30",
+    ],
+    ["one whole day", "Nov 5", "2026-11-05T00:00:00+05:30", "2026-11-05T23:59:59+05:30"],
+    [
+      "12h with the period on the last end",
+      "Nov 4, 1:47 – 3:52 PM",
+      "2026-11-04T13:47:00+05:30",
+      "2026-11-04T15:52:00+05:30",
+    ],
+    [
+      "12h on both ends",
+      "Nov 4, 1:47:03 PM – Nov 6, 2:02:03 PM",
+      "2026-11-04T13:47:03+05:30",
+      "2026-11-06T14:02:03+05:30",
+    ],
+    [
+      "en-GB order",
+      "4 Nov, 13:47 – 6 Nov, 13:47",
+      "2026-11-04T13:47:00+05:30",
+      "2026-11-06T13:47:00+05:30",
+    ],
+    ["en-GB whole days", "4–6 Nov", "2026-11-04T00:00:00+05:30", "2026-11-06T23:59:59+05:30"],
+    [
+      "End year left out across new year",
+      "Dec 30, 2025 – Jan 2",
+      "2025-12-30T00:00:00+05:30",
+      "2026-01-02T23:59:59+05:30",
+    ],
+    [
+      "Start year left out across new year",
+      "Dec 30 – Jan 2, 2026",
+      "2025-12-30T00:00:00+05:30",
+      "2026-01-02T23:59:59+05:30",
+    ],
+    [
+      "cross-year with years",
+      "Dec 30, 2025, 23:59 – Jan 2, 2026, 00:10",
+      "2025-12-30T23:59:00+05:30",
+      "2026-01-02T00:10:00+05:30",
+    ],
+    [
+      "a future date without a year is last year's",
+      "Dec 20 – 22",
+      "2025-12-20T00:00:00+05:30",
+      "2025-12-22T23:59:59+05:30",
+    ],
+    [
+      "the trigger's UTC suffix",
+      "Nov 4, 08:17 – Nov 6, 08:17 UTC",
+      "2026-11-04T08:17:00Z",
+      "2026-11-06T08:17:00Z",
+    ],
+    [
+      "an offset suffix",
+      "Nov 4, 13:47 – 15:52 UTC+05:30",
+      "2026-11-04T13:47:00+05:30",
+      "2026-11-04T15:52:00+05:30",
+    ],
+    [
+      "per-end DST offsets",
+      "Nov 1, 01:30 UTC-04:00 – 01:15 UTC-05:00",
+      "2026-11-01T01:30:00-04:00",
+      "2026-11-01T01:15:00-05:00",
+    ],
+    [
+      "a bare UTC on another format",
+      "2026/11/04 10:00:00 - 2026/11/05 10:00:00 UTC",
+      "2026-11-04T10:00:00Z",
+      "2026-11-05T10:00:00Z",
+    ],
+  ])("reads %s", (_case, text, start, end) => {
+    expect(range(read(text))).toEqual([us(start), us(end)]);
+  });
+
+  it("names the format and whether the picker's zone was assumed", () => {
+    expect(read("Nov 4, 13:47 – 15:52")).toMatchObject({ format: "label", zoneAssumed: true });
+    expect(read("Nov 4, 08:17 – Nov 6, 08:17 UTC")).toMatchObject({ zoneAssumed: false });
+    expect(read('{"start_date":1721557986000000,"end_date":1721565186000000}')).toMatchObject({
+      format: "copied",
+      zoneAssumed: false,
+    });
+    expect(read("1721557986 - 1721565186")).toMatchObject({ format: "epoch", epochUnit: "s" });
+  });
+
+  it("floors a sub-second start and ceils a sub-second end, and says so", () => {
+    const result = read("Nov 4, 2026 13:47:03.250 - Nov 4, 2026 13:48:03.250");
+    expect(range(result)).toEqual([
+      us("2026-11-04T13:47:03+05:30"),
+      us("2026-11-04T13:48:04+05:30"),
+    ]);
+    expect(result).toMatchObject({ format: "log", endRoundedUp: true });
+  });
+
+  it("returns a single value with no end", () => {
+    expect(read("2026-11-04 13:47:03")).toMatchObject({
+      ok: true,
+      startUs: us("2026-11-04T13:47:03+05:30"),
+      endUs: null,
+    });
+    expect(read("Nov 5, 13:47")).toMatchObject({
+      startUs: us("2026-11-05T13:47:00+05:30"),
+      endUs: null,
+    });
+  });
+
+  it.each(["Mar 10 – Mar 5, 2026", "Mar 10, 2026 – Mar 5"])(
+    "keeps the shared year for a reversed label %s, so it reads as end before start",
+    (text) => {
+      expect(range(read(text))).toEqual([
+        us("2026-03-10T00:00:00+05:30"),
+        us("2026-03-05T23:59:59+05:30"),
+      ]);
+    },
+  );
+
+  it.each([
+    ["Nov 20 – Feb 3", "2025-11-20T00:00:00+05:30", "2026-02-03T23:59:59+05:30"],
+    ["Dec 20 – Jan 3", "2025-12-20T00:00:00+05:30", "2026-01-03T23:59:59+05:30"],
+    ["Mar 10 – Feb 5", "2026-03-10T00:00:00+05:30", "2027-02-05T23:59:59+05:30"],
+  ])(
+    "rolls a yearless %s End that is earlier than Start into the next year, a future start moving both back",
+    (text, start, end) => {
+      expect(range(read(text))).toEqual([us(start), us(end)]);
+    },
+  );
+
+  it("keeps one shared year when only Start gives a year and the pair is not December to January", () => {
+    expect(range(read("Nov 20, 2025 – Feb 3"))).toEqual([
+      us("2025-11-20T00:00:00+05:30"),
+      us("2025-02-03T23:59:59+05:30"),
+    ]);
+  });
+
+  it("pastes the trigger's own label back to the same instants", () => {
+    const start = us("2026-11-04T13:47:03+05:30");
+    const end = us("2026-11-06T14:02:03+05:30");
+    expect(range(read("Nov 4, 13:47:03 – Nov 6, 14:02:03"))).toEqual([start, end]);
+  });
+
+  it.each([
+    ["empty", "   ", "empty"],
+    ["no date", "hello there", "no-date"],
+    ["a part that does not exist", "2026-13-01", "invalid-part"],
+    ["a shortened label", "2d 15m", "no-date"],
+    ["one side with an offset", "2026-11-04T10:00:00Z - 2026-11-05 10:00", "mixed-offset"],
+  ])("says why it could not read %s", (_case, text, reason) => {
+    expect(read(text)).toMatchObject({ ok: false, reason });
+  });
+
+  it("cuts a long fragment to 40 characters", () => {
+    const result = read("x".repeat(60));
+    expect(result.ok ? "" : result.fragment).toHaveLength(40);
+  });
+});
+
+describe("parseRangeInput", () => {
+  // Saturday 2026-11-07 10:00 in Asia/Calcutta.
+  const NOW = Date.parse("2026-11-07T04:30:00Z");
+  const IST = "Asia/Calcutta";
+  const us = (iso: string) => Date.parse(iso) * 1000;
+  const ctx = (extra: Partial<RangeInputContext> = {}): RangeInputContext => ({
+    zone: IST,
+    nowMs: NOW,
+    calendarPresets: true,
+    ...extra,
+  });
+  const read = (text: string, extra: Partial<RangeInputContext> = {}): RangeInputResult =>
+    parseRangeInput(text, ctx(extra));
+  const kindOf = (result: RangeInputResult) => (result.ok ? result.kind : result.reason);
+  const germanLabels: Record<string, string> = {
+    "common.today": "Heute",
+    "common.yesterday": "Gestern",
+    "common.thisWeek": "Diese Woche",
+    "common.lastWeek": "Letzte Woche",
+    "common.rangeParseTo": "bis",
+    "common.rangeParseLast": "letzte",
+    "common.rangeParsePast": "vergangene",
+  };
+  // Plural forms the way vue-i18n picks them: one, else other.
+  const germanPast: Record<string, [string, string]> = {
+    "common.pastMinute": ["Letzte Minute", "Letzte {count} Minuten"],
+    "common.pastHour": ["Letzte Stunde", "Letzte {count} Stunden"],
+  };
+  const germanT = (key: string, named?: Record<string, unknown>) => {
+    const forms = germanPast[key];
+    if (forms) {
+      const count = Number(named?.count ?? 1);
+      return (count === 1 ? forms[0] : forms[1]).replace("{count}", String(count));
+    }
+    return germanLabels[key] ?? key;
+  };
+
+  describe("normalisation", () => {
+    it.each([
+      ["  15m  ", 15, "m"],
+      ["\u0661\u0665m", 15, "m"],
+      ["\u06f2h", 2, "h"],
+      ["\u200f15m\u200e", 15, "m"],
+    ])("reads %j as a relative window", (text, value, unit) => {
+      expect(read(text)).toMatchObject({ ok: true, kind: "relative", value, unit });
+    });
+
+    it("turns the Arabic comma and thin spaces into plain ones", () => {
+      expect(read("Nov 4\u060c 13:47\u2009-\u202f15:52")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-04T08:17:00Z"),
+        endUs: us("2026-11-04T10:22:00Z"),
+      });
+    });
+
+    it("reads the localized “to” as a range separator", () => {
+      expect(read("Nov 4, 13:47 bis 15:52", { t: germanT, locale: "de-DE" })).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-04T08:17:00Z"),
+      });
+    });
+  });
+
+  describe("rule 1, relative", () => {
+    it.each([
+      ["15m", 15, "m"],
+      ["15 min", 15, "m"],
+      ["last 15 minutes", 15, "m"],
+      ["past 15m", 15, "m"],
+      ["-15m", 15, "m"],
+      ["now-15m", 15, "m"],
+      ["90m", 90, "m"],
+      ["30s", 30, "s"],
+      ["6h", 6, "h"],
+      ["2d", 2, "d"],
+      ["1w", 1, "w"],
+      ["3M", 3, "M"],
+      ["3 months", 3, "M"],
+      ["15 MIN", 15, "m"],
+      ["Past 15 Minutes", 15, "m"],
+    ])("reads %j", (text, value, unit) => {
+      expect(read(text)).toEqual({ ok: true, kind: "relative", value, unit });
+    });
+
+    it("keeps the unit letter's case: m is minutes and M is months", () => {
+      expect(read("15m")).toMatchObject({ unit: "m" });
+      expect(read("15M")).toMatchObject({ unit: "M" });
+    });
+
+    it("has no year unit", () => {
+      expect(read("1y").ok).toBe(false);
+    });
+
+    it("reads the picker's own labels in the current language", () => {
+      expect(read("Letzte 15 Minuten", { t: germanT, locale: "de-DE" })).toEqual({
+        ok: true,
+        kind: "relative",
+        value: 15,
+        unit: "m",
+      });
+      expect(read("letzte 2 stunden", { t: germanT, locale: "de-DE" })).toMatchObject({
+        value: 2,
+        unit: "h",
+      });
+      expect(read("letzte 4h", { t: germanT, locale: "de-DE" })).toMatchObject({
+        value: 4,
+        unit: "h",
+      });
+    });
+
+    it("refuses relative text on a dates-only picker", () => {
+      expect(kindOf(read("15m", { disableRelative: true }))).toBe("not-allowed");
+      expect(kindOf(read("15m", { hideRelativeTime: true }))).toBe("not-allowed");
+    });
+
+    it("drops the seconds unit where seconds are hidden", () => {
+      expect(read("30s", { hideSeconds: true }).ok).toBe(false);
+      expect(read("30m", { hideSeconds: true }).ok).toBe(true);
+    });
+
+    it("refuses a zero amount and caps a huge one at about ten years", () => {
+      expect(kindOf(read("0m"))).toBe("invalid-part");
+      expect(read("40000000000000000000m")).toMatchObject({ value: 5_256_000, unit: "m" });
+    });
+  });
+
+  describe("query-range limit, duration based", () => {
+    it("keeps a typed window within the limit as typed", () => {
+      expect(read("90m", { queryRangeRestrictionInHour: 2 })).toEqual({
+        ok: true,
+        kind: "relative",
+        value: 90,
+        unit: "m",
+      });
+    });
+
+    it.each([
+      ["30d", 168, { value: 7, unit: "d" }],
+      ["2d", 36, { value: 36, unit: "h" }],
+      ["2w", 168, { value: 1, unit: "w" }],
+      ["90m", 1, { value: 60, unit: "m" }],
+      ["3h", 2.5, { value: 150, unit: "m" }],
+    ])("clamps %j on a %sh limit to the largest whole period", (text, limit, expected) => {
+      const result = read(text, { queryRangeRestrictionInHour: limit });
+      expect(result).toMatchObject({ ok: true, kind: "relative", ...expected });
+      expect(result.ok && result.kind === "relative" && result.typed).toBeTruthy();
+    });
+  });
+
+  describe("rule 2, calendar", () => {
+    it.each([
+      ["today", "calendar:day:0"],
+      ["Yesterday", "calendar:day:-1"],
+      ["this week", "calendar:week:0"],
+      ["last week", "calendar:week:-1"],
+      ["this month", "calendar:month:0"],
+      ["last month", "calendar:month:-1"],
+      ["this quarter", "calendar:quarter:0"],
+      ["last quarter", "calendar:quarter:-1"],
+      ["this year", "calendar:year:0"],
+      ["last year", "calendar:year:-1"],
+    ])("reads %j as %s", (text, token) => {
+      expect(read(text)).toEqual({ ok: true, kind: "calendar", token });
+    });
+
+    it("reads the localized period labels", () => {
+      expect(read("Gestern", { t: germanT, locale: "de-DE" })).toEqual({
+        ok: true,
+        kind: "calendar",
+        token: "calendar:day:-1",
+      });
+      expect(read("letzte woche", { t: germanT, locale: "de-DE" })).toMatchObject({
+        token: "calendar:week:-1",
+      });
+    });
+
+    it("needs calendar presets", () => {
+      expect(read("today", { calendarPresets: false }).ok).toBe(false);
+      expect(read("yesterday 09:00 - 17:00", { calendarPresets: false }).ok).toBe(false);
+    });
+
+    it("reads a weekday as that whole day, the most recent one", () => {
+      expect(read("thursday")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-04T18:30:00Z"),
+        endUs: us("2026-11-05T18:30:00Z"),
+      });
+      expect(read("Saturday")).toMatchObject({ startUs: us("2026-11-06T18:30:00Z") });
+    });
+
+    it("reads a day period with hours", () => {
+      expect(read("yesterday 09:00 - 17:00")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-06T03:30:00Z"),
+        endUs: us("2026-11-06T11:30:00Z"),
+      });
+      expect(read("today 2 PM to 4 PM")).toMatchObject({
+        startUs: us("2026-11-07T08:30:00Z"),
+        endUs: us("2026-11-07T10:30:00Z"),
+      });
+    });
+  });
+
+  describe("rule 3, absolute", () => {
+    it("reads everything the paste grammar reads", () => {
+      expect(read("Nov 4, 13:47 – 15:52")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        format: "label",
+        zoneAssumed: true,
+      });
+      expect(read("2026/11/04 13:00:00 - 2026/11/04 15:00:00")).toMatchObject({
+        kind: "absolute",
+        format: "slashed",
+      });
+      expect(read("1762244223 - 1762251423")).toMatchObject({ kind: "absolute", format: "epoch" });
+    });
+
+    it("reads the ISO interval Copy writes, back to the same instants", () => {
+      expect(read("2026-11-04T13:47:00+05:30/2026-11-04T15:52:00+05:30")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-04T08:17:00Z"),
+        endUs: us("2026-11-04T10:22:00Z"),
+        zoneAssumed: false,
+      });
+    });
+
+    it("reads month names in the picker's language", () => {
+      expect(read("4. Nov. 2026, 13:00 - 15:00", { locale: "de-DE", t: germanT })).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-04T07:30:00Z"),
+      });
+      expect(read("4 octobre 2026, 13:00 - 15:00", { locale: "fr-FR" })).toMatchObject({
+        ok: true,
+        startUs: us("2026-10-04T07:30:00Z"),
+      });
+    });
+
+    it("reads an hour with am or pm and no minutes, on today when no date is given", () => {
+      expect(read("2 PM - 4 PM")).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-07T08:30:00Z"),
+        endUs: us("2026-11-07T10:30:00Z"),
+      });
+    });
+
+    it("runs two bare times past midnight when the end is earlier", () => {
+      expect(read("22:00 - 02:00")).toMatchObject({
+        startUs: us("2026-11-07T16:30:00Z"),
+        endUs: us("2026-11-07T20:30:00Z"),
+      });
+    });
+  });
+
+  describe("rule 4, zones in text", () => {
+    it("reads offsets, Z and UTC", () => {
+      expect(read("2026-11-04T08:17:03Z - 2026-11-04T09:17:03Z")).toMatchObject({
+        startUs: us("2026-11-04T08:17:03Z"),
+        zoneAssumed: false,
+      });
+      expect(read("Nov 4, 13:00 - 15:00 UTC")).toMatchObject({
+        startUs: us("2026-11-04T13:00:00Z"),
+        zoneAssumed: false,
+      });
+    });
+
+    it("reads an IANA zone name at the end", () => {
+      expect(read("Nov 4, 13:00 - 15:00 America/New_York")).toMatchObject({
+        ok: true,
+        startUs: us("2026-11-04T18:00:00Z"),
+        zoneAssumed: false,
+        namedZone: { zone: "America/New_York" },
+      });
+    });
+
+    it.each([
+      ["IST", "Asia/Kolkata", "2026-11-04T07:30:00Z"],
+      ["CST", "America/Chicago", "2026-11-04T19:00:00Z"],
+      ["PST", "America/Los_Angeles", "2026-11-04T21:00:00Z"],
+      ["CET", "Europe/Paris", "2026-11-04T12:00:00Z"],
+      ["JST", "Asia/Tokyo", "2026-11-04T04:00:00Z"],
+    ])("reads the abbreviation %s as %s", (abbr, zone, start) => {
+      expect(read(`Nov 4, 13:00 - 15:00 ${abbr}`)).toMatchObject({
+        ok: true,
+        startUs: us(start),
+        namedZone: { zone, abbr },
+      });
+    });
+
+    it("reads two 12-hour times in a named zone on today", () => {
+      expect(read("2:15 PM to 2:40 PM IST", { zone: "UTC" })).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-07T08:45:00Z"),
+        endUs: us("2026-11-07T09:10:00Z"),
+        namedZone: { zone: "Asia/Kolkata", abbr: "IST" },
+      });
+    });
+  });
+
+  describe("zones after a day word", () => {
+    it("reads a day period with hours in a named zone", () => {
+      expect(read("yesterday 09:00 - 17:00 IST", { zone: "UTC" })).toMatchObject({
+        ok: true,
+        kind: "absolute",
+        startUs: us("2026-11-06T03:30:00Z"),
+        endUs: us("2026-11-06T11:30:00Z"),
+        zoneAssumed: false,
+        namedZone: { zone: "Asia/Kolkata", abbr: "IST" },
+      });
+    });
+  });
+
+  describe("rule 5, one instant", () => {
+    it.each([
+      ["2026-11-04T08:17:03Z", us("2026-11-04T08:17:03Z")],
+      ["1762244223", 1762244223 * 1_000_000],
+      ["14:30", us("2026-11-07T09:00:00Z")],
+    ])("reads %j as an instant", (text, at) => {
+      expect(read(text)).toMatchObject({ ok: true, kind: "instant", startUs: at });
+    });
+  });
+
+  describe("failures", () => {
+    it.each([
+      ["", "empty"],
+      ["hello there", "no-date"],
+      ["2026-02-30 - 2026-03-01", "invalid-part"],
+      ["2026-11-04T10:00:00Z - 2026-11-04 12:00:00", "mixed-offset"],
+    ])("reports %j as %s", (text, reason) => {
+      expect(kindOf(read(text))).toBe(reason);
+    });
+
+    it("suggests a keyword within two edits", () => {
+      const typo = read("15 minuts");
+      expect(typo).toMatchObject({ ok: false, reason: "unknown" });
+      expect(typo.ok ? "" : typo.suggestion).toMatch(/^15 minutes?$/);
+      expect(read("yesterdy")).toMatchObject({ ok: false, suggestion: "yesterday" });
+      expect(read("last weak")).toMatchObject({ ok: false, suggestion: "last week" });
+    });
+
+    it("says seconds are not available where they are hidden", () => {
+      expect(read("30s", { hideSeconds: true })).toEqual({
+        ok: false,
+        reason: "no-seconds",
+        fragment: "30s",
+      });
+    });
+
+    it("offers no calendar word as a suggestion without calendar presets", () => {
+      expect(read("yesterdy", { calendarPresets: false })).not.toHaveProperty("suggestion");
+    });
+  });
+});
+
+describe("zoneAbbreviation", () => {
+  const JAN = Date.parse("2026-01-15T12:00:00Z");
+  const JUL = Date.parse("2026-07-15T12:00:00Z");
+
+  it("names daylight time by its own abbreviation where Intl only gives an offset", () => {
+    expect(zoneAbbreviation("Europe/Paris", JAN)).toBe("CET");
+    expect(zoneAbbreviation("Europe/Paris", JUL)).toBe("CEST");
+    expect(zoneAbbreviation("Australia/Sydney", JAN)).toBe("AEDT");
+    expect(zoneAbbreviation("Australia/Sydney", JUL)).toBe("AEST");
+  });
+
+  it("keeps Intl's own short name and reads India as IST", () => {
+    expect(zoneAbbreviation("America/New_York", JUL)).toBe("EDT");
+    expect(zoneAbbreviation("Asia/Calcutta", JUL)).toBe("IST");
+  });
+
+  it("falls back to the offset for a zone with no abbreviation", () => {
+    expect(zoneAbbreviation("Asia/Dhaka", JUL)).toMatch(/^(GMT|UTC)\+0?6/);
+  });
 });

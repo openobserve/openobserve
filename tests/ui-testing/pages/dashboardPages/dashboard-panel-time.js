@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { hasRelativeChip, setRelativeCode } from "../commonActions.js";
 import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 /**
@@ -93,7 +94,7 @@ export default class DashboardPanelTime {
 
   /** Click a relative time button inside an open date-time picker (page-level) */
   async clickDateTimeRelative(timeRange) {
-    await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
+    await setRelativeCode(this.page, timeRange);
   }
 
   /** Apply the range picked in the open date-time picker (Apply, or close + Refresh on dashboards) */
@@ -130,9 +131,14 @@ export default class DashboardPanelTime {
     return this.page.locator(`[data-test="panel-${panelId}-refresh-btn"]`);
   }
 
-  /** Returns a relative time range button scoped inside the open date-time menu */
+  /** Returns a relative time range chip scoped inside the open date-time menu; only the picker's chips exist */
   timeRangeBtn(timeRange) {
     return this.dateTimeMenu.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+  }
+
+  /** Picks a relative window in the open picker: its chip, or the window typed into the range field */
+  async pickTimeRange(timeRange) {
+    await setRelativeCode(this.page, timeRange);
   }
 
   // =========================================
@@ -225,9 +231,7 @@ export default class DashboardPanelTime {
 
     // Select the time range within the dialog
     // Config panel picker has auto-apply enabled, so selecting auto-saves and closes
-    const timeOptionLocator = this.timeRangeBtn(timeRange);
-    await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
-    await timeOptionLocator.click();
+    await this.pickTimeRange(timeRange);
 
     // No apply button needed — config panel picker has auto-apply enabled
     // Wait for the date time dialog to close after auto-apply
@@ -249,8 +253,8 @@ export default class DashboardPanelTime {
     // Wait for the date picker dropdown to open
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Switch to absolute tab
-    await this.dateTimeMenu.locator('[data-test="date-time-absolute-tab"]').click();
+    // Custom range is always shown beside Quick ranges
+    await this.dateTimeMenu.locator('[data-test="date-time-custom-range"] h3').waitFor({ state: "visible", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Select the start and end days using Reka UI calendar — scope to non-disabled, non-outside-view cells
@@ -261,8 +265,8 @@ export default class DashboardPanelTime {
     await visibleCell(startDay).click();
     await visibleCell(endDay).click();
 
-    // Config panel picker has auto-apply enabled — no Apply button; menu closes automatically
-    // Wait for the date picker dropdown to close after auto-apply
+    // Calendar days are a draft until Apply, Enter or an outside click commits them
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
@@ -280,8 +284,8 @@ export default class DashboardPanelTime {
     // Wait for the date picker dropdown to open
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Switch to absolute tab
-    await this.dateTimeMenu.locator('[data-test="date-time-absolute-tab"]').click();
+    // Custom range is always shown beside Quick ranges
+    await this.dateTimeMenu.locator('[data-test="date-time-custom-range"] h3').waitFor({ state: "visible", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Select the start and end days using Reka UI calendar — scope to non-disabled, non-outside-view cells
@@ -292,8 +296,8 @@ export default class DashboardPanelTime {
     await visibleCell(startDay).click();
     await visibleCell(endDay).click();
 
-    // Config panel picker has auto-apply enabled — no Apply button; menu closes automatically
-    // Wait for the date picker dropdown to close after auto-apply
+    // Calendar days are a draft until Apply, Enter or an outside click commits them
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
@@ -360,6 +364,11 @@ export default class DashboardPanelTime {
 
     // Page-level locators survive portal re-mounts; only one datetime menu can be
     // open at a time (Reka UI unmounts when closed), so these are unambiguous.
+    if (!hasRelativeChip(...timeRange.split("-"))) {
+      await setRelativeCode(this.page, timeRange);
+      if (clickApply) await applyPickedDateTime(this.page);
+      return;
+    }
     const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).first();
     // force: true is required here. Reka UI's data-reka-popper-content-wrapper can
     // transiently intercept pointer events mid-re-render even after the idle wait,
@@ -376,10 +385,10 @@ export default class DashboardPanelTime {
           await this.clickPanelTimePicker(panelId);
           await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
         }
-        if (!/bg-button-primary!/.test((await timeOptionLocator.getAttribute("class")) ?? "")) {
+        if ((await timeOptionLocator.getAttribute("aria-pressed")) !== "true") {
           await timeOptionLocator.click({ force: true, timeout: 5000 });
         }
-        await expect(timeOptionLocator).toHaveClass(/bg-button-primary!/, { timeout: 2000 });
+        await expect(timeOptionLocator).toHaveAttribute("aria-pressed", "true", { timeout: 2000 });
       }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
     }
 
@@ -515,9 +524,7 @@ export default class DashboardPanelTime {
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Click the time option within the dialog
-    const timeOptionBtn = this.timeRangeBtn(timeRange);
-    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
-    await timeOptionBtn.click();
+    await this.pickTimeRange(timeRange);
 
     // Apply the pick: the dashboard picker has no Apply button
     await applyPickedDateTime(this.page);
@@ -627,9 +634,7 @@ export default class DashboardPanelTime {
   async selectGlobalTimeWithoutApply(timeRange) {
     await this.clickGlobalTimePicker();
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
-    const timeOptionBtn = this.timeRangeBtn(timeRange);
-    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
-    await timeOptionBtn.click();
+    await this.pickTimeRange(timeRange);
   }
 
   /**
@@ -655,7 +660,7 @@ export default class DashboardPanelTime {
   async openGlobalPickerAbsoluteTab() {
     await this.clickGlobalTimePicker();
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
-    await this.dateTimeMenu.locator('[data-test="date-time-absolute-tab"]').click();
+    await this.dateTimeMenu.locator('[data-test="date-time-custom-range"] h3').waitFor({ state: "visible", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
@@ -703,16 +708,13 @@ export default class DashboardPanelTime {
   async changeViewPanelDateTime(timeRange) {
     await this.clickViewPanelDateTimePicker();
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
-    const timeOptionBtn = this.timeRangeBtn(timeRange);
-    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
-
     // Set up the response waiter BEFORE the pick, which applies at once with Auto Run on
     const queryDone = this.page.waitForResponse(
       r => r.url().includes('/_search') || r.url().includes('/query'),
       { timeout: 15000 }
     ).catch(() => {});
 
-    await timeOptionBtn.click();
+    await this.pickTimeRange(timeRange);
     await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     // Wait for the re-query response triggered by the time change
@@ -728,9 +730,7 @@ export default class DashboardPanelTime {
   async selectViewPanelTimeWithoutApply(timeRange) {
     await this.clickViewPanelDateTimePicker();
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
-    const timeOptionBtn = this.timeRangeBtn(timeRange);
-    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
-    await timeOptionBtn.click();
+    await this.pickTimeRange(timeRange);
     await this.dismissDateTimePicker();
   }
 }

@@ -185,6 +185,7 @@ import Undo from "~icons/material-symbols/undo";
 import UnfoldMore from "~icons/material-symbols/unfold-more";
 import ZoomIn from "~icons/material-symbols/zoom-in";
 import ZoomOut from "~icons/material-symbols/zoom-out";
+import Globe from "~icons/material-symbols/globe";
 import Upload from "~icons/material-symbols/upload";
 import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
@@ -581,6 +582,7 @@ export const iconRegistry = {
   "unfold-more": UnfoldMore,
   "zoom-in": ZoomIn,
   "zoom-out": ZoomOut,
+  globe: Globe,
   upload: Upload,
   "verified-user": VerifiedUser,
   webhook: Webhook,

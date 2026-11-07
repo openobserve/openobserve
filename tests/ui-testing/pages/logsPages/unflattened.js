@@ -23,7 +23,7 @@ class UnflattenedPage {
 
         // Logs explorer
         this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
-        this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        this.relativeTab = page.locator('[data-test="date-time-quick-ranges"] h3');
         this.logTableRowExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
         // FTS default-column feature: first cell may be the generic "source"
         // column OR an FTS column (body/message/log). Target whichever first-row

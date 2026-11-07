@@ -1,6 +1,6 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
-import { gotoMetricsVisualize } from '../commonActions.js';
+import { gotoMetricsVisualize, hasRelativeChip, setRelative } from '../commonActions.js';
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -57,7 +57,7 @@ export class MetricsPage {
         // Date/time picker (shared metrics control)
         this.dateTimePicker = page.locator('[data-test="metrics-date-picker"]');
         // Relative tab inside DateTime popover
-        this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        this.dateTimeRelativeTab = page.locator('[data-test="date-time-quick-ranges"] h3');
         // Datetime start/end input (absolute mode)
         this.dateTimeStartInput = page.locator('[data-test="datetime-start-time"]');
         // Auto-refresh button (toggles dropdown)
@@ -1396,10 +1396,13 @@ export class MetricsPage {
             };
             const unit = unitMap[unitRaw] || 'm';
 
-            // Use the actual data-test selector pattern from DateTime.vue
-            // Pattern: [data-test="date-time-relative-{value}-{unit}-btn"]
-            const dateTimeSelector = `[data-test="date-time-relative-${value}-${unit}-btn"]`;
-            const dateTimeBtn = this.page.locator(dateTimeSelector);
+            // A chip when the picker has one, else the window typed into its range field.
+            if (!hasRelativeChip(value, unit)) {
+                await setRelative(this.page, value, unit);
+                await this.closeDateTimePickerIfOpen();
+                return true;
+            }
+            const dateTimeBtn = this.page.locator(`[data-test="date-time-relative-${value}-${unit}-btn"]`);
 
             if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await dateTimeBtn.click();
@@ -1603,8 +1606,7 @@ export class MetricsPage {
     }
 
     async getCustomRangeOption() {
-        // The DateTime popover opens onto the Relative tab by default; click it
-        // to expose the relative-period preset buttons.
+        // The DateTime popover has no tabs; its Quick ranges heading marks the preset chips.
         return this.dateTimeRelativeTab;
     }
 
@@ -1802,7 +1804,7 @@ export class MetricsPage {
     async getDatePickerDropdown() {
         // The DateTime popover renders the "Relative" tab as a sentinel data-test;
         // when the popover is open, this element is in the DOM.
-        return this.page.locator('[data-test="date-time-relative-tab"]');
+        return this.page.locator('[data-test="date-time-quick-ranges"] h3');
     }
 
     async getCollapsibleToggle() {

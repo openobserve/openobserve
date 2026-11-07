@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :menu-align="menuAlign"
     :variant="variant"
     :calendar-presets="calendarPresets"
+    :page-shortcuts="pageShortcuts"
     @hide="onHide"
     @show="onShow"
   >
@@ -91,6 +92,12 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
     },
     calendarPresets: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    /** Binds the time picker's page keys, for the dashboard's own picker only. */
+    pageShortcuts: {
       required: false,
       default: false,
       type: Boolean,

@@ -185,4 +185,69 @@ describe("ODateRangeCalendar", () => {
 
     expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(true);
   });
+
+  // ── Month model and invalid days ───────────────────────────────
+
+  it("shows the month it is given, so a typed date moves the grid", async () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: { month: "2024/03/15", maxDate: "2030/01/01" },
+      attachTo: document.body,
+    });
+    expect(wrapper.find('[data-test="daterangecalendar-cell-2024-03-15"]').exists()).toBe(true);
+    await wrapper.setProps({ month: "2024/07/01" });
+    expect(wrapper.find('[data-test="daterangecalendar-cell-2024-07-20"]').exists()).toBe(true);
+  });
+
+  it("reports its own month navigation as the first day of the new month", async () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: { month: "2024/03/15", maxDate: "2030/01/01" },
+      attachTo: document.body,
+    });
+    await wrapper.find('[data-test="daterangecalendar-next"]').trigger("click");
+    expect(wrapper.emitted("update:month")?.at(-1)).toEqual(["2024/04/01"]);
+  });
+
+  it("rings the days of an invalid range", () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: {
+        month: "2024/03/15",
+        maxDate: "2030/01/01",
+        invalidDates: ["2024/03/10", "2024/03/04"],
+      },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper.find('[data-test="daterangecalendar-cell-2024-03-10"]').attributes("data-invalid"),
+    ).toBe("");
+    expect(
+      wrapper.find('[data-test="daterangecalendar-cell-2024-03-11"]').attributes("data-invalid"),
+    ).toBeUndefined();
+  });
+
+  it("outlines a preview range without selecting it, distinct from today", () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: {
+        month: "2024/03/15",
+        startDate: "2024/03/20",
+        endDate: "2024/03/21",
+        previewRange: { start: "2024/03/04", end: "2024/03/10" },
+      },
+      attachTo: document.body,
+    });
+    const cell = (day: string) =>
+      wrapper.find(`[data-test="daterangecalendar-cell-2024-03-${day}"]`);
+    expect(cell("04").attributes("data-preview")).toBe("");
+    expect(cell("10").attributes("data-preview")).toBe("");
+    expect(cell("11").attributes("data-preview")).toBeUndefined();
+    expect(cell("04").attributes("data-selected")).toBeUndefined();
+    expect(wrapper.emitted("update:startDate")).toBeUndefined();
+  });
+
+  it("draws no preview without the prop", () => {
+    wrapper = mount(ODateRangeCalendar, {
+      props: { month: "2024/03/15", startDate: "2024/03/20", endDate: "2024/03/21" },
+      attachTo: document.body,
+    });
+    expect(wrapper.findAll("[data-preview]")).toHaveLength(0);
+  });
 });

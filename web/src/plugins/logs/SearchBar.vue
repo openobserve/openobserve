@@ -888,6 +888,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
             calendar-presets
+            page-shortcuts
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
@@ -1247,8 +1248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :trigger="true"
                 :is-compact="true"
                 :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
+                :range-start-us="fixedRefreshRange?.startUs ?? 0"
+                :range-end-us="fixedRefreshRange?.endUs ?? 0"
+                :busy="!!searchObj.loading"
+                :max-range-hours="searchObj.data.datetime.queryRangeRestrictionInHour || 0"
                 @update:model-value="onRefreshIntervalUpdate"
                 @trigger="$emit('onAutoIntervalTrigger')"
+                @switch-relative="onSwitchRefreshRelative"
               />
             </div>
           </div>
@@ -1761,6 +1767,7 @@ import {
 } from "@/utils/queryHistory/logs";
 import type { HistoryStatus, QueryHistoryEntry } from "@/services/query_history";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { fixedRangeOf } from "@/composables/useAutoRefreshGate";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
@@ -3483,6 +3490,18 @@ export default defineComponent({
       emit("onChangeInterval");
     };
 
+    const fixedRefreshRange = computed(() => fixedRangeOf(searchObj.data.datetime));
+
+    // A paused refresh resumes by turning the ended range into the relative period nearest its length.
+    const onSwitchRefreshRelative = (period: string) => {
+      const picker = dateTimeRef.value as {
+        setSavedDate?: (value: { type: string; relativeTimePeriod: string }) => void;
+        saveDate?: (type: string) => void;
+      } | null;
+      picker?.setSavedDate?.({ type: "relative", relativeTimePeriod: period });
+      picker?.saveDate?.("relative");
+    };
+
     const fnSavedView = () => {
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
@@ -5167,6 +5186,8 @@ export default defineComponent({
       resolveFieldValues,
       effectiveSuggestions,
       onRefreshIntervalUpdate,
+      fixedRefreshRange,
+      onSwitchRefreshRelative,
       updateTimezone,
       dateTimeRef,
       fnSavedView,

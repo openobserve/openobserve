@@ -16,6 +16,7 @@
 import { reactive, onBeforeMount, nextTick, watch } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
+import { fixedRangeOf, rangeHasEnded } from "@/composables/useAutoRefreshGate";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
@@ -206,6 +207,7 @@ const useLogs = (t: TranslateFn) => {
     clearInterval(store.state.refreshIntervalID);
     if (!(searchObj.meta.refreshInterval > 0)) return;
     const refreshIntervalID = setInterval(() => {
+      if (rangeHasEnded(fixedRangeOf(searchObj.data.datetime))) return;
       if (
         searchObj.meta.logsVisualizeToggle === "logs" &&
         searchObj.data.stream.selectedStream.length > 0
@@ -231,8 +233,11 @@ const useLogs = (t: TranslateFn) => {
       ) {
         armRefreshInterval();
 
-        // only notify if user is in logs page
-        if (searchObj.meta.logsVisualizeToggle == "logs") {
+        // An ended range never goes live, so it gets no live-mode notice.
+        if (
+          searchObj.meta.logsVisualizeToggle == "logs" &&
+          !rangeHasEnded(fixedRangeOf(searchObj.data.datetime))
+        ) {
           toast({
             variant: "info",
             message: t("toastMessages.composables.liveModeIsEnabledOnlyTop", {

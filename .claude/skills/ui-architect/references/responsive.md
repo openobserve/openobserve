@@ -219,8 +219,8 @@ the same recipe so it never takes two rows of chrome:
 
 ## Popups, dropdowns and dialogs fit the viewport
 
-- Library popups (`ODropdown`, `OPopover`, `OSelect`, `OCombobox`, `OColor`, `OTime`,
-  `ODateTimeRange`): below lg they cap to the available height, scroll, and keep an
+- Library popups (`ODropdown`, `OPopover`, `OSelect`, `OCombobox`, `OColor`,
+  `OTime`): below lg they cap to the available height, scroll, and keep an
   8 px margin from the viewport edge. Build floating UI from them, not from absolutely
   positioned divs.
 - **No popup is wider than the phone.** A fixed width becomes

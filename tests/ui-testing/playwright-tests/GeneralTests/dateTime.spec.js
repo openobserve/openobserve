@@ -13,7 +13,7 @@ const PageManager = require('../../pages/page-manager.js');
  *
  * Assertion strategy — copy-back round-trip (same as the copy/paste spec):
  * after a shift the picker closes, so the test reopens it, clicks Copy, and
- * compares the {"start_date","end_date"} epoch-microsecond payload. This is
+ * compares the copied ISO 8601 interval, read back as epoch microseconds. This is
  * exact for second-aligned input and independent of the runner's timezone.
  */
 
@@ -66,8 +66,10 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.expectPasteReadNote();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
+    // A paste only fills the draft; the shift arrows move the applied range.
+    await pm.dateTimePickerPage.clickApply();
     await pm.dateTimePickerPage.expectNextEnabled();
 
     await pm.dateTimePickerPage.clickNext();
@@ -127,8 +129,10 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.expectPasteReadNote();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
+    // A paste only fills the draft; the shift arrows move the applied range.
+    await pm.dateTimePickerPage.clickApply();
 
     await pm.dateTimePickerPage.clickPrev();
 
@@ -156,8 +160,10 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${startMicros} - ${endMicros}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.expectPasteReadNote();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
+    // A paste only fills the draft; the shift arrows move the applied range.
+    await pm.dateTimePickerPage.clickApply();
 
     await pm.dateTimePickerPage.expectNextDisabled();
 

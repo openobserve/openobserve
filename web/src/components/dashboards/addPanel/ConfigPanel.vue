@@ -211,7 +211,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
                 />
-                <OTooltip :content="raw(formattedPickerValue)" max-width="20rem" />
               </div>
               <OIcon
                 class="ms-2 me-1 flex-shrink-0 shrink-0 cursor-pointer"
@@ -4931,14 +4930,6 @@ export default defineComponent({
       dateTimePicker?: { getDisplayValue: string };
     } | null>(null);
 
-    // Format picker value for tooltip display using the DateTime component's display value
-    const formattedPickerValue = computed(() => {
-      if (!panelTimePickerRef.value?.dateTimePicker?.getDisplayValue) {
-        return "";
-      }
-      return panelTimePickerRef.value.dateTimePicker.getDisplayValue;
-    });
-
     // Toggle on/off
     const onToggleDefaultTime = (value: SwitchValue) => {
       const enabled = value as boolean;
@@ -5370,7 +5361,6 @@ export default defineComponent({
       pickerValue,
       showTimePicker,
       panelTimePickerRef,
-      formattedPickerValue,
       onToggleDefaultTime,
       onCancelPanelTime,
       searchQuery,
@@ -5405,16 +5395,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(lib-override:DateTimePicker): truncate the picker label and size the arrow
-   inside the date-time button — targets the picker's internal DOM via :deep(). */
-.panel-time-picker-btn :deep(.date-time-button .date-time-label) {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* keep(lib-override:DateTimePicker): size the arrow inside the date-time button — targets the picker's internal DOM via :deep(). */
 .panel-time-picker-btn :deep(.date-time-button .date-time-arrow) {
   flex-shrink: 0;
   font-size: var(--text-lg) !important;

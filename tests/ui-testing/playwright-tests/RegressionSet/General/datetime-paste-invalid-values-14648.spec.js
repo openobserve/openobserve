@@ -36,7 +36,7 @@ test.describe("DateTime paste rejects invalid calendar and clock values (#14648)
       await pm.dateTimePickerPage.seedClipboard(text);
       await pm.dateTimePickerPage.clickPaste();
 
-      await pm.dateTimePickerPage.expectPasteErrorToast();
+      await pm.dateTimePickerPage.expectPasteErrorNote();
       expect(await pm.dateTimePickerPage.getTriggerLabel(),
         `Bug #14648: an invalid paste must leave the selected range as it was`
       ).toBe(before);
@@ -49,7 +49,7 @@ test.describe("DateTime paste rejects invalid calendar and clock values (#14648)
     await pm.dateTimePickerPage.seedClipboard('2028-02-29T10:00:00 - 2028-02-29T11:00:00');
     await pm.dateTimePickerPage.clickPaste();
 
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
-    expect(await pm.dateTimePickerPage.getTriggerLabel()).toContain('2028/02/29 10:00:00');
+    await pm.dateTimePickerPage.expectPasteReadNote();
+    expect(await pm.dateTimePickerPage.getRangeSummary()).toContain('Feb 29, 2028, 10:00:00');
   });
 });

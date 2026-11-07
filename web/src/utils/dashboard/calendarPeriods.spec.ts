@@ -349,14 +349,14 @@ describe("calendarPeriods", () => {
           "America/Santiago",
           Date.parse("2026-09-07T15:00:00Z"),
         ),
-      ).toBe("2026/09/06 01:00:00 - 2026/09/06 23:59:59 (America/Santiago)");
+      ).toBe("2026-09-06 01:00:00 – 2026-09-06 23:59:59\n23h · America/Santiago (UTC-03:00)");
       expect(
         formatCalendarTooltip(
           "calendar:day:-2",
           "America/Havana",
           Date.parse("2026-11-02T15:00:00Z"),
         ),
-      ).toBe("2026/10/31 00:00:00 - 2026/10/31 23:59:59 (America/Havana)");
+      ).toBe("2026-10-31 00:00:00 – 2026-10-31 23:59:59\n1d · America/Havana (UTC-04:00)");
     });
   });
 
@@ -481,7 +481,7 @@ describe("calendarPeriods", () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(NOW);
         expect(describePeriod("calendar:day:-1")).toBe(
-          "2026/10/07 00:00:00 - 2026/10/07 23:59:59 (UTC)",
+          "2026-10-07 00:00:00 – 2026-10-07 23:59:59 · 1d · UTC",
         );
         expect(describePeriod("15m")).toBe("15m");
       } finally {
@@ -511,22 +511,22 @@ describe("calendarPeriods", () => {
   describe("formatCalendarTooltip", () => {
     it("ends at now for the current period", () => {
       expect(formatCalendarTooltip("calendar:month:0", IST, NOW)).toBe(
-        "2026/10/01 00:00:00 - 2026/10/08 08:30:00 (Asia/Calcutta)",
+        "2026-10-01 00:00:00 – 2026-10-08 08:30:00\n7d 8h · Asia/Calcutta (UTC+05:30)",
       );
     });
 
     it("ends at the last second of a past period", () => {
       expect(formatCalendarTooltip("calendar:month:-1", IST, NOW)).toBe(
-        "2026/09/01 00:00:00 - 2026/09/30 23:59:59 (Asia/Calcutta)",
+        "2026-09-01 00:00:00 – 2026-09-30 23:59:59\n30d · Asia/Calcutta (UTC+05:30)",
       );
       expect(formatCalendarTooltip("calendar:day:-1", NY, NOW)).toBe(
-        "2026/10/06 00:00:00 - 2026/10/06 23:59:59 (America/New_York)",
+        "2026-10-06 00:00:00 – 2026-10-06 23:59:59\n1d · America/New_York (UTC-04:00)",
       );
     });
 
     it("names the resolved zone when the given one is unknown", () => {
       expect(formatCalendarTooltip("calendar:day:0", "Not/AZone", NOW)).toBe(
-        "2026/10/08 00:00:00 - 2026/10/08 03:00:00 (UTC)",
+        "2026-10-08 00:00:00 – 2026-10-08 03:00:00\n3h · UTC",
       );
     });
   });

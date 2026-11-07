@@ -16,11 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="rootEl"
     icon="info"
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
+      'max-w-full min-w-0': triggerView.kind === 'absolute',
     }"
   >
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
@@ -45,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
+      @pointer-down-outside="onPointerDownOutside"
     >
       <template #trigger>
         <OButton
@@ -62,17 +65,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'h-auto! rounded-none! border-0!': !hideRangeShift,
             'border-select-border! enabled:hover:border-select-border-hover! w-full':
               fieldAppearance,
+            'max-w-full min-w-0': triggerView.kind === 'absolute',
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
+          :data-start-us="triggerView.kind === 'absolute' ? triggerView.startUs : undefined"
+          :data-end-us="triggerView.kind === 'absolute' ? triggerView.endUs : undefined"
+          :aria-describedby="triggerTooltip && !menuOpen ? triggerDescriptionId : undefined"
           @mouseenter="refreshTooltipNow"
         >
           <template #icon-left>
-            <OTooltip v-if="triggerTooltip" :content="triggerTooltip" />
+            <OTooltip
+              v-if="triggerTooltip && !menuOpen"
+              :content="triggerTooltip"
+              content-class="whitespace-pre-line"
+              max-width="30rem"
+            />
             <OIcon name="schedule" size="sm" />
           </template>
+          <span
+            v-if="triggerView.kind === 'absolute' && !triggerText"
+            ref="triggerLabelEl"
+            class="date-time-label min-w-0 flex-1 overflow-hidden text-start whitespace-nowrap"
+            :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
+          >
+            <span v-if="ladderStep === 3" data-test="date-time-btn-duration">{{
+              triggerView.duration
+            }}</span>
+            <template v-else>
+              <span>{{ ladderStep === 1 ? triggerView.full.range : triggerView.short.range }}</span>
+              <span
+                v-if="triggerView.full.zone"
+                data-test="date-time-btn-tz"
+                class="text-text-secondary ms-1 font-normal"
+                >{{ triggerView.full.zone }}</span
+              >
+            </template>
+            <span v-if="ladderStep > 1" class="sr-only">{{ triggerAccessibleTail }}</span>
+          </span>
           <OTruncatedText
-            class="date-time-label flex-1 text-left"
+            v-else
+            class="date-time-label flex-1 text-start"
             :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
             >{{ triggerLabel }}</OTruncatedText
           >
@@ -86,293 +119,236 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
-        :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
-        @keydown.capture="onPickerKeydown"
+        tabindex="-1"
+        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col overflow-y-auto outline-none"
+        :class="hasHelpers ? 'w-180 max-sm:w-[calc(100vw-1rem)]' : 'w-90'"
+        @keydown="onPickerKeydown"
         @paste="onPickerPaste"
+        @pointerleave="endPreview"
+        @focusin="onPanelFocusIn"
       >
-        <div
-          class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
-          :class="
-            showRail ? 'grid-cols-[19.25rem_1fr] grid-rows-[auto_1fr]' : 'grid-rows-[auto_1fr]'
-          "
-        >
-          <div
-            v-if="!(hideClipboard && disableRelative)"
-            class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
-            :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
+        <div class="border-border-default flex flex-col gap-1 border-b px-3 pt-3 pb-2">
+          <DateTimeRangeField
+            ref="rangeField"
+            :model-value="fieldText"
+            :placeholder="fieldPlaceholder"
+            :show-hint="showFieldHint"
+            :error="fieldInvalid"
+            :hide-clipboard="hideClipboard"
+            :described-by="lineNote ? noteId : undefined"
+            :relative="!disableRelative && !hideRelativeTime"
+            :calendar="calendarPresets"
+            @update:model-value="onFieldInput"
+            @draft="onFieldDraft"
+            @submit="onFieldSubmit"
+            @paste-text="onFieldPaste"
+            @copy="copyRange"
+            @paste="pasteRange"
+          />
+          <DateTimeResolvedLine
+            :view="lineView"
+            :note="lineNote"
+            :note-id="noteId"
+            :zoom-disabled="zoomDisabled"
+            :live-text="liveText"
+            @zoom-out="zoomOut"
+            @freeze="freezeCalendar"
+            @note-action="onNoteAction"
           >
-            <OToggleGroup
-              v-if="!disableRelative"
-              :model-value="selectedType"
-              type="single"
-              class="flex-1"
-              data-test="date-time-type-toggle"
-              @update:model-value="onTypeToggle"
-            >
-              <OToggleGroupItem
-                value="relative"
-                size="sm"
-                class="flex-1"
-                data-test="date-time-relative-tab"
-              >
-                {{ t("common.relative") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="absolute"
-                size="sm"
-                class="flex-1"
-                data-test="date-time-absolute-tab"
-              >
-                {{ t("common.absolute") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div v-else class="flex-1" />
-            <OTooltip v-if="!hideClipboard" :content="t('common.copyRange')">
-              <OButton
-                data-test="date-time-copy-btn"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-copy"
-                :aria-label="t('common.copyRange')"
-                @click="copyRange"
-              />
-            </OTooltip>
-            <OTooltip v-if="!hideClipboard" :content="t('common.pasteRange')">
-              <OButton
-                data-test="date-time-paste-btn"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-paste"
-                :aria-label="t('common.pasteRange')"
-                @click="pasteRange"
-              />
-            </OTooltip>
-          </div>
-          <div
-            v-if="showRail"
-            class="bg-surface-panel border-border-default relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
-            data-test="date-time-rail-frame"
-          >
-            <DateTimeRail
-              :recent="recentRailItems"
-              :calendar="calendarRailItems"
-              :restriction-msg="raw(queryRangeRestrictionMsg)"
-              class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:overflow-visible"
-              @hover="refreshTooltipNow"
-              @select-recent="applyRecentRange"
-              @remove-recent="removeRecentRange"
-              @select-calendar="applyCalendarItem"
-            />
-          </div>
-          <div
-            class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
-            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
-          >
-            <div
-              class="relative grid min-h-0 flex-1 overflow-y-auto max-sm:flex-none max-sm:overflow-visible"
-            >
-              <div
-                v-if="!disableRelative"
-                role="tabpanel"
-                class="col-start-1 row-start-1"
-                :class="selectedType === 'relative' ? '' : 'pointer-events-none invisible'"
-                :aria-hidden="selectedType !== 'relative'"
-                :inert="selectedType !== 'relative'"
-              >
-                <div class="date-time-table relative flex flex-col">
-                  <div
-                    class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
-                    v-for="(period, index) in relativePeriods"
-                    :key="'date_' + index"
-                  >
-                    <div class="min-w-18.75 text-sm font-semibold">
-                      {{ period.label }}
-                    </div>
-                    <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
-                      <OButton
-                        :disabled="
-                          relativeDatesInHour[period.value][item_index] >
-                            queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                        "
-                        :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                        class="h-8! w-8! font-bold! disabled:opacity-35"
-                        :class="
-                          selectedType == 'relative' &&
-                          calendarToken === null &&
-                          relativePeriod == period.value &&
-                          relativeValue == item
-                            ? 'bg-button-primary! text-button-primary-foreground!'
-                            : `bg-text-heading/7! ${relativePeriod}`
-                        "
-                        variant="ghost"
-                        size="xs"
-                        @click="setRelativeDate(period.value, item)"
-                        :key="'period_' + item_index"
-                      >
-                        {{ item }}
-                        <OTooltip
-                          v-if="
-                            relativeDatesInHour[period.value][item_index] >
-                              queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                          "
-                          side="right"
-                          align="center"
-                          max-width="18.75rem"
-                          :content="raw(queryRangeRestrictionMsg)"
-                        />
-                      </OButton>
-                    </div>
-                  </div>
-
-                  <div
-                    class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
-                  >
-                    <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
-                    <OTooltip
-                      side="right"
-                      align="center"
-                      max-width="18.75rem"
-                      v-if="queryRangeRestrictionInHour > 0"
-                      :content="raw(queryRangeRestrictionMsg)"
-                    />
-
-                    <div class="flex min-w-0 flex-1 gap-2">
-                      <div class="flex w-20 flex-col">
-                        <OInput
-                          v-model.number="relativeValue"
-                          :aria-label="t('common.timeAmount')"
-                          type="number"
-                          :min="1"
-                          :step="1"
-                          :max="
-                            relativePeriodsMaxValue[relativePeriod] > 0
-                              ? relativePeriodsMaxValue[relativePeriod]
-                              : undefined
-                          "
-                          @update:model-value="onCustomPeriodSelect"
-                          @focus="onCustomValueFocus"
-                          @blur="onCustomValueBlur"
-                        />
-                      </div>
-                      <div class="flex min-w-0 flex-1 flex-col">
-                        <OSelect
-                          v-model="relativePeriod"
-                          :aria-label="t('common.timeUnit')"
-                          :options="relativePeriodsSelect"
-                          @update:model-value="onCustomPeriodSelect"
-                        >
-                          <template v-slot:selected-item>
-                            <div>{{ getPeriodLabel }}</div>
-                          </template>
-                        </OSelect>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                role="tabpanel"
-                class="col-start-1 row-start-1"
-                :class="selectedType === 'absolute' ? '' : 'pointer-events-none invisible'"
-                :aria-hidden="selectedType !== 'absolute'"
-                :inert="selectedType !== 'absolute'"
-              >
-                <div class="date-time-table flex flex-col">
-                  <OTooltip
-                    side="right"
-                    align="center"
-                    max-width="18.75rem"
-                    v-if="queryRangeRestrictionInHour > 0"
-                    :content="raw(queryRangeRestrictionMsg)"
-                  />
-                  <div class="flex justify-center px-3 py-2">
-                    <ODateRangeCalendar
-                      :start-date="selectedDate.from"
-                      :end-date="selectedDate.to"
-                      :min-date="calendarMinDate"
-                      :max-date="calendarMaxDate"
-                      @update:start-date="selectedDate.from = $event"
-                      @update:end-date="selectedDate.to = $event"
-                      @update:pending-date="pendingDay = $event"
-                    />
-                  </div>
-                  <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
-                  <OSeparator v-if="!disableRelative" class="my-2" />
-
-                  <table
-                    v-if="!hideRelativeTime"
-                    class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
-                  >
-                    <tbody>
-                      <tr>
-                        <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
-                        >
-                          {{ t("common.startTime") }}
-                        </td>
-                        <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
-                        >
-                          {{ t("common.endTime") }}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="w-1/2 pe-1.5">
-                          <OTime
-                            class="w-full"
-                            v-model="selectedTime.startTime"
-                            with-seconds
-                            data-test="datetime-start-time"
-                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                          />
-                        </td>
-                        <td class="w-1/2 ps-1.5">
-                          <OTime
-                            class="w-full"
-                            v-model="selectedTime.endTime"
-                            :with-seconds="true"
-                            data-test="datetime-end-time"
-                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div
-              v-if="!hideRelativeTimezone || !autoApply"
-              class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[0.4rem] py-2"
-            >
+            <template v-if="!hideRelativeTimezone && lineView.mode !== 'preview'" #zone>
               <OSelect
-                v-if="!hideRelativeTimezone"
                 data-test="datetime-timezone-select"
                 v-model="timezone"
+                appearance="inline"
                 :options="timezoneSelectOptions"
                 searchable
-                :aria-label="t('logStream.timezone')"
+                :aria-label="t('common.timezone')"
                 :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
+                class="text-text-link max-w-full min-w-0"
                 @update:model-value="onTimezoneChange"
                 @open="isTimezoneSelectOpen = true"
                 @close="isTimezoneSelectOpen = false"
-                class="min-w-0 italic"
-                :class="autoApply ? 'col-span-2' : ''"
-              />
-              <div v-else />
-              <OButton
-                v-if="!autoApply"
-                data-test="date-time-apply-btn"
-                variant="primary"
-                size="sm"
-                class="justify-self-end px-6!"
-                @click="applyAndClose"
               >
-                {{ t("common.apply") }}
-              </OButton>
+                <template #icon-left><OIcon name="globe" size="xs" /></template>
+                <template #trigger
+                  ><OTruncatedText class="min-w-0">{{
+                    isMobile ? zoneAbbreviationText : zoneLinkText
+                  }}</OTruncatedText></template
+                >
+              </OSelect>
+            </template>
+          </DateTimeResolvedLine>
+          <div
+            v-if="instantDraft"
+            data-test="date-time-instant"
+            role="group"
+            :aria-label="t('common.rangeInstantRead')"
+            class="flex flex-col gap-1"
+          >
+            <div
+              v-for="choice in instantChoices"
+              :key="choice.id"
+              class="rounded-default flex min-h-8 items-center gap-2 border pe-2"
+              :class="
+                choice.chosen
+                  ? 'border-input-border-focus bg-surface-tint-accent'
+                  : 'border-input-border'
+              "
+            >
+              <OButton
+                :data-test="`date-time-instant-${choice.id}`"
+                variant="ghost"
+                size="xs"
+                class="min-w-0 flex-1 justify-start! font-normal tabular-nums"
+                :aria-pressed="choice.chosen"
+                data-instant-choice
+                @click="pickInstantChoice(choice.id)"
+                @keydown="onInstantKeydown($event, choice.id)"
+                >{{ choice.label }}</OButton
+              >
+              <OToggleGroup
+                v-if="choice.id === 'around'"
+                type="single"
+                :model-value="String(instantDraft.window)"
+                :aria-label="t('common.rangeInstantWindow')"
+                @update:model-value="setInstantWindow"
+              >
+                <OToggleGroupItem
+                  v-for="minutes in INSTANT_WINDOWS"
+                  :key="minutes"
+                  :value="String(minutes)"
+                  size="xs"
+                  :data-test="`date-time-instant-window-${windowLabel(minutes)}`"
+                  ><span class="text-2xs">{{
+                    raw(`±${windowLabel(minutes)}`)
+                  }}</span></OToggleGroupItem
+                >
+              </OToggleGroup>
+              <span v-else class="text-text-secondary text-xs whitespace-nowrap">{{
+                choice.detail
+              }}</span>
             </div>
           </div>
+        </div>
+        <div
+          class="grid min-h-0"
+          :class="hasHelpers ? 'grid-cols-[1fr_18.5rem] max-sm:grid-cols-1' : 'grid-cols-1'"
+        >
+          <DateTimeHelpers
+            v-if="hasHelpers"
+            ref="helpers"
+            :relative="relativeRows"
+            :calendar-rows="calendarRows"
+            :recent="recentRailItems"
+            :show-recent="showRail"
+            :restriction-msg="raw(queryRangeRestrictionMsg)"
+            @select="onHelperSelect"
+            @preview="onHelperPreview"
+            @freeze="freezeCalendarItem"
+            @remove-recent="removeRecentRange"
+          />
+          <section
+            data-test="date-time-custom-range"
+            class="flex min-w-0 flex-col gap-2 p-3"
+            :aria-labelledby="customBodyShown ? customHeadingId : undefined"
+            :aria-label="customBodyShown ? undefined : t('common.rangeCustomRange')"
+          >
+            <OButton
+              v-if="isMobile"
+              data-test="date-time-custom-toggle"
+              variant="ghost"
+              size="sm"
+              class="w-full justify-start!"
+              icon-left="calendar-month"
+              :aria-expanded="customOpen"
+              @click="customOpen = !customOpen"
+              >{{ t("common.rangePickOnCalendar") }}
+              <template #icon-right
+                ><OIcon
+                  :name="customOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
+                  size="sm"
+                  class="ms-auto"
+              /></template>
+            </OButton>
+            <div v-if="customBodyShown" class="flex h-7 items-center gap-2">
+              <h3
+                :id="customHeadingId"
+                class="text-text-heading text-compact font-semibold whitespace-nowrap"
+              >
+                {{ t("common.rangeCustomRange") }}
+              </h3>
+              <div v-if="!hideRelativeTime" class="ms-auto flex items-center gap-1">
+                <span class="text-text-secondary text-2xs">{{ t("common.clockFormat") }}</span>
+                <OToggleGroup
+                  data-test="date-time-hour-format"
+                  type="single"
+                  :model-value="hourFormat"
+                  :aria-label="t('common.clockFormatAria')"
+                  @update:model-value="onHourFormat"
+                >
+                  <OToggleGroupItem value="24h" size="xs" data-test="date-time-hour-format-24h"
+                    ><span class="text-2xs">{{ raw("24h") }}</span></OToggleGroupItem
+                  >
+                  <OToggleGroupItem value="12h" size="xs" data-test="date-time-hour-format-12h"
+                    ><span class="text-2xs">{{ raw("12h") }}</span></OToggleGroupItem
+                  >
+                </OToggleGroup>
+              </div>
+            </div>
+            <div v-if="customBodyShown" class="flex justify-center">
+              <ODateRangeCalendar
+                :start-date="toSlashDate(draft.start.date)"
+                :end-date="pendingEnd ? '' : toSlashDate(draft.end.date)"
+                :min-date="calendarMinDate"
+                :max-date="maxDate || undefined"
+                :month="calendarMonth || undefined"
+                :invalid-dates="calendarInvalidDates"
+                :preview-range="calendarPreview"
+                @update:start-date="onCalendarStart"
+                @update:end-date="onCalendarEnd"
+                @update:pending-date="onCalendarPending"
+                @update:month="calendarMonth = $event"
+              />
+            </div>
+            <DateTimeRangeFields
+              v-if="customBodyShown"
+              ref="rangeFields"
+              :start="draft.start"
+              :end="pendingEnd ? EMPTY_EDGE : draft.end"
+              :hour-format="hourFormat"
+              :start-error="draftErrors.start"
+              :end-error="draftErrors.end"
+              :start-error-part="draftErrors.startPart"
+              :end-error-part="draftErrors.endPart"
+              :start-offsets="draftOffsets.start"
+              :end-offsets="draftOffsets.end"
+              :pasted="pasted"
+              :pending-end="pendingEnd"
+              :date-only="hideRelativeTime"
+              :min-date="toIsoDate(calendarMinDate)"
+              :max-date="maxDate ? toIsoDate(maxDate) : undefined"
+              :apply-disabled="applyDisabled"
+              @update:start="onDraftEdge('start', $event)"
+              @update:end="onDraftEdge('end', $event)"
+              @status="onFieldStatus"
+              @submit="submitDraft"
+              @paste-text="onFieldPaste"
+              @start-of-day="setEdgeTime('start', START_OF_DAY)"
+              @end-of-day="setEdgeTime('end', END_OF_DAY)"
+              @now="setEndNow"
+              @apply="applyAndClose"
+            />
+            <OButton
+              v-else
+              data-test="date-time-apply-btn"
+              variant="primary"
+              size="sm-action"
+              class="mt-auto self-end"
+              :disabled="applyDisabled"
+              @click="applyAndClose"
+              >{{ t("common.apply") }}</OButton
+            >
+          </section>
         </div>
       </div>
     </OPopover>
@@ -388,6 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.prevent.stop="shiftTimeRange('next')"
       />
     </OTooltip>
+    <span v-if="triggerTooltip" :id="triggerDescriptionId" class="sr-only">{{
+      triggerTooltip
+    }}</span>
   </div>
 </template>
 
@@ -398,13 +377,22 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import DateTimeRail from "@/components/DateTimeRail.vue";
+import DateTimeRangeField from "@/components/DateTimeRangeField.vue";
+import DateTimeResolvedLine, {
+  type ResolvedLineAction,
+  type ResolvedLineNote,
+  type ResolvedLineView,
+} from "@/components/DateTimeResolvedLine.vue";
+import DateTimeHelpers, {
+  type CalendarRow,
+  type HelperItem,
+  type RelativeRow,
+} from "@/components/DateTimeHelpers.vue";
+import DateTimeRangeFields, { type RangeFieldPart } from "@/components/DateTimeRangeFields.vue";
+import type { SegmentedFieldStatus } from "@/lib/forms/SegmentedField/OSegmentedField.types";
 import {
   ref,
   defineComponent,
@@ -415,11 +403,11 @@ import {
   onMounted,
   watch,
   nextTick,
+  useId,
   type PropType,
 } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import {
-  getImageURL,
   useLocalTimezone,
   convertToUtcTimestamp,
   timestampToTimezoneDate,
@@ -438,44 +426,143 @@ import {
   CALENDAR_RAIL_ITEMS,
   exceedsRangeRestriction,
   formatAbsoluteInstant,
+  formatCopyRange,
+  formatInstantFull,
   formatRecentRange,
   formatCalendarRailHint,
+  formatRangeFull,
+  formatRangeLabel,
   formatRecentDuration,
   formatRecentRangeLabel,
+  joinRangeLabel,
+  RELATIVE_UNIT_SECONDS,
+  zoomOutRange,
+  type RangeLabel,
+  type RelativeUnit,
+  type RelativeWindow,
   type TimeRangeRailItem,
+  type ZoomRange,
 } from "@/utils/timeRangeRail";
+import {
+  describeDstTransition,
+  displayEndUs,
+  formatRangeTooltipLines,
+  formatUtcOffsetAt,
+  formatZoneName,
+} from "@/utils/rangeText";
+import {
+  END_OF_DAY,
+  START_OF_DAY,
+  draftFromRange,
+  edgeInstant,
+  emptyDraft,
+  emptyEdge,
+  emptyFieldStatus,
+  sameDraft,
+  toIsoDate,
+  toSlashDate,
+  validateDraft,
+  type DraftEdge,
+  type DraftEdgeError,
+  type DraftEdgeName,
+  type DraftFieldStatus,
+  type RangeDraft,
+} from "@/utils/dateTimeDraft";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
 import { localeFileMap } from "@/locales";
 import {
-  parseDateRangeString,
-  parseSingleDateTime,
-  type ParsedSingleDateTime,
+  parseRangeInput,
+  zoneAbbreviation,
+  type NamedZone,
+  type PasteParsed,
+  type RangeInputFailed,
+  type RangeInputFailReason,
+  type RangeInputResult,
 } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
 import { timezoneSearchMatcher } from "@/utils/timezoneSearch";
 import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
+import { useLocalHourFormat } from "@/utils/storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import type { Shortcut } from "@/lib/vue-shortcut-manager/types";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
-const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
-// Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
-const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
-  s: 315_360_000,
-  m: 5_256_000,
-  h: 87_600,
-  d: 3_650,
-  w: 520,
-  M: 120,
+const EMPTY_EDGE: DraftEdge = Object.freeze(emptyEdge());
+const READ_FAIL_KEYS: Record<Exclude<RangeInputFailReason, "not-allowed">, I18nKey> = {
+  empty: "common.dateRangePasteEmpty",
+  "no-date": "common.pasteNoDate",
+  "invalid-part": "common.pasteInvalidPart",
+  "mixed-offset": "common.pasteMixedOffset",
+  unknown: "common.rangeReadError",
+  "no-seconds": "common.rangeNoSeconds",
 };
+const PASTE_FORMAT_KEYS: Record<PasteParsed["format"], I18nKey> = {
+  copied: "common.pasteFormatCopied",
+  iso: "common.pasteFormatIso",
+  log: "common.pasteFormatLog",
+  epoch: "common.pasteFormatEpochUs",
+  slashed: "common.pasteFormatSlashed",
+  label: "common.pasteFormatLabel",
+};
+const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
+// The twelve one-click windows, as unit rows.
+const RELATIVE_CHIPS: readonly [RelativeUnit, readonly number[]][] = [
+  ["m", [5, 15, 30]],
+  ["h", [1, 2, 4, 6, 12]],
+  ["d", [1, 2, 7, 30]],
+];
+const RELATIVE_ROW_KEYS: Partial<Record<RelativeUnit, I18nKey>> = {
+  m: "common.rangeUnitMinutes",
+  h: "common.rangeUnitHours",
+  d: "common.rangeUnitDays",
+};
+const CALENDAR_ROW_KEYS: readonly [I18nKey, readonly string[]][] = [
+  ["common.rangePeriodDay", ["today", "yesterday"]],
+  ["common.rangePeriodWeek", ["this-week", "last-week"]],
+  ["common.rangePeriodMonth", ["this-month", "last-month"]],
+  ["common.rangePeriodQuarter", ["this-quarter", "last-quarter"]],
+];
+const ROLLS_KEYS: Record<string, I18nKey> = {
+  day: "common.rangeRollsDaily",
+  week: "common.rangeRollsWeekly",
+  month: "common.rangeRollsMonthly",
+  quarter: "common.rangeRollsQuarterly",
+  year: "common.rangeRollsYearly",
+};
+const INSTANT_WINDOWS = [5, 15, 60] as const;
+const MICROS_PER_MINUTE = 60 * MICROS_PER_SECOND;
+// An absolute range that ended within this long reads as just Fixed, not "ended 0m ago".
+const ENDED_AGO_MIN_MS = 60_000;
 
 interface CalendarPresetState {
   tooltip: I18nText | undefined;
   disabled: boolean;
 }
+
+interface TriggerSource {
+  type: string;
+  calendarToken: string | null;
+  relativePeriod: string;
+  relativeValue: number;
+  startUs: number;
+  endUs: number;
+}
+
+/** What the trigger shows: a relative or calendar text, or an absolute range with its ladder steps. */
+type TriggerView =
+  | { kind: "text"; text: string }
+  | {
+      kind: "absolute";
+      full: RangeLabel;
+      short: RangeLabel;
+      duration: string;
+      startUs: number;
+      endUs: number;
+    };
 
 interface ConsumableDateTime {
   startTime: number;
@@ -487,24 +574,69 @@ interface ConsumableDateTime {
   userChangedValue?: boolean;
 }
 
+type InstantWindow = (typeof INSTANT_WINDOWS)[number];
+
+/** Where a draft came from: typed or pasted text, a helper on a non-applying host, or the calendar and fields. */
+type DraftSource = "text" | "paste" | "helper" | "fields";
+
+/** The one unapplied range the panel holds; its window always fills the calendar and Start/End. */
+type PanelDraft =
+  | ({ kind: "relative"; source: DraftSource; typed?: RelativeWindow } & RelativeWindow)
+  | { kind: "calendar"; source: DraftSource; token: string }
+  | {
+      kind: "absolute";
+      source: DraftSource;
+      zoneAssumed: boolean;
+      format?: PasteParsed["format"];
+      namedZone?: NamedZone;
+    }
+  | {
+      kind: "instant";
+      source: DraftSource;
+      us: number;
+      choice: "around" | "since";
+      window: InstantWindow;
+      zoneAssumed: boolean;
+      namedZone?: NamedZone;
+    };
+
+/** The panel's draft state as a whole, so Esc and Undo can put it back. */
+interface PanelSnapshot {
+  panelDraft: PanelDraft | null;
+  draft: RangeDraft;
+  pendingEnd: boolean;
+  fieldText: string;
+  shownText: string;
+  pasted: boolean;
+  readNote: ResolvedLineNote | null;
+}
+
+/** A window the line shows, and what kind of range it is. */
+interface LineWindow {
+  startUs: number;
+  endUs: number;
+  kind: "relative" | "calendar" | "absolute";
+  token?: string;
+}
+
 // One offset lookup per zone for the whole app, not per picker instance.
 const zoneOffsets = new Map<string, string>();
 
 export default defineComponent({
   components: {
-    OSeparator,
     OButton,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
     OTooltip,
     OTruncatedText,
-    OInput,
     OSelect,
-    OTime,
     ODateRangeCalendar,
     OPopover,
-    DateTimeRail,
+    DateTimeRangeField,
+    DateTimeResolvedLine,
+    DateTimeHelpers,
+    DateTimeRangeFields,
   },
   props: {
     defaultType: {
@@ -617,6 +749,11 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    /** Binds `t` (open) and, with the range shift shown, `[` `]` `-` on the page; for one main picker per page. */
+    pageShortcuts: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
@@ -652,14 +789,56 @@ export default defineComponent({
     // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
     const tooltipNow = ref(Date.now());
     const timeRangeHistory = useTimeRangeHistory();
-    // A single clicked day the range calendar is still waiting to pair with an end date.
-    const pendingDay = ref<string | null>(null);
-    // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
+    // Fields written by the picker itself (a Recent pick, a zoom, an applied draft) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
-    let seededEnd: { date: string; time: string } | null = null;
     // Date-only pickers cannot show the times a recent range carries.
     const showRail = computed(() => !props.disableRelative);
-    const lastValidCustomValue = ref(15);
+    // The Custom range fields edit this draft; selectedDate/selectedTime change only when it is applied.
+    const draft = ref<RangeDraft>(emptyDraft());
+    const seededDraft = ref<RangeDraft>(emptyDraft());
+    const fieldStatus = ref<DraftFieldStatus>(emptyFieldStatus());
+    // A first calendar click gave Start its day; End waits for the second click.
+    const pendingEnd = ref(false);
+    const pasted = ref(false);
+    // Null while the panel shows the applied range; set by text, a paste, a helper on a non-applying host, or an edit.
+    const panelDraft = ref<PanelDraft | null>(null);
+    const fieldText = ref("");
+    // What the field last showed for the applied range or the draft; Enter on it unchanged re-applies with no parsing.
+    const shownText = ref("");
+    // Text typed by hand since the field last showed a value; an outside close discards it.
+    const fieldEdited = ref(false);
+    // Between a keystroke and its debounced read the hint and the error stay hidden.
+    const fieldTyping = ref(false);
+    const parseError = ref<RangeInputFailed | null>(null);
+    // How the last text was read (assumed zone, named zone, rounded end), with Undo for a paste.
+    const readNote = ref<ResolvedLineNote | null>(null);
+    const zoneNote = ref<ResolvedLineNote | null>(null);
+    const previewItem = ref<HelperItem | null>(null);
+    const liveText = ref("");
+    const customOpen = ref(false);
+    const menuOpen = ref(false);
+    let beforeTyping: PanelSnapshot | null = null;
+    let beforePaste: PanelSnapshot | null = null;
+    let beforeZoneChange: (PanelSnapshot & { zone: string }) | null = null;
+    // Set while Undo switches the zone back, so that switch does not re-read the draft again.
+    let restoringZone = false;
+    const calendarMonth = ref("");
+    const hourFormat = ref<"24h" | "12h">(useLocalHourFormat() === "12h" ? "12h" : "24h");
+    // Offsets a repeated hour was applied with; the wall-clock fields alone cannot tell the two apart.
+    let appliedOffsets = { start: "", end: "" };
+    // The End date whose 23:59:59 arrived as an exact instant (URL, zoom, shift), so it is sent unwidened.
+    let exactEndDate: string | null = null;
+    const triggerDescriptionId = useId();
+    const rootEl = ref<HTMLElement | null>(null);
+    const triggerLabelEl = ref<HTMLElement | null>(null);
+    const rangeField = ref<InstanceType<typeof DateTimeRangeField> | null>(null);
+    const rangeFields = ref<InstanceType<typeof DateTimeRangeFields> | null>(null);
+    const helpers = ref<InstanceType<typeof DateTimeHelpers> | null>(null);
+    const noteId = useId();
+    const customHeadingId = useId();
+    const ladderStep = ref<1 | 2 | 3>(1);
+    // Esc, the shift arrows and a commit close the panel without applying the draft, unlike an outside click.
+    let closeReason: "escape" | "shift" | "commit" | null = null;
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(props.pickerTimezone || currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
@@ -680,6 +859,9 @@ export default defineComponent({
       if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
         selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       }
+      const previousZone = zone.value;
+      const openDraft =
+        !restoringZone && menuOpen.value && panelDraft.value !== null ? snapshotPanel() : null;
       if (props.pickerTimezone) {
         pickerZone.value = selectedTimezone;
       } else {
@@ -687,6 +869,7 @@ export default defineComponent({
         store.dispatch("setTimezone", selectedTimezone);
       }
       await nextTick();
+      if (openDraft && previousZone !== zone.value) reResolveDraft(openDraft, previousZone);
       if (props.autoApply) {
         if (selectedType.value == "absolute") saveDate("absolute");
         else saveDate("relative");
@@ -773,15 +956,6 @@ export default defineComponent({
       M: [1, 2, 3, 4, 5, 6],
     };
 
-    const relativeDatesInHour: Record<string, number[]> = {
-      s: [1, 1, 1, 1, 1, 1],
-      m: [1, 1, 1, 1, 1, 1],
-      h: [1, 2, 3, 6, 8, 12],
-      d: [24, 48, 72, 96, 120, 144],
-      w: [168, 336, 504, 672, 840, 1008],
-      M: [744, 1488, 2232, 2976, 3720, 4464],
-    };
-
     let relativePeriodsMaxValue = ref<Record<string, number>>({
       s: 0,
       m: 0,
@@ -865,21 +1039,24 @@ export default defineComponent({
           label,
           tooltip: state?.tooltip,
           hint:
-            formatCalendarRailHint(
-              preset.token,
-              zone.value,
-              tooltipNow.value,
-              intlLocale.value,
-              (quarter) => t("common.calendarQuarterShort", { quarter }),
-            ) ?? undefined,
-          selected: selectedType.value === "relative" && calendarToken.value === preset.token,
+            formatCalendarRailHint(preset.token, zone.value, tooltipNow.value, intlLocale.value) ??
+            undefined,
+          selected: selectedCalendarToken.value === preset.token,
           disabled: state?.disabled ?? false,
         };
       });
     });
 
+    // The calendar chip in force: the draft's, else the applied one while there is no draft.
+    const selectedCalendarToken = computed<string | null>(() => {
+      const pending = panelDraft.value;
+      if (pending) return pending.kind === "calendar" ? pending.token : null;
+      return selectedType.value === "relative" ? calendarToken.value : null;
+    });
+
     const recentRailItems = computed<TimeRangeRailItem[]>(() => {
-      const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
+      const current =
+        panelDraft.value === null && selectedType.value === "absolute" ? getUTCTimeStamp() : null;
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
         label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
@@ -901,6 +1078,10 @@ export default defineComponent({
           entry.endUs,
           props.queryRangeRestrictionInHour,
         ),
+        zoneTag:
+          entry.zone && entry.zone !== zone.value
+            ? formatUtcOffsetAt(Math.floor(entry.startUs / 1000), entry.zone)
+            : undefined,
       }));
     });
 
@@ -910,14 +1091,15 @@ export default defineComponent({
 
     const displayValue = ref("");
 
-    /**
-     * The label as of the last APPLY, which is what the trigger button shows.
-     * With `autoApply` off, a selection only takes effect when the user presses
-     * Apply, so the trigger renders the range actually in force rather than the
-     * pending selection in `getDisplayValue`. Every path that applies a range
-     * stamps it via `markApplied`.
-     */
-    const appliedDisplayValue = ref("");
+    // The selection as of the last apply; the trigger shows it whenever the panel holds an unapplied edit.
+    const appliedSource = ref<TriggerSource>({
+      type: "relative",
+      calendarToken: null,
+      relativePeriod: "m",
+      relativeValue: 15,
+      startUs: 0,
+      endUs: 0,
+    });
 
     const datePayload = ref({});
 
@@ -928,11 +1110,6 @@ export default defineComponent({
     const calendarMinDate = computed(() => {
       if (props.disableRelative && props.minDate) return props.minDate;
       return "1999/01/01";
-    });
-
-    const calendarMaxDate = computed(() => {
-      if (props.maxDate) return props.maxDate;
-      return timestampToTimezoneDate(new Date().getTime(), zone.value, "yyyy/MM/dd");
     });
 
     onMounted(() => {
@@ -982,14 +1159,12 @@ export default defineComponent({
         selectedTime.value.endTime;
         selectedDate.value?.from;
         selectedDate.value?.to;
-        pendingDay.value;
       },
       () => {
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
           !isSeedingAbsolute &&
-          pendingDay.value === null &&
           store.state.savedViewFlag == false
         ) {
           saveDate("absolute");
@@ -1018,50 +1193,9 @@ export default defineComponent({
     const isValidCustomValue = (value: unknown) =>
       value !== "" && value !== null && Number.isFinite(Number(value));
 
-    const onCustomPeriodSelect = () => {
-      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
-      if (!isValidCustomValue(relativeValue.value)) return;
-
-      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
-      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
-      if (
-        selectedType.value == "relative" &&
-        props.queryRangeRestrictionInHour > 0 &&
-        value > restrictedMax
-      ) {
-        value = restrictedMax > -1 ? restrictedMax : 15;
-      }
-      relativeValue.value = Math.min(
-        value,
-        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
-      );
-      lastValidCustomValue.value = relativeValue.value;
-      calendarToken.value = null;
-
-      if (props.autoApply) saveDate("relative-custom");
-    };
-
-    const onCustomValueFocus = () => {
-      lastValidCustomValue.value = relativeValue.value;
-    };
-    const onCustomValueBlur = () => {
-      if (!isValidCustomValue(relativeValue.value))
-        relativeValue.value = lastValidCustomValue.value;
-    };
-
     // A finished calendar period ends at the next one's start; second-precision fields show its last second, as its tooltip does.
     const lastInstant = (token: string | null, endUs: number) =>
       (parseCalendarToken(token)?.offset ?? 0) < 0 ? endUs - 1 : endUs;
-
-    // The shown 23:59:59 of a copied calendar end stands for the next period's start until the user edits it.
-    const rememberShownEnd = (exclusiveEndUs: number) => {
-      const shown = convertUnixTime(exclusiveEndUs - 1);
-      seededEnd = { date: shown.date, time: shown.time };
-    };
-    const rememberSeededEnd = (token: string | null, endUs: number) => {
-      if ((parseCalendarToken(token)?.offset ?? 0) >= 0) seededEnd = null;
-      else rememberShownEnd(endUs);
-    };
 
     const setRelativeTime = (period: string) => {
       const calendarRange = resolveCalendarPeriod(period, zone.value);
@@ -1076,7 +1210,6 @@ export default defineComponent({
         selectedType.value = "absolute";
         calendarToken.value = null;
         setAbsoluteTime(calendarRange.startTime, lastInstant(period, calendarRange.endTime));
-        rememberSeededEnd(period, calendarRange.endTime);
         return;
       }
 
@@ -1124,7 +1257,7 @@ export default defineComponent({
     const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
-      seededEnd = null;
+      appliedOffsets = { start: "", end: "" };
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
         selectedDate.value.from = dateString;
@@ -1133,13 +1266,22 @@ export default defineComponent({
       }
 
       const startDateTime = convertUnixTime(startTime);
-      const endDateTime = convertUnixTime(endTime);
+      // An end at an exclusive midnight reads back as the day before's 23:59:59, which sends that midnight again.
+      const endDateTime = convertUnixTime(displayEndUs(startTime, endTime, zone.value));
 
       selectedDate.value.from = startDateTime.date;
       selectedDate.value.to = endDateTime.date;
 
       selectedTime.value.startTime = startDateTime.time;
       selectedTime.value.endTime = endDateTime.time;
+      rememberEndInstant(endTime, displayEndUs(startTime, endTime, zone.value));
+    };
+
+    // A whole-second 23:59:59 end is that exact instant; one read back from a midnight or sub-second end is inclusive.
+    const rememberEndInstant = (endUs: number, shownEndUs: number) => {
+      const exact = shownEndUs === endUs && endUs % MICROS_PER_SECOND === 0;
+      exactEndDate =
+        exact && selectedTime.value.endTime === END_OF_DAY ? selectedDate.value.to : null;
     };
 
     function convertUnixTime(unixTimeMicros: number) {
@@ -1175,7 +1317,7 @@ export default defineComponent({
      * absolute inputs when `autoApply` is off: those stay pending until Apply.
      */
     const markApplied = () => {
-      appliedDisplayValue.value = getDisplayValue.value;
+      appliedSource.value = liveSource.value;
       appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
       appliedSelection = {
         selectedType: selectedType.value,
@@ -1232,6 +1374,8 @@ export default defineComponent({
       selectedDate.value.to = endObj.date;
       selectedTime.value.startTime = startObj.time;
       selectedTime.value.endTime = endObj.time;
+      appliedOffsets = { start: "", end: "" };
+      rememberEndInstant(dateobj.end * 1000, dateobj.end * 1000);
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
@@ -1264,33 +1408,22 @@ export default defineComponent({
       M: "months",
     };
 
-    const periodLabelKey = computed<I18nKey>(() => {
-      const keys: Record<string, I18nKey> = {
-        s: "common.seconds",
-        m: "common.minutes",
-        h: "common.hours",
-        d: "common.days",
-        w: "common.weeks",
-        M: "common.months",
-      };
-      return keys[relativePeriod.value];
-    });
-    const getPeriodLabel = computed(() => t(periodLabelKey.value));
-
-    // "Past 15 Minutes" — one whole-sentence pipe-plural key per unit rather than
-    // gluing the period noun onto a translated "Past" fragment (word order is
-    // per-language, and so is the number of plural forms).
-    const pastPeriodKey = computed<I18nKey>(() => {
-      const keys: Record<string, I18nKey> = {
-        s: "common.pastSecond",
-        m: "common.pastMinute",
-        h: "common.pastHour",
-        d: "common.pastDay",
-        w: "common.pastWeek",
-        M: "common.pastMonth",
-      };
-      return keys[relativePeriod.value];
-    });
+    // Weeks are subtracted as days, since the date helper has no week unit.
+    const relativeStartMs = (value: number, unit: string, endMs: number): number => {
+      let period = PERIOD_ARITHMETIC_UNIT[unit];
+      let amount = value;
+      if (unit === "w") {
+        period = "days";
+        amount = value * 7;
+      }
+      const subtractObject: Record<string, number> = {};
+      if (period && amount) subtractObject[period] = amount;
+      else {
+        console.error("getConsumableDateTime: Invalid relative period");
+        subtractObject["Minutes"] = 15;
+      }
+      return new Date(subtractRelativeTime(new Date(endMs), subtractObject)).getTime();
+    };
 
     function isValidDateTimeString(dateStr: string, timeStr: string): boolean {
       return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
@@ -1305,30 +1438,10 @@ export default defineComponent({
         return { ...calendarRange, relativeTimePeriod: calendarToken.value };
       }
       if (selectedType.value == "relative") {
-        let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
-        let periodValue = relativeValue.value;
-
-        // arithmetic on weeks is not supported; convert to days.
-        if (relativePeriod.value === "w") {
-          period = "days";
-          periodValue = periodValue * 7;
-        }
-
-        const subtractObject: Record<string, number> = {};
-
-        if (period && periodValue) subtractObject[period] = periodValue;
-        else {
-          console.error("getConsumableDateTime: Invalid relative period");
-          subtractObject["Minutes"] = 15;
-        }
-
-        const endTimeStamp = new Date();
-
-        const startTimeStamp = subtractRelativeTime(endTimeStamp, subtractObject);
-
+        const endMs = Date.now();
         return {
-          startTime: new Date(startTimeStamp).getTime() * 1000,
-          endTime: new Date(endTimeStamp).getTime() * 1000,
+          startTime: relativeStartMs(relativeValue.value, relativePeriod.value, endMs) * 1000,
+          endTime: endMs * 1000,
           relativeTimePeriod: relativeValue.value + relativePeriod.value,
         };
       } else {
@@ -1380,17 +1493,30 @@ export default defineComponent({
       }
     };
 
+    // A chosen offset picks one of a repeated hour's two instants; otherwise luxon reads the wall time.
+    const wallToMicros = (date: string, time: string, offset: string): number => {
+      if (offset) {
+        const { us } = edgeInstant({ date: toIsoDate(date), time, offset }, zone.value);
+        if (us !== null) return us;
+      }
+      return convertToUtcTimestamp(`${date} ${time}`, zone.value);
+    };
+
     const getUTCTimeStamp = () => {
-      let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
-      let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
-      const startUTC = convertToUtcTimestamp(startTime, zone.value);
-      const untouchedSeededEnd =
-        seededEnd !== null &&
-        seededEnd.date === selectedDate.value.to &&
-        seededEnd.time === selectedTime.value.endTime;
-      // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
-      const endUTC =
-        convertToUtcTimestamp(endTime, zone.value) + (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
+      const startUTC = wallToMicros(
+        selectedDate.value.from,
+        selectedTime.value.startTime,
+        appliedOffsets.start,
+      );
+      const endWall = wallToMicros(
+        selectedDate.value.to,
+        selectedTime.value.endTime,
+        appliedOffsets.end,
+      );
+      // An End reading 23:59:59 includes that whole second, and the backend end is exclusive.
+      const inclusive =
+        selectedTime.value.endTime === END_OF_DAY && exactEndDate !== selectedDate.value.to;
+      const endUTC = endWall + (inclusive ? MICROS_PER_SECOND : 0);
       return { startUTC, endUTC };
     };
 
@@ -1412,6 +1538,8 @@ export default defineComponent({
         ) {
           selectedDate.value = dateobj.selectedDate;
           selectedTime.value = dateobj.selectedTime;
+          appliedOffsets = { start: "", end: "" };
+          exactEndDate = null;
         } else {
           applyCustomDate(dateobj.type, {
             start: dateobj.startTime / 1000,
@@ -1425,6 +1553,7 @@ export default defineComponent({
 
     const { isMobile } = useBreakpoint();
 
+    // Absolute ranges shorten through the width ladder instead, so only the relative form is compacted here.
     const compactRangeLabel = (label: string) => {
       const REL_UNIT: Record<string, string> = {
         second: "s",
@@ -1436,184 +1565,464 @@ export default defineComponent({
       };
       const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
       if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
-      const abs = label.match(
-        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})? - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})?$/,
-      );
-      // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
-      if (!abs || abs[1] !== abs[4]) return label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
-      const [, , fromDay, fromTime, , toDay, toTime] = abs;
-      return fromDay === toDay
-        ? `${fromDay} ${fromTime} - ${toTime}`
-        : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
+      return label;
     };
 
-    /**
-     * What the trigger button renders.
-     *
-     * With `autoApply` the pending selection IS the applied one, so show it live.
-     * Without it, show the live selection while the panel is open (so switching
-     * Relative/Absolute updates the label immediately, like the logs picker), and
-     * fall back to the range in force once closed — so closing without Apply snaps
-     * back to what's actually applied; see `appliedDisplayValue`.
-     * The `||` fallback covers the first paint, before the mount-time apply.
-     */
-    const triggerLabel = computed(() => {
-      if (props.triggerText) return props.triggerText;
-      const showsApplied = !props.autoApply && !menuOpen.value;
-      // A calendar label is re-derived so an older period keeps naming the right day after midnight.
-      const appliedCalendarLabel =
-        showsApplied && appliedCalendarToken.value !== null
-          ? formatCalendarLabel(
-              appliedCalendarToken.value,
-              zone.value,
-              t,
-              intlLocale.value,
-              tooltipNow.value,
-            )
-          : null;
-      const label = showsApplied
-        ? appliedCalendarLabel || appliedDisplayValue.value || getDisplayValue.value
-        : getDisplayValue.value;
-      return isMobile.value ? compactRangeLabel(label) : label;
+    const pastKeyFor = (period: string): I18nKey => {
+      const keys: Record<string, I18nKey> = {
+        s: "common.pastSecond",
+        m: "common.pastMinute",
+        h: "common.pastHour",
+        d: "common.pastDay",
+        w: "common.pastWeek",
+        M: "common.pastMonth",
+      };
+      return keys[period] ?? "common.pastMinute";
+    };
+
+    const rangeLabelOptions = computed(() => ({
+      locale: intlLocale.value,
+      hourCycle: hourFormat.value === "12h" ? ("h12" as const) : ("h23" as const),
+      browserZone: browserTz,
+      nowMs: tooltipNow.value,
+    }));
+
+    // Date-only pickers name whole days, whatever times their fields carry.
+    const dateOnlyRange = (startUs: number, endUs: number): { startUs: number; endUs: number } => {
+      const from = toIsoDate(convertUnixTime(startUs).date);
+      const to = toIsoDate(convertUnixTime(displayEndUs(startUs, endUs, zone.value)).date);
+      const start = edgeInstant({ date: from, time: START_OF_DAY, offset: "" }, zone.value).us;
+      const end = edgeInstant({ date: to, time: END_OF_DAY, offset: "" }, zone.value).us;
+      if (start === null || end === null) return { startUs, endUs };
+      return { startUs: start, endUs: end + MICROS_PER_SECOND };
+    };
+
+    const liveSource = computed<TriggerSource>(() => {
+      const { startUTC, endUTC } = getUTCTimeStamp();
+      return {
+        type: selectedType.value,
+        calendarToken: calendarToken.value,
+        relativePeriod: relativePeriod.value,
+        relativeValue: isValidCustomValue(relativeValue.value) ? Number(relativeValue.value) : 15,
+        startUs: startUTC,
+        endUs: endUTC,
+      };
     });
 
-    // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
-    const triggerTooltip = computed(() => {
-      if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
+    const viewFor = (source: TriggerSource): TriggerView => {
+      const relative = !props.disableRelative && source.type === "relative";
+      if (relative && source.calendarToken !== null) {
+        const label = formatCalendarLabel(
+          source.calendarToken,
+          zone.value,
+          t,
+          intlLocale.value,
+          tooltipNow.value,
+        );
+        if (label) return { kind: "text", text: label };
+      }
+      if (relative) {
+        return {
+          kind: "text",
+          text: t(pastKeyFor(source.relativePeriod), { count: source.relativeValue }),
+        };
+      }
+      const span = props.disableRelative
+        ? dateOnlyRange(source.startUs, source.endUs)
+        : { startUs: source.startUs, endUs: source.endUs };
+      if (!Number.isFinite(span.startUs) || !Number.isFinite(span.endUs)) {
+        return { kind: "text", text: "" };
+      }
+      const options = rangeLabelOptions.value;
+      return {
+        kind: "absolute",
+        full: formatRangeLabel(span.startUs, span.endUs, zone.value, options),
+        short: formatRangeLabel(span.startUs, span.endUs, zone.value, {
+          ...options,
+          precision: "minutes",
+        }),
+        duration: formatRecentDuration(span.startUs, span.endUs),
+        startUs: source.startUs,
+        endUs: source.endUs,
+      };
+    };
+
+    const textOf = (view: TriggerView): string =>
+      view.kind === "text" ? view.text : joinRangeLabel(view.full);
+
+    // The panel never edits what the trigger shows: while it is open, or until Apply, the trigger keeps the applied range.
+    const triggerView = computed<TriggerView>(() => {
+      const showsApplied =
+        (!props.autoApply && !menuOpen.value) ||
+        (menuOpen.value && selectedType.value === "absolute");
+      return viewFor(showsApplied ? appliedSource.value : liveSource.value);
+    });
+
+    const triggerLabel = computed(() => {
+      if (props.triggerText) return props.triggerText;
+      const view = triggerView.value;
+      if (view.kind === "absolute") return textOf(view);
+      return isMobile.value ? compactRangeLabel(view.text) : view.text;
+    });
+
+    // At ladder steps 2 and 3 the name still starts with what is seen, then gives the whole range.
+    const triggerAccessibleTail = computed(() => {
+      const view = triggerView.value;
+      return view.kind === "absolute" ? `, ${joinRangeLabel(view.full)}` : "";
+    });
+
+    const triggerTooltip = computed<I18nText | undefined>(() => {
+      const view = triggerView.value;
+      if (view.kind === "absolute") {
+        const lines = formatRangeTooltipLines(view.startUs, view.endUs, zone.value);
+        return raw(`${lines.range}\n${lines.detail}`);
+      }
+      const showsApplied = !props.autoApply && !menuOpen.value;
+      if (showsApplied) return calendarTooltip(appliedCalendarToken.value);
       return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
     });
 
-    const getDisplayValue = computed(() => {
-      const calendarLabel =
-        !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
-          ? formatCalendarLabel(
-              calendarToken.value,
-              zone.value,
-              t,
-              intlLocale.value,
-              tooltipNow.value,
-            )
-          : null;
-      if (calendarLabel) return calendarLabel;
-      if (!props.disableRelative && selectedType.value === "relative") {
-        const count = isValidCustomValue(relativeValue.value)
-          ? relativeValue.value
-          : lastValidCustomValue.value;
-        return t(pastPeriodKey.value, { count });
-      } else {
-        if (selectedDate.value != null) {
-          // Here as if multiple dates is selected we get object with from and to keys
-          // If single date is selected we get string with date value
-          // So have added check for from and to
-          if (selectedDate.value?.from && selectedDate.value?.to && !props.disableRelative) {
-            // A pending single clicked day is what Apply will use, so the label shows it already.
-            const pending = menuOpen.value ? pendingDay.value : null;
-            const from = pending ?? selectedDate.value.from;
-            const to = pending ?? selectedDate.value.to;
-            return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
-          } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
-            return `${selectedDate.value.from} - ${selectedDate.value.to}`;
-          } else {
-            return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
-          }
-        } else {
-          const todayDate = new Date().toLocaleDateString("en-ZA");
-          return `${todayDate} ${selectedTime.value.startTime} - ${todayDate} ${selectedTime.value.endTime}`;
-        }
-      }
+    const getDisplayValue = computed(() => textOf(viewFor(liveSource.value)));
+
+    const parseContext = () => ({
+      zone: zone.value,
+      nowMs: Date.now(),
+      locale: intlLocale.value,
+      t: (key: I18nKey, named?: Record<string, unknown>): string =>
+        named ? t(key, named) : t(key),
+      calendarPresets: props.calendarPresets && !props.disableRelative,
+      disableRelative: props.disableRelative,
+      hideRelativeTime: props.hideRelativeTime,
+      hideSeconds: props.hideSeconds,
+      queryRangeRestrictionInHour: props.queryRangeRestrictionInHour,
     });
 
-    // ----- Copy / paste of the selected range ---------------------------------
-    // Copy always resolves the selection (relative OR absolute) to a concrete
-    // absolute window, so the copied value is unambiguous. Paste accepts that
-    // format plus `Past N <Period>` and raw epoch timestamp pairs.
-    const copyRange = () => {
-      // Epoch microseconds side-step timezone ambiguity: pasting this into a
-      // tab with a different selected timezone still lands on the same
-      // instant, unlike a "yyyy/MM/dd HH:mm:ss" string (which paste would
-      // reinterpret using the pasting tab's own timezone).
-      const { startTime, endTime } = getConsumableDateTime();
-      const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
-      copyToClipboard(payload, t, { successMessage: t("common.dateRangeCopied") });
-    };
+    const relativeLabel = (window: RelativeWindow): string =>
+      t(pastKeyFor(window.unit), { count: window.value });
 
-    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
-    // time in the currently selected timezone, to epoch microseconds — the
-    // inverse of convertUnixTime.
-    const absoluteToMicros = (date: string, time: string): number => {
-      const iso = `${date.replace(/\//g, "-")}T${time}`;
-      return fromZonedTime(iso, zone.value).getTime() * 1000;
-    };
+    const calendarLabel = (token: string): string =>
+      formatCalendarLabel(token, zone.value, t, intlLocale.value, tooltipNow.value) ?? token;
 
-    const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
-      selectedType.value = "absolute";
-      calendarToken.value = null;
-      // A day clicked before the paste would otherwise overwrite the pasted range when the panel closes.
-      pendingDay.value = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
-      isSeedingAbsolute = true;
-      setAbsoluteTime(startMicros, endMicros);
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
-      isUserInitiated = true;
-      if (props.autoApply) {
-        saveDate(null);
-        recordAbsoluteRange();
-      }
-    };
+    const appliedText = (): string => textOf(viewFor(appliedSource.value));
 
-    const applyParsedRange = (text: string): boolean => {
-      const parsed = parseDateRangeString(text);
-      if (!parsed) return false;
-      if (parsed.type === "timestamp") {
-        finalizeAbsoluteRange(parsed.startMicros, parsed.endMicros);
-      } else {
-        finalizeAbsoluteRange(
-          absoluteToMicros(parsed.startDate, parsed.startTime),
-          absoluteToMicros(parsed.endDate, parsed.endTime),
-        );
-      }
-      return true;
-    };
-
-    // Applies a single pasted date-time value to whichever side of the current
-    // range it sits closer to — e.g. a range of 5:00-10:00 pasted with 7:00
-    // becomes 7:00-10:00 (closer to start), while 13:00 becomes 5:00-13:00
-    // (closer to end). There's no cursor/selection to anchor a side to
-    // without a text field, so proximity is the next best signal of intent.
-    const applySingleDateTime = (parsed: ParsedSingleDateTime) => {
-      const micros =
-        parsed.type === "timestamp"
-          ? parsed.micros
-          : absoluteToMicros(parsed.date, parsed.time ?? "00:00:00");
-
-      const { startTime: baseStart, endTime: baseEnd } = getConsumableDateTime();
-      const isCloserToStart = Math.abs(micros - baseStart) <= Math.abs(micros - baseEnd);
-      finalizeAbsoluteRange(
-        isCloserToStart ? micros : baseStart,
-        isCloserToStart ? baseEnd : micros,
+    // The field's text for a draft that did not come from typing; an unreadable draft keeps the current text.
+    const draftText = (): string => {
+      const pending = panelDraft.value;
+      if (pending?.kind === "relative") return relativeLabel(pending);
+      if (pending?.kind === "calendar") return calendarLabel(pending.token);
+      const result = validation.value;
+      if (!result.valid || result.startUs === null || result.endUs === null) return fieldText.value;
+      return joinRangeLabel(
+        formatRangeLabel(result.startUs, result.endUs, zone.value, rangeLabelOptions.value),
       );
     };
 
-    // Tries a full range first, then a single value applied to both sides.
-    const applyPastedText = (text: string): boolean => {
-      if (applyParsedRange(text)) return true;
+    const showText = (text: string) => {
+      rangeField.value?.cancelPending();
+      fieldText.value = text;
+      shownText.value = text;
+      fieldEdited.value = false;
+      fieldTyping.value = false;
+      beforeTyping = null;
+    };
 
-      const single = parseSingleDateTime(text);
-      if (!single) return false;
+    const cloneDraft = (value: RangeDraft): RangeDraft => ({
+      start: { ...value.start },
+      end: { ...value.end },
+    });
 
-      applySingleDateTime(single);
+    const snapshotPanel = (): PanelSnapshot => ({
+      panelDraft: panelDraft.value ? { ...panelDraft.value } : null,
+      draft: cloneDraft(draft.value),
+      pendingEnd: pendingEnd.value,
+      fieldText: fieldText.value,
+      shownText: shownText.value,
+      pasted: pasted.value,
+      readNote: readNote.value,
+    });
+
+    const restorePanel = (snapshot: PanelSnapshot) => {
+      panelDraft.value = snapshot.panelDraft;
+      draft.value = cloneDraft(snapshot.draft);
+      pendingEnd.value = snapshot.pendingEnd;
+      pasted.value = snapshot.pasted;
+      readNote.value = snapshot.readNote;
+      fieldStatus.value = emptyFieldStatus();
+      parseError.value = null;
+      showText(snapshot.fieldText);
+      shownText.value = snapshot.shownText;
+      showDraftMonth();
+    };
+
+    const instantWindow = (
+      pending: Extract<PanelDraft, { kind: "instant" }>,
+      nowMs: number,
+    ): { startUs: number; endUs: number } => {
+      if (pending.choice === "since") {
+        const nowUs = Math.floor(nowMs / 1000) * MICROS_PER_SECOND;
+        return { startUs: pending.us, endUs: Math.max(pending.us + MICROS_PER_SECOND, nowUs) };
+      }
+      const half = pending.window * MICROS_PER_MINUTE;
+      return { startUs: pending.us - half, endUs: pending.us + half };
+    };
+
+    // A relative or calendar draft resolves at now; an instant fills the window of its highlighted choice.
+    const syncDraftWindow = () => {
+      const pending = panelDraft.value;
+      if (!pending || pending.kind === "absolute") return;
+      const nowMs = Date.now();
+      let range: { startUs: number; endUs: number } | null = null;
+      if (pending.kind === "relative") {
+        range = {
+          startUs: relativeStartMs(pending.value, pending.unit, nowMs) * 1000,
+          endUs: nowMs * 1000,
+        };
+      } else if (pending.kind === "calendar") {
+        const resolved = resolveCalendarPeriod(pending.token, zone.value, nowMs);
+        if (resolved) range = { startUs: resolved.startTime, endUs: resolved.endTime };
+      } else {
+        range = instantWindow(pending, nowMs);
+      }
+      if (!range) return;
+      draft.value = draftFromRange(range.startUs, range.endUs, zone.value);
+      pendingEnd.value = false;
+      fieldStatus.value = emptyFieldStatus();
+      showDraftMonth();
+    };
+
+    const setPanelDraft = (next: PanelDraft) => {
+      panelDraft.value = next;
+      parseError.value = null;
+      syncDraftWindow();
+    };
+
+    const undoAction = (): ResolvedLineAction => ({
+      id: "undo",
+      label: t("common.rangeUndo"),
+      dataTest: "date-time-range-note-undo",
+    });
+
+    const formatKeyFor = (format: PasteParsed["format"], epochUnit?: PasteParsed["epochUnit"]) =>
+      format === "epoch"
+        ? (
+            {
+              s: "common.pasteFormatEpochS",
+              ms: "common.pasteFormatEpochMs",
+              us: "common.pasteFormatEpochUs",
+            } as const
+          )[epochUnit ?? "us"]
+        : PASTE_FORMAT_KEYS[format];
+
+    // The wall-clock times a zone-less text was read at, which a zone switch keeps.
+    const draftClockText = (): string => {
+      const { start, end } = draft.value;
+      const startText = start.time.slice(0, 5);
+      return panelDraft.value?.kind === "instant"
+        ? startText
+        : `${startText} – ${end.time.slice(0, 5)}`;
+    };
+
+    // How a text was read: the zone it named, the zone it was assumed to be in, and a rounded end.
+    const readNoteFor = (
+      result: Extract<RangeInputResult, { kind: "absolute" | "instant" }>,
+      source: DraftSource,
+    ): ResolvedLineNote | null => {
+      const parts: string[] = [];
+      const startMs = Math.floor(result.startUs / 1000);
+      if (result.namedZone?.abbr) {
+        parts.push(
+          t("common.rangeZoneAbbrev", {
+            abbr: result.namedZone.abbr,
+            zoneName: result.namedZone.zone,
+            offset: formatUtcOffsetAt(startMs, result.namedZone.zone),
+          }),
+        );
+      } else if (result.zoneAssumed && source === "paste") {
+        // Typed text in the picker's zone needs no note; a paste from elsewhere may have meant another zone.
+        parts.push(
+          t("common.pasteAssumedZone", {
+            zone: formatZoneName(zone.value, startMs),
+            range: draftClockText(),
+          }),
+        );
+      } else if (source === "paste") {
+        parts.push(
+          t("common.pasteReadAs", { format: t(formatKeyFor(result.format, result.epochUnit)) }),
+        );
+      }
+      if (result.kind === "absolute" && result.endRoundedUp) {
+        parts.push(t("common.pasteEndRoundedUp", { time: draft.value.end.time }));
+      }
+      if (parts.length === 0) return null;
+      return {
+        kind: "info",
+        reason: result.format,
+        text: raw(parts.join(" ")),
+        actions: source === "paste" ? [undoAction()] : undefined,
+      };
+    };
+
+    // The zone a text carried, for the note after a zone switch: its name, abbreviation or offset.
+    const textZoneLabel = (text: string, named?: NamedZone): string | undefined => {
+      if (named) return named.abbr ?? named.zone;
+      const offset = text.trim().match(/(Z|[+-]\d{2}:?\d{2}|(?:UTC|GMT)(?:[+-][\d:]+)?)$/i)?.[1];
+      if (!offset) return undefined;
+      return /^z$/i.test(offset) ? "UTC" : offset;
+    };
+
+    // Reads the field's text into the draft; false when it does not read, which keeps the applied range on the line.
+    const readText = (text: string, source: "text" | "paste"): boolean => {
+      if (text === shownText.value) {
+        parseError.value = null;
+        return true;
+      }
+      const result = parseRangeInput(text, parseContext());
+      if (!result.ok) {
+        parseError.value = result;
+        readNote.value = null;
+        liveText.value = parseErrorText(result);
+        // A paste that does not read leaves the draft it landed on; typed text falls back to the applied range.
+        if (source === "text") {
+          panelDraft.value = null;
+          pasted.value = false;
+          seedWindow();
+        }
+        return false;
+      }
+      parseError.value = null;
+      zoneNote.value = null;
+      pasted.value = source === "paste";
+      if (result.kind === "relative") {
+        setPanelDraft({
+          kind: "relative",
+          source,
+          value: result.value,
+          unit: result.unit,
+          typed: result.typed,
+        });
+        readNote.value = null;
+        return true;
+      }
+      if (result.kind === "calendar") {
+        setPanelDraft({ kind: "calendar", source, token: result.token });
+        readNote.value = null;
+        return true;
+      }
+      const zoneLabel = result.zoneAssumed ? undefined : textZoneLabel(text, result.namedZone);
+      if (result.kind === "instant") {
+        setPanelDraft({
+          kind: "instant",
+          source,
+          us: result.startUs,
+          choice: "around",
+          window: 15,
+          zoneAssumed: result.zoneAssumed,
+          namedZone: result.namedZone ?? (zoneLabel ? { zone: zoneLabel } : undefined),
+        });
+      } else {
+        panelDraft.value = {
+          kind: "absolute",
+          source,
+          zoneAssumed: result.zoneAssumed,
+          format: result.format,
+          namedZone: result.namedZone ?? (zoneLabel ? { zone: zoneLabel } : undefined),
+        };
+        draft.value = draftFromRange(result.startUs, result.endUs, zone.value);
+        pendingEnd.value = false;
+        fieldStatus.value = emptyFieldStatus();
+        showDraftMonth();
+      }
+      readNote.value = readNoteFor(result, source);
       return true;
     };
 
-    const applyPastedTextWithToast = (text: string) => {
-      if (applyPastedText(text)) {
-        toast({ variant: "success", message: t("common.dateRangePasted") });
-      } else {
-        toast({ variant: "error", message: t("common.dateRangePasteError") });
+    const parseErrorText = (error: RangeInputFailed): I18nText => {
+      if (error.reason === "not-allowed") {
+        return t("common.rangeNotAllowedRelative", { example: raw("Nov 4, 13:00 - 15:00") });
       }
+      return t(READ_FAIL_KEYS[error.reason], { text: error.fragment });
+    };
+
+    const parseErrorNote = (error: RangeInputFailed): ResolvedLineNote => ({
+      kind: "error",
+      reason: error.reason,
+      input: true,
+      text: parseErrorText(error),
+      actions: error.suggestion
+        ? [
+            {
+              id: "suggestion",
+              label: raw(`${t("common.rangeDidYouMean")} “${error.suggestion}”?`),
+              dataTest: "date-time-range-suggestion",
+            },
+          ]
+        : undefined,
+    });
+
+    const onFieldInput = (text: string) => {
+      // Typing after an unread paste keeps the restore point from before that paste.
+      if (!fieldEdited.value && !beforeTyping) beforeTyping = snapshotPanel();
+      fieldText.value = text;
+      fieldEdited.value = true;
+      fieldTyping.value = true;
+    };
+
+    const onFieldDraft = (text: string) => {
+      fieldTyping.value = false;
+      if (!text.trim()) {
+        parseError.value = null;
+        return;
+      }
+      readText(text, "text");
+    };
+
+    // Enter reads the text at once, then applies it; the shown text unchanged re-applies with no parsing.
+    const onFieldSubmit = (text: string) => {
+      fieldTyping.value = false;
+      if (!text.trim()) return;
+      // Enter on an unread paste does what Apply and an outside close do: apply the draft it landed on.
+      if (!fieldEdited.value && parseError.value !== null) {
+        if (panelDraft.value) applyAndClose();
+        return;
+      }
+      if (text !== shownText.value && !readText(text, "text")) return;
+      if (panelDraft.value === null) {
+        isUserInitiated = true;
+        saveDate(null);
+        closePanel();
+        return;
+      }
+      fieldEdited.value = false;
+      applyAndClose();
+    };
+
+    // A paste is a deliberate edit, so an outside close applies it like a calendar or field edit.
+    const onFieldPaste = (text: string) => {
+      const snapshot = beforeTyping ?? snapshotPanel();
+      rangeField.value?.cancelPending();
+      beforeTyping = null;
+      fieldTyping.value = false;
+      fieldEdited.value = false;
+      fieldText.value = text;
+      if (!readText(text, "paste")) {
+        // The draft it landed on stays appliable, as Apply and an outside close agree; Esc still puts back the field.
+        beforeTyping = snapshot;
+        return;
+      }
+      beforePaste = snapshot;
+      shownText.value = text;
+    };
+
+    const pasteIntoField = (text: string) => onFieldPaste(text);
+
+    const copyRange = () => {
+      const pending = hasDraft.value ? draftWindow.value : null;
+      const { startTime, endTime } = pending
+        ? { startTime: pending.startUs, endTime: pending.endUs }
+        : getConsumableDateTime();
+      copyToClipboard(formatCopyRange(startTime, endTime, zone.value), t, {
+        successMessage: t("common.dateRangeCopied"),
+      });
     };
 
     const pasteRange = async () => {
@@ -1621,28 +2030,24 @@ export default defineComponent({
       try {
         text = await navigator.clipboard.readText();
       } catch {
-        toast({
-          variant: "error",
-          message: t("common.dateRangePasteBlocked", {
+        readNote.value = {
+          kind: "error",
+          reason: "blocked",
+          text: t("common.dateRangePasteBlocked", {
             shortcut: isMacOS() ? raw("⌘V") : raw("Ctrl+V"),
           }),
-        });
+        };
         return;
       }
-      if (!text.trim()) {
-        toast({ variant: "info", message: t("common.dateRangePasteEmpty") });
-        return;
-      }
-      applyPastedTextWithToast(text);
+      pasteIntoField(text);
+      if (panelDraft.value) nextTick(() => rangeFields.value?.focusApply());
     };
 
-    // A native paste event carries the clipboard text without the read permission pasteRange needs.
+    // A native paste with focus on a chip or the panel carries the clipboard without the read permission pasteRange needs.
     const onPickerPaste = (event: ClipboardEvent) => {
       if (isInputFocused(event.target)) return;
-      const text = event.clipboardData?.getData("text") ?? "";
-      if (!text.trim()) return;
       event.preventDefault();
-      applyPastedTextWithToast(text);
+      pasteIntoField(event.clipboardData?.getData("text") ?? "");
     };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
@@ -1664,40 +2069,674 @@ export default defineComponent({
       return filteredOptions;
     };
 
-    const optionsFn = (date: string) => {
-      const formattedDate = calendarMaxDate.value;
-      if (props.disableRelative) {
-        return date >= props.minDate && date <= formattedDate;
-      }
-      return date >= "1999/01/01" && date <= formattedDate;
+    const showDraftMonth = () => {
+      const date = draft.value.start.date || draft.value.end.date;
+      if (date) calendarMonth.value = toSlashDate(date);
     };
 
-    const seedAbsoluteFromSelection = () => {
+    // Start/End and the calendar show the applied window again, leaving the field and notes as they are.
+    const seedWindow = () => {
       const { startTime, endTime } = getConsumableDateTime();
-      if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return;
-      const start = convertUnixTime(startTime);
-      const end = convertUnixTime(lastInstant(calendarToken.value, endTime));
-      rememberSeededEnd(calendarToken.value, endTime);
-      isSeedingAbsolute = true;
-      selectedDate.value.from = start.date;
-      selectedDate.value.to = end.date;
-      selectedTime.value.startTime = start.time;
-      selectedTime.value.endTime = end.time;
-      nextTick(() => {
-        isSeedingAbsolute = false;
+      const usable = Number.isFinite(startTime) && Number.isFinite(endTime) && startTime > 0;
+      draft.value = usable ? draftFromRange(startTime, endTime, zone.value) : emptyDraft();
+      if (usable && props.hideRelativeTime) {
+        draft.value.start.time = selectedTime.value.startTime;
+        draft.value.end.time = selectedTime.value.endTime;
+      }
+      seededDraft.value = cloneDraft(draft.value);
+      fieldStatus.value = emptyFieldStatus();
+      pendingEnd.value = false;
+      showDraftMonth();
+    };
+
+    const seedDraft = () => {
+      seedWindow();
+      panelDraft.value = null;
+      pasted.value = false;
+      parseError.value = null;
+      readNote.value = null;
+      zoneNote.value = null;
+      previewItem.value = null;
+      beforePaste = null;
+      beforeZoneChange = null;
+      showText(appliedText());
+    };
+
+    const discardDraft = () => {
+      seedDraft();
+    };
+
+    // Re-reads an open draft after a zone switch: a text that named its zone keeps its instants, one that did not keeps its clock.
+    const reResolveDraft = (snapshot: PanelSnapshot, previousZone: string) => {
+      const pending = snapshot.panelDraft;
+      if (!pending || pending.kind === "relative" || pending.kind === "calendar") return;
+      const keptInstants = !pending.zoneAssumed;
+      if (pending.kind === "instant") {
+        if (!keptInstants) {
+          const wall = formatAbsoluteInstant(pending.us, previousZone);
+          const us = edgeInstant(
+            { date: toIsoDate(wall.date), time: wall.time, offset: "" },
+            zone.value,
+          ).us;
+          if (us !== null) panelDraft.value = { ...pending, us };
+        }
+        syncDraftWindow();
+      } else if (keptInstants) {
+        const startUs = edgeInstant(snapshot.draft.start, previousZone).us;
+        const endUs = edgeInstant(snapshot.draft.end, previousZone).us;
+        if (startUs !== null && endUs !== null) {
+          const inclusive = snapshot.draft.end.time === END_OF_DAY ? MICROS_PER_SECOND : 0;
+          draft.value = draftFromRange(startUs, endUs + inclusive, zone.value);
+          showDraftMonth();
+          showText(draftText());
+        }
+      }
+      if (pending.source !== "text" && pending.source !== "paste") return;
+      beforeZoneChange = { ...snapshot, zone: previousZone };
+      const newZone = formatZoneName(zone.value, Date.now());
+      zoneNote.value = {
+        kind: "info",
+        reason: "zone-change",
+        text: keptInstants
+          ? t("common.rangeZoneKeptInstants", {
+              zone: pending.namedZone?.zone ?? formatZoneName(previousZone, Date.now()),
+              newZone,
+            })
+          : t("common.rangeZoneKeptClock", { newZone }),
+        actions: [undoAction()],
+      };
+    };
+
+    // Undo after a zone switch puts back both the zone and the draft as they were.
+    const undoZoneChange = async () => {
+      const saved = beforeZoneChange;
+      if (!saved) return;
+      beforeZoneChange = null;
+      zoneNote.value = null;
+      restoringZone = true;
+      timezone.value =
+        timezoneOptions.find((option) => option === saved.zone) ??
+        (saved.zone === browserTz ? browserTime : saved.zone);
+      try {
+        await onTimezoneChange();
+      } finally {
+        restoringZone = false;
+      }
+      restorePanel(saved);
+    };
+
+    const onNoteAction = (id: ResolvedLineAction["id"]) => {
+      if (id === "undo") {
+        if (zoneNote.value) {
+          void undoZoneChange();
+          return;
+        }
+        if (beforePaste) restorePanel(beforePaste);
+        beforePaste = null;
+        return;
+      }
+      if (id === "swap") {
+        const { start, end } = draft.value;
+        draft.value = { start: { ...end, offset: "" }, end: { ...start, offset: "" } };
+        markFieldsDraft();
+        return;
+      }
+      if (id === "dst-next") {
+        const edge: DraftEdgeName = validation.value.start === "skipped" ? "start" : "end";
+        const next = nextValidTime(edge);
+        if (next) onDraftEdge(edge, { ...draft.value[edge], time: next, offset: "" });
+        return;
+      }
+      const suggestion = parseError.value?.suggestion;
+      if (!suggestion) return;
+      fieldText.value = suggestion;
+      if (readText(suggestion, "text")) {
+        fieldEdited.value = false;
+        shownText.value = suggestion;
+      }
+    };
+
+    // The first wall time after a spring-forward gap, e.g. 03:00:00 for a skipped 02:30.
+    const nextValidTime = (edge: DraftEdgeName): string | null => {
+      const value = draft.value[edge];
+      const change = describeDstTransition(value.date, value.time, zone.value);
+      return change ? `${change.after}:00` : null;
+    };
+
+    // Any calendar, Start/End, Now or repair edit turns the draft into these fixed dates.
+    const markFieldsDraft = () => {
+      const current = panelDraft.value;
+      if (current?.kind !== "absolute" || current.source !== "fields") {
+        panelDraft.value = { kind: "absolute", source: "fields", zoneAssumed: true };
+      }
+      parseError.value = null;
+      readNote.value = null;
+      previewItem.value = null;
+      pasted.value = false;
+      if (validation.value.valid) showText(draftText());
+    };
+
+    const validationDraft = computed<RangeDraft>(() =>
+      pendingEnd.value ? { start: draft.value.start, end: EMPTY_EDGE } : draft.value,
+    );
+
+    // A part holding a value is complete; an emptied part reports whether it is empty or half typed.
+    const effectiveStatus = computed<DraftFieldStatus>(() => {
+      const value = validationDraft.value;
+      const pick = (filled: string, status: SegmentedFieldStatus): SegmentedFieldStatus =>
+        filled && status !== "out-of-range" ? "valid" : status;
+      return {
+        startDate: pick(value.start.date, fieldStatus.value.startDate),
+        startTime: pick(value.start.time, fieldStatus.value.startTime),
+        endDate: pick(value.end.date, fieldStatus.value.endDate),
+        endTime: pick(value.end.time, fieldStatus.value.endTime),
+      };
+    });
+
+    const validation = computed(() =>
+      validateDraft(
+        validationDraft.value,
+        effectiveStatus.value,
+        zone.value,
+        props.hideRelativeTime,
+      ),
+    );
+
+    const draftChanged = computed(
+      () => pendingEnd.value || !sameDraft(draft.value, seededDraft.value),
+    );
+
+    // A draft from the fields counts once it differs from the applied window; text, a paste and a helper always do.
+    const hasDraft = computed(() => {
+      const pending = panelDraft.value;
+      if (!pending) return false;
+      return pending.kind !== "absolute" || pending.source !== "fields" || draftChanged.value;
+    });
+
+    const applyDisabled = computed(() => !hasDraft.value || !validation.value.valid);
+
+    const summaryText = (us: number) =>
+      formatInstantFull(us, zone.value, {
+        locale: intlLocale.value,
+        hourCycle: rangeLabelOptions.value.hourCycle,
+        nowMs: tooltipNow.value,
+      });
+
+    const summaryRange = (): string => {
+      const startUs = edgeInstant(validationDraft.value.start, zone.value).us;
+      if (startUs === null) return "";
+      const result = validation.value;
+      const options = { ...rangeLabelOptions.value, browserZone: zone.value };
+      if (result.valid && result.startUs !== null && result.endUs !== null) {
+        if (props.hideRelativeTime) {
+          return formatRangeLabel(result.startUs, result.endUs, zone.value, options).range;
+        }
+        return formatRangeFull(result.startUs, result.endUs, zone.value, options).range;
+      }
+      const endUs = edgeInstant(validationDraft.value.end, zone.value).us;
+      return `${summaryText(startUs)} – ${endUs === null ? "…" : summaryText(endUs)}`;
+    };
+
+    const transitionDay = (date: string) =>
+      new Intl.DateTimeFormat(intlLocale.value, {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+        calendar: "gregory",
+        numberingSystem: "latn",
+      }).format(new Date(`${date}T00:00:00Z`));
+
+    const edgeErrorText = (
+      edge: DraftEdgeName,
+      error: DraftEdgeError | null,
+    ): I18nText | undefined => {
+      const value = validationDraft.value[edge];
+      if (error === "incomplete-date") return t("common.rangeIncompleteDate");
+      if (error === "incomplete-time") return t("common.rangeIncompleteTime");
+      if (error === "invalid-date") return t("common.rangeInvalidDate");
+      // Without a host maxDate future days are pickable, so only the earliest date can be out of range.
+      if (error === "out-of-range") {
+        if (!props.maxDate) {
+          return t("common.rangeOutOfBoundsMin", { min: toIsoDate(calendarMinDate.value) });
+        }
+        return t("common.rangeOutOfBounds", {
+          min: toIsoDate(calendarMinDate.value),
+          max: toIsoDate(props.maxDate),
+        });
+      }
+      if (error === "skipped") {
+        const change = describeDstTransition(value.date, value.time, zone.value);
+        return t("common.rangeTimeSkipped", {
+          time: value.time.slice(0, 5),
+          date: transitionDay(value.date),
+          zone: zone.value,
+          from: change?.before ?? "",
+          to: change?.after ?? "",
+        });
+      }
+      if (error === "end-before-start") return t("common.rangeEndBeforeStartShort");
+      return undefined;
+    };
+
+    // The note under the line names the Start that End falls before; the field error stays short.
+    const endBeforeStartText = (): I18nText => {
+      const startUs = edgeInstant(validationDraft.value.start, zone.value).us;
+      return t("common.rangeEndBeforeStart", {
+        start: startUs === null ? "" : summaryText(startUs),
       });
     };
 
-    // A tab only shows its panel; the range changes once the user picks or edits in it.
-    const selectTab = (type: string) => {
-      if (type === selectedType.value) return;
-      if (type === "absolute" && selectedType.value === "relative") seedAbsoluteFromSelection();
-      selectedType.value = type;
+    const errorPart = (error: DraftEdgeError | null): "date" | "time" | "both" => {
+      if (error === "incomplete-time" || error === "skipped") return "time";
+      if (error === "end-before-start" || error === null) return "both";
+      return "date";
     };
 
-    // Clicking the active segment deselects it in the group; the picker always keeps one type.
-    const onTypeToggle = (value: unknown) => {
-      if (value === "relative" || value === "absolute") selectTab(value);
+    const draftErrors = computed(() => ({
+      start: edgeErrorText("start", validation.value.start),
+      end: edgeErrorText("end", validation.value.end),
+      startPart: errorPart(validation.value.start),
+      endPart: errorPart(validation.value.end),
+    }));
+
+    const draftOffsets = computed(() => ({
+      start: edgeInstant(draft.value.start, zone.value).offsets,
+      end: pendingEnd.value ? [] : edgeInstant(draft.value.end, zone.value).offsets,
+    }));
+
+    const calendarInvalidDates = computed(() =>
+      validation.value.end === "end-before-start"
+        ? [toSlashDate(draft.value.start.date), toSlashDate(draft.value.end.date)]
+        : [],
+    );
+
+    const repeatedHourNote = (): ResolvedLineNote | null => {
+      const edge: DraftEdgeName | null = draftOffsets.value.start.length
+        ? "start"
+        : draftOffsets.value.end.length
+          ? "end"
+          : null;
+      if (!edge) return null;
+      const value = draft.value[edge];
+      const change = describeDstTransition(value.date, value.time, zone.value);
+      if (!change) return null;
+      return {
+        kind: "info",
+        reason: "repeated-hour",
+        text: t("common.rangeTimeRepeated", {
+          time: change.before,
+          date: transitionDay(value.date),
+          from: change.after,
+          to: change.before,
+        }),
+      };
+    };
+
+    const draftWindow = computed<LineWindow | null>(() => {
+      const pending = panelDraft.value;
+      if (!pending || pending.kind === "instant") return null;
+      const result = validation.value;
+      if (!result.valid || result.startUs === null || result.endUs === null) return null;
+      if (pending.kind === "calendar") {
+        return {
+          kind: "calendar",
+          token: pending.token,
+          startUs: result.startUs,
+          endUs: result.endUs,
+        };
+      }
+      return { kind: pending.kind, startUs: result.startUs, endUs: result.endUs };
+    });
+
+    const appliedWindow = computed<LineWindow | null>(() => {
+      const source = appliedSource.value;
+      const nowMs = tooltipNow.value;
+      if (!props.disableRelative && source.type === "relative") {
+        const range = resolveCalendarPeriod(source.calendarToken, zone.value, nowMs);
+        if (range && source.calendarToken) {
+          return {
+            kind: "calendar",
+            token: source.calendarToken,
+            startUs: range.startTime,
+            endUs: range.endTime,
+          };
+        }
+        return {
+          kind: "relative",
+          startUs: relativeStartMs(source.relativeValue, source.relativePeriod, nowMs) * 1000,
+          endUs: nowMs * 1000,
+        };
+      }
+      if (
+        !Number.isFinite(source.startUs) ||
+        !Number.isFinite(source.endUs) ||
+        source.startUs <= 0
+      ) {
+        return null;
+      }
+      return { kind: "absolute", startUs: source.startUs, endUs: source.endUs };
+    });
+
+    const previewWindow = computed<LineWindow | null>(() => {
+      const item = previewItem.value;
+      if (!item) return null;
+      const nowMs = tooltipNow.value;
+      if (item.kind === "relative") {
+        return {
+          kind: "relative",
+          startUs: relativeStartMs(item.value, item.unit, nowMs) * 1000,
+          endUs: nowMs * 1000,
+        };
+      }
+      if (item.kind === "calendar") {
+        const preset = CALENDAR_RAIL_ITEMS.find((entry) => entry.id === item.id);
+        const range = preset ? resolveCalendarPeriod(preset.token, zone.value, nowMs) : null;
+        if (!preset || !range) return null;
+        return {
+          kind: "calendar",
+          token: preset.token,
+          startUs: range.startTime,
+          endUs: range.endTime,
+        };
+      }
+      const entry = timeRangeHistory.entries.value[Number(item.id)];
+      return entry ? { kind: "absolute", startUs: entry.startUs, endUs: entry.endUs } : null;
+    });
+
+    const calendarPreview = computed(() => {
+      const preview = previewWindow.value;
+      if (!preview) return null;
+      return {
+        start: convertUnixTime(preview.startUs).date,
+        end: convertUnixTime(displayEndUs(preview.startUs, preview.endUs, zone.value)).date,
+      };
+    });
+
+    const windowText = (window: LineWindow): string => {
+      const options = { ...rangeLabelOptions.value, browserZone: zone.value };
+      // A phone line has room for minutes only; the field already states the window.
+      if (props.hideRelativeTime) {
+        return formatRangeLabel(window.startUs, window.endUs, zone.value, options).range;
+      }
+      if (isMobile.value) {
+        return formatRangeLabel(window.startUs, window.endUs, zone.value, {
+          ...options,
+          precision: "minutes",
+        }).range;
+      }
+      return formatRangeFull(window.startUs, window.endUs, zone.value, options).range;
+    };
+
+    // "2 days ago" in the picker's language, in the largest whole unit.
+    const endedAgo = (ms: number): string => {
+      const minutes = Math.floor(ms / 60_000);
+      const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+        minutes >= 1440
+          ? [Math.floor(minutes / 1440), "day"]
+          : minutes >= 60
+            ? [Math.floor(minutes / 60), "hour"]
+            : [minutes, "minute"];
+      try {
+        return new Intl.RelativeTimeFormat(intlLocale.value, { style: "narrow" }).format(
+          -value,
+          unit,
+        );
+      } catch {
+        return `${value}${unit[0]}`;
+      }
+    };
+
+    // "ended … ago" only fits the applied line on a wide panel; a draft or a phone shows just Fixed.
+    const kindOf = (
+      window: LineWindow,
+      withEnded = false,
+    ): Pick<ResolvedLineView, "kind" | "kindTooltip"> => {
+      if (window.kind === "relative") {
+        return { kind: t("common.rangeEndingNow"), kindTooltip: t("common.rangeMovesWithNow") };
+      }
+      if (window.kind === "calendar") {
+        return { kind: t(ROLLS_KEYS[parseCalendarToken(window.token)?.unit ?? "day"]) };
+      }
+      const agoMs = tooltipNow.value - Math.floor(window.endUs / 1000);
+      if (!withEnded || isMobile.value || agoMs < ENDED_AGO_MIN_MS) {
+        return { kind: t("common.rangeFixed") };
+      }
+      return {
+        kind: raw(
+          `${t("common.rangeFixed")} · ${t("common.rangeEndedAgo", { ago: endedAgo(agoMs) })}`,
+        ),
+      };
+    };
+
+    // Only hand-typed text is led by "Read as"; a paste says how it was read in its note.
+    const readAsLead = (pending: PanelDraft): I18nText | undefined =>
+      pending.source === "text" ? t("common.rangeReadAs") : undefined;
+
+    // One row in fixed slots: a preview, an instant, the draft (or the clamped window it runs), else the applied range.
+    const lineView = computed<ResolvedLineView>(() => {
+      const preview = previewWindow.value;
+      if (preview) {
+        return {
+          mode: "preview",
+          lead: t("common.rangePreview"),
+          range: windowText(preview),
+          duration: formatRecentDuration(preview.startUs, preview.endUs),
+          ...kindOf(preview),
+          endSlot: preview.kind === "calendar" ? "freeze" : null,
+        };
+      }
+      const pending = panelDraft.value;
+      if (pending?.kind === "instant") {
+        return {
+          mode: "instant",
+          lead: t("common.rangeInstantRead"),
+          range: summaryText(pending.us),
+          duration: "",
+          kind: "",
+          endSlot: "badge",
+        };
+      }
+      if (pending && hasDraft.value) {
+        const window = draftWindow.value;
+        const runs = pending.kind === "relative" && pending.typed !== undefined;
+        return {
+          mode: runs ? "runs" : "read-as",
+          lead: runs ? t("common.rangeRuns") : window ? readAsLead(pending) : undefined,
+          range: window ? windowText(window) : summaryRange(),
+          duration: window ? formatRecentDuration(window.startUs, window.endUs) : raw("—"),
+          ...(window ? kindOf(window) : { kind: "" as const }),
+          endSlot: "badge",
+        };
+      }
+      const applied = appliedWindow.value;
+      if (!applied) return { mode: "applied", range: "", duration: "", kind: "", endSlot: null };
+      return {
+        mode: "applied",
+        range: windowText(applied),
+        duration: formatRecentDuration(applied.startUs, applied.endUs),
+        ...kindOf(applied, true),
+        endSlot: applied.kind === "calendar" ? "freeze" : props.hideRangeShift ? null : "zoom",
+      };
+    });
+
+    // A draft that cannot apply as it is: End before Start offers Swap, a skipped wall time offers the next valid one.
+    const repairNote = (): ResolvedLineNote | null => {
+      const result = validation.value;
+      if (result.end === "end-before-start") {
+        return {
+          kind: "error",
+          reason: "end-before-start",
+          text: endBeforeStartText(),
+          actions: [{ id: "swap", label: t("common.rangeSwap"), dataTest: "date-time-range-swap" }],
+        };
+      }
+      const skipped: DraftEdgeName | null =
+        result.start === "skipped" ? "start" : result.end === "skipped" ? "end" : null;
+      const next = skipped ? nextValidTime(skipped) : null;
+      if (!skipped || !next) return null;
+      return {
+        kind: "error",
+        reason: "skipped",
+        text: draftErrors.value[skipped] ?? raw(""),
+        actions: [
+          {
+            id: "dst-next",
+            label: t("common.rangeUseTime", { time: next.slice(0, 5) }),
+            dataTest: "date-time-range-dst-next",
+          },
+        ],
+      };
+    };
+
+    const limitNote = (): ResolvedLineNote | null => {
+      const pending = panelDraft.value;
+      if (pending?.kind === "relative" && pending.typed) {
+        const text = t("common.rangeOverLimit", {
+          typed: relativeLabel(pending.typed),
+          range: relativeLabel(pending),
+        });
+        const host = props.queryRangeRestrictionMsg;
+        return {
+          kind: "warn",
+          reason: "query-range-limit",
+          text: raw(host ? `${text} ${host}` : text),
+        };
+      }
+      const result = validation.value;
+      if (
+        result.valid &&
+        props.queryRangeRestrictionMsg &&
+        exceedsRangeRestriction(
+          result.startUs as number,
+          result.endUs as number,
+          props.queryRangeRestrictionInHour,
+        )
+      ) {
+        return {
+          kind: "warn",
+          reason: "query-range-limit",
+          text: raw(props.queryRangeRestrictionMsg),
+        };
+      }
+      return null;
+    };
+
+    // One note at a time: a read error, a repair, the zone switch, the query-range limit, how text was read, then DST.
+    const lineNote = computed<ResolvedLineNote | null>(() => {
+      if (parseError.value && !fieldTyping.value) return parseErrorNote(parseError.value);
+      if (readNote.value?.kind === "error") return readNote.value;
+      const repair = panelDraft.value ? repairNote() : null;
+      if (repair) return repair;
+      if (zoneNote.value) return zoneNote.value;
+      return limitNote() ?? readNote.value ?? repeatedHourNote();
+    });
+
+    const onDraftEdge = (edge: DraftEdgeName, value: DraftEdge) => {
+      const next = edge === "end" && pendingEnd.value ? fillPendingEnd(value) : value;
+      if (edge === "end") pendingEnd.value = false;
+      draft.value = { ...draft.value, [edge]: { ...next } };
+      if (value.date) calendarMonth.value = toSlashDate(value.date);
+      markFieldsDraft();
+    };
+
+    // The End fields read empty while a first calendar click waits, yet that End is the clicked day at the draft's time.
+    const fillPendingEnd = (value: DraftEdge): DraftEdge => ({
+      date: value.date || draft.value.start.date,
+      time: value.time || draft.value.end.time,
+      offset: value.offset,
+    });
+
+    const onFieldStatus = (part: RangeFieldPart, status: SegmentedFieldStatus) => {
+      fieldStatus.value = { ...fieldStatus.value, [part]: status };
+    };
+
+    const setEdgeTime = (edge: DraftEdgeName, time: string) => {
+      const current =
+        edge === "end" && pendingEnd.value ? { ...draft.value.start } : draft.value[edge];
+      onDraftEdge(edge, { ...current, time, offset: "" });
+    };
+
+    // Now ends the range at this second.
+    const setEndNow = () => {
+      const nowUs = Math.floor(Date.now() / 1000) * MICROS_PER_SECOND;
+      const { start } = draftFromRange(nowUs, nowUs + MICROS_PER_SECOND, zone.value);
+      onDraftEdge("end", { ...start });
+    };
+
+    const setHourFormat = (value: "24h" | "12h") => {
+      hourFormat.value = value;
+      useLocalHourFormat(value);
+    };
+
+    const onHourFormat = (value: unknown) => {
+      if (value === "24h" || value === "12h") setHourFormat(value);
+    };
+
+    const applyDraft = (): boolean => {
+      if (!validation.value.valid) return false;
+      const value = validationDraft.value;
+      isSeedingAbsolute = true;
+      selectedDate.value = { from: toSlashDate(value.start.date), to: toSlashDate(value.end.date) };
+      if (!props.hideRelativeTime) {
+        selectedTime.value = { startTime: value.start.time, endTime: value.end.time };
+      }
+      appliedOffsets = { start: value.start.offset, end: value.end.offset };
+      exactEndDate = null;
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+      selectedType.value = "absolute";
+      calendarToken.value = null;
+      isUserInitiated = true;
+      saveDate("absolute");
+      recordAbsoluteRange();
+      seedDraft();
+      return true;
+    };
+
+    const focusInvalidField = () => {
+      const edge: DraftEdgeName = validation.value.start ? "start" : "end";
+      const error = validation.value[edge];
+      rangeFields.value?.focusField("invalid", edge, errorPart(error) === "time" ? "time" : "date");
+    };
+
+    const submitDraft = () => {
+      if (pendingEnd.value) commitPendingDay();
+      if (validation.value.valid && hasDraft.value) {
+        applyAndClose();
+        return;
+      }
+      if (!validation.value.valid) focusInvalidField();
+    };
+
+    const onCalendarPending = (day: string | null) => {
+      if (day === null) return;
+      draft.value = {
+        ...draft.value,
+        start: { ...draft.value.start, date: toIsoDate(day), offset: "" },
+      };
+      pendingEnd.value = true;
+      markFieldsDraft();
+    };
+
+    // The calendar swaps a second click before the first, so the times swap with the days.
+    const onCalendarStart = (day: string) => {
+      const date = toIsoDate(day);
+      if (pendingEnd.value && date !== draft.value.start.date) {
+        const { start, end } = draft.value;
+        draft.value = { start: { ...end, date, offset: "" }, end: { ...start, offset: "" } };
+        markFieldsDraft();
+        return;
+      }
+      draft.value = { ...draft.value, start: { ...draft.value.start, date, offset: "" } };
+      markFieldsDraft();
+    };
+
+    const onCalendarEnd = (day: string) => {
+      const date = toIsoDate(day);
+      draft.value = { ...draft.value, end: { ...draft.value.end, date, offset: "" } };
+      pendingEnd.value = false;
+      markFieldsDraft();
     };
 
     const setDateType = (type: string) => {
@@ -1754,6 +2793,8 @@ export default defineComponent({
       selectedDate.value.to = endDateTime.date;
       selectedTime.value.startTime = startDateTime.time;
       selectedTime.value.endTime = endDateTime.time;
+      appliedOffsets = { start: "", end: "" };
+      rememberEndInstant(endTime + delta, endTime + delta);
       selectedType.value = "absolute";
 
       menuOpen.value = false;
@@ -1773,116 +2814,368 @@ export default defineComponent({
       return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
     };
 
-    // Rail items in tab order: recent rows, the show-more toggle, then the single-column calendar rows.
-    const railItems = (panel: HTMLElement): HTMLButtonElement[] =>
-      Array.from(
-        panel.querySelectorAll<HTMLButtonElement>(
-          "[data-date-time-rail-recent], [data-test='date-time-rail-recent-toggle'], [data-date-time-rail-calendar]",
-        ),
-      );
+    const isFieldInput = (target: EventTarget | null) =>
+      target instanceof HTMLElement && !!target.closest("[data-test='date-time-range-input']");
 
-    // Arrow-key navigation for the picker panel: Left/Right switch the
-    // Relative/Absolute tabs, and arrows roam the relative preset grid.
-    // stopPropagation keeps reka's dropdown-menu keydown from swallowing them.
-    const onPickerKeydown = (event: KeyboardEvent) => {
-      const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-      if (!arrows.includes(event.key)) return;
-      const panel = event.currentTarget as HTMLElement;
-      const target = event.target as HTMLElement;
-      if (!panel || !target) return;
-
-      const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
-      if (railItem) {
-        // A recent row's own listener reaches its × with Left/Right.
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-        event.preventDefault();
-        event.stopPropagation();
-
-        const items = railItems(panel);
-        const dir = event.key === "ArrowDown" ? 1 : -1;
-        let next: HTMLButtonElement | null = null;
-        for (let i = items.indexOf(railItem) + dir; i >= 0 && i < items.length; i += dir) {
-          if (!items[i].disabled) {
-            next = items[i];
-            break;
-          }
-        }
-        next?.focus();
-        return;
-      }
-
-      const tab = target.closest(
-        "[data-test='date-time-relative-tab'], [data-test='date-time-absolute-tab']",
-      );
-      if (tab) {
-        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-          event.preventDefault();
-          event.stopPropagation();
-          const next = event.key === "ArrowRight" ? "absolute" : "relative";
-          selectTab(next);
-          panel.querySelector<HTMLElement>(`[data-test='date-time-${next}-tab']`)?.focus();
-        } else if (event.key === "ArrowDown") {
-          event.preventDefault();
-          event.stopPropagation();
-          panel
-            .querySelector<HTMLElement>(".date-time-table [data-test$='-btn']:not([disabled])")
-            ?.focus();
-        }
-        return;
-      }
-
-      const cell = target.closest<HTMLButtonElement>(
-        "[data-test^='date-time-relative-'][data-test$='-btn']",
-      );
-      if (!cell) return;
-      const rows = Array.from(panel.querySelectorAll(".date-time-table .relative-row"))
-        .map((row) =>
-          Array.from(
-            row.querySelectorAll<HTMLButtonElement>(
-              "[data-test^='date-time-relative-'][data-test$='-btn']",
-            ),
-          ),
-        )
-        .filter((btns) => btns.length > 0);
-      let r = -1;
-      let c = -1;
-      rows.forEach((btns, ri) => {
-        const ci = btns.indexOf(cell);
-        if (ci !== -1) {
-          r = ri;
-          c = ci;
-        }
-      });
-      if (r === -1) return;
+    // Esc is handled here and stopped, so neither the popover's dismiss nor a page or dialog Escape shortcut sees it.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isTimezoneSelectOpen.value) return;
       event.preventDefault();
       event.stopPropagation();
-
-      const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
-      const stepRow = (btns: HTMLButtonElement[], from: number, dir: number) => {
-        for (let i = from + dir; i >= 0 && i < btns.length; i += dir)
-          if (enabled(btns[i])) return btns[i];
-        return null;
-      };
-      const stepCol = (from: number, dir: number) => {
-        for (let ri = from + dir; ri >= 0 && ri < rows.length; ri += dir) {
-          const btns = rows[ri];
-          const col = Math.min(c, btns.length - 1);
-          if (enabled(btns[col])) return btns[col];
-          const back = stepRow(btns, col + 1, -1);
-          if (back) return back;
-          const fwd = stepRow(btns, col - 1, 1);
-          if (fwd) return fwd;
-        }
-        return null;
-      };
-
-      let next: HTMLButtonElement | null = null;
-      if (event.key === "ArrowLeft") next = stepRow(rows[r], c, -1);
-      else if (event.key === "ArrowRight") next = stepRow(rows[r], c, 1);
-      else if (event.key === "ArrowUp") next = stepCol(r, -1);
-      else if (event.key === "ArrowDown") next = stepCol(r, 1);
-      next?.focus();
+      if (beforeTyping && (fieldEdited.value || parseError.value !== null)) {
+        restorePanel(beforeTyping);
+        nextTick(() => rangeField.value?.focusAndSelect());
+        return;
+      }
+      closePanel("escape");
     };
+
+    const onPickerKeydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onEscape(event);
+        return;
+      }
+      if (event.key !== "ArrowDown" || !isFieldInput(event.target)) return;
+      event.preventDefault();
+      if (instantDraft.value) focusInstantChoice(instantDraft.value.choice);
+      else helpers.value?.focusFirst();
+    };
+
+    const selectedRelativeKey = computed<string | null>(() => {
+      const pending = panelDraft.value;
+      if (pending) return pending.kind === "relative" ? `${pending.value}${pending.unit}` : null;
+      if (selectedType.value !== "relative" || calendarToken.value !== null) return null;
+      return `${relativeValue.value}${relativePeriod.value}`;
+    });
+
+    const relativeRows = computed<RelativeRow[] | null>(() => {
+      if (props.disableRelative || props.hideRelativeTime) return null;
+      const limit = props.queryRangeRestrictionInHour;
+      return RELATIVE_CHIPS.map(([unit, values]) => ({
+        unit,
+        label: t(RELATIVE_ROW_KEYS[unit] ?? "common.rangeUnitMinutes"),
+        chips: values.map((value) => ({
+          value,
+          ariaLabel: t(pastKeyFor(unit), { count: value }),
+          selected: selectedRelativeKey.value === `${value}${unit}`,
+          disabled: limit > 0 && (value * RELATIVE_UNIT_SECONDS[unit]) / 3600 > limit,
+        })),
+      }));
+    });
+
+    // Calendar periods are rolling tokens, which a dates-only picker cannot emit.
+    const calendarRows = computed<CalendarRow[]>(() => {
+      const items = calendarRailItems.value;
+      if (!items || props.disableRelative) return [];
+      return CALENDAR_ROW_KEYS.map(([key, ids]) => ({
+        label: t(key),
+        items: ids
+          .map((id) => items.find((item) => item.id === id))
+          .filter((item): item is TimeRangeRailItem => item !== undefined),
+      }));
+    });
+
+    const hasHelpers = computed(
+      () => relativeRows.value !== null || calendarRows.value.length > 0 || showRail.value,
+    );
+
+    const customBodyShown = computed(() => !isMobile.value || customOpen.value);
+
+    const onHelperPreview = (item: HelperItem) => {
+      refreshTooltipNow();
+      previewItem.value = item;
+    };
+
+    const endPreview = () => {
+      previewItem.value = null;
+    };
+
+    // Focus leaving the helpers and the line's Use these dates ends a preview; the pointer can still travel to the line.
+    const onPanelFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest?.("[data-roving], [data-test='date-time-range-freeze']")) {
+        previewItem.value = null;
+      }
+    };
+
+    const fillAbsoluteDraft = (startUs: number, endUs: number) => {
+      panelDraft.value = { kind: "absolute", source: "helper", zoneAssumed: false };
+      draft.value = draftFromRange(startUs, endUs, zone.value);
+      pendingEnd.value = false;
+      fieldStatus.value = emptyFieldStatus();
+      parseError.value = null;
+      readNote.value = null;
+      showDraftMonth();
+      showText(draftText());
+    };
+
+    const commitRelative = (window: RelativeWindow, valueType: "relative" | "relative-custom") => {
+      selectedType.value = "relative";
+      calendarToken.value = null;
+      relativePeriod.value = window.unit;
+      relativeValue.value = window.value;
+      isUserInitiated = true;
+      saveDate(valueType);
+    };
+
+    const commitCalendar = (token: string) => {
+      selectedType.value = "relative";
+      calendarToken.value = token;
+      isUserInitiated = true;
+      saveDate("relative");
+    };
+
+    // Fixed instants become the applied absolute range; saved once here, so the auto-apply watcher must not save again.
+    const commitAbsoluteRange = (startUs: number, endUs: number, record: boolean) => {
+      const start = convertUnixTime(startUs);
+      const shownEndUs = displayEndUs(startUs, endUs, zone.value);
+      const end = convertUnixTime(shownEndUs);
+      appliedOffsets = { start: "", end: "" };
+      isSeedingAbsolute = true;
+      selectedDate.value.from = start.date;
+      selectedDate.value.to = end.date;
+      selectedTime.value.startTime = start.time;
+      selectedTime.value.endTime = end.time;
+      rememberEndInstant(endUs, shownEndUs);
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+      selectedType.value = "absolute";
+      calendarToken.value = null;
+      isUserInitiated = true;
+      saveDate("absolute");
+      if (record && showRail.value) timeRangeHistory.add(startUs, endUs, zone.value);
+    };
+
+    // A helper commits and closes on an applying host; elsewhere it fills the draft and waits for Apply.
+    const onHelperSelect = (item: HelperItem) => {
+      previewItem.value = null;
+      if (item.kind === "recent") {
+        const entry = timeRangeHistory.entries.value[Number(item.id)];
+        if (!entry) return;
+        if (props.autoApply) applyRecentRange(item.id);
+        else fillAbsoluteDraft(entry.startUs, entry.endUs);
+        return;
+      }
+      if (item.kind === "calendar") {
+        const preset = CALENDAR_RAIL_ITEMS.find((entry) => entry.id === item.id);
+        if (!preset) return;
+        if (props.autoApply) {
+          applyCalendarItem(item.id);
+          return;
+        }
+        setPanelDraft({ kind: "calendar", source: "helper", token: preset.token });
+        showText(draftText());
+        return;
+      }
+      const window = { value: item.value, unit: item.unit };
+      if (props.autoApply) {
+        commitRelative(window, "relative");
+        closePanel();
+        return;
+      }
+      setPanelDraft({ kind: "relative", source: "helper", ...window });
+      showText(draftText());
+    };
+
+    // Use these dates turns a calendar period into its fixed dates, committed like a chip.
+    const freezeToken = (token: string) => {
+      const range = resolveCalendarPeriod(token, zone.value);
+      if (!range) return;
+      previewItem.value = null;
+      if (!props.autoApply) {
+        fillAbsoluteDraft(range.startTime, range.endTime);
+        return;
+      }
+      commitAbsoluteRange(range.startTime, range.endTime, true);
+      closePanel();
+    };
+
+    const freezeCalendar = () => {
+      const preview = previewWindow.value;
+      const token =
+        preview?.kind === "calendar" ? preview.token : (appliedWindow.value?.token ?? null);
+      if (token) freezeToken(token);
+    };
+
+    const freezeCalendarItem = (id: string) => {
+      const preset = CALENDAR_RAIL_ITEMS.find((entry) => entry.id === id);
+      if (preset) freezeToken(preset.token);
+    };
+
+    const instantDraft = computed(() =>
+      panelDraft.value?.kind === "instant" ? panelDraft.value : null,
+    );
+
+    const windowLabel = (minutes: number) => (minutes >= 60 ? `${minutes / 60}h` : `${minutes}m`);
+
+    const instantChoices = computed(() => {
+      const pending = instantDraft.value;
+      if (!pending) return [];
+      const around = instantWindow({ ...pending, choice: "around" }, tooltipNow.value);
+      return [
+        {
+          id: "around" as const,
+          chosen: pending.choice === "around",
+          label: t("common.rangeInstantAround", {
+            range: windowText({ kind: "absolute", ...around }),
+          }),
+          detail: "",
+        },
+        {
+          id: "since" as const,
+          chosen: pending.choice === "since",
+          label: t("common.rangeInstantSince", { time: summaryText(pending.us) }),
+          detail: formatRecentDuration(pending.us, tooltipNow.value * 1000),
+        },
+      ];
+    });
+
+    const chooseInstant = (choice: "around" | "since") => {
+      const pending = instantDraft.value;
+      if (pending && pending.choice !== choice) setPanelDraft({ ...pending, choice });
+    };
+
+    const pickInstantChoice = (choice: "around" | "since") => {
+      chooseInstant(choice);
+      if (props.autoApply) applyAndClose();
+    };
+
+    const setInstantWindow = (value: unknown) => {
+      const pending = instantDraft.value;
+      const minutes = INSTANT_WINDOWS.find((option) => String(option) === value);
+      if (pending && minutes) setPanelDraft({ ...pending, choice: "around", window: minutes });
+    };
+
+    const panelEl = () => document.getElementById("date-time-menu");
+
+    const focusInstantChoice = (choice: "around" | "since") => {
+      nextTick(() =>
+        panelEl()?.querySelector<HTMLElement>(`[data-test='date-time-instant-${choice}']`)?.focus(),
+      );
+    };
+
+    // ↑ ↓ move the highlight between the two readings; past them, focus returns to the field or goes on to the helpers.
+    const onInstantKeydown = (event: KeyboardEvent, choice: "around" | "since") => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "ArrowUp") {
+        if (choice === "around") rangeField.value?.focusAndSelect();
+        else {
+          chooseInstant("around");
+          focusInstantChoice("around");
+        }
+        return;
+      }
+      if (choice === "since") {
+        helpers.value?.focusFirst();
+        return;
+      }
+      chooseInstant("since");
+      focusInstantChoice("since");
+    };
+
+    const zoomSource = (): ZoomRange | null => {
+      const window = appliedWindow.value;
+      if (!window) return null;
+      if (window.kind === "relative") {
+        return {
+          kind: "relative",
+          value: appliedSource.value.relativeValue,
+          unit: appliedSource.value.relativePeriod as RelativeUnit,
+        };
+      }
+      return { kind: "absolute", startUs: window.startUs, endUs: window.endUs };
+    };
+
+    const zoomTarget = (): ZoomRange | null => {
+      const source = zoomSource();
+      if (!source) return null;
+      return zoomOutRange(source, {
+        nowUs: Date.now() * 1000,
+        minUs: convertToUtcTimestamp(`${calendarMinDate.value} 00:00:00`, zone.value),
+        limitHours: props.queryRangeRestrictionInHour,
+      });
+    };
+
+    const zoomDisabled = computed(() => {
+      void tooltipNow.value;
+      void appliedSource.value;
+      return zoomTarget() === null;
+    });
+
+    // Zoom out commits at once and discards any draft, like the shift arrows.
+    const zoomOut = () => {
+      if (props.hideRangeShift || props.disable) return;
+      const next = zoomTarget();
+      if (!next) return;
+      if (next.kind === "relative") commitRelative(next, "relative-custom");
+      else commitAbsoluteRange(next.startUs, next.endUs, false);
+      closePanel();
+    };
+
+    // The earlier and later keys follow reading order, so they swap in RTL.
+    const shiftByKey = (direction: "prev" | "next") => {
+      const rtl = rootEl.value ? getComputedStyle(rootEl.value).direction === "rtl" : false;
+      const step = rtl ? (direction === "prev" ? "next" : "prev") : direction;
+      if (props.disable) return;
+      if (step === "prev" && props.disablePrevShift) return;
+      if (step === "next" && isNextShiftDisabled()) return;
+      shiftTimeRange(step);
+    };
+
+    const openFromShortcut = () => {
+      if (props.disable || menuOpen.value) return;
+      menuOpen.value = true;
+      onMenuOpenChange(true);
+    };
+
+    const pageShortcutList: Shortcut[] = [
+      { key: "t", handler: openFromShortcut, description: t("common.rangeShortcutOpen") },
+    ];
+    if (!props.hideRangeShift) {
+      pageShortcutList.push(
+        {
+          key: "[",
+          handler: () => shiftByKey("prev"),
+          description: t("common.rangeShortcutEarlier"),
+        },
+        {
+          key: "]",
+          handler: () => shiftByKey("next"),
+          description: t("common.rangeShortcutLater"),
+        },
+        { key: "-", handler: zoomOut, description: t("common.rangeZoomOut") },
+      );
+    }
+    useShortcuts(pageShortcutList, undefined, {
+      active: computed(() => props.pageShortcuts && !props.disable),
+    });
+
+    const fieldPlaceholder = computed(() =>
+      t("common.rangeInputPlaceholder", {
+        relative: raw(props.disableRelative || props.hideRelativeTime ? "2026-11-04" : "90m"),
+        absolute: raw("Nov 4, 13:00 - 15:00"),
+      }),
+    );
+
+    // The field reads in error for text that does not read and for a draft End before Start or in a DST gap.
+    const fieldInvalid = computed(
+      () =>
+        (parseError.value !== null && !fieldTyping.value) ||
+        (panelDraft.value !== null && repairNote() !== null),
+    );
+
+    // The hint stays over the applied or a pasted value, never over hand-typed text or an error.
+    const showFieldHint = computed(
+      () => !fieldEdited.value && fieldText.value !== "" && !fieldInvalid.value,
+    );
+
+    const zoneLinkText = computed(() => formatZoneName(zone.value, tooltipNow.value));
+
+    // A phone's zone link has room only for the short name (IST).
+    const zoneAbbreviationText = computed(() => zoneAbbreviation(zone.value, tooltipNow.value));
 
     const computeRelativePeriod = () => {
       if (selectedType.value === "relative") {
@@ -1991,21 +3284,11 @@ export default defineComponent({
       emit("show");
     };
 
-    const absoluteRangeKey = () => {
-      if (selectedType.value !== "absolute") return null;
-      const { startUTC, endUTC } = getUTCTimeStamp();
-      return `${startUTC}-${endUTC}`;
-    };
-
     const recordAbsoluteRange = () => {
       if (!showRail.value || selectedType.value !== "absolute") return;
       const { startUTC, endUTC } = getUTCTimeStamp();
-      timeRangeHistory.add(startUTC, endUTC);
+      timeRangeHistory.add(startUTC, endUTC, zone.value);
     };
-
-    // An auto-applied absolute range is final only when the panel closes, not after every edit.
-    let rangeKeyAtOpen: string | null = null;
-    const menuOpen = ref(false);
 
     // Calendar labels name a day and the rail ends "so far" ranges at now, so the clock runs only while one is shown.
     const needsClock = computed(
@@ -2028,108 +3311,162 @@ export default defineComponent({
     onActivated(syncClock);
     onDeactivated(stopClock);
     onBeforeUnmount(stopClock);
+    // The shift arrows discard the draft and move the applied range, so their pointerdown must not apply it.
+    const onPointerDownOutside = (event: Event) => {
+      const target = event.target as Element | null;
+      if (target?.closest?.("[data-test='date-time-prev-btn'], [data-test='date-time-next-btn']")) {
+        closeReason = "shift";
+      }
+    };
+
+    // Applies the draft as it stands; false when there is none or it does not read.
+    const commitPanelDraft = (): boolean => {
+      const pending = panelDraft.value;
+      if (!pending) return false;
+      if (pending.kind === "relative") {
+        commitRelative(pending, pending.source === "helper" ? "relative" : "relative-custom");
+        return true;
+      }
+      if (pending.kind === "calendar") {
+        commitCalendar(pending.token);
+        return true;
+      }
+      // From an instant to now ends when it is applied, not when it was read.
+      if (pending.kind === "instant") syncDraftWindow();
+      if (pendingEnd.value) commitPendingDay();
+      return applyDraft();
+    };
+
+    // An outside close (Run query included) on an auto-apply host applies a deliberate draft before the click lands; typed text is dropped.
+    const applyOnClose = () => {
+      const reason = closeReason;
+      closeReason = null;
+      if (!props.autoApply || reason !== null || fieldEdited.value || !panelDraft.value) return;
+      if (pendingEnd.value) commitPendingDay();
+      if (hasDraft.value && validation.value.valid) commitPanelDraft();
+    };
+
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
         refreshTooltipNow();
-        pendingDay.value = null;
-        rangeKeyAtOpen = absoluteRangeKey();
+        closeReason = null;
+        customOpen.value = false;
+        liveText.value = "";
+        seedDraft();
         onBeforeShow();
         onShow();
       } else {
-        if (props.autoApply && commitPendingDay()) saveDate("absolute");
-        pendingDay.value = null;
+        applyOnClose();
+        discardDraft();
         if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
           restoreAppliedSelection();
-        } else if (absoluteRangeKey() !== rangeKeyAtOpen) {
-          recordAbsoluteRange();
         }
         onBeforeHide();
         onHide();
       }
     };
 
-    // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
+    // The field holds the applied range selected, so typing or pasting replaces it at once.
     const onPopoverOpenAutoFocus = (event: Event) => {
-      if (!showRail.value) return;
-      const firstItem = document.querySelector<HTMLElement>(
-        "#date-time-menu [data-date-time-rail-item]:not([disabled])",
-      );
-      // An empty rail keeps reka's default focus, or focus stays on the trigger and ⌘V never reaches the panel.
-      if (!firstItem) return;
       event.preventDefault();
-      firstItem.focus();
+      // On a phone a focused field raises the keyboard, so the panel itself takes focus and Esc still reaches it.
+      if (isMobile.value) {
+        nextTick(() => panelEl()?.focus());
+        return;
+      }
+      nextTick(() => rangeField.value?.focusAndSelect());
     };
 
-    // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
-    const closeMenu = () => {
+    // A commit, Esc or a shift closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    const closePanel = (reason: "commit" | "escape" = "commit") => {
       if (!menuOpen.value) return;
+      closeReason = reason;
       menuOpen.value = false;
       onMenuOpenChange(false);
     };
 
-    // A single clicked day applies as that day.
-    const commitPendingDay = (): boolean => {
-      const day = pendingDay.value;
-      pendingDay.value = null;
-      if (!day || selectedType.value !== "absolute") return false;
-      isSeedingAbsolute = true;
-      selectedDate.value.from = day;
-      selectedDate.value.to = day;
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      return true;
+    // A single clicked day applies as that day, keeping both times.
+    const commitPendingDay = () => {
+      if (!pendingEnd.value) return;
+      draft.value = { ...draft.value, end: { ...draft.value.end, date: draft.value.start.date } };
+      pendingEnd.value = false;
     };
 
     const applyAndClose = () => {
-      commitPendingDay();
-      saveDate(null);
-      recordAbsoluteRange();
-      menuOpen.value = false;
+      if (!commitPanelDraft()) {
+        if (!validation.value.valid) focusInvalidField();
+        return;
+      }
+      liveText.value = triggerLabel.value;
+      closePanel();
     };
 
     const applyCalendarItem = (id: string) => {
       const preset = CALENDAR_RAIL_ITEMS.find((item) => item.id === id);
       if (!preset) return;
-      selectedType.value = "relative";
-      calendarToken.value = preset.token;
-      saveDate("relative");
-      closeMenu();
+      commitCalendar(preset.token);
+      closePanel();
     };
 
     const applyRecentRange = (id: string) => {
       const entry = timeRangeHistory.entries.value[Number(id)];
       if (!entry) return;
-      const start = convertUnixTime(entry.startUs);
-      // An exclusive midnight end shows as the previous day's last second, as the rail label does.
-      const endsAtMidnight =
-        entry.endUs > entry.startUs &&
-        entry.endUs % MICROS_PER_SECOND === 0 &&
-        convertUnixTime(entry.endUs).time === "00:00:00";
-      const end = convertUnixTime(endsAtMidnight ? entry.endUs - 1 : entry.endUs);
-      if (endsAtMidnight) rememberShownEnd(entry.endUs);
-      else seededEnd = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
-      isSeedingAbsolute = true;
-      selectedDate.value.from = start.date;
-      selectedDate.value.to = end.date;
-      selectedTime.value.startTime = start.time;
-      selectedTime.value.endTime = end.time;
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      selectedType.value = "absolute";
-      calendarToken.value = null;
-      saveDate("absolute");
-      timeRangeHistory.add(entry.startUs, entry.endUs);
-      rangeKeyAtOpen = absoluteRangeKey();
-      closeMenu();
+      commitAbsoluteRange(entry.startUs, entry.endUs, true);
+      closePanel();
     };
 
     const removeRecentRange = (id: string) => {
       const entry = timeRangeHistory.entries.value[Number(id)];
       if (entry) timeRangeHistory.remove(entry);
     };
+
+    // Absolute labels shorten in steps instead of being cut: full, then without seconds, then the duration.
+    let measuring = false;
+    let settledHostWidth = -1;
+    const labelFits = () => {
+      const el = triggerLabelEl.value;
+      return !el || el.scrollWidth <= el.clientWidth;
+    };
+    const measureLadder = async () => {
+      if (measuring) return;
+      measuring = true;
+      try {
+        ladderStep.value = 1;
+        await nextTick();
+        if (!labelFits()) {
+          ladderStep.value = 2;
+          await nextTick();
+          if (!labelFits()) ladderStep.value = 3;
+        }
+      } finally {
+        measuring = false;
+        settledHostWidth = rootEl.value?.parentElement?.clientWidth ?? -1;
+      }
+    };
+    let ladderObserver: ResizeObserver | null = null;
+    onMounted(() => {
+      const host = rootEl.value?.parentElement;
+      if (!host || typeof ResizeObserver === "undefined") return;
+      // A host sized by its content resizes with each step, so only a width change it did not cause re-measures.
+      ladderObserver = new ResizeObserver(() => {
+        if (Math.abs(host.clientWidth - settledHostWidth) < 1) return;
+        void measureLadder();
+      });
+      ladderObserver.observe(host);
+    });
+    onBeforeUnmount(() => {
+      ladderObserver?.disconnect();
+    });
+    watch(
+      () => {
+        const view = triggerView.value;
+        return view.kind === "absolute" ? joinRangeLabel(view.full) : "";
+      },
+      (text) => {
+        if (text) void measureLadder();
+        else ladderStep.value = 1;
+      },
+    );
 
     onMounted(() => {
       if (!props.defaultOpen) return;
@@ -2144,14 +3481,11 @@ export default defineComponent({
       raw,
       t,
       POPOVER_COLLISION_PADDING,
+      INSTANT_WINDOWS,
       menuOpen,
       onMenuOpenChange,
       onPopoverOpenAutoFocus,
       datetimeBtn,
-      getImageURL,
-      onCustomPeriodSelect,
-      onCustomValueFocus,
-      onCustomValueBlur,
       setRelativeDate,
       relativePeriods,
       relativeDates,
@@ -2162,7 +3496,6 @@ export default defineComponent({
       applyRecentRange,
       removeRecentRange,
       applyAndClose,
-      pendingDay,
       calendarToken,
       calendarTooltip,
       triggerTooltip,
@@ -2174,7 +3507,6 @@ export default defineComponent({
       selectedDate,
       relativePeriod,
       relativeValue,
-      getPeriodLabel,
       displayValue,
       triggerLabel,
       copyRange,
@@ -2189,15 +3521,11 @@ export default defineComponent({
       timezoneFilterFn,
       setCustomDate,
       setSavedDate,
-      optionsFn,
       setDateType,
-      selectTab,
-      onTypeToggle,
       shiftTimeRange,
       isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
-      relativeDatesInHour,
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,
@@ -2209,9 +3537,87 @@ export default defineComponent({
       onShow,
       onHide,
       calendarMinDate,
-      calendarMaxDate,
       timezoneSelectOptions,
       isTimezoneSelectOpen,
+      EMPTY_EDGE,
+      START_OF_DAY,
+      END_OF_DAY,
+      toIsoDate,
+      toSlashDate,
+      rootEl,
+      triggerLabelEl,
+      rangeField,
+      rangeFields,
+      helpers,
+      noteId,
+      customHeadingId,
+      triggerView,
+      triggerAccessibleTail,
+      triggerDescriptionId,
+      ladderStep,
+      measureLadder,
+      onPointerDownOutside,
+      draft,
+      pendingEnd,
+      pasted,
+      hourFormat,
+      calendarMonth,
+      calendarPreview,
+      draftErrors,
+      draftOffsets,
+      calendarInvalidDates,
+      validation,
+      applyDisabled,
+      hasDraft,
+      panelDraft,
+      fieldText,
+      shownText,
+      fieldEdited,
+      parseError,
+      fieldPlaceholder,
+      showFieldHint,
+      fieldInvalid,
+      lineView,
+      lineNote,
+      liveText,
+      zoomDisabled,
+      zoomOut,
+      zoneLinkText,
+      zoneAbbreviationText,
+      instantDraft,
+      instantChoices,
+      pickInstantChoice,
+      setInstantWindow,
+      onInstantKeydown,
+      windowLabel,
+      relativeRows,
+      calendarRows,
+      hasHelpers,
+      isMobile,
+      customOpen,
+      customBodyShown,
+      onHelperSelect,
+      onHelperPreview,
+      endPreview,
+      onPanelFocusIn,
+      freezeCalendar,
+      freezeCalendarItem,
+      onNoteAction,
+      onFieldInput,
+      onFieldDraft,
+      onFieldSubmit,
+      onFieldPaste,
+      onDraftEdge,
+      onFieldStatus,
+      setEdgeTime,
+      setEndNow,
+      setHourFormat,
+      onHourFormat,
+      submitDraft,
+      onCalendarStart,
+      onCalendarEnd,
+      onCalendarPending,
+      closePanel,
     };
   },
   computed: {

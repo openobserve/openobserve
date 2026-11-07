@@ -23,6 +23,8 @@ const KEY_PREFIX = "o2.timeRangeHistory";
 export interface TimeRangeHistoryEntry {
   startUs: number;
   endUs: number;
+  /** The picker zone the range was applied in; older entries have none. */
+  zone?: string;
 }
 
 // Bumped on every write so each mounted picker re-reads the shared list.
@@ -53,7 +55,9 @@ export const readTimeRangeHistory = (key: string): TimeRangeHistoryEntry[] => {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter(isValidHistoryEntry)
-      .map(({ startUs, endUs }) => ({ startUs, endUs }))
+      .map(({ startUs, endUs, zone }) =>
+        typeof zone === "string" ? { startUs, endUs, zone } : { startUs, endUs },
+      )
       .slice(0, TIME_RANGE_HISTORY_LIMIT);
   } catch {
     return [];
@@ -89,8 +93,9 @@ export default function useTimeRangeHistory() {
     return readTimeRangeHistory(storageKey.value);
   });
 
-  const add = (startUs: number, endUs: number) => {
-    const entry = { startUs: Math.round(startUs), endUs: Math.round(endUs) };
+  const add = (startUs: number, endUs: number, zone?: string) => {
+    const entry: TimeRangeHistoryEntry = { startUs: Math.round(startUs), endUs: Math.round(endUs) };
+    if (zone) entry.zone = zone;
     if (!isValidHistoryEntry(entry)) return;
     const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameRange(e, entry));
     writeTimeRangeHistory(storageKey.value, [entry, ...rest].slice(0, TIME_RANGE_HISTORY_LIMIT));

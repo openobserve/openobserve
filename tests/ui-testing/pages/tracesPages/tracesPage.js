@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+import { dateTimeButtonLocator, customRangeLocator, Past30SecondsValue, setRelative } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
@@ -212,8 +212,6 @@ export class TracesPage {
 
     // Time Range Selectors
     this.dateTimeRelative15mButton = '[data-test="date-time-relative-15-m-btn"]';
-    this.dateTimeRelative1mButton = '[data-test="date-time-relative-1-m-btn"]';
-    this.dateTimeRelativeCustomButton = '[data-test="date-time-relative-custom-btn"]';
 
     // Trace Tree/Span Selectors
     this.traceTreeSpanServiceName = '[data-test="trace-tree-span-service-name"]';
@@ -224,8 +222,7 @@ export class TracesPage {
 
     // Legacy/Common
     this.dateTimeButton = dateTimeButtonLocator;
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
+    this.absoluteTab = customRangeLocator;
     // Profile menu / sign-out — navbar selectors verified against Header.vue
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
@@ -641,31 +638,15 @@ export class TracesPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+    await setRelative(this.page, 30, 's');
   }
 
   async setTimeRange(range) {
-    // Set time range based on provided value (e.g., '15m', '1h', '6d', '1M').
-    // Source: web/src/components/DateTime.vue — items per period:
-    //   s/m: [1,5,10,15,30,45], h: [1,2,3,6,8,12], d/w/M: [1,2,3,4,5,6]
+    // Set time range based on provided value (e.g., '15m', '1h', '6d', '1M'): the chip
+    // when the picker has one, else typed into its range field (m minutes, M months).
     await this.page.locator(this.dateTimeButton).click();
-    // Wait for relative tab content to mount
-    await this.page.locator('[data-test^="date-time-relative-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-    const rangeMap = {
-      '15m': '[data-test="date-time-relative-15-m-btn"]',
-      '30m': '[data-test="date-time-relative-30-m-btn"]',
-      '1h': '[data-test="date-time-relative-1-h-btn"]',
-      '6h': '[data-test="date-time-relative-6-h-btn"]',
-      '12h': '[data-test="date-time-relative-12-h-btn"]',
-      '24h': '[data-test="date-time-relative-1-d-btn"]',
-      '2d': '[data-test="date-time-relative-2-d-btn"]',
-      '6d': '[data-test="date-time-relative-6-d-btn"]',
-      '1M': '[data-test="date-time-relative-1-M-btn"]',
-    };
-
-    const selector = rangeMap[range] || '[data-test="date-time-relative-15-m-btn"]';
-    await this.page.locator(selector).click();
+    const [, amount, unit] = String(range === '24h' ? '1d' : range).match(/^(\d+)([smhdwM])$/) ?? [, 15, 'm'];
+    await setRelative(this.page, Number(amount), unit);
     await this.closeDateTimePickerIfOpen();
   }
 
@@ -697,8 +678,8 @@ export class TracesPage {
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
-    await this.page.locator(this.absoluteTab).click();
-    // Wait for absolute tab content (Start time field) to be visible
+    await this.page.locator(this.absoluteTab).waitFor({ state: 'visible', timeout: 5000 });
+    // Wait for the Custom range fields (Start time) to be visible
     await this.page.locator(this.datetimeStartTime).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
 
@@ -1969,12 +1950,8 @@ export class TracesPage {
    */
   async clickTimeRange1m() {
     await this.page.locator(this.dateTimeButton).click();
-    try {
-      await this.page.locator(this.dateTimeRelative1mButton).click({ timeout: 5000 });
-    } catch {
-      // Fallback to custom range if 1m not available
-      await this.page.locator(this.dateTimeRelativeCustomButton).click();
-    }
+    // One minute has no chip, so it is typed into the range field.
+    await setRelative(this.page, 1, 'm');
   }
 
   /**

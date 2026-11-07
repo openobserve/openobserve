@@ -2,7 +2,7 @@
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 import { expect } from "@playwright/test";
 import DateTimeHelper from "./dashboard-time.js";
-import { selectLogsViewMode } from "../commonActions.js";
+import { selectLogsViewMode, setRelative } from "../commonActions.js";
 import { LogsPage } from "../logsPages/logsPage.js";
 import testLogger from "../../playwright-tests/utils/test-logger.js";
 
@@ -12,7 +12,7 @@ export default class LogsVisualise {
   constructor(page) {
     this.page = page;
     this.timeTab = page.locator('[data-test="date-time-btn"]');
-    this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
+    this.relativeTime = page.locator('[data-test="date-time-quick-ranges"] h3');
     this.indexListDropdown = page.locator(
       '[data-test="log-search-index-list-select-stream"]'
     );
@@ -206,13 +206,9 @@ export default class LogsVisualise {
       { timeout: 15000 }
     );
     await this.timeTab.click();
-    await this.relativeTime.click();
-    const selector = `[data-test="date-time-relative-${date}-${time}-btn"]`;
-    // Wait for the relative time button to be enabled (not just visible)
-    await this.page.waitForSelector(`${selector}:not([disabled])`, {
-      timeout: 15000,
-    });
-    await this.page.locator(selector).click();
+    await this.relativeTime.waitFor({ state: "visible", timeout: 15000 });
+    // A chip when the picker has one (30m), else typed into the range field (8h, 4w).
+    await setRelative(this.page, date, time);
     await new LogsPage(this.page).closeDateTimePickerIfOpen();
   }
 

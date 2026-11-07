@@ -80,6 +80,14 @@ const calendarMinDate = computed(() =>
   props.minDate ? tryParseDate(toIso(props.minDate)) : undefined,
 );
 
+const shownMonth = computed(() => (props.month ? tryParseDate(toIso(props.month)) : undefined));
+
+const invalidDays = computed(() => new Set((props.invalidDates ?? []).map(toIso)));
+
+function onMonthChange(value: DateValue | undefined) {
+  if (value) emit("update:month", fromIso(value.set({ day: 1 }).toString()));
+}
+
 const calendarMaxDate = computed(() =>
   props.maxDate ? tryParseDate(toIso(props.maxDate)) : undefined,
 );
@@ -88,7 +96,17 @@ const calendarMaxDate = computed(() =>
 // state, cells get a dashed-outline preview based on hover position.
 const isAwaitingEndClick = computed(() => !!internalStart.value && !internalEnd.value);
 
+const previewBounds = computed(() => {
+  const range = props.previewRange;
+  if (!range) return null;
+  const start = tryParseDate(toIso(range.start));
+  const end = tryParseDate(toIso(range.end));
+  return start && end ? { start, end } : null;
+});
+
 function isCellInPreview(d: DateValue): boolean {
+  const preview = previewBounds.value;
+  if (preview) return d.compare(preview.start) >= 0 && d.compare(preview.end) <= 0;
   if (!isAwaitingEndClick.value || !hoverDate.value || !internalStart.value) {
     return false;
   }
@@ -138,10 +156,12 @@ function handleRangeChange(value: DateRange | undefined) {
     :min-value="calendarMinDate"
     :max-value="calendarMaxDate"
     :disabled="disabled"
+    :placeholder="shownMonth"
     week-start-on="0"
     :class="['o-range-cal', isAwaitingEndClick ? 'o-range-cal--awaiting' : 'o-range-cal--complete']"
     data-test="daterangecalendar-root"
     @update:model-value="handleRangeChange"
+    @update:placeholder="onMonthChange"
   >
     <template #default="{ weekDays, grid }">
       <RangeCalendarHeader class="mb-3 flex items-center justify-between">
@@ -189,11 +209,11 @@ function handleRangeChange(value: DateRange | undefined) {
 
       <RangeCalendarGrid v-for="month in grid" :key="month.value.toString()">
         <RangeCalendarGridHead>
-          <RangeCalendarGridRow class="mb-1 flex gap-1">
+          <RangeCalendarGridRow class="mb-1 grid grid-cols-[repeat(7,2.25rem)]">
             <RangeCalendarHeadCell
               v-for="day in weekDays"
               :key="day"
-              class="text-datepicker-weekday-text flex h-6 w-8 items-center justify-center text-xs font-medium"
+              class="text-datepicker-weekday-text flex h-6 w-9 items-center justify-center text-xs font-medium"
               >{{ day }}</RangeCalendarHeadCell
             >
           </RangeCalendarGridRow>
@@ -202,7 +222,7 @@ function handleRangeChange(value: DateRange | undefined) {
           <RangeCalendarGridRow
             v-for="(weekDates, idx) in month.rows"
             :key="idx"
-            class="mb-1 flex gap-1"
+            class="mb-1 grid grid-cols-[repeat(7,2.25rem)]"
           >
             <RangeCalendarCell v-for="d in weekDates" :key="d.toString()" :date="d">
               <RangeCalendarCellTrigger
@@ -210,8 +230,9 @@ function handleRangeChange(value: DateRange | undefined) {
                 :month="month.value"
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
                 :data-preview="isCellInPreview(d) ? '' : undefined"
+                :data-invalid="invalidDays.has(d.toString()) ? '' : undefined"
                 @mouseenter="handleCellMouseEnter(d)"
-                class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-today:border data-unavailable:pointer-events-none data-unavailable:cursor-not-allowed"
+                class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text data-invalid:ring-input-border-error flex h-[2.1rem] w-9 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-invalid:ring-2 data-today:border data-unavailable:pointer-events-none data-unavailable:cursor-not-allowed"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>
@@ -233,7 +254,7 @@ function handleRangeChange(value: DateRange | undefined) {
   background-color: transparent;
   color: inherit;
 }
-.o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
+.o-range-cal :deep([data-preview]:not([data-selected])) {
   background-color: var(--color-datepicker-day-range-bg);
   color: var(--color-datepicker-day-range-text);
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel dashed focus outline must not scale with text or it smears at fractional zoom */

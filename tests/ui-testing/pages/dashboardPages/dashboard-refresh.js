@@ -1,4 +1,5 @@
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { setRelative } from "../commonActions.js";
 
 //Dahboard time refresh
 // Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
@@ -12,12 +13,11 @@ export default class DashboardTimeRefresh {
       'button[data-test="dashboard-folder-tab-default"]'
     );
     this.timeTab = page.locator('[data-test="date-time-btn"]');
-    this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
+    this.relativeTime = page.locator('[data-test="date-time-quick-ranges"] h3');
     this.absolutetimeTime = page.locator(
-      '[data-test="date-time-absolute-tab"]'
+      '[data-test="date-time-custom-range"] h3'
     );
     this.dateTimeMenu = page.locator("#date-time-menu").first();
-    this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
       '[data-test="logs-search-bar-refresh-interval-btn"]'
     );
@@ -46,11 +46,7 @@ export default class DashboardTimeRefresh {
       await this.relativeTime.waitFor({ state: "visible", timeout: 10000 });
     }
 
-    await this.relativeTime.click();
-    const relBtn = this.page.locator(`[data-test="date-time-relative-${date}-${time}-btn"]`);
-    await relBtn.waitFor({ state: "attached" });
-    // Use JS click — the dropdown can extend outside the viewport in the new layout
-    await relBtn.evaluate((el) => el.click());
+    await setRelative(this.page, date, time);
     await applyPickedDateTime(this.page);
   }
 

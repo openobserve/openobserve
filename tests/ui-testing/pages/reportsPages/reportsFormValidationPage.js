@@ -43,7 +43,7 @@ export class ReportsFormValidationPage {
         // DateTime component uses dataTestName prop defaulting to "date-time-btn".
         // CreateReport passes data-test attr (not the dataTestName prop), so the actual button is date-time-btn.
         this.timerangeDropdown = '[data-test="add-report-timerange-select"] [data-test="date-time-btn"]';
-        this.dateTimeAbsoluteTab = '[data-test="date-time-absolute-tab"]';
+        this.dateTimeAbsoluteTab = '[data-test="date-time-custom-range"] h3';
         // DateTime.vue renders OTime with data-test="datetime-start-time" / "datetime-end-time"
         this.dateTimeAbsoluteStartField = '[data-test="datetime-start-time"]';
         this.dateTimeAbsoluteEndField = '[data-test="datetime-end-time"]';

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-center">
+  <div class="flex items-center" data-test="auto-refresh-state" :data-state="refreshState">
     <OPopover
       v-model:open="btnRefreshInterval"
       side="bottom"
@@ -31,23 +31,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variant"
           :active="isAnimating"
           :aria-label="triggerAriaLabel"
+          :data-state="refreshState"
+          @pointerenter="tickClock"
         >
           <OIcon
-            :name="isOn ? 'update' : 'sync-disabled'"
-            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
+            :name="triggerIcon"
+            :class="isAnimating || isWaiting ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="t('search.autoRefreshWithValue', { value: triggerLabel })" />
+          <OTooltip :content="triggerTooltip" />
         </OButton>
         <OButton
           v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          :variant="isOn ? 'outline-primary' : variant"
+          :variant="isOn && !isPaused ? 'outline-primary' : variant"
           size="sm-toolbar"
           :aria-label="triggerAriaLabel"
+          :data-state="refreshState"
+          @pointerenter="tickClock"
         >
           <div class="flex flex-nowrap items-center">
-            <OIcon :name="isOn ? 'update' : 'sync-disabled'" size="sm" class="me-1" />
+            <OIcon
+              :name="triggerIcon"
+              size="sm"
+              class="me-1"
+              :class="isWaiting ? 'auto-refresh-icon--spinning' : ''"
+            />
             <div class="text-compact text-center leading-4">{{ triggerLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
@@ -60,11 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.autoRefreshTitle") }}
             </h4>
             <p class="text-text-secondary text-xs italic" data-test="auto-refresh-subtitle">
-              {{
-                isOn
-                  ? t("search.autoRefreshEvery", { value: triggerLabel })
-                  : t("search.autoRefreshPaused")
-              }}
+              {{ subtitle }}
             </p>
           </div>
           <OSwitch
@@ -74,6 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('search.autoRefreshTitle')"
             @update:model-value="onSwitch"
           />
+        </div>
+        <div
+          v-if="rangeEnded"
+          data-test="auto-refresh-fixed-reason"
+          class="bg-warning-surface text-text-body flex flex-col items-start gap-2 px-4 py-3 text-xs"
+        >
+          <span>{{ endedReason }}</span>
+          <OButton
+            data-test="auto-refresh-switch-relative"
+            variant="primary"
+            size="sm"
+            @click="onSwitchRelative"
+          >
+            {{ switchLabel }}
+          </OButton>
         </div>
         <hr class="border-border-default my-0 border-0 border-t border-solid" />
         <div class="flex flex-col gap-3 px-4 py-3">
@@ -112,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="auto-refresh-footer"
         >
           <OIcon name="info" size="sm" />
-          {{ t("search.autoRefreshRelativeOnly") }}
+          {{ footerText }}
         </div>
       </div>
     </OPopover>
@@ -127,10 +147,16 @@ import {
   watch,
   onActivated,
   onDeactivated,
+  onMounted,
   onUnmounted,
   type PropType,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { useStore } from "vuex";
+import { formatInTimeZone } from "date-fns-tz";
+import { localeFileMap } from "@/locales";
+import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
+import { isTabHidden, suggestRelativePeriod } from "@/composables/useAutoRefreshGate";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
 import {
@@ -177,11 +203,41 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Start of a range that does not follow now (µs); only used to suggest a relative period. */
+    rangeStartUs: {
+      type: Number,
+      default: 0,
+    },
+    /** End of a range that does not follow now (µs); 0 while the range is relative. */
+    rangeEndUs: {
+      type: Number,
+      default: 0,
+    },
+    /** A query of the page is running, so the next tick waits for it; null on hosts that do not report runs. */
+    busy: {
+      type: Boolean as PropType<boolean | null>,
+      default: null,
+    },
+    /** The page's query-range limit in hours; 0 for none. Caps the "Switch to Past N" suggestion. */
+    maxRangeHours: {
+      type: Number,
+      default: 0,
+    },
   },
-  emits: ["update:modelValue", "trigger"],
+  emits: ["update:modelValue", "trigger", "switch-relative"],
   setup(props: any, { emit }) {
     const router = useRouter();
-    const { t } = useI18nTyped();
+    const store = useStore();
+    const { t, locale } = useI18nTyped();
+    const nowMs = ref(Date.now());
+    let endTimer: ReturnType<typeof setTimeout> | null = null;
+    let clockTimer: ReturnType<typeof setInterval> | null = null;
+    const lastRunMs = ref<number | null>(null);
+    // A tick that found the tab hidden or a query running; it fires (or reschedules) when that ends.
+    let missedWhileHidden = false;
+    // A deactivated (kept-alive) instance arms no timer; onActivated re-arms it.
+    let isActive = true;
+    const waitingForRun = ref(false);
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
@@ -240,22 +296,154 @@ export default defineComponent({
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
-    // Check if animation should be active
-    const isAnimating = computed(() => {
-      return props.isCompact && selectedValue.value > 0;
+    const isOn = computed(() => selectedValue.value > 0);
+
+    const rangeEnded = computed(
+      () => props.rangeEndUs > 0 && props.rangeEndUs <= nowMs.value * 1000,
+    );
+
+    // Only a range that has ended pauses; one ending later keeps refreshing until it does.
+    const isPaused = computed(() => isOn.value && rangeEnded.value);
+
+    const isWaiting = computed(() => isOn.value && !isPaused.value && waitingForRun.value);
+
+    const refreshState = computed(() => {
+      if (!isOn.value) return "off";
+      if (isPaused.value) return "paused";
+      return isWaiting.value ? "waiting" : "on";
     });
 
-    const isOn = computed(() => selectedValue.value > 0);
+    const triggerIcon = computed(() => {
+      if (!isOn.value) return "sync-disabled";
+      if (isPaused.value) return "pause";
+      return isWaiting.value ? "progress-activity" : "update";
+    });
+
+    // Check if animation should be active
+    const isAnimating = computed(() => {
+      return props.isCompact && isOn.value && !isPaused.value;
+    });
+
+    const intlLocale = computed(() => localeFileMap[String(locale.value)] ?? "en-US");
+
+    const formatEnd = (pattern: string) =>
+      formatInTimeZone(
+        Math.floor(props.rangeEndUs / 1000),
+        safeTimezone(store.state.timezone),
+        pattern,
+      );
+
+    const endDateText = computed(() =>
+      new Intl.DateTimeFormat(intlLocale.value, {
+        month: "short",
+        day: "numeric",
+        timeZone: safeTimezone(store.state.timezone),
+        calendar: "gregory",
+        numberingSystem: "latn",
+      }).format(Math.floor(props.rangeEndUs / 1000)),
+    );
+
+    // With refresh off nothing is paused, so the reason says refresh will not run instead.
+    const endedReason = computed(() =>
+      t(isOn.value ? "common.autoRefreshEnded" : "common.autoRefreshEndedNoRun", {
+        date: endDateText.value,
+        time: formatEnd("HH:mm"),
+      }),
+    );
+
+    const PAST_KEYS: Record<string, I18nKey> = {
+      m: "common.pastMinute",
+      h: "common.pastHour",
+      d: "common.pastDay",
+      w: "common.pastWeek",
+      M: "common.pastMonth",
+    };
+
+    const suggestedPeriod = computed(() =>
+      suggestRelativePeriod(
+        Math.max(0, props.rangeEndUs - props.rangeStartUs),
+        props.maxRangeHours > 0 ? props.maxRangeHours * 3_600_000_000 : 0,
+      ),
+    );
+
+    const switchLabel = computed(() => {
+      const match = suggestedPeriod.value.match(/^(\d+)([mhdwM])$/);
+      const count = Number(match?.[1] ?? 15);
+      const unit = match?.[2] ?? "m";
+      if (unit === "m" && count > 60 && count % 60 !== 0) {
+        const duration = `${t("common.hrCompact", { count: Math.floor(count / 60) })} ${t(
+          "common.minCompact",
+          { count: count % 60 },
+        )}`;
+        return t("common.autoRefreshSwitchTo", { period: t("common.pastDuration", { duration }) });
+      }
+      const key = PAST_KEYS[unit] ?? "common.pastMinute";
+      return t("common.autoRefreshSwitchTo", { period: t(key, { count }) });
+    });
+
+    const onSwitchRelative = () => {
+      emit("switch-relative", suggestedPeriod.value);
+      btnRefreshInterval.value = false;
+    };
 
     const triggerLabel = computed(() =>
       isOn.value ? autoRefreshShortLabel(selectedValue.value, t) : t("common.off"),
     );
 
-    const triggerAriaLabel = computed(() =>
-      isOn.value
+    const lastRunAge = computed(() => {
+      if (lastRunMs.value === null) return null;
+      const seconds = Math.max(0, Math.floor((nowMs.value - lastRunMs.value) / 1000));
+      if (seconds < 60) return t("common.secCompact", { count: seconds });
+      if (seconds < 3600) return t("common.minCompact", { count: Math.floor(seconds / 60) });
+      return t("common.hrCompact", { count: Math.floor(seconds / 3600) });
+    });
+
+    const triggerAriaLabel = computed(() => {
+      if (isPaused.value) return t("common.autoRefreshPausedAria");
+      if (isWaiting.value) return t("search.autoRefreshWaiting", { value: triggerLabel.value });
+      return isOn.value
         ? t("search.autoRefreshAriaOn", { value: triggerLabel.value })
-        : t("search.autoRefreshAriaOff"),
-    );
+        : t("search.autoRefreshAriaOff");
+    });
+
+    const triggerTooltip = computed(() => {
+      if (isPaused.value) return t("common.autoRefreshPausedAria");
+      if (isWaiting.value) return t("search.autoRefreshWaiting", { value: triggerLabel.value });
+      if (isOn.value && lastRunAge.value !== null) {
+        return t("search.autoRefreshTooltipLastRun", {
+          value: triggerLabel.value,
+          age: lastRunAge.value,
+        });
+      }
+      return t("search.autoRefreshWithValue", { value: triggerLabel.value });
+    });
+
+    const subtitle = computed(() => {
+      if (rangeEnded.value) {
+        return t(isOn.value ? "common.autoRefreshPausedEnded" : "common.autoRefreshOffEnded");
+      }
+      if (!isOn.value) return t("search.autoRefreshPaused");
+      if (props.rangeEndUs > 0 && !isPaused.value) {
+        return t("common.autoRefreshUntil", {
+          interval: triggerLabel.value,
+          time: formatEnd("HH:mm"),
+        });
+      }
+      if (!isPaused.value && lastRunAge.value !== null) {
+        return t("search.autoRefreshEveryLastRun", {
+          value: triggerLabel.value,
+          age: lastRunAge.value,
+        });
+      }
+      return t("search.autoRefreshEvery", { value: triggerLabel.value });
+    });
+
+    const footerText = computed(() => {
+      if (isPaused.value) return t("search.autoRefreshResumeNote", { value: triggerLabel.value });
+      return props.busy === null
+        ? t("search.autoRefreshRulesHidden")
+        : t("search.autoRefreshRules");
+    });
 
     let lastSelectedInterval = 0;
     const DEFAULT_INTERVAL = 30;
@@ -296,19 +484,84 @@ export default defineComponent({
       resetTimers();
     });
 
+    // Flips to paused the moment a range that ends later reaches its end, not on the next tick.
+    const armEndTimer = () => {
+      if (endTimer !== null) clearTimeout(endTimer);
+      endTimer = null;
+      nowMs.value = Date.now();
+      const wait = props.rangeEndUs / 1000 - nowMs.value;
+      if (props.rangeEndUs > 0 && wait > 0 && wait < 2_147_483_647) {
+        endTimer = setTimeout(() => {
+          nowMs.value = Date.now();
+        }, wait + 50);
+      }
+    };
+
+    watch(() => [props.rangeStartUs, props.rangeEndUs], armEndTimer, { immediate: true });
+    const tickClock = () => {
+      nowMs.value = Date.now();
+    };
+
+    // The open panel shows the last-run age, so it counts while it is visible.
+    watch(btnRefreshInterval, (open) => {
+      tickClock();
+      if (clockTimer !== null) clearInterval(clockTimer);
+      clockTimer = open ? setInterval(tickClock, 1000) : null;
+    });
+
+    // Any finished run of the page, a refresh or not, is the last run; a tick that waited on it restarts from here.
+    watch(
+      () => props.busy,
+      (busy, wasBusy) => {
+        if (busy || !wasBusy) return;
+        lastRunMs.value = Date.now();
+        if (!waitingForRun.value) return;
+        waitingForRun.value = false;
+        resetTimers();
+      },
+    );
+
+    const fireTrigger = () => {
+      lastRunMs.value = Date.now();
+      emit("trigger");
+    };
+
+    const onTimerTick = () => {
+      tickClock();
+      if (isPaused.value) return;
+      if (isTabHidden()) {
+        missedWhileHidden = true;
+        return;
+      }
+      if (props.busy) {
+        waitingForRun.value = true;
+        clearInterval(intervalInstance);
+        return;
+      }
+      fireTrigger();
+    };
+
+    // One refresh on return, then the normal cadence counted from it.
+    const onVisibilityChange = () => {
+      if (isTabHidden() || !missedWhileHidden) return;
+      missedWhileHidden = false;
+      if (!props.trigger || !isOn.value) return;
+      resetTimers();
+      onTimerTick();
+    };
+
     const resetTimers = () => {
       // first reset the current interval callback
       clearInterval(intervalInstance);
+      waitingForRun.value = false;
 
       // return if the interval value is zero
-      if (selectedValue.value == 0 || !props.trigger) {
+      if (!isActive || selectedValue.value == 0 || !props.trigger) {
         return;
       }
 
       // if we have the value, continue and set the interval
-      intervalInstance = window?.setInterval(() => {
-        emit("trigger");
-      }, selectedValue.value * 1000);
+      intervalInstance = window?.setInterval(onTimerTick, selectedValue.value * 1000);
     };
 
     const minRangeRestrictionMessageVal = computed(() =>
@@ -316,16 +569,28 @@ export default defineComponent({
     );
 
     // on component mount and unmount, update the intervals
+    onMounted(() => {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    });
+
     onActivated(() => {
+      isActive = true;
+      document.addEventListener("visibilitychange", onVisibilityChange);
       resetTimers();
     });
 
     onDeactivated(() => {
+      isActive = false;
+      waitingForRun.value = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       clearInterval(intervalInstance);
     });
 
     onUnmounted(() => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       clearInterval(intervalInstance);
+      if (endTimer !== null) clearTimeout(endTimer);
+      if (clockTimer !== null) clearInterval(clockTimer);
     });
 
     return {
@@ -346,6 +611,18 @@ export default defineComponent({
       minRangeRestrictionMessageVal,
       isAnimating,
       selectedValue,
+      isPaused,
+      rangeEnded,
+      isWaiting,
+      refreshState,
+      triggerIcon,
+      triggerTooltip,
+      footerText,
+      tickClock,
+      subtitle,
+      endedReason,
+      switchLabel,
+      onSwitchRelative,
     };
   },
 });

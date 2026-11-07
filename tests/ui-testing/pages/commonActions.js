@@ -156,13 +156,46 @@ export async function gotoMetricsVisualize(page) {
 
 // Common Locator exports
 export var dateTimeButtonLocator='[data-test="date-time-btn"]';
-export var relative30SecondsButtonLocator='[data-test="date-time-relative-30-s-btn"]';
-export var absoluteTabLocator='[data-test="date-time-absolute-tab"]';
+// The picker has no Relative/Absolute tabs; these headings mark its two always-shown sections.
+export var quickRangesLocator='[data-test="date-time-quick-ranges"] h3';
+export var customRangeLocator='[data-test="date-time-custom-range"] h3';
 export var Past30SecondsValue='Past 30 Seconds';
 export var startTimeValue='01:01:01';
 export var endTimeValue='02:02:02';
 export var startDateTimeValue='2024/10/01 01:01:01';
 export var endDateTimeValue='2024/10/01 02:02:02';
+
+// The relative windows the picker shows as chips; any other window is typed into its range field.
+const RELATIVE_CHIP_IDS = new Set(['5-m', '15-m', '30-m', '1-h', '2-h', '4-h', '6-h', '12-h', '1-d', '2-d', '7-d', '30-d']);
+
+/** Whether the open picker has a chip for this window (amount and unit, e.g. 30 and "m"). */
+export function hasRelativeChip(amount, unit) {
+    return RELATIVE_CHIP_IDS.has(`${amount}-${unit}`);
+}
+
+/**
+ * Picks a rolling window in the open time picker: its chip when it has one, else the
+ * window typed into the range field and Enter. Units: s m h d w M (m minutes, M months).
+ */
+export async function setRelative(page, amount, unit) {
+    if (hasRelativeChip(amount, unit)) {
+        const chip = page.locator(`[data-test="date-time-relative-${amount}-${unit}-btn"]`).first();
+        await chip.waitFor({ state: 'visible', timeout: 10000 });
+        await chip.click();
+        return;
+    }
+    const field = page.locator('#date-time-menu [data-test="date-time-range-input"] input').first();
+    await field.waitFor({ state: 'visible', timeout: 10000 });
+    await field.fill(`${amount}${unit}`);
+    await field.press('Enter');
+}
+
+/** The same, from a `<amount>-<unit>` code such as "6-d" or "1-M". */
+export async function setRelativeCode(page, code) {
+    const [, amount, unit] = String(code).match(/^(\d+)-([smhdwM])$/) ?? [];
+    if (!amount) throw new Error(`Not a relative code: ${code}`);
+    await setRelative(page, Number(amount), unit);
+}
 
 export class CommonActions {
     constructor(page) {

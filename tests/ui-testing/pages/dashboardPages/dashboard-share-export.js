@@ -31,7 +31,7 @@ export default class DashboardShareExportPage {
     );
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
-    this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+    this.absoluteTab = page.locator('[data-test="date-time-custom-range"] h3');
     this.settingBtn = page.locator('[data-test="dashboard-setting-btn"]');
     this.settingsTabTab = page.locator('[data-test="dashboard-settings-tab-tab"]');
     this.tabListContainer = page.locator(
@@ -148,7 +148,7 @@ export default class DashboardShareExportPage {
     await this.shareBtn.click();
   }
 
-  //Open the date-time picker and switch to the Absolute tab
+  //Open the date-time picker on its Custom range section
   async openAbsoluteDateTime() {
     await this.dateTimeBtn.click();
     await this.absoluteTab.click();

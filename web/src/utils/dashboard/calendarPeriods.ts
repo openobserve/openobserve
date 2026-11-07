@@ -16,9 +16,9 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import { formatRangeTooltipLines } from "@/utils/rangeText";
 
 const CALENDAR_TOKEN_PATTERN = /^calendar:(day|week|month|quarter|year):(0|-[1-9]\d{0,5})$/;
-const RANGE_FORMAT = "yyyy/MM/dd HH:mm:ss";
 const DST_SEARCH_SECONDS = 3 * 60 * 60;
 
 const THIS_KEYS: Record<Exclude<CalendarUnit, "day">, I18nKey> = {
@@ -144,7 +144,8 @@ export const formatCalendarTooltip = (
 };
 
 /** A period as plain text for a reader without the picker, e.g. an AI prompt: calendar tokens become their dates and zone. */
-export const describePeriod = (period: string): string => formatCalendarTooltip(period) ?? period;
+export const describePeriod = (period: string): string =>
+  formatCalendarTooltip(period)?.replace("\n", " · ") ?? period;
 
 /** Tooltip for an already resolved calendar range; a finished period shows its last second, not the next start. */
 export const formatResolvedCalendarTooltip = (
@@ -156,16 +157,14 @@ export const formatResolvedCalendarTooltip = (
   return formatRangeTooltip(range.startTime, range.endTime - (finished ? 1 : 0), timezone);
 };
 
-/** Absolute range (microseconds) in the product's absolute format plus the timezone, for tooltips. */
+/** The ISO range on one line and "duration · zone" on the next, as the trigger's absolute tooltip shows it. */
 export const formatRangeTooltip = (
   startUs: number,
   endUs: number,
   timezone?: string | null,
 ): I18nText => {
-  const zone = safeTimezone(timezone);
-  const start = formatInTimeZone(Math.floor(startUs / 1000), zone, RANGE_FORMAT);
-  const end = formatInTimeZone(Math.floor(endUs / 1000), zone, RANGE_FORMAT);
-  return raw(`${start} - ${end} (${zone})`);
+  const { range, detail } = formatRangeTooltipLines(startUs, endUs, safeTimezone(timezone));
+  return raw(`${range}\n${detail}`);
 };
 
 const browserTimezone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -286,4 +285,9 @@ const dayOptions = (withYear: boolean): Intl.DateTimeFormatOptions =>
     : { month: "short", day: "numeric" };
 
 const civilFormatter = (locale: string, options: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
+  new Intl.DateTimeFormat(locale, {
+    ...options,
+    timeZone: "UTC",
+    calendar: "gregory",
+    numberingSystem: "latn",
+  });

@@ -37,7 +37,7 @@ const CALENDAR_IDS = [
   "last-quarter",
 ];
 
-const SELECTED_CLASS = "bg-button-primary!";
+const pressed = (node: Element | null) => node?.getAttribute("aria-pressed") === "true";
 
 describe("DateTime rail", () => {
   let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
@@ -97,50 +97,46 @@ describe("DateTime rail", () => {
   });
 
   describe("layout", () => {
-    it("hides the Recent section when empty and shows the eight calendar ranges beside the picker", async () => {
+    it("explains an empty Recent list and shows the eight calendar ranges in four rows", async () => {
       createWrapper();
       await openMenu();
 
-      expect(el("date-time-rail")).not.toBeNull();
-      expect(el("date-time-rail-recent-group")).toBeNull();
-      expect(el("date-time-rail-recent-header")).toBeNull();
+      expect(el("date-time-helpers")).not.toBeNull();
+      expect(el("date-time-rail-recent-empty")?.textContent?.trim()).toBe(
+        "Ranges you apply will show up here.",
+      );
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).not.toBeNull();
       expect(calendarItem("today")?.textContent).toContain("Today");
       expect(calendarItem("last-month")?.textContent).toContain("Last month");
-      expect(el("date-time-rail-calendar-today-hint")?.textContent).toBe("Oct 8");
-      expect(el("date-time-rail-calendar-yesterday-hint")?.textContent).toBe("Oct 7");
-      expect(el("date-time-rail-calendar-this-month-hint")?.textContent).toBe("Oct");
-      expect(el("date-time-rail-calendar-last-quarter-hint")?.textContent).toBe("Q3");
+      expect(el("date-time-rail-calendar-today-hint")?.textContent).toBe("· Oct 8");
+      expect(el("date-time-rail-calendar-yesterday-hint")?.textContent).toBe("· Oct 7");
+      expect(el("date-time-rail-calendar-this-month-hint")?.textContent).toBe("· Oct 1 – 8");
+      expect(el("date-time-rail-calendar-last-quarter-hint")?.textContent).toBe("· Jul 1 – Sep 30");
       expect(
         Array.from(document.querySelectorAll("[data-date-time-rail-calendar]")).map((node) =>
           node.getAttribute("data-test"),
         ),
       ).toEqual(CALENDAR_IDS.map((id) => `date-time-rail-calendar-${id}`));
       expect(el("date-time-relative-15-m-btn")).not.toBeNull();
-      expect(el("date-time-relative-tab")).not.toBeNull();
+      expect(el("date-time-relative-tab")).toBeNull();
     });
-
-    it("labels the section headers in one muted style", async () => {
+    it("labels the groups in one muted, sentence-case style", async () => {
       seedHistory([hourRange(1)]);
       createWrapper();
       await openMenu();
 
       const recent = el("date-time-rail-recent-header")!;
-      const calendar = el("date-time-rail-calendar-header")!;
-      for (const header of [recent, calendar]) {
-        expect(header.className).toContain("text-input-label-text");
-        expect(header.className).toContain("tracking-wide");
-      }
+      expect(recent.className).toContain("text-text-secondary");
+      expect(recent.className).not.toContain("uppercase");
+      expect(recent.className).not.toContain("tracking-wide");
     });
-
-    it("has no separate rail header cell and gives the rail its own surface", async () => {
+    it("gives Quick ranges its own surface beside Custom range", async () => {
       createWrapper();
       await openMenu();
 
-      expect(el("date-time-rail-header")).toBeNull();
-      expect(el("date-time-rail-frame")?.className).toContain("bg-surface-panel");
+      expect(el("date-time-quick-ranges")?.className).toContain("bg-surface-panel");
+      expect(el("date-time-custom-range")).not.toBeNull();
     });
-
     it("keeps the remove button always visible", async () => {
       seedHistory([hourRange(1)]);
       createWrapper();
@@ -148,24 +144,6 @@ describe("DateTime rail", () => {
 
       expect(el("date-time-rail-recent-0-remove")?.className).not.toContain("opacity-0");
       expect(el("date-time-rail-recent-0-remove")?.className).toContain("text-text-secondary!");
-    });
-
-    it("switches Relative and Absolute from the segmented control", async () => {
-      createWrapper();
-      await openMenu();
-
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
-      expect(wrapper!.vm.selectedType).toBe("absolute");
-      expect(el("date-time-absolute-tab")?.getAttribute("data-state")).toBe("on");
-
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
-      expect(wrapper!.vm.selectedType).toBe("absolute");
-
-      el("date-time-relative-tab")!.click();
-      await flushPromises();
-      expect(wrapper!.vm.selectedType).toBe("relative");
     });
 
     it("gives every timezone option a UTC offset suffix and the zone name as its list label", async () => {
@@ -192,9 +170,7 @@ describe("DateTime rail", () => {
 
       wrapper!.vm.timezone = IST;
       await flushPromises();
-      expect(el("datetime-timezone-select-trigger")?.textContent).toContain(
-        "Asia/Calcutta (UTC+05:30)",
-      );
+      expect(el("date-time-range-tz")?.textContent).toContain("Asia/Calcutta (UTC+05:30)");
       expect(el("date-time-apply-btn")).not.toBeNull();
     });
 
@@ -202,32 +178,22 @@ describe("DateTime rail", () => {
       createWrapper({ calendarPresets: false });
       await openMenu();
 
-      expect(el("date-time-rail")).not.toBeNull();
+      expect(el("date-time-helpers")).not.toBeNull();
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).toBeNull();
       expect(wrapper!.vm.calendarRailItems).toBeNull();
     });
 
-    it("explains the empty Recent list when there is no calendar to fill the rail", async () => {
-      createWrapper({ calendarPresets: false });
-      await openMenu();
-
-      expect(el("date-time-rail-recent-empty")?.textContent?.trim()).toBe(
-        "Ranges you apply will show up here.",
-      );
-      expect(el("date-time-rail-keys-hint")).toBeNull();
-    });
-
-    it("has no rail on a date-only picker", async () => {
+    it("has no helpers on a date-only picker", async () => {
       createWrapper({ disableRelative: true });
       await openMenu();
 
-      expect(el("date-time-rail")).toBeNull();
+      expect(el("date-time-helpers")).toBeNull();
     });
   });
 
   describe("calendar items", () => {
-    it("applies a range on click without Apply, and closes the panel", async () => {
-      createWrapper({ autoApply: false });
+    it("applies a range on click on an applying host, and closes the panel", async () => {
+      createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
       const hidesBefore = (wrapper!.emitted("hide") ?? []).length;
@@ -245,29 +211,45 @@ describe("DateTime rail", () => {
       expect((wrapper!.emitted("hide") ?? []).length).toBe(hidesBefore + 1);
       expect(wrapper!.vm.triggerLabel).toBe("This month");
       expect(wrapper!.vm.triggerTooltip).toBe(
-        "2026/10/01 00:00:00 - 2026/10/08 08:30:00 (Asia/Calcutta)",
+        "2026-10-01 00:00:00 – 2026-10-08 08:30:00\n7d 8h · Asia/Calcutta (UTC+05:30)",
       );
     });
 
-    it("keeps a rail item and a grid chip mutually exclusive", async () => {
+    it("fills the draft on a host that does not apply, and applies it on Apply", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+      const before = (wrapper!.emitted("on:date-change") ?? []).length;
+
+      calendarItem("this-month")!.click();
+      await flushPromises();
+      expect(wrapper!.vm.menuOpen).toBe(true);
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before);
+      expect(pressed(calendarItem("this-month"))).toBe(true);
+
+      el("date-time-apply-btn")!.click();
+      await flushPromises();
+      expect(lastEmit()).toMatchObject({ relativeTimePeriod: "calendar:month:0" });
+      expect(wrapper!.vm.menuOpen).toBe(false);
+    });
+    it("keeps a calendar chip and a relative chip mutually exclusive", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
-      expect(el("date-time-relative-15-m-btn")?.className).toContain(SELECTED_CLASS);
+      expect(pressed(el("date-time-relative-15-m-btn"))).toBe(true);
 
       calendarItem("yesterday")!.click();
       await openMenu();
-      expect(calendarItem("yesterday")?.className).toContain(SELECTED_CLASS);
-      expect(calendarItem("today")?.className).not.toContain(SELECTED_CLASS);
-      expect(el("date-time-relative-15-m-btn")?.className).not.toContain(SELECTED_CLASS);
+      expect(pressed(calendarItem("yesterday"))).toBe(true);
+      expect(pressed(calendarItem("today"))).toBe(false);
+      expect(pressed(el("date-time-relative-15-m-btn"))).toBe(false);
 
-      el("date-time-relative-3-h-btn")!.click();
-      await flushPromises();
-      expect(calendarItem("yesterday")?.className).not.toContain(SELECTED_CLASS);
-      expect(el("date-time-relative-3-h-btn")?.className).toContain(SELECTED_CLASS);
-      expect(lastEmit().relativeTimePeriod).toBe("3h");
+      el("date-time-relative-4-h-btn")!.click();
+      await openMenu();
+      expect(pressed(calendarItem("yesterday"))).toBe(false);
+      expect(pressed(el("date-time-relative-4-h-btn"))).toBe(true);
+      expect(lastEmit().relativeTimePeriod).toBe("4h");
     });
-
     it("disables ranges longer than the query-range limit and explains why", async () => {
       createWrapper({ queryRangeRestrictionInHour: 24, queryRangeRestrictionMsg: "Max 24h" });
       await openMenu();
@@ -278,7 +260,8 @@ describe("DateTime rail", () => {
       expect(calendarItem("last-quarter")?.disabled).toBe(true);
     });
 
-    it("moves between rail items with Up and Down, one calendar row at a time", async () => {
+    it("moves inside the calendar group with the arrows, Home and End, and leaves Recent to its own group", async () => {
+      vi.useRealTimers();
       seedHistory([hourRange(1)]);
       createWrapper();
       await openMenu();
@@ -290,23 +273,25 @@ describe("DateTime rail", () => {
         return document.activeElement?.getAttribute("data-test");
       };
 
-      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe("date-time-rail-calendar-today");
       expect(press("date-time-rail-calendar-today", "ArrowDown")).toBe(
         "date-time-rail-calendar-yesterday",
       );
-      expect(press("date-time-rail-calendar-yesterday", "ArrowDown")).toBe(
+      expect(press("date-time-rail-calendar-yesterday", "ArrowRight")).toBe(
         "date-time-rail-calendar-this-week",
       );
       expect(press("date-time-rail-calendar-this-week", "ArrowUp")).toBe(
         "date-time-rail-calendar-yesterday",
       );
-      expect(press("date-time-rail-calendar-today", "ArrowUp")).toBe("date-time-rail-recent-0");
+      expect(press("date-time-rail-calendar-today", "End")).toBe(
+        "date-time-rail-calendar-last-quarter",
+      );
       expect(press("date-time-rail-calendar-last-quarter", "ArrowDown")).toBe(
         "date-time-rail-calendar-last-quarter",
       );
-      expect(press("date-time-rail-calendar-today", "ArrowRight")).toBe(
+      expect(press("date-time-rail-calendar-last-quarter", "Home")).toBe(
         "date-time-rail-calendar-today",
       );
+      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe("date-time-rail-recent-0");
     });
   });
 
@@ -327,7 +312,7 @@ describe("DateTime rail", () => {
       expect(el("date-time-next-btn")?.disabled).toBe(true);
     });
 
-    it("drops the calendar token when a rolling chip or custom value is chosen", async () => {
+    it("drops the calendar token when a rolling chip or typed value is chosen", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
 
@@ -336,8 +321,9 @@ describe("DateTime rail", () => {
       expect(lastEmit().relativeTimePeriod).toBe("3h");
 
       wrapper!.vm.setRelativeTime("calendar:day:0");
-      wrapper!.vm.relativeValue = 7;
-      wrapper!.vm.onCustomPeriodSelect();
+      await openMenu();
+      wrapper!.vm.onFieldInput("7h");
+      wrapper!.vm.onFieldSubmit("7h");
       expect(wrapper!.vm.calendarToken).toBeNull();
       expect(lastEmit().relativeTimePeriod).toBe("7h");
     });
@@ -515,13 +501,13 @@ describe("DateTime rail", () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:week:0" });
       await flushPromises();
       expect(wrapper!.vm.triggerTooltip).toBe(
-        "2026/10/05 00:00:00 - 2026/10/08 08:30:00 (Asia/Calcutta)",
+        "2026-10-05 00:00:00 – 2026-10-08 08:30:00\n3d 8h · Asia/Calcutta (UTC+05:30)",
       );
 
       vi.setSystemTime(new Date("2026-10-08T04:00:00Z"));
       await wrapper!.find('[data-test="date-time-btn"]').trigger("mouseenter");
       expect(wrapper!.vm.triggerTooltip).toBe(
-        "2026/10/05 00:00:00 - 2026/10/08 09:30:00 (Asia/Calcutta)",
+        "2026-10-05 00:00:00 – 2026-10-08 09:30:00\n3d 9h · Asia/Calcutta (UTC+05:30)",
       );
     });
 
@@ -541,19 +527,26 @@ describe("DateTime rail", () => {
   describe("single clicked day", () => {
     const calendar = () => wrapper!.findComponent({ name: "ODateRangeCalendar" });
 
-    it("applies the clicked day, not the old dates, when Apply is pressed", async () => {
+    const setTimes = (start: string, end: string) => {
+      wrapper!.vm.onDraftEdge("start", { ...wrapper!.vm.draft.start, time: start });
+      wrapper!.vm.draft.end.time = end;
+    };
+
+    it("keeps Apply off while End waits, and Enter applies the clicked day", async () => {
       createWrapper({ autoApply: false });
       await flushPromises();
+      const applied = wrapper!.vm.triggerLabel;
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
-      wrapper!.vm.selectedTime.startTime = "09:15:00";
-      wrapper!.vm.selectedTime.endTime = "10:30:00";
+      setTimes("09:15:00", "10:30:00");
       await flushPromises();
-      expect(wrapper!.vm.triggerLabel).toBe("2026/10/03 09:15:00 - 2026/10/03 10:30:00");
-      el("date-time-apply-btn")!.click();
+      expect(wrapper!.vm.triggerLabel).toBe(applied);
+      expect(el("date-time-range-summary-range")!.textContent).toContain("Oct 3, 09:15:00 – …");
+      expect(el("date-time-range-draft")).not.toBeNull();
+      expect((el("date-time-apply-btn") as HTMLButtonElement).disabled).toBe(true);
+
+      wrapper!.vm.submitDraft();
       await flushPromises();
 
       expect(lastEmit()).toMatchObject({
@@ -563,13 +556,11 @@ describe("DateTime rail", () => {
       });
     });
 
-    it("drops an unapplied pending day from the label when the panel closes without Apply", async () => {
+    it("drops an unapplied pending day when the panel closes without Apply", async () => {
       createWrapper({ autoApply: false });
       await flushPromises();
       const applied = wrapper!.vm.triggerLabel;
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
       await flushPromises();
 
@@ -577,7 +568,7 @@ describe("DateTime rail", () => {
       wrapper!.vm.menuOpen = false;
       await flushPromises();
 
-      expect(wrapper!.vm.pendingDay).toBeNull();
+      expect(wrapper!.vm.pendingEnd).toBe(false);
       expect(wrapper!.vm.triggerLabel).toBe(applied);
     });
 
@@ -585,13 +576,10 @@ describe("DateTime rail", () => {
       createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
-      wrapper!.vm.selectedTime.startTime = "09:15:00";
-      wrapper!.vm.selectedTime.endTime = "10:30:00";
+      setTimes("09:15:00", "10:30:00");
       await flushPromises();
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
 
@@ -606,12 +594,11 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedType).toBe("absolute");
     });
 
-    it("applies a range completed by the second click as before", async () => {
+    it("applies a range completed by the second click when the panel closes", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
+      const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
       calendar().vm.$emit("update:pendingDate", "2026/10/03");
       await flushPromises();
@@ -619,46 +606,60 @@ describe("DateTime rail", () => {
       calendar().vm.$emit("update:endDate", "2026/10/05");
       calendar().vm.$emit("update:pendingDate", null);
       await flushPromises();
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+
+      wrapper!.vm.onMenuOpenChange(false);
+      wrapper!.vm.menuOpen = false;
+      await flushPromises();
 
       expect(lastEmit()).toMatchObject({ valueType: "absolute" });
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/05" });
     });
+
+    it("swaps the times with the days when the second click is before the first", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+
+      calendar().vm.$emit("update:pendingDate", "2026/10/05");
+      setTimes("09:15:00", "10:30:00");
+      calendar().vm.$emit("update:startDate", "2026/10/03");
+      calendar().vm.$emit("update:endDate", "2026/10/05");
+      await flushPromises();
+
+      expect(wrapper!.vm.draft.start).toMatchObject({ date: "2026-10-03", time: "10:30:00" });
+      expect(wrapper!.vm.draft.end).toMatchObject({ date: "2026-10-05", time: "09:15:00" });
+    });
   });
 
   describe("semantics", () => {
-    it("labels the Recent and Calendar sections as groups of lists", async () => {
+    it("labels the Relative, Calendar and Recent groups", async () => {
       seedHistory([hourRange(1), hourRange(2)]);
       createWrapper();
       await openMenu();
 
       const groups = Array.from(
-        document.querySelectorAll('[data-test="date-time-rail"] [role="group"]'),
+        document.querySelectorAll('[data-test="date-time-helpers"] [role="group"]'),
       );
-      // "Recent" is labelled by the shared header band outside the rail, not a heading inside it.
       const names = groups.map(
         (g) =>
           g.getAttribute("aria-label") ??
           document.getElementById(g.getAttribute("aria-labelledby") ?? "")?.textContent?.trim(),
       );
-      expect(names).toEqual(["Recent", "Calendar"]);
-      expect(groups[0].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(2);
-      expect(groups[1].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(8);
+      expect(names).toEqual(["Relative", "Calendar", "Recent"]);
+      expect(groups[2].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(2);
     });
   });
 
-  describe("tabs", () => {
-    it("seeds the Absolute tab with the applied calendar range and applies nothing", async () => {
+  describe("seeded Start/End", () => {
+    it("shows the applied calendar range in Start/End and applies nothing on close", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
       await openMenu();
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
 
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
-
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/08", to: "2026/10/08" });
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "08:30:00" });
-      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+      expect(wrapper!.vm.draft.start).toMatchObject({ date: "2026-10-08", time: "00:00:00" });
+      expect(wrapper!.vm.draft.end).toMatchObject({ date: "2026-10-08", time: "08:30:00" });
 
       wrapper!.vm.onMenuOpenChange(false);
       wrapper!.vm.menuOpen = false;
@@ -668,29 +669,24 @@ describe("DateTime rail", () => {
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
     });
 
-    it("keeps typed times while the clock ticks; only switching to the tab seeds the fields", async () => {
+    it("keeps edited times while the clock ticks", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
 
-      wrapper!.vm.selectedTime.startTime = "09:00:00";
-      wrapper!.vm.selectedTime.endTime = "10:00:00";
+      wrapper!.vm.onDraftEdge("start", { date: "2026-10-08", time: "09:00:00", offset: "" });
       await flushPromises();
       vi.setSystemTime(new Date("2026-10-08T03:05:00Z"));
       wrapper!.vm.refreshTooltipNow();
       await flushPromises();
 
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "09:00:00", endTime: "10:00:00" });
+      expect(wrapper!.vm.draft.start.time).toBe("09:00:00");
     });
 
-    it("keeps the exact period end when the zone changes while the seeded fields are shown", async () => {
+    it("keeps the exact period end when the zone changes", async () => {
       createWrapper({ autoApply: false, defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       await openMenu();
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
 
       store.state.timezone = "UTC";
       expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
@@ -699,27 +695,23 @@ describe("DateTime rail", () => {
       });
     });
 
-    it("applies the seeded range once the user edits it", async () => {
+    it("applies the seeded range once the user edits it, on close", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
       await openMenu();
 
-      el("date-time-absolute-tab")!.click();
-      await flushPromises();
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/09/30" });
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
+      expect(wrapper!.vm.draft.start).toMatchObject({ date: "2026-09-01", time: "00:00:00" });
+      expect(wrapper!.vm.draft.end).toMatchObject({ date: "2026-09-30", time: "23:59:59" });
 
-      wrapper!.vm.selectedTime.startTime = "06:00:00";
+      wrapper!.vm.onDraftEdge("start", { date: "2026-09-01", time: "06:00:00", offset: "" });
+      wrapper!.vm.onMenuOpenChange(false);
+      wrapper!.vm.menuOpen = false;
       await flushPromises();
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-09-01T00:30:00Z"),
         endTime: micros("2026-09-30T18:30:00Z"),
       });
-
-      wrapper!.vm.selectedTime.endTime = "23:00:00";
-      await flushPromises();
-      expect(lastEmit()).toMatchObject({ endTime: micros("2026-09-30T17:30:00Z") });
     });
   });
 
@@ -744,25 +736,24 @@ describe("DateTime rail", () => {
   });
 
   describe("height", () => {
-    it("caps the panel to the space the popover has and scrolls the presets inside it", async () => {
+    it("caps the panel to the space the popover has and scrolls inside it", async () => {
       createWrapper();
       await openMenu();
 
       const menu = document.querySelector("#date-time-menu")!;
       expect(menu.className).toContain("max-h-[calc(var(--reka-popper-available-height");
-      expect(
-        document.querySelector('#date-time-menu [role="tabpanel"]')?.parentElement?.className,
-      ).toContain("overflow-y-auto");
+      expect(menu.className).toContain("overflow-y-auto");
     });
   });
 
   describe("recent history", () => {
+    const editDraft = (start: string, end: string) => {
+      wrapper!.vm.onDraftEdge("start", { date: "2026-10-07", time: start, offset: "" });
+      wrapper!.vm.onDraftEdge("end", { date: "2026-10-07", time: end, offset: "" });
+    };
+
     const applyAbsolute = async () => {
-      wrapper!.vm.setDateType("absolute");
-      wrapper!.vm.selectedDate.from = "2026/10/07";
-      wrapper!.vm.selectedDate.to = "2026/10/07";
-      wrapper!.vm.selectedTime.startTime = "10:00:00";
-      wrapper!.vm.selectedTime.endTime = "11:30:00";
+      editDraft("10:00:00", "11:30:00");
       await flushPromises();
       el("date-time-apply-btn")!.click();
       await flushPromises();
@@ -776,7 +767,11 @@ describe("DateTime rail", () => {
       await applyAbsolute();
 
       expect(storedHistory()).toEqual([
-        { startUs: micros("2026-10-07T04:30:00Z"), endUs: micros("2026-10-07T06:00:00Z") },
+        {
+          startUs: micros("2026-10-07T04:30:00Z"),
+          endUs: micros("2026-10-07T06:00:00Z"),
+          zone: IST,
+        },
       ]);
     });
 
@@ -799,15 +794,15 @@ describe("DateTime rail", () => {
       await flushPromises();
       await openMenu();
 
-      wrapper!.vm.setDateType("absolute");
-      wrapper!.vm.selectedTime.startTime = "01:00:00";
+      editDraft("01:00:00", "03:00:00");
       await flushPromises();
-      wrapper!.vm.selectedTime.startTime = "02:00:00";
+      editDraft("02:00:00", "03:00:00");
       await flushPromises();
       expect(storedHistory()).toEqual([]);
 
       wrapper!.vm.onMenuOpenChange(false);
       expect(storedHistory()).toHaveLength(1);
+      expect(storedHistory()[0].zone).toBe(IST);
     });
 
     it("records a chart drag-zoom but not a restored saved range", async () => {
@@ -835,16 +830,19 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(el("date-time-rail-recent-0")?.getAttribute("aria-label")).toBe(
-        "Oct 8 · 04:30–05:00 (2026/10/08 04:30:00 - 2026/10/08 05:00:00)",
+        "Oct 8 · 04:30–05:00 (Oct 8, 04:30:00 – 05:00:00 UTC+05:30)",
       );
       expect(el("date-time-rail-recent-0")?.textContent).toContain("Oct 8");
       expect(el("date-time-rail-recent-0-duration")?.textContent).toBe("30m");
       expect(el("date-time-rail-recent-1")?.getAttribute("aria-label")).toBe(
-        "Oct 6 · 23:30–23:59 (2026/10/06 23:30:00 - 2026/10/06 23:59:59)",
+        "Oct 6 · 23:30–23:59 (Oct 6, 23:30:00 – 23:59:59 UTC+05:30)",
       );
       expect(el("date-time-rail-recent-1")?.textContent).toContain("Oct 6");
 
       el("date-time-rail-recent-1")!.click();
+      await flushPromises();
+      expect(wrapper!.vm.menuOpen).toBe(true);
+      el("date-time-apply-btn")!.click();
       await flushPromises();
 
       expect(lastEmit()).toMatchObject({
@@ -853,16 +851,11 @@ describe("DateTime rail", () => {
         endTime: hourRange(30).endUs,
       });
       expect(wrapper!.vm.menuOpen).toBe(false);
-      expect(storedHistory()).toEqual([hourRange(30), hourRange(1)]);
+      expect(storedHistory()).toEqual([{ ...hourRange(30), zone: IST }, hourRange(1)]);
 
       await openMenu();
-      expect(el("date-time-rail-recent-0")?.className).toContain(SELECTED_CLASS);
-      // Both tab panels stay mounted for equal height; the inactive one is just aria-hidden.
-      expect(
-        el("date-time-relative-15-m-btn")
-          ?.closest('[role="tabpanel"]')
-          ?.getAttribute("aria-hidden"),
-      ).toBe("true");
+      expect(pressed(el("date-time-rail-recent-0"))).toBe(true);
+      expect(pressed(el("date-time-relative-15-m-btn"))).toBe(false);
     });
 
     it("keeps the × out of the Tab order and removes the focused row with Delete", async () => {
@@ -929,15 +922,13 @@ describe("DateTime rail", () => {
       await flushPromises();
 
       expect(storedHistory()).toEqual([]);
-      expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
-      );
+      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-relative-5-m-btn");
     });
 
     it.each([
       ["without calendar presets", { calendarPresets: false }],
       ["when every calendar item is over the limit", { queryRangeRestrictionInHour: 0.001 }],
-    ])("keeps focus inside the rail after removing the last row %s", async (_label, props) => {
+    ])("keeps focus inside the helpers after removing the last row %s", async (_label, props) => {
       vi.useRealTimers();
       seedHistory([hourRange(1)]);
       createWrapper(props);
@@ -949,56 +940,53 @@ describe("DateTime rail", () => {
       await flushPromises();
 
       expect(storedHistory()).toEqual([]);
-      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail");
+      expect(document.activeElement?.closest('[data-test="date-time-helpers"]')).not.toBeNull();
     });
 
-    it("opens on the first rail item and keeps the rail a single Tab stop", async () => {
+    it("opens on the field and keeps Recent a single Tab stop", async () => {
       vi.useRealTimers();
-      seedHistory([1, 2, 3, 4, 5, 6, 7].map(hourRange));
+      seedHistory([1, 2, 3, 4, 5].map(hourRange));
       createWrapper();
       await openMenu();
+      wrapper!.vm.onPopoverOpenAutoFocus(new Event("focus", { cancelable: true }));
+      await flushPromises();
 
-      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-0");
+      expect(document.activeElement?.closest('[data-test="date-time-range-input"]')).not.toBeNull();
       const tabbable = () =>
-        Array.from(document.querySelectorAll("[data-date-time-rail-item]"))
+        Array.from(document.querySelectorAll('[data-roving="recent"]'))
           .filter((node) => node.getAttribute("tabindex") === "0")
           .map((node) => node.getAttribute("data-test"));
-      expect(tabbable()).toEqual(["date-time-rail-recent-0"]);
+      expect(tabbable()).toEqual(["date-time-rail-recent-toggle"]);
       expect(el("date-time-rail-recent-0-remove")?.getAttribute("tabindex")).toBe("-1");
 
+      el("date-time-rail-recent-toggle")!.focus();
       const press = (key: string) =>
         document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-      for (let i = 0; i < 6; i++) press("ArrowDown");
+      for (let i = 0; i < 3; i++) press("ArrowDown");
       await flushPromises();
-      expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-recent-toggle",
-      );
-      expect(tabbable()).toEqual(["date-time-rail-recent-toggle"]);
-      press("ArrowDown");
-      await flushPromises();
-      expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
-      );
-      expect(tabbable()).toEqual(["date-time-rail-calendar-today"]);
-      expect(el("date-time-type-toggle")?.getAttribute("tabindex")).toBe("0");
+      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-2");
+      expect(tabbable()).toEqual(["date-time-rail-recent-2"]);
     });
-
-    it("opens on the first calendar item when there is no recent range", async () => {
+    it("moves from the field to the first chip with ↓", async () => {
+      vi.useRealTimers();
       createWrapper();
       await openMenu();
+      const input = document.querySelector<HTMLInputElement>(
+        '[data-test="date-time-range-input"] input',
+      )!;
+      input.focus();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      await flushPromises();
 
-      expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
-      );
+      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-relative-15-m-btn");
     });
-
     it("recalls a range ending at midnight as that day's last second and still queries the exact end", async () => {
       const day = {
         startUs: micros("2026-10-05T18:30:00Z"),
         endUs: micros("2026-10-06T18:30:00Z"),
       };
       seedHistory([day]);
-      createWrapper({ autoApply: false });
+      createWrapper({ autoApply: true });
       await flushPromises();
       await openMenu();
 
@@ -1008,7 +996,7 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/06", to: "2026/10/06" });
       expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
       expect(lastEmit()).toMatchObject({ startTime: day.startUs, endTime: day.endUs });
-      expect(storedHistory()).toEqual([day]);
+      expect(storedHistory()).toEqual([{ ...day, zone: IST }]);
     });
 
     it("removes a range with its × button", async () => {
@@ -1023,7 +1011,7 @@ describe("DateTime rail", () => {
       expect(el("date-time-rail-recent-1")).toBeNull();
     });
 
-    it("shows six ranges with Show more, and all of them after a click or Enter", async () => {
+    it("shows three ranges with Show more, and all of them after a click or Enter", async () => {
       // Vue drops a handler's events stamped before it attached, which a faked Date clock gets wrong.
       vi.useRealTimers();
       seedHistory([1, 2, 3, 4, 5, 6, 7, 8].map(hourRange));
@@ -1033,25 +1021,21 @@ describe("DateTime rail", () => {
       const toggle = el("date-time-rail-recent-toggle")!;
       expect(toggle.tagName).toBe("BUTTON");
       expect(toggle.textContent?.trim()).toBe("Show more");
-      expect(el("date-time-rail-recent-5")).not.toBeNull();
-      expect(el("date-time-rail-recent-6")).toBeNull();
+      expect(el("date-time-rail-recent-2")).not.toBeNull();
+      expect(el("date-time-rail-recent-3")).toBeNull();
 
       toggle.click();
       await flushPromises();
       expect(el("date-time-rail-recent-7")).not.toBeNull();
       expect(el("date-time-rail-recent-toggle")?.textContent?.trim()).toBe("Show less");
-      expect(el("date-time-rail-recent-list")?.className).not.toContain("overflow");
-      expect(el("date-time-rail")?.className).toContain("overflow-y-auto");
-      expect(el("date-time-rail")?.className).toContain("absolute");
 
       el("date-time-rail-recent-toggle")!.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
       await flushPromises();
-      expect(el("date-time-rail-recent-6")).toBeNull();
+      expect(el("date-time-rail-recent-3")).toBeNull();
       expect(el("date-time-rail-recent-toggle")?.textContent?.trim()).toBe("Show more");
     });
-
     it("keeps at most 15 ranges in the rail after 20 applies", async () => {
       vi.useRealTimers();
       createWrapper({ autoApply: true });
@@ -1070,12 +1054,12 @@ describe("DateTime rail", () => {
       expect(document.querySelectorAll("[data-date-time-rail-recent]")).toHaveLength(15);
     });
 
-    it("has no Show more link for six ranges or fewer", async () => {
-      seedHistory([1, 2, 3, 4, 5, 6].map(hourRange));
+    it("has no Show more link for three ranges or fewer", async () => {
+      seedHistory([1, 2, 3].map(hourRange));
       createWrapper();
       await openMenu();
 
-      expect(el("date-time-rail-recent-5")).not.toBeNull();
+      expect(el("date-time-rail-recent-2")).not.toBeNull();
       expect(el("date-time-rail-recent-toggle")).toBeNull();
     });
 
@@ -1090,7 +1074,7 @@ describe("DateTime rail", () => {
       wrapper!.vm.menuOpen = false;
       await flushPromises();
       await openMenu();
-      expect(el("date-time-rail-recent-6")).toBeNull();
+      expect(el("date-time-rail-recent-3")).toBeNull();
     });
 
     it("disables a recent range longer than the query-range limit", async () => {

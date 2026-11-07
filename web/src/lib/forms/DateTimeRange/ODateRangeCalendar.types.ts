@@ -16,6 +16,12 @@ export interface DateRangeCalendarProps {
   maxDate?: string;
   /** When true, all cell interactions are disabled */
   disabled?: boolean;
+  /** Any day of the month to show — YYYY/MM/DD; follows the range when absent. */
+  month?: string;
+  /** Days ringed as part of an invalid range — YYYY/MM/DD. */
+  invalidDates?: string[];
+  /** A range drawn with the dashed preview outline, without selecting it — YYYY/MM/DD ends. */
+  previewRange?: { start: string; end: string } | null;
 }
 
 export interface DateRangeCalendarEmits {
@@ -25,4 +31,6 @@ export interface DateRangeCalendarEmits {
   (_e: "update:endDate", _value: string): void;
   /** A first click waiting for its end date (YYYY/MM/DD), or null once the range is complete. */
   (_e: "update:pendingDate", _value: string | null): void;
+  /** The shown month changed by its own navigation; value is its first day, YYYY/MM/DD. */
+  (_e: "update:month", _value: string): void;
 }

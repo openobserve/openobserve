@@ -9,7 +9,6 @@ The `OForm` container + `useOForm` composable own field registration, validation
 - [OEmojiPicker](#oemojipicker) — curated emoji picker
 - [ODate](#odate) — single date
 - [OTime](#otime) — time of day
-- [ODateTimeRange](#odatetimerange) — relative/absolute range picker
 - [ODateRangeCalendar](#odaterangecalendar) — dual-month date-range calendar
 - [OFormDateTimeRange](#oformdatetimerange) — form-bound legacy range picker
 - [OFile](#ofile) — file upload
@@ -195,7 +194,7 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 
 **Import:** `@/lib/forms/Date/ODate.vue`
 **Use when:** Selecting a single calendar date as `YYYY-MM-DD`.
-**Don't use for:** A start/end date span — use [ODateRangeCalendar](#odaterangecalendar) or [ODateTimeRange](#odatetimerange). A date **and** time-of-day range — use [ODateTimeRange](#odatetimerange). Inside an `OForm`, use `OFormDate`.
+**Don't use for:** A start/end date span — use [ODateRangeCalendar](#odaterangecalendar). A date **and** time-of-day range — use `@/components/DateTime.vue` (or `OFormDateTimeRange` inside a form). Inside an `OForm`, use `OFormDate`.
 **Key props:** `modelValue` (`string` — `YYYY-MM-DD`), `min` / `max` (`string` — `YYYY-MM-DD`), `clearable` (`boolean`), `autoApply` (`boolean`, default `true` — apply on click; set `false` for an Apply button), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm" | "md"`, default `"md"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (string), `change` (string), `clear`, `blur`, `focus`.
@@ -227,7 +226,7 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 
 **Import:** `@/lib/forms/Time/OTime.vue`
 **Use when:** Selecting a time of day as `HH:MM` (or `HH:MM:SS` with `withSeconds`).
-**Don't use for:** A full date+time — pair with `ODate` or use `ODateTimeRange`. Inside an `OForm`, use `OFormTime`.
+**Don't use for:** A full date+time — pair with `ODate` or use `@/components/DateTime.vue`. Inside an `OForm`, use `OFormTime`.
 **Key props:** `modelValue` (`string` — `HH:MM` / `HH:MM:SS`), `withSeconds` (`boolean`, default `false`), `min` / `max` (`string` — `HH:MM`), `step` (`number` — seconds, default 60), `clearable` (`boolean`), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm" | "md"`, default `"md"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (string), `change` (string), `clear`, `blur`, `focus`.
@@ -255,42 +254,16 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 
 ## DateTimeRange family
 
-Three distinct components — do not confuse them:
+Two distinct components — do not confuse them:
 
-- **`ODateTimeRange`** — the full standalone headless picker: a popover trigger with Relative and Absolute tabs, `OTime` inputs, timezone selector, and its own Reka `RangeCalendar` (built directly, it does **not** consume `ODateRangeCalendar`). Value is exposed field-by-field via `startDate`/`startTime`/`endDate`/`endTime`/`mode`/`relativeUnit`/`relativeAmount` (each with its own `update:*`), plus a consolidated `change` payload (`DateTimeRangeValue` — a discriminated `absolute | relative` union).
-- **`ODateRangeCalendar`** — a low-level, date-only dual-month range calendar (no time, no popover, no tabs). Dates are `YYYY/MM/DD` (app convention; it converts to Reka's `YYYY-MM-DD` internally). Currently a standalone building block — not wired into `ODateTimeRange`.
-- **`OFormDateTimeRange`** — the form-bound wrapper. **It does not wrap `ODateTimeRange`;** it wraps the legacy composite `@/components/DateTime.vue` (which takes its value via once-read `default-*` props and emits `on:date-change`). The wrapper seeds those props from the field, translates each change into the form's `{ type, period, from, to }` timerange object via `field.handleChange`, and remounts the inner picker (via `:key`) only when the field value changes from an external source (form reset / async prefill).
-
-### ODateTimeRange
-
-**Import:** `@/lib/forms/DateTimeRange/ODateTimeRange.vue`
-**Use when:** A standalone date-time range picker offering both relative ("last 30 minutes") and absolute (start/end date+time) selection, outside a form.
-**Don't use for:** A single date (`ODate`) or a date-only range with no time/relative modes (`ODateRangeCalendar`). Inside an `OForm`, use `OFormDateTimeRange`.
-**Key props:** `startDate`/`endDate` (`string` — `YYYY-MM-DD`, default `""`), `startTime`/`endTime` (`string` — `HH:MM[:SS]`, default `""`), `mode` (`"relative" | "absolute"`, default `"relative"`), `relativeUnit` (`"seconds" | "minutes" | "hours" | "days" | "weeks" | "months"`, default `"minutes"`), `relativeAmount` (`number`, default 0 — 0 = no selection), `withSeconds` (`boolean`, default `false`), `autoApply` (`boolean`, default `false` — else shows Apply), `disableRelative` (`boolean`, default `false` — absolute-only), `hideTime` (`boolean`, default `false`), `showTimezone` (`boolean`, default `false`), `minDate`/`maxDate` (`string` — `YYYY-MM-DD`), `maxHours` (`number` — disables relative options exceeding it), `timezone` (`string` — IANA; `""` = browser local), `label`, `helpText`, `errorMessage`, `disabled` (`boolean`), `required` (`boolean`), `placeholder` (default `"Select date range"`).
-**Slots:** `label`, `tooltip`.
-**Emits:** `update:startDate`, `update:startTime`, `update:endDate`, `update:endTime`, `update:mode`, `update:timezone`, `update:relativeUnit`, `update:relativeAmount`, and `change` (the consolidated `DateTimeRangeValue` union). Note: no single `v-model` — bind the individual `update:*` events (or use `v-model:startDate` etc.).
-**Example:**
-
-```vue
-<ODateTimeRange
-  v-model:start-date="startDate"
-  v-model:start-time="startTime"
-  v-model:end-date="endDate"
-  v-model:end-time="endTime"
-  :mode="mode"
-  @update:mode="mode = $event"
-  show-timezone
-  @change="onRangeChange"
-/>
-```
-
-**Family:** Standalone headless picker; date-only sibling `ODateRangeCalendar`; form-bound wrapper `OFormDateTimeRange` (wraps legacy DateTime, not this component).
+- **`ODateRangeCalendar`** — a low-level, date-only dual-month range calendar (no time, no popover, no tabs). Dates are `YYYY/MM/DD` (app convention; it converts to Reka's `YYYY-MM-DD` internally). `@/components/DateTime.vue` renders it in its Custom range column.
+- **`OFormDateTimeRange`** — the form-bound wrapper. It wraps the legacy composite `@/components/DateTime.vue` (which takes its value via once-read `default-*` props and emits `on:date-change`). The wrapper seeds those props from the field, translates each change into the form's `{ type, period, from, to }` timerange object via `field.handleChange`, and remounts the inner picker (via `:key`) only when the field value changes from an external source (form reset / async prefill).
 
 ### ODateRangeCalendar
 
 **Import:** `@/lib/forms/DateTimeRange/ODateRangeCalendar.vue`
 **Use when:** Embedding a bare dual-month date-range calendar (no time, no popover) — e.g. inline in a custom filter panel.
-**Don't use for:** Anything needing time-of-day, relative ranges, or a popover trigger — use `ODateTimeRange`. A single date — use `ODate`.
+**Don't use for:** Anything needing time-of-day, relative ranges, or a popover trigger — use `@/components/DateTime.vue`. A single date — use `ODate`.
 **Key props:** `startDate` / `endDate` (`string` — `YYYY/MM/DD`), `minDate` / `maxDate` (`string` — `YYYY/MM/DD`), `disabled` (`boolean`).
 **Slots:** none.
 **Emits:** `update:startDate` (`YYYY/MM/DD`), `update:endDate` (`YYYY/MM/DD` — fired when the range is completed).
@@ -304,13 +277,13 @@ Three distinct components — do not confuse them:
 />
 ```
 
-**Family:** Low-level calendar; the full picker is `ODateTimeRange`.
+**Family:** Low-level calendar; the full picker is `@/components/DateTime.vue`.
 
 ### OFormDateTimeRange
 
 **Import:** `@/lib/forms/DateTime/OFormDateTimeRange.vue`
 **Use when:** A timerange field inside `<OForm>` whose value is the app's `{ type, period, from, to }` shape (backed by the legacy `@/components/DateTime.vue` picker).
-**Don't use for:** A standalone (non-form) range picker — use `ODateTimeRange`. Note the path lives under `forms/DateTime/`, not `forms/DateTimeRange/`.
+**Don't use for:** A standalone (non-form) range picker — use `@/components/DateTime.vue`. Note the path lives under `forms/DateTime/`, not `forms/DateTimeRange/`.
 **Key props:** `name` (`string`, required — supports nested/indexed paths like `dashboards[0].timerange`), `label` (`string` — DateTime has no label of its own), `required` (`boolean` — renders the `*`), `description` (`string` — helper line under the label). All other DateTime attrs pass through via `$attrs`.
 **Slots:** none. **Emits:** none (writes the timerange object through `field.handleChange`). Errors are validated cross-field in the form schema, not rendered inline.
 **Example:**

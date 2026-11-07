@@ -86,13 +86,15 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     }
   });
 
-  it("drops the copy and paste row but keeps the zone select and the hint", async () => {
+  it("drops copy and paste but keeps the field, the line, and the zone select", async () => {
     createWrapper({ pickerTimezone: "Asia/Calcutta", hideClipboard: true, defaultOpen: true });
     await flushPromises();
     expect(inMenu("date-time-copy-btn")).toBeNull();
     expect(inMenu("date-time-paste-btn")).toBeNull();
+    expect(inMenu("date-time-range-input")).not.toBeNull();
     expect(inMenu("datetime-timezone-select")).not.toBeNull();
-    expect(document.body.textContent).toContain("You can choose multiple dates");
+    expect(inMenu("date-time-range-summary")).not.toBeNull();
+    expect(inMenu("date-time-range-tz")?.textContent).toContain("Asia/Calcutta (UTC+05:30)");
   });
 
   it("keeps copy and paste and reads the app's zone by default", async () => {

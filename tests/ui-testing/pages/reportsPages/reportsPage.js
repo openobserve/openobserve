@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
-  dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
-  Past30SecondsValue, openNavFlyoutChild
+  dateTimeButtonLocator, customRangeLocator,
+  Past30SecondsValue, openNavFlyoutChild, setRelative
 } from '../commonActions.js';
 
 export class ReportsPage {
@@ -99,8 +99,7 @@ export class ReportsPage {
 
     // Common time-range locators (used by Logs/Reports/Dashboards screens, exported as data-test)
     this.dateTimeButton = dateTimeButtonLocator;
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
+    this.absoluteTab = customRangeLocator;
 
     // Header / profile / logout
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
@@ -131,7 +130,7 @@ export class ReportsPage {
 
     // Date/Time locators wrapped as Locator (the constants are CSS selector strings)
     this.dateTimeButtonLocator = page.locator(dateTimeButtonLocator);
-    this.absoluteTabLocator = page.locator(absoluteTabLocator);
+    this.customRangeHeading = page.locator(customRangeLocator);
     this.absoluteStartTimeField = page.locator('[data-test="date-time-absolute-start-time-field"]');
     this.absoluteEndTimeField = page.locator('[data-test="date-time-absolute-end-time-field"]');
   }
@@ -456,7 +455,7 @@ export class ReportsPage {
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.dateTimeButtonLocator.click({ force: true });
-    await this.relative30SecondsButton.click({ force: true });
+    await setRelative(this.page, 30, 's');
   }
 
   async verifyTimeSetTo30Seconds() {
@@ -467,13 +466,13 @@ export class ReportsPage {
   async setDateTime() {
     await expect(this.dateTimeButtonLocator).toBeVisible();
     await this.dateTimeButtonLocator.click({ force: true });
-    await this.absoluteTabLocator.click({ force: true });
+    await this.customRangeHeading.click({ force: true });
     await this.page.waitForTimeout(1000);
   }
 
   async fillTimeRange(startTime, endTime) {
     // Absolute-tab calendar — first day cell, then access_time input (left untouched: this method isn't used by reportsScheduleNow)
-    await this.absoluteTabLocator.click({ force: true });
+    await this.customRangeHeading.click({ force: true });
     await this.absoluteStartTimeField.fill(startTime);
     await this.absoluteEndTimeField.fill(endTime);
   }

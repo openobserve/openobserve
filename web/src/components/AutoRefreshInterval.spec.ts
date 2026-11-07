@@ -1,8 +1,10 @@
 import { mount } from "@vue/test-utils";
+import { KeepAlive, defineComponent, h, nextTick, ref } from "vue";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import i18n from "@/locales";
+import i18n, { loadLocaleMessages } from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
+import store from "@/test/unit/helpers/store";
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn((value) => `${value} seconds`),
@@ -35,7 +37,7 @@ describe("AutoRefreshInterval", () => {
         ...props,
       },
       global: {
-        plugins: [i18n, mockRouter],
+        plugins: [i18n, mockRouter, store],
         stubs: {
           OIcon: {
             template: '<div class="OIcon" :data-icon="name"></div>',
@@ -486,10 +488,337 @@ describe("AutoRefreshInterval", () => {
       expect(wrapper.vm.btnRefreshInterval).toBe(false);
     });
 
-    it("shows the relative-time footer", () => {
+    it("states the running-query rule only on a host that reports its runs", async () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="auto-refresh-footer"]').text()).toBe(
-        "Applies to relative time ranges only",
+        "Pauses while this tab is hidden.",
+      );
+      await wrapper.setProps({ busy: false });
+      expect(wrapper.find('[data-test="auto-refresh-footer"]').text()).toBe(
+        "Pauses while this tab is hidden. Waits for a running query before the next refresh.",
+      );
+    });
+  });
+
+  describe("tick rules", () => {
+    let visibility: DocumentVisibilityState = "visible";
+
+    beforeEach(() => {
+      visibility = "visible";
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => visibility,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      });
+    });
+
+    const mountOn = async (props = {}) => {
+      wrapper = createWrapper({ trigger: true, ...props });
+      await wrapper.setProps({ modelValue: 30 });
+    };
+
+    it("skips ticks while the tab is hidden and refreshes once when it shows again", async () => {
+      await mountOn();
+      visibility = "hidden";
+      vi.advanceTimersByTime(90_000);
+      expect(wrapper.emitted("trigger")).toBeUndefined();
+
+      visibility = "visible";
+      document.dispatchEvent(new Event("visibilitychange"));
+      expect(wrapper.emitted("trigger")).toHaveLength(1);
+      vi.advanceTimersByTime(29_000);
+      expect(wrapper.emitted("trigger")).toHaveLength(1);
+      vi.advanceTimersByTime(1_000);
+      expect(wrapper.emitted("trigger")).toHaveLength(2);
+    });
+
+    it("waits for a running query and counts the next tick from when it finishes", async () => {
+      await mountOn({ busy: true });
+      vi.advanceTimersByTime(30_000);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted("trigger")).toBeUndefined();
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe(
+        "waiting",
+      );
+      expect(wrapper.vm.triggerTooltip).toBe(
+        "Auto refresh every 30s. Waiting for the running query.",
+      );
+
+      vi.advanceTimersByTime(10_000);
+      await wrapper.setProps({ busy: false });
+      vi.advanceTimersByTime(29_000);
+      expect(wrapper.emitted("trigger")).toBeUndefined();
+      vi.advanceTimersByTime(1_000);
+      expect(wrapper.emitted("trigger")).toHaveLength(1);
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe("on");
+    });
+
+    it("does not call a run waiting when no tick fell due during it", async () => {
+      await mountOn({ busy: false });
+      await wrapper.setProps({ busy: true });
+
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe("on");
+      expect(wrapper.vm.triggerTooltip).toBe("Auto Refresh: 30s");
+    });
+
+    it("drops a waiting tick when it is deactivated, so no later run re-arms it", async () => {
+      const show = ref(true);
+      const interval = ref(0);
+      const onTrigger = vi.fn();
+      const host = mount(
+        defineComponent({
+          setup: () => () =>
+            h(KeepAlive, null, [
+              show.value
+                ? h(AutoRefreshInterval, {
+                    modelValue: interval.value,
+                    trigger: true,
+                    busy: true,
+                    onTrigger,
+                  })
+                : null,
+            ]),
+        }),
+        { global: { plugins: [i18n, mockRouter, store] } },
+      );
+      const child = host.findComponent(AutoRefreshInterval);
+      interval.value = 30;
+      await nextTick();
+      vi.advanceTimersByTime(30_000);
+      expect(child.vm.isWaiting).toBe(true);
+
+      show.value = false;
+      await nextTick();
+      vi.advanceTimersByTime(120_000);
+
+      expect(child.vm.isWaiting).toBe(false);
+      expect(onTrigger).not.toHaveBeenCalled();
+      host.unmount();
+    });
+
+    it("arms no timer from its watchers while deactivated, only once it is active again", async () => {
+      const show = ref(true);
+      const interval = ref(30);
+      const busy = ref<boolean | null>(true);
+      const onTrigger = vi.fn();
+      const host = mount(
+        defineComponent({
+          setup: () => () =>
+            h(KeepAlive, null, [
+              show.value
+                ? h(AutoRefreshInterval, {
+                    modelValue: interval.value,
+                    trigger: true,
+                    busy: busy.value,
+                    onTrigger,
+                  })
+                : null,
+            ]),
+        }),
+        { global: { plugins: [i18n, mockRouter, store] } },
+      );
+      await nextTick();
+      show.value = false;
+      await nextTick();
+      const setIntervalSpy = vi.spyOn(window, "setInterval");
+
+      interval.value = 60;
+      busy.value = false;
+      show.value = true;
+      await nextTick();
+      await nextTick();
+      const armed = setIntervalSpy.mock.calls.filter(([, ms]) => ms === 60_000).length;
+      setIntervalSpy.mockRestore();
+      vi.advanceTimersByTime(60_000);
+
+      expect(armed).toBe(1);
+      expect(onTrigger).toHaveBeenCalledTimes(1);
+      host.unmount();
+    });
+
+    it("shows how long ago the last run finished", async () => {
+      vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
+      await mountOn();
+      vi.advanceTimersByTime(30_000);
+      vi.setSystemTime(new Date("2026-11-06T12:00:42Z"));
+      wrapper.vm.tickClock();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
+        "Refreshing every 30s · last run 12s ago",
+      );
+      expect(wrapper.vm.triggerTooltip).toBe("Auto refresh every 30s, last run 12s ago");
+    });
+  });
+
+  describe("a range that does not follow now", () => {
+    const NOW = new Date("2026-11-06T12:00:00Z");
+    const setLocale = (code: string): string => {
+      const holder = i18n.global as unknown as { locale: string | { value: string } };
+      if (typeof holder.locale === "string") {
+        const before = holder.locale;
+        holder.locale = code;
+        return before;
+      }
+      const before = holder.locale.value;
+      holder.locale.value = code;
+      return before;
+    };
+    const HOUR_US = 3_600_000_000;
+    const nowUs = NOW.getTime() * 1000;
+
+    beforeEach(() => {
+      vi.setSystemTime(NOW);
+      store.state.timezone = "UTC";
+    });
+
+    it("keeps refreshing a range that ends later and says until when", async () => {
+      wrapper = createWrapper({
+        trigger: true,
+        rangeStartUs: nowUs - HOUR_US,
+        rangeEndUs: nowUs + HOUR_US,
+      });
+      await wrapper.setProps({ modelValue: 30 });
+      vi.advanceTimersByTime(30_000);
+
+      expect(wrapper.emitted("trigger")).toHaveLength(1);
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe("on");
+      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
+        "Refreshing every 30s until this range ends at 13:00",
+      );
+    });
+
+    it("pauses once the range ends, with the reason and a way back to a relative range", async () => {
+      wrapper = createWrapper({
+        trigger: true,
+        rangeStartUs: nowUs - HOUR_US,
+        rangeEndUs: nowUs + 10_000_000,
+      });
+      await wrapper.setProps({ modelValue: 30 });
+      vi.advanceTimersByTime(60_000);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.emitted("trigger")).toBeUndefined();
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe(
+        "paused",
+      );
+      expect(wrapper.find('[data-test="auto-refresh-fixed-reason"]').text()).toContain(
+        "This range ended on Nov 6 at 12:00, so no new data can arrive in it. Refresh is paused.",
+      );
+      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
+        "Paused: this range has ended",
+      );
+      await wrapper.find('[data-test="auto-refresh-switch-relative"]').trigger("click");
+      expect(wrapper.emitted("switch-relative")?.[0]).toEqual(["1h"]);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    });
+
+    it("keeps the switch inside the page's query-range limit", async () => {
+      wrapper = createWrapper({
+        modelValue: 30,
+        rangeStartUs: nowUs - 3 * 24 * HOUR_US,
+        rangeEndUs: nowUs - 60_000_000,
+        maxRangeHours: 24,
+      });
+      await wrapper.vm.$nextTick();
+      await wrapper.find('[data-test="auto-refresh-switch-relative"]').trigger("click");
+
+      expect(wrapper.emitted("switch-relative")?.[0]).toEqual(["1d"]);
+      expect(wrapper.find('[data-test="auto-refresh-footer"]').text()).toBe(
+        "Resumes at 30s when you pick a range that has not ended.",
+      );
+    });
+
+    it("gives the reason and the switch while refresh is off for a range that has ended", async () => {
+      wrapper = createWrapper({
+        modelValue: 0,
+        rangeStartUs: nowUs - 2 * HOUR_US,
+        rangeEndUs: nowUs - 60_000_000,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="auto-refresh-state"]').attributes("data-state")).toBe("off");
+      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
+        "Off: this range has ended",
+      );
+      const reason = wrapper.find('[data-test="auto-refresh-fixed-reason"]').text();
+      expect(reason).toContain(
+        "This range ended on Nov 6 at 11:59, so no new data can arrive in it. Refresh will not run for this range.",
+      );
+      expect(reason).not.toContain("paused");
+      expect(wrapper.find('[data-test="auto-refresh-switch-relative"]').text()).toBe(
+        "Switch to Past 2 Hours",
+      );
+    });
+
+    it.each([
+      [(2 * 60 + 30) * 60_000_000, "Switch to Past 2h 30m"],
+      [90 * 60_000_000, "Switch to Past 1h 30m"],
+      [24 * HOUR_US, "Switch to Past 1 Day"],
+      [HOUR_US, "Switch to Past 1 Hour"],
+      [45 * 60_000_000, "Switch to Past 45 Minutes"],
+    ])("names a %d µs range on the switch as %s", async (durationUs, label) => {
+      wrapper = createWrapper({
+        modelValue: 30,
+        rangeStartUs: nowUs - 60_000_000 - durationUs,
+        rangeEndUs: nowUs - 60_000_000,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="auto-refresh-switch-relative"]').text()).toBe(label);
+    });
+
+    it("names a minutes period over the limit's fractional hours exactly, in the locale's units", async () => {
+      wrapper = createWrapper({
+        modelValue: 30,
+        rangeStartUs: nowUs - 60_000_000 - 3 * 24 * HOUR_US,
+        rangeEndUs: nowUs - 60_000_000,
+        maxRangeHours: 25.5,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="auto-refresh-switch-relative"]').text()).toBe(
+        "Switch to Past 25h 30m",
+      );
+      await wrapper.find('[data-test="auto-refresh-switch-relative"]').trigger("click");
+      expect(wrapper.emitted("switch-relative")?.[0]).toEqual(["1530m"]);
+    });
+
+    it("builds the hours-and-minutes label from the translated compact units", async () => {
+      await loadLocaleMessages("ja");
+      const previous = setLocale("ja");
+      try {
+        wrapper = createWrapper({
+          modelValue: 30,
+          rangeStartUs: nowUs - 60_000_000 - 150 * 60_000_000,
+          rangeEndUs: nowUs - 60_000_000,
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('[data-test="auto-refresh-switch-relative"]').text()).toContain(
+          "過去 2時間 30分",
+        );
+      } finally {
+        setLocale(previous);
+      }
+    });
+
+    it("names the rounded relative period on the switch", async () => {
+      wrapper = createWrapper({
+        modelValue: 30,
+        rangeStartUs: nowUs - (2 * 24 * 60 + 15) * 60_000_000,
+        rangeEndUs: nowUs - 60_000_000,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="auto-refresh-switch-relative"]').text()).toBe(
+        "Switch to Past 2 Days",
       );
     });
   });

@@ -256,16 +256,21 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // Panel time should be preserved
     await assertPanelTimeInURL(page, panelIds[0], "1d");
 
-    // Step 7: Test quick successive changes
-    await pm.dashboardPanelTime.clickPanelTimePicker(panelIds[0]);
-    await pm.dashboardPanelTime.timeRangeBtn('1-h').click();
-    await pm.dashboardPanelTime.timeRangeBtn('6-d').click();
-    await pm.dashboardPanelTime.timeRangeBtn('1-m').click();
+    // Step 7: Test quick successive changes; an applying picker closes on each chip, so reopen it
+    const pickQuickly = async (code) => {
+      if (!(await pm.dashboardPanelTime.dateTimeMenu.isVisible())) {
+        await pm.dashboardPanelTime.clickPanelTimePicker(panelIds[0]);
+      }
+      await pm.dashboardPanelTime.timeRangeBtn(code).click();
+    };
+    await pickQuickly('1-h');
+    await pickQuickly('6-h');
+    await pickQuickly('30-m');
     await pm.dashboardPanelTime.clickDateTimeApply();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Last change (1m) should be applied
-    await assertPanelTimeInURL(page, panelIds[0], "1m");
+    // Last change (30m) should be applied
+    await assertPanelTimeInURL(page, panelIds[0], "30m");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
