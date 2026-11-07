@@ -221,6 +221,7 @@ const flyoutBlocks = computed<Block[]>(() => {
 // (zero-width) seam between tile and flyout doesn't flicker it.
 const OPEN_DELAY = 120;
 const CLOSE_DELAY = 220;
+const VIEWPORT_MARGIN = 8;
 let openTimer: ReturnType<typeof setTimeout> | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -376,8 +377,6 @@ function focusTile() {
   tileElement()?.focus();
 }
 
-const VIEWPORT_MARGIN = 8;
-
 // ── Open / close ──────────────────────────────────────────────────────────
 async function positionFlyout() {
   const wrapper = wrapperRef.value;
@@ -396,10 +395,12 @@ async function positionFlyout() {
     top: `${rect.top}px`,
     maxHeight: `${maxHeight}px`,
     overflowY: "auto",
+    // Without this the wheel chains to the page at the end of the list and onScroll closes the flyout.
+    overscrollBehavior: "contain",
     zIndex: "6000",
   };
   await nextTick();
-  const flyoutH = Math.min(flyoutRef.value?.offsetHeight ?? 0, maxHeight);
+  const flyoutH = flyoutRef.value?.offsetHeight ?? 0;
   const maxTop = window.innerHeight - flyoutH - VIEWPORT_MARGIN;
   flyoutStyle.value = {
     ...flyoutStyle.value,

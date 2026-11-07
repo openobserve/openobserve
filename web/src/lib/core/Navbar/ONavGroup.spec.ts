@@ -258,28 +258,48 @@ describe("ONavGroup", () => {
     expect(flyout().attributes("style")).not.toContain("right:");
   });
 
-  it("caps the flyout to the viewport height and scrolls when it is taller", async () => {
-    vi.spyOn(window, "innerHeight", "get").mockReturnValue(500);
-    wrapper = mountGroup();
-    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
-      left: 10,
-      right: 98,
-      top: 300,
-      bottom: 360,
-      width: 88,
-      height: 60,
-      x: 10,
-      y: 300,
-      toJSON: () => ({}),
+  describe("flyout height vs viewport", () => {
+    const spies: Array<{ mockRestore: () => void }> = [];
+
+    async function openWithFlyoutHeight(flyoutHeight: number) {
+      spies.push(vi.spyOn(window, "innerHeight", "get").mockReturnValue(500));
+      wrapper = mountGroup();
+      spies.push(
+        vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+          left: 10,
+          right: 98,
+          top: 300,
+          bottom: 360,
+          width: 88,
+          height: 60,
+          x: 10,
+          y: 300,
+          toJSON: () => ({}),
+        }),
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(flyoutHeight),
+      );
+      await hoverOpen();
+      return flyout().attributes("style");
+    }
+
+    afterEach(() => {
+      spies.splice(0).forEach((spy) => spy.mockRestore());
     });
-    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(900);
 
-    await hoverOpen();
+    it("caps a flyout taller than the viewport, scrolls it and pins it to the top margin", async () => {
+      const style = await openWithFlyoutHeight(900);
 
-    const style = flyout().attributes("style");
-    expect(style).toContain("max-height: 484px");
-    expect(style).toContain("overflow-y: auto");
-    expect(style).toContain("top: 8px");
+      expect(style).toContain("max-height: 484px");
+      expect(style).toContain("overflow-y: auto");
+      expect(style).toContain("overscroll-behavior: contain");
+      expect(style).toContain("top: 8px");
+    });
+
+    it("keeps a flyout that fits at the tile's top, clamped above the bottom margin", async () => {
+      const style = await openWithFlyoutHeight(100);
+
+      expect(style).toContain("top: 300px");
+    });
   });
 
   it("positions the flyout before the right-hand rail in RTL", async () => {
