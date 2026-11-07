@@ -54,6 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-secondary text-center">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
+      <OTag
+        v-if="sessionTracesIncomplete"
+        type="logsResultChip"
+        value="warn"
+        data-test="rum-player-traces-tab-partial-empty"
+        >{{ t("common.partialResults") }}</OTag
+      >
     </div>
 
     <!-- Detail view: embedded TraceDetails -->
@@ -83,6 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ selectedTrace.metadata.errorCount }}
             {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
+          <span
+            v-if="rowHttpStatus(selectedTrace) >= 400"
+            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-bold"
+            data-test="rum-player-traces-tab-http-status"
+          >
+            <OIcon name="error" size="xs" />
+            {{ t("traces.traceTree.httpStatus", { status: rowHttpStatus(selectedTrace) }) }}
+          </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
             class="rounded-default text-2xs bg-surface-accent text-text-body hover:bg-card-glass-border inline-flex cursor-pointer items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
@@ -94,11 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
-            v-if="selectedTrace.metadata?.e2eDuration != null"
+            v-if="rowDurationMs(selectedTrace) != null"
             class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="text-text-secondary" />
-            {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
+            {{ formatTimeWithSuffix((rowDurationMs(selectedTrace) ?? 0) * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
@@ -161,6 +176,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="error"
           data-test="rum-player-traces-tab-error-count-badge"
           >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag
+        >
+        <OTag
+          v-if="sessionTracesIncomplete"
+          type="logsResultChip"
+          value="warn"
+          data-test="rum-player-traces-tab-partial"
+          >{{ t("common.partialResults") }}</OTag
+        >
+        <OTag
+          v-if="metadataError"
+          type="logsResultChip"
+          value="warn"
+          data-test="rum-player-traces-tab-metadata-error"
+          :title="metadataError"
+          >{{ t("rum.fetchTraceMetadataFailed") }}</OTag
         >
         <div class="ms-auto w-[18rem] max-w-[50%]">
           <OInput
@@ -232,14 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-duration="{ row }">
             <span class="text-xs tabular-nums">
               {{
-                row.metadata?.e2eDuration != null
-                  ? formatTimeWithSuffix(row.metadata.e2eDuration * 1000)
-                  : "—"
+                rowDurationMs(row) === null ? "—" : formatTimeWithSuffix(rowDurationMs(row)! * 1000)
               }}
             </span>
           </template>
           <template #cell-status="{ row }">
-            <TraceStatusCell :item="{ errors: row.metadata?.errorCount ?? 0 }" />
+            <TraceStatusCell v-if="rowStatusKnown(row)" :item="{ errors: rowErrorCount(row) }" />
+            <span v-else class="text-xs">—</span>
           </template>
         </OTable>
       </div>
@@ -267,7 +296,12 @@ import {
   TRACE_RANGE_PADDING_US,
   traceQueryWindow,
 } from "@/utils/rum/traceWindow";
-import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
+import {
+  TRACE_IDS_PER_GET_REQUEST,
+  type TraceTimeRange,
+} from "@/ts/interfaces/traces/traceTimeRange.types";
+import { chunkItems, mapWithConcurrency } from "@/utils/rum/batching";
+import { SERVER_STATUS_COLUMNS } from "@/utils/rum/serverStatus";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -327,6 +361,8 @@ const traceDetailsRef = ref<any>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
+// The session's request list itself is incomplete (a partial page, or the MAX_SESSION_TRACES cap).
+const sessionTracesIncomplete = ref(false);
 const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
 const traceSearch = ref("");
@@ -368,11 +404,11 @@ function traceDurationMs(rumDateMs: number, meta: any): number | null {
 function matchesTraceStatus(view: any): boolean {
   const statuses = selectedTraceStatuses.value;
   if (!statuses.length) return true;
-  const hasError = (view.metadata?.errorCount || 0) > 0;
+  const hasError = rowIsError(view);
   return (
     (statuses.includes("error") && hasError) ||
     (statuses.includes("success") && !hasError) ||
-    (statuses.includes("slow") && (view.metadata?.e2eDuration || 0) >= SLOW_TRACE_MS)
+    (statuses.includes("slow") && (rowDurationMs(view) ?? 0) >= SLOW_TRACE_MS)
   );
 }
 
@@ -396,9 +432,7 @@ const visibleViews = computed(() => {
   );
 });
 
-const totalErrorCount = computed(
-  () => visibleViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
-);
+const totalErrorCount = computed(() => visibleViews.value.filter((v) => rowIsError(v)).length);
 
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
@@ -410,7 +444,7 @@ const traceColumns = computed(() => [
   {
     id: "timestamp",
     header: t("rum.timestamp"),
-    accessorFn: (row: any) => row.metadata?.start_time ?? 0,
+    accessorFn: (row: any) => traceSortKey(row),
     size: 100,
     minSize: 100,
     maxSize: 200,
@@ -438,7 +472,7 @@ const traceColumns = computed(() => [
   {
     id: "duration",
     header: t("rum.duration"),
-    accessorFn: (row: any) => row.metadata?.e2eDuration ?? 0,
+    accessorFn: (row: any) => rowDurationMs(row) ?? 0,
     size: 100,
     minSize: 50,
     maxSize: 200,
@@ -447,7 +481,7 @@ const traceColumns = computed(() => [
   {
     id: "status",
     header: t("common.status"),
-    accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
+    accessorFn: (row: any) => rowErrorCount(row),
     size: 120,
     minSize: 80,
     maxSize: 180,
@@ -455,8 +489,45 @@ const traceColumns = computed(() => [
   },
 ]);
 
+// A row's duration and status. The browser's own timing of the request (`resource_duration`) is
+// the duration: one clock, so a device clock that differs from the server's cannot zero or inflate it. Without it,
+// the trace's end-to-end duration (traceDurationMs, which falls back to the span length under clock skew); with
+// neither (or a zero, which is no measurement), null, shown as "—".
+function rowDurationMs(row: any): number | null {
+  if (row?.browserDurationMs > 0) return row.browserDurationMs;
+  const traceMs = row?.metadata?.e2eDuration;
+  return traceMs > 0 ? traceMs : null;
+}
+
+// The worse HTTP status the browser or the trace's server span saw (0 when neither has one). The browser reports
+// 0 for a request it got no readable answer for, so the server span's status counts too.
+function rowHttpStatus(row: any): number {
+  return Math.max(Number(row?.browserStatus) || 0, Number(row?.metadata?.serverStatus) || 0);
+}
+
+// A request failed when its trace has an ERROR span or its HTTP status is 400 or above: backends leave a 4xx
+// server span UNSET (OpenTelemetry semantics), so the span status alone shows almost every failure as a success.
+function rowIsError(row: any): boolean {
+  return (row?.metadata?.errorCount || 0) > 0 || rowHttpStatus(row) >= 400;
+}
+
+// The count the status pill shows: the trace's ERROR spans, or 1 for a request only its HTTP status failed.
+function rowErrorCount(row: any): number {
+  return row?.metadata?.errorCount || (rowIsError(row) ? 1 : 0);
+}
+
+// Whether a status is shown: the trace details loaded, or the HTTP status alone proves a failure.
+function rowStatusKnown(row: any): boolean {
+  return !!row?.metadata || rowHttpStatus(row) >= 400;
+}
+
+// A row's trace start (ns); a row whose trace details failed to load uses its browser time.
+function traceSortKey(row: any): number {
+  return row.metadata?.start_time ?? (row.rumDate || 0) * 1_000_000;
+}
+
 function traceRowClass(row: any): string {
-  return row.metadata?.errorCount > 0 ? "trace-row--error" : "";
+  return rowIsError(row) ? "trace-row--error" : "";
 }
 
 // ── Formatting helpers ──────────────────────────────────────
@@ -511,6 +582,14 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
+// A session's requests are read in pages, up to MAX_SESSION_TRACES (a long session can have thousands),
+// instead of the first 250 only.
+const RUM_TRACE_PAGE_SIZE = 1000;
+const MAX_SESSION_TRACES = 10000;
+// The metadata GET carries its ids in the URL, so it goes in batches of TRACE_IDS_PER_GET_REQUEST;
+// a WAF answers a longer query string with 403 and every row lost its metadata. This many batches run at once.
+const METADATA_CONCURRENCY = 4;
+
 /**
  * The window covering `ranges`, padded — widened to the caller's window when
  * any trace has no indexed range, so an unknown trace is never narrowed out.
@@ -534,12 +613,47 @@ function unionTraceWindow(
   };
 }
 
+/** What a traces stream's schema allows the server-span query to name. */
+interface ServerSpanSchema {
+  /** The HTTP status columns it has, in SERVER_STATUS_COLUMNS order. */
+  statusColumns: string[];
+  /** Whether it has `http_route`, which the route name needs. */
+  hasRoute: boolean;
+}
+
+/**
+ * The server-span columns a traces stream has (naming a column the stream lacks fails the whole query). Asked
+ * once per stream per fetch: getStream re-reads the schema on every call. Without a schema there are no status
+ * columns, and the route name is asked as before.
+ */
+async function serverSpanSchema(streamName: string): Promise<ServerSpanSchema> {
+  try {
+    const traceStream = await getStream(streamName, "traces", true);
+    const columns = new Set((traceStream?.schema ?? []).map((field: any) => field?.name));
+    return {
+      statusColumns: SERVER_STATUS_COLUMNS.filter((column) => columns.has(column)),
+      hasRoute: columns.has("http_route"),
+    };
+  } catch {
+    return { statusColumns: [], hasRoute: true };
+  }
+}
+
+/**
+ * Trace summaries for `traceIds` in one stream. `incomplete` is true when the server flagged the answer partial
+ * (`is_partial`, `function_error`), so an id it lacks is unknown, not absent. Rejects when `signal` aborts.
+ * `serverSchema` says which server-span columns the stream has (see serverSpanSchema).
+ */
 async function fetchTraceMetadata(
   traceIds: string[],
   streamName: string,
   window?: { startTime: number; endTime: number },
-): Promise<Record<string, any>> {
-  if (traceIds.length === 0) return {};
+  signal?: AbortSignal,
+  serverSchema: ServerSpanSchema = { statusColumns: [], hasRoute: true },
+): Promise<{ metadata: Record<string, any>; incomplete: boolean }> {
+  const { statusColumns, hasRoute } = serverSchema;
+  if (traceIds.length === 0) return { metadata: {}, incomplete: false };
+  let incomplete = false;
 
   const orgId = store.state.selectedOrganization.identifier;
   const nowMs = Date.now();
@@ -551,11 +665,26 @@ async function fetchTraceMetadata(
     traceIds.length === 1 ? sqlEquals("trace_id", traceIds[0]) : sqlIn("trace_id", traceIds);
 
   const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
     const traceId = generateTraceContext().traceId;
     activeTraceIds.push(traceId);
+    // A cancelled stream calls no handler, so the abort settles this promise itself.
+    const onAbort = () => {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+      });
+      untrack();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
     const untrack = () => {
       activeTraceIds = activeTraceIds.filter((id) => id !== traceId);
+      signal?.removeEventListener("abort", onAbort);
     };
+    signal?.addEventListener("abort", onAbort, { once: true });
     const metadata: Record<string, any> = {};
 
     fetchQueryDataWithHttpStream(
@@ -574,7 +703,9 @@ async function fetchTraceMetadata(
       },
       {
         data: (_payload, response) => {
-          const hits = response.content?.results?.hits || [];
+          const results = response.content?.results;
+          if (results?.is_partial || results?.function_error?.length) incomplete = true;
+          const hits = results?.hits || [];
           hits.forEach((hit: any) => {
             metadata[hit.trace_id] = {
               duration: hit.duration,
@@ -601,15 +732,39 @@ async function fetchTraceMetadata(
     );
   });
 
-  try {
-    const stream = quoteSqlIdentifierIfNeeded(streamName);
-    const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
-    const operationResponse = await searchService.search(
+  // An abort between the summary stream and this lookup starts no request.
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  const stream = quoteSqlIdentifierIfNeeded(streamName);
+  const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+  const routeSql = hasRoute
+    ? `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`
+    : null;
+  // With status columns, the status is the earliest server span's that has one: the request's
+  // entry point, which answered the browser (a 404 an internal service returned to the backend is not the
+  // request's status). Unrouted spans count, since a request rejected before routing (a 401, an unmatched 404)
+  // has no route. The route name still comes from the earliest routed span: routed spans sort first, and a
+  // trace without one gets a null name. One span answers for both status columns (a trace can mix
+  // semantic-convention versions across services); they are cast to text, since one may be an integer.
+  const routed = `http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != ''`;
+  const status = statusColumns.length
+    ? `COALESCE(${statusColumns
+        .map((column) => `CAST(${quoteSqlIdentifierIfNeeded(column)} AS VARCHAR)`)
+        .join(", ")})`
+    : "";
+  // A stream without `http_route` has no route names, and naming the column would fail the query.
+  const name = hasRoute
+    ? `first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, ${timestamp} ASC)`
+    : "NULL";
+  const statusSql = status
+    ? `SELECT trace_id, ${name} AS operation_name, first_value(${status} ORDER BY CASE WHEN ${status} IS NOT NULL THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS server_status FROM ${stream} WHERE ${filter} AND span_kind='2' GROUP BY trace_id`
+    : null;
+  const searchOperations = (sql: string) =>
+    searchService.search(
       {
         org_identifier: orgId,
         query: {
           query: {
-            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
+            sql,
             start_time: searchStartTime,
             end_time: searchEndTime,
             from: 0,
@@ -617,41 +772,77 @@ async function fetchTraceMetadata(
           },
         },
         page_type: "traces",
+        signal,
       },
       "RUM",
     );
+  const firstSql = statusSql ?? routeSql;
+  if (!firstSql) return { metadata, incomplete };
+  try {
+    let operationResponse: any;
+    try {
+      operationResponse = await searchOperations(firstSql);
+    } catch (err) {
+      // A failed status query costs the status only; the route names are asked again without it.
+      if (!statusSql || !routeSql || signal?.aborted) throw err;
+      console.warn("Server status lookup failed; loading the route names without it:", err);
+      operationResponse = await searchOperations(routeSql);
+    }
 
     for (const hit of operationResponse.data?.hits || []) {
       if (metadata[hit.trace_id] && hit.operation_name) {
         metadata[hit.trace_id].httpOperation = hit.operation_name;
       }
+      const serverStatus = Number(hit.server_status) || 0;
+      if (metadata[hit.trace_id] && serverStatus > 0) {
+        metadata[hit.trace_id].serverStatus = serverStatus;
+      }
     }
   } catch (err) {
-    console.warn("HTTP server operation fetch failed:", err);
+    // An abort is the caller's own doing (session change, unmount); the caller discards this result.
+    if (!signal?.aborted) console.warn("HTTP server operation fetch failed:", err);
   }
 
-  return metadata;
+  return { metadata, incomplete };
 }
 
-// An in-flight metadata fetch outlives this tab otherwise; cancel it on unmount.
-onUnmounted(() => {
+// Every fetch takes a generation. A newer fetch (another session) or unmount supersedes it; a
+// superseded fetch starts no further request and writes no state, since a long session's paged and batched
+// fetch can outlast the next session's.
+let fetchGeneration = 0;
+let fetchAbort: AbortController | null = null;
+
+function cancelInFlightStreams() {
   const orgId = store.state.selectedOrganization?.identifier;
   activeTraceIds.forEach((traceId) =>
     cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
   );
   activeTraceIds = [];
   cancelCorrelatedTracesStream();
+}
+
+// An in-flight metadata fetch outlives this tab otherwise; cancel it on unmount.
+onUnmounted(() => {
+  fetchGeneration += 1;
+  fetchAbort?.abort();
+  cancelInFlightStreams();
 });
 
-// Each fetch takes a number; a fetch that a newer one has replaced (the session changed, or the
-// replay's arrival window came in after the tab opened) stops writing its results.
-let fetchGeneration = 0;
-
 async function fetchTraces() {
-  if (!props.sessionId) return;
-
+  // Supersede the previous fetch first, even when there is no session to load.
   const generation = ++fetchGeneration;
-  const replaced = () => generation !== fetchGeneration;
+  const isStale = () => generation !== fetchGeneration;
+  fetchAbort?.abort();
+  const abort = new AbortController();
+  fetchAbort = abort;
+  metadataError.value = null;
+  sessionTracesIncomplete.value = false;
+  error.value = null;
+  if (!props.sessionId) {
+    loading.value = false;
+    return;
+  }
+
   loading.value = true;
   error.value = null;
   traceSearchWindow.value = null;
@@ -668,7 +859,7 @@ async function fetchTraces() {
     // a stable `_trace_id` so SELECT/GROUP BY and the row reads below stay identical
     // regardless of which spellings are present.
     const rumStream = await getStream("_rumdata", "logs", true);
-    if (replaced()) return;
+    if (isStale()) return;
     const traceIdExpr = rumFieldSql(rumStream?.schema, "trace_id");
     const traceIdSet = rumFieldNotNullSql(rumStream?.schema, "trace_id");
     if (!traceIdExpr || !traceIdSet) {
@@ -689,6 +880,9 @@ async function fetchTraces() {
       `${traceIdExpr} as _trace_id`,
       aggOrNull("max", "type", "_type"),
       aggOrNull("min", "date", "_date"),
+      // The browser's own timing (ns) and the worst HTTP status it saw for the request.
+      aggOrNull("max", "resource_duration", "_resource_duration"),
+      aggOrNull("max", "resource_status_code", "_status_code"),
     ];
     if (props.rumWindowUs) {
       const ts = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
@@ -701,9 +895,7 @@ async function fetchTraces() {
 
     const rumQuery = {
       query: {
-        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
-        // The arrival window can start after the device start (a RUM batch that arrived before
-        // the first replay row), so take whichever is earlier.
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC, _trace_id ASC`,
         start_time: props.rumWindowUs
           ? Math.min(props.rumWindowUs.start, searchStartTime)
           : searchStartTime,
@@ -712,21 +904,45 @@ async function fetchTraces() {
           ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
           : searchEndTime,
         from: 0,
-        size: 250,
+        size: RUM_TRACE_PAGE_SIZE,
       },
     };
 
-    const rumResponse = await searchService.search(
-      {
-        org_identifier: orgId,
-        query: rumQuery,
-        page_type: "logs",
-      },
-      "RUM",
-    );
-
-    if (replaced()) return;
-    const rumHits = rumResponse.data?.hits || [];
+    // A short page is the last one. There is one row per trace id and `_trace_id` breaks `_date` ties, so the
+    // order is total; a row ingested during the read can only push later rows one place on, which repeats a row
+    // across pages (dropped by the dedup below), never skips one.
+    const rumHits: any[] = [];
+    let lastPageShort = false;
+    for (let from = 0; from < MAX_SESSION_TRACES; from += RUM_TRACE_PAGE_SIZE) {
+      const size = Math.min(RUM_TRACE_PAGE_SIZE, MAX_SESSION_TRACES - from);
+      const rumResponse = await searchService.search(
+        {
+          org_identifier: orgId,
+          query: { query: { ...rumQuery.query, from, size } },
+          page_type: "logs",
+        },
+        "RUM",
+      );
+      if (isStale()) return;
+      if (rumResponse.data?.is_partial || rumResponse.data?.function_error?.length) {
+        // The page is not authoritative, so a short one does not prove the list ended.
+        sessionTracesIncomplete.value = true;
+        console.warn(
+          "Session traces: the server returned a partial page; later requests may be missing",
+        );
+      }
+      const page = rumResponse.data?.hits || [];
+      rumHits.push(...page);
+      if (page.length < size) {
+        lastPageShort = true;
+        break;
+      }
+    }
+    if (!lastPageShort) {
+      // Every page came back full up to the cap, so the session may have more requests.
+      sessionTracesIncomplete.value = true;
+      console.warn(`Session traces capped at the first ${MAX_SESSION_TRACES} requests`);
+    }
 
     if (rumHits.length === 0) {
       correlatedViews.value = [];
@@ -756,6 +972,8 @@ async function fetchTraces() {
       traceMap.set(traceId, {
         traceId,
         rumDate: hit._date || 0,
+        browserDurationMs: (Number(hit._resource_duration) || 0) / 1_000_000,
+        browserStatus: Number(hit._status_code) || 0,
         route: viewUrl,
         label: viewUrl ? shortRoute(viewUrl).replace(/\/$/, "") || "/" : traceId,
         kind:
@@ -781,8 +999,12 @@ async function fetchTraces() {
           views.map((v) => v.traceId),
           searchWindow.start,
           searchWindow.end,
+          undefined,
+          abort.signal,
         );
+        if (isStale()) return;
         const fallbackStream = await fallbackTracesStream();
+        if (isStale()) return;
         for (const view of views as any[]) {
           const location = locationById[view.traceId];
           view.stream = location?.stream ?? fallbackStream;
@@ -799,48 +1021,89 @@ async function fetchTraces() {
           idsByStream.set(view.stream, ids);
           rangeById.set(view.traceId, view.range);
         }
+        // Metadata goes in URL-safe batches per stream, METADATA_CONCURRENCY at a time. A failed
+        // batch keeps its rows without metadata (shown as "—") instead of dropping the whole list's metadata.
+        const batches = [...idsByStream.entries()].flatMap(([stream, ids]) =>
+          chunkItems(ids, TRACE_IDS_PER_GET_REQUEST).map((batchIds) => ({ stream, batchIds })),
+        );
+        // Each stream's status columns, asked once for this fetch rather than once per batch.
+        const serverSchemaByStream = new Map<string, ServerSpanSchema>();
+        for (const stream of idsByStream.keys()) {
+          serverSchemaByStream.set(stream, await serverSpanSchema(stream));
+          if (isStale()) return;
+        }
         const metadata: Record<string, any> = {};
-        const metadataPerStream = await Promise.all(
-          [...idsByStream.entries()].map(([stream, ids]) =>
-            fetchTraceMetadata(
-              ids,
+        const unresolvedIds = new Set<string>();
+        let firstBatchError: any = null;
+        await mapWithConcurrency(batches, METADATA_CONCURRENCY, async ({ stream, batchIds }) => {
+          if (isStale()) return;
+          try {
+            const part = await fetchTraceMetadata(
+              batchIds,
               stream,
               unionTraceWindow(
-                ids.map((id) => rangeById.get(id)),
+                batchIds.map((id) => rangeById.get(id)),
                 searchWindow.start,
                 searchWindow.end,
               ),
-            ),
-          ),
-        );
-        if (replaced()) return;
-        for (const part of metadataPerStream) Object.assign(metadata, part);
+              abort.signal,
+              serverSchemaByStream.get(stream),
+            );
+            Object.assign(metadata, part.metadata);
+            if (part.incomplete) {
+              // A partial answer: an id it lacks may still exist, so its row stays (without metadata).
+              const missing = batchIds.filter((id) => !part.metadata[id]);
+              missing.forEach((id) => unresolvedIds.add(id));
+              if (missing.length) {
+                firstBatchError ??= new Error(t("rum.fetchTraceMetadataFailed"));
+              }
+            }
+          } catch (err: any) {
+            if (isStale()) return;
+            firstBatchError ??= err;
+            batchIds.forEach((id) => unresolvedIds.add(id));
+          }
+        });
+        if (isStale()) return;
+        if (firstBatchError) {
+          // As when the whole lookup failed: a row whose id no stream claimed stays listed too.
+          views.filter((view) => !view.stream).forEach((view) => unresolvedIds.add(view.traceId));
+          metadataError.value = firstBatchError?.message || t("rum.fetchTraceMetadataFailed");
+          console.warn(
+            `Trace metadata fetch failed for ${unresolvedIds.size} of ${views.length} traces:`,
+            firstBatchError,
+          );
+        }
 
-        // Only keep views whose trace_id exists in the traces stream, sorted by start time
+        // Keep views whose trace_id exists in the traces stream, plus the ones whose batch failed (unknown, not
+        // absent), sorted by start time; a row without metadata sorts by its browser time.
         filteredViews = views
-          .filter((view) => metadata[view.traceId])
+          .filter((view) => metadata[view.traceId] || unresolvedIds.has(view.traceId))
           .map((view) => {
             const meta = metadata[view.traceId];
-            const e2eDuration = traceDurationMs(view.rumDate, meta);
-            return { ...view, metadata: { ...meta, e2eDuration: e2eDuration } };
+            if (!meta) return view;
+            return {
+              ...view,
+              metadata: { ...meta, e2eDuration: traceDurationMs(view.rumDate, meta) },
+            };
           })
-          .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));
+          .sort((a, b) => traceSortKey(a) - traceSortKey(b));
 
         traceMetadata.value = metadata;
       } catch (err: any) {
-        if (replaced()) return;
+        if (isStale()) return;
         metadataError.value = err?.message || t("rum.fetchTraceMetadataFailed");
         console.warn("Trace metadata fetch failed:", err);
       } finally {
-        if (!replaced()) metadataLoading.value = false;
+        if (!isStale()) metadataLoading.value = false;
       }
     }
 
     correlatedViews.value = filteredViews;
   } catch (err: any) {
-    if (!replaced()) error.value = err?.message || t("rum.failedToFetchTraces");
+    if (!isStale()) error.value = err?.message || t("rum.failedToFetchTraces");
   } finally {
-    if (!replaced()) loading.value = false;
+    if (!isStale()) loading.value = false;
   }
 }
 
@@ -900,13 +1163,13 @@ watch(
     selectedPages.value = [];
     selectedTrace.value = null;
     closeTraceDetail();
+    // Stop the previous session's streams; fetchTraces supersedes the rest of its work.
+    cancelInFlightStreams();
     fetchTraces();
   },
 );
 
-// A replay session's arrival window is known only once the session has loaded, which can be
-// after this tab opened and fetched without it. Fetch again when it arrives or changes; the
-// values are compared, so a new object with the same bounds does not re-fetch.
+// The replay arrival bounds can become available after this tab's first fetch.
 watch(
   () => [props.rumWindowUs?.start, props.rumWindowUs?.end],
   (now, before) => {
