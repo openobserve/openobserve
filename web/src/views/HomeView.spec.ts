@@ -22,6 +22,7 @@ import i18n from "@/locales";
 // the panel's own layout rules are FirstDataPanel.spec's; here only HomeView's reading of them is pinned
 const panel = vi.hoisted(() => ({ layout: "none" as string }));
 
+vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   const { defineComponent: define, h: render } = await import("vue");
   const statusLine = define({
@@ -144,6 +145,12 @@ describe("HomeView", () => {
     config.isCloud = originalFlags.isCloud;
     localStorage.removeItem("o2_home_active_tab");
     vi.restoreAllMocks();
+  });
+
+  it("shows no pack card while the Starter Packs flag is off", async () => {
+    wrapper = mountHome();
+    await flushPromises();
+    expect(has("home-pack-section")).toBe(false);
   });
 
   describe("a pinned home dashboard", () => {
