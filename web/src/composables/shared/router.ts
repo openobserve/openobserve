@@ -951,6 +951,18 @@ const useRoutes = () => {
       },
     },
     {
+      path: "slos/import",
+      name: "importSlo",
+      component: () => import("@/views/slos/ImportSlo.vue"),
+      meta: {
+        titleKey: "slos.import.title",
+        licenseFeature: "anomaly_detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "slos/edit/:slo_id",
       name: "editSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
