@@ -9826,7 +9826,6 @@
       "duplicatePanelId": "Dubbele paneel-ID gevonden: {id}",
       "panelMissingLayoutI": "Paneel {id} mist een layout.i-waarde",
       "duplicateLayoutI": "Dubbele layout.i-waarde gevonden in tab {tabId}: {value}",
-      "customChartCallbacksDropped": "Aangepaste grafiek: {count} functiecallback in de code van dit paneel is genegeerd. Opgeslagen grafiekcode kan geen callbacks in de app uitvoeren; gebruik in plaats daarvan gewone waarden. | Aangepaste grafiek: {count} functiecallbacks in de code van dit paneel zijn genegeerd. Opgeslagen grafiekcode kan geen callbacks in de app uitvoeren; gebruik in plaats daarvan gewone waarden.",
       "unsafeCodeDetected": "Onveilige code gedetecteerd: {error}",
       "forbiddenFunctionCall": "Gebruik van '{name}()' is niet toegestaan.",
       "forbiddenInsideSetTimeout": "Gebruik van {name} binnen 'setTimeout()' is niet toegestaan.",

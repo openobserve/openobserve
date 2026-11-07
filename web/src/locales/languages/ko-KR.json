@@ -9826,7 +9826,6 @@
       "duplicatePanelId": "중복된 패널 ID 발견: {id}",
       "panelMissingLayoutI": "패널 {id}에 layout.i 값이 없습니다.",
       "duplicateLayoutI": "탭 {tabId}에서 중복된 layout.i 값 발견: {value}",
-      "customChartCallbacksDropped": "사용자 지정 차트: 이 패널 코드의 함수 콜백 {count}개가 무시되었습니다. 저장된 차트 코드는 앱에서 콜백을 실행할 수 없으므로 대신 일반 값을 사용하세요. | 사용자 지정 차트: 이 패널 코드의 함수 콜백 {count}개가 무시되었습니다. 저장된 차트 코드는 앱에서 콜백을 실행할 수 없으므로 대신 일반 값을 사용하세요.",
       "unsafeCodeDetected": "안전하지 않은 코드 감지: {error}",
       "forbiddenFunctionCall": "'{name}()' 사용은 허용되지 않습니다.",
       "forbiddenInsideSetTimeout": "'setTimeout()' 내에서 {name} 사용은 허용되지 않습니다.",

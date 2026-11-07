@@ -9826,7 +9826,6 @@
       "duplicatePanelId": "تم العثور على معرف لوحة مكررة: {id}",
       "panelMissingLayoutI": "لوحة {id} تفتقد قيمة layout.i",
       "duplicateLayoutI": "قيمة layout.i المكررة الموجودة في التبويب {tabId}: {value}",
-      "customChartCallbacksDropped": "مخطط مخصص: تم تجاهل {count} دالة رد اتصال في كود هذه اللوحة. لا يمكن لكود المخطط المخزّن تشغيل دوال رد الاتصال في التطبيق؛ استخدم قيمًا عادية بدلًا من ذلك. | مخطط مخصص: تم تجاهل {count} دوال رد اتصال في كود هذه اللوحة. لا يمكن لكود المخطط المخزّن تشغيل دوال رد الاتصال في التطبيق؛ استخدم قيمًا عادية بدلًا من ذلك.",
       "unsafeCodeDetected": "تم اكتشاف رمز غير آمن: {error}",
       "forbiddenFunctionCall": "استخدام '{name}()' غير مسموح به.",
       "forbiddenInsideSetTimeout": "استخدام {name} داخل 'setTimeout()' غير مسموح به.",

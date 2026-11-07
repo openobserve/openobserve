@@ -9821,7 +9821,6 @@
       "duplicatePanelId": "發現重複的面板 ID：{id}",
       "panelMissingLayoutI": "面板 {id} 缺少 layout.i 值",
       "duplicateLayoutI": "在分頁 {tabId} 中發現重複的 layout.i 值：{value}",
-      "customChartCallbacksDropped": "自訂圖表：此面板程式碼中的 {count} 個函式回呼已被忽略。儲存的圖表程式碼無法在應用程式中執行回呼；請改用一般值。 | 自訂圖表：此面板程式碼中的 {count} 個函式回呼已被忽略。儲存的圖表程式碼無法在應用程式中執行回呼；請改用一般值。",
       "unsafeCodeDetected": "偵測到不安全的程式碼：{error}",
       "forbiddenFunctionCall": "不允許使用 '{name}()'。",
       "forbiddenInsideSetTimeout": "不允許在 'setTimeout()' 內使用 {name}。",

@@ -9824,7 +9824,6 @@
       "duplicatePanelId": "Duplicate panel ID found: {id}",
       "panelMissingLayoutI": "Panel {id} is missing a layout.i value",
       "duplicateLayoutI": "Duplicate layout.i value found in tab {tabId}: {value}",
-      "customChartCallbacksDropped": "Custom chart: {count} function callback in this panel's code was ignored. Stored chart code cannot run callbacks in the app; use plain values instead. | Custom chart: {count} function callbacks in this panel's code were ignored. Stored chart code cannot run callbacks in the app; use plain values instead.",
       "unsafeCodeDetected": "Unsafe code detected: {error}",
       "forbiddenFunctionCall": "Use of '{name}()' is not allowed.",
       "forbiddenInsideSetTimeout": "Use of {name} inside 'setTimeout()' is not allowed.",

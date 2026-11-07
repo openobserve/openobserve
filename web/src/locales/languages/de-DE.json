@@ -9826,7 +9826,6 @@
       "duplicatePanelId": "Doppelte Panel-ID gefunden: {id}",
       "panelMissingLayoutI": "Panel {id} fehlt ein layout.i-Wert",
       "duplicateLayoutI": "Doppelter layout.i-Wert in Tab {tabId} gefunden: {value}",
-      "customChartCallbacksDropped": "Benutzerdefiniertes Diagramm: {count} Funktions-Callback im Code dieses Panels wurde ignoriert. Gespeicherter Diagrammcode kann in der App keine Callbacks ausführen; verwenden Sie stattdessen einfache Werte. | Benutzerdefiniertes Diagramm: {count} Funktions-Callbacks im Code dieses Panels wurden ignoriert. Gespeicherter Diagrammcode kann in der App keine Callbacks ausführen; verwenden Sie stattdessen einfache Werte.",
       "unsafeCodeDetected": "Unsicherer Code erkannt: {error}",
       "forbiddenFunctionCall": "Verwendung von '{name}()' ist nicht zulässig.",
       "forbiddenInsideSetTimeout": "Verwendung von {name} innerhalb von 'setTimeout()' ist nicht zulässig.",

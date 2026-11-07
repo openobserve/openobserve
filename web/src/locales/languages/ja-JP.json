@@ -9826,7 +9826,6 @@
       "duplicatePanelId": "重複するパネルIDが見つかりました: {id}",
       "panelMissingLayoutI": "パネル {id} に layout.i の値がありません",
       "duplicateLayoutI": "タブ {tabId} に重複する layout.i の値が見つかりました: {value}",
-      "customChartCallbacksDropped": "カスタムグラフ: このパネルのコード内の {count} 件の関数コールバックは無視されました。保存されたグラフコードはアプリ内でコールバックを実行できません。代わりにプレーンな値を使用してください。 | カスタムグラフ: このパネルのコード内の {count} 件の関数コールバックは無視されました。保存されたグラフコードはアプリ内でコールバックを実行できません。代わりにプレーンな値を使用してください。",
       "unsafeCodeDetected": "安全でないコードが検出されました: {error}",
       "forbiddenFunctionCall": "'{name}()' の使用は許可されていません。",
       "forbiddenInsideSetTimeout": "'setTimeout()' 内での {name} の使用は許可されていません。",

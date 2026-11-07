@@ -15,17 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 import { customChartTemplateContent, loadCustomChartTemplate } from "./customChartTemplates";
-import { isTrustedCustomChartCode } from "@/utils/dashboard/convertCustomChartData";
 
 describe("customChartTemplateContent", () => {
-  it("trusts a bundled template with callbacks exactly as inserted, and nothing edited from it", async () => {
+  it("puts the query header above the bundled template code, callbacks included", async () => {
     const template = (await loadCustomChartTemplate("multiple-x-axis"))!;
     expect(template.code).toContain("function");
 
-    const content = customChartTemplateContent("// header\n", template);
-
-    expect(content).toBe("// header\n" + template.code);
-    expect(isTrustedCustomChartCode(content)).toBe(true);
-    expect(isTrustedCustomChartCode(content + "\n// edited")).toBe(false);
+    expect(customChartTemplateContent("// header\n", template)).toBe("// header\n" + template.code);
   });
 });
