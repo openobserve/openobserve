@@ -2632,6 +2632,33 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("SLO import route", () => {
+    it("resolves slos/import to the import page, not an SLO detail with id 'import'", () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+        ],
+      });
+      expect(router.resolve("/slos/import").name).toBe("importSlo");
+      expect(router.resolve("/slos/some-id").name).toBe("sloDetail");
+      expect(enTitle(findRoute(homeChildRoutes, "importSlo").meta.titleKey)).toBe("Import SLOs");
+    });
+
+    it("guards the import page with routeGuard", () => {
+      const route = findRoute(useRoutes().homeChildRoutes, "importSlo");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+  });
+
   describe("profiles route guard", () => {
     const enter = (zoConfig: Record<string, unknown>) => {
       const previous = store.state.zoConfig;
@@ -2741,6 +2768,7 @@ describe("useRoutes (router.ts)", () => {
       ["editAnomalyDetection", "anomaly_detection"],
       ["sloList", "anomaly_detection"],
       ["addSlo", "anomaly_detection"],
+      ["importSlo", "anomaly_detection"],
       ["editSlo", "anomaly_detection"],
       ["sloDetail", "anomaly_detection"],
       ["pipelines", "pipelines"],

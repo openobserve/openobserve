@@ -23992,6 +23992,19 @@
     "exportSucceeded": "Exported {count} SLO | Exported {count} SLOs",
     "moved": "Moved {count} SLO(s) to {folder}",
     "moveFailed": "Move failed",
+    "import": {
+      "title": "Import SLOs",
+      "results": "Import results",
+      "noResults": "Each SLO's result appears here after you import.",
+      "jsonEmpty": "Add SLO JSON from a file, a URL or the editor before importing.",
+      "invalidJson": "The SLO JSON could not be parsed.",
+      "notAnObject": "SLO #{index} is not a JSON object and was skipped.",
+      "nameRequired": "SLO #{index} has no name and was skipped.",
+      "created": "SLO #{index} \"{name}\" imported.",
+      "failed": "SLO #{index} \"{name}\" was not imported: {reason}",
+      "unknownError": "Unknown error",
+      "succeeded": "Imported {count} SLO | Imported {count} SLOs"
+    },
     "preview": {
       "goodEvents": "Good events",
       "badEvents": "Bad events",

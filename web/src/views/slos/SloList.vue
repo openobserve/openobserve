@@ -37,6 +37,15 @@
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="upload-file"
+        data-test="slos-slolist-import"
+        @click="goToImport"
+      >
+        {{ t("dashboard.import") }}
+      </OButton>
+      <OButton
         variant="primary"
         size="sm-action"
         data-test="slos-slolist-new"
@@ -730,7 +739,6 @@ async function fetchSloForExport(id: string): Promise<Record<string, unknown> | 
     id: _id,
     status: _status,
     definition_generation: _generation,
-    groups_estimate: _estimate,
     groups_reserved: _reserved,
     ...definition
   } = body;
@@ -1077,6 +1085,13 @@ async function doMove() {
 // Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
+}
+
+function goToImport() {
+  router.push({
+    name: "importSlo",
+    query: { ...route.query, org_identifier: org.value, folder: activeFolderId.value },
+  });
 }
 
 const activeCorrections = (row: SloListItem) =>
