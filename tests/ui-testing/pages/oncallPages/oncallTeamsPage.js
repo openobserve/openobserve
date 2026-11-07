@@ -276,6 +276,14 @@ export class OnCallTeamsPage {
     await this.page.keyboard.press('Escape');
   }
 
+  getFormHandoverDate() { return this.page.locator('[data-test="oncall-team-form-handover-date-group"]'); }
+
+  /** One key at a time, because the year bug re-read the half-typed value after each digit. */
+  async typeFormHandoverYear(year) {
+    await this.getFormHandoverDate().locator('[data-reka-date-field-segment="year"]').click();
+    await this.page.keyboard.type(year, { delay: 150 });
+  }
+
   /** Creation only — once the team exists, membership has a screen of its own. */
   async addEveryone() {
     await this.page.locator(this.locators.formAddEveryone).click();
