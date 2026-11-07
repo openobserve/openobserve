@@ -23,7 +23,7 @@ import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import K8sClusterHotbar from "./K8sClusterHotbar.vue";
+import K8sResourceTree from "./K8sResourceTree.vue";
 import K8sCommandPalette from "./K8sCommandPalette.vue";
 import KubernetesPage from "./KubernetesPage.vue";
 import { QUERY_STREAM, VIEWS, queryText, type QueryId } from "./kubernetesQueries";
@@ -784,19 +784,11 @@ describe("KubernetesPage", () => {
       expect(wrapper.findComponent(YamlPanelStub).props("row")).toMatchObject({ name: "p" });
     });
 
-    it("switches the cluster in the URL from the hot-bar", async () => {
+    it("switches the cluster in the URL from the cluster picker", async () => {
       await mountPage({ view: "pods", cluster: "alpha" });
-      wrapper.findComponent(K8sClusterHotbar).vm.$emit("select", "beta");
+      wrapper.findComponent(K8sResourceTree).vm.$emit("cluster", "beta");
       await flushPromises();
       expect(query().cluster).toBe("beta");
-    });
-
-    it("opens the palette on its clusters group from the hot-bar", async () => {
-      await mountPage();
-      wrapper.findComponent(K8sClusterHotbar).vm.$emit("all");
-      await flushPromises();
-      expect(palette().props("open")).toBe(true);
-      expect(palette().props("group")).toBe("clusters");
     });
 
     it("toggles the palette from the k8sPalette shortcut", async () => {
