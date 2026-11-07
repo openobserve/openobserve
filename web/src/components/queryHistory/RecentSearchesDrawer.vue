@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <OButton
         variant="ghost"
-        size="icon-xs"
+        size="icon-sm"
         icon-left="info-outline"
         :aria-label="aboutText"
         data-test="recent-searches-about"
