@@ -49,6 +49,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     file_path: &str,
     responses: &[CachedQueryResponse],
     histogram_interval: i64, // microseconds; 0 for non-histogram queries
+    ts_offset: i64,
 ) -> Result<Vec<CachedQueryResponse>, String> {
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
@@ -85,7 +86,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
             .filter_map(|mut meta| {
                 meta.cached_response.hits.retain(|hit| {
                     let hit_ts = get_ts_value(&meta.ts_column, hit);
-                    hit_ts + histogram_interval > stream_min_ts
+                    hit_ts - ts_offset + histogram_interval > stream_min_ts
                 });
                 if meta.cached_response.hits.is_empty() {
                     None
@@ -129,6 +130,7 @@ pub async fn check_cache(
     sql: &Sql,
     result_ts_col: &str,
     is_descending: bool,
+    ts_offset: Option<i64>,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
@@ -183,6 +185,13 @@ pub async fn check_cache(
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
+    let Some(ts_offset) = ts_offset else {
+        return MultiCachedQueryResponse {
+            order_by: order_by.clone(),
+            ..Default::default()
+        };
+    };
+
     // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
     // before calling this function, so we use the pre-refined value directly
 
@@ -205,6 +214,7 @@ pub async fn check_cache(
     };
     if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
+        multi_resp.ts_offset = ts_offset;
     }
     log::info!(
         "[trace_id {trace_id}] check_cache: result_ts_col: {}, histogram_interval: {}, time range: {} - {}",
@@ -224,6 +234,7 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
+                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -240,6 +251,7 @@ pub async fn check_cache(
             file_path,
             &cached_responses,
             histogram_interval,
+            ts_offset,
         )
         .await
         {
@@ -309,6 +321,7 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
+                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -322,6 +335,7 @@ pub async fn check_cache(
                     file_path,
                     &[cached_resp.clone()],
                     histogram_interval,
+                    ts_offset,
                 )
                 .await
                 {
@@ -434,8 +448,14 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
-                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
+                && (histogram_bucket_offset(
+                    m.start_time + cache_req.ts_offset,
+                    cache_req.histogram_interval,
+                ) != 0
+                    || histogram_bucket_offset(
+                        m.end_time + cache_req.ts_offset,
+                        cache_req.histogram_interval,
+                    ) != 0)
             {
                 return false;
             }
@@ -484,8 +504,10 @@ pub async fn get_cached_results(
     // filter data based on request time range
     let (hits_allowed_start_time, hits_allowed_end_time) =
         (cache_req.q_start_time, cache_req.q_end_time);
-    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap())
+        - cache_req.ts_offset;
+    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
+        - cache_req.ts_offset;
     let data_start_time = std::cmp::min(first_ts, last_ts);
     let data_end_time = std::cmp::max(first_ts, last_ts);
     // convert histogram interval to microseconds
@@ -493,7 +515,7 @@ pub async fn get_cached_results(
     // check if need to filter the data
     if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
         cached_response.hits.retain(|hit| {
-            let hit_ts = get_ts_value(&cache_req.ts_column, hit);
+            let hit_ts = get_ts_value(&cache_req.ts_column, hit) - cache_req.ts_offset;
             hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
         });
         // if the data is empty after filtering, return None
@@ -501,8 +523,10 @@ pub async fn get_cached_results(
             return None;
         }
         // reset the start and end time
-        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap())
+            - cache_req.ts_offset;
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
+            - cache_req.ts_offset;
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
         matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
     }
@@ -1330,7 +1354,7 @@ mod tests {
         ];
 
         let file_path = "test_org/logs/test_stream";
-        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0).await;
+        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0, 0).await;
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
@@ -1368,6 +1392,164 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn timezone_cached_labels_compare_to_utc_bounds() {
+        use std::sync::Arc;
+
+        use ::search::datafusion::{
+            optimizer::rewrite_histogram::RewriteHistogram, udf::time::histogram,
+        };
+        use arrow::{
+            array::{Int64Array, StringArray, TimestampMicrosecondArray},
+            record_batch::RecordBatch,
+        };
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+        const DAY: i64 = 86_400_000_000;
+        const EDGE: i64 = 1_757_376_000_000_000;
+        for (case, offset) in [
+            ("east", 19_800_000_000),
+            ("west", -28_800_000_000),
+            ("utc", 0),
+        ] {
+            let path = format!("timezone_read/logs/{case}/hash");
+            let start = EDGE - offset;
+            let meta = ResultCacheMeta {
+                start_time: start,
+                end_time: start + 4 * DAY,
+                is_aggregate: true,
+                is_descending: false,
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+                Field::new("level", arrow_schema::DataType::Utf8, false),
+            ]));
+            let timestamps = (0..4)
+                .flat_map(|i| (0..=i).map(move |j| start + i * DAY + j * 1_000_000))
+                .collect::<Vec<_>>();
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(timestamps.clone())),
+                    Arc::new(StringArray::from(vec!["keep"; timestamps.len()])),
+                ],
+            )
+            .unwrap();
+            let ctx = SessionContext::new();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+            )
+            .unwrap();
+            ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
+            let sign = if offset < 0 { '-' } else { '+' };
+            let zone = format!(
+                "{sign}{:02}:{:02}",
+                offset.abs() / 3_600_000_000,
+                offset.abs() % 3_600_000_000 / 60_000_000
+            );
+            ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(
+                start,
+                start + 4 * DAY,
+                86400,
+                Some(zone),
+            )));
+            let batches = ctx.sql("SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS count FROM t WHERE level = 'keep' GROUP BY ts ORDER BY ts").await.unwrap().collect().await.unwrap();
+            let mut hits = Vec::new();
+            for batch in batches {
+                let keys = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap();
+                let counts = batch
+                    .column(1)
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap();
+                hits.extend(
+                    (0..batch.num_rows())
+                        .map(|i| json::json!({"ts": keys.value(i), "count": counts.value(i)})),
+                );
+            }
+            let response = Response {
+                hits,
+                total: 4,
+                histogram_interval: Some(86400),
+                ..Default::default()
+            };
+            super::super::write_results(
+                "tz",
+                "ts",
+                start,
+                start + 4 * DAY,
+                &response,
+                path.clone(),
+                true,
+                false,
+                true,
+                false,
+                offset,
+            )
+            .await;
+            let query_key = path.replace('/', "_");
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while !QUERY_RESULT_CACHE.read().await.contains_key(&query_key) {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            let full_request = CacheQueryRequest {
+                q_start_time: start,
+                q_end_time: start + 4 * DAY,
+                is_aggregate: true,
+                ts_column: "ts".to_string(),
+                histogram_interval: DAY,
+                ts_offset: offset,
+                is_descending: false,
+                is_histogram_non_ts_order: false,
+            };
+            let full = get_cached_results("tz", &path, full_request, None)
+                .await
+                .unwrap();
+            assert_eq!(
+                full.cached_response.hits, response.hits,
+                "{case}: cache-on vs scan"
+            );
+            let request = CacheQueryRequest {
+                q_start_time: start + DAY,
+                q_end_time: start + 4 * DAY,
+                is_aggregate: true,
+                ts_column: "ts".to_string(),
+                histogram_interval: DAY,
+                ts_offset: offset,
+                is_descending: false,
+                is_histogram_non_ts_order: false,
+            };
+            let cached = get_cached_results("tz", &path, request, Some(vec![meta]))
+                .await
+                .unwrap();
+            assert_eq!(cached.cached_response.hits, response.hits[1..3], "{case}");
+            assert_eq!(cached.response_start_time, start + DAY);
+            assert_eq!(cached.response_end_time, start + 3 * DAY);
+            let key = format!("timezone_read/logs/{case}");
+            infra::cache::stats::set_stream_stats(
+                "timezone_read",
+                case,
+                StreamType::Logs,
+                config::meta::stream::StreamStats {
+                    doc_time_min: start + 2 * DAY,
+                    ..Default::default()
+                },
+            );
+            let retained =
+                invalidate_cached_response_by_stream_min_ts(&key, &[cached], DAY, offset)
+                    .await
+                    .unwrap();
+            assert_eq!(retained[0].cached_response.hits.len(), 1, "{case}");
+        }
+    }
+
+    #[tokio::test]
     async fn test_get_cached_results_heals_stale_meta_on_disk_miss() {
         let file_path = "heal_org/logs/heal_stream/heal_hash";
         let query_key = file_path.replace('/', "_");
@@ -1388,6 +1570,7 @@ mod tests {
             is_aggregate: false,
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
+            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1425,6 +1608,7 @@ mod tests {
             is_aggregate: true,
             ts_column: "_timestamp".to_string(),
             histogram_interval: thirty_days,
+            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1498,6 +1682,7 @@ mod tests {
             &sql,
             &result_ts_col,
             is_descending,
+            Some(0),
             &mut should_exec_query,
         )
         .await;

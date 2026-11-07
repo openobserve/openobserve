@@ -64,7 +64,10 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::RE_SELECT_FROM,
+    sql::{
+        RE_SELECT_FROM,
+        histogram::{histogram_cache_offset_micros, pin_histogram_timezone},
+    },
 };
 
 pub mod cacher;
@@ -526,6 +529,7 @@ pub async fn search(
             c_resp.is_descending,
             req.clear_cache,
             is_histogram_non_ts_order,
+            c_resp.ts_offset,
         )
         .await;
     }
@@ -559,6 +563,11 @@ pub async fn prepare_cache_response(
     req: &mut search::Request,
     use_cache: bool,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
+    pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
     let mut origin_sql = req.query.sql.clone();
     let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
@@ -624,6 +633,25 @@ pub async fn prepare_cache_response(
         );
     }
 
+    let ts_offset = if sql.histogram_interval.is_some() {
+        histogram_cache_offset_micros(
+            &origin_sql,
+            req.query.timezone.as_deref(),
+            req.query.end_time,
+        )?
+    } else {
+        Some(0)
+    };
+    if !use_cache && ts_offset.is_none() {
+        return Ok((
+            MultiCachedQueryResponse {
+                order_by: sql.order_by,
+                ..Default::default()
+            },
+            true,
+        ));
+    }
+
     // calculate hash for the query with version (after normalizing histogram interval)
     let mut hash_body = vec![
         CACHE_VERSION.to_string(),
@@ -632,6 +660,11 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
+    }
+    if let Some(offset) = ts_offset
+        && offset != 0
+    {
+        hash_body.push(format!("ts_offset={offset}"));
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -667,7 +700,9 @@ pub async fn prepare_cache_response(
     }
 
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
-    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    if ts_offset.is_some() {
+        sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    }
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
@@ -695,6 +730,7 @@ pub async fn prepare_cache_response(
             &sql,
             &ts_column,
             is_descending,
+            ts_offset,
             &mut should_exec_query,
         )
         .await
@@ -707,6 +743,7 @@ pub async fn prepare_cache_response(
             order_by: sql.order_by,
             limit: sql.limit,
             file_path,
+            ts_offset: ts_offset.unwrap_or_default(),
             ..Default::default()
         }
     };
@@ -1034,6 +1071,7 @@ pub async fn write_results(
     is_descending: bool,
     clear_cache: bool,
     is_histogram_non_ts_order: bool,
+    ts_offset: i64,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1045,6 +1083,7 @@ pub async fn write_results(
             req_query_start_time,
             req_query_end_time,
             interval * 1000 * 1000,
+            ts_offset,
         ),
         _ => (req_query_start_time, req_query_end_time, false),
     };
@@ -1092,12 +1131,14 @@ pub async fn write_results(
     let is_time_ordered = !is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
-    if data_start_time < accept_start_time || data_end_time > accept_end_time {
+    if data_start_time - ts_offset < accept_start_time
+        || data_end_time - ts_offset > accept_end_time
+    {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
-                let item_ts = hit_ts_datetime.timestamp_micros();
+                let item_ts = hit_ts_datetime.timestamp_micros() - ts_offset;
                 // only keep the records within the accept time range
                 item_ts >= accept_start_time && item_ts <= accept_end_time
             } else {
@@ -1172,14 +1213,19 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
-fn histogram_cacheable_range(start: i64, end: i64, interval: i64) -> (i64, i64, bool) {
-    let start_offset = histogram_bucket_offset(start, interval);
+fn histogram_cacheable_range(
+    start: i64,
+    end: i64,
+    interval: i64,
+    ts_offset: i64,
+) -> (i64, i64, bool) {
+    let start_offset = histogram_bucket_offset(start + ts_offset, interval);
     let start = if start_offset == 0 {
         start
     } else {
         start - start_offset + interval
     };
-    let end_offset = histogram_bucket_offset(end, interval);
+    let end_offset = histogram_bucket_offset(end + ts_offset, interval);
     if end_offset == 0 {
         (start, end, false)
     } else {
@@ -1503,7 +1549,7 @@ mod tests {
         ];
         for (start, end, interval, expected) in cases {
             assert_eq!(
-                histogram_cacheable_range(start, end, interval),
+                histogram_cacheable_range(start, end, interval, 0),
                 expected,
                 "start={start}, end={end}, interval={interval}"
             );
@@ -1718,6 +1764,345 @@ mod tests {
     fn test_is_result_array_skip_vrl_no_marker() {
         let query_fn = "just a normal query";
         assert!(!is_result_array_skip_vrl(query_fn));
+    }
+
+    #[tokio::test]
+    async fn timezone_cache_bypass_preserves_interval_normalization() {
+        use std::sync::Arc;
+
+        use ::search::datafusion::{
+            optimizer::rewrite_histogram::RewriteHistogram, udf::time::histogram,
+        };
+        use arrow::{array::Int64Array, record_batch::RecordBatch};
+        use arrow_schema::{DataType, Field, Schema};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        const DAY: i64 = 86_400_000_000;
+        const START: i64 = 1_767_225_600_000_000;
+        let org = "timezone_cache_normalization";
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(schema.as_ref().clone()),
+        );
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![
+                START + DAY + 10 * 3_600_000_000,
+                START + DAY + 11 * 3_600_000_000,
+            ]))],
+        )
+        .unwrap();
+        for (use_cache, track_total_hits, projects_timestamp, zone, expected_counts) in [
+            (true, false, true, "UTC", vec![2]),
+            (true, false, true, "+05:30", vec![2]),
+            (false, false, true, "UTC", vec![1, 1]),
+            (false, false, true, "+05:30", vec![1, 1]),
+            (true, true, true, "UTC", vec![1, 1]),
+            (true, true, true, "+05:30", vec![1, 1]),
+            (true, false, false, "UTC", vec![1]),
+            (true, false, false, "+05:30", vec![1]),
+        ] {
+            let mut request = search::Request::default();
+            request.query.sql = if projects_timestamp {
+                "SELECT histogram(_timestamp, '1 hour', 'UTC') AS a, histogram(_timestamp, '1 day') AS b, count(*) AS cnt FROM t GROUP BY a,b ORDER BY b"
+            } else {
+                "SELECT count(*) AS cnt FROM t WHERE histogram(_timestamp, '1 hour', 'UTC') = to_timestamp_micros(1767348000000000) AND histogram(_timestamp, '1 day') >= to_timestamp_micros(1767225600000000)"
+            }.to_string();
+            request.query.start_time = START;
+            request.query.end_time = START + 4 * DAY;
+            request.query.histogram_interval = 86400;
+            request.query.track_total_hits = track_total_hits;
+            request.query.timezone = Some(zone.to_string());
+            let (metadata, execute) = prepare_cache_response(
+                "normalization",
+                org,
+                StreamType::Logs,
+                &mut request,
+                use_cache,
+            )
+            .await
+            .unwrap();
+            assert!(execute);
+            if zone == "+05:30" {
+                assert!(!metadata.cache_query_response);
+            }
+            let ctx = SessionContext::new();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap()),
+            )
+            .unwrap();
+            ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
+            ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(
+                START,
+                START + 4 * DAY,
+                86400,
+                request.query.timezone.clone(),
+            )));
+            let batches = ctx
+                .sql(&request.query.sql)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            let counts = batches
+                .iter()
+                .flat_map(|batch| {
+                    batch
+                        .column(if projects_timestamp { 2 } else { 0 })
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .values()
+                        .to_vec()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                counts, expected_counts,
+                "use_cache={use_cache}, track_total_hits={track_total_hits}, projects_timestamp={projects_timestamp}, timezone={zone}, executed SQL={}",
+                request.query.sql
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn timezone_mixed_histograms_do_not_reuse_utc_cache() {
+        use std::sync::Arc;
+
+        use ::search::datafusion::{
+            optimizer::rewrite_histogram::RewriteHistogram, udf::time::histogram,
+        };
+        use arrow::{
+            array::{Int64Array, TimestampMicrosecondArray},
+            record_batch::RecordBatch,
+        };
+        use arrow_schema::{DataType, Field, Schema};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        const DAY: i64 = 86_400_000_000;
+        const START: i64 = 1_767_225_600_000_000;
+        let org = "timezone_mixed_histograms";
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(schema.as_ref().clone()),
+        );
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![
+                START + DAY + 10 * 3_600_000_000,
+                START + DAY + 20 * 3_600_000_000,
+            ]))],
+        )
+        .unwrap();
+        let mut request = search::Request::default();
+        request.query.sql = "SELECT histogram(_timestamp, '1 day', 'UTC') AS a, histogram(_timestamp, '1 day') AS b, count(*) AS cnt FROM t GROUP BY a,b ORDER BY b".to_string();
+        request.query.start_time = START;
+        request.query.end_time = START + 4 * DAY;
+        request.query.histogram_interval = 86400;
+        let mut scans = Vec::new();
+        for zone in ["UTC", "+05:30"] {
+            let ctx = SessionContext::new();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap()),
+            )
+            .unwrap();
+            ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
+            ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(
+                START,
+                START + 4 * DAY,
+                86400,
+                Some(zone.to_string()),
+            )));
+            let batches = ctx
+                .sql(&request.query.sql)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            let mut hits = Vec::new();
+            for batch in batches {
+                let a = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap();
+                let b = batch
+                    .column(1)
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap();
+                let cnt = batch
+                    .column(2)
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap();
+                hits.extend(
+                    (0..batch.num_rows()).map(
+                        |i| json::json!({"a": a.value(i), "b": b.value(i), "cnt": cnt.value(i)}),
+                    ),
+                );
+            }
+            scans.push(hits);
+        }
+        assert_eq!(
+            scans[0],
+            vec![json::json!({"a": START + DAY, "b": START + DAY, "cnt": 2})]
+        );
+        assert_eq!(
+            scans[1],
+            vec![
+                json::json!({"a": START + DAY, "b": START + DAY, "cnt": 1}),
+                json::json!({"a": START + DAY, "b": START + 2 * DAY, "cnt": 1})
+            ]
+        );
+        request.query.timezone = Some("UTC".to_string());
+        let (warm, _) = prepare_cache_response("mixed", org, StreamType::Logs, &mut request, true)
+            .await
+            .unwrap();
+        assert!(!warm.file_path.is_empty());
+        let response = search::Response {
+            hits: scans[0].clone(),
+            total: 1,
+            histogram_interval: Some(86400),
+            ..Default::default()
+        };
+        for alias in ["a", "b"] {
+            let path = format!(
+                "{}{alias}",
+                warm.file_path.strip_suffix(&warm.ts_column).unwrap()
+            );
+            write_results(
+                "mixed",
+                alias,
+                START,
+                START + 4 * DAY,
+                &response,
+                path.clone(),
+                true,
+                false,
+                true,
+                false,
+                warm.ts_offset,
+            )
+            .await;
+            let query_key = path.replace('/', "_");
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while !QUERY_RESULT_CACHE.read().await.contains_key(&query_key) {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+        let (utc, execute) =
+            prepare_cache_response("mixed", org, StreamType::Logs, &mut request, true)
+                .await
+                .unwrap();
+        assert!(
+            !execute,
+            "warm path={}, read path={}, cached={}",
+            warm.file_path, utc.file_path, utc.has_cached_data
+        );
+        assert!(utc.has_cached_data);
+        assert_eq!(utc.cached_response[0].cached_response.hits, scans[0]);
+        request.query.timezone = Some("+05:30".to_string());
+        let (east, execute) =
+            prepare_cache_response("mixed", org, StreamType::Logs, &mut request, true)
+                .await
+                .unwrap();
+        assert!(
+            execute && !east.has_cached_data,
+            "mixed timezone reused UTC cache: {:?}",
+            east.cached_response
+        );
+        assert!(!east.cache_query_response);
+        let mut results = vec![::search::SearchResultType::Search(search::Response {
+            hits: scans[1].clone(),
+            ..Default::default()
+        })];
+        crate::streaming::write_results_to_cache(east, START, START + 4 * DAY, &mut results, false)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        let ::search::SearchResultType::Search(response) = &results[0] else {
+            panic!("expected executed search response")
+        };
+        assert_eq!(response.hits, scans[1]);
+        request.query.timezone = Some("UTC".to_string());
+        let (utc, execute) =
+            prepare_cache_response("mixed", org, StreamType::Logs, &mut request, true)
+                .await
+                .unwrap();
+        assert!(
+            !execute,
+            "warm path={}, read path={}, cached={}",
+            warm.file_path, utc.file_path, utc.has_cached_data
+        );
+        assert!(utc.cache_query_response);
+        assert_eq!(utc.cached_response[0].cached_response.hits, scans[0]);
+    }
+
+    #[tokio::test]
+    async fn timezone_cache_context_is_pinned_and_isolated() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        let org = "timezone_cache_context";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let mut request = search::Request::default();
+        request.query.sql = "SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS cnt FROM t GROUP BY ts ORDER BY ts".to_string();
+        request.query.start_time = 1_767_225_600_000_000;
+        request.query.end_time = 1_782_864_000_000_000;
+        request.query.histogram_interval = 86400;
+        let mut paths = Vec::new();
+        for zone in [None, Some("UTC"), Some("+05:30"), Some("-08:00")] {
+            let mut req = request.clone();
+            req.query.timezone = zone.map(str::to_string);
+            let (uncached, _) =
+                prepare_cache_response("tz", org, StreamType::Logs, &mut req, false)
+                    .await
+                    .unwrap();
+            let (cached, _) = prepare_cache_response("tz", org, StreamType::Logs, &mut req, true)
+                .await
+                .unwrap();
+            assert_eq!(uncached.file_path, cached.file_path);
+            assert!(!uncached.file_path.is_empty());
+            paths.push(uncached.file_path);
+        }
+        assert_eq!(paths[0], paths[1]);
+        assert_ne!(paths[0], paths[2]);
+        assert_ne!(paths[2], paths[3]);
+        request.query.timezone = Some("America/Los_Angeles".to_string());
+        prepare_cache_response("tz", org, StreamType::Logs, &mut request, false)
+            .await
+            .unwrap();
+        assert_eq!(request.query.timezone.as_deref(), Some("-07:00"));
+        request.query.end_time = 1_767_312_000_000_000;
+        prepare_cache_response("tz", org, StreamType::Logs, &mut request, false)
+            .await
+            .unwrap();
+        assert_eq!(request.query.timezone.as_deref(), Some("-07:00"));
     }
 
     #[tokio::test]
