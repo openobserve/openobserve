@@ -47,7 +47,7 @@ export default class DashboardactionPage {
     this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
     this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
     this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
-    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.moreOptionsBtn = page.locator(SELECTORS.MORE_OPTIONS_BTN);
     this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');

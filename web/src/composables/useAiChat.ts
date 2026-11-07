@@ -3,6 +3,7 @@ import { contextRegistry, createDefaultContextProvider } from "@/composables/con
 import { generateTraceContext, getUUIDv7 } from "@/utils/zincutils";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import analytics from "@/services/product_analytics";
+import { isNetworkFailure } from "@/utils/networkFailure";
 
 let contextHandler: any;
 
@@ -140,7 +141,9 @@ const useAiChat = () => {
         // Return a special response to indicate cancellation
         return { cancelled: true, error };
       } else {
-        console.error("Error fetching AI chat:", error);
+        // A dropped connection is not an app defect, and RUM records console.error.
+        if (isNetworkFailure(error)) console.warn("Error fetching AI chat:", error);
+        else console.error("Error fetching AI chat:", error);
         return null;
       }
     }
