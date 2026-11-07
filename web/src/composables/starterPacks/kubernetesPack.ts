@@ -61,6 +61,13 @@ export const KUBERNETES_PACK: StarterPack = {
   ],
   alerts: PLACEHOLDER_KUBERNETES_ALERT_IDS,
   bundledAlerts: bundledAlerts as PackBundledAlert[],
+  aliases: [
+    ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
+    ["k8s_namespace_name", "k8s_namespace", "namespace"],
+    ["k8s_pod_name", "k8s_pod", "pod"],
+    ["k8s_node_name", "k8s_node", "node"],
+    ["k8s_container_name", "k8s_container", "container"],
+  ],
   savedViews: [
     {
       id: "events",
@@ -75,3 +82,5 @@ export const KUBERNETES_PACK: StarterPack = {
     },
   ],
 };
+
+export const STARTER_PACKS: StarterPack[] = [KUBERNETES_PACK];

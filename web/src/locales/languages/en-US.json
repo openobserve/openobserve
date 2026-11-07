@@ -15008,6 +15008,21 @@
     "countDowntime": "{count} downtime | {count} downtimes"
   },
   "starterPacks": {
+    "libraryTabs": {
+      "alerts": "Alerts",
+      "packs": "Packs",
+      "dashboards": "Dashboards",
+      "statInstalled": "Installed",
+      "installedBy": "Installed by {who} on {date}",
+      "installedByUnknown": "Installed on {date}",
+      "unknownDate": "an unknown date",
+      "statusIncomplete": "Incomplete",
+      "open": "Open pack",
+      "emptyTitle": "Nothing here yet",
+      "emptyInstalled": "No pack has been installed in this organization.",
+      "emptyFilter": "No items match this filter.",
+      "loadFailed": "Couldn't load the packs"
+    },
     "kubernetes": {
       "title": "Kubernetes",
       "description": "Dashboards, alerts and saved views for Kubernetes clusters."

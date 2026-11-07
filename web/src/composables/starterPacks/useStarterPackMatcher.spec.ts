@@ -18,6 +18,7 @@ const fake = vi.hoisted(() => ({
   cancel: vi.fn(),
 }));
 
+vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/query/readQuery", () => ({
   readQuery: async (options: { queryKey: unknown[] }) => {
     if (fake.fail) throw new Error("down");
