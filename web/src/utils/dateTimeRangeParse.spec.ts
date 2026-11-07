@@ -114,6 +114,26 @@ describe("parseDateRangeString", () => {
       });
     });
 
+    it("preserves milliseconds in an ISO range with offsets", () => {
+      expect(
+        parseDateRangeString("2026-07-21T13:33:06.123Z - 2026-07-21T21:03:06.456+05:30"),
+      ).toEqual({
+        type: "timestamp",
+        startMicros: 1784640786123000,
+        endMicros: 1784647986456000,
+      });
+    });
+
+    it("preserves milliseconds in an ISO range without offsets", () => {
+      expect(parseDateRangeString("2026-07-21T13:33:06.1 - 2026-07-21T15:33:06.012")).toEqual({
+        type: "absolute",
+        startDate: "2026/07/21",
+        startTime: "13:33:06.1",
+        endDate: "2026/07/21",
+        endTime: "15:33:06.012",
+      });
+    });
+
     it("rejects a pair that mixes offset and offset-less sides", () => {
       // One side is an unambiguous instant, the other isn't — genuinely
       // ambiguous, so this is a paste error rather than a guess.
@@ -291,6 +311,41 @@ describe("parseDateRangeString", () => {
 });
 
 describe("parseSingleDateTime", () => {
+  it.each([
+    ["2026-07-21T13:33:06.1Z", 1784640786100000],
+    ["2026-07-21T13:33:06.01Z", 1784640786010000],
+    ["2026-07-21T13:33:06.001Z", 1784640786001000],
+    ["2026-07-21T19:03:06.123+05:30", 1784640786123000],
+    ["2026-07-21T08:33:06.123-05", 1784640786123000],
+  ])("parses fractional ISO seconds with an offset: %s", (value, micros) => {
+    expect(parseSingleDateTime(String(value))).toEqual({ type: "timestamp", micros });
+  });
+
+  it("accepts a timestamp copied from Date.toISOString", () => {
+    const date = new Date("2026-07-21T13:33:06.123Z");
+    expect(parseSingleDateTime(date.toISOString())).toEqual({
+      type: "timestamp",
+      micros: date.getTime() * 1000,
+    });
+  });
+
+  it("keeps fractional ISO seconds without an offset in the picker timezone", () => {
+    expect(parseSingleDateTime("2026-07-21 13:33:06.123")).toEqual({
+      type: "absolute",
+      date: "2026/07/21",
+      time: "13:33:06.123",
+    });
+  });
+
+  it.each([
+    "2026-07-21T13:33:06.Z",
+    "2026-07-21T13:33.123Z",
+    "2026-07-21T13:33:60.123Z",
+    "2026-02-30T13:33:06.123Z",
+  ])("rejects malformed fractional ISO timestamps: %s", (value) => {
+    expect(parseSingleDateTime(value)).toBeNull();
+  });
+
   describe("single epoch timestamp", () => {
     it("passes microseconds through unchanged", () => {
       expect(parseSingleDateTime("1721557986000000")).toEqual({
