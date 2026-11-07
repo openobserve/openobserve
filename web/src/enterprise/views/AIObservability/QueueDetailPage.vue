@@ -113,10 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Status split as filter tiles: the counts are what tells a reviewer
              whether this queue is worth opening. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="ai-queue-detail-summary"
-          >
+          <div data-test="ai-queue-detail-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"

@@ -62,10 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                as the state facet (the toggle group above facets by pipeline TYPE,
                so the two never overlap). Always rendered so rows never shift. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="pipeline-list-summary"
-            >
+            <div data-test="pipeline-list-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
