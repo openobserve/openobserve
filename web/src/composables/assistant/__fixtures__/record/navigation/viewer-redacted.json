@@ -1,0 +1,31 @@
+[
+  {
+    "role": "user",
+    "content": "Show payments errors",
+    "sentAt": 1772418060000,
+    "turnId": "t-nav-1"
+  },
+  {
+    "role": "assistant",
+    "content": "I prepared a logs query for **payments errors in the last hour**.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "I prepared a logs query for **payments errors in the last hour**."
+      },
+      {
+        "type": "link",
+        "link": {
+          "resourceType": "logs",
+          "action": "load_query",
+          "target": {},
+          "redacted": true
+        }
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

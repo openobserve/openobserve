@@ -15,6 +15,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 - [OFile](#ofile) — file upload
 - [ORange](#orange) — dual-thumb numeric range
 - [OSlider](#oslider) — single-value slider
+- [OSecretInput](#osecretinput) — write-only secret with an Unchanged state
 
 ---
 
@@ -155,9 +156,11 @@ const kind = form.useStore((s) => s.values.kind);
 ## OEmojiPicker
 
 ### Icon tokens
+
 The picker's value is an **icon token**, not plain text — either a Unicode emoji (`"🚀"`) or a service-glyph reference (`"o2:redis"`). Persist it opaquely; only `OGlyph` and `glyphRegistry.ts` need to tell them apart. Type it as `IconToken` from `@/lib/forms/EmojiPicker/OGlyph.types`.
 
 ### OEmojiPicker
+
 **Import:** `@/lib/forms/EmojiPicker/OEmojiPicker.vue`
 **Use when:** Letting a user badge a record (folder, board, saved view) with a single icon — a square trigger opens a searchable, grouped grid of ~200 curated entries: Unicode emoji plus **full-colour** logos for every service on the Ingestion pages (Redis, Kafka, Terraform, Prometheus, Postgres…).
 **Don't use for:** A full Unicode emoji keyboard (the catalog is deliberately curated), or picking an app icon from the Material set — that's `OIcon`'s `IconName` union.
@@ -165,22 +168,27 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 **Emits:** `update:modelValue` (`string | null`), and `select` (`string | null`) which fires **only** on a deliberate pick or clear — use it to stop any auto-fill you drive from another field.
 **Behaviour:** clicking the selected entry deselects it; the panel search matches the catalog's `keywords`; the grid uses a roving tabindex (arrows / Home / End) so it adds one tab stop, not a hundred; the popover z-index rides ODialog's stacking ladder so it works inside a dialog.
 **Example:**
+
 ```vue
 <OEmojiPicker v-model="icon" size="md" @select="userChoseIcon = true" />
 ```
+
 **Form binding:** There is no `OFormEmojiPicker`. Inside `<OForm>`, wrap it in an app component that injects `FORM_CONTEXT_KEY` and renders `form.Field` — see `components/common/sidebar/FolderIconField.vue`, which also shows the suggest-until-touched pattern.
 
 ### OGlyph
+
 **Import:** `@/lib/forms/EmojiPicker/OGlyph.vue`
 **Use when:** Displaying a chosen icon token anywhere outside the picker (a list row, a header, a chip). It renders an emoji as text, an Iconify glyph as an inline SVG, and an asset-backed glyph as an `<img>` — callers never branch on the kind.
 **Key props:** `token` (`IconToken | null` — renders nothing when empty or unresolvable), `size` (`"sm" | "md" | "lg"`, default `"md"`; one scale drives emoji font-size and glyph box so the kinds line up on a row), `alt` (image-backed glyphs only; empty by default = decorative).
 **Dark mode:** brand logos keep their own colours, so they can't adapt to the surface like an `OIcon`. The fix is the **`--color-glyph-plate` token** — transparent on light, a light chip on dark — which keeps near-black marks (GitHub, Kafka, Helm, InfluxDB) legible. It's a token, not a `dark:` class, so the theme owns the decision; don't add per-component conditionals here.
 **Note:** glyphs are `aria-hidden` / empty-alt by design — the adjacent label carries the meaning. A retired `o2:` token renders nothing rather than leaking the raw string.
+
 ```vue
 <OGlyph :token="folder.icon" size="sm" />
 ```
 
 ### Catalog & glyph registry
+
 - `emojiCatalog.ts` exports `EMOJI_GROUPS` / `ALL_EMOJIS`. `emojiCatalog.spec.ts` enforces four invariants: **no token appears twice**, **no keyword has two owners** (ties break on catalog order, so a shared keyword silently resolves to whichever group is first), **registry ↔ catalog parity in both directions**, and **every Ingestion-page service is pickable**. The Services group owns product names; the Creatures group keeps only creature names.
 - `glyphRegistry.ts` is a closed, explicitly-imported map with two sources: `@iconify-json/logos` (full-colour marks, compiled inline by `unplugin-icons`) and `@/assets/images/ingestion/*` (the repo's own logos, for services `logos` has no entry for — Fluentd, Telegraf, Databricks, IIS…). Using the ingestion assets keeps the picker and the integrations list from drifting apart. Both resolve at build time — no runtime fetch, air-gapped safe, same contract as `lib/core/Icon/OIcon.icons.ts`.
 - **The list is the bundle cost.** 84 glyphs today: 67 inline colour SVGs ≈ **187 KB in the JS bundle** (tree-shaken from a 2,091-icon collection), plus 17 image-backed ones ≈ 662 KB served as separate lazy assets that the build already emits for the Ingestion pages. Eager rather than lazy so folder-rail icons paint without pop-in. Keep it curated; if it grows much further, switch the registry to `defineAsyncComponent` — `resolveGlyph()` is the only seam that would change.
@@ -441,4 +449,45 @@ Both are numeric track controls with identical `min`/`max`/`step` semantics — 
 
 ```vue
 <OFormFile name="avatar" accept="image/*" label="Avatar" required />
+```
+
+---
+
+## OSecretInput
+
+### OSecretInput
+
+**Import:** `@/lib/forms/SecretInput/OSecretInput.vue`
+**Use when:** A stored credential (API key, header value, token) is edited: the server never returns the value, so the field starts **Unchanged** and the user must choose **Replace** to overwrite it.
+**Don't use for:** A password the user types once on a create-only form — use `OInput type="password" revealable`.
+**Key props:**
+
+- `modelValue` (`string | null`) — `null` means unchanged; never seed it with a masked placeholder such as `***`
+- `state` (`"unchanged" | "replacing" | "new"`) — controlled; listen to `update:state`
+- `label`, `unchangedLabel`, `replaceLabel`, `keepLabel`, `willReplaceLabel`, `showLabel`, `hideLabel` (`I18nText`) — every string is a prop; the component has no i18n of its own
+- `required`, `disabled`, `error`, `errorMessage`, `dataTest`
+
+**Behaviour:** Unchanged renders the label, an "Unchanged" `OTag` and an outline **Replace** button (described by the tag). Replace emits `replacing` only, then focuses an empty password `OInput` (spellcheck, autocapitalize and autocorrect off) whose trailing `OButton size="icon-sm"` toggles visibility with its name switching between `showLabel` / `hideLabel`. While replacing, an empty field emits `null`, never `""`, so saving without typing keeps the stored secret; the will-replace tag shows only once a value is typed. **Keep current** (or Escape, ignored during IME composition) emits `null` and `unchanged` and returns focus to Replace. `new` is the same field without Keep current. Child ids: `{dataTest}-replace`, `-unchanged`, `-input`, `-visibility`, `-keep`, `-will-replace`.
+**Family:** `OFormSecretInput` (form-bound).
+
+### OFormSecretInput
+
+**Import:** `@/lib/forms/SecretInput/OFormSecretInput.vue`
+**Use when:** The secret lives in an `OForm`. Same props minus `modelValue` / `error` / `errorMessage`, plus `name`; the value and the schema error come from the field. Submit sees `null` for every secret left unchanged, so the payload builder omits it.
+
+**Example:**
+
+```vue
+<OFormSecretInput
+  :name="`headers[${i}].value`"
+  v-model:state="secretStates[i]"
+  :label="t('aiToolset.headerValue')"
+  :unchanged-label="t('assistant.secret.unchanged')"
+  :replace-label="t('assistant.secret.replace')"
+  :keep-label="t('assistant.secret.keep')"
+  :will-replace-label="t('assistant.secret.willReplace')"
+  :show-label="t('assistant.secret.show')"
+  :hide-label="t('assistant.secret.hide')"
+  :data-test="`ai-toolset-header-${i}`"
+/>
 ```

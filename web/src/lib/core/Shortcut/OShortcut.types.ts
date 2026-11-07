@@ -27,4 +27,6 @@ export interface ShortcutProps {
   id?: string;
   /** Keycap size. Default: `"sm"` */
   size?: ShortcutSize;
+  /** `strong` uses body text on the keycap, for small keycaps that must meet 4.5:1 on their own. */
+  tone?: "default" | "strong";
 }

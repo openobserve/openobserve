@@ -36,6 +36,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="['w-full', sizeClass, toneClass]"
     :data-test="dataTest ? `${dataTest}-sparkline` : undefined"
   >
+    <line
+      v-if="baselineY !== null"
+      x1="0"
+      :x2="VB_W"
+      :y1="baselineY"
+      :y2="baselineY"
+      class="stroke-border-strong"
+      :stroke-width="BASELINE_STROKE"
+      :stroke-dasharray="BASELINE_DASH"
+      :data-test="dataTest ? `${dataTest}-sparkline-baseline` : 'sparkline-baseline'"
+    />
     <template v-if="shape === 'bar'">
       <rect
         v-for="bar in bars"
@@ -90,6 +101,8 @@ const VB_H = 24;
 const STROKE = 1.6;
 /** Keeps the stroke's round cap from clipping at the box edge. */
 const PAD = STROKE;
+const BASELINE_STROKE = 1;
+const BASELINE_DASH = "3 2";
 
 const sizeClasses: Record<NonNullable<SparklineProps["size"]>, string> = {
   xs: "h-5",
@@ -122,8 +135,11 @@ const scale = computed(() => {
     .filter((v): v is number => v !== null && Number.isFinite(v));
   if (!values.length) return null;
 
-  const max = props.max !== undefined ? props.max : Math.max(...values);
-  const min = Math.min(...values, 0);
+  // The baseline joins the range so a series far below or above it still shows the gap.
+  const reference =
+    props.baseline !== undefined && Number.isFinite(props.baseline) ? [props.baseline] : [];
+  const max = props.max !== undefined ? props.max : Math.max(...values, ...reference);
+  const min = Math.min(...values, 0, ...reference);
   // A flat series has no range to divide by; centre it rather than dividing by
   // zero, which would put every point at the top of the box.
   const range = max - min || 1;
@@ -140,6 +156,12 @@ const scale = computed(() => {
     min,
     count,
   };
+});
+
+const baselineY = computed<string | null>(() => {
+  const s = scale.value;
+  if (!s || props.baseline === undefined || !Number.isFinite(props.baseline)) return null;
+  return s.y(props.baseline).toFixed(2);
 });
 
 interface Segment {

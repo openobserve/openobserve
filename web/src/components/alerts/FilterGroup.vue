@@ -18,12 +18,12 @@
     :class="[
       `filter-group-box border-card-glass-border rounded-default mb-2 border px-2`,
       'mt-4',
-      store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit',
+      squeezed ? 'w-full' : 'xl:w-fit',
     ]"
     :style="{
       opacity: computedOpacity,
       backgroundColor: computedStyleMap,
-      marginLeft: depth * (props.indentRem ?? (store.state.isAiChatEnabled ? 0.625 : 1.25)) + 'rem',
+      marginLeft: depth * (props.indentRem ?? (squeezed ? 0.625 : 1.25)) + 'rem',
     }"
   >
     <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
@@ -68,11 +68,7 @@
           :name-prefix="childNamePrefix(index)"
           @input:update="(name, field) => inputUpdate(name, field)"
         />
-        <div
-          v-else
-          class="mb-2 flex items-center gap-2"
-          :class="store.state.isAiChatEnabled ? 'ps-0' : 'ps-4'"
-        >
+        <div v-else class="mb-2 flex items-center gap-2" :class="squeezed ? 'ps-0' : 'ps-4'">
           <FilterCondition
             :condition="item"
             :stream-fields="props.streamFields"
@@ -156,7 +152,7 @@
 import { computed, ref, watch } from "vue";
 import { cloneDeep } from "lodash-es";
 import FilterCondition from "./FilterCondition.vue";
-import { useStore } from "vuex";
+import { useAssistantPanelWidth } from "@/composables/assistant/pure";
 import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -267,7 +263,9 @@ const isOpen = ref(true);
 // back through the form (which re-syncs via the watch below).
 const groups = ref(cloneDeep(props.group));
 
-const store = useStore();
+// The assistant panel squeezes this list only while pinned beside it; floating never does.
+const { panelWidthRem } = useAssistantPanelWidth();
+const squeezed = computed(() => panelWidthRem.value > 0);
 const { isDark } = useTheme();
 const { t } = useI18nTyped();
 

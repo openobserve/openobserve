@@ -17,7 +17,12 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { shouldPropagateTracing } from "./tracingOrigin";
 import { isIgnoredNoise } from "./ignoredNoisePatterns";
-import { scrubAuthParams } from "./scrubAuthParams";
+import {
+  scrubAuthParams,
+  scrubSharePath,
+  scrubShareTokens,
+  type ShareScrubbable,
+} from "./scrubAuthParams";
 import { isExtensionOnlyError } from "./extensionFrames";
 
 /** The `rum` block of the authenticated full config (`GET /api/{org}/config`). */
@@ -128,8 +133,8 @@ const startRumSdk = (
         ]
       : [],
     beforeSend: (event) => {
-      event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
-      event.view.referrer = scrubAuthParams(event.view.referrer);
+      event.view.url = scrubSharePath(scrubAuthParams(event.view.url) ?? event.view.url);
+      event.view.referrer = scrubSharePath(scrubAuthParams(event.view.referrer));
       if (event.type === "resource") {
         event.resource.url = scrubAuthParams(event.resource.url) ?? event.resource.url;
       }
@@ -140,6 +145,7 @@ const startRumSdk = (
             scrubAuthParams(event.error.resource.url) ?? event.error.resource.url;
         }
       }
+      scrubShareTokens(event as ShareScrubbable);
       if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
       if (event.type === "action" && event.action.target?.name) {
         event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
@@ -173,10 +179,13 @@ const startLogsSdk = (
     insecureHTTP,
     apiVersion,
     beforeSend: (log) => {
-      if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
-      if (log.view?.referrer) log.view.referrer = scrubAuthParams(log.view.referrer);
-      if (log.http?.url) log.http.url = scrubAuthParams(log.http.url) ?? log.http.url;
-      log.message = scrubAuthParams(log.message) ?? log.message;
+      if (log.view?.url)
+        log.view.url = scrubSharePath(scrubAuthParams(log.view.url) ?? log.view.url);
+      if (log.view?.referrer)
+        log.view.referrer = scrubSharePath(scrubAuthParams(log.view.referrer));
+      if (log.http?.url)
+        log.http.url = scrubSharePath(scrubAuthParams(log.http.url) ?? log.http.url);
+      log.message = scrubSharePath(scrubAuthParams(log.message) ?? log.message);
       const logMessage = log.message || "";
       const shouldIgnore = IGNORED_LOG_PATTERNS.some((pattern) => pattern.test(logMessage));
       return !(shouldIgnore || isIgnoredNoise(logMessage));

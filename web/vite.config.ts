@@ -18,6 +18,8 @@ import { spawn } from "node:child_process";
 
 import { defineConfig, loadEnv } from "vite";
 
+import { assistantBundlePlugin } from "./scripts/assistantBundlePlugin";
+
 // Runs `node <scriptPath>` as a child process and resolves when it finishes.
 // We use spawn (not execFileSync/execFile) for two reasons:
 //   - stdio: "inherit" streams the script's logs straight to the terminal so a
@@ -213,6 +215,8 @@ export default defineConfig(({ mode }) => {
           forceBuildInstrument: true,
         }),
       enterpriseResolverPlugin,
+      // The public shared page must load without the assistant runtime; any build fails if it can.
+      !isTesting && assistantBundlePlugin(),
       // Register the content fetcher for dev + builds, but NOT under vitest
       // (tests mock the content/manifest and must stay offline/deterministic).
       // `false` entries are dropped by the `.filter(Boolean)` at the end.

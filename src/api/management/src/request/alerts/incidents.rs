@@ -2858,6 +2858,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3084,6 +3088,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3271,6 +3279,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -4406,6 +4418,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         }
     }
 

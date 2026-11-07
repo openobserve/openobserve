@@ -1,0 +1,387 @@
+{
+  "version": 5,
+  "dashboardId": "",
+  "title": "D1 Turn health (O2 Assistant)",
+  "description": "HT-11 AC 6, gap-2 \u00a74.1 D1 over ai_* RUM actions. Cloud and dogfood only; self-hosted sends nothing.",
+  "role": "",
+  "owner": "",
+  "created": "2026-10-18T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Turn health",
+      "panels": [
+        {
+          "id": "d1_silent_end",
+          "type": "line",
+          "title": "M-01 silent ends per day",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '1 day') AS x_axis_1, round(100.0 * count(CASE WHEN context_outcome IN ('done_empty', 'lost') THEN 1 END) / count(*), 2) AS y_axis_1 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_turn_ended' GROUP BY x_axis_1 ORDER BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 1,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_outcome_container",
+          "type": "stacked",
+          "title": "Outcome by container",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT context_container AS x_axis_1, context_outcome AS breakdown_1, count(*) AS y_axis_1 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_turn_ended' GROUP BY x_axis_1, breakdown_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 2,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_error_codes",
+          "type": "table",
+          "title": "M-17 error codes and recovery",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT context_error_code AS x_axis_1, count(*) AS y_axis_1, count(CASE WHEN context_recoverable = true THEN 1 END) AS y_axis_2 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_turn_ended' AND context_error_code IS NOT NULL GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 10,
+            "i": 3,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_latency",
+          "type": "table",
+          "title": "TTFB and duration p50 / p95 per container",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT context_container AS x_axis_1, approx_percentile_cont(context_ttfb_ms, 0.5) AS y_axis_1, approx_percentile_cont(context_ttfb_ms, 0.95) AS y_axis_2, approx_percentile_cont(context_duration_ms, 0.5) AS y_axis_3, approx_percentile_cont(context_duration_ms, 0.95) AS y_axis_4 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_turn_ended' GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 9,
+            "w": 24,
+            "h": 10,
+            "i": 4,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_unnamed_wait",
+          "type": "line",
+          "title": "M-02 longest state gap p95 (stall states)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '1 day') AS x_axis_1, approx_percentile_cont(context_elapsed_ms, 0.95) AS y_axis_1 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_turn_state' GROUP BY x_axis_1 ORDER BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 19,
+            "w": 24,
+            "h": 9,
+            "i": 5,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_stop",
+          "type": "table",
+          "title": "M-07 Stop rate and server_cancel_ms p95",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT context_surface AS x_axis_1, count(*) AS y_axis_1, approx_percentile_cont(context_server_cancel_ms, 0.95) AS y_axis_2, count(CASE WHEN context_server_cancel_ms IS NULL THEN 1 END) AS y_axis_3 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_stop' GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 19,
+            "w": 24,
+            "h": 9,
+            "i": 6,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_feedback_outside_done",
+          "type": "metric",
+          "title": "M-03 feedback outside done (must be 0)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS y_axis_1 FROM \"_rumdata\" WHERE action_type = 'custom' AND action_target_name = 'ai_feedback' AND context_outcome != 'done'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 28,
+            "w": 12,
+            "h": 7,
+            "i": 7,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "d1_long_tasks",
+          "type": "line",
+          "title": "RUM long tasks on assistant views",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "decimals": 2
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '1 hour') AS x_axis_1, count(*) AS y_axis_1 FROM \"_rumdata\" WHERE type = 'long_task' AND view_name IN ('assistant', 'home') GROUP BY x_axis_1 ORDER BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "_rumdata",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 12,
+            "y": 28,
+            "w": 36,
+            "h": 7,
+            "i": 8,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": false
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "7d",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

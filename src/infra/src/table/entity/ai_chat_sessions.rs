@@ -36,6 +36,14 @@ pub struct Model {
     pub fork_seed_seq: Option<i64>,
     /// When every live o2-ai replica confirmed it dropped this deleted chat's copy.
     pub replica_purged_at: Option<i64>,
+    pub pinned: bool,
+    pub pinned_at: Option<i64>,
+    /// A fork's seed as JSON (`{owner_name, as_of, turns}`), copied when the fork was made.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub seed: Option<String>,
+    /// The chat's typed prompts, lowercased and capped, that `q` searches besides the title.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub search_text: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

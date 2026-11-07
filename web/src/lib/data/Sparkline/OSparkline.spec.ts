@@ -98,4 +98,35 @@ describe("OSparkline", () => {
     expect(svg.attributes("aria-label")).toBe("calls over time");
     expect(svg.attributes("data-test")).toBe("dbm-queries-sparkline");
   });
+
+  it("draws a dashed baseline line in the strong border token when baseline is given", () => {
+    const wrapper = mount(OSparkline, {
+      props: { points: [1, 2, 3], baseline: 2, dataTest: "svc" },
+    });
+    const line = wrapper.get('[data-test="svc-sparkline-baseline"]');
+    expect(line.element.tagName.toLowerCase()).toBe("line");
+    expect(line.classes()).toContain("stroke-border-strong");
+    expect(line.attributes("stroke-dasharray")).toBeTruthy();
+    expect(line.attributes("y1")).toBe(line.attributes("y2"));
+    expect(Number(line.attributes("y1"))).toBeGreaterThan(0);
+    expect(wrapper.findAll("path")).toHaveLength(2);
+  });
+
+  it("draws no baseline without the prop", () => {
+    const wrapper = mount(OSparkline, { props: { points: [1, 2, 3] } });
+    expect(wrapper.find("line").exists()).toBe(false);
+  });
+
+  it("keeps a baseline above every point inside the box", () => {
+    const wrapper = mount(OSparkline, { props: { points: [1, 1, 1], baseline: 10 } });
+    const y = Number(wrapper.get("line").attributes("y1"));
+    const ys = wrapper
+      .get('path[stroke="currentColor"]')
+      .attributes("d")!
+      .split(/[ML ]/)
+      .filter(Boolean)
+      .map((pair) => Number(pair.split(",")[1]));
+    expect(y).toBeLessThan(Math.min(...ys));
+    expect(y).toBeGreaterThanOrEqual(0);
+  });
 });

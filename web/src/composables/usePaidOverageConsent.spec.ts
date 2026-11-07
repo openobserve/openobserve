@@ -14,7 +14,12 @@ vi.mock("@/services/paidOverage", () => ({
   default: service,
 }));
 
-import { useChatConsentSurface, usePaidOverageConsent } from "./usePaidOverageConsent";
+import {
+  enablePaidOverage,
+  registerSessionConsentSurface,
+  useChatConsentSurface,
+  usePaidOverageConsent,
+} from "./usePaidOverageConsent";
 
 function status(overrides: Partial<PaidOverageStatus> = {}): PaidOverageStatus {
   return {
@@ -167,5 +172,47 @@ describe("usePaidOverageConsent", () => {
     expect(consent.showInChat.value).toBe(false);
     expect(consent.showInDialog.value).toBe(true);
     chat.unmount();
+  });
+
+  it("hands a session caller to the assistant's card and never queues the dialog", async () => {
+    const surface = vi.fn(async () => true);
+    registerSessionConsentSurface(surface);
+    try {
+      await expect(
+        consent.promptForConsent("member", "ai_credits", status(), { surface: { sid: "s1" } }),
+      ).resolves.toBe(true);
+      expect(surface).toHaveBeenCalledWith("s1", "member", "ai_credits", status());
+      expect(consent.activeRequest.value).toBeNull();
+      expect(consent.showInDialog.value).toBe(false);
+    } finally {
+      registerSessionConsentSurface(null);
+    }
+  });
+
+  it("declines a session caller when no assistant card can show it", async () => {
+    await expect(
+      consent.promptForConsent("member", "ai_credits", status(), { surface: { sid: "s1" } }),
+    ).resolves.toBe(false);
+    expect(consent.activeRequest.value).toBeNull();
+  });
+
+  it("queues the dialog for the additive dialog surface as before", () => {
+    void consent.promptForConsent("member", "ai_credits", status(), { surface: "dialog" });
+    expect(consent.activeRequest.value?.orgId).toBe("member");
+    expect(consent.showInDialog.value).toBe(true);
+  });
+
+  it("enables every missing org, member first, then reads the status back", async () => {
+    service.get.mockResolvedValue({ data: status({ effective: true }) });
+    const result = await enablePaidOverage(
+      "member",
+      "ai_credits",
+      status({ payer: { org_id: "payer", enabled: false, can_manage: true } }),
+    );
+    expect(service.update.mock.calls).toEqual([
+      ["member", "ai_credits", true],
+      ["payer", "ai_credits", true],
+    ]);
+    expect(result.effective).toBe(true);
   });
 });

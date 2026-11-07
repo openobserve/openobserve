@@ -352,8 +352,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center justify-end gap-1">
             <!-- Root only. Every other row is a victim, and asking about a
                  victim gets advice aimed at the wrong session. -->
+            <AiEntryButton
+              v-if="assistantV2 && row.kind === 'root'"
+              v-bind="blockingDoor(row)"
+              size="sm"
+            />
             <DbmSuggestFixButton
-              v-if="row.kind === 'root'"
+              v-else-if="row.kind === 'root'"
               :label="t('dbm.ai.blockingFix')"
               :tooltip="t('dbm.ai.blockingFixHint')"
               size="xs"
@@ -441,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmBlockedQueriesPage" });
 
-import { computed, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -482,6 +487,9 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
 import { buildBlockingFixPrompt } from "@/utils/dbm/aiPrompts";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { dbmFixDoor } from "@/components/dbm/dbmDoors";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import {
   buildWaitingRows,
   chainsFromSamples,
@@ -1181,21 +1189,42 @@ const longestWaitBehind = (pid: number | null): number | null => {
   return behind.length ? Math.max(...behind) : null;
 };
 
+const blockingInput = (row: BlockedRow) => ({
+  query: row.query,
+  dbSystem: row.db_system,
+  dbInstance: row.db_instance,
+  pid: row.pid,
+  application: row.application,
+  idleSeconds: idleSecondsForRoot(row.pid),
+  blockingCount: row.blockingCount,
+  longestWaitSeconds: longestWaitBehind(row.pid),
+});
+
 const askAiForFix = (row: BlockedRow) => {
   emit("sendToAiChat", {
-    query: buildBlockingFixPrompt({
-      query: row.query,
-      dbSystem: row.db_system,
-      dbInstance: row.db_instance,
-      pid: row.pid,
-      application: row.application,
-      idleSeconds: idleSecondsForRoot(row.pid),
-      blockingCount: row.blockingCount,
-      longestWaitSeconds: longestWaitBehind(row.pid),
-    }),
+    query: buildBlockingFixPrompt(blockingInput(row)),
     autoSend: true,
   });
 };
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org the rows were loaded under, so a door left on screen after an org switch is refused.
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => tableRows.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const blockingDoor = (row: BlockedRow) =>
+  dbmFixDoor(
+    { label: t("dbm.ai.blockingFix"), tooltip: t("dbm.ai.blockingFixHint") },
+    () => ({ kind: "blocking", input: blockingInput(row) }),
+    store.state,
+    loadedOrg?.value,
+  );
 
 // Registered/unregistered by useDbmListPage around this page's lifecycle.
 const dbmContext = createDbmContextProvider(() => {

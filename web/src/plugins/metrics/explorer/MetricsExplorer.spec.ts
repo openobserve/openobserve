@@ -21,6 +21,7 @@ import {
   encodeMetricsConfig,
   decodeMetricsConfig,
 } from "@/composables/metrics/metricsUrlState";
+import { b64EncodeUnicode } from "@/utils/formatters";
 
 /**
  * These test the EXPLORER'S WIRING, not the grid's logic.
@@ -152,6 +153,11 @@ vi.mock("vue-router", () => ({
     name: "metrics",
     fullPath: "/metrics",
   }),
+}));
+const assistantFlag = vi.hoisted(() => ({ on: false }));
+vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  isAssistantV2: () => assistantFlag.on,
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 const showErrorNotification = vi.hoisted(() => vi.fn());
@@ -1240,6 +1246,192 @@ describe("MetricsExplorer wiring", () => {
 
         expect(routerState.replace).toHaveBeenCalled();
         expect(routerState.push).not.toHaveBeenCalled();
+      });
+
+      describe("assistant links", () => {
+        const link = {
+          type: "ai_chat_query",
+          t: "1",
+          query_type: "promql",
+          query: b64EncodeUnicode("rate(x[5m])"),
+          period: "15m",
+        };
+
+        beforeEach(() => {
+          assistantFlag.on = true;
+          routerState.replace.mockClear();
+        });
+        afterEach(() => {
+          assistantFlag.on = false;
+        });
+
+        it("translates a link opened on the page into Visualize", () => {
+          routerState.query = {};
+          const vm = mountExplorer().vm as any;
+
+          routerState.query = link;
+          vm.onRouteQueryChange();
+
+          const { query } = routerState.replace.mock.calls.at(-1)![0];
+          expect(query).toMatchObject({ mode: "visualize", type: "ai_chat_query", period: "15m" });
+          expect(query).not.toHaveProperty("query");
+          expect(decodeMetricsConfig(query.metrics_data)?.data?.queries[0].query).toBe(
+            "rate(x[5m])",
+          );
+        });
+
+        it("holds only the seed a link brought", () => {
+          routerState.query = {
+            mode: "visualize",
+            type: "ai_chat_query",
+            metrics_data: encodeMetricsConfig(
+              getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+            ),
+          };
+          const vm = mountExplorer().vm as any;
+          expect(vm.visualizeSeedHeld).toBe(true);
+
+          vm.onVisualizeSeedConsumed();
+          expect(vm.visualizeSeed).toBeNull();
+          expect(vm.visualizeSeedHeld).toBe(false);
+        });
+
+        describe("once the link has landed", () => {
+          const blob = encodeMetricsConfig(
+            getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+          );
+          const landed = {
+            mode: "visualize",
+            type: "ai_chat_query",
+            t: "1",
+            metrics_data: blob,
+            period: "2h",
+          };
+          const open = () => {
+            grid.selectedTypes.value = new Set();
+            routerState.query = landed;
+            const vm = mountExplorer().vm as any;
+            vm.onVisualizeSeedConsumed();
+            routerState.replace.mockClear();
+            return vm;
+          };
+
+          afterEach(() => {
+            visualizePanel = null;
+            grid.selectedTypes.value = new Set();
+          });
+
+          it("keeps the marker through a state sync, so a reload stays held", async () => {
+            const vm = open();
+
+            vm.refreshInterval = 60;
+            await vm.$nextTick();
+
+            const { query } = routerState.replace.mock.calls.at(-1)![0];
+            expect(query.type).toBe("ai_chat_query");
+          });
+
+          it("gives the marker up to a real type filter", async () => {
+            const vm = open();
+
+            grid.selectedTypes.value = new Set(["counter"]);
+            vm.refreshInterval = 60;
+            await vm.$nextTick();
+
+            expect(routerState.replace.mock.calls.at(-1)![0].query.type).toBe("counter");
+          });
+
+          it("does not reopen the chart when the panel re-encodes the link's blob", () => {
+            visualizePanel = {
+              data: { type: "line", queries: [{ query: "up", fields: { stream: "up" } }] },
+            };
+            const vm = open();
+            const mounted = vm.visualizeMount;
+
+            const { type: _marker, ...withoutMarker } = landed;
+            routerState.query = withoutMarker;
+            vm.onRouteQueryChange();
+
+            expect(vm.visualizeMount).toBe(mounted);
+            expect(vm.visualizeSeed).toBeNull();
+          });
+
+          it("opens a repeat link with the same chart and another range held", () => {
+            visualizePanel = {
+              data: { type: "line", queries: [{ query: "up", fields: {} }] },
+            };
+            const vm = open();
+            const mounted = vm.visualizeMount;
+
+            routerState.query = { ...landed, t: "2", period: "6h" };
+            vm.onRouteQueryChange();
+
+            expect(vm.visualizeMount).toBe(mounted + 1);
+            expect(vm.visualizeSeedHeld).toBe(true);
+            expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("up");
+            expect(vm.selectedDate).toMatchObject({ relativeTimePeriod: "6h" });
+          });
+
+          it("lands a repeat link's new range without querying anything", () => {
+            visualizePanel = {
+              data: { type: "line", queries: [{ query: "up", fields: {} }] },
+            };
+            const vm = open();
+            grid.sweepSlice.mockClear();
+            grid.requestPreview.mockClear();
+
+            routerState.query = { ...landed, t: "2", period: "6h" };
+            vm.onRouteQueryChange();
+
+            expect(vm.selectedDate).toMatchObject({ relativeTimePeriod: "6h" });
+            expect(grid.sweepSlice).not.toHaveBeenCalled();
+            expect(grid.requestPreview).not.toHaveBeenCalled();
+          });
+
+          it("reads a second link's millisecond range as the same window, not 1970", () => {
+            const vm = open();
+            const { period: _period, ...noPeriod } = landed;
+
+            routerState.query = {
+              ...noPeriod,
+              t: "2",
+              from: "1793532000000",
+              to: "1793575000000",
+            };
+            vm.onRouteQueryChange();
+
+            expect(vm.selectedDate).toMatchObject({
+              valueType: "absolute",
+              startTime: "1793532000000000",
+              endTime: "1793575000000000",
+            });
+          });
+
+          it("leaves the open chart alone on the link's own URL updates", () => {
+            const vm = open();
+            const mounted = vm.visualizeMount;
+
+            routerState.query = { ...landed, refresh: "5s" };
+            vm.onRouteQueryChange();
+
+            expect(vm.visualizeMount).toBe(mounted);
+            expect(vm.visualizeSeed).toBeNull();
+          });
+        });
+
+        it("leaves a link alone with the flag off", () => {
+          assistantFlag.on = false;
+          routerState.query = {};
+          const vm = mountExplorer().vm as any;
+          routerState.replace.mockClear();
+
+          routerState.query = link;
+          vm.onRouteQueryChange();
+
+          expect(routerState.replace.mock.calls.some(([r]: any[]) => r.query?.metrics_data)).toBe(
+            false,
+          );
+        });
       });
 
       it("remounts Visualize on the URL's chart when Back/Forward moves between two blobs", async () => {

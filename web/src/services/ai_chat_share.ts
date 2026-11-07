@@ -37,6 +37,7 @@ export interface ShareView {
   title: string;
   /** Tool inputs and outputs are hidden from viewers; only tool names show. */
   redact_tools: boolean;
+  hide_attachments?: boolean;
   /** Set on the org-wide admin list only. */
   owner_name?: string;
   owner_email?: string;
@@ -57,6 +58,16 @@ export interface SharedChat {
   active_turn?: boolean;
   turns?: StoredTurn[];
   not_modified: boolean;
+  /** The earliest turns were dropped because the chat is too large to share in full. */
+  truncated?: boolean;
+  /** The owner org, on public reads only. */
+  org_identifier?: string;
+  /** The owner org's IANA zone, beside `org_identifier`. */
+  org_timezone?: string;
+  /** Tool steps whose stream this viewer cannot read, by `call_id`. */
+  hidden?: Record<string, { reason: "stream_forbidden"; stream: string }>;
+  /** Attachments were stripped from the shared turns. */
+  hide_attachments?: boolean;
 }
 
 /** What a viewer already holds, so an unchanged share answers `not_modified`. */
@@ -71,18 +82,24 @@ export interface CreateShareRequest {
   /** Required for public links. */
   expires_in_secs?: number;
   redact_tools: boolean;
+  /** Sent only when `/config` advertises `ai_share_redact_attachments`; older servers reject the field. */
+  hide_attachments?: boolean;
 }
 
 export interface UpdateShareRequest {
   mode?: ShareMode;
-  expires_in_secs?: number;
+  /** `null` makes an organization link never expire. */
+  expires_in_secs?: number | null;
   refresh_snapshot?: boolean;
   redact_tools?: boolean;
+  hide_attachments?: boolean;
 }
 
 export interface ForkResult {
   session_id: string;
   title: string;
+  /** The shared turns the fork starts from, stored server-side. */
+  seed?: { turns: StoredTurn[] };
 }
 
 const enc = encodeURIComponent;
@@ -123,6 +140,16 @@ const aiChatShare = {
       {},
       { headers: { "Content-Type": "application/json" } },
     ),
+
+  /** The whole stored chat; without `limit` the server returns every turn. */
+  chatTurns: (org: string, sessionId: string) =>
+    http().get<{ turns?: unknown; has_more?: unknown }>(
+      `/api/${enc(org)}/ai/chats/${enc(sessionId)}`,
+    ),
+
+  /** Titles a fork "(continued)" until the server names forks itself. */
+  renameChat: (org: string, sessionId: string, title: string) =>
+    http().patch<unknown>(`/api/${enc(org)}/ai/chats/${enc(sessionId)}`, { title }),
 
   getPublic: (token: string, known?: SharedChatKnown) =>
     http().get<SharedChat>(`/api/public/ai_chats/${enc(token)}`, { params: knownParams(known) }),

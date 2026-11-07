@@ -1,0 +1,42 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-nav-1",
+      "created": 1772418060000000,
+      "user": {
+        "text": "Show payments errors"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "message_delta",
+          "content": "I prepared a logs query for **payments errors in the last hour**."
+        },
+        {
+          "type": "navigation_action",
+          "resource_type": "logs",
+          "action": "load_query",
+          "label": "View payments errors in Logs",
+          "target": {
+            "stream": "default",
+            "stream_type": "logs",
+            "query": "SELECT * FROM \"default\" WHERE level = 'error'",
+            "sql_mode": true,
+            "from": 1772413200000000,
+            "to": 1772416800000000
+          }
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 5
+    }
+  ]
+}

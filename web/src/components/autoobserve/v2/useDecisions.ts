@@ -138,3 +138,40 @@ export const resetDecisions = () => {
   log.splice(0);
   Object.assign(autonomy, AUTONOMY_DEFAULTS);
 };
+
+interface DecisionSnapshot {
+  decisions: Record<string, Decision>;
+  phases: Record<string, FixPhase>;
+  log: LogEntry[];
+  autonomy: Record<FixKind, Autonomy>;
+}
+
+// Session-only, never persisted: each user-and-org pair keeps its own sample decisions.
+const stashedOrgs = new Map<string, DecisionSnapshot>();
+let decisionsOrg: string | null = null;
+
+/** Keeps the current org's decisions aside and restores the next org's, so another org starts with none. */
+export const switchDecisionsOrg = (key: string) => {
+  if (key === decisionsOrg) return;
+  // A sample fix that was settling finishes before its org is put aside.
+  Object.keys(phases).forEach((id) => {
+    if (phases[id] !== "fixing") return;
+    phases[id] = "fixed";
+    record(id, "fixed");
+  });
+  if (decisionsOrg !== null)
+    stashedOrgs.set(decisionsOrg, {
+      decisions: { ...decisions },
+      phases: { ...phases },
+      log: [...log],
+      autonomy: { ...autonomy },
+    });
+  resetDecisions();
+  decisionsOrg = key;
+  const saved = stashedOrgs.get(key);
+  if (!saved) return;
+  Object.assign(decisions, saved.decisions);
+  Object.assign(phases, saved.phases);
+  log.push(...saved.log);
+  Object.assign(autonomy, saved.autonomy);
+};

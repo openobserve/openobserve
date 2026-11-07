@@ -1,0 +1,14 @@
+{
+  "_source": "o2-ai src/server/tool_formatting.py tool_call frame",
+  "_item": "today",
+  "frame": {
+    "type": "tool_call",
+    "tool": "SearchSQL",
+    "message": "Querying logs",
+    "context": {
+      "stream_name": "default",
+      "sql": "SELECT service_name, http_status, count(*) AS errors FROM \"default\" WHERE level = 'error' GROUP BY service_name, http_status ORDER BY errors DESC"
+    },
+    "call_id": "call_3"
+  }
+}

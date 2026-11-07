@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close-column="handleCloseColumn"
             @column-order-change="handleColumnOrderChange"
             @update:expandedIds="onCorrelatedExpandedIdsChange"
+            v-bind="assistantV2 ? { focusToolbar: true } : {}"
           >
             <template
               v-for="col in tableColumns"
@@ -227,24 +228,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-else>{{ value }}</span>
             </template>
 
-            <template #cell-hover-actions="{ row, column, active }">
-              <O2AIContextAddBtn
-                v-if="active && column.id === correlatedTimestampCol"
-                class="size-6!"
-                :imageHeight="'14'"
-                :imageWidth="'14'"
-                @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
-              />
-              <CellActions
-                v-else-if="active && column.meta?.closable && row[column.id] != null"
-                :column="column"
-                :row="row"
-                :selected-stream-fields="selectedFields"
-                :hide-search-term-actions="hideSearchTermActions"
-                @copy="handleCopy"
-                @add-search-term="handleAddSearchTerm"
-                @send-to-ai-chat="handleSendToAiChat"
-              />
+            <template #cell-hover-actions="{ row, column, active, menu }">
+              <template v-if="assistantV2">
+                <ODropdown v-if="menu">
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                      :aria-label="t('assistant.entry.rowActions')"
+                      data-test="correlated-logs-row-menu"
+                    >
+                      <OIcon name="more-vert" size="sm" />
+                    </OButton>
+                  </template>
+                  <AiEntryButton
+                    v-bind="correlatedRowDoor(row, 'explain')"
+                    appearance="menu-item"
+                  />
+                  <AiEntryButton
+                    v-bind="correlatedRowDoor(row, 'add_to_chat')"
+                    appearance="menu-item"
+                  />
+                </ODropdown>
+                <template v-else-if="active">
+                  <CellActions
+                    v-if="column.meta?.closable && row[column.id] != null"
+                    :column="column"
+                    :row="row"
+                    :selected-stream-fields="selectedFields"
+                    :hide-search-term-actions="hideSearchTermActions"
+                    :door-context="() => correlatedDoorBase(row)"
+                    @copy="handleCopy"
+                    @add-search-term="handleAddSearchTerm"
+                  />
+                  <AiEntryButton
+                    v-bind="correlatedRowDoor(row, 'explain')"
+                    appearance="toolbar-icon"
+                  />
+                  <AiEntryButton
+                    v-bind="correlatedRowDoor(row, 'add_to_chat')"
+                    appearance="toolbar-icon"
+                  />
+                </template>
+              </template>
+              <template v-else>
+                <O2AIContextAddBtn
+                  v-if="active && column.id === correlatedTimestampCol"
+                  class="size-6!"
+                  :imageHeight="'14'"
+                  :imageWidth="'14'"
+                  @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
+                />
+                <CellActions
+                  v-else-if="active && column.meta?.closable && row[column.id] != null"
+                  :column="column"
+                  :row="row"
+                  :selected-stream-fields="selectedFields"
+                  :hide-search-term-actions="hideSearchTermActions"
+                  @copy="handleCopy"
+                  @add-search-term="handleAddSearchTerm"
+                  @send-to-ai-chat="handleSendToAiChat"
+                />
+              </template>
             </template>
 
             <template #expansion="{ row }">
@@ -332,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount, watch } from "vue";
 import {
   SUBJECT_BUTTONS_BY_SET,
   resolveSetId,
@@ -354,6 +400,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { logRowBuild, rowKeyOf, type LogsDoorBase } from "@/plugins/logs/logsDoors";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { resolveLogSeverity, severityIndicatorColor } from "@/utils/logs/statusParser";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
@@ -1008,6 +1057,49 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
 const handleSendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
+
+const assistantV2 = isAssistantV2();
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => pagedResults.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+
+// Correlated rows come from the incident's streams and window, not the Logs search.
+const correlatedDoorBase = (row: Record<string, unknown>): LogsDoorBase => ({
+  org: store.state.selectedOrganization?.identifier ?? "",
+  stream: String(row._stream_name ?? jsonPreviewStreamName.value ?? ""),
+  streamType: "logs",
+  range: {
+    from: Math.round(props.timeRange.startTime / 1000),
+    to: Math.round(props.timeRange.endTime / 1000),
+  },
+  timeZone: store.state.timezone || "UTC",
+  query: "",
+  mode: "filter",
+  timestampField: correlatedTimestampCol.value,
+});
+
+const correlatedRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg?.value,
+  objectKind: "log_row" as const,
+  label: t(verb === "explain" ? "assistant.entry.explainLogRow" : "assistant.entry.addLogRow"),
+  tooltip: t(
+    verb === "explain" ? "assistant.entry.tooltip.explainRow" : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "explain"
+      ? ("ai-entry-correlated-row-explain" as const)
+      : ("ai-entry-log-row-add" as const),
+  build: logRowBuild(() => correlatedDoorBase(row), row),
+  objectKey: rowKeyOf(row, correlatedTimestampCol.value),
+});
 
 const handleAddSearchTerm = (
   field: string | number,

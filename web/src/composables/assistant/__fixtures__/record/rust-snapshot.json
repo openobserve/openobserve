@@ -1,0 +1,5 @@
+{
+  "status": "pending_b10",
+  "note": "Viewer projection of each case as the server returns it; empty until the paired server change lands.",
+  "cases": {}
+}
