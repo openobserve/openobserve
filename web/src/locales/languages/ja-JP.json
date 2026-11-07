@@ -2130,6 +2130,8 @@
     "translatingStackTrace": "ソースマップを使用してスタックトレースを変換中...",
     "translatingStackTraceHint": "これには少し時間がかかる場合があります",
     "sourceMapsNotAvailable": "ソースマップが利用できません",
+    "mobileSourceMapsNotApplicable": "ソースマップは iOS および Android のエラーには適用されません",
+    "mobileSourceMapsNotApplicableBody": "アップロードされた JavaScript ソースマップではネイティブモバイルのスタックフレームを解決できません。元のスタックは {tab} タブで確認してください。",
     "sourceMapsNotAvailableBody": "元のソースコードと行番号を含む詳細なスタックトレースを表示するには、このアプリケーションのソースマップをアップロードしてください。",
     "serviceBadge": "サービス:",
     "versionBadge": "バージョン:",

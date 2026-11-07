@@ -2130,6 +2130,8 @@
     "translatingStackTrace": "Перевод стек-трейса с исходными картами...",
     "translatingStackTraceHint": "Это может занять некоторое время",
     "sourceMapsNotAvailable": "Исходные карты недоступны",
+    "mobileSourceMapsNotApplicable": "Карты исходного кода не применяются к ошибкам iOS и Android",
+    "mobileSourceMapsNotApplicableBody": "Загруженные карты исходного кода JavaScript не позволяют разрешить кадры нативного мобильного стека. Исходный стек можно посмотреть на вкладке {tab}.",
     "sourceMapsNotAvailableBody": "Чтобы просмотреть подробные стек-трейсы с исходным кодом и номерами строк, загрузите исходные карты для этого приложения.",
     "serviceBadge": "Сервис:",
     "versionBadge": "Версия:",
