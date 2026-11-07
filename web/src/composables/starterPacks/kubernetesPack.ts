@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { StarterPack } from "./types";
+import { S3_BASE, S3_PREFIX } from "@/composables/useDashboardGallery";
+
+import bundledAlerts from "./bundledKubernetesAlerts.json";
+import type { PackBundledAlert, StarterPack } from "./types";
+
+const GALLERY_DASHBOARD_PATH = "Kubernetes(openobserve-collector)/kubernetes_overview.json";
 
 // Placeholder selection until the pack's real alert list is chosen.
 export const PLACEHOLDER_KUBERNETES_ALERT_IDS = [
@@ -22,6 +27,24 @@ export const PLACEHOLDER_KUBERNETES_ALERT_IDS = [
   "k8s/cluster_memory_capacity_high",
   "k8s/cluster_pod_count_high",
 ];
+
+const GALLERY_TIMEOUT_MS = 10_000;
+
+// The gallery holds the full dashboard; the bundled tab keeps the pack working offline.
+const loadKubernetesOverview = async (): Promise<Record<string, any>> => {
+  try {
+    const response = await fetch(`${S3_BASE}/${S3_PREFIX}${GALLERY_DASHBOARD_PATH}`, {
+      signal: AbortSignal.timeout(GALLERY_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`gallery answered ${response.status}`);
+    const doc = await response.json();
+    if (!Array.isArray(doc?.tabs)) throw new Error("gallery dashboard has no tabs");
+    return doc;
+  } catch {
+    const bundled = await import("@/assets/dashboards/kubernetes_overview.dashboard.json");
+    return bundled.default;
+  }
+};
 
 export const KUBERNETES_PACK: StarterPack = {
   id: "kubernetes",
@@ -32,15 +55,11 @@ export const KUBERNETES_PACK: StarterPack = {
     {
       id: "overview",
       title: "Kubernetes Overview",
-      load: async () => ({
-        version: 8,
-        title: "Kubernetes Overview",
-        description: "",
-        tabs: [{ tabId: "default", name: "Default", panels: [] }],
-      }),
+      load: loadKubernetesOverview,
     },
   ],
   alerts: PLACEHOLDER_KUBERNETES_ALERT_IDS,
+  bundledAlerts: bundledAlerts as PackBundledAlert[],
   savedViews: [
     {
       id: "events",

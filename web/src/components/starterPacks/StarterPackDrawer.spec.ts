@@ -1,0 +1,181 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it } from "vitest";
+import { ref, shallowRef } from "vue";
+
+import i18n from "@/locales";
+
+import StarterPackDrawer from "./StarterPackDrawer.vue";
+import { fakeFlow } from "./starterPackTestFlow";
+
+const SHELL = { template: '<div><slot /><slot name="footer" /></div>' };
+const render = (flow = fakeFlow(), cluster?: string) =>
+  mount(StarterPackDrawer, {
+    props: { flow, clusters: ["staging-eu-1"], cluster, open: true },
+    global: {
+      plugins: [i18n],
+      stubs: {
+        ODrawer: SHELL,
+        ODialog: { template: '<div data-test="stub-dialog"><slot /></div>' },
+        OIcon: true,
+      },
+    },
+  });
+const has = (wrapper: ReturnType<typeof render>, id: string) =>
+  wrapper.find(`[data-test="${id}"]`).exists();
+
+const PREVIEW = {
+  panels: { kept: 12, dropped: 3 },
+  items: [
+    { kind: "alert", itemId: "a1", status: "pending" },
+    { kind: "savedView", itemId: "v1", status: "pending" },
+  ],
+  names: {},
+  notIncluded: [{ kind: "alert", itemId: "a2", name: "Disk full", reason: "already_have" }],
+};
+
+describe("StarterPackDrawer", () => {
+  it("lists names, scope and the reason for each item left out", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW) }));
+    expect(wrapper.get('[data-test="starter-pack-drawer-alert-names"]').text()).toBe("name-a1");
+    expect(wrapper.get('[data-test="starter-pack-drawer-reach"]').text()).toContain(
+      "All clusters · 1 seen so far: staging-eu-1",
+    );
+    expect(wrapper.get('[data-test="starter-pack-drawer-not-included"]').text()).toContain(
+      "Disk full: you already have it",
+    );
+  });
+
+  it("uses the unlicensed copy: a dashboard, and the view under Not included", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW), licensed: ref(false) }));
+    expect(wrapper.get('[data-test="starter-pack-drawer-items"]').text()).toContain(
+      "Kubernetes dashboard",
+    );
+    expect(wrapper.get('[data-test="starter-pack-drawer-panels"]').text()).toContain(
+      "12 panels fit your data",
+    );
+    expect(wrapper.get('[data-test="starter-pack-drawer-not-included"]').text()).toContain(
+      "Kubernetes view: needs the Enterprise plan",
+    );
+  });
+
+  it("loads the preview on open and offers Retry when it fails", async () => {
+    const flow = fakeFlow({ previewState: ref("idle") });
+    render(flow);
+    expect(flow.loadPreview).toHaveBeenCalledOnce();
+    const failed = fakeFlow({ previewState: ref("error") });
+    const wrapper = render(failed);
+    await wrapper.get('[data-test="starter-pack-drawer-retry-btn"]').trigger("click");
+    expect(failed.loadPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes and lands once setup completes", async () => {
+    const flow = fakeFlow({ preview: shallowRef(PREVIEW) });
+    const wrapper = render(flow, "staging-eu-1");
+    await wrapper.get('[data-test="starter-pack-drawer-submit-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.land).toHaveBeenCalledWith("staging-eu-1");
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("stays open with Retry after a partial failure, then lands when the retry finishes", async () => {
+    const failedItem = { kind: "alert", itemId: "a2", status: "failed" };
+    const flow = fakeFlow({
+      interrupted: ref(true),
+      failed: ref([failedItem]),
+      toCreate: ref([{ kind: "alert", itemId: "a1", status: "created" }, failedItem]),
+      made: ref([{ kind: "alert", itemId: "a1", status: "created" }]),
+    });
+    const wrapper = render(flow);
+    expect(wrapper.get('[data-test="starter-pack-progress-summary"]').text()).toBe(
+      "1 of 2 created · 1 to retry",
+    );
+    expect(wrapper.get('[data-test="starter-pack-progress-failed-row"]').text()).toContain(
+      "name-a2",
+    );
+    expect(wrapper.get('[data-test="starter-pack-progress-retry-btn"]').text()).toBe(
+      "Retry 1 item",
+    );
+    await wrapper.get('[data-test="starter-pack-progress-retry-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.land).toHaveBeenCalled();
+  });
+
+  it("offers Finish or Undo on an interrupted install", () => {
+    const wrapper = render(
+      fakeFlow({
+        interrupted: ref(true),
+        toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
+      }),
+    );
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
+    expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(true);
+  });
+
+  it("hides Finish, Retry and Undo while running", () => {
+    const wrapper = render(
+      fakeFlow({
+        running: ref(true),
+        toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
+      }),
+    );
+    expect(wrapper.text()).toContain("Creating");
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
+  });
+
+  it("swaps Undo for Remove pack once the window closes", () => {
+    const created = [{ kind: "alert", itemId: "a1", status: "created" }];
+    const wrapper = render(
+      fakeFlow({
+        installed: ref(true),
+        canUndo: ref(false),
+        toCreate: ref(created),
+        made: ref(created),
+      }),
+    );
+    expect(has(wrapper, "starter-pack-page-remove-btn")).toBe(true);
+    expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-progress-summary"]').text()).toBe(
+      "1 of 1 created",
+    );
+  });
+
+  it("never reports the pack's own items as already there", () => {
+    const made = [{ kind: "alert", itemId: "a2", status: "created" }];
+    const wrapper = render(
+      fakeFlow({
+        installed: ref(true),
+        made: ref(made),
+        toCreate: ref(made),
+        preview: shallowRef(PREVIEW),
+      }),
+    );
+    expect(wrapper.text()).not.toContain("you already have it");
+  });
+
+  it("says so when setup fails before anything is recorded", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW), installFailed: ref(true) }));
+    expect(has(wrapper, "starter-pack-drawer-install-error")).toBe(true);
+    expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(true);
+  });
+
+  it("keeps Set up while only the dashboard is left to create", () => {
+    const wrapper = render(
+      fakeFlow({ preview: shallowRef(PREVIEW), alertCount: ref(0), viewCount: ref(0) }),
+    );
+    expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(true);
+  });
+
+  it("names the built-in pack calmly when the Library is out of reach", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef({ ...PREVIEW, offline: true }) }));
+    expect(wrapper.get('[data-test="starter-pack-drawer-source"]').text()).toContain(
+      "can't be reached. Using the pack built into this version",
+    );
+  });
+
+  it("offers the admin link when setup was refused", () => {
+    const wrapper = render(fakeFlow({ forbidden: ref(true) }));
+    expect(has(wrapper, "starter-pack-drawer-copy-link-btn")).toBe(true);
+    expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(false);
+  });
+});
