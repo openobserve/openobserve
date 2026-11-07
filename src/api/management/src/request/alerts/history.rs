@@ -201,9 +201,9 @@ pub struct AlertHistoryResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Option<String>, Query, description = "Filter by specific alert id"),
-        ("alert_ids" = Option<String>, Query, description = "Comma-separated alert ids to include"),
+        ("alert_ids" = Option<String>, Query, description = "Comma-separated alert ids to include, at most 500; ignored when alert_id is set"),
         ("outcome" = Option<String>, Query, description = "Comma-separated outcomes to include: firing, normal, error, skipped, succeeded, notify_failed"),
-        ("siem" = Option<bool>, Query, description = "Only SIEM detections, resolved by the server"),
+        ("siem" = Option<bool>, Query, description = "Only SIEM detections, resolved by the server; ignored when alert_id or alert_ids is set"),
         ("anomaly_id" = Option<String>, Query, description = "Return history for this anomaly detection config"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
@@ -214,7 +214,7 @@ pub struct AlertHistoryResponse {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
-        (status = 400, description = "Bad Request", content_type = "application/json"),
+        (status = 400, description = "Bad Request: an invalid or over-limit alert_ids list, an unknown outcome or sort field, or an invalid time range", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 404, description = "Alert or anomaly config not found", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
@@ -1351,6 +1351,15 @@ pub(crate) fn restrict_to_permitted(ids: Vec<String>, permitted: Option<&[String
 
 /// Matches trigger rows of the given alerts; the key is `"{alert_name}/{alert_id}"`.
 pub(crate) fn alert_ids_predicate(ids: &[String]) -> String {
+    // Only KSUID-shaped ids pass, so a stray permission id cannot put a quote in the SQL.
+    let ids: Vec<&str> = ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+        .collect();
+    if ids.is_empty() {
+        return "FALSE".to_string();
+    }
     if ids.len() <= LIKE_PREDICATE_MAX_IDS {
         return ids
             .iter()
@@ -1358,14 +1367,7 @@ pub(crate) fn alert_ids_predicate(ids: &[String]) -> String {
             .collect::<Vec<_>>()
             .join(" OR ");
     }
-    // Ids are KSUIDs; anything else is dropped, so the alternation needs no escaping.
-    let alternation = ids
-        .iter()
-        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join("|");
-    format!("regexp_like(key, '/({alternation})$')")
+    format!("regexp_like(key, '/({})$')", ids.join("|"))
 }
 
 /// A `status IN (...)` predicate; each outcome also matches its legacy spellings.
@@ -1433,6 +1435,13 @@ mod tests {
             alert_ids_predicate(&ids),
             "key LIKE '%/a' OR key LIKE '%/b'"
         );
+    }
+
+    #[test]
+    fn test_alert_ids_predicate_drops_unsafe_ids_in_both_forms() {
+        let ids = vec!["a1".to_string(), "x' OR '1'='1".to_string()];
+        assert_eq!(alert_ids_predicate(&ids), "key LIKE '%/a1'");
+        assert_eq!(alert_ids_predicate(&["bad'".to_string()]), "FALSE");
     }
 
     #[test]

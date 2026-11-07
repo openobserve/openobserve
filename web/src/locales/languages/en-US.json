@@ -24022,7 +24022,15 @@
   },
   "solutionSwitcher": {
     "title": "Solution",
-    "hint": "Switch products without losing your place"
+    "hint": "Switch products without losing your place",
+    "observability": {
+      "label": "Observability",
+      "description": "Logs, metrics, traces, dashboards"
+    },
+    "security": {
+      "label": "Security",
+      "description": "SIEM · OCSF · Sigma rules"
+    }
   },
   "siem": {
     "severity": {
@@ -24776,6 +24784,8 @@
         "emptyHint": "Add security sources or widen the time range to see the risk graph.",
         "showingTop": "Showing top {n} of {total} by risk",
         "illustrative": "Illustrative: relationships are inferred from risk ranking, not observed.",
+        "baseScore": "base {n}",
+        "propagatedScore": "prop {n}",
         "tier": {
           "critical": "Critical",
           "high": "High",
@@ -25153,7 +25163,16 @@
       "blockFlattenLevel": "{stream}: the stream's flatten level differs from the global one, so attaching would rename its columns.",
       "blockGlobalFlatten": "{stream}: the global flatten level ({level}) would not keep the OCSF columns flat.",
       "blockSchemaMissing": "{stream}: the user-defined schema is missing OCSF columns: {columns}.",
-      "blockPipelineDisabled": "{stream}: the existing pipeline is disabled; enable it before attaching."
+      "blockPipelineDisabled": "{stream}: the existing pipeline is disabled; enable it before attaching.",
+      "attachErrors": {
+        "functionEditedOutside": "Function {name} was edited outside the SIEM.",
+        "pipelineNoAccess": "This stream has a pipeline you don't have access to.",
+        "permissionDenied": "You need permission to edit functions and pipelines for this stream.",
+        "pipelineChanged": "This stream's pipeline changed and now blocks attach; refresh and re-check.",
+        "packConflict": "This stream already has pack {pack}; detach it first.",
+        "noPipeline": "Could not create or find a realtime pipeline for this stream.",
+        "failed": "Attach failed."
+      }
     },
     "nav": {
       "overview": "Overview",

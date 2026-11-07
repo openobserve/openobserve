@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -22,23 +22,23 @@ const mode = computed(() => store.state.solutionMode as "observability" | "secur
 
 const SOLUTIONS: {
   key: "observability" | "security";
-  label: string;
+  labelKey: I18nKey;
   icon: IconName;
-  description: string;
+  descriptionKey: I18nKey;
   route: string;
 }[] = [
   {
     key: "observability",
-    label: "Observability",
+    labelKey: "solutionSwitcher.observability.label",
     icon: "monitor-heart",
-    description: "Logs, metrics, traces, dashboards",
+    descriptionKey: "solutionSwitcher.observability.description",
     route: "/",
   },
   {
     key: "security",
-    label: "Security",
+    labelKey: "solutionSwitcher.security.label",
     icon: "verified-user",
-    description: "SIEM · OCSF · Sigma rules",
+    descriptionKey: "solutionSwitcher.security.description",
     route: "/security/overview",
   },
 ];
@@ -63,14 +63,16 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         size="sm"
         :icon-left="current.icon"
         icon-right="expand-more"
-        class="solution-switcher-btn"
+        class="font-[650] tracking-[-0.00625rem]"
         data-test="solution-switcher"
       >
-        {{ current.label }}
+        {{ t(current.labelKey) }}
       </OButton>
     </template>
 
-    <div class="solution-switcher-header">{{ t("solutionSwitcher.title") }}</div>
+    <div class="text-3xs px-3.5 pt-1.5 pb-1 font-bold tracking-[0.03125rem] uppercase opacity-50">
+      {{ t("solutionSwitcher.title") }}
+    </div>
 
     <ODropdownItem
       v-for="solution in SOLUTIONS"
@@ -78,104 +80,29 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
       :data-test="`solution-${solution.key}`"
       @select="switchTo(solution)"
     >
-      <div class="solution-item">
+      <div class="flex min-w-[13.75rem] items-center gap-2.5">
         <div
-          class="solution-ico"
-          :class="solution.key === 'security' ? 'solution-ico--sec' : 'solution-ico--obs'"
+          class="rounded-default flex size-8 shrink-0 items-center justify-center"
+          :class="
+            solution.key === 'security'
+              ? 'bg-status-success-bg text-status-success-text'
+              : 'bg-accent/12 text-accent'
+          "
         >
           <OIcon :name="solution.icon" size="sm" />
         </div>
-        <div class="solution-text">
-          <span class="solution-label">{{ solution.label }}</span>
-          <span class="solution-desc">{{ solution.description }}</span>
+        <div class="flex flex-1 flex-col gap-px">
+          <span class="text-compact font-[650]">{{ t(solution.labelKey) }}</span>
+          <span class="text-2xs opacity-55">{{ t(solution.descriptionKey) }}</span>
         </div>
         <OIcon v-if="solution.key === mode" name="task-alt" class="text-accent size-3.5 shrink-0" />
       </div>
     </ODropdownItem>
 
     <ODropdownSeparator />
-    <div class="solution-switcher-footer">
+    <div class="text-2xs flex items-center gap-1.5 px-3.5 pt-1.5 pb-2 opacity-45">
       <OIcon name="info-outline" size="xs" class="opacity-50" />
       <span>{{ t("solutionSwitcher.hint") }}</span>
     </div>
   </ODropdown>
 </template>
-
-<style scoped>
-.solution-switcher-btn {
-  font-weight: 650;
-  letter-spacing: -0.00625rem;
-}
-
-.solution-switcher-header {
-  padding: 0.375rem 0.875rem 0.25rem;
-  font-size: 0.65625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03125rem;
-  opacity: 0.5;
-}
-
-.solution-item {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-width: 13.75rem;
-}
-
-.solution-ico {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.solution-ico--obs {
-  background: rgba(109, 92, 224, 0.12);
-  color: #6d5ce0;
-}
-
-.solution-ico--sec {
-  background: rgba(48, 164, 108, 0.12);
-  color: #30a46c;
-}
-
-body.body--dark .solution-ico--obs {
-  background: rgba(139, 144, 230, 0.16);
-  color: #8b90e6;
-}
-
-body.body--dark .solution-ico--sec {
-  background: rgba(48, 164, 108, 0.18);
-  color: #4cc38a;
-}
-
-.solution-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.0625rem;
-}
-
-.solution-label {
-  font-size: 0.8125rem;
-  font-weight: 650;
-}
-
-.solution-desc {
-  font-size: 0.6875rem;
-  opacity: 0.55;
-}
-
-.solution-switcher-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.875rem 0.5rem;
-  font-size: 0.6875rem;
-  opacity: 0.45;
-}
-</style>

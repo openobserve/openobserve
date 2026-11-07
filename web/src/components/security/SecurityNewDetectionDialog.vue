@@ -11,7 +11,10 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -37,8 +40,14 @@ import {
   sigmaCatalog,
   type SigmaRule,
 } from "@/utils/security/sigma";
-import { buildDetectionAlert } from "@/utils/security/detection";
+import { buildDetectionAlert, detectionAlertName } from "@/utils/security/detection";
 import { severityTagValue, toneLabelKey, toneOfSigmaLevel } from "@/utils/security/severity";
+import {
+  makeNewDetectionSchema,
+  newDetectionDefaults,
+  toMinutes,
+  type NewDetectionForm,
+} from "./SecurityNewDetectionDialog.schema";
 
 const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -61,6 +70,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const FORM_ID = "security-detections-new-form";
 
 const STARTER_YAML = `title: My Detection
 status: experimental
@@ -90,10 +100,6 @@ const fieldsStream = ref("");
 const destinations = ref<string[]>([]);
 const destinationsLoaded = ref(false);
 const pickedDestinations = ref<string[]>([]);
-const period = ref(15);
-const frequency = ref(15);
-const silence = ref(30);
-const saving = ref(false);
 /** The Events page's classification, preferred over re-deciding from a schema. */
 const presetSource = ref("");
 
@@ -168,52 +174,22 @@ const ocsfBridgeText = computed(() => {
   return t("siem.detections.ocsfBridge", { stream: pickedStream.value, guard: guard.join(", ") });
 });
 
-/** History joins firings to rules by name, so the name is checked before saving. */
-const draftPayload = computed(() => {
-  const rule = draftRule.value;
-  const compiled = draftCompiled.value;
-  if (!rule || !compiled?.runnable || !pickedStream.value) return null;
-  return buildDetectionAlert({
-    rule,
-    where: compiled.where,
-    fields: compiled.fields,
-    stream: pickedStream.value,
-    destinations: pickedDestinations.value,
-    sourceType: draftSource.value?.id ?? "",
-    period: Number(period.value),
-    frequency: Number(frequency.value),
-    silence: Number(silence.value),
-  });
+const draftReady = computed(
+  () => !!draftRule.value && !!draftCompiled.value?.runnable && !!pickedStream.value,
+);
+const draftName = computed(() =>
+  draftReady.value && draftRule.value
+    ? detectionAlertName(draftRule.value.title, pickedStream.value)
+    : "",
+);
+
+const form = useOForm<NewDetectionForm>({
+  defaultValues: newDetectionDefaults(),
+  schema: makeNewDetectionSchema(t, () => props.existingNames ?? []),
+  onSubmit: save,
 });
-const nameTaken = computed(
-  () => !!draftPayload.value && (props.existingNames ?? []).includes(draftPayload.value.name),
-);
-
-// A period shorter than the frequency leaves minutes no run ever looks at.
-const periodError = computed(() =>
-  !(period.value > 0)
-    ? t("siem.detections.validation.positive")
-    : period.value < frequency.value
-      ? t("siem.detections.validation.periodGap")
-      : undefined,
-);
-const frequencyError = computed(() =>
-  frequency.value > 0 ? undefined : t("siem.detections.validation.positive"),
-);
-const silenceError = computed(() =>
-  silence.value >= 0 ? undefined : t("siem.detections.validation.nonNegative"),
-);
-
-const canSave = computed(
-  () =>
-    !!draftPayload.value &&
-    pickedDestinations.value.length > 0 &&
-    !nameTaken.value &&
-    !periodError.value &&
-    !frequencyError.value &&
-    !silenceError.value &&
-    !saving.value,
-);
+// The name is derived from the rule and stream, so it is fed into the form for the taken-name check.
+watch(draftName, (name) => form.setFieldValue("name", name), { immediate: true });
 
 async function loadStreams() {
   try {
@@ -320,10 +296,22 @@ watch(
   { immediate: true },
 );
 
-async function save() {
-  const payload = draftPayload.value;
-  if (!payload || !canSave.value) return;
-  saving.value = true;
+async function save(value: NewDetectionForm) {
+  const rule = draftRule.value;
+  const compiled = draftCompiled.value;
+  if (!rule || !compiled?.runnable || !pickedStream.value || !pickedDestinations.value.length)
+    return;
+  const payload = buildDetectionAlert({
+    rule,
+    where: compiled.where,
+    fields: compiled.fields,
+    stream: pickedStream.value,
+    destinations: pickedDestinations.value,
+    sourceType: draftSource.value?.id ?? "",
+    period: toMinutes(value.period),
+    frequency: toMinutes(value.frequency),
+    silence: toMinutes(value.silence),
+  });
   try {
     await alertsService.create_by_alert_id(props.orgId, payload);
     invalidateSiemDetections(props.orgId);
@@ -335,8 +323,6 @@ async function save() {
       variant: "error",
       message: e?.response?.data?.message ?? t("siem.detections.createFailed"),
     });
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -344,10 +330,6 @@ const streamOptions = computed(() => streams.value.map((s) => ({ label: raw(s), 
 const destinationOptions = computed(() =>
   destinations.value.map((d) => ({ label: raw(d), value: d })),
 );
-const toNumber = (v: string | number) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
 </script>
 
 <template>
@@ -358,11 +340,10 @@ const toNumber = (v: string | number) => {
     :sub-title="t('siem.detections.newSubtitle')"
     :primary-button-label="t('siem.detections.create')"
     :secondary-button-label="t('siem.detections.cancel')"
-    :primary-button-disabled="!canSave"
-    :primary-button-loading="saving"
+    :form-id="FORM_ID"
+    :primary-button-disabled="!draftReady || !pickedDestinations.length"
     data-test="security-detections-new-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
-    @click:primary="save"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-4">
@@ -508,35 +489,26 @@ const toNumber = (v: string | number) => {
         </template>
       </OBanner>
 
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <OInput
-          :model-value="period"
+      <OForm :id="FORM_ID" :form="form" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <OFormInput
+          name="period"
           type="number"
           :label="t('siem.detections.lookBack')"
-          :error="!!periodError"
-          :error-message="periodError"
           data-test="security-detections-new-period"
-          @update:model-value="(v: string | number) => (period = toNumber(v))"
         />
-        <OInput
-          :model-value="frequency"
+        <OFormInput
+          name="frequency"
           type="number"
           :label="t('siem.detections.runEvery')"
-          :error="!!frequencyError"
-          :error-message="frequencyError"
           data-test="security-detections-new-frequency"
-          @update:model-value="(v: string | number) => (frequency = toNumber(v))"
         />
-        <OInput
-          :model-value="silence"
+        <OFormInput
+          name="silence"
           type="number"
           :label="t('siem.detections.silence')"
-          :error="!!silenceError"
-          :error-message="silenceError"
           data-test="security-detections-new-silence"
-          @update:model-value="(v: string | number) => (silence = toNumber(v))"
         />
-      </div>
+      </OForm>
 
       <OBanner
         v-if="logsourceMismatch"
@@ -583,15 +555,19 @@ const toNumber = (v: string | number) => {
         </div>
       </OBanner>
 
-      <OBanner
-        v-if="nameTaken && draftPayload"
-        variant="error-soft"
-        icon="error-outline"
-        dense
-        data-test="security-detections-new-name-taken"
-      >
-        {{ t("siem.detections.nameTaken", { name: draftPayload.name }) }}
-      </OBanner>
+      <component :is="form.Field" name="name">
+        <template #default="{ field }">
+          <OBanner
+            v-if="field.state.meta.errors.length > 0"
+            variant="error-soft"
+            icon="error-outline"
+            dense
+            data-test="security-detections-new-name-taken"
+          >
+            {{ firstFieldError(field.state.meta.errors) }}
+          </OBanner>
+        </template>
+      </component>
     </div>
   </ODialog>
 </template>

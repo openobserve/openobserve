@@ -32,7 +32,7 @@
         <span class="inline-block size-2.5 rounded-full" :style="{ backgroundColor: item.color }" />
         {{ item.label }}
       </span>
-      <span v-if="hiddenCount" class="text-text-secondary ml-auto">
+      <span v-if="hiddenCount" class="text-text-secondary ms-auto">
         {{ t("siem.entities.riskGraph.showingTop", { n: shownCount, total: rows.length }) }}
       </span>
     </div>
@@ -64,17 +64,20 @@
           <Handle
             type="target"
             :position="Position.Left"
-            class="!size-1.5 !border-0 !bg-gray-400"
+            class="!bg-border-strong !size-1.5 !border-0"
           />
           <div
             class="rounded-default bg-surface-base flex w-52 cursor-pointer flex-col gap-1.5 border p-2.5 shadow-sm transition-all hover:[transform:translateY(-0.125rem)] hover:shadow-md"
-            :style="{ borderColor: data.accent, borderLeftWidth: '4px' }"
+            :style="{ borderColor: data.accent, borderLeftWidth: '0.25rem' }"
             :data-test="`risk-node-${data.id}`"
           >
             <div class="flex items-center gap-1.5">
               <span
-                class="flex size-6 shrink-0 items-center justify-center rounded"
-                :style="{ backgroundColor: data.accent + '22', color: data.accent }"
+                class="rounded-default flex size-6 shrink-0 items-center justify-center"
+                :style="{
+                  backgroundColor: `color-mix(in srgb, ${data.accent} 13%, transparent)`,
+                  color: data.accent,
+                }"
               >
                 <OIcon :name="KIND_ICON[data.kind] || 'share'" size="sm" />
               </span>
@@ -84,23 +87,25 @@
                 >{{ data.label }}</span
               >
               <span
-                class="rounded px-1.5 py-0.5 text-xs font-bold text-white tabular-nums"
+                class="rounded-default px-1.5 py-0.5 text-xs font-bold text-white tabular-nums"
                 :style="{ backgroundColor: data.accent }"
                 >{{ data.score }}</span
               >
             </div>
-            <span class="text-text-secondary text-[0.65rem] tracking-wide uppercase">{{
+            <span class="text-text-secondary text-2xs tracking-wide uppercase">{{
               t(`siem.entities.riskGraph.tier.${data.tier}`)
             }}</span>
-            <div class="text-text-secondary flex gap-2 text-[0.6rem] tabular-nums">
-              <span>base {{ data.base }}</span>
-              <span>prop {{ data.propagated }}</span>
+            <div class="text-text-secondary text-3xs flex gap-2 tabular-nums">
+              <span>{{ t("siem.entities.riskGraph.baseScore", { n: data.base }) }}</span>
+              <span>{{
+                t("siem.entities.riskGraph.propagatedScore", { n: data.propagated })
+              }}</span>
             </div>
           </div>
           <Handle
             type="source"
             :position="Position.Right"
-            class="!size-1.5 !border-0 !bg-gray-400"
+            class="!bg-border-strong !size-1.5 !border-0"
           />
         </template>
       </VueFlow>
@@ -130,12 +135,12 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
 const TIER_COLOR: Record<RiskTier, string> = {
-  critical: "#dc2626",
-  high: "#f59e0b",
-  medium: "#eab308",
-  low: "#22c55e",
+  critical: "var(--color-badge-error-solid-bg)",
+  high: "var(--color-badge-orange-solid-bg)",
+  medium: "var(--color-badge-amber-solid-bg)",
+  low: "var(--color-badge-success-solid-bg)",
 };
-const EDGE_COLOR = "#6b7280";
+const EDGE_COLOR = "var(--color-border-strong)";
 const KIND_ICON: Record<string, string> = {
   user: "person",
   ip: "lan",

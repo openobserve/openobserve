@@ -3,7 +3,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ocsfPacks from "@/services/ocsfPacks";
-import { attach, detach, OcsfAttachError } from "@/composables/security/useOcsfAttach";
+import {
+  attach,
+  detach,
+  OcsfAttachError,
+  useOcsfAttach,
+} from "@/composables/security/useOcsfAttach";
 import { findOurNode } from "@/utils/security/ocsfPipeline";
 
 vi.mock("@/services/ocsfPacks", () => ({
@@ -185,7 +190,10 @@ describe("attach (R11)", () => {
     svc.listFunctions.mockResolvedValue({
       data: { list: [{ name: "ocsf_entity_v1_web", function: ".x = 1\n." }] },
     });
-    await expect(attach("org1", "web", PACK)).rejects.toBeInstanceOf(OcsfAttachError);
+    await expect(attach("org1", "web", PACK)).rejects.toMatchObject({
+      code: "functionEditedOutside",
+      params: { name: "ocsf_entity_v1_web" },
+    });
   });
 
   const realtime = (id: string) => ({
@@ -267,7 +275,10 @@ describe("attach (R11)", () => {
     svc.listPipelines.mockResolvedValue({ data: { list: [other] } });
     svc.getPipeline.mockResolvedValue({ data: other });
 
-    await expect(attach("org1", "web", PACK)).rejects.toBeInstanceOf(OcsfAttachError);
+    await expect(attach("org1", "web", PACK)).rejects.toMatchObject({
+      code: "packConflict",
+      params: { pack: "entity@2" },
+    });
     expect(svc.saveSetting).not.toHaveBeenCalled();
   });
 
@@ -278,7 +289,7 @@ describe("attach (R11)", () => {
 
     await expect(
       attach("org1", "web", PACK, true, { globalFlattenLevel: 0, guaranteedColumns: [] }),
-    ).rejects.toBeInstanceOf(OcsfAttachError);
+    ).rejects.toMatchObject({ code: "pipelineChanged" });
     expect(svc.updatePipeline).not.toHaveBeenCalled();
     expect(svc.saveSetting).not.toHaveBeenCalled();
   });
@@ -290,7 +301,7 @@ describe("attach (R11)", () => {
 
     await expect(
       attach("org1", "web", PACK, true, { globalFlattenLevel: 0, guaranteedColumns: [] }),
-    ).rejects.toBeInstanceOf(OcsfAttachError);
+    ).rejects.toMatchObject({ code: "pipelineChanged" });
     expect(svc.saveSetting).not.toHaveBeenCalled();
   });
 
@@ -463,5 +474,24 @@ describe("detach (R12)", () => {
 
     expect(svc.saveSetting).toHaveBeenCalled();
     expect(svc.deleteFunction).not.toHaveBeenCalled();
+  });
+});
+
+describe("useOcsfAttach error", () => {
+  it("exposes an attach failure as an i18n key with its params", async () => {
+    const flow = useOcsfAttach();
+    await flow.run(() => Promise.reject(new OcsfAttachError("packConflict", { pack: "x@1" })));
+    expect(flow.error.value).toEqual({
+      key: "siem.sources.attachErrors.packConflict",
+      params: { pack: "x@1" },
+    });
+  });
+
+  it("keeps a server message as raw text and falls back to a key", async () => {
+    const flow = useOcsfAttach();
+    await flow.run(() => Promise.reject(httpError(400, "bad config")));
+    expect(flow.error.value).toEqual({ raw: "bad config" });
+    await flow.run(() => Promise.reject({}));
+    expect(flow.error.value).toEqual({ key: "siem.sources.attachErrors.failed" });
   });
 });

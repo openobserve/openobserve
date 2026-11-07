@@ -24,15 +24,25 @@ import {
 } from "@/utils/security/ocsfPipeline";
 
 export type AttachErrorCode =
-  "function_edited_outside" | "pipeline_no_access" | "pipeline_conflict" | "permission_denied";
+  | "functionEditedOutside"
+  | "pipelineNoAccess"
+  | "pipelineChanged"
+  | "packConflict"
+  | "noPipeline"
+  | "permissionDenied";
 
 export class OcsfAttachError extends Error {
   code: AttachErrorCode;
-  constructor(code: AttachErrorCode, message: string) {
-    super(message);
+  params: Record<string, unknown>;
+  constructor(code: AttachErrorCode, params: Record<string, unknown> = {}) {
+    super(code);
     this.code = code;
+    this.params = params;
   }
 }
+
+/** An i18n key with its params, or a server-supplied message shown as-is. */
+export type AttachErrorView = { key: string; params?: Record<string, unknown> } | { raw: string };
 
 export interface DetachResult {
   pipeline_skipped: boolean;
@@ -115,10 +125,7 @@ async function ensureFunction(org: string, name: string, program: string): Promi
   const existing = await find();
   if (existing !== null) {
     if (!sameVrl(existing, program)) {
-      throw new OcsfAttachError(
-        "function_edited_outside",
-        `Function ${name} was edited outside the SIEM.`,
-      );
+      throw new OcsfAttachError("functionEditedOutside", { name });
     }
     return;
   }
@@ -128,10 +135,7 @@ async function ensureFunction(org: string, name: string, program: string): Promi
     if (!isAlreadyExists(err)) throw err;
     const afterRace = await find();
     if (afterRace !== null && !sameVrl(afterRace, program)) {
-      throw new OcsfAttachError(
-        "function_edited_outside",
-        `Function ${name} was edited outside the SIEM.`,
-      );
+      throw new OcsfAttachError("functionEditedOutside", { name });
     }
   }
 }
@@ -151,10 +155,7 @@ async function findPipelineId(org: string, stream: string): Promise<string | nul
   const matches = realtimePipelinesFor(listRes.data?.list ?? listRes.data ?? [], stream);
   if (matches.length) return matches[0].pipeline_id ?? "";
   if (listed) {
-    throw new OcsfAttachError(
-      "pipeline_no_access",
-      "This stream has a pipeline you don't have access to.",
-    );
+    throw new OcsfAttachError("pipelineNoAccess");
   }
   return null;
 }
@@ -189,10 +190,7 @@ async function createOcsfPipeline(
     id = res.data?.pipeline_id ?? res.data?.id ?? "";
   } catch (err) {
     if (httpStatus(err) === 403) {
-      throw new OcsfAttachError(
-        "permission_denied",
-        "You need permission to edit functions and pipelines for this stream.",
-      );
+      throw new OcsfAttachError("permissionDenied");
     }
     // A 400 is a lost race only if a realtime pipeline now exists; a validation error is re-raised.
     const existing = await listRealtime(org, stream);
@@ -221,10 +219,7 @@ async function extendPipeline(
   const pipeline = toPipeline(res.data);
   // Re-check the live pipeline (disabled / rerouted since the page snapshot) before reusing or editing it.
   if (cfg && preAttachChecks({ name: stream }, pipeline, cfg).length) {
-    throw new OcsfAttachError(
-      "pipeline_conflict",
-      "This stream's pipeline changed and now blocks attach; refresh and re-check.",
-    );
+    throw new OcsfAttachError("pipelineChanged");
   }
   const present = findOurNode(pipeline);
   if (present) {
@@ -233,10 +228,7 @@ async function extendPipeline(
       return;
     }
     // A different pack or a renamed function is an out-of-scope upgrade/conflict, not a silent reuse.
-    throw new OcsfAttachError(
-      "pipeline_conflict",
-      `This stream already has pack ${tag}; detach it first.`,
-    );
+    throw new OcsfAttachError("packConflict", { pack: tag });
   }
   const source = pipeline.nodes[0];
   const node = ourNode(pack.id, pack.version, functionName(pack, stream), {
@@ -253,10 +245,7 @@ async function extendPipeline(
       return;
     }
     if (httpStatus(err) === 403) {
-      throw new OcsfAttachError(
-        "permission_denied",
-        "You need permission to edit functions and pipelines for this stream.",
-      );
+      throw new OcsfAttachError("permissionDenied");
     }
     throw err;
   }
@@ -283,10 +272,7 @@ export async function attach(
   }
   // Never record a mapped setting without a pipeline that actually runs the pack.
   if (!pipelineId) {
-    throw new OcsfAttachError(
-      "pipeline_conflict",
-      "Could not create or find a realtime pipeline for this stream.",
-    );
+    throw new OcsfAttachError("noPipeline");
   }
   if (!pipelineCreated) {
     await extendPipeline(org, pipelineId, pack, stream, cfg);
@@ -360,18 +346,20 @@ export async function detach(
 
 export function useOcsfAttach() {
   const busy = ref(false);
-  const error = ref("");
+  const error = ref<AttachErrorView | null>(null);
 
   async function run<T>(op: () => Promise<T>): Promise<T | null> {
     busy.value = true;
-    error.value = "";
+    error.value = null;
     try {
       return await op();
     } catch (err) {
-      error.value =
-        err instanceof OcsfAttachError
-          ? err.message
-          : httpMessage(err) || (err as Error)?.message || "Attach failed.";
+      if (err instanceof OcsfAttachError) {
+        error.value = { key: `siem.sources.attachErrors.${err.code}`, params: err.params };
+      } else {
+        const text = httpMessage(err) || (err as Error)?.message;
+        error.value = text ? { raw: text } : { key: "siem.sources.attachErrors.failed" };
+      }
       return null;
     } finally {
       busy.value = false;

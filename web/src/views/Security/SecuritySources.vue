@@ -216,8 +216,10 @@ const consistencyNotices = computed<SecurityNotice[]>(() => {
 
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
-  if (attachFlow.error.value) {
-    out.push({ key: "attach-error", tone: "error", text: attachFlow.error.value });
+  const err = attachFlow.error.value;
+  if (err) {
+    const text = "raw" in err ? raw(err.raw) : t(err.key, err.params ?? {});
+    out.push({ key: "attach-error", tone: "error", text });
   }
   if (actionNotice.value) out.push(actionNotice.value);
   return [...out, ...blockNotices.value, ...consistencyNotices.value];
