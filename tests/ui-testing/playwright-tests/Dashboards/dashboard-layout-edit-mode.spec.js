@@ -83,7 +83,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
     await expect(actions.layoutEditBtn).toHaveCount(0);
     await expect(actions.addPanelBtn).toHaveCount(0);
     await expect(actions.shareBtn).toHaveCount(0);
-    await expect(actions.settingsBtn).toHaveCount(0);
+    await expect(actions.moreOptionsBtn).toHaveCount(0);
     await expect(actions.addTabBtn).toHaveCount(0);
     await expect(actions.getTabRenameBtn("default")).toHaveCount(0);
 

@@ -323,7 +323,7 @@ describe("AutoRefreshInterval", () => {
       wrapper = createWrapper({ modelValue: 30 });
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]').text(),
-      ).toContain("30s");
+      ).toContain("Auto: 30s");
       expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
         "Refreshing every 30s",
       );
@@ -333,7 +333,7 @@ describe("AutoRefreshInterval", () => {
       wrapper = createWrapper({ modelValue: 0 });
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]').text(),
-      ).toContain("Off");
+      ).toContain("Auto: Off");
       expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
         "Paused. Pick an interval to start.",
       );
@@ -455,10 +455,10 @@ describe("AutoRefreshInterval", () => {
     it.each([
       ["compact", true, "logs-search-bar-refresh-interval-btn"],
       ["labelled", false, "logs-search-bar-refresh-interval-btn-dropdown"],
-    ])("swaps the %s trigger icon between update and sync-disabled", async (_m, isCompact, dt) => {
+    ])("keeps the %s trigger icon neutral whether on or off", async (_m, isCompact, dt) => {
       wrapper = createWrapper({ modelValue: 0, isCompact });
       const icon = () => wrapper.find(`[data-test="${dt}"] .OIcon`).attributes("data-icon");
-      expect(icon()).toBe("sync-disabled");
+      expect(icon()).toBe("update");
       await wrapper.setProps({ modelValue: 30 });
       expect(icon()).toBe("update");
     });
