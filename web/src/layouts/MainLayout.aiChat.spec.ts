@@ -205,6 +205,7 @@ describe("MainLayout — sendToAiChat", () => {
         text: "show me slow traces",
         autoSend: true,
       });
+      expect(seenInputContexts).toEqual([]);
     });
 
     it("{query, autoSend} without chipName keeps the old payload shape", async () => {
@@ -220,7 +221,7 @@ describe("MainLayout — sendToAiChat", () => {
         autoSend: true,
         id: expect.any(Number),
       });
-      expect(seenInputContexts).toContain("what changed?");
+      expect(seenInputContexts).toEqual([]);
     });
 
     it("an empty chipName stays on the old path", async () => {
@@ -234,7 +235,32 @@ describe("MainLayout — sendToAiChat", () => {
         autoSend: true,
         id: expect.any(Number),
       });
-      expect(seenInputContexts).toContain("q");
+      expect(seenInputContexts).toEqual([]);
+    });
+
+    it("{query, autoSend: true} from a DBM row leaves no prompt behind for the composer", async () => {
+      await open(true);
+
+      send({ query: "Fix this slow query: SELECT 1", autoSend: true });
+      await flushPromises();
+
+      expect(seenPayloads).toHaveLength(1);
+      expect(seenPayloads[0].payload).toMatchObject({
+        text: "Fix this slow query: SELECT 1",
+        autoSend: true,
+      });
+      expect(seenInputContexts).toEqual([]);
+    });
+
+    it("{query} without autoSend still prefills the composer through the legacy context", async () => {
+      await open(true);
+
+      send({ query: "explain this row" });
+      await flushPromises();
+
+      expect(seenPayloads[0].payload).toMatchObject({ text: "explain this row", autoSend: false });
+      expect(seenInputContexts).toContain("explain this row");
+      expect(seenInputContexts[seenInputContexts.length - 1]).toBe("");
     });
   });
 });

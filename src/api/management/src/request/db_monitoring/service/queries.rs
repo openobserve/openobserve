@@ -153,7 +153,8 @@ async fn read_queries_window(
     // The free-text `search` is DELIBERATELY not part of this SQL — it is
     // applied at merge time in Rust (it must filter the cached unfiltered tail
     // anyway), so user search text never reaches the SQL string at all.
-    let qs_sql = build_stats_sql(org_id, "query_stats", &filters.sql_preds());
+    let absent = absent_stats_columns(org_id).await;
+    let qs_sql = build_stats_sql(org_id, "query_stats", &filters.sql_preds(&absent));
     let qs_rows = match run_stats_search(org_id, Some(user_id), qs_sql, start_time, end_time).await
     {
         Ok(rows) => rows,
@@ -272,7 +273,7 @@ mod tests {
         let sql = build_stats_sql(
             "default",
             "query_stats",
-            &ScopeFilters::default().sql_preds(),
+            &ScopeFilters::default().sql_preds(&[]),
         );
         assert!(!sql.contains("OR 1=1"));
         assert!(!sql.contains("UNION"));

@@ -164,10 +164,14 @@ pub(crate) async fn read_samples_body(
         stream: q.stream.clone(),
         ..Default::default()
     };
-    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
+    let absent = absent_stats_columns(org_id).await;
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds(&absent));
     let totals_rows =
         match run_stats_search(org_id, Some(user_id), totals_sql, start_time, end_time).await {
-            Ok(rows) => rows,
+            Ok(rows) => rows
+                .into_iter()
+                .filter(|r| totals_filters.matches(r))
+                .collect(),
             Err(e) => {
                 log::warn!("[DbMonitoring] samples stream discovery failed for {org_id}: {e}");
                 Vec::new()
