@@ -4060,12 +4060,12 @@ mod tests {
 
         use crate::alerts::rca_runs::tests::{db, failures, new_incident, start, stored, timeline};
 
+        let _db = db().await;
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         assert!(
             !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
-            "the test relies on the default: RCA off"
+            "db() pins RCA off"
         );
-        let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
 
