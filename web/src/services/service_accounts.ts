@@ -16,8 +16,9 @@
 import http from "./http";
 
 const service_accounts = {
-  list: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/service_accounts`);
+  list: (org_identifier: string, config?: { silentForbidden?: boolean }) => {
+    const url = `/api/${org_identifier}/service_accounts`;
+    return config ? http().get(url, config) : http().get(url);
   },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
