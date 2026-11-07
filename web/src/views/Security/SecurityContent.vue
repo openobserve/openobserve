@@ -76,6 +76,7 @@ const {
 const streams = ref<StreamSchema[]>([]);
 const streamsLoading = ref(false);
 const streamsError = ref("");
+let streamsSeq = 0;
 
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
@@ -100,20 +101,23 @@ const notices = computed<SecurityNotice[]>(() => {
 });
 
 async function loadStreams() {
+  const mine = ++streamsSeq;
   streamsLoading.value = true;
   streamsError.value = "";
   try {
     // One request carries every stream's schema, which is all identification needs.
     const res = await streamService.nameList(orgId.value, "logs", true);
+    if (mine !== streamsSeq) return;
     streams.value = (res.data?.list ?? []).map((s: any) => ({
       name: String(s.name),
       fields: (s.schema ?? []).map((f: any) => String(f.name)),
     }));
   } catch (e: any) {
+    if (mine !== streamsSeq) return;
     streams.value = [];
     streamsError.value = e?.response?.data?.message ?? e?.message ?? t("siem.content.streamsError");
   } finally {
-    streamsLoading.value = false;
+    if (mine === streamsSeq) streamsLoading.value = false;
   }
 }
 

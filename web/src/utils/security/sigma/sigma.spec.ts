@@ -201,7 +201,14 @@ describe("compileSigmaRule", () => {
 
   it("compares strings without regard to case, which is Sigma's default", () => {
     const { where } = compile(RULE("  s: {User: Administrator}\n  condition: s"));
-    expect(where).toBe(`lower("User") = 'administrator'`);
+    expect(where).toBe(`lower(CAST("User" AS VARCHAR)) = 'administrator'`);
+  });
+
+  it("reads a quoted value against an integer-typed field as text", () => {
+    const { where } = compile(RULE("  s: {EventID: '4625'}\n  condition: s"), {
+      availableFields: ["EventID"],
+    });
+    expect(where).toBe(`lower(CAST("EventID" AS VARCHAR)) = '4625'`);
   });
 
   it("does not wrap a numeric comparison in a string function", () => {
@@ -220,7 +227,7 @@ describe("compileSigmaRule", () => {
       RULE("  s:\n    CommandLine|contains|all: ['delete', 'shadows']\n  condition: s"),
     );
     expect(allOf.where).toBe(
-      `(lower("CommandLine") LIKE '%delete%' AND lower("CommandLine") LIKE '%shadows%')`,
+      `(lower(CAST("CommandLine" AS VARCHAR)) LIKE '%delete%' AND lower(CAST("CommandLine" AS VARCHAR)) LIKE '%shadows%')`,
     );
   });
 
@@ -242,39 +249,39 @@ describe("compileSigmaRule", () => {
 
   it("compiles the string modifiers to the right side of the wildcard", () => {
     const contains = compile(RULE("  s: {CommandLine|contains: enc}\n  condition: s"));
-    expect(contains.where).toBe(`lower("CommandLine") LIKE '%enc%'`);
+    expect(contains.where).toBe(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '%enc%'`);
 
     // arrow's LIKE kernel drops a lone `\` before a non-wildcard, so `\U` would match a bare "U".
     const starts = compile(RULE("  s: {Image|startswith: 'C:\\Users'}\n  condition: s"));
-    expect(starts.where).toBe(`lower("Image") LIKE 'c:\\\\users%'`);
+    expect(starts.where).toBe(`lower(CAST("Image" AS VARCHAR)) LIKE 'c:\\\\users%'`);
 
     const ends = compile(RULE("  s: {Image|endswith: '\\cmd.exe'}\n  condition: s"));
-    expect(ends.where).toBe(`lower("Image") LIKE '%\\\\cmd.exe'`);
+    expect(ends.where).toBe(`lower(CAST("Image" AS VARCHAR)) LIKE '%\\\\cmd.exe'`);
   });
 
   it("translates Sigma wildcards into LIKE wildcards", () => {
     const { where } = compile(RULE("  s: {path: '/api/*/admin'}\n  condition: s"));
-    expect(where).toBe(`lower("path") LIKE '/api/%/admin'`);
+    expect(where).toBe(`lower(CAST("path" AS VARCHAR)) LIKE '/api/%/admin'`);
 
     const single = compile(RULE("  s: {code: 'HTTP?'}\n  condition: s"));
-    expect(single.where).toBe(`lower("code") LIKE 'http_'`);
+    expect(single.where).toBe(`lower(CAST("code" AS VARCHAR)) LIKE 'http_'`);
   });
 
   it("escapes LIKE metacharacters that appear literally in a value", () => {
     // A percent sign in a URL is a literal, not "match anything".
     const { where } = compile(RULE("  s: {path|contains: '%2e%2e/'}\n  condition: s"));
-    expect(where).toBe(`lower("path") LIKE '%\\%2e\\%2e/%'`);
+    expect(where).toBe(`lower(CAST("path" AS VARCHAR)) LIKE '%\\%2e\\%2e/%'`);
   });
 
   it("treats an escaped Sigma wildcard as a literal character", () => {
     const { where } = compile(RULE("  s: {q: 'a\\*b'}\n  condition: s"));
     // No wildcard survived, so this is an equality test, not a LIKE.
-    expect(where).toBe(`lower("q") = 'a*b'`);
+    expect(where).toBe(`lower(CAST("q" AS VARCHAR)) = 'a*b'`);
   });
 
   it("escapes a quote rather than ending the literal", () => {
     const { where } = compile(RULE(`  s: {c-uri|contains: "' or '1'='1"}\n  condition: s`));
-    expect(where).toBe(`lower("c-uri") LIKE '%'' or ''1''=''1%'`);
+    expect(where).toBe(`lower(CAST("c-uri" AS VARCHAR)) LIKE '%'' or ''1''=''1%'`);
   });
 
   it("compiles null and exists to the null tests", () => {
@@ -312,25 +319,37 @@ describe("compileSigmaRule", () => {
   });
 
   it("compiles IPv4 CIDR exactly, including masks inside an octet", () => {
-    const shape = `re_match(CAST("src_ip" AS VARCHAR), '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')`;
+    const octet = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+    const shape = `re_match(CAST("src_ip" AS VARCHAR), '^${octet}(\\.${octet}){3}$')`;
     const aligned = compile(RULE("  s: {src_ip|cidr: '10.0.0.0/8'}\n  condition: s"));
-    expect(aligned.where).toBe(`(${shape} AND "src_ip" LIKE '10.%')`);
+    expect(aligned.where).toBe(`(${shape} AND CAST("src_ip" AS VARCHAR) LIKE '10.%')`);
     expect(aligned.runnable).toBe(true);
 
     expect(compile(RULE("  s: {src_ip|cidr: '10.1.2.3/32'}\n  condition: s")).where).toBe(
-      `"src_ip" = '10.1.2.3'`,
+      `CAST("src_ip" AS VARCHAR) = '10.1.2.3'`,
     );
     // Any IPv4 address, and nothing that is not one.
     expect(compile(RULE("  s: {src_ip|cidr: '0.0.0.0/0'}\n  condition: s")).where).toBe(shape);
 
     // A /17 keeps two octets and splits the third: 128..255.
     expect(compile(RULE("  s: {src_ip|cidr: '40.108.128.0/17'}\n  condition: s")).where).toBe(
-      `(${shape} AND "src_ip" LIKE '40.108.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 3) AS INT) BETWEEN 128 AND 255)`,
+      `(${shape} AND CAST("src_ip" AS VARCHAR) LIKE '40.108.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 3) AS INT) BETWEEN 128 AND 255)`,
     );
     // A /26 inside the last octet: 64..127.
     expect(compile(RULE("  s: {src_ip|cidr: '10.0.0.64/26'}\n  condition: s")).where).toBe(
-      `(${shape} AND "src_ip" LIKE '10.0.0.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 4) AS INT) BETWEEN 64 AND 127)`,
+      `(${shape} AND CAST("src_ip" AS VARCHAR) LIKE '10.0.0.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 4) AS INT) BETWEEN 64 AND 127)`,
     );
+  });
+
+  it("rejects event addresses whose octets exceed 255", () => {
+    const { where } = compile(RULE("  s: {src_ip|cidr: '10.0.0.0/8'}\n  condition: s"));
+    const pattern = where.match(/re_match\(CAST\("src_ip" AS VARCHAR\), '([^']+)'\)/)?.[1];
+    expect(pattern).toBeDefined();
+    const shape = new RegExp(pattern!);
+    expect(shape.test("10.1.2.3")).toBe(true);
+    expect(shape.test("10.255.250.0")).toBe(true);
+    expect(shape.test("10.999.999.999")).toBe(false);
+    expect(shape.test("10.0.0.256")).toBe(false);
   });
 
   it("refuses IPv6 and malformed CIDR rather than approximating", () => {
@@ -356,7 +375,7 @@ describe("compileSigmaRule", () => {
     expect(runnable).toBe(true);
     // The values pySigma produces for the same input.
     for (const variant of ["L2Jpbi9iYXNo", "9iaW4vYmFza", "vYmluL2Jhc2"]) {
-      expect(where).toContain(`"CommandLine" LIKE '%${variant}%'`);
+      expect(where).toContain(`CAST("CommandLine" AS VARCHAR) LIKE '%${variant}%'`);
     }
   });
 
@@ -364,8 +383,8 @@ describe("compileSigmaRule", () => {
     const { where } = compile(
       RULE("  s: {CommandLine|windash|contains: ' -enc '}\n  condition: s"),
     );
-    expect(where).toContain(`lower("CommandLine") LIKE '% -enc %'`);
-    expect(where).toContain(`lower("CommandLine") LIKE '% /enc %'`);
+    expect(where).toContain(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '% -enc %'`);
+    expect(where).toContain(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '% /enc %'`);
     expect(where).toContain("–"); // en dash, which is the point of the modifier
   });
 
@@ -373,9 +392,9 @@ describe("compileSigmaRule", () => {
     const { where } = compile(
       RULE("  s: {CommandLine|windash|contains: ' -nop -enc '}\n  condition: s"),
     );
-    expect(where).toContain(`lower("CommandLine") LIKE '% -nop -enc %'`);
-    expect(where).toContain(`lower("CommandLine") LIKE '% /nop /enc %'`);
-    expect(where).toContain(`lower("CommandLine") LIKE '% –nop –enc %'`);
+    expect(where).toContain(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '% -nop -enc %'`);
+    expect(where).toContain(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '% /nop /enc %'`);
+    expect(where).toContain(`lower(CAST("CommandLine" AS VARCHAR)) LIKE '% –nop –enc %'`);
     expect(where).not.toContain(`/nop -enc`);
   });
 
@@ -409,7 +428,7 @@ describe("compileSigmaRule", () => {
       `title: T\nlogsource: {product: linux}\ndetection:\n  keywords:\n    - 'Failed password for'\n  condition: keywords`,
       { keywordFields: ["message"], availableFields: ["message"] },
     );
-    expect(where).toBe(`lower("message") LIKE '%failed password for%'`);
+    expect(where).toBe(`lower(CAST("message" AS VARCHAR)) LIKE '%failed password for%'`);
     expect(runnable).toBe(true);
   });
 
@@ -427,7 +446,7 @@ describe("compileSigmaRule", () => {
       fieldMap: { "c-uri": "path" },
       availableFields: ["path", "status"],
     });
-    expect(where).toBe(`lower("path") LIKE '%../%'`);
+    expect(where).toBe(`lower(CAST("path" AS VARCHAR)) LIKE '%../%'`);
     expect(fields).toEqual(["path"]);
   });
 
@@ -443,7 +462,7 @@ describe("compileSigmaRule", () => {
     const { where, runnable } = compile(RULE("  s: {userIdentity.type: Root}\n  condition: s"), {
       availableFields: ["eventname", "useridentity_type"],
     });
-    expect(where).toBe(`lower("useridentity_type") = 'root'`);
+    expect(where).toBe(`lower(CAST("useridentity_type" AS VARCHAR)) = 'root'`);
     expect(runnable).toBe(true);
   });
 
@@ -466,7 +485,7 @@ describe("compileSigmaRule", () => {
       { availableFields: ["eventName"] },
     );
     expect(compiled.runnable).toBe(true);
-    expect(compiled.where).toBe(`lower("eventName") = 'consolelogin'`);
+    expect(compiled.where).toBe(`lower(CAST("eventName" AS VARCHAR)) = 'consolelogin'`);
     expect(compiled.assumedAbsent).toEqual(["SamlProviderArn"]);
     expect(caveat(compiled)).toMatch(/SamlProviderArn/);
   });
@@ -530,7 +549,7 @@ describe("compileSigmaRule", () => {
 
   it("quotes an identifier containing a dot, which is how nested fields arrive", () => {
     const { where } = compile(RULE("  s: {userIdentity.type: Root}\n  condition: s"));
-    expect(where).toBe(`lower("userIdentity.type") = 'root'`);
+    expect(where).toBe(`lower(CAST("userIdentity.type" AS VARCHAR)) = 'root'`);
   });
 });
 
@@ -585,7 +604,9 @@ describe("applicableRules", () => {
     expect(applicable.length).toBeGreaterThan(4);
     const rootActivity = applicable.find((entry) => entry.rule.title.includes("Root Account"))!;
     expect(rootActivity.compiled.runnable).toBe(true);
-    expect(rootActivity.compiled.where).toContain(`lower("userIdentity.type") = 'root'`);
+    expect(rootActivity.compiled.where).toContain(
+      `lower(CAST("userIdentity.type" AS VARCHAR)) = 'root'`,
+    );
   });
 
   it("puts the runnable rules first, most severe first within them", () => {
@@ -614,7 +635,9 @@ describe("applicableRules", () => {
     const sshFailure = applicable.find((entry) => entry.rule.title.includes("SSH Authentication"))!;
 
     expect(sshFailure.compiled.runnable).toBe(true);
-    expect(sshFailure.compiled.where).toContain(`lower("message") LIKE '%failed password for%'`);
+    expect(sshFailure.compiled.where).toContain(
+      `lower(CAST("message" AS VARCHAR)) LIKE '%failed password for%'`,
+    );
   });
 
   it("uses the field map for a web server stream that spells things its own way", () => {
@@ -623,7 +646,7 @@ describe("applicableRules", () => {
     const traversal = applicable.find((entry) => entry.rule.title.includes("Path Traversal"))!;
 
     expect(traversal.compiled.runnable).toBe(true);
-    expect(traversal.compiled.where).toContain(`lower("path")`);
+    expect(traversal.compiled.where).toContain(`lower(CAST("path" AS VARCHAR))`);
   });
 });
 
@@ -663,7 +686,7 @@ detection:
     expect(compiled.runnable).toBe(true);
     expect(compiled.where).toBe(
       `((TRY_CAST("class_uid" AS DOUBLE) = 1007 AND TRY_CAST("activity_id" AS DOUBLE) = 1)) AND ` +
-        `((lower(json_as_text("process_parent_process_file", 'path')) LIKE '%\\\\winword.exe' AND lower("process_file_path") LIKE '%\\\\cmd.exe'))`,
+        `((lower(CAST(json_as_text("process_parent_process_file", 'path') AS VARCHAR)) LIKE '%\\\\winword.exe' AND lower(CAST("process_file_path" AS VARCHAR)) LIKE '%\\\\cmd.exe'))`,
     );
   });
 
@@ -700,7 +723,7 @@ detection:
 describe("flatten-depth JSON fallback", () => {
   it("reads only a path deeper than the flatten level, from the level-3 column", () => {
     const deep = compile(RULE("  s: {a.b.c.d: x}\n  condition: s"), { availableFields: ["a_b_c"] });
-    expect(deep.where).toBe(`lower(json_as_text("a_b_c", 'd')) = 'x'`);
+    expect(deep.where).toBe(`lower(CAST(json_as_text("a_b_c", 'd') AS VARCHAR)) = 'x'`);
     // A shallower column of the same name is a plain value: the field is absent.
     const shallow = compile(RULE("  s: {missing.deep.field.x: 1}\n  condition: s"), {
       availableFields: ["missing"],
@@ -732,7 +755,7 @@ detection:
       "message",
     ]);
     expect(compiled.runnable).toBe(true);
-    expect(compiled.where).toContain(`lower("message") LIKE '%mimikatz%'`);
+    expect(compiled.where).toContain(`lower(CAST("message" AS VARCHAR)) LIKE '%mimikatz%'`);
     expect(compiled.assumedAbsent).toEqual([]);
   });
 });

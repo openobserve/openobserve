@@ -34,6 +34,10 @@ export class OcsfAttachError extends Error {
   }
 }
 
+export interface DetachResult {
+  pipeline_skipped: boolean;
+}
+
 export interface AttachResult {
   pipeline_id: string;
   pipeline_created: boolean;
@@ -153,6 +157,19 @@ async function findPipelineId(org: string, stream: string): Promise<string | nul
     );
   }
   return null;
+}
+
+/** The recorded pipeline is only ours to change when it is this org's, sources this stream, and runs this pack. */
+function isDetachTarget(
+  pipeline: Pipeline,
+  org: string,
+  stream: string,
+  setting: SecuritySetting,
+): boolean {
+  if (pipeline.org && pipeline.org !== org) return false;
+  if (!realtimePipelinesFor([pipeline], stream).length) return false;
+  const tag = (findOurNode(pipeline)?.meta as { o2_ocsf_pack?: string } | undefined)?.o2_ocsf_pack;
+  return tag === `${setting.pack_id}@${setting.pack_version}`;
 }
 
 async function listRealtime(org: string, stream: string): Promise<Pipeline[]> {
@@ -293,18 +310,18 @@ export async function detach(
   stream: string,
   setting: SecuritySetting,
   persistSetting = true,
-): Promise<void> {
+): Promise<DetachResult> {
+  let pipelineSkipped = false;
   if (setting.pipeline_id) {
     try {
       const res = await ocsfPacks.getPipeline(org, setting.pipeline_id);
       const pipeline = toPipeline(res.data);
-      const our = findOurNode(pipeline);
-      if (our) {
-        if (setting.pipeline_created && isSoleOcsfPipeline(pipeline, stream)) {
-          await ocsfPacks.deletePipeline(org, setting.pipeline_id);
-        } else {
-          await ocsfPacks.updatePipeline(org, removeNode(pipeline));
-        }
+      if (!isDetachTarget(pipeline, org, stream, setting)) {
+        pipelineSkipped = true;
+      } else if (setting.pipeline_created && isSoleOcsfPipeline(pipeline, stream)) {
+        await ocsfPacks.deletePipeline(org, setting.pipeline_id);
+      } else {
+        await ocsfPacks.updatePipeline(org, removeNode(pipeline));
       }
     } catch (err) {
       // The pipeline was removed outside the SIEM; clear the record anyway.
@@ -330,7 +347,7 @@ export async function detach(
     // The setting carries no pack kind, and the name must be derived exactly as attach did.
     const { packs } = await ocsfPacks.listPacks(org);
     const pack = packs.find((p) => p.id === setting.pack_id);
-    if (!pack) return;
+    if (!pack) return { pipeline_skipped: pipelineSkipped };
     const name = functionName({ ...pack, version: setting.pack_version }, stream);
     const deps = await ocsfPacks.functionDependencies(org, name);
     const list: any[] = deps.data?.list ?? deps.data ?? [];
@@ -338,6 +355,7 @@ export async function detach(
   } catch {
     /* a missing function or a lookup error leaves it in place; detach still succeeds */
   }
+  return { pipeline_skipped: pipelineSkipped };
 }
 
 export function useOcsfAttach() {

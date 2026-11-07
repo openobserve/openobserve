@@ -25143,6 +25143,7 @@
       "exclude": "Exclude",
       "attached": "Attached {pack}.",
       "detached": "Pack detached.",
+      "detachedPipelineSkipped": "Pack detached. The recorded pipeline no longer matches this stream and pack, so it was left unchanged.",
       "empty": "No logs streams yet. Ingest security logs as any stream and they appear here.",
       "noticePackRemoved": "{stream}: pack removed outside the SIEM. Re-attach or clear it.",
       "noticeNoRecord": "{stream}: a pack is attached without a record. Record it or detach.",

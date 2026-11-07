@@ -391,7 +391,7 @@ describe("detach (R12)", () => {
     svc.functionDependencies.mockResolvedValue({ data: { list: [] } });
     svc.deleteFunction.mockResolvedValue({ data: {} });
 
-    await expect(detach("org1", "web", setting())).resolves.toBeUndefined();
+    await expect(detach("org1", "web", setting())).resolves.toEqual({ pipeline_skipped: false });
 
     expect(svc.deletePipeline).not.toHaveBeenCalled();
     const cleared = svc.saveSetting.mock.calls[0][2];
@@ -413,6 +413,46 @@ describe("detach (R12)", () => {
 
     await detach("org1", "web", { ...setting(), pack_id: "aws_cloudtrail", pack_version: 2 });
     expect(svc.deleteFunction).toHaveBeenLastCalledWith("org1", "ocsf_aws_cloudtrail_v2");
+  });
+
+  it("leaves a recorded pipeline that sources another stream untouched but clears the setting", async () => {
+    const other = soleOcsf();
+    other.source = { source_type: "realtime", stream_name: "other", stream_type: "logs" };
+    svc.getPipeline.mockResolvedValue({ data: other });
+    svc.functionDependencies.mockResolvedValue({ data: { list: [{ name: "p1" }] } });
+
+    const res = await detach("org1", "web", setting());
+
+    expect(res).toEqual({ pipeline_skipped: true });
+    expect(svc.deletePipeline).not.toHaveBeenCalled();
+    expect(svc.updatePipeline).not.toHaveBeenCalled();
+    expect(svc.saveSetting.mock.calls[0][2]).toMatchObject({ pack_id: "", pipeline_id: "" });
+  });
+
+  it("leaves a recorded pipeline from another org or running another pack untouched", async () => {
+    svc.getPipeline.mockResolvedValue({ data: { ...soleOcsf(), org: "org2" } });
+    svc.functionDependencies.mockResolvedValue({ data: { list: [{ name: "p1" }] } });
+    await expect(detach("org1", "web", setting())).resolves.toEqual({ pipeline_skipped: true });
+
+    svc.getPipeline.mockResolvedValue({ data: soleOcsf() });
+    await expect(
+      detach("org1", "web", { ...setting(), pack_id: "aws_cloudtrail", pack_version: 2 }),
+    ).resolves.toEqual({ pipeline_skipped: true });
+
+    expect(svc.deletePipeline).not.toHaveBeenCalled();
+    expect(svc.updatePipeline).not.toHaveBeenCalled();
+    expect(svc.saveSetting).toHaveBeenCalledTimes(2);
+  });
+
+  it("still deletes a matching pipeline that carries this org", async () => {
+    svc.getPipeline.mockResolvedValue({ data: { ...soleOcsf(), org: "org1" } });
+    svc.functionDependencies.mockResolvedValue({ data: { list: [] } });
+    svc.deleteFunction.mockResolvedValue({ data: {} });
+
+    await expect(detach("org1", "web", setting())).resolves.toEqual({ pipeline_skipped: false });
+
+    expect(svc.deletePipeline).toHaveBeenCalledWith("org1", "p1");
+    expect(svc.saveSetting).toHaveBeenCalled();
   });
 
   it("leaves the function in place when the pack is no longer in the registry", async () => {

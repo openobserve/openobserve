@@ -55,6 +55,8 @@ const SUPPORTED_MODIFIERS = new Set([
   "base64offset",
 ]);
 
+const IPV4_OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+
 /** `%` and `_` are LIKE metacharacters; a literal one has to be escaped. */
 const escapeLikeLiteral = (char: string) =>
   char === "%" || char === "_" || char === "\\" ? `\\${char}` : char;
@@ -114,19 +116,20 @@ function cidrPredicate(identifier: string, value: string): string | null {
   if (octets.length !== 4 || octets.some((o) => !(o >= 0 && o <= 255))) return null;
   if (bits < 0 || bits > 32) return null;
 
-  // Dotted-quad shape, so `10.example.com` is not in 10.0.0.0/8 and IPv6 is in no IPv4 block.
-  const shape = `re_match(CAST(${identifier} AS VARCHAR), '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')`;
+  const text = `CAST(${identifier} AS VARCHAR)`;
+  // Dotted quad of 0-255 octets, so `10.example.com` and `10.999.999.999` are not in 10.0.0.0/8.
+  const shape = `re_match(${text}, '^${IPV4_OCTET}(\\.${IPV4_OCTET}){3}$')`;
   if (bits === 0) return shape;
   const whole = Math.floor(bits / 8);
   const rest = bits % 8;
   const kept = octets.slice(0, whole).join(".");
-  if (whole === 4) return `${identifier} = ${quoteString(kept)}`;
+  if (whole === 4) return `${text} = ${quoteString(kept)}`;
   const parts = [shape];
-  if (whole) parts.push(`${identifier} LIKE ${quoteString(`${kept}.%`)}`);
+  if (whole) parts.push(`${text} LIKE ${quoteString(`${kept}.%`)}`);
   if (rest) {
     const low = octets[whole] & (0xff << (8 - rest)) & 0xff;
     const high = low + (1 << (8 - rest)) - 1;
-    const octet = `TRY_CAST(split_part(CAST(${identifier} AS VARCHAR), '.', ${whole + 1}) AS INT)`;
+    const octet = `TRY_CAST(split_part(${text}, '.', ${whole + 1}) AS INT)`;
     parts.push(`${octet} BETWEEN ${low} AND ${high}`);
   }
   return `(${parts.join(" AND ")})`;
@@ -301,7 +304,8 @@ class Compiler {
       }
       const variants = base64OffsetVariants(String(value)).map(
         // Base64 is case-sensitive, so these compare exactly.
-        (variant) => `${identifier} LIKE ${quoteString(`%${toLikePattern(variant).pattern}%`)}`,
+        (variant) =>
+          `CAST(${identifier} AS VARCHAR) LIKE ${quoteString(`%${toLikePattern(variant).pattern}%`)}`,
       );
       return joinClauses(variants, "OR");
     }
@@ -327,8 +331,6 @@ class Compiler {
     if (typeof value === "number" && !textual) return `${asNumber(identifier)} = ${value}`;
 
     const text = String(value);
-    // lower() on an integer column is a function error, so the column is read as text first.
-    if (typeof value === "number") identifier = `CAST(${identifier} AS VARCHAR)`;
     if (modifiers.has("windash")) {
       const parts = windashVariants(text).map((variant) =>
         this.stringComparison(identifier, modifiers, variant),
@@ -343,13 +345,15 @@ class Compiler {
     const startswith = modifiers.has("startswith");
     const endswith = modifiers.has("endswith");
     const { pattern, hasWildcard } = toLikePattern(text);
+    // lower() on an integer column is a function error, so the column is read as text first.
+    const column = `lower(CAST(${identifier} AS VARCHAR))`;
 
     if (!contains && !startswith && !endswith && !hasWildcard) {
-      return `lower(${identifier}) = ${quoteString(unescapeSigma(text).toLowerCase())}`;
+      return `${column} = ${quoteString(unescapeSigma(text).toLowerCase())}`;
     }
     const prefix = contains || endswith ? "%" : "";
     const suffix = contains || startswith ? "%" : "";
-    return `lower(${identifier}) LIKE ${quoteString(`${prefix}${pattern}${suffix}`.toLowerCase())}`;
+    return `${column} LIKE ${quoteString(`${prefix}${pattern}${suffix}`.toLowerCase())}`;
   }
 
   /** A bare string in a search list: look for it anywhere in the event text. */
@@ -369,7 +373,7 @@ class Compiler {
     }
     const parts = columns.map((column) => {
       this.fields.add(column);
-      return `lower(${quoteIdent(column)}) LIKE ${quoteString(`%${pattern}%`.toLowerCase())}`;
+      return `lower(CAST(${quoteIdent(column)} AS VARCHAR)) LIKE ${quoteString(`%${pattern}%`.toLowerCase())}`;
     });
     return joinClauses(parts, "OR");
   }

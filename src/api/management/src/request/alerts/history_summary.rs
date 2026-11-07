@@ -137,12 +137,14 @@ pub async fn get_alert_history_summary(
         return empty();
     }
 
-    // Past the cap, one LIKE per id is unbounded, so filter rows in Rust.
-    let filter_in_rust = ids.as_ref().is_some_and(|ids| ids.len() > MAX_ALERT_IDS);
-    let id_predicate = ids
-        .as_deref()
-        .filter(|_| !filter_in_rust)
-        .map(alert_ids_predicate);
+    // Past the cap, one LIKE per id is unbounded, so a single regex filters in SQL instead.
+    let id_predicate = ids.as_deref().map(|ids| {
+        if ids.len() > MAX_ALERT_IDS {
+            summary::alert_ids_regex_predicate(ids)
+        } else {
+            alert_ids_predicate(ids)
+        }
+    });
     let sql = summary::summary_sql(
         &org_id,
         start_time,
@@ -190,11 +192,8 @@ pub async fn get_alert_history_summary(
         }
     };
 
-    let is_partial = result.hits.len() as i64 >= MAX_ROWS;
-    let mut rows = summary::summarize_hits(&result.hits);
-    if let Some(ids) = ids.as_deref().filter(|_| filter_in_rust) {
-        summary::retain_alerts(&mut rows, ids);
-    }
+    let is_partial = result.is_partial || result.hits.len() as i64 >= MAX_ROWS;
+    let rows = summary::summarize_hits(&result.hits);
     MetaHttpResponse::json(AlertHistorySummaryResponse {
         start_time,
         end_time,
@@ -212,21 +211,28 @@ async fn clamped_range(
     query: &AlertHistorySummaryQuery,
 ) -> Result<(i64, i64), String> {
     let end_time = query.end_time.unwrap_or_else(now_micros);
-    let mut start_time = query
+    let start_time = query
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
-    if let Some(settings) =
-        infra::schema::get_settings(org_id, TRIGGERS_STREAM, StreamType::Logs).await
-    {
-        let max_hours =
-            get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id)).await;
-        if max_hours > 0 && (end_time - start_time) > max_hours * 3600 * 1_000_000 {
-            start_time = end_time - max_hours * 3600 * 1_000_000;
-        }
-    }
-    if start_time >= end_time {
-        return Err("start_time must be before end_time".to_string());
-    }
+    let max_hours =
+        match infra::schema::get_settings(org_id, TRIGGERS_STREAM, StreamType::Logs).await {
+            Some(settings) => {
+                get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id)).await
+            }
+            None => 0,
+        };
+    clamp_window(start_time, end_time, max_hours).map_err(str::to_string)
+}
+
+/// Raw history's max-range clamp and time validation, both overflow-safe for any `i64` input.
+fn clamp_window(
+    start_time: i64,
+    end_time: i64,
+    max_hours: i64,
+) -> Result<(i64, i64), &'static str> {
+    let start_time = config::utils::query_range::clamp_start_time(start_time, end_time, max_hours)
+        .unwrap_or(start_time);
+    openobserve_api_common::request::validate_time_range(start_time, end_time)?;
     Ok((start_time, end_time))
 }
 
@@ -265,4 +271,21 @@ async fn permitted_alert_ids(org_id: &str, user_id: &str) -> Result<Option<Vec<S
             .filter_map(|perm| perm.split(':').nth(1).map(str::to_string))
             .collect(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clamp_window_survives_extreme_bounds() {
+        let hour = 3600 * 1_000_000;
+        assert_eq!(
+            clamp_window(i64::MIN, i64::MAX, 24),
+            Ok((i64::MAX - 24 * hour, i64::MAX))
+        );
+        assert!(clamp_window(i64::MIN, i64::MAX, 0).is_err());
+        assert!(clamp_window(5, 5, 0).is_err());
+        assert_eq!(clamp_window(1, 10, 0), Ok((1, 10)));
+    }
 }

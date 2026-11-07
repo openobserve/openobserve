@@ -319,8 +319,15 @@ async function onDetach(row: SourceRow) {
     row.detachSetting,
     row.setting != null,
   );
-  if (res !== null)
+  if (res?.pipeline_skipped) {
+    actionNotice.value = {
+      key: "detached",
+      tone: "warning",
+      text: t("siem.sources.detachedPipelineSkipped"),
+    };
+  } else if (res !== null) {
     actionNotice.value = { key: "detached", tone: "info", text: t("siem.sources.detached") };
+  }
   await reload();
 }
 

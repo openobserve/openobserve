@@ -108,8 +108,9 @@ let loadSeq = 0;
 const uids = new WeakMap<Indicator, string>();
 const uidOf = (i: Indicator) => uids.get(i) ?? "";
 
-async function loadIndicators() {
-  if (!orgId.value) return;
+/** Resolves false when a newer load superseded this one, so the caller must not act on it. */
+async function loadIndicators(): Promise<boolean> {
+  if (!orgId.value) return true;
   const mySeq = ++loadSeq;
   loading.value = true;
   loadError.value = "";
@@ -118,7 +119,7 @@ async function loadIndicators() {
     const reads = await Promise.all(
       list.map((tb) => threatIntel.readTable(orgId.value, tb.name).catch(() => null)),
     );
-    if (mySeq !== loadSeq) return;
+    if (mySeq !== loadSeq) return false;
     tables.value = list;
     const all: Indicator[] = [];
     const seen = new Map<string, number>();
@@ -154,11 +155,12 @@ async function loadIndicators() {
       .map((tb, i) => ({ table: tb.name, n: reads[i]?.hasIndicatorColumn ? reads[i]!.skipped : 0 }))
       .filter((x) => x.n > 0);
   } catch (e: any) {
-    if (mySeq !== loadSeq) return;
+    if (mySeq !== loadSeq) return false;
     loadError.value = e?.response?.data?.message ?? e?.message ?? t("siem.intel.loadFailed");
   } finally {
     if (mySeq === loadSeq) loading.value = false;
   }
+  return true;
 }
 
 /** Stored columns of each list, so appends match the table's schema. */
@@ -190,8 +192,7 @@ async function runSweep() {
 }
 
 async function refresh() {
-  await loadIndicators();
-  await runSweep();
+  if (await loadIndicators()) await runSweep();
 }
 
 onMounted(refresh);
