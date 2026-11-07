@@ -376,6 +376,8 @@ function focusTile() {
   tileElement()?.focus();
 }
 
+const VIEWPORT_MARGIN = 8;
+
 // ── Open / close ──────────────────────────────────────────────────────────
 async function positionFlyout() {
   const wrapper = wrapperRef.value;
@@ -387,18 +389,21 @@ async function positionFlyout() {
   const horizontalPosition: Record<string, string> = isRtl
     ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
     : { left: `${rect.right + GAP}px` };
+  const maxHeight = window.innerHeight - VIEWPORT_MARGIN * 2;
   flyoutStyle.value = {
     position: "fixed",
     ...horizontalPosition,
     top: `${rect.top}px`,
+    maxHeight: `${maxHeight}px`,
+    overflowY: "auto",
     zIndex: "6000",
   };
   await nextTick();
-  const flyoutH = flyoutRef.value?.offsetHeight ?? 0;
-  const maxTop = window.innerHeight - flyoutH - 8;
+  const flyoutH = Math.min(flyoutRef.value?.offsetHeight ?? 0, maxHeight);
+  const maxTop = window.innerHeight - flyoutH - VIEWPORT_MARGIN;
   flyoutStyle.value = {
     ...flyoutStyle.value,
-    top: `${Math.max(8, Math.min(rect.top, maxTop))}px`,
+    top: `${Math.max(VIEWPORT_MARGIN, Math.min(rect.top, maxTop))}px`,
   };
 }
 

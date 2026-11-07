@@ -258,6 +258,30 @@ describe("ONavGroup", () => {
     expect(flyout().attributes("style")).not.toContain("right:");
   });
 
+  it("caps the flyout to the viewport height and scrolls when it is taller", async () => {
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(500);
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: 10,
+      right: 98,
+      top: 300,
+      bottom: 360,
+      width: 88,
+      height: 60,
+      x: 10,
+      y: 300,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(900);
+
+    await hoverOpen();
+
+    const style = flyout().attributes("style");
+    expect(style).toContain("max-height: 484px");
+    expect(style).toContain("overflow-y: auto");
+    expect(style).toContain("top: 8px");
+  });
+
   it("positions the flyout before the right-hand rail in RTL", async () => {
     const viewportWidth = 1024;
     vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(viewportWidth);
