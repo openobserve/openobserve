@@ -476,18 +476,44 @@ describe("compileSigmaRule", () => {
     expect(blockedReason(compiled)).toBe("Cannot match: this stream has no CommandLine");
   });
 
-  it("keeps a rule whose optional filter names a field the stream never emits", () => {
-    // No SSO column means the filter excludes nothing, so the rule is still exactly right.
+  it("refuses a rule whose exclusion names a field the stream lacks", () => {
+    // Folded away, the filter would exclude nothing and the rule would fire on the rows it meant to skip.
     const compiled = compile(
-      RULE(
-        "  s: {eventName: ConsoleLogin}\n  f: {SamlProviderArn|exists: true}\n  condition: s and not f",
-      ),
+      RULE("  s: {eventName: ConsoleLogin}\n  f: {SamlProviderArn: x}\n  condition: s and not f"),
       { availableFields: ["eventName"] },
     );
+    expect(compiled.runnable).toBe(false);
+    expect(compiled.unsupported).toEqual([
+      "not over absent field 'SamlProviderArn': cannot prove the exclusion",
+    ]);
+    expect(blockedReason(compiled)).toMatch(/not over absent field 'SamlProviderArn'/);
+  });
+
+  it("refuses an absent field under a negated quantifier, but not under a double negation", () => {
+    const quantified = compile(
+      RULE("  s: {a: 1}\n  filter_x: {gone: x}\n  condition: s and not 1 of filter_*"),
+      { availableFields: ["a"] },
+    );
+    expect(quantified.runnable).toBe(false);
+    expect(quantified.unsupported).toEqual([
+      "not over absent field 'gone': cannot prove the exclusion",
+    ]);
+    const doubled = compile(RULE("  s: {a: 1}\n  f: {gone: x}\n  condition: s or not not f"), {
+      availableFields: ["a"],
+    });
+    expect(doubled.unsupported).toEqual([]);
+    expect(doubled.runnable).toBe(true);
+  });
+
+  it("still folds an absent field in a positive selection to false", () => {
+    const compiled = compile(RULE("  s: {a: 1}\n  t: {gone: x}\n  condition: s or t"), {
+      availableFields: ["a"],
+    });
     expect(compiled.runnable).toBe(true);
-    expect(compiled.where).toBe(`lower(CAST("eventName" AS VARCHAR)) = 'consolelogin'`);
-    expect(compiled.assumedAbsent).toEqual(["SamlProviderArn"]);
-    expect(caveat(compiled)).toMatch(/SamlProviderArn/);
+    expect(compiled.where).toBe(`TRY_CAST("a" AS DOUBLE) = 1`);
+    expect(compiled.unsupported).toEqual([]);
+    expect(compiled.assumedAbsent).toEqual(["gone"]);
+    expect(caveat(compiled)).toMatch(/gone/);
   });
 
   it("folds an absent field to the truth value it actually has", () => {
@@ -717,6 +743,22 @@ detection:
     const compiled = compileForSource(r, ocsf, [...fields, "hashes"]);
     expect(compiled.assumedAbsent).toContain("Hashes");
     expect(compiled.runnable).toBe(false);
+  });
+
+  it("refuses AWS Root Account Activity rather than fold away its AwsServiceEvent exclusion", async () => {
+    const { compileForSource, ocsf } = await load();
+    const root = sigmaCatalog().find((r) => r.title === "AWS Root Account Activity")!;
+    const compiled = compileForSource(root, ocsf, [
+      "class_uid",
+      "metadata_product_name",
+      "actor_user_type",
+      "eventtype",
+    ]);
+    expect(compiled.runnable).toBe(false);
+    expect(compiled.where).not.toMatch(/eventtype/i);
+    expect(compiled.unsupported).toEqual([
+      "not over absent field 'eventType': cannot prove the exclusion",
+    ]);
   });
 });
 

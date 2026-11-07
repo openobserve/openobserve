@@ -735,7 +735,7 @@ async function loadTimeline() {
 watch(
   () =>
     selected.value
-      ? `${indicatorKey(selected.value)}|${selectedMatch.value?.hits ?? 0}|${range.value}`
+      ? `${indicatorKey(selected.value)}|${sweep.lastRunAt.value ?? 0}|${range.value}`
       : "",
   () => void loadTimeline(),
 );

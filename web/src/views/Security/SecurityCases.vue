@@ -91,6 +91,7 @@ const totals = ref<Record<CaseStatus, number | null>>({
 const loading = ref(false);
 const error = ref("");
 let listSeq = 0;
+let totalsSeq = 0;
 
 const notices = computed<SecurityNotice[]>(() =>
   error.value
@@ -99,11 +100,13 @@ const notices = computed<SecurityNotice[]>(() =>
 );
 
 async function fetchTotals() {
+  const mine = ++totalsSeq;
   const results = await Promise.allSettled(
     CASE_STATUSES.map((status) =>
       incidentsService.list(orgId.value, status, 1, 0, undefined, true),
     ),
   );
+  if (mine !== totalsSeq) return;
   const next = { ...totals.value };
   CASE_STATUSES.forEach((status, i) => {
     const r = results[i];

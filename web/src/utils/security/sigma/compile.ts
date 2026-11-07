@@ -164,6 +164,9 @@ class Compiler {
   readonly fields = new Set<string>();
   error?: string;
 
+  private readonly absentBySearch = new Map<string, string[]>();
+  private absentHere: string[] = [];
+
   private readonly available: FieldIndex | null;
   private readonly fieldMap: Record<string, string>;
   private readonly keywordFields: string[];
@@ -181,7 +184,7 @@ class Compiler {
     const mapped = this.fieldMap[name] ?? this.fieldMap[name.toLowerCase()];
     const plain = (column: string, known: boolean) => ({ column, known, sql: quoteIdent(column) });
     if (this.strict && mapped === undefined) {
-      this.assumedAbsent.add(name);
+      this.markAbsent(name);
       return plain(name, false);
     }
     // A mapping may offer `a|b`: whichever spelling the stream actually has.
@@ -203,8 +206,15 @@ class Compiler {
         sql: `json_as_text(${quoteIdent(nested.column)}, ${keys})`,
       };
     }
-    this.assumedAbsent.add(candidates[0]);
+    this.markAbsent(candidates[0]);
     return plain(candidates[0], false);
+  }
+
+  search(name: string, body: SigmaSearch): string | null {
+    this.absentHere = [];
+    const clause = this.searchBody(name, body);
+    this.absentBySearch.set(name, this.absentHere);
+    return clause;
   }
 
   private comparison(key: string, value: unknown): string | null {
@@ -378,7 +388,7 @@ class Compiler {
     return joinClauses(parts, "OR");
   }
 
-  search(name: string, body: SigmaSearch): string | null {
+  private searchBody(name: string, body: SigmaSearch): string | null {
     if (body === null || body === undefined) {
       this.error ??= `Search '${name}' is empty`;
       return null;
@@ -427,6 +437,7 @@ class Compiler {
     node: ConditionNode,
     clauses: Map<string, string | null>,
     names: string[],
+    negated = false,
   ): string | null {
     switch (node.type) {
       case "identifier": {
@@ -434,6 +445,7 @@ class Compiler {
           this.error ??= `Condition refers to '${node.name}', which is not defined`;
           return null;
         }
+        this.refuseNegatedAbsent([node.name], negated);
         return clauses.get(node.name) ?? null;
       }
       case "quantifier": {
@@ -442,6 +454,7 @@ class Compiler {
           this.error ??= `Condition's '${node.pattern}' matches no search identifier`;
           return null;
         }
+        this.refuseNegatedAbsent(targets, negated);
         const parts = targets
           .map((target) => clauses.get(target) ?? null)
           .filter((part): part is string => part !== null);
@@ -453,13 +466,30 @@ class Compiler {
         return `(${sum}) >= ${node.count}`;
       }
       case "not": {
-        const operand = this.condition(node.operand, clauses, names);
+        const operand = this.condition(node.operand, clauses, names, !negated);
         return operand === null ? null : negate(operand);
       }
       default: {
-        const parts = node.operands.map((operand) => this.condition(operand, clauses, names));
+        const parts = node.operands.map((operand) =>
+          this.condition(operand, clauses, names, negated),
+        );
         if (parts.some((part) => part === null)) return null;
         return joinClauses(parts as string[], node.type === "and" ? "AND" : "OR");
+      }
+    }
+  }
+
+  private markAbsent(name: string) {
+    this.assumedAbsent.add(name);
+    this.absentHere.push(name);
+  }
+
+  /** Negated, a fold for an absent field turns an exclusion into a pass; the field may exist under another name. */
+  private refuseNegatedAbsent(searches: string[], negated: boolean) {
+    if (!negated) return;
+    for (const search of searches) {
+      for (const field of this.absentBySearch.get(search) ?? []) {
+        this.unsupported.add(`not over absent field '${field}': cannot prove the exclusion`);
       }
     }
   }
