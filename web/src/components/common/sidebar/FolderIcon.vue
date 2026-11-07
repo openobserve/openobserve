@@ -21,11 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Shared by the folder rail and the folder dropdowns so the two can't drift.
 
+import { computed } from "vue";
 import OGlyph from "@/lib/forms/EmojiPicker/OGlyph.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconToken } from "@/lib/forms/EmojiPicker/OGlyph.types";
+import { isUnresolvedFlatToken } from "@/lib/forms/EmojiPicker/flatIconCatalog";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** The folder's chosen icon, or null to fall back to the folder glyph. */
     token?: IconToken | null;
@@ -34,11 +36,13 @@ withDefaults(
   }>(),
   { token: null, favorite: false },
 );
+
+const showGlyph = computed(() => !!props.token && !isUnresolvedFlatToken(props.token));
 </script>
 
 <template>
   <span class="flex size-4 shrink-0 items-center justify-center" data-test="folder-icon">
-    <OGlyph v-if="token" :token="token" size="sm" />
+    <OGlyph v-if="showGlyph" :token="token" size="sm" />
     <OIcon v-else-if="favorite" name="star" size="sm" class="text-favorite" />
     <OIcon v-else name="folder-outline" size="sm" class="text-current" />
   </span>

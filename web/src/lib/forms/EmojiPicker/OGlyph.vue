@@ -6,7 +6,10 @@
 // through here, so the rest of the app never has to know which kind it holds.
 
 import { computed } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { resolveGlyph, isGlyphToken, isImageGlyph } from "./glyphRegistry";
+import { isFlatIconToken, resolveFlatIcon } from "./flatIconCatalog";
+import { isMonoLogoToken, resolveMonoLogo } from "./monoLogoRegistry";
 import type { GlyphProps } from "./OGlyph.types";
 
 const props = withDefaults(defineProps<GlyphProps>(), {
@@ -18,11 +21,19 @@ const props = withDefaults(defineProps<GlyphProps>(), {
 const glyph = computed(() => resolveGlyph(props.token));
 const imageSrc = computed(() => (isImageGlyph(glyph.value) ? glyph.value : null));
 const glyphComponent = computed(() => (isImageGlyph(glyph.value) ? null : glyph.value));
+const flatIcon = computed(() => resolveFlatIcon(props.token));
+const monoLogo = computed(() => resolveMonoLogo(props.token));
 
 // An `o2:` token with no registry entry renders nothing rather than leaking the
 // raw string — that happens when a glyph is retired but a folder still points
 // at it.
-const showEmoji = computed(() => !!props.token && !isGlyphToken(props.token));
+const showEmoji = computed(
+  () =>
+    !!props.token &&
+    !isGlyphToken(props.token) &&
+    !isFlatIconToken(props.token) &&
+    !isMonoLogoToken(props.token),
+);
 
 // Emoji are sized by font-size, glyphs by box — a single scale drives both so
 // the two kinds line up on the same row.
@@ -30,6 +41,17 @@ const emojiSize: Record<NonNullable<GlyphProps["size"]>, string> = {
   sm: "text-sm",
   md: "text-lg",
   lg: "text-xl",
+};
+// Flat icons and mono logos are both padded 24-unit grids, so they share OIcon's steps rather than the glyph box.
+const flatIconSize: Record<NonNullable<GlyphProps["size"]>, "sm" | "md"> = {
+  sm: "sm",
+  md: "md",
+  lg: "md",
+};
+const monoSize: Record<NonNullable<GlyphProps["size"]>, string> = {
+  sm: "size-4",
+  md: "size-6",
+  lg: "size-6",
 };
 const glyphSize: Record<NonNullable<GlyphProps["size"]>, string> = {
   sm: "size-3.5",
@@ -44,8 +66,16 @@ const plateClasses = "bg-glyph-plate rounded-default box-content p-px";
 </script>
 
 <template>
+  <OIcon v-if="flatIcon" :name="flatIcon" :size="flatIconSize[size]" data-test="glyph-icon" />
+  <component
+    :is="monoLogo"
+    v-else-if="monoLogo"
+    :class="['shrink-0', monoSize[size]]"
+    aria-hidden="true"
+    data-test="glyph-mono"
+  />
   <span
-    v-if="glyphComponent"
+    v-else-if="glyphComponent"
     :class="['inline-flex shrink-0 items-center justify-center', plateClasses]"
     data-test="glyph-plate"
   >
