@@ -10,6 +10,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -26,7 +27,8 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
-import searchService from "@/services/search";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/auth";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
@@ -36,6 +38,12 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  filtersWhere,
+  sliceBounds,
+  type FieldFilter,
+  type TimeSlice,
+} from "@/utils/dashboard/chartPointExplore";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 
 const props = defineProps<{
@@ -46,6 +54,9 @@ const props = defineProps<{
   startTime: number; // microseconds
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
+  // A chart point's group-by values; they replace the single field/value of a table cell.
+  filters?: FieldFilter[];
+  timeSlice?: TimeSlice;
 }>();
 
 const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
@@ -57,7 +68,12 @@ const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
-const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
+const activeFilters = computed<FieldFilter[]>(
+  () => props.filters ?? [{ field: props.field, value: props.value }],
+);
+const paramsValid = computed(
+  () => SQL_IDENT.test(props.stream) && activeFilters.value.every((f) => SQL_IDENT.test(f.field)),
+);
 
 // Editable time range (µs); searches read these refs, not the fixed props.
 const rangeStart = ref(props.startTime);
@@ -106,24 +122,29 @@ function isResultExpanded(i: number) {
 const customSql = ref("");
 const showSql = ref(false); // query editor is collapsed until the SQL toggle
 
-function escSql(v: string | number): string {
-  return String(v).replace(/'/g, "''");
-}
-// Clicked cell predicate: IS NULL for empty, unquoted for numbers, escaped-quote otherwise.
-function cellWhere(): string {
-  const v = props.value;
-  if (v === null || v === undefined || v === "") return `${props.field} IS NULL`;
-  if (typeof v === "number") return `${props.field} = ${v}`;
-  return `${props.field} = '${escSql(v)}'`;
-}
-// Cell predicate AND-combined with the panel's own filter to match its scoped data.
-function effectiveWhere(): string {
-  const cell = cellWhere();
-  return props.baseWhere ? `(${props.baseWhere}) AND ${cell}` : cell;
+// Clicked predicates AND-combined with the panel's own filter to match its scoped data.
+function whereClause(): string {
+  const where = filtersWhere(props.baseWhere, activeFilters.value);
+  return where ? ` WHERE ${where}` : "";
 }
 function buildDefaultSql(): string {
-  return `SELECT * FROM "${props.stream}" WHERE ${effectiveWhere()} ORDER BY _timestamp DESC`;
+  return `SELECT * FROM "${props.stream}"${whereClause()} ORDER BY _timestamp DESC`;
 }
+
+// ── Applied filters (chart point) ─────────────────────────────────────────────
+const appliedTime = computed(() => {
+  const range = t(
+    "panel.pointExplore.slice",
+    sliceBounds(rangeStart.value, rangeEnd.value, store.state.timezone),
+  );
+  // The slice note only holds while the picker still shows the clicked slice.
+  if (rangeStart.value !== props.startTime || rangeEnd.value !== props.endTime) return range;
+  const note =
+    props.timeSlice === "bucket"
+      ? t("panel.logExplorer.applied.clickedBucket")
+      : t("panel.logExplorer.applied.panelRange");
+  return t("panel.logExplorer.applied.timeWithNote", { range, note });
+});
 function activeSql() {
   return customSql.value || buildDefaultSql();
 }
@@ -315,23 +336,18 @@ async function loadSurrounding(ev: Record<string, any>) {
   surroundPage.value = 0;
   surroundExpandedIdx.value = new Set();
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT * FROM "${props.stream}" ORDER BY _timestamp ASC`,
-            start_time: ts - win,
-            end_time: ts + win,
-            from: 0,
-            size: 200,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
+    const res = await streamSearch("surround", {
+      sql: `SELECT * FROM "${props.stream}" ORDER BY _timestamp ASC`,
+      start_time: ts - win,
+      end_time: ts + win,
+      from: 0,
+      size: 200,
+    });
+    if (!res) return;
+    // Streamed partitions arrive in their own order, so restore the ascending order the SQL asks for.
+    surroundEvents.value = [...res.hits].sort(
+      (a, b) => Number(a._timestamp ?? 0) - Number(b._timestamp ?? 0),
     );
-    surroundEvents.value = res.data?.hits ?? [];
     // Jump to the page containing the selected event
     const idx = surroundEvents.value.findIndex((e) => String(e._timestamp) === String(ts));
     if (idx >= 0) surroundPage.value = Math.floor(idx / surroundPageSize.value);
@@ -348,26 +364,17 @@ async function loadInsights(ev: Record<string, any>) {
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
-  const where = effectiveWhere();
+  const where = whereClause();
 
   const [histR, patR] = await Promise.allSettled([
     // 1. Histogram — event count per time bucket over full range
-    searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT histogram(_timestamp, '${intv}') AS zo_key, COUNT(*) AS zo_cnt FROM "${props.stream}" WHERE ${where} GROUP BY zo_key ORDER BY zo_key`,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: 0,
-            size: 500,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    ),
+    streamSearch("histogram", {
+      sql: `SELECT histogram(_timestamp, '${intv}') AS zo_key, COUNT(*) AS zo_cnt FROM "${props.stream}"${where} GROUP BY zo_key ORDER BY zo_key`,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: 0,
+      size: 500,
+    }),
 
     // 2. Log patterns — cluster similar log lines
     patternsService.extractPatterns({
@@ -375,7 +382,7 @@ async function loadInsights(ev: Record<string, any>) {
       stream_name: props.stream,
       query: {
         query: {
-          sql: `SELECT * FROM "${props.stream}" WHERE ${where}`,
+          sql: `SELECT * FROM "${props.stream}"${where}`,
           start_time: rangeStart.value,
           end_time: rangeEnd.value,
           from: 0,
@@ -391,7 +398,7 @@ async function loadInsights(ev: Record<string, any>) {
       const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(key) ? key : `${key}Z`;
       return new Date(iso).getTime();
     };
-    timeline.value = (histR.value.data?.hits ?? [])
+    timeline.value = (histR.value?.hits ?? [])
       .map((h: any) => ({ keyMs: toUtcMs(String(h.zo_key ?? "")), num: Number(h.zo_cnt) }))
       .filter((b: any) => !isNaN(b.keyMs))
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
@@ -616,7 +623,120 @@ function fmtRelTime(tsMicros: number, refMicros: number): string {
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
-async function runSql(sql: string, fromOffset: number) {
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+// One stream per purpose: a new search of the same purpose cancels the one before it.
+const inFlight = new Map<string, { traceId: string; settle: () => void }>();
+
+function cancelSearch(key: string) {
+  const running = inFlight.get(key);
+  if (!running) return;
+  inFlight.delete(key);
+  cancelStreamQueryBasedOnRequestId({ trace_id: running.traceId, org_id: orgId.value });
+  running.settle();
+}
+
+/** One SQL search over _search_stream; null when a newer search of `key` or closing the drawer cancels it. */
+function streamSearch(
+  key: string,
+  query: {
+    sql: string;
+    start_time: number;
+    end_time: number;
+    from: number;
+    size: number;
+    track_total_hits?: boolean;
+  },
+): Promise<{ hits: any[] } | null> {
+  cancelSearch(key);
+  const { traceId } = generateTraceContext();
+  const useBase64 = store.state.zoConfig?.sql_base64_enabled;
+  return new Promise((resolve, reject) => {
+    inFlight.set(key, { traceId, settle: () => resolve(null) });
+    const isCurrent = () => inFlight.get(key)?.traceId === traceId;
+    let streamingAggs = false;
+    let hits: any[] = [];
+    const metadataHits: any[] = [];
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: { ...query, sql: useBase64 ? b64EncodeUnicode(query.sql) : query.sql },
+          ...(useBase64 ? { encoding: "base64" } : {}),
+        },
+        type: "search",
+        pageType: props.streamType ?? "logs",
+        searchType: "ui",
+        traceId,
+        org_id: orgId.value,
+      },
+      {
+        data: (_payload: unknown, response: any) => {
+          const content = response?.content ?? {};
+          const results = content.results ?? {};
+          if (response?.type === "search_response_metadata") {
+            streamingAggs ||= Boolean(results.streaming_aggs ?? content.streaming_aggs);
+            // A cached response can carry its hits on metadata alone, so keep them as a fallback.
+            if (Array.isArray(results.hits)) metadataHits.push(...results.hits);
+            return;
+          }
+          if (response?.type !== "search_response_hits") return;
+          const chunk: any[] = results.hits ?? content.hits ?? [];
+          if (!Array.isArray(chunk) || !chunk.length) return;
+          // A streaming aggregate resends its whole result with every chunk.
+          hits = streamingAggs ? [...chunk] : [...hits, ...chunk];
+        },
+        error: (_payload: unknown, response: any) => {
+          if (!isCurrent()) return;
+          inFlight.delete(key);
+          const body = response?.content ?? response ?? {};
+          const error: any = new Error(
+            String(body.error ?? body.message ?? body.error_detail ?? "Search failed"),
+          );
+          error.response = { data: body };
+          reject(error);
+        },
+        complete: () => {
+          if (!isCurrent()) return;
+          inFlight.delete(key);
+          resolve({ hits: hits.length ? hits : metadataHits });
+        },
+      },
+    );
+  });
+}
+onBeforeUnmount(() => [...inFlight.keys()].forEach(cancelSearch));
+
+// A streamed search reports only the rows it sent, so the match count is its own request, as the Logs page does it.
+async function countMatches(sql: string): Promise<number | null> {
+  try {
+    const res = await streamSearch("count", {
+      sql,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: 0,
+      size: 0,
+      track_total_hits: true,
+    });
+    return res ? res.hits.reduce((sum, hit) => sum + (Number(hit?.zo_sql_num) || 0), 0) : null;
+  } catch {
+    return null;
+  }
+}
+
+// A count belongs to one query run: page turns reuse it, and a newer run drops a late one.
+let queryRun = 0;
+let runRows = { run: 0, seen: 0, failed: false };
+
+async function countInto(sql: string, run: number) {
+  const matches = await countMatches(sql);
+  if (matches === null || run !== queryRun) return;
+  // A failed search shows its error with no rows; a late count must not bring a pager back.
+  if (runRows.run === run && runRows.failed) return;
+  // The run's rows already on screen are a floor, so the pager never hides a page being shown.
+  total.value = Math.max(matches, runRows.run === run ? runRows.seen : 0);
+}
+
+// `count` is set for a new query; paging keeps the total it already has.
+async function runSql(sql: string, fromOffset: number, count = false) {
   if (!orgId.value || !props.stream) {
     errorMsg.value = props.stream ? "" : `Stream not resolved (field: ${props.field})`;
     return;
@@ -629,32 +749,36 @@ async function runSql(sql: string, fromOffset: number) {
   }
   loading.value = true;
   errorMsg.value = "";
+  let superseded = false;
+  const run = count ? ++queryRun : queryRun;
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: fromOffset,
-            size: pageSize.value,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    );
-    events.value = res.data?.hits ?? [];
-    total.value = res.data?.total ?? events.value.length;
+    if (count) {
+      total.value = 0;
+      runRows = { run, seen: 0, failed: false };
+      void countInto(sql, run);
+    }
+    const res = await streamSearch("events", {
+      sql,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: fromOffset,
+      size: pageSize.value,
+    });
+    // A newer query took over this one; its own run owns the results and the spinner.
+    superseded = !res;
+    if (!res) return;
+    events.value = res.hits;
+    runRows = { run, seen: fromOffset + res.hits.length, failed: false };
+    // Until the count answers, or if it fails, the total is at least the rows seen so far.
+    total.value = Math.max(total.value, runRows.seen);
     resultExpandedIdx.value = new Set();
   } catch (e: any) {
     errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
     events.value = [];
     total.value = 0;
+    runRows = { run, seen: 0, failed: true };
   } finally {
-    loading.value = false;
+    if (!superseded) loading.value = false;
   }
 }
 
@@ -662,11 +786,11 @@ async function loadEvents() {
   page.value = 0;
   const sql = buildDefaultSql();
   customSql.value = sql;
-  await runSql(sql, 0);
+  await runSql(sql, 0, true);
 }
 async function runQuery() {
   page.value = 0;
-  await runSql(activeSql(), 0);
+  await runSql(activeSql(), 0, true);
 }
 async function goToPage(p: number) {
   page.value = p;
@@ -680,23 +804,14 @@ async function restoreEventDetail() {
   if (!/^\d{1,20}$/.test(rawTs)) return;
   const ts = Number(rawTs);
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT * FROM "${props.stream}" WHERE _timestamp = ${ts}`,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: 0,
-            size: 1,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    );
-    const found = res.data?.hits?.[0];
+    const res = await streamSearch("restore", {
+      sql: `SELECT * FROM "${props.stream}" WHERE _timestamp = ${ts}`,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: 0,
+      size: 1,
+    });
+    const found = res?.hits[0];
     if (found) {
       selectedEvent.value = found;
       loadInsights(found);
@@ -713,7 +828,7 @@ onMounted(async () => {
   await restoreEventDetail();
 });
 watch(
-  () => [props.field, props.value, props.stream],
+  () => [props.field, props.value, props.stream, props.filters],
   () => {
     selectedEvent.value = null;
     loadEvents();
@@ -851,6 +966,38 @@ function openInLogs() {
             />
           </div>
         </div>
+      </div>
+
+      <div
+        v-if="filters"
+        class="border-border-default flex shrink-0 flex-wrap items-center gap-1.5 border-b px-2 py-2"
+        data-test="log-explorer-applied"
+      >
+        <span class="text-text-secondary me-1 text-xs">{{
+          t("panel.logExplorer.applied.label")
+        }}</span>
+        <ODimensionChip
+          dim-key="time"
+          :key-label="t('panel.logExplorer.applied.time')"
+          :value="appliedTime"
+          variant="default-soft"
+          data-test="log-explorer-applied-time"
+        />
+        <ODimensionChip
+          v-if="baseWhere"
+          dim-key="panel-filter"
+          :key-label="t('panel.logExplorer.applied.panelFilter')"
+          :value="baseWhere"
+          variant="warning-soft"
+          data-test="log-explorer-applied-where"
+        />
+        <ODimensionChip
+          v-for="f in filters"
+          :key="f.field"
+          :dim-key="f.field"
+          :value="f.value ?? t('panel.logExplorer.applied.empty')"
+          :data-test="`log-explorer-applied-${f.field}`"
+        />
       </div>
 
       <!-- ── Error ────────────────────────────────────────────────────── -->
