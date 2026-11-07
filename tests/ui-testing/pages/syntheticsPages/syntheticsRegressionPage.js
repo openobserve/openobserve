@@ -46,6 +46,11 @@ export class SyntheticsRegressionPage {
       runDetailBackButton: '[data-test="synthetics-run-detail-back-btn"]',
       runDetailTitle: '[data-test="synthetics-run-detail-title"]',
       runDetailInfoSkeleton: '[data-test="synthetics-run-detail-info-skeleton"]',
+      runDetailStatusBadge: '[data-test="synthetics-run-detail-status-badge"]',
+      runDetailStepsTab: '[data-test="synthetics-run-detail-tab-steps"]',
+      runDetailSkippedCount: '[data-test="synthetics-run-detail-skipped-count"]',
+      stepDetailsCell: '[data-test="o2-table-cell-details"]',
+      stepDot: '[data-test="o2-table-cell-step"] span',
       protocolRunTitle: '[data-test="synthetics-protocol-run-title"]',
       protocolRunBackButton: '[data-test="synthetics-protocol-run-back-btn"]',
       locationsAddButton: '[data-test="synthetics-locations-add-btn"]',
@@ -142,7 +147,7 @@ export class SyntheticsRegressionPage {
   }
 
   // Disabled so the scheduler never claims it; the seeded runs stand in for real probes.
-  async createCheck(name, type, locationId, { destinations = [] } = {}) {
+  async createCheck(name, type, locationId, { destinations = [], config, target } = {}) {
     const configs = {
       http: { method: 'GET', timeout_ms: 10000, follow_redirects: true, headers: [], assertions: [{ field: 'status_code', operator: 'eq', value: 200 }] },
       tcp: { port: 443, timeout_ms: 10000 },
@@ -153,20 +158,28 @@ export class SyntheticsRegressionPage {
         capture: { screenshot: 'on-fail', trace: 'on-fail', video: 'off' },
       },
     };
+    const checkTarget = target ?? (type === 'tcp' ? 'example.com' : 'https://example.com');
     const { status, body } = await this.apiRequest('post', `/api/${this.org()}/synthetics?folder=default`, {
       name,
       type,
-      target: type === 'tcp' ? 'example.com' : 'https://example.com',
+      target: checkTarget,
       enabled: false,
       retries: 0,
       locations: [locationId],
       frequency: { type: 'minutes', interval: 5, cron: '' },
-      config: configs[type],
+      config: config ?? configs[type],
       destinations,
     });
     if (body?.id) this.createdCheckIds.push(body.id);
     expect([200, 201], `check ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
-    return { id: body.id, name, type };
+    return { id: body.id, name, type, target: checkTarget };
+  }
+
+  async fetchCheckSteps(checkId) {
+    const { status, body } = await this.apiRequest('get', `/api/${this.org()}/synthetics/${checkId}?folder=default`);
+    expect(status, `check ${checkId} must load: ${JSON.stringify(body)}`).toBe(200);
+    expect(body?.config?.steps?.length, 'the check must have stored steps').toBeGreaterThan(0);
+    return body.config.steps;
   }
 
   async deleteCheck(id) {
@@ -256,13 +269,72 @@ export class SyntheticsRegressionPage {
           : { status_code: passed ? 200 : 503, assertions_passed: passed }),
       };
     });
+    await this.ingestResultRows(check, rows);
+    return rows.map((r) => ({ runId: r.run_id, executionId: r.execution_id }));
+  }
+
+  /** Stores one browser run with the fields the probe posts, so run detail reads it through real ingest and search. */
+  async seedBrowserRunRecord(check, locationId, { status, lastAttemptSteps, startLoad, failureDetail, error = '', durationMs = 4000 }) {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const tsMicros = (Date.now() - 30000) * 1000;
+    const row = {
+      _timestamp: tsMicros,
+      execution_id: `exec-${suffix}`,
+      run_id: `run-${suffix}`,
+      job_id: `job-${suffix}`,
+      synthetics_id: check.id,
+      synthetics_name: check.name,
+      org_id: this.org(),
+      location: locationId,
+      location_label: locationId,
+      scheduled_ts: tsMicros - 6_000_000,
+      started_ts: tsMicros - 5_000_000,
+      completed_ts: tsMicros,
+      trigger_type: 'schedule',
+      type: 'browser',
+      target: check.target,
+      runtime: 'lambda',
+      region: 'us-east-1',
+      schema_version: 1,
+      engine: 'chromium',
+      device: 'desktop',
+      status,
+      response_time_ms: durationMs,
+      init_ms: 300,
+      total_attempt_ms: durationMs,
+      error,
+      attempts: 1,
+      recorded_steps: await this.fetchCheckSteps(check.id),
+      last_attempt_steps: lastAttemptSteps,
+      start_load: startLoad,
+      retry_history: [{
+        attempt: 0,
+        steps: lastAttemptSteps.map(({ step_id, status: stepStatus, duration_ms }) => ({ step_id, status: stepStatus, duration_ms })),
+        start_load: startLoad,
+        status,
+        response_time_ms: durationMs,
+        init_ms: 300,
+        ...(failureDetail ? { failure_detail: failureDetail } : {}),
+        artifacts: { screenshot_refs: [] },
+      }],
+      ...(failureDetail ? { failure_detail: failureDetail } : {}),
+      artifacts_withheld: [],
+      evidence_truncated: false,
+      evidence_by_step: [],
+      probe_id: 'e2e-probe',
+      probe_name: 'e2e',
+    };
+    await this.ingestResultRows(check, [row]);
+    return { runId: row.run_id, executionId: row.execution_id };
+  }
+
+  async ingestResultRows(check, rows) {
     const res = await ingestCustomData(this.page, RESULTS_STREAM, rows);
     const failed = res.data?.status?.find((s) => Number(s.failed) > 0);
     expect(res.status === 200 && !failed, `seeding ${RESULTS_STREAM} must succeed: ${JSON.stringify(res.data)}`).toBe(true);
     const searchable = await waitForFieldValueSearchable(this.page, RESULTS_STREAM, 'synthetics_id', check.id, 60000);
     expect(searchable, `seeded runs for ${check.id} must become searchable`).toBe(true);
     testLogger.info('Synthetics runs seeded', { checkId: check.id, count: rows.length });
-    return rows.map((r) => ({ runId: r.run_id, executionId: r.execution_id }));
   }
 
   // One click per settled direction, so a slow re-render cannot step past the target in the asc -> desc -> none cycle.
@@ -480,6 +552,69 @@ export class SyntheticsRegressionPage {
     await this.gotoRunDetail(check, run, { period: '6h' });
     await this.clickRunDetailBack(type);
     await this.expectResultsReopenedOnRun(check.id, run, '6h');
+  }
+
+  runStepRow(index) { return this.page.locator(`[data-test="o2-table-row-${index}"]`); }
+  runStepPanel(index) { return this.page.locator(`[data-test="o2-table-expanded-row-${index}"]`); }
+  runStepBadge(index) { return this.page.locator(`[data-test="synthetics-journey-step-badge-${index}"]`); }
+  runStepErrorCard(rowId) { return this.page.locator(`[data-test="synthetics-run-detail-step-error-card-${rowId}"]`); }
+
+  // By visible label: the bug rendered these rows with the wrong value, so a missing test id would prove less.
+  runStepFieldLabel(index, label) { return this.runStepPanel(index).locator(`dt:text-is("${label}")`); }
+  runStepField(index, label) { return this.runStepPanel(index).locator(`dt:text-is("${label}") + dd`); }
+
+  async openRunSteps(check, run, stepCount) {
+    await this.gotoRunDetail(check, run);
+    await this.page.locator(this.locators.runDetailStepsTab).click();
+    await expect(this.page.locator(this.locators.tableRow), 'one row per executed step').toHaveCount(stepCount, { timeout: 30000 });
+  }
+
+  async expandRunStep(index) {
+    await this.runStepRow(index).locator(this.locators.stepDetailsCell).click();
+    await expect(this.runStepPanel(index)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectRunStatus(text) {
+    await expect(this.page.locator(this.locators.runDetailStatusBadge)).toHaveText(text, { timeout: 30000 });
+  }
+
+  async expectSkippedStepCount(count) {
+    await expect(this.page.locator(this.locators.runDetailSkippedCount)).toHaveText(`${count} skipped`);
+  }
+
+  async expectRunStepBadge(index, text) {
+    await expect(this.runStepBadge(index)).toHaveText(text);
+  }
+
+  async expectNoRunStepBadge(index) {
+    await expect(this.runStepBadge(index)).toHaveCount(0);
+  }
+
+  async runStepDotColor(index) {
+    const dot = this.runStepRow(index).locator(this.locators.stepDot);
+    await expect(dot).toBeVisible();
+    return dot.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
+  async expectRunStepDotsDiffer(index, otherIndex) {
+    expect(await this.runStepDotColor(index), `step ${index} and step ${otherIndex} must not share a status colour`)
+      .not.toBe(await this.runStepDotColor(otherIndex));
+  }
+
+  async expectRunStepField(index, label, value) {
+    await expect(this.runStepField(index, label), `${label} of step ${index}`).toHaveText(value);
+  }
+
+  async expectNoRunStepField(index, label) {
+    await expect(this.runStepFieldLabel(index, label), `step ${index} must not list ${label}`).toHaveCount(0);
+  }
+
+  async expectRunStepPanelOmits(index, text) {
+    await expect(this.runStepPanel(index), `step ${index} must not mention ${text}`).not.toContainText(text);
+  }
+
+  async expectRunStepError(rowId, text) {
+    await expect(this.runStepErrorCard(rowId)).toContainText(text, { timeout: 15000 });
   }
 
   async gotoLocations(metaOrg) {

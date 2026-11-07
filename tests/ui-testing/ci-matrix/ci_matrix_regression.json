@@ -242,7 +242,8 @@
     "run_files": [
       "synthetics-15269-list-state.spec.js",
       "synthetics-15060-full-text-on-hover.spec.js",
-      "synthetics-ent2691-destination-delete-guard.spec.js"
+      "synthetics-ent2691-destination-delete-guard.spec.js",
+      "synthetics-ent3140-run-detail-steps.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",
