@@ -1,0 +1,10 @@
+{
+  "actor": {
+    "user_name": "preset-user"
+  },
+  "device": {
+    "hostname": "preset-host"
+  },
+  "user": "gina",
+  "host": "other-host"
+}

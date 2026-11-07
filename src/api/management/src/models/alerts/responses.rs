@@ -25,6 +25,18 @@ use utoipa::ToSchema;
 
 use super::{Alert, FrequencyType, QueryCondition, TriggerCondition};
 
+/// Context attributes the list carries for SIEM detections; `sigma_yaml` stays on the GET.
+const SIEM_LIST_ATTRIBUTES: [&str; 8] = [
+    "siem",
+    "sigma_id",
+    "sigma_title",
+    "sigma_level",
+    "sigma_logsource",
+    "mitre_techniques",
+    "mitre_tactics",
+    "source_type",
+];
+
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct GetAlertResponseBody {
@@ -164,6 +176,9 @@ pub struct ListAlertsResponseBodyItem {
     /// `groups_observed` does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub groups_firing_is_lower_bound: Option<bool>,
+    /// SIEM detections only: the detection's context attributes minus the rule YAML.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_attributes: Option<HashMap<String, String>>,
     /// Composite rows only: number of referenced children.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub child_count: Option<usize>,
@@ -510,6 +525,10 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         } else {
             "scheduled".to_string()
         };
+        let context_attributes = alert
+            .context_attributes
+            .as_ref()
+            .and_then(siem_list_attributes);
         // Every scheduled/realtime/slo alert is saved against a real stream —
         // an empty `stream_name` only happens pre-save, never on a stored
         // alert — but treat it as "no stream" defensively rather than send a
@@ -553,6 +572,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            context_attributes,
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
@@ -691,6 +711,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         groups_firing: None,
         groups_observed_is_lower_bound: None,
         groups_firing_is_lower_bound: None,
+        context_attributes: None,
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
@@ -830,11 +851,93 @@ fn still_active(
     })
 }
 
+/// The list-safe subset of a SIEM detection's attributes; `None` for any other alert.
+fn siem_list_attributes(
+    attrs: &hashbrown::HashMap<String, String>,
+) -> Option<HashMap<String, String>> {
+    if attrs.get("siem").map(String::as_str) != Some("true") {
+        return None;
+    }
+    let mut out: HashMap<String, String> = SIEM_LIST_ATTRIBUTES
+        .iter()
+        .filter_map(|key| attrs.get(*key).map(|v| (key.to_string(), v.clone())))
+        .collect();
+    // Detections created before `sigma_title` existed only carry the YAML.
+    if !out.contains_key("sigma_title")
+        && let Some(title) = attrs.get("sigma_yaml").and_then(|y| sigma_title_of(y))
+    {
+        out.insert("sigma_title".to_string(), title);
+    }
+    Some(out)
+}
+
+/// The top-level `title:` of a Sigma rule, unquoted.
+fn sigma_title_of(yaml: &str) -> Option<String> {
+    let raw = yaml
+        .lines()
+        .find_map(|line| line.strip_prefix("title:"))?
+        .trim();
+    let unquoted = raw
+        .strip_prefix('"')
+        .and_then(|r| r.strip_suffix('"'))
+        .or_else(|| raw.strip_prefix('\'').and_then(|r| r.strip_suffix('\'')))
+        .unwrap_or(raw);
+    Some(unquoted.trim().to_string()).filter(|t| !t.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
+
+    #[test]
+    fn test_siem_list_attributes_skips_non_siem_alerts() {
+        let attrs = hashbrown::HashMap::from([("sigma_id".to_string(), "x".to_string())]);
+        assert!(siem_list_attributes(&attrs).is_none());
+    }
+
+    #[test]
+    fn test_siem_list_attributes_drops_yaml_and_derives_title() {
+        let attrs = hashbrown::HashMap::from([
+            ("siem".to_string(), "true".to_string()),
+            ("sigma_level".to_string(), "high".to_string()),
+            (
+                "sigma_yaml".to_string(),
+                "title: 'AWS IAM Access Key Created'\nlevel: high\n".to_string(),
+            ),
+            ("unrelated".to_string(), "v".to_string()),
+        ]);
+        let out = siem_list_attributes(&attrs).unwrap();
+        assert_eq!(
+            out.get("sigma_title").unwrap(),
+            "AWS IAM Access Key Created"
+        );
+        assert_eq!(out.get("sigma_level").unwrap(), "high");
+        assert!(!out.contains_key("sigma_yaml"));
+        assert!(!out.contains_key("unrelated"));
+    }
+
+    #[test]
+    fn test_siem_list_attributes_keeps_stored_title() {
+        let attrs = hashbrown::HashMap::from([
+            ("siem".to_string(), "true".to_string()),
+            ("sigma_title".to_string(), "Stored".to_string()),
+            ("sigma_yaml".to_string(), "title: From YAML\n".to_string()),
+        ]);
+        let out = siem_list_attributes(&attrs).unwrap();
+        assert_eq!(out.get("sigma_title").unwrap(), "Stored");
+    }
+
+    #[test]
+    fn test_sigma_title_of_ignores_nested_titles_and_empty() {
+        assert_eq!(
+            sigma_title_of("id: 1\ntitle: \"Quoted\"\n").as_deref(),
+            Some("Quoted")
+        );
+        assert_eq!(sigma_title_of("detection:\n  title: nested\n"), None);
+        assert_eq!(sigma_title_of("title:\n"), None);
+    }
 
     fn valid_ksuid_str() -> String {
         svix_ksuid::Ksuid::new(None, None).to_string()
@@ -916,6 +1019,7 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            context_attributes: None,
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,

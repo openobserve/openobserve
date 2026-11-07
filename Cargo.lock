@@ -8337,8 +8337,10 @@ dependencies = [
  "reqwest 0.13.4",
  "serde",
  "serde_json",
+ "sha256",
  "thiserror 2.0.21",
  "tokio",
+ "transform",
  "utoipa",
 ]
 

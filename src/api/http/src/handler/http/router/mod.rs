@@ -46,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
-    slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1350,6 +1350,9 @@ fn service_route_table() -> Router {
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
+        // Built-in OCSF packs: read-only, no org data
+        .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
+
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/overview", get(organization::org::org_overview))
@@ -1536,6 +1539,7 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
+        .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
 
         // Alerts - incidents must be before alerts to avoid route conflicts

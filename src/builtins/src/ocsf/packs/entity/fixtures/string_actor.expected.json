@@ -1,0 +1,19 @@
+{
+  "class_uid": 0,
+  "class_name": "Base Event",
+  "category_uid": 0,
+  "category_name": "Uncategorized",
+  "activity_id": 0,
+  "activity_name": "Unknown",
+  "type_uid": 0,
+  "metadata_product_name": "__O2_STREAM__",
+  "metadata_product_vendor_name": "Unknown",
+  "metadata_version": "1.6.0",
+  "o2_ocsf_pack": "entity@1",
+  "severity_id": 2,
+  "severity": "Low",
+  "status_id": 0,
+  "actor": "system",
+  "src_endpoint_ip": "203.0.113.9",
+  "actor_user_name": null
+}

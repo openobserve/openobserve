@@ -1,0 +1,17 @@
+{
+  "class_uid": 3002,
+  "category_uid": 3,
+  "activity_id": 1,
+  "type_uid": 300201,
+  "metadata_product_name": "__O2_STREAM__",
+  "metadata_product_vendor_name": "Unknown",
+  "metadata_version": "1.6.0",
+  "o2_ocsf_pack": "entity@1",
+  "severity_id": 4,
+  "severity": "High",
+  "status_id": 0,
+  "actor_user_name": "hank",
+  "class_name": null,
+  "category_name": null,
+  "activity_name": null
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OStatCard — the reusable KPI / stat tile. The ONE stat primitive across the
@@ -15,8 +15,8 @@ import type { I18nText } from "@/types/i18n";
 //
 // Colour comes only from `tone` (token-backed, both themes). `clickable` makes it
 // a button (e.g. a filter tile); `selected` marks the active filter with an
-// accent BORDER (no fills). Value is shown verbatim — pass "—" for "no data";
-// a real 0 renders as "0".
+// accent BORDER (no fills). Value is shown verbatim unless `compactValue` — pass "—"
+// for "no data"; a real 0 renders as "0".
 
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -25,6 +25,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
+import { formatCompactCount } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const { lgUp } = useBreakpoint();
@@ -48,6 +49,8 @@ const props = withDefaults(
     trend?: StatTrend;
     /** Denominator for the proportion bar (this stat's share of the whole). */
     max?: number;
+    /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
+    compactValue?: boolean;
     /** Render as a button with hover feedback (e.g. a filter tile). */
     clickable?: boolean;
     /** Active-filter state — accent border. */
@@ -56,7 +59,7 @@ const props = withDefaults(
     loading?: boolean;
     dataTest?: string;
   }>(),
-  { tone: "neutral", clickable: false, selected: false, loading: false },
+  { tone: "neutral", clickable: false, selected: false, loading: false, compactValue: false },
 );
 
 const slots = useSlots();
@@ -122,7 +125,14 @@ const tc = computed(() => TONES[props.tone ?? "neutral"] ?? TONES.neutral);
 // (nothing to draw attention to) — only a positive value gets the tone colour.
 const displayValue = computed(() => {
   const v = props.value;
-  return v === "" || v == null || v === "—" ? "—" : v;
+  if (v === "" || v == null || v === "—") return "—";
+  return props.compactValue && typeof v === "number" ? formatCompactCount(v) : v;
+});
+const exactTitle = computed(() => {
+  const v = props.value;
+  return props.compactValue && typeof v === "number" && String(v) !== displayValue.value
+    ? raw(v.toLocaleString())
+    : undefined;
 });
 const isMuted = computed(() => {
   const v = props.value;
@@ -180,6 +190,7 @@ const trendClass = computed(() =>
             data-test="o-stat-card-value-skeleton"
           />
           <slot v-else name="value">{{ displayValue }}</slot>
+          <OTooltip v-if="exactTitle" :content="exactTitle" />
         </span>
         <OTruncatedText v-if="label" class="text-text-secondary text-xs font-medium">{{
           label

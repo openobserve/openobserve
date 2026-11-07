@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :flat="store.state.solutionMode === 'security'"
         :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
@@ -132,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ONavbar
             class="min-h-0 flex-1 overflow-y-auto"
             :links-list="navLinks"
+            :flat="store.state.solutionMode === 'security'"
             :visible="true"
             @menu-hover="handleMenuHover"
           />
@@ -283,6 +285,7 @@ import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -316,7 +319,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView } from "vue-router";
+import { solutionModeForPath } from "@/utils/security/solutionMode";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -681,6 +685,45 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
+    // ── SIEM nav links (shown when solutionMode === "security") ─────────────
+
+    // Snapshot of observability links — restored when switching back from security mode
+    let _obsLinksSnapshot: NavItem[] = [];
+    const securityNavLinks = buildSecurityNavLinks(t);
+
+    watch(
+      () => store.state.solutionMode,
+      (mode: string) => {
+        if (mode === "security") {
+          // Save observability links before swapping (skip if already in security mode)
+          if (linksList.value !== securityNavLinks) {
+            _obsLinksSnapshot = [...linksList.value];
+          }
+          linksList.value = securityNavLinks;
+        } else {
+          // Restore observability nav; if no snapshot (cold load as observability), leave as-is
+          if (_obsLinksSnapshot.length > 0) {
+            linksList.value = _obsLinksSnapshot;
+            _obsLinksSnapshot = [];
+          }
+          // If snapshot is empty, filterMenus() will re-init the observability nav normally
+        }
+      },
+      { immediate: true },
+    );
+
+    // The URL decides the mode, so a shared /security link or a jump into
+    // /logs from a detection shows the matching nav.
+    const route = useRoute();
+    watch(
+      () => route.path,
+      (path: string) => {
+        const mode = solutionModeForPath(path, store.state.solutionMode);
+        if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+      },
+      { immediate: true },
+    );
+
     const navLinks = computed(() => (menuReady.value ? linksList.value : []));
 
     const langList = [
@@ -958,7 +1001,7 @@ export default defineComponent({
       if (needsFullConfig()) {
         getConfig();
       } else {
-        if (config.isCloud == "false") {
+        if (config.isCloud == "false" && store.state.solutionMode !== "security") {
           linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           filterMenus();
         }
@@ -1051,7 +1094,13 @@ export default defineComponent({
       });
     };
 
-    watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
+    watch(
+      isExperimentalEnabled,
+      () => {
+        if (store.state.solutionMode !== "security") updateAutoObserveMenu();
+      },
+      { immediate: false },
+    );
 
     // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
     const downtimesMenuState = computed<FeatureState>(() =>
@@ -1080,7 +1129,13 @@ export default defineComponent({
         licenseLocked,
       });
     };
-    watch(downtimesMenuState, () => updateDowntimesMenu(), { immediate: false });
+    watch(
+      downtimesMenuState,
+      () => {
+        if (store.state.solutionMode !== "security") updateDowntimesMenu();
+      },
+      { immediate: false },
+    );
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
@@ -1094,8 +1149,20 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or the state flips),
     // keep the menu in sync — same contract as the other flag-driven entries.
-    watch([isIncidentsEnabled, features], () => updateIncidentsMenu(), { immediate: false });
-    watch([isWorkflowsEnabled, features], () => updateWorkflowsMenu(), { immediate: false });
+    watch(
+      [isIncidentsEnabled, features],
+      () => {
+        if (store.state.solutionMode !== "security") updateIncidentsMenu();
+      },
+      { immediate: false },
+    );
+    watch(
+      [isWorkflowsEnabled, features],
+      () => {
+        if (store.state.solutionMode !== "security") updateWorkflowsMenu();
+      },
+      { immediate: false },
+    );
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -1125,7 +1192,13 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the state
     // ever flips at runtime), keep the menu in sync.
-    watch(aiObservabilityMenuState, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(
+      aiObservabilityMenuState,
+      () => {
+        if (store.state.solutionMode !== "security") updateAIObservabilityMenu();
+      },
+      { immediate: false },
+    );
 
     // A locked license keeps the entry even with the runtime flag off, so the lock stays discoverable.
     const syntheticsMenuState = computed<FeatureState>(() =>
@@ -1150,9 +1223,13 @@ export default defineComponent({
     };
 
     // Keep the menu in sync if /config resolves after mount.
-    watch(syntheticsMenuState, () => updateSyntheticMenu(), {
-      immediate: false,
-    });
+    watch(
+      syntheticsMenuState,
+      () => {
+        if (store.state.solutionMode !== "security") updateSyntheticMenu();
+      },
+      { immediate: false },
+    );
 
     const profilesMenuState = computed<FeatureState>(() =>
       menuState(features.value, "continuous_profiling", isProfilingEnabled.value),
@@ -1173,7 +1250,13 @@ export default defineComponent({
       );
     };
 
-    watch(profilesMenuState, () => updateProfilesMenu(), { immediate: false });
+    watch(
+      profilesMenuState,
+      () => {
+        if (store.state.solutionMode !== "security") updateProfilesMenu();
+      },
+      { immediate: false },
+    );
 
     // Static rail entries owned by a license feature: locked keeps the entry with a lock, hidden drops it.
     const LICENSED_LINKS: Record<string, string> = {
@@ -1188,6 +1271,7 @@ export default defineComponent({
       sloList: "anomaly_detection",
     };
     const applyLicenseStates = () => {
+      if (store.state.solutionMode === "security") return;
       linksList.value = linksList.value.flatMap((link) => {
         const key = LICENSED_LINKS[link.name];
         if (!key) return [link];
@@ -1204,6 +1288,9 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
+      // Security mode owns a fixed nav set — observability feature-flag items
+      // (AI, Synthetics, SLOs, Actions, Workflows) must not be spliced into it.
+      if (store.state.solutionMode === "security") return;
       updateAutoObserveMenu();
       updateIncidentsMenu();
       updateDowntimesMenu();
@@ -1230,10 +1317,13 @@ export default defineComponent({
     };
 
     // additional links based on environment and conditions
+    // Guard: security mode owns a fixed nav — do not splice observability items into it.
     if (config.isCloud == "true") {
-      linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
+      if (store.state.solutionMode !== "security") {
+        linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
+      }
       filterMenus();
-    } else {
+    } else if (store.state.solutionMode !== "security") {
       const streamsIndex = linksList.value.findIndex((l) => l.name === "streams");
       linksList.value.splice(streamsIndex + 1, 0, {
         title: t("menu.report"),
@@ -1661,7 +1751,7 @@ export default defineComponent({
         .fetchQuery(configFullQuery(orgIdentifier))
         .then(async (data: any) => {
           const res = { data };
-          if (config.isCloud == "false") {
+          if (config.isCloud == "false" && store.state.solutionMode !== "security") {
             linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           }
 

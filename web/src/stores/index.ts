@@ -173,6 +173,9 @@ const store = createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
+    // SIEM solution mode — switches nav and entry point between Observability and Security
+    solutionMode: (localStorage.getItem("solutionMode") || "observability") as
+      "observability" | "security",
   },
   mutations: {
     login(state, payload) {
@@ -307,6 +310,10 @@ const store = createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setSolutionMode(state, payload: "observability" | "security") {
+      state.solutionMode = payload;
+      localStorage.setItem("solutionMode", payload);
     },
     setKioskMode(state, payload) {
       state.kioskMode = payload;

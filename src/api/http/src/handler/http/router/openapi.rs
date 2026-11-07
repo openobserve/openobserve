@@ -108,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::list_ocsf_packs,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -187,6 +188,7 @@ use crate::{
         openobserve_api_management::request::alerts::move_alerts,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
+        openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
         openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::get_incident,
@@ -612,6 +614,7 @@ use crate::{
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
@@ -1066,6 +1069,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
+        (name = "Security", description = "Built-in OCSF mapping packs for security sources"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -2272,6 +2276,26 @@ mod tests {
         );
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn ocsf_packs_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/ocsf/packs"]["get"];
+        assert_eq!(op["operationId"], "ListOcsfPacks", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/OcsfPacksResponse"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "OcsfPacksResponse",
+            "OcsfPack",
+            "OcsfPackManifest",
+            "OcsfPackKind",
+        ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
