@@ -95,6 +95,15 @@ async fn remove_file_if_exists(path: &PathBuf) -> Result<bool> {
     }
 }
 
+/// Rename a tmp file to `.parquet`, returning false if its stream deleted it first.
+async fn rename_tmp_file(path: &PathBuf) -> Result<bool> {
+    match fs::rename(path, path.with_extension("parquet")).await {
+        Ok(_) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e).context(RenameFileSnafu { path }),
+    }
+}
+
 impl Immutable {
     pub(crate) fn new(idx: usize, key: WriterKey, memtable: MemTable) -> Self {
         Self { idx, key, memtable }
@@ -151,10 +160,14 @@ impl Immutable {
         }
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
+            // counted even when skipped: the whole memtable is released either way
             persist_stat += stat;
-            fs::rename(&path, &path.with_extension("parquet"))
-                .await
-                .context(RenameFileSnafu { path: &path })?;
+            if !rename_tmp_file(&path).await? {
+                log::warn!(
+                    "tmp file {} is gone, its stream was deleted while persisting, skipping it",
+                    path.display()
+                );
+            }
         }
         // 5. delete the lock file
         remove_file_if_exists(&done_path).await?;
@@ -429,5 +442,22 @@ mod tests {
         // Both functions should be callable independently
         let _ = get_immutables_cache_stats().await;
         let _ = get_processing_tables_cache_stats().await;
+    }
+
+    #[tokio::test]
+    async fn test_rename_tmp_file_skips_missing_and_renames_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("deleted_stream.par");
+        assert!(!rename_tmp_file(&missing).await.unwrap());
+        assert!(!missing.with_extension("parquet").exists());
+
+        let existing = dir.path().join("live_stream.par");
+        std::fs::write(&existing, b"data").unwrap();
+        assert!(rename_tmp_file(&existing).await.unwrap());
+        assert!(!existing.exists());
+        assert_eq!(
+            std::fs::read(existing.with_extension("parquet")).unwrap(),
+            b"data"
+        );
     }
 }
