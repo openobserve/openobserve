@@ -53,6 +53,9 @@ const AGENT_READS = [
   "dashboardId",
   "panelId",
   "alertId",
+  "alertName",
+  "alertState",
+  "alertCondition",
   "pipelineId",
   "request_timestamp",
   "user_timezone",
@@ -192,16 +195,16 @@ describe("Home Overview rows (§1.3)", () => {
   it("gives each Overview list one removable report chip labelled with its post-cap count", () => {
     const chips = pageChipsOf(HOME).map((chip) => [chip.id, chip.kind, chip.label, chip.sent]);
     expect(chips).toEqual([
-      ["page:overviewIncidents", "report", "Incidents on Overview (1)", "whitelist"],
-      ["page:overviewServices", "report", "Services on Overview (2)", "whitelist"],
-      ["page:overviewAnomalies", "report", "Anomalies on Overview (1)", "whitelist"],
-      ["page:overviewAlerts", "report", "Alerts on Overview (1)", "whitelist"],
+      ["page:overviewIncidents", "report", "Incidents on Home (1)", "whitelist"],
+      ["page:overviewServices", "report", "Services on Home (2)", "whitelist"],
+      ["page:overviewAnomalies", "report", "Anomalies on Home (1)", "whitelist"],
+      ["page:overviewAlerts", "report", "Alerts on Home (1)", "whitelist"],
     ]);
     expect(pageChipsOf(HOME, ["overviewServices"]).map((chip) => chip.id)).not.toContain(
       "page:overviewServices",
     );
     expect(ghostChipsOf(HOME, ["overviewServices"]).map((chip) => chip.label)).toEqual([
-      "Services on Overview (2)",
+      "Services on Home (2)",
     ]);
   });
 
@@ -211,12 +214,12 @@ describe("Home Overview rows (§1.3)", () => {
       rows.filter((r) => r.group === "sent").map((r) => [r.id, [r.label, r.value, r.fields]]),
     );
     expect(sent.overviewServices).toEqual([
-      "Services on Overview (2)",
+      "Services on Home (2)",
       "checkout-api, search",
       ["overviewServices", "overviewServicesMeta"],
     ]);
     expect(sent.overviewIncidents).toEqual([
-      "Incidents on Overview (1)",
+      "Incidents on Home (1)",
       "Checkout errors",
       ["overviewIncidents"],
     ]);
@@ -229,7 +232,7 @@ describe("Home Overview rows (§1.3)", () => {
     const row = seesRowsOf(rest, { window, timezone: "UTC" }).find(
       (r) => r.id === "overviewServices",
     );
-    expect(row).toMatchObject({ label: "Services on Overview (0)", value: "—" });
+    expect(row).toMatchObject({ label: "Services on Home (0)", value: "—" });
     expect(row?.fields).toEqual(["overviewServicesMeta"]);
   });
 

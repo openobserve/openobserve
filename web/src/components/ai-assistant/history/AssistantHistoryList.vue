@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="
             (listState.status === 'loading' || listState.status === 'idle') &&
-            !history.rows.value.length
+            (!history.rows.value.length || (!!query && !drawn.length))
           "
           class="flex flex-col gap-2"
           data-test="assistant-history-skeleton"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantErrorRow>
         <OEmptyState
-          v-else-if="!history.rows.value.length && !drawn.length"
+          v-else-if="!history.rows.value.length && !drawn.length && !query"
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.empty.title')"

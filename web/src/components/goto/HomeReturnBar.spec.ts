@@ -60,7 +60,7 @@ describe("HomeReturnBar", () => {
   it("shows on a valid home_return", async () => {
     await mountBar({ name: "traces", query: { [HOME_RETURN_QUERY_KEY]: ret } });
     expect(bar().exists()).toBe(true);
-    expect(bar().text()).toContain("Back to Overview");
+    expect(bar().text()).toContain("Back to Home");
   });
 
   it("stays hidden on a malformed home_return", async () => {
@@ -100,7 +100,7 @@ describe("HomeReturnBar", () => {
     expect(bar().exists()).toBe(true);
   });
 
-  it("pushes home with the Overview tab and the saved state", async () => {
+  it("pushes home with the AI Assistant tab and the saved state", async () => {
     await mountBar({
       name: "traces",
       query: {
@@ -116,7 +116,7 @@ describe("HomeReturnBar", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
     expect(router.currentRoute.value.query).toEqual({
-      home_tab: "overview",
+      home_tab: "ai",
       row: "incident:7",
       from: "10",
       to: "20",

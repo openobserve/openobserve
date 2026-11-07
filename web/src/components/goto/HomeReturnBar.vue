@@ -58,7 +58,7 @@ watch(
 function back(): void {
   const state = held.value?.state;
   if (!state) return;
-  const query: LocationQueryRaw = { home_tab: "overview" };
+  const query: LocationQueryRaw = { home_tab: "ai" };
   if (state.row) query.row = state.row;
   if (state.period) query.period = state.period;
   if (state.from !== undefined) query.from = String(state.from);

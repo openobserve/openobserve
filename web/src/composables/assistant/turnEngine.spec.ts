@@ -93,6 +93,8 @@ function setup(
     hidden?: boolean;
     client?: AssistantClient;
     approvals?: Pick<ApprovalsService, "onConfirmationRequired" | "onResolved">;
+    page?: Record<string, unknown>;
+    pageRead?: Promise<void>;
   } = {},
 ) {
   const persistence = { value: opts.persistence ?? true };
@@ -145,11 +147,16 @@ function setup(
     history: () => deps.history,
     now: () => clock,
     uuid: () => deps.uuid(),
-    pageContext: async () => ({
-      currentPage: "logs",
-      selectedStreams: ["default"],
-      secret: "nope",
-    }),
+    pageContext: async () => {
+      await opts.pageRead;
+      return (
+        opts.page ?? {
+          currentPage: "logs",
+          selectedStreams: ["default"],
+          secret: "nope",
+        }
+      );
+    },
     uiVersion: () => "ui1",
     tailEnabled: () => !!opts.tail,
     raf: (cb) => cb(),
@@ -287,6 +294,94 @@ describe("turnEngine: send", () => {
     expect(homeDefault(sidebar)).toBeUndefined();
   });
 
+  it("keeps the thread's window for the follow-up and records it as the turn's asked window", async () => {
+    const askedOf = (h: ReturnType<typeof setup>) =>
+      h.session().annotations[turnAnnotationKey(h.session().turnMeta.turnId!, "window")]?.window;
+    const h = setup();
+    h.type("what needs attention?");
+    h.store.setTimeOverride(h.current.sid, { from: 1, to: 86_400_001 });
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.session().composer.text).toBe("");
+    expect(h.session().composer.timeOverride).toEqual({ from: 1, to: 86_400_001 });
+    expect(askedOf(h)).toEqual({ from: 1, to: 86_400_001 });
+    h.feed({ type: "complete" } as AssistantFrame);
+    h.end();
+    await settle();
+    h.type("and the one before?");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    expect(askedOf(h)).toEqual({ from: 1, to: 86_400_001 });
+  });
+
+  it("follows the page's own range after a send, but keeps an Investigate thread's window", async () => {
+    const page = {
+      currentPage: "logs",
+      timeRange: { type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 },
+    };
+    const picked = setup({ page });
+    picked.type("why?");
+    picked.store.setTimeOverride(picked.current.sid, { from: 1, to: 3_600_001, period: "1h" });
+    void picked.store.send(picked.current.sid);
+    await settle();
+    expect(picked.session().composer.timeOverride).toBeNull();
+    const draftKey = `o2.assistant.draft:k1:${picked.current.sid}`;
+    expect(sessionStorage.getItem(draftKey)).toBeNull();
+
+    const investigate = setup({ page });
+    investigate.current.sid = investigate.store.createSession({
+      origin: { entryKind: "object_verb", objectKind: "incident", container: "sidebar" },
+      thread: "new",
+    });
+    investigate.type("investigate this incident");
+    investigate.store.setTimeOverride(investigate.current.sid, { from: 5_000, to: 9_000 });
+    void investigate.store.send(investigate.current.sid);
+    await settle();
+    expect(investigate.session().composer.timeOverride).toEqual({ from: 5_000, to: 9_000 });
+    investigate.feed({ type: "complete" } as AssistantFrame);
+    investigate.end();
+    await settle();
+    investigate.type("and upstream?");
+    void investigate.store.send(investigate.current.sid);
+    await settle();
+    expect(investigate.session().composer.timeOverride).toEqual({ from: 5_000, to: 9_000 });
+  });
+
+  it("keeps text typed while a slow page is read, dropping only the sent window", async () => {
+    let read!: () => void;
+    const pageRead = new Promise<void>((resolve) => (read = resolve));
+    const page = {
+      currentPage: "logs",
+      timeRange: { type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 },
+    };
+    const h = setup({ page, pageRead });
+    h.type("why?");
+    h.store.setTimeOverride(h.current.sid, { from: 1, to: 3_600_001, period: "1h" });
+    void h.store.send(h.current.sid);
+    await settle();
+    h.type("next q");
+    await settle();
+    read();
+    await settle();
+    expect(h.session().composer.timeOverride).toBeNull();
+    const stored = JSON.parse(
+      sessionStorage.getItem(`o2.assistant.draft:k1:${h.current.sid}`) ?? "{}",
+    );
+    expect(stored).toMatchObject({ text: "next q", timeOverride: null });
+  });
+
+  it("never writes a helper session's kept window to storage", async () => {
+    const h = setup();
+    h.current.sid = h.store.createSession({ origin: ORIGIN, ephemeral: true });
+    h.type("explain this");
+    h.store.setTimeOverride(h.current.sid, { from: 1, to: 2, period: "24h" });
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(1);
+    expect(sessionStorage.getItem(`o2.assistant.draft:k1:${h.current.sid}`)).toBeNull();
+  });
+
   it("marks a Home starter's question from the sidebar, whatever opened it, and its regenerated answer", async () => {
     const homeDefault = (h: ReturnType<typeof setup>) =>
       h.session().annotations[turnAnnotationKey(h.session().turnMeta.turnId!, "window")]
@@ -358,6 +453,29 @@ describe("turnEngine: send", () => {
       user_timezone: expect.any(String),
     });
     expect(h.capability.noteAdmitted).toHaveBeenCalled();
+  });
+
+  it("sends the alert status page's name, state and condition with its id", async () => {
+    const h = setup({
+      page: {
+        currentPage: "Alerts",
+        alertId: "a1",
+        alertName: "High errors",
+        alertState: "firing",
+        alertCondition: "SELECT count(*) FROM default · >= 5",
+        isRealTime: false,
+      },
+    });
+    h.type("why is this firing?");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.last().req.context).toMatchObject({
+      alertId: "a1",
+      alertName: "High errors",
+      alertState: "firing",
+      alertCondition: "SELECT count(*) FROM default · >= 5",
+    });
+    expect(h.last().req.context).not.toHaveProperty("isRealTime");
   });
 
   it("streams one turn to done and emits the lifecycle once (HT-11 AC 2, 6)", async () => {

@@ -10333,7 +10333,68 @@
     "removeHomeDashboard": "Remove home dashboard",
     "subtitle": "Your observability workspace at a glance",
     "resources": "Resources",
-    "explore": "Explore"
+    "explore": "Explore",
+    "agent": {
+      "goToPlaceholder": "Go to a page, dashboard, alert or stream…",
+      "goToName": "Go to",
+      "askOff": {
+        "budget": "AI credits for this month are used up, so {product} cannot answer",
+        "oss": "{product}, the AI assistant, is part of OpenObserve Enterprise. This Open Source build has no assistant and no incidents.",
+        "not_entitled": "{product} is not part of this plan",
+        "not_configured": "{product} is not set up for this organization yet",
+        "off_for_org": "{product} is off for this organization",
+        "no_permission": "Your role cannot use {product}"
+      },
+      "admins": "Admins: {names}",
+      "briefMe": "Brief me",
+      "briefMePrompt": "Brief me on what changed and what needs me now.",
+      "headline": {
+        "clear": "Nothing needs you right now",
+        "needYou": "{count} thing needs you | {count} things need you",
+        "noAlert": "{count} service has no alert | {count} services have no alert"
+      },
+      "briefingNote": "Ranked against each service's last 24 h · grouped by service · no AI used to build this list",
+      "briefingNoteRefresh": "Ranked against each service's last 24 h · grouped by service · refreshes every 60 s · no AI used to build this list",
+      "flapping": "Flapping · {count}×",
+      "problems": {
+        "title": "Problems with no alert",
+        "note": "Matched by service name in your alert queries",
+        "noAlert": "No alert matches this service",
+        "createAlert": "Create alert",
+        "askEditor": "Ask an editor"
+      },
+      "openIncident": "Open incident",
+      "openService": "Open service",
+      "openAlert": "Open alert",
+      "creditsUsedUp": "AI credits are used up, so nothing was sent",
+      "since": {
+        "title": "Since you were last here",
+        "ago": "{time} ago",
+        "none": "Nothing changed since then",
+        "incident_opened": "Incident {title} opened",
+        "incident_resolved": "Incident {title} was resolved",
+        "alert_fired": "Alert {title} started firing",
+        "thread_finished": "Your thread {title} finished",
+        "approval_waiting": "An approval waits for you: {title}",
+        "firstVisit": "This is your first visit on this device. Changes since then show here next time.",
+        "firstVisitAt": "First visit",
+        "thread_stopped": "Your thread {title} was stopped before it finished",
+        "thread_failed": "Your thread {title} ended with an error",
+        "thread_updated": "Your thread {title} has new activity"
+      },
+      "dashboards": {
+        "title": "Recent dashboards",
+        "all": "All dashboards",
+        "none": "Dashboards you open show up here",
+        "viewed": "Viewed {time} ago"
+      },
+      "firstRun": {
+        "title": "No data yet · send your first logs, metrics or traces",
+        "note": "Home fills in by itself once a service sends data: Now, Problems with no alert and dashboards. Building it uses no AI."
+      },
+      "tabLabel": "AI Assistant",
+      "nowClearProblems": "Nothing else is over baseline right now"
+    }
   },
   "overview": {
     "alertsSuffix": "alerts",
@@ -10588,7 +10649,7 @@
       },
       "empty": "No pages match",
       "placeholder": "Go to a page",
-      "back": "Back to Overview"
+      "back": "Back to Home"
     }
   },
   "chatHistory": {
@@ -11095,6 +11156,8 @@
       "retry": "Retry",
       "record": {
         "denied": "Denied: {name}",
+        "deniedUnnamed": "Denied a change the assistant proposed",
+        "deniedUnnamedReason": "Denied a change the assistant proposed · {reason}",
         "expired": "Request expired. Nothing was changed.",
         "moved": "Moved to {editor}",
         "paused": "Paused {entity} {name}",
@@ -11102,7 +11165,8 @@
         "replied": "Declined with a reply",
         "resumed": "Resumed {entity} {name}",
         "youAt": "you · {time}"
-      }
+      },
+      "onDashboard": "On dashboard {name}"
     },
     "askAdmin": {
       "adminsOf": "Admins of {org}",
@@ -11246,7 +11310,6 @@
       "attachImage": "Attach image",
       "inert": "Decide above to continue",
       "busy": "{product} is busy. Send again in {s} s.",
-      "unsent": "Isn't reachable. Your message wasn't sent.",
       "imageCap": "{name} wasn't added. Up to {count} images, {size} each.",
       "sendReply": "Send reply",
       "offline": "You're offline. Draft kept.",
@@ -11346,10 +11409,10 @@
         "timezone": "Timezone",
         "traceQuery": "Trace query",
         "vrl": "VRL",
-        "overviewIncidents": "Incidents on Overview ({count})",
-        "overviewServices": "Services on Overview ({count})",
-        "overviewAnomalies": "Anomalies on Overview ({count})",
-        "overviewAlerts": "Alerts on Overview ({count})"
+        "overviewIncidents": "Incidents on Home ({count})",
+        "overviewServices": "Services on Home ({count})",
+        "overviewAnomalies": "Anomalies on Home ({count})",
+        "overviewAlerts": "Alerts on Home ({count})"
       },
       "fromChat": "Added to this chat",
       "fromPage": "From this page",
@@ -12352,7 +12415,7 @@
         "services": "Open services",
         "service": "Open service “{name}”",
         "ingestion": "Open data sources",
-        "home": "Back to Overview"
+        "home": "Back to Home"
       },
       "openAction": "Open",
       "opened": "Opened · {time}",
@@ -12882,7 +12945,13 @@
       "widthNarrower": "Narrower",
       "widthNoRoom": "Not enough room at this window size",
       "widthWider": "Wider",
-      "loadFailedAgain": "Still couldn't load this chat · tried {time}"
+      "loadFailedAgain": "Still couldn't load this chat · tried {time}",
+      "density": {
+        "label": "Density",
+        "full": "Full",
+        "panel": "Panel",
+        "float": "Float"
+      }
     },
     "tray": {
       "close": "Close {title}",
@@ -13406,8 +13475,19 @@
       "sendAnswer": "Send answer",
       "needsAnswerLabel": "Needs your answer"
     },
-    "send": {
-      "unreachable": "Isn't reachable. Your message wasn't sent."
+    "threadsBar": {
+      "label": "Threads",
+      "title": "Threads",
+      "incidents": "Incidents with a live RCA run · {count}",
+      "noIncidents": "No incident has a live RCA run",
+      "incidentsLoading": "Checking open incidents…",
+      "incidentsFailed": "Could not load open incidents",
+      "moreIncidents": "{count} more, newest first",
+      "pageFull": "{count}+ open",
+      "openIncidents": "Open incidents",
+      "yourThreads": "Your threads · {count}",
+      "noThreads": "No threads running",
+      "keys": "Arrow keys move · Enter opens · Esc closes"
     }
   },
   "llmObservability": {
@@ -25272,6 +25352,7 @@
     },
     "pages": {
       "global": "Global",
+      "home": "Home",
       "kubernetes": "Kubernetes",
       "logs": "Logs",
       "dashboardsList": "Dashboards",
@@ -25474,7 +25555,9 @@
       "tracePrevVisibleSpan": "Previous visible span",
       "fleetEditorDeleteNode": "Remove the selected component",
       "fleetFlowCloseDetails": "Close the path details or collapse the map",
-      "goTo": "Go to"
+      "goTo": "Go to",
+      "threadsBarOpen": "Open the Threads bar",
+      "homeFocusAsk": "Focus the Ask box"
     }
   },
   "components": {

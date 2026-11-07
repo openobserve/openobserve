@@ -34,6 +34,9 @@ export const WHITELIST_FIELDS = [
   "dashboardId",
   "panelId",
   "alertId",
+  "alertName",
+  "alertState",
+  "alertCondition",
   "pipelineId",
   "request_timestamp",
   "user_timezone",
@@ -115,7 +118,6 @@ const HIDDEN_FIELDS: ReadonlySet<string> = new Set([
   "timestamp",
   "error",
   "agent_type",
-  "alertName",
   "pipelineName",
   "dashboardName",
   "panelName",
@@ -198,7 +200,7 @@ export const CONTEXT_FIELDS: readonly ContextFieldRow[] = [
     labelKey: "assistant.context.field.dashboard",
   },
   {
-    fields: ["alertId"],
+    fields: ["alertId", "alertName", "alertState", "alertCondition"],
     chip: "alert",
     sent: "whitelist",
     labelKey: "assistant.context.field.alert",
@@ -652,6 +654,7 @@ function rowValue(row: ContextFieldRow, page: PageContext, t: TranslateFn): I18n
   const field = row.fields[0];
   const value = page[field];
   if (!isPresent(value)) return null;
+  if (field === "alertId") return raw(String(page.alertName || value));
   if (field === "selectedStreams") {
     const names = (value as string[]).join(", ");
     return t("assistant.context.streamsValue", {

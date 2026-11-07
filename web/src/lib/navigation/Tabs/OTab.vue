@@ -78,12 +78,12 @@ const baseClasses = computed<string>(() =>
     // + this ps-1, the label lands on the page-edge grid line (12px) while the
     // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
     // their own padding override.
-    // Reorderable tabs widen the left inset to a 0.75rem gutter that hosts the
+    // Reorderable tabs widen the left inset to a gutter wider than the grip, which hosts the
     // hover-revealed drag grip. The gutter is tied to `reorderable` (not
     // per-press state), so a tab is pixel-identical at rest, on hover, and
     // while its label is being edited — the grip only ever changes opacity.
     isReorderable.value
-      ? "ps-3 pe-2"
+      ? "ps-4.5 pe-2"
       : isVertical.value
         ? "ps-1 pe-2"
         : slots.trailing
@@ -197,7 +197,7 @@ const heightClasses = computed<string>(() => {
         v-if="isReorderable && !isDisabled"
         aria-hidden="true"
         data-otab-grip
-        class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
+        class="absolute inset-y-0 left-0 z-10 flex w-4 items-center justify-center transition-opacity duration-150"
         :class="
           isDraggable
             ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'

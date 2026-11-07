@@ -30,15 +30,13 @@ import type { AssistantStoreInternal } from "./assistantStore";
 import type { GateCode, Sid } from "./assistantStore.types";
 import { openAssistant } from "./openAssistant";
 import { getAssistantRuntime } from "./runtime";
+import { ASSISTANT_ROOT_SELECTOR } from "./surfaces";
 
 /** The Escape ladder's rungs, innermost first (`10` §6.3). */
 export const ESCAPE_RUNGS = ["a", "a2", "b", "c", "d", "e", "f", "g", "h", "i"] as const;
 
 /** How long Ctrl+I / ⌘I must stay down before it dictates (`40` §1.8.6). */
 export const HOLD_MS = 350;
-
-/** The assistant's focus scope: `assistantClose` is bound only while focus is inside it. */
-export const ASSISTANT_ROOT_SELECTOR = "[data-assistant-root]";
 
 const COMPOSER_SELECTOR = "[data-assistant-composer]";
 

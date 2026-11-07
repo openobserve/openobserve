@@ -100,6 +100,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import { isFullThreadRoute } from "@/composables/assistant/pure";
 import {
   approvalClock,
   approvalDuration,
@@ -186,7 +187,7 @@ const line = computed<I18nText | null>(() => {
 });
 // The page area ends at the sidebar, and the full view and a focused window in the end corner push it to the start.
 const side = computed<"start" | "end">(() =>
-  route?.name === "assistant" || windowAtEnd.value ? "start" : "end",
+  isFullThreadRoute(route) || windowAtEnd.value ? "start" : "end",
 );
 const ask = computed(() => (subject.value ? runRequest(subject.value, t) : null));
 // The time joins the request at the warnings, in amber; the bare clock stays on the card.

@@ -508,6 +508,34 @@ describe("AssistantMessage", () => {
       expect(order).toEqual(["assistant-findings", "assistant-block-text"]);
     });
 
+    it("drops the bare Findings label the cut-out findings fence leaves behind, never a sentence", () => {
+      const card = {
+        type: "findings" as const,
+        findings: {
+          likelyCause: "Redis pool",
+          confidence: "low" as const,
+          evidence: [],
+          ruledOut: [],
+          unknowns: [],
+          nextSteps: [],
+        },
+      };
+      const texts = (blocks: Parameters<typeof mountLive>[0]) =>
+        mountLive(blocks)
+          .findAll('[data-test="assistant-block-text"]')
+          .map((el) => el.text().trim());
+      expect(
+        texts([{ type: "text", text: "Rests on 41 requests.\n\nFindings\n\n\n\n" }, card]),
+      ).toEqual(["Rests on 41 requests."]);
+      for (const label of ["**Findings**", "## Findings", "Findings:"])
+        expect(texts([{ type: "text", text: `Flat.\n\n${label}\n` }, card])).toEqual(["Flat."]);
+      expect(texts([card, { type: "text", text: "Findings" }])).toEqual([]);
+      const kept = "Findings show the error rate is flat.";
+      expect(texts([{ type: "text", text: kept }, card])).toEqual([kept]);
+      expect(texts([{ type: "text", text: "Our findings" }, card])).toEqual(["Our findings"]);
+      expect(texts([{ type: "text", text: "Done.\n\nFindings" }])[0]).toContain("Findings");
+    });
+
     it("puts the live line above the text, under the question", () => {
       const wrapper = mount(AssistantMessage, {
         props: {

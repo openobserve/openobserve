@@ -291,9 +291,19 @@ describe("refused sends (§1)", () => {
     refuse(store, sid, { code: "unreachable" });
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-composer-error-row"]').text()).toBe(
-      "Isn't reachable. Your message wasn't sent.",
+      "O2 Assistant isn't reachable right now. Your message wasn't sent.",
     );
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("says the browser is offline, not that the agent is unreachable, when an offline send bounced", async () => {
+    const { wrapper, store, sid } = setup();
+    store.setDraft(sid, { text: "why?" });
+    refuse(store, sid, { code: "offline" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-composer-error-row"]').text()).toBe(
+      "You're offline. Draft kept.",
+    );
   });
 
   it("states the first attachment once; OK remembers it", async () => {

@@ -56,6 +56,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
 // ---------------------------------------------------------------------------
@@ -865,5 +866,23 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     withListRow({ last_outcome: "firing" });
     wrapper = await mountView({ alert: makeAnomalyAlert() });
     expect(header().exists()).toBe(false);
+  });
+});
+
+describe("AlertDetail — assistant context", () => {
+  afterEach(() => contextRegistry.cleanup());
+
+  it("tells the assistant which alert is open, and stops when the page closes", async () => {
+    const wrapper = await mountView();
+    const context = await contextRegistry.getActiveContext();
+    expect(context).toMatchObject({
+      currentPage: "Alerts",
+      alertId: "alert-1",
+      alertName: makeSimpleAlert().name,
+      selectedStreams: [makeSimpleAlert().stream_name],
+    });
+
+    wrapper.unmount();
+    expect((await contextRegistry.getActiveContext())?.alertId).toBeUndefined();
   });
 });

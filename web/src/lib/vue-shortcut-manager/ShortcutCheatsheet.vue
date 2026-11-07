@@ -502,6 +502,11 @@ const KEY_SYMBOLS: Record<string, string> = {
 
 function formatKey(key: string): string[] {
   if (key.includes(" ") || (key.includes("/") && !key.includes("ctrl+"))) return [key];
+  // A trailing "+>" is the chord's own key: the browser reports Shift+. as ">".
+  if (key.endsWith("+>")) {
+    const mods = key.slice(0, -2).split("+");
+    return [...mods.map(sym), mods.includes("shift") ? "." : ">"];
+  }
   if (key.includes(">")) {
     const r: string[] = [];
     key.split(">").forEach((p, i) => {

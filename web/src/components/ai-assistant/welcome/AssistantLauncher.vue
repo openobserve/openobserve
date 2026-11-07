@@ -17,16 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section
     v-if="shown"
-    :aria-labelledby="titleId"
+    :aria-labelledby="layout === 'card' ? titleId : undefined"
+    :aria-label="sectionName"
     class="w-full min-w-0"
     data-test="assistant-launcher"
     data-assistant-surface
     data-dd-privacy="mask"
-    :data-state="state"
+    :data-state="goToOnly ? 'go_to' : state"
     :data-layout="layout"
   >
     <OCard variant="outlined" class="@container flex min-w-0 flex-col gap-3 p-3">
-      <div v-if="layout !== 'chats'" class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
+      <div v-if="layout === 'card'" class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
         <OIcon :name="assistantGlyph.assistant" size="sm" class="text-text-secondary shrink-0" />
         <h2 :id="titleId" class="text-text-heading text-sm font-medium">
           {{ t("assistant.name") }}
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <AssistantGateState
-        v-if="state === 'gate' && layout !== 'chats'"
+        v-if="state === 'gate' && layout === 'card'"
         reason="no_permission"
         size="inline"
         :is-admin="capability.isAdmin"
@@ -65,10 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="text"
         size="md"
         width="full"
-        :disabled="state === 'loading'"
-        :placeholder="t('assistant.composer.placeholder')"
+        :disabled="state === 'loading' && !goToOnly"
+        :placeholder="
+          goToOnly ? t('home.agent.goToPlaceholder') : t('assistant.composer.placeholder')
+        "
         :input-attrs="{
-          'aria-label': t('assistant.welcome.launcher.inputName', { product }),
+          'aria-label': goToOnly
+            ? t('home.agent.goToName')
+            : t('assistant.welcome.launcher.inputName', { product }),
           maxlength: MAX_LAUNCHER_CHARS,
           enterkeyhint: 'send',
           ...(goToShown && {
@@ -94,12 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="clear"
             />
             <AssistantTimePrefix
+              v-if="!goToOnly && mdUp"
               :window="window"
               :disabled="state === 'loading'"
               align="end"
               @change="onTimeChange"
             />
-            <AssistantContextSeesPopover :sid="null" hide-streams>
+            <AssistantContextSeesPopover v-if="!goToOnly && mdUp" :sid="null" hide-streams>
               <template #trigger>
                 <AssistantIconButton
                   :label="t('assistant.context.title')"
@@ -109,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </AssistantContextSeesPopover>
             <OButton
+              v-if="!goToOnly"
               variant="primary"
               size="xs"
               :icon-left="mdUp ? undefined : assistantGlyph.send"
@@ -138,8 +145,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="text = ''"
         />
       </div>
+      <!-- A phone keeps the field for the question, so the time and context controls sit under it -->
       <div
-        v-if="layout === 'overview' && (pageChips.length || ghostChips.length)"
+        v-if="!goToOnly && !mdUp && layout !== 'chats' && !(state === 'gate' && layout === 'card')"
+        class="flex min-w-0 items-center gap-1"
+        data-test="assistant-launcher-narrow-tools"
+      >
+        <AssistantTimePrefix
+          :window="window"
+          :disabled="state === 'loading'"
+          align="start"
+          @change="onTimeChange"
+        />
+        <AssistantContextSeesPopover :sid="null" hide-streams>
+          <template #trigger>
+            <AssistantIconButton
+              :label="t('assistant.context.title')"
+              :icon="assistantGlyph.info"
+              data-test="assistant-launcher-sees"
+            />
+          </template>
+        </AssistantContextSeesPopover>
+      </div>
+      <slot v-if="goToOnly" name="note" />
+      <div
+        v-if="layout === 'overview' && !goToOnly && (pageChips.length || ghostChips.length)"
         class="flex min-w-0 flex-wrap items-center gap-1.5"
         data-test="assistant-launcher-page-chips"
       >
@@ -148,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="chip.id"
           :chip="chip"
           :popup="false"
+          @open="showPageSection"
           @remove="removePageKey(chip)"
         />
         <AssistantContextChip
@@ -372,8 +403,10 @@ const props = withDefaults(
     layout?: "card" | "overview" | "chats";
     /** The page range in ms; the time chip mirrors it and a pick moves it. */
     pageRange?: ComposerState["timeOverride"];
+    /** Set on Home when the agent cannot answer: the field is Go to only and the `note` slot says why. */
+    goToOnly?: boolean;
   }>(),
-  { layout: "card", pageRange: null },
+  { layout: "card", pageRange: null, goToOnly: false },
 );
 
 const emit = defineEmits<{
@@ -405,15 +438,24 @@ const state = computed(() => {
   const gated = launcherState(capability.gate.value);
   return gated === "ready" && loading.value ? "loading" : gated;
 });
+const goToOnly = computed(() => props.layout === "overview" && props.goToOnly);
+// The card names itself with its heading; the Home layouts draw none, so they carry the name.
+const sectionName = computed(() => {
+  if (props.layout === "card") return undefined;
+  if (props.layout === "chats") return t("assistant.welcome.launcher.recent");
+  return goToOnly.value
+    ? t("home.agent.goToName")
+    : t("assistant.welcome.launcher.inputName", { product });
+});
 // On the Overview the ask field stays with the dock open, and always starts a new chat.
 const shown = computed(
-  () => state.value !== null && (props.layout !== "card" || !sidebarOpen.value),
+  () => goToOnly.value || (state.value !== null && (props.layout !== "card" || !sidebarOpen.value)),
 );
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 const shownStarters = computed(() => starters.value.slice(0, LAUNCHER_ROWS));
 // The sidebar is the assistant while it is open, so Home shows no second one beside it.
 const sidebarOpen = computed(() => assistant.state.shell.placement.kind === "sidebar");
-const showSuggestions = computed(() => state.value !== "gate");
+const showSuggestions = computed(() => state.value !== "gate" && !goToOnly.value);
 
 const window = computed<TimeWindow>(() =>
   props.pageRange ? { ...props.pageRange, source: "page" } : timeWindowOf(null, timeOverride.value),
@@ -440,7 +482,7 @@ watch(org, () => (removedPageKeys.value = []));
 const results = ref<InstanceType<typeof GoToResults> | null>(null);
 const goToActive = ref(-1);
 const { matches: goToMatches } = useGoToIndex(text, {
-  canAsk: () => state.value === "ready",
+  canAsk: () => state.value === "ready" && !goToOnly.value,
   enabled: () => props.layout === "overview" && shown.value,
 });
 const goToShown = computed(() => props.layout === "overview" && text.value.trim() !== "");
@@ -461,6 +503,16 @@ function removePageKey(chip: ContextChip): void {
   const field = fieldOf(chip);
   if (!removedPageKeys.value.includes(field))
     removedPageKeys.value = [...removedPageKeys.value, field];
+}
+
+// The page chips summarise Home's Now list, so opening one takes the reader there.
+function showPageSection(): void {
+  const section = document.querySelector<HTMLElement>('[data-test="home-now"]');
+  if (!section) return;
+  const reduce = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  section.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  if (!section.hasAttribute("tabindex")) section.setAttribute("tabindex", "-1");
+  section.focus({ preventScroll: true });
 }
 
 function addBackPageKey(chip: ContextChip): void {
@@ -497,10 +549,13 @@ function focusField(clear: boolean): void {
   input.value?.focus();
 }
 
-// ⌘K on Home lands here while the field can take a question; nothing listens while it is hidden or gated.
+// `/` on Home lands here while the field can take a question; nothing listens while it is hidden or gated.
+const askListening = computed(
+  () => shown.value && (state.value === "ready" || goToOnly.value) && props.layout !== "chats",
+);
 let stopFocusListener: (() => void) | null = null;
 watch(
-  () => shown.value && state.value === "ready" && props.layout !== "chats",
+  askListening,
   (listening) => {
     stopFocusListener?.();
     stopFocusListener = listening ? onOverviewFocusRequest(() => focusField(false)) : null;
@@ -509,7 +564,7 @@ watch(
 );
 onBeforeUnmount(() => stopFocusListener?.());
 
-// Back to Overview with `focus=ask` clears and focuses the field once, then drops the key.
+// Back to Home with `focus=ask` clears and focuses the field once, then drops the key.
 watch(
   () => route.query.focus === "ask" && shown.value && state.value === "ready",
   async (focusNow) => {
@@ -563,16 +618,23 @@ function onKeydown(event: KeyboardEvent): void {
   if (goToShown.value && !event.shiftKey && results.value?.onKeydown(event)) return;
   if (event.key === "Enter") {
     event.preventDefault();
-    ask(event.shiftKey);
+    if (goToOnly.value) openFirstMatch();
+    else ask(event.shiftKey);
   } else if (event.key === "Escape") {
     // Escape never clears what was typed; only the clear button does (round 1 X-20).
     (event.target as HTMLElement | null)?.blur();
   }
 }
 
+// With no agent to ask, Enter opens the best match, as the palette does.
+function openFirstMatch(): void {
+  const first = goToMatches.value.find((match) => match.kind !== "ask");
+  if (first) onGoToSelect(first);
+}
+
 // The launcher is a door, not a composer: the line goes to `/assistant` and nothing stays here (`70` §5 note 6).
 function ask(stage: boolean): void {
-  if (state.value !== "ready") return;
+  if (state.value !== "ready" || goToOnly.value) return;
   const line = text.value.trim();
   if (!line) return openFull();
   text.value = "";

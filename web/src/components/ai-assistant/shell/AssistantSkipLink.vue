@@ -50,6 +50,7 @@ import {
   useAssistantPlacement,
   useAssistantStore,
 } from "@/composables/assistant";
+import { isFullThreadRoute } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -63,7 +64,7 @@ const route = useRoute();
 
 const visible = computed(
   () =>
-    route.name !== "assistant" &&
+    !isFullThreadRoute(route) &&
     (placement.placement.value.kind === "sidebar" || !!lockedPanel.value),
 );
 

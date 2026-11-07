@@ -26,7 +26,7 @@ const ORG_QUERY_KEY = "org_identifier";
 // Per tab on purpose: the return target belongs to the tab that ran the Investigate.
 const armed = new Map<Sid, HomeReturnState>();
 
-/** Where "Back to Overview" lands: the row, the range (`period`, or `from` + `to` in µs) and whether to focus the ask field. */
+/** Where "Back to Home" lands: the row, the range (`period`, or `from` + `to` in µs) and whether to focus the ask field. */
 export interface HomeReturnState {
   row?: string;
   period?: string;
@@ -80,7 +80,7 @@ export function withHomeReturn(
   return { ...location, query };
 }
 
-/** Remembers, for this tab only, where a chat started from the Overview should return to. */
+/** Remembers, for this tab only, where a chat started from Home should return to. */
 export function armHomeReturn(sid: Sid, state: HomeReturnState): void {
   armed.set(sid, { ...state });
 }

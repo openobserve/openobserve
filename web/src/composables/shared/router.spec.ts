@@ -1956,19 +1956,53 @@ describe("useRoutes (router.ts)", () => {
       expect(resolveIn(homeChildRoutes, "/assistant").name).toBeUndefined();
     });
 
-    it("registers /assistant/:chatId? with its title and no keep-alive with the flag on", () => {
+    it("redirects /assistant/:chatId? to the thread in Home's AI tab, keeping the query, with the flag on", () => {
       const { homeChildRoutes } = flagged(true);
       const route = findRoute(homeChildRoutes, "assistant");
       expect(route.path).toBe("assistant/:chatId?");
-      expect(enTitle(route.meta.titleKey)).toBe("O2 Assistant");
-      expect(route.meta.keepAlive).toBe(false);
-      expect(route.meta.public).toBeUndefined();
-      expect(resolveIn(homeChildRoutes, "/assistant").name).toBe("assistant");
+      expect(route.component).toBeUndefined();
       expect(
-        resolveIn(homeChildRoutes, "/assistant/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b").params,
+        route.redirect({
+          params: { chatId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" },
+          query: { org_identifier: "acme" },
+        }),
       ).toEqual({
-        chatId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        name: "home",
+        params: {},
+        query: {
+          org_identifier: "acme",
+          tab: "ai",
+          thread: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        },
       });
+      expect(route.redirect({ params: {}, query: {} })).toEqual({
+        name: "home",
+        params: {},
+        query: { tab: "ai", thread: "" },
+      });
+    });
+
+    it("lands a pushed /assistant/:id on Home with ?tab=ai&thread=", async () => {
+      const { homeChildRoutes } = flagged(true);
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout", render: () => null },
+            children: homeChildRoutes
+              .filter((r: any) => r !== catchAll)
+              .map((r: any) => ({ ...r, beforeEnter: undefined })),
+          },
+        ],
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      await router.push({ name: "assistant", params: { chatId: "abc" }, query: { a: "1" } });
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("Discarded invalid param"));
+      warn.mockRestore();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(router.currentRoute.value.query).toEqual({ a: "1", tab: "ai", thread: "abc" });
     });
 
     it("leaves the /ai namespace and the share routes untouched", () => {
@@ -1986,20 +2020,6 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("/close-tab");
       expect(route.meta.public).toBeUndefined();
       expect(enTitle(route.meta.titleKey)).toBe("You're signed in");
-    });
-
-    it("waits for the gate to settle before entering", async () => {
-      const { homeChildRoutes } = flagged(true);
-      const route = findRoute(homeChildRoutes, "assistant");
-      assistantGate.value = "loading";
-      const next = vi.fn();
-      route.beforeEnter({ name: "assistant" }, {}, next);
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(routeGuard).toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalled();
-      assistantGate.value = "not_entitled";
-      await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
     });
   });
 

@@ -364,7 +364,7 @@ describe("assistant entries", () => {
     expect(getShortcutDef("assistantHistory")).toMatchObject({
       keyForWindows: "ctrl+shift+h",
       keyForMac: "meta+shift+h",
-      scope: "assistant",
+      scope: undefined,
       allowInInput: true,
     });
     expect(getShortcutDef("assistantHelper")).toMatchObject({
@@ -447,5 +447,29 @@ describe("cheatsheet with the assistant flag on", () => {
     expect(capabilityDisposed).not.toHaveBeenCalled();
     wrapper.unmount();
     expect(capabilityDisposed).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the legacy AI chat toggle, which v2 never registers", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(false);
+  });
+
+  it("renders the Threads bar chord as modifiers plus a period, not a sequence", async () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    const wrapper = mount(ShortcutCheatsheet, {
+      props: { open: true },
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+    });
+    await flushPromises();
+    const row = () =>
+      document.querySelector('[data-test="shortcut-cheatsheet-row-threadsBarOpen"]');
+    await vi.waitFor(() => expect(row()).not.toBeNull());
+    const keys = [...row()!.querySelectorAll("kbd")].map((k) => k.textContent?.trim());
+    expect(keys.at(-1)).toBe(".");
+    expect(keys).toHaveLength(3);
+    expect(row()!.textContent).not.toContain("then");
+    wrapper.unmount();
   });
 });

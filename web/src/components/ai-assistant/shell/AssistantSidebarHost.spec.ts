@@ -275,7 +275,7 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     expect(column()!.style.display).toBe("none");
     store.moveTo({ kind: "sidebar" });
-    await router.push("/assistant");
+    await router.push("/?thread=");
     await flushPromises();
     expect(column()!.style.display).toBe("none");
   });

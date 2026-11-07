@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     :aria-label="t('assistant.tray.label')"
     data-test="assistant-tray"
-    class="fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000 flex items-center gap-2"
+    :class="[
+      'flex items-center gap-2',
+      !inline && 'fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000',
+    ]"
   >
     <div
       v-for="(bar, index) in shown"
@@ -93,6 +96,8 @@ export interface AssistantTrayProps {
   order: Sid[];
   /** 2 at 1024–1279, where the rest sit behind "+{count}". */
   visibleBars: number;
+  /** Inside the Threads bar, which owns the position. */
+  inline?: boolean;
 }
 
 export type TrayState = "needsYou" | "working" | "failed" | "idle";
@@ -128,7 +133,7 @@ const TRAY_SIGNAL = {
   idle: null,
 } as const;
 
-const props = defineProps<AssistantTrayProps>();
+const props = withDefaults(defineProps<AssistantTrayProps>(), { inline: false });
 
 const emit = defineEmits<{ restore: [sid: Sid]; close: [sid: Sid] }>();
 

@@ -99,7 +99,7 @@ describe("AssistantLinkCard", () => {
     ["services", {}, "Open services"],
     ["service", { service_name: "checkout-api" }, "Open service “checkout-api”"],
     ["ingestion", {}, "Open data sources"],
-    ["home", {}, "Back to Overview"],
+    ["home", {}, "Back to Home"],
   ])("titles a %s card from its template", (type, target, title) => {
     const link = buildNavigationRoute(
       { resource_type: type, action: "navigate_direct", target },

@@ -19,7 +19,6 @@ import type { PageContext } from "@/composables/contextProviders/types";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { epochMs } from "@/utils/assistant/explorerRoutes";
 
 import {
   agentIdOf,
@@ -128,6 +127,9 @@ const PAGE_CONTEXT_FIELDS = [
   "dashboardId",
   "panelId",
   "alertId",
+  "alertName",
+  "alertState",
+  "alertCondition",
   "pipelineId",
   "incident_id",
 ] as const;
@@ -818,10 +820,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (previous && previous.turnId === rec.turnId) rec.idSends = previous.idSends;
     runtime.set(sid, { controller: new AbortController(), turn: rec });
     runner.flush(sid, (s) => queueTurn(s, rec, deps.now(), fromComposer));
-    if (fromComposer) store.drafts.remove(session.userOrgKey, sid);
+    if (fromComposer) store.keepThreadWindow(sid, snapshot.timeOverride, null);
     rec.rawContext = await safePageContext(deps);
     rec.pageContext = whitelist(rec.rawContext, snapshot);
-    const asked = noteSentWindow(sessionOf(rec.sid), rec);
+    const asked = noteSentWindow(sessionOf(rec.sid), rec, deps.now());
     const windowKey = turnAnnotationKey(rec.turnId, "window");
     const homeDefault = homeDefaultAsk(sessionOf(rec.sid), rec);
     if (asked || homeDefault || sessionOf(rec.sid)?.annotations[windowKey]?.homeDefaultWindow)
@@ -829,6 +831,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         ...(asked && { window: asked }),
         homeDefaultWindow: homeDefault || undefined,
       });
+    if (fromComposer)
+      store.keepThreadWindow(sid, snapshot.timeOverride, isPresentRange(rec.rawContext));
     if (sessionOf(rec.sid)?.turn.state === "queued") await attempt(rec);
     return rec.promise;
   };
@@ -1122,11 +1126,11 @@ function queueTurn(
   rec.stream.messages = session.messages;
   // Regenerate and Edit and resend send their own text; the composer draft stays as it is (EB-09 AC 2).
   if (!fromComposer) return { stream: [], turn: effects };
+  // The window stays until the page is read: `keepThreadWindow` decides whether follow-ups keep it.
   Object.assign(session.composer, {
     text: "",
     chips: [],
     images: [],
-    timeOverride: null,
     recallIndex: -1,
     recallDraft: null,
     homeStarter: undefined,
@@ -1152,16 +1156,26 @@ function queuePrompt(session: AssistantSession, rec: TurnRecord, now: number): v
   rec.userIndex = session.messages.length - 1;
 }
 
+function isPresentRange(context: unknown): boolean {
+  const range = (context as PageContext | null)?.timeRange;
+  return !!range && typeof range === "object";
+}
+
 // The window the turn asked about, so a query block or "Open in Logs instead" opens an absolute range.
 function noteSentWindow(
   session: AssistantSession | undefined,
   rec: TurnRecord,
+  now: number,
 ): { from: number; to: number } | null {
   const prompt = session?.messages[rec.userIndex];
-  const range = rec.pageContext?.timeRange;
-  const from = epochMs(range?.startTime);
-  const to = epochMs(range?.endTime);
-  if (prompt?.role !== "user" || from === null || to === null || to <= from) return null;
+  if (prompt?.role !== "user") return null;
+  // An override or the default window is what went on the wire too, so a fence query runs over it.
+  const { from, to } = timeWindowOf(
+    rec.rawContext as PageContext | null,
+    rec.snapshot.timeOverride,
+    now,
+  );
+  if (!(to > from)) return null;
   prompt.sentWindow = { from, to };
   return prompt.sentWindow;
 }

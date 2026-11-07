@@ -99,7 +99,8 @@ const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.inciden
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
-const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
+// The legacy chat binding is registered only while the v2 assistant is off.
+const aiChat = (c: ShortcutCapabilities) => !isAssistantV2() && c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
 // Every assistant row is gated on the flag too, so the cheatsheet is unchanged with it off.
 const assistantChat = (c: ShortcutCapabilities) =>
@@ -119,7 +120,10 @@ export const GO_TO_EDITOR_ACTION_ID = "o2.goTo";
  * is one chip + one block in the listing; its `pages` render as sub-sections.
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
-  { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
+  {
+    titleKey: "shortcuts.modules.global",
+    pages: ["shortcuts.pages.global", "shortcuts.pages.home"],
+  },
   {
     titleKey: "shortcuts.modules.assistant",
     pages: [
@@ -260,11 +264,43 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         visible: assistantChat,
       },
       {
+        // Global like assistantOpen: a scope here would outrank, and silence, every page scope.
+        id: "assistantHistory",
+        keyForWindows: "ctrl+shift+h",
+        keyForMac: "meta+shift+h",
+        descriptionKey: "shortcuts.actions.assistantHistory",
+        allowInInput: true,
+        visible: assistantChat,
+      },
+      {
         id: "goTo",
         keyForWindows: "ctrl+k",
         keyForMac: "meta+k",
         descriptionKey: "shortcuts.actions.goTo",
         allowInInput: true,
+        visible: goToPalette,
+      },
+      {
+        id: "threadsBarOpen",
+        // Shift turns the period into ">" in the key the browser reports.
+        keyForWindows: "ctrl+shift+>",
+        keyForMac: "meta+shift+>",
+        descriptionKey: "shortcuts.actions.threadsBarOpen",
+        allowInInput: true,
+        visible: assistantChat,
+      },
+    ],
+  },
+
+  // ── Home ────────────────────────────────────────────────────────────────
+  // No scope: acquiring one would hide the assistant scope's chords on Home; HomeView binds it only while the AI tab shows.
+  {
+    pageKey: "shortcuts.pages.home",
+    shortcuts: [
+      {
+        id: "homeFocusAsk",
+        key: "/",
+        descriptionKey: "shortcuts.actions.homeFocusAsk",
         visible: goToPalette,
       },
     ],
@@ -282,14 +318,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.assistantClose",
         allowInInput: true,
         visible: () => false,
-      },
-      {
-        id: "assistantHistory",
-        keyForWindows: "ctrl+shift+h",
-        keyForMac: "meta+shift+h",
-        descriptionKey: "shortcuts.actions.assistantHistory",
-        allowInInput: true,
-        visible: assistantChat,
       },
     ],
   },

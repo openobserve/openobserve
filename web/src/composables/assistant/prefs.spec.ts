@@ -372,16 +372,16 @@ describe("sidebar prefs", () => {
 });
 
 describe("home prefs", () => {
-  it("migrates the unscoped tab state once and maps a saved ai tab to overview", () => {
+  it("migrates the unscoped tab state once and keeps a saved ai tab", () => {
     localStorage.setItem("o2_home_tab_order", JSON.stringify(["ai", "overview", "usage"]));
     localStorage.setItem("o2_home_active_tab", "ai");
     expect(migrateHome(KEY)).toEqual({
-      order: ["overview", "usage"],
-      active: "overview",
+      order: ["ai", "overview", "usage"],
+      active: "ai",
       migratedFromUnscoped: true,
     });
     localStorage.setItem("o2_home_active_tab", "usage");
-    expect(migrateHome(KEY).active).toBe("overview");
+    expect(migrateHome(KEY).active).toBe("ai");
     expect(localStorage.getItem("o2_home_tab_order")).not.toBeNull();
     expect(readHome("other")).toEqual({});
   });

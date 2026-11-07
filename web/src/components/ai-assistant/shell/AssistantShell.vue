@@ -47,8 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :layout-direct="onlyFullPage"
       >
         <template #container-actions="{ narrow }">
+          <AssistantDensitySwitch
+            v-if="!narrow && densitySwitch"
+            :placement="densitySwitch"
+            :sid="activeSid"
+            :dock-host="host?.id"
+            :compact="densitySwitch === 'sidebar'"
+          />
           <AssistantLayoutMenu
-            v-if="!narrow"
+            v-else-if="!narrow"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
@@ -755,6 +762,7 @@ import {
   assistantEvidenceHostKey,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
+  isFullThreadRoute,
   recordedLedger,
   type AssistantEvidenceHost,
   type AssistantTranscriptHost,
@@ -777,6 +785,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters";
 
+import AssistantDensitySwitch from "./AssistantDensitySwitch.vue";
 import AssistantLayoutMenu from "./AssistantLayoutMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
@@ -893,6 +902,12 @@ const container = computed<Container>(() => {
 
 // A window closes from its own title bar, and the full page is left by navigating.
 const closable = computed(() => props.placement !== "window" && props.placement !== "full");
+// Full and Panel switch density in their header; a window's bar and the editor dock keep the Layout menu.
+const densitySwitch = computed(() =>
+  !props.sheet && lgUp.value && (props.placement === "full" || props.placement === "sidebar")
+    ? props.placement
+    : null,
+);
 
 const chromeClasses = computed(() => {
   const base = "border-border-default flex shrink-0 items-center gap-1 border-b ps-1 pe-2";
@@ -1741,8 +1756,9 @@ function newChat(): void {
 function freshChat(previous: Sid | null): Sid {
   const own = scopedSid.value;
   if (!own) {
-    store.setActive(null);
-    return ensureSession();
+    return store.startNewChat({
+      origin: { entryKind: "thread_new", objectKind: "none", container: container.value },
+    });
   }
   if (previous && !store.state.sessions[previous]?.messages.length) return previous;
   const sid = store.createSession({
@@ -1783,7 +1799,7 @@ function closeContainer(): void {
   closeLockedPanel();
   if (scopedSid.value) return store.closeWindow(scopedSid.value);
   store.close("close");
-  if (props.placement !== "full" || route.name !== "assistant") return;
+  if (props.placement !== "full" || !isFullThreadRoute(route)) return;
   if (window.history.state?.back) router.back();
   else void router.push("/");
 }
