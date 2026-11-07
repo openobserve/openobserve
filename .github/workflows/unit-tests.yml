@@ -70,6 +70,9 @@ jobs:
       labels: eks-openobserve-standard-8
     permissions:
       contents: read
+    env:
+      # Replaces .cargo/config.toml target rustflags, so it repeats them; -Zthreads parallelises the rustc frontend.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -120,6 +123,8 @@ jobs:
       ZO_TEXT_DATA_TYPE: text
       ZO_META_STORE: postgres
       ZO_META_POSTGRES_DSN: postgres://postgres:password@localhost:5432/postgres
+      # Replaces .cargo/config.toml target rustflags, so it repeats them; -Zthreads parallelises the rustc frontend.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
     services:
       postgres:
         image: postgres:17.5-alpine3.22
@@ -199,6 +204,8 @@ jobs:
       ZO_TEXT_DATA_TYPE: text
       ZO_META_STORE: sqlite
       ZO_META_POSTGRES_DSN: ""
+      # Replaces .cargo/config.toml target rustflags, so it repeats them; -Zthreads parallelises the rustc frontend.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
