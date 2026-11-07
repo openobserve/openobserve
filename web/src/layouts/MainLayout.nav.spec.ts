@@ -77,6 +77,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
     wrapper = undefined;
     store.state.zoConfig.custom_hide_menus = "";
     store.state.zoConfig.synthetics_enabled = false;
+    store.state.solutionMode = "observability";
   });
 
   const rail = async (): Promise<RailEntry[]> => groupNavLinks(await railItems());
@@ -96,6 +97,25 @@ describe("MainLayout — Product Analytics menu entry", () => {
       link: "/product-analytics",
       name: "productAnalytics",
     });
+  });
+
+  it("shows the security rail in security mode and the full observability rail after switching back", async () => {
+    store.state.solutionMode = "security";
+    const names = (await railItems()).map((l) => l.name);
+    expect(names).toContain("securityOverview");
+    expect(names).not.toContain("logs");
+
+    store.state.zoConfig.synthetics_enabled = true;
+    await flushPromises();
+    store.state.solutionMode = "observability";
+    await flushPromises();
+    const back = (wrapper!.findAllComponents(NavbarStub)[0].props("linksList") as NavItem[]).map(
+      (l) => l.name,
+    );
+    expect(back).toContain("logs");
+    expect(back).toContain("reports");
+    expect(back).toContain("synthetics");
+    expect(back).not.toContain("securityOverview");
   });
 
   it("keeps Reports right after Streams", async () => {

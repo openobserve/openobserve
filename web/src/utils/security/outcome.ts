@@ -3,7 +3,7 @@
 // Word lists mirror `toOcsfStatus` in ocsf.ts, so a row failed here shows as "Failure" in Events.
 
 import { toOcsfStatus } from "./ocsf";
-import { quoteString } from "./sql";
+import { quoteIdent, quoteString } from "./sql";
 
 export const OUTCOME_FAILURE_WORDS = [
   "failure",
@@ -36,8 +36,6 @@ export function classifyOutcome(value: unknown): number {
   if (EXTRA_SUCCESS_PHRASES.includes(word)) return 1;
   return toOcsfStatus(value);
 }
-
-const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 export function failurePredicate(column: string): string {
   const text = `LOWER(TRIM(CAST(${quoteIdent(column)} AS VARCHAR)))`;

@@ -296,11 +296,19 @@ describe("compileSigmaRule", () => {
 
   it("compiles a regex, with the case-insensitive flag inline", () => {
     expect(compile(RULE("  s: {query|re: '^[a-z]{40,}'}\n  condition: s")).where).toBe(
-      `re_match("query", '^[a-z]{40,}')`,
+      `re_match(CAST("query" AS VARCHAR), '^[a-z]{40,}')`,
     );
     expect(compile(RULE("  s: {query|re|i: 'admin'}\n  condition: s")).where).toBe(
-      `re_match("query", '(?i)admin')`,
+      `re_match(CAST("query" AS VARCHAR), '(?i)admin')`,
     );
+  });
+
+  it("refuses a regex using lookaround or a backreference", () => {
+    for (const pattern of ["'foo(?=bar)'", "'(?<!x)y'", "'(a)\\1'"]) {
+      const compiled = compile(RULE(`  s: {query|re: ${pattern}}\n  condition: s`));
+      expect(compiled.runnable).toBe(false);
+      expect(compiled.unsupported[0]).toMatch(/^re: lookaround or backreference/);
+    }
   });
 
   it("compiles IPv4 CIDR exactly, including masks inside an octet", () => {
@@ -359,6 +367,16 @@ describe("compileSigmaRule", () => {
     expect(where).toContain(`lower("CommandLine") LIKE '% -enc %'`);
     expect(where).toContain(`lower("CommandLine") LIKE '% /enc %'`);
     expect(where).toContain("–"); // en dash, which is the point of the modifier
+  });
+
+  it("replaces every flag dash in a windash value with the same dash", () => {
+    const { where } = compile(
+      RULE("  s: {CommandLine|windash|contains: ' -nop -enc '}\n  condition: s"),
+    );
+    expect(where).toContain(`lower("CommandLine") LIKE '% -nop -enc %'`);
+    expect(where).toContain(`lower("CommandLine") LIKE '% /nop /enc %'`);
+    expect(where).toContain(`lower("CommandLine") LIKE '% –nop –enc %'`);
+    expect(where).not.toContain(`/nop -enc`);
   });
 
   it("negates through COALESCE so a null column does not swallow the row", () => {
@@ -488,6 +506,26 @@ describe("compileSigmaRule", () => {
     const compiled = compile(RULE("  s: {a: 1}\n  condition: s and missing"));
     expect(compiled.runnable).toBe(false);
     expect(compiled.error).toMatch(/missing/);
+  });
+
+  it("refuses a rule that folds to matching every row", () => {
+    const compiled = compile(RULE("  s: {gone|exists: false}\n  condition: s"), {
+      availableFields: ["a"],
+    });
+    expect(compiled.where).toBe("TRUE");
+    expect(compiled.runnable).toBe(false);
+    expect(blockedReason(compiled)).toBe("Rule matches every row");
+  });
+
+  it("names an empty search or value list instead of blocking silently", () => {
+    for (const body of ["  s: []\n  condition: s", "  s: {}\n  condition: s"]) {
+      const compiled = compile(RULE(body));
+      expect(compiled.runnable).toBe(false);
+      expect(compiled.error).toBe("Search 's' is empty");
+    }
+    const emptyValues = compile(RULE("  s: {a: []}\n  condition: s"));
+    expect(emptyValues.runnable).toBe(false);
+    expect(emptyValues.error).toBe("Field 'a' has an empty value list");
   });
 
   it("quotes an identifier containing a dot, which is how nested fields arrive", () => {

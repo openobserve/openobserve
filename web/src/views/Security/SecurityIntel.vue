@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -175,12 +175,18 @@ const now = ref(Date.now());
 const liveIndicators = computed(() => indicators.value.filter((i) => !isExpired(i, now.value)));
 
 const sweep = useIntelSweep();
+let sweepController: AbortController | null = null;
+let disposed = false;
 
 async function runSweep() {
+  // A refresh still awaiting its indicator load must not start a sweep after the page is gone.
+  if (disposed) return;
+  sweepController?.abort();
+  const ctrl = (sweepController = new AbortController());
   now.value = Date.now();
   windowEndUs.value = now.value * 1000;
   // Expired indicators are kept on the list but not hunted for.
-  await sweep.run(orgId.value, liveIndicators.value, windowUs.value);
+  await sweep.run(orgId.value, liveIndicators.value, windowUs.value, ctrl.signal);
 }
 
 async function refresh() {
@@ -190,6 +196,10 @@ async function refresh() {
 
 onMounted(refresh);
 watch(orgId, refresh);
+onBeforeUnmount(() => {
+  disposed = true;
+  sweepController?.abort();
+});
 function onRangeChange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
@@ -680,7 +690,10 @@ async function loadTimeline() {
   const mySeq = ++timelineSeq;
   timeline.value = [];
   const m = selectedMatch.value;
-  if (!m || m.indicator.type === "cidr") return;
+  if (!m || m.indicator.type === "cidr") {
+    timelineLoading.value = false;
+    return;
+  }
   timelineLoading.value = true;
   const window = windowUs.value;
   const interval = histogramInterval((window.end - window.start) / 1000);

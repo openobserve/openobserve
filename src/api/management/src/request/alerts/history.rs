@@ -731,7 +731,7 @@ pub async fn get_alert_history(
         if ids.is_empty() {
             return empty();
         }
-        where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
+        where_clause.push_str(&format!(" AND ({})", siem_ids_predicate(&ids)));
     } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
         if permitted_ids.is_empty() {
@@ -1382,6 +1382,21 @@ pub(crate) fn outcome_predicate(raw: &str) -> Result<String, String> {
         .collect::<Vec<_>>()
         .join(", ");
     Ok(format!("status IN ({list})"))
+}
+
+/// A SIEM id list has no request cap, so past it one regex replaces the per-id LIKEs.
+#[cfg(feature = "enterprise")]
+fn siem_ids_predicate(ids: &[String]) -> String {
+    if ids.len() > MAX_ALERT_IDS {
+        o2_enterprise::enterprise::security::history_summary::alert_ids_regex_predicate(ids)
+    } else {
+        alert_ids_predicate(ids)
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn siem_ids_predicate(ids: &[String]) -> String {
+    alert_ids_predicate(ids)
 }
 
 #[cfg(test)]

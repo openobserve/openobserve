@@ -80,7 +80,10 @@ export function useSiemDetections() {
       }));
       if (seq !== loadSeq) return;
       listCache.set(orgId, { at: Date.now(), list });
-      alerts.value = list;
+      const previous = new Map(alerts.value.map((row) => [row.id, row]));
+      alerts.value = list.map((row: Record<string, any>) =>
+        keepFullFields(row, previous.get(row.id)),
+      );
     } catch (e: any) {
       if (seq !== loadSeq) return;
       error.value = e?.response?.data?.message ?? t("siem.detections.loadError");
@@ -130,5 +133,18 @@ export function useSiemDetections() {
     loadFull,
     patch,
     remove,
+  };
+}
+
+/** The list omits the rule SQL and YAML, and the drawers only fetch them once per id. */
+function keepFullFields(row: Record<string, any>, prev: Record<string, any> | undefined) {
+  if (!prev) return row;
+  const yaml = prev.context_attributes?.sigma_yaml;
+  return {
+    ...row,
+    query_condition: row.query_condition ?? prev.query_condition,
+    ...(yaml && !row.context_attributes?.sigma_yaml
+      ? { context_attributes: { ...row.context_attributes, sigma_yaml: yaml } }
+      : {}),
   };
 }

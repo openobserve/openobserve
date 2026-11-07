@@ -24775,9 +24775,7 @@
         "empty": "No entities to graph",
         "emptyHint": "Add security sources or widen the time range to see the risk graph.",
         "showingTop": "Showing top {n} of {total} by risk",
-        "attackPath": "Attack path",
-        "crownJewel": "Crown jewel",
-        "asset": "Asset",
+        "illustrative": "Illustrative: relationships are inferred from risk ranking, not observed.",
         "tier": {
           "critical": "Critical",
           "high": "High",

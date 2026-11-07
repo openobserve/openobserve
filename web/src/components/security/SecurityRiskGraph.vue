@@ -15,6 +15,14 @@
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-test="security-risk-graph">
+    <OBanner
+      variant="info"
+      icon="info"
+      dense
+      class="mx-page-edge mt-2"
+      :content="t('siem.entities.riskGraph.illustrative')"
+      data-test="security-risk-graph-illustrative"
+    />
     <div class="mx-page-edge mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
       <span
         v-for="item in legend"
@@ -23,10 +31,6 @@
       >
         <span class="inline-block size-2.5 rounded-full" :style="{ backgroundColor: item.color }" />
         {{ item.label }}
-      </span>
-      <span class="text-text-secondary flex items-center gap-1.5">
-        <span class="inline-block h-0.5 w-5 rounded" :style="{ backgroundColor: PATH_COLOR }" />
-        {{ t("siem.entities.riskGraph.attackPath") }}
       </span>
       <span v-if="hiddenCount" class="text-text-secondary ml-auto">
         {{ t("siem.entities.riskGraph.showingTop", { n: shownCount, total: rows.length }) }}
@@ -72,14 +76,11 @@
                 class="flex size-6 shrink-0 items-center justify-center rounded"
                 :style="{ backgroundColor: data.accent + '22', color: data.accent }"
               >
-                <OIcon
-                  :name="data.crownJewel ? 'star' : KIND_ICON[data.kind] || 'share'"
-                  size="sm"
-                />
+                <OIcon :name="KIND_ICON[data.kind] || 'share'" size="sm" />
               </span>
               <span
                 class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold"
-                :class="{ 'font-mono': data.kind !== 'user' && data.kind !== 'asset' }"
+                :class="{ 'font-mono': data.kind !== 'user' }"
                 >{{ data.label }}</span
               >
               <span
@@ -88,27 +89,12 @@
                 >{{ data.score }}</span
               >
             </div>
-            <div class="flex items-center gap-1.5">
-              <span class="text-text-secondary text-[0.65rem] tracking-wide uppercase">{{
-                data.crownJewel
-                  ? t("siem.entities.riskGraph.crownJewel")
-                  : t(`siem.entities.riskGraph.tier.${data.tier}`)
-              }}</span>
-              <span
-                v-if="data.onPath"
-                class="ml-auto flex items-center gap-0.5 text-[0.6rem] font-semibold"
-                :style="{ color: PATH_COLOR }"
-              >
-                <OIcon name="warning" size="xs" />{{ t("siem.entities.riskGraph.attackPath") }}
-              </span>
-            </div>
-            <div
-              v-if="data.kind !== 'asset'"
-              class="text-text-secondary flex gap-2 text-[0.6rem] tabular-nums"
-            >
+            <span class="text-text-secondary text-[0.65rem] tracking-wide uppercase">{{
+              t(`siem.entities.riskGraph.tier.${data.tier}`)
+            }}</span>
+            <div class="text-text-secondary flex gap-2 text-[0.6rem] tabular-nums">
               <span>base {{ data.base }}</span>
               <span>prop {{ data.propagated }}</span>
-              <span>blast {{ data.blast }}</span>
             </div>
           </div>
           <Handle
@@ -130,11 +116,11 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import {
   buildRiskGraph,
   type RiskGraph,
   type RiskKind,
-  type RiskNode,
   type RiskRowInput,
   type RiskTier,
 } from "@/utils/security/riskGraph";
@@ -149,14 +135,11 @@ const TIER_COLOR: Record<RiskTier, string> = {
   medium: "#eab308",
   low: "#22c55e",
 };
-const ASSET_COLOR = "#6b7280";
-const CROWN_COLOR = "#a855f7";
-const PATH_COLOR = "#ef4444";
+const EDGE_COLOR = "#6b7280";
 const KIND_ICON: Record<string, string> = {
   user: "person",
   ip: "lan",
   host: "computer",
-  asset: "database",
 };
 
 // Cap the entity nodes so a large org does not render a wall of cards.
@@ -164,18 +147,10 @@ const ENTITY_CAP = 24;
 const ENTITY_COLS = 3;
 const CELL_W = 236;
 const CELL_H = 124;
-const HUB_GAP = 150;
-const CROWN_GAP = 320;
-
-function accentOf(n: RiskNode): string {
-  if (n.crownJewel) return CROWN_COLOR;
-  if (n.kind === "asset") return ASSET_COLOR;
-  return TIER_COLOR[n.tier];
-}
 
 export default defineComponent({
   name: "SecurityRiskGraph",
-  components: { VueFlow, Background, Controls, Handle, OIcon, OEmptyState },
+  components: { VueFlow, Background, Controls, Handle, OIcon, OEmptyState, OBanner },
   props: {
     rows: { type: Array as () => RiskRowInput[], default: () => [] },
     kind: { type: String as () => RiskKind, required: true },
@@ -186,7 +161,7 @@ export default defineComponent({
 
     const graph = computed<RiskGraph>(() => buildRiskGraph(props.rows, props.kind, ENTITY_CAP));
 
-    const shownCount = computed(() => graph.value.nodes.filter((n) => n.kind !== "asset").length);
+    const shownCount = computed(() => graph.value.nodes.length);
     const hiddenCount = computed(() => Math.max(0, props.rows.length - shownCount.value));
 
     const legend = computed(() => [
@@ -194,56 +169,27 @@ export default defineComponent({
       { label: t("siem.entities.riskGraph.tier.high"), color: TIER_COLOR.high },
       { label: t("siem.entities.riskGraph.tier.medium"), color: TIER_COLOR.medium },
       { label: t("siem.entities.riskGraph.tier.low"), color: TIER_COLOR.low },
-      { label: t("siem.entities.riskGraph.crownJewel"), color: CROWN_COLOR },
     ]);
 
-    const onPathIds = computed(() => new Set(graph.value.topPath));
-
-    const flowNodes = computed(() => {
-      const entities = graph.value.nodes.filter((n) => n.kind !== "asset");
-      const hubs = graph.value.nodes.filter((n) => n.kind === "asset" && !n.crownJewel);
-      const crowns = graph.value.nodes.filter((n) => n.crownJewel);
-
-      const rows = Math.ceil(entities.length / ENTITY_COLS) || 1;
-      const gridH = rows * CELL_H;
-      const gridW = ENTITY_COLS * CELL_W;
-      const centerY = gridH / 2;
-      const pos = new Map<string, { x: number; y: number }>();
-
-      entities.forEach((n, i) => {
-        pos.set(n.id, { x: (i % ENTITY_COLS) * CELL_W, y: Math.floor(i / ENTITY_COLS) * CELL_H });
-      });
-      hubs.forEach((n, i) => {
-        pos.set(n.id, { x: gridW + HUB_GAP, y: centerY + (i - (hubs.length - 1) / 2) * CELL_H });
-      });
-      crowns.forEach((n, i) => {
-        pos.set(n.id, {
-          x: gridW + HUB_GAP + CROWN_GAP,
-          y: centerY + (i - (crowns.length - 1) / 2) * (CELL_H + 30),
-        });
-      });
-
-      return graph.value.nodes.map((n) => ({
+    const flowNodes = computed(() =>
+      graph.value.nodes.map((n, i) => ({
         id: n.id,
         type: "risk",
-        position: pos.get(n.id) ?? { x: 0, y: 0 },
+        position: { x: (i % ENTITY_COLS) * CELL_W, y: Math.floor(i / ENTITY_COLS) * CELL_H },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         data: {
           id: n.id,
           label: n.label,
           kind: n.kind,
-          crownJewel: n.crownJewel,
           tier: n.tier,
-          accent: accentOf(n),
+          accent: TIER_COLOR[n.tier],
           score: Math.round(n.score),
           base: Math.round(n.base),
           propagated: Math.round(n.propagated),
-          blast: Math.round(n.blast),
-          onPath: onPathIds.value.has(n.id),
         },
-      }));
-    });
+      })),
+    );
 
     const flowEdges = computed(() =>
       graph.value.edges.map((e) => ({
@@ -251,19 +197,14 @@ export default defineComponent({
         source: e.source,
         target: e.target,
         type: "default",
-        animated: e.onPath,
         markerEnd: MarkerType.ArrowClosed,
-        style: {
-          stroke: e.onPath ? PATH_COLOR : ASSET_COLOR,
-          strokeWidth: e.onPath ? 2.5 : 1,
-          opacity: e.onPath ? 1 : 0.2 + e.p * 0.5,
-        },
+        style: { stroke: EDGE_COLOR, strokeWidth: 1, opacity: 0.2 + e.p * 0.5 },
       })),
     );
 
-    function onNodeClick({ node }: { node: { data?: { kind?: string; label?: string } } }) {
-      const d = node?.data;
-      if (d && d.kind !== "asset" && d.label) emit("node-select", d.label);
+    function onNodeClick({ node }: { node: { data?: { label?: string } } }) {
+      const label = node?.data?.label;
+      if (label) emit("node-select", label);
     }
 
     return {
@@ -277,7 +218,6 @@ export default defineComponent({
       onNodeClick,
       Position,
       KIND_ICON,
-      PATH_COLOR,
     };
   },
 });

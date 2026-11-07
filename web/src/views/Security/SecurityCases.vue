@@ -270,8 +270,7 @@ async function loadDetail(id: string) {
   ]);
   if (mine !== detailSeq) return;
   if (one.status === "fulfilled") detail.value = one.value.data;
-  else
-    detailError.value = (one.reason as any)?.response?.data?.message ?? t("siem.cases.openError");
+  else detailError.value = one.reason?.response?.data?.message ?? t("siem.cases.openError");
   events.value = timeline.status === "fulfilled" ? toTimeline(timeline.value.data?.events) : [];
   eventsPartial.value =
     timeline.status === "fulfilled" && !!timeline.value.data?.partial_reconstruction;
@@ -526,6 +525,7 @@ const { requestRca } = useRcaTrigger();
 const rca = ref("");
 let rcaLoaded: { incidentId: string; runId: string } | null = null;
 let rcaPoll: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
 const triggering = ref(false);
 const analyzing = computed(() => triggering.value || isLiveRca(detail.value?.rca));
 
@@ -553,6 +553,7 @@ async function loadRcaReport(id: string) {
 }
 
 function syncRca(id: string) {
+  if (disposed) return;
   stopRcaPoll();
   if (detail.value?.id !== id) return;
   void loadRcaReport(id);
@@ -560,6 +561,7 @@ function syncRca(id: string) {
 }
 
 async function refreshRca(id: string, wasLive = isLiveRca(detail.value?.rca)) {
+  if (disposed) return;
   try {
     const res = await incidentsService.get(orgId.value, id);
     if (!stillOpen(id) || detail.value?.id !== id) return;
@@ -598,7 +600,10 @@ async function runAnalysis() {
   }
 }
 
-onBeforeUnmount(stopRcaPoll);
+onBeforeUnmount(() => {
+  disposed = true;
+  stopRcaPoll();
+});
 
 function openDetection(name: string) {
   const id = byName.value.get(name)?.alert.id;

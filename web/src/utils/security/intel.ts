@@ -2,7 +2,7 @@
 
 // Intel tables are enrichment tables named `ioc_*` or `threat_intel*`; matching is exact, never fuzzy.
 
-import { quoteString } from "./sql";
+import { quoteIdent, quoteString } from "./sql";
 
 export const INDICATOR_TYPES = ["ip", "cidr", "domain", "url", "hash", "email"] as const;
 export type IndicatorType = (typeof INDICATOR_TYPES)[number];
@@ -416,8 +416,6 @@ export function candidateColumns(
 
 /** Folded like normalizeIndicator; `ip` too because IPv6 hex may be stored in either case. */
 const CASE_FOLDED: SweepType[] = ["ip", "domain", "hash", "email"];
-
-const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 /** Server caps an IN list well above this; batches keep each query modest. */
 export const SWEEP_BATCH = 400;

@@ -567,7 +567,6 @@ const shareUrl = computed(() => {
     to: String(to),
     firing: f.id,
   };
-  if (!f.detection) query.all = "1";
   if (!isSignal(f)) query.evals = "1";
   return new URL(
     router.resolve({ path: route.path, query }).href,

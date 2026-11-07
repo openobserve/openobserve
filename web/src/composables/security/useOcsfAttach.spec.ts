@@ -8,6 +8,7 @@ import { findOurNode } from "@/utils/security/ocsfPipeline";
 
 vi.mock("@/services/ocsfPacks", () => ({
   default: {
+    listPacks: vi.fn(),
     listFunctions: vi.fn(),
     functionDependencies: vi.fn(),
     saveFunction: vi.fn(),
@@ -35,6 +36,15 @@ const PACK = {
   product_name: "__O2_STREAM__",
   vendor_name: "Unknown",
   vrl: '.metadata_product_name = "__O2_STREAM__"\n.',
+};
+
+const FULL_PACK = {
+  ...PACK,
+  id: "aws_cloudtrail",
+  version: 2,
+  label: "CloudTrail",
+  kind: "full" as const,
+  source_type: "aws_cloudtrail",
 };
 
 const httpError = (status: number, message = "") => ({ response: { status, data: { message } } });
@@ -103,6 +113,7 @@ const soleOcsf = () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  svc.listPacks.mockResolvedValue({ ocsf_version: "1.3.0", packs: [PACK, FULL_PACK] });
   svc.listFunctions.mockResolvedValue({ data: { list: [] } });
   svc.saveFunction.mockResolvedValue({ data: {} });
   svc.saveSetting.mockResolvedValue({ data: {} });
@@ -386,5 +397,31 @@ describe("detach (R12)", () => {
     const cleared = svc.saveSetting.mock.calls[0][2];
     expect(cleared).toMatchObject({ pack_id: "", pack_version: 0 });
     expect(svc.deleteFunction).toHaveBeenCalledWith("org1", "ocsf_entity_v1_web");
+  });
+
+  it("names the function by the pack kind, the same way attach does", async () => {
+    svc.getPipeline.mockRejectedValue(httpError(404));
+    svc.functionDependencies.mockResolvedValue({ data: { list: [] } });
+    svc.deleteFunction.mockResolvedValue({ data: {} });
+    svc.listPacks.mockResolvedValue({
+      ocsf_version: "1.3.0",
+      packs: [{ ...PACK, id: "entity_alt" }, FULL_PACK],
+    });
+
+    await detach("org1", "Web", { ...setting(), pack_id: "entity_alt", pack_version: 3 });
+    expect(svc.deleteFunction).toHaveBeenLastCalledWith("org1", "ocsf_entity_v3_web");
+
+    await detach("org1", "web", { ...setting(), pack_id: "aws_cloudtrail", pack_version: 2 });
+    expect(svc.deleteFunction).toHaveBeenLastCalledWith("org1", "ocsf_aws_cloudtrail_v2");
+  });
+
+  it("leaves the function in place when the pack is no longer in the registry", async () => {
+    svc.getPipeline.mockRejectedValue(httpError(404));
+    svc.functionDependencies.mockResolvedValue({ data: { list: [] } });
+
+    await detach("org1", "web", { ...setting(), pack_id: "gone" });
+
+    expect(svc.saveSetting).toHaveBeenCalled();
+    expect(svc.deleteFunction).not.toHaveBeenCalled();
   });
 });

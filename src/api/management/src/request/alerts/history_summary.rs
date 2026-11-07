@@ -137,8 +137,7 @@ pub async fn get_alert_history_summary(
         return empty();
     }
 
-    // Past the explicit-list cap, one LIKE per id makes an unbounded predicate; filter rows
-    // instead.
+    // Past the cap, one LIKE per id is unbounded, so filter rows in Rust.
     let filter_in_rust = ids.as_ref().is_some_and(|ids| ids.len() > MAX_ALERT_IDS);
     let id_predicate = ids
         .as_deref()

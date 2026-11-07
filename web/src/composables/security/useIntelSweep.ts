@@ -3,7 +3,7 @@
 // Coverage is returned with matches, so an empty result is told apart from "nothing could have matched".
 
 import { ref, shallowRef } from "vue";
-import { runSql } from "@/composables/security/useSecurityStreamPlans";
+import { runPool, runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
 import { bestMatch } from "@/utils/security/classify";
 import { FieldIndex } from "@/utils/security/fields";
@@ -86,8 +86,10 @@ export function useIntelSweep() {
     orgId: string,
     indicators: Indicator[],
     window: { start: number; end: number },
+    signal?: AbortSignal,
   ) {
     const mySeq = ++seq;
+    const stale = () => mySeq !== seq || !!signal?.aborted;
     running.value = true;
     done.value = 0;
     failed.value = 0;
@@ -99,7 +101,7 @@ export function useIntelSweep() {
         orgId,
         (all.data?.list ?? []).map((s: any) => String(s.name)),
       );
-      if (mySeq !== seq) return;
+      if (stale()) return;
       streams.value = names;
 
       const valuesByType = new Map<SweepType, string[]>();
@@ -110,16 +112,12 @@ export function useIntelSweep() {
         valuesByType.set(i.type, list);
       }
 
-      const unread: string[] = [];
-      const resolvers = await Promise.all(
-        names.map((stream) =>
-          columnsFor(orgId, stream).catch(() => {
-            unread.push(stream);
-            return () => [] as string[];
-          }),
-        ),
+      const settled = await runPool(names.map((stream) => () => columnsFor(orgId, stream)));
+      if (stale()) return;
+      const unread = names.filter((_, s) => settled[s].status === "rejected");
+      const resolvers = settled.map((r) =>
+        r.status === "fulfilled" ? r.value : () => [] as string[],
       );
-      if (mySeq !== seq) return;
       unreadStreams.value = unread;
 
       // Interleaved per type, so the query cap trims every type rather than dropping the last one.
@@ -152,7 +150,7 @@ export function useIntelSweep() {
       }[] = [];
       const worker = async () => {
         for (let task = queue.shift(); task; task = queue.shift()) {
-          if (mySeq !== seq) return;
+          if (stale()) return;
           try {
             const res = await runSql(
               orgId,
@@ -160,6 +158,7 @@ export function useIntelSweep() {
               window.start,
               window.end,
               task.values.length,
+              { signal },
             );
             results.push({ ...task, rows: res.hits });
             // A partial answer still counts its rows, but the column was not fully searched.
@@ -168,6 +167,7 @@ export function useIntelSweep() {
               partialResults.value += 1;
             }
           } catch {
+            if (stale()) return;
             // One unreadable column must not sink the sweep; it is counted and shown.
             failed.value += 1;
             failedTasks.push(task);
@@ -176,7 +176,7 @@ export function useIntelSweep() {
         }
       };
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-      if (mySeq !== seq) return;
+      if (stale()) return;
       // A column counts as searched only when none of its batches was dropped by the cap or failed.
       const key = (t: Task) => `${t.type}|${t.stream}|${t.column}`;
       const incomplete = new Set([...dropped, ...failedTasks, ...partialTasks].map(key));

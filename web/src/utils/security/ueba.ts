@@ -3,7 +3,8 @@
 // Each user is compared with their own baseline, not the org's: a service account's volume is normal for it.
 
 import type { SeverityTone } from "./severity";
-import { isExternalIp, quoteIdent, type StreamPlan } from "./entities";
+import { failSum, isExternalIp, type StreamPlan } from "./entities";
+import { quoteIdent } from "./sql";
 
 /** Tuning knobs. Each guard exists to stop a tiny count from reading as a spike. */
 export const UEBA_THRESHOLDS = {
@@ -82,8 +83,6 @@ export interface IpHit {
 
 const userPresent = (user: string) =>
   `${quoteIdent(user)} IS NOT NULL AND CAST(${quoteIdent(user)} AS VARCHAR) != ''`;
-const failSum = (plan: StreamPlan) =>
-  plan.failure ? `SUM(CASE WHEN ${plan.failure} THEN 1 ELSE 0 END)` : "0";
 
 /** user × hour of day, with totals. Null when the stream has no user column. */
 export function hoursSql(plan: StreamPlan, limit: number): string | null {

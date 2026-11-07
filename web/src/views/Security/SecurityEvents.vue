@@ -88,6 +88,7 @@ import {
 import { widerPeriodFor, sourceHealth, type SourceHealth } from "@/utils/security/streams";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { FieldIndex } from "@/utils/security/fields";
+import { quoteIdent } from "@/utils/security/sql";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
 import {
@@ -1077,7 +1078,7 @@ function filterByRule(where: string) {
   const stream = selectedStream.value;
   if (!stream) return;
   sqlMode.value = true;
-  sqlQuery.value = `SELECT * FROM "${stream}" WHERE ${where} ORDER BY _timestamp DESC`;
+  sqlQuery.value = `SELECT * FROM ${quoteIdent(stream)} WHERE ${where} ORDER BY _timestamp DESC`;
   showRules.value = false;
   void runSearch();
 }

@@ -6,6 +6,7 @@ import { computed, ref, shallowRef } from "vue";
 
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import type { SourceType } from "@/utils/security/sourceTypes";
+import { quoteIdent } from "@/utils/security/sql";
 import type { ApplicableRule } from "@/utils/security/sigma";
 import { applicableRules } from "@/utils/security/sigma";
 
@@ -25,7 +26,7 @@ export function buildRuleCountSql(stream: string, wheres: string[]): string {
   const projections = wheres.map(
     (where, index) => `SUM(CASE WHEN ${where} THEN 1 ELSE 0 END) AS r${index}`,
   );
-  return `SELECT ${projections.join(", ")} FROM "${stream.replace(/"/g, '""')}"`;
+  return `SELECT ${projections.join(", ")} FROM ${quoteIdent(stream)}`;
 }
 
 export function useSigmaRules() {

@@ -4,6 +4,7 @@
 
 import type { SigmaLevel, SigmaRule } from "./sigma";
 import { parseSigmaRule, sigmaLevelToSeverity } from "./sigma";
+import { quoteIdent } from "./sql";
 
 /** The key that marks an alert as belonging to the SIEM. */
 export const SIEM_MARKER = "siem";
@@ -184,12 +185,9 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
 
 /** No time bound here: the scheduler applies the window from `trigger_condition.period`. */
 export function detectionSql(stream: string, where: string, fields: string[] = []): string {
-  const quoted = stream.replace(/"/g, '""');
   const columns = ["_timestamp", ...fields.filter((field) => field !== "_timestamp")];
-  const projection = [...new Set(columns)]
-    .map((field) => `"${field.replace(/"/g, '""')}"`)
-    .join(", ");
-  return `SELECT ${projection} FROM "${quoted}" WHERE ${where}`;
+  const projection = [...new Set(columns)].map(quoteIdent).join(", ");
+  return `SELECT ${projection} FROM ${quoteIdent(stream)} WHERE ${where}`;
 }
 
 /** Lets the Events page re-run a stored detection over an arbitrary window. */

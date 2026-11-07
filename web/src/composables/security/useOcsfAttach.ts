@@ -40,7 +40,7 @@ export interface AttachResult {
   setting: SecuritySetting;
 }
 
-const functionName = (pack: OcsfPack, stream: string): string =>
+const functionName = (pack: Pick<OcsfPack, "id" | "version" | "kind">, stream: string): string =>
   pack.kind === "entity"
     ? entityFunctionName(pack.version, stream)
     : fullFunctionName(pack.id, pack.version);
@@ -326,11 +326,12 @@ export async function detach(
     await ocsfPacks.saveSetting(org, stream, cleared);
   }
 
-  const name =
-    setting.pack_id === "entity"
-      ? entityFunctionName(setting.pack_version, stream)
-      : fullFunctionName(setting.pack_id, setting.pack_version);
   try {
+    // The setting carries no pack kind, and the name must be derived exactly as attach did.
+    const { packs } = await ocsfPacks.listPacks(org);
+    const pack = packs.find((p) => p.id === setting.pack_id);
+    if (!pack) return;
+    const name = functionName({ ...pack, version: setting.pack_version }, stream);
     const deps = await ocsfPacks.functionDependencies(org, name);
     const list: any[] = deps.data?.list ?? deps.data ?? [];
     if (!list.length) await ocsfPacks.deleteFunction(org, name);

@@ -5,7 +5,7 @@
 import type { SourceType } from "./sourceTypes";
 import { FieldIndex } from "./fields";
 import { failurePredicate, outcomeInterpretable } from "./outcome";
-import { quoteString } from "./sql";
+import { quoteIdent, quoteString } from "./sql";
 
 export type EntityKind = "user" | "ip" | "host";
 export const ENTITY_KINDS: EntityKind[] = ["user", "ip", "host"];
@@ -67,7 +67,6 @@ export const LARGE_STREAM_ROWS = 50_000_000;
 /** The slice a large stream is cut to, µs. */
 export const LARGE_STREAM_SLICE_US = 3_600_000_000;
 
-export const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 export { quoteString };
 
 function resolveFirst(index: FieldIndex, paths: string[] | undefined): string | null {
@@ -171,7 +170,7 @@ export function shouldLimitWindow(estimate: number | null, windowUs: number): bo
   return estimate !== null && estimate > LARGE_STREAM_ROWS && windowUs > LARGE_STREAM_SLICE_US;
 }
 
-const failSum = (plan: StreamPlan) =>
+export const failSum = (plan: StreamPlan) =>
   plan.failure ? `SUM(CASE WHEN ${plan.failure} THEN 1 ELSE 0 END)` : "0";
 
 const present = (column: string) =>

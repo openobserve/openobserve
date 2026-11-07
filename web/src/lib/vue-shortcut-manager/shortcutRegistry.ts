@@ -219,6 +219,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.securityRecord",
     scope: "security-record",
+    visible: enterprise,
     shortcuts: [
       {
         id: "securityRecordNext",

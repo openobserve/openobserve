@@ -43,7 +43,6 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
-      use_cache: useCacheOverride,
     }: {
       org_identifier: string;
       query: any;
@@ -69,8 +68,6 @@ const search = {
        * unaffected.
        */
       signal?: AbortSignal;
-      /** Force the result cache on/off; omitted keeps the global default. */
-      use_cache?: boolean;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,

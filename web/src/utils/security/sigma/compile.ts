@@ -6,7 +6,7 @@ import type { SigmaRule, SigmaSearch } from "./types";
 import type { ConditionNode } from "./condition";
 import { expandPattern, parseCondition } from "./condition";
 import { FieldIndex } from "../fields";
-import { quoteString } from "../sql";
+import { quoteIdent, quoteString } from "../sql";
 
 export interface CompileOptions {
   /** Sigma field name to stream column, for sources that spell things differently. */
@@ -55,8 +55,6 @@ const SUPPORTED_MODIFIERS = new Set([
   "base64offset",
 ]);
 
-const quoteIdent = (field: string) => `"${field.replace(/"/g, '""')}"`;
-
 /** `%` and `_` are LIKE metacharacters; a literal one has to be escaped. */
 const escapeLikeLiteral = (char: string) =>
   char === "%" || char === "_" || char === "\\" ? `\\${char}` : char;
@@ -101,12 +99,9 @@ function unescapeSigma(value: string): string {
 function windashVariants(value: string): string[] {
   const dashes = ["-", "/", "–", "—", "―"];
   // Not anchored at position zero: rules are usually written as ' -enc ' with surrounding spaces.
-  const match = /(^|\s)([-/–—―])(?=\S)/.exec(value);
-  if (!match) return [value];
-  const at = match.index + match[1].length;
-  const head = value.slice(0, at);
-  const tail = value.slice(at + 1);
-  return dashes.map((dash) => `${head}${dash}${tail}`);
+  const flagDash = /(^|\s)[-/–—―](?=\S)/g;
+  if (value.search(flagDash) === -1) return [value];
+  return dashes.map((dash) => value.replace(flagDash, `$1${dash}`));
 }
 
 /** Octet prefix plus a numeric range so /17 is exact; IPv6 is refused since its text form is not unique. */
@@ -248,6 +243,10 @@ class Compiler {
 
     // A list is OR by default; the `all` modifier makes it AND.
     if (Array.isArray(value)) {
+      if (!value.length) {
+        this.error ??= `Field '${name}' has an empty value list`;
+        return null;
+      }
       const parts = value
         .map((entry) => this.scalarComparison(identifier, modifiers, entry))
         .filter((part): part is string => part !== null);
@@ -277,8 +276,13 @@ class Compiler {
     if (value === null || value === undefined) return `${identifier} IS NULL`;
 
     if (modifiers.has("re")) {
+      // The backend's Rust regex engine cannot compile lookaround or backreferences.
+      if (/\(\?<?[=!]|\\[1-9]/.test(String(value))) {
+        this.unsupported.add(`re: lookaround or backreference in ${String(value)}`);
+        return null;
+      }
       const pattern = modifiers.has("i") ? `(?i)${String(value)}` : String(value);
-      return `re_match(${identifier}, ${quoteString(pattern)})`;
+      return `re_match(CAST(${identifier} AS VARCHAR), ${quoteString(pattern)})`;
     }
 
     if (modifiers.has("cidr")) {
@@ -377,10 +381,14 @@ class Compiler {
     }
 
     if (Array.isArray(body)) {
+      if (!body.length) {
+        this.error ??= `Search '${name}' is empty`;
+        return null;
+      }
       const parts = body
         .map((entry) =>
           entry !== null && typeof entry === "object"
-            ? this.map(entry as Record<string, unknown>)
+            ? this.map(name, entry as Record<string, unknown>)
             : this.keyword(entry as string | number),
         )
         .filter((part): part is string => part !== null);
@@ -389,13 +397,17 @@ class Compiler {
       return joinClauses(parts, "OR");
     }
 
-    if (typeof body === "object") return this.map(body as Record<string, unknown>);
+    if (typeof body === "object") return this.map(name, body as Record<string, unknown>);
 
     this.error ??= `Search '${name}' is neither a map nor a list`;
     return null;
   }
 
-  private map(entries: Record<string, unknown>): string | null {
+  private map(name: string, entries: Record<string, unknown>): string | null {
+    if (!Object.keys(entries).length) {
+      this.error ??= `Search '${name}' is empty`;
+      return null;
+    }
     const parts: string[] = [];
     for (const [key, value] of Object.entries(entries)) {
       const part = this.comparison(key, value);
@@ -403,7 +415,6 @@ class Compiler {
       if (part === null) return null;
       parts.push(part);
     }
-    if (!parts.length) return null;
     return joinClauses(parts, "AND");
   }
 
@@ -493,11 +504,14 @@ export function compileSigmaRule(rule: SigmaRule, options: CompileOptions = {}):
   const where = branches.length ? joinClauses(branches, "OR") : "";
   const assumedAbsent = [...compiler.assumedAbsent];
   const unsupported = [...compiler.unsupported];
+  // A saved alert on a constant-TRUE predicate would fire on every event.
+  if (where === TRUE) compiler.error ??= "Rule matches every row";
 
   return {
     where,
     // FALSE is a compiled predicate, but it is not a detection.
-    runnable: !!where && where !== FALSE && !unsupported.length && !compiler.error,
+    runnable:
+      !!where && where !== FALSE && where !== TRUE && !unsupported.length && !compiler.error,
     unsupported,
     assumedAbsent,
     fields: [...compiler.fields],
