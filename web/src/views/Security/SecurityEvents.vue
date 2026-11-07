@@ -39,7 +39,6 @@ import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.v
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import config from "@/aws-exports";
 import { generateTraceContext } from "@/utils/auth";
 import {
   bestMatch,
@@ -1243,12 +1242,9 @@ function cancelSearch({ quiet = false } = {}) {
   loading.value = false;
   histogramLoading.value = false;
   if (!quiet) errorMsg.value = t("siem.events.cancelled");
-  // Server-side cancel exists only in enterprise builds; OSS answers 403.
-  if (config.isEnterprise === "true" || config.isCloud === "true") {
-    searchService
-      .delete_running_queries(orgId.value, [run.searchTrace.traceId, run.histogramTrace.traceId])
-      .catch(() => {});
-  }
+  searchService
+    .delete_running_queries(orgId.value, [run.searchTrace.traceId, run.histogramTrace.traceId])
+    .catch(() => {});
 }
 
 onBeforeUnmount(() => cancelSearch({ quiet: true }));

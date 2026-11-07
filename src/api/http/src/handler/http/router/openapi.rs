@@ -1487,6 +1487,17 @@ impl Modify for SecurityAddon {
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
         overlay_doc(openapi, CloudQuotaApiDoc::openapi());
+        // The hand-written history params cannot be cfg-gated, and `siem` is enterprise-only.
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(params) = openapi
+            .paths
+            .paths
+            .get_mut("/api/v2/{org_id}/alerts/history")
+            .and_then(|path| path.get.as_mut())
+            .and_then(|op| op.parameters.as_mut())
+        {
+            params.retain(|param| param.name != "siem");
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -2277,6 +2288,20 @@ mod tests {
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
             assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn siem_filters_are_not_advertised_in_oss() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/v2/{org_id}/alerts/history",
+            "/api/v2/{org_id}/alerts/incidents",
+        ] {
+            let params = spec["paths"][path]["get"]["parameters"].as_array().unwrap();
+            assert!(!params.is_empty(), "{path}");
+            assert!(params.iter().all(|p| p["name"] != "siem"), "{path}");
         }
     }
 

@@ -54,16 +54,12 @@ import {
   toneOfSigmaLevel,
 } from "@/utils/security/severity";
 import { formatEventCount } from "@/utils/formatters";
-import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
-
-// OSS answers an empty 200 for incidents, which would otherwise read as "no cases".
-const available = config.isEnterprise === "true" || config.isCloud === "true";
 
 const { byName, byId, load: loadDetections } = useSiemDetections();
 
@@ -117,7 +113,7 @@ async function fetchTotals() {
 }
 
 async function fetchCases() {
-  if (!available || !orgId.value) return;
+  if (!orgId.value) return;
   const mine = ++listSeq;
   loading.value = true;
   error.value = "";
@@ -288,7 +284,7 @@ async function loadDetail(id: string) {
 const stillOpen = (id: string) => selectedId.value === id;
 
 watch(selectedId, (id) => {
-  if (id && available) void loadDetail(id);
+  if (id) void loadDetail(id);
   else {
     stopRcaPoll();
     detail.value = null;
@@ -630,7 +626,6 @@ function openAlerts() {
 }
 
 onMounted(() => {
-  if (!available) return;
   void loadDetections(orgId.value);
   refresh();
   if (selectedId.value) void loadDetail(selectedId.value);
@@ -646,18 +641,7 @@ onMounted(() => {
     bleed
     title-data-test="security-cases-title"
   >
-    <OEmptyState
-      v-if="!available"
-      size="hero"
-      icon="assignment"
-      :title="t('siem.cases.unavailableTitle')"
-      :description="t('siem.cases.unavailableHint')"
-      :action-label="t('siem.cases.goToAlerts')"
-      action-icon="notifications-active"
-      data-test="security-cases-unavailable"
-      @action="openAlerts"
-    />
-    <div v-else class="flex min-h-0 flex-1 flex-col">
+    <div class="flex min-h-0 flex-1 flex-col">
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <SecurityNotices :notices="notices" data-test="security-cases-notices" />
         <OStatStrip
@@ -762,7 +746,7 @@ onMounted(() => {
     </div>
 
     <SecurityRecordDrawer
-      v-if="selectedId && available"
+      v-if="selectedId"
       :open="!!selectedId"
       v-model:tab="tab"
       :title="

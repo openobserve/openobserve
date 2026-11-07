@@ -40,6 +40,7 @@ pub struct ListIncidentsQuery {
     #[serde(default)]
     pub offset: u64,
     /// Only incidents that contain at least one SIEM detection
+    #[cfg(feature = "enterprise")]
     #[serde(default)]
     pub siem: bool,
 }
@@ -134,11 +135,14 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
 ) -> Response {
-    let siem_ids = if cfg!(feature = "enterprise") && query.siem {
+    #[cfg(feature = "enterprise")]
+    let siem_ids = if query.siem {
         Some(db::alerts::alert::resolve_siem_alert_ids(&org_id).await)
     } else {
         None
     };
+    #[cfg(not(feature = "enterprise"))]
+    let siem_ids: Option<Vec<String>> = None;
     match openobserve_core::alerts::incidents::list_incidents_filtered(
         &org_id,
         query.status.as_deref(),
@@ -2330,6 +2334,7 @@ mod tests {
             status: None,
             limit: default_limit(),
             offset: 0,
+            #[cfg(feature = "enterprise")]
             siem: false,
         };
         assert_eq!(query.limit, 50);
@@ -2343,11 +2348,13 @@ mod tests {
             status: Some("open".to_string()),
             limit: 100,
             offset: 25,
+            #[cfg(feature = "enterprise")]
             siem: true,
         };
         assert_eq!(query.status.unwrap(), "open");
         assert_eq!(query.limit, 100);
         assert_eq!(query.offset, 25);
+        #[cfg(feature = "enterprise")]
         assert!(query.siem);
     }
 

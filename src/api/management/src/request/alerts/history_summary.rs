@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::BTreeMap;
-
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -23,11 +21,12 @@ use chrono::{Duration, Utc};
 use config::{
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
-        self_reporting::usage::{TRIGGERS_STREAM, TriggerDataType, normalize_outcome},
+        self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
     utils::time::now_micros,
 };
+use o2_enterprise::enterprise::security::history_summary as summary;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service as SearchService;
@@ -41,10 +40,6 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-/// Upper bound on buckets; a wider window gets a coarser interval instead.
-const MAX_BUCKETS: i64 = 500;
-const MIN_INTERVAL_SECS: i64 = 60;
-const DEFAULT_INTERVAL_SECS: i64 = 300;
 /// Grouped rows fetched at most; reaching it marks the response partial.
 const MAX_ROWS: i64 = 50_000;
 
@@ -62,19 +57,6 @@ pub struct AlertHistorySummaryQuery {
     pub siem: Option<bool>,
 }
 
-/// Evaluations of one alert with one outcome inside one time bucket.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct AlertHistorySummaryRow {
-    /// Bucket start in Unix timestamp microseconds.
-    pub bucket: i64,
-    pub alert_id: String,
-    /// Normalized run outcome, legacy values mapped; `unknown` when unrecognised.
-    pub outcome: String,
-    pub n: i64,
-    /// How many of the `n` evaluations ran while the alert was silenced.
-    pub silenced: i64,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AlertHistorySummaryResponse {
     pub start_time: i64,
@@ -85,7 +67,7 @@ pub struct AlertHistorySummaryResponse {
     pub total: i64,
     /// True when the grouped row cap was reached and counts are incomplete.
     pub is_partial: bool,
-    pub rows: Vec<AlertHistorySummaryRow>,
+    pub rows: Vec<summary::AlertHistorySummaryRow>,
 }
 
 /// GetAlertHistorySummary
@@ -125,7 +107,7 @@ pub async fn get_alert_history_summary(
         Ok(range) => range,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
-    let interval = bucket_interval_secs(query.interval, end_time - start_time);
+    let interval = summary::bucket_interval_secs(query.interval, end_time - start_time);
     let empty = || {
         MetaHttpResponse::json(AlertHistorySummaryResponse {
             start_time,
@@ -154,7 +136,14 @@ pub async fn get_alert_history_summary(
         return empty();
     }
 
-    let sql = summary_sql(&org_id, start_time, end_time, interval, ids.as_deref());
+    let id_predicate = ids.as_deref().map(alert_ids_predicate);
+    let sql = summary::summary_sql(
+        &org_id,
+        start_time,
+        end_time,
+        interval,
+        id_predicate.as_deref(),
+    );
     let search_req = SearchRequest {
         query: SearchQuery {
             sql,
@@ -196,7 +185,7 @@ pub async fn get_alert_history_summary(
     };
 
     let is_partial = result.hits.len() as i64 >= MAX_ROWS;
-    let rows = summarize_hits(&result.hits);
+    let rows = summary::summarize_hits(&result.hits);
     MetaHttpResponse::json(AlertHistorySummaryResponse {
         start_time,
         end_time,
@@ -267,143 +256,4 @@ async fn permitted_alert_ids(org_id: &str, user_id: &str) -> Result<Option<Vec<S
             .filter_map(|perm| perm.split(':').nth(1).map(str::to_string))
             .collect(),
     ))
-}
-
-fn bucket_interval_secs(requested: Option<i64>, range_micros: i64) -> i64 {
-    let range_secs = (range_micros.max(0) + 999_999) / 1_000_000;
-    let needed = (range_secs + MAX_BUCKETS - 1) / MAX_BUCKETS;
-    requested
-        .unwrap_or(DEFAULT_INTERVAL_SECS)
-        .max(MIN_INTERVAL_SECS)
-        .max(needed)
-}
-
-fn summary_sql(
-    org_id: &str,
-    start_time: i64,
-    end_time: i64,
-    interval_secs: i64,
-    ids: Option<&[String]>,
-) -> String {
-    let interval_us = interval_secs * 1_000_000;
-    let org = org_id.replace('\'', "''");
-    // ids are validated KSUIDs, so they need no escaping.
-    let mut where_clause = format!(
-        "module = 'alert' AND org = '{org}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
-    );
-    if let Some(ids) = ids {
-        where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(ids)));
-    }
-    format!(
-        "SELECT (_timestamp / {interval_us}) * {interval_us} AS zo_bucket, key AS zo_key, \
-         status AS zo_status, COUNT(*) AS zo_n, \
-         SUM(CASE WHEN is_silenced THEN 1 ELSE 0 END) AS zo_silenced \
-         FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
-         GROUP BY zo_bucket, zo_key, zo_status"
-    )
-}
-
-/// Turns grouped trigger rows into per-alert outcome counts, merging legacy statuses.
-fn summarize_hits(hits: &[serde_json::Value]) -> Vec<AlertHistorySummaryRow> {
-    let mut merged: BTreeMap<(i64, String, String), (i64, i64)> = BTreeMap::new();
-    for hit in hits {
-        let key = hit.get("zo_key").and_then(|v| v.as_str()).unwrap_or("");
-        let (name, alert_id) = key.rsplit_once('/').unwrap_or(("", ""));
-        // Raw history drops rows without an alert name (scheduler error rows keyed "/{id}").
-        if name.is_empty() || alert_id.is_empty() {
-            continue;
-        }
-        let outcome = hit
-            .get("zo_status")
-            .and_then(|v| v.as_str())
-            .and_then(|raw| normalize_outcome(raw, &TriggerDataType::Alert, None))
-            .map_or_else(|| "unknown".to_string(), |o| o.to_string());
-        let bucket = hit.get("zo_bucket").and_then(|v| v.as_i64()).unwrap_or(0);
-        let n = hit.get("zo_n").and_then(|v| v.as_i64()).unwrap_or(0);
-        let silenced = hit.get("zo_silenced").and_then(|v| v.as_i64()).unwrap_or(0);
-        let entry = merged
-            .entry((bucket, alert_id.to_string(), outcome))
-            .or_default();
-        entry.0 += n;
-        entry.1 += silenced;
-    }
-    merged
-        .into_iter()
-        .map(
-            |((bucket, alert_id, outcome), (n, silenced))| AlertHistorySummaryRow {
-                bucket,
-                alert_id,
-                outcome,
-                n,
-                silenced,
-            },
-        )
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn test_bucket_interval_keeps_bucket_count_bounded() {
-        let day = 24 * 3600 * 1_000_000;
-        assert_eq!(bucket_interval_secs(None, day), DEFAULT_INTERVAL_SECS);
-        assert_eq!(bucket_interval_secs(Some(10), day), 173);
-        assert_eq!(
-            bucket_interval_secs(Some(10), 3600 * 1_000_000),
-            MIN_INTERVAL_SECS
-        );
-        assert_eq!(bucket_interval_secs(Some(3600), day), 3600);
-    }
-
-    #[test]
-    fn test_summary_sql_filters_requested_ids() {
-        let ids = vec!["2xyz".to_string()];
-        let sql = summary_sql("org1", 1, 2, 60, Some(&ids));
-        assert!(sql.contains("(_timestamp / 60000000) * 60000000 AS zo_bucket"));
-        assert!(sql.contains("AND (key LIKE '%/2xyz')"));
-        assert!(!summary_sql("org1", 1, 2, 60, None).contains("key LIKE"));
-        assert!(summary_sql("o'1", 1, 2, 60, None).contains("org = 'o''1'"));
-    }
-
-    #[test]
-    fn test_summarize_hits_merges_legacy_statuses_and_drops_unnamed_rows() {
-        let hits = vec![
-            json!({"zo_bucket": 0, "zo_key": "rule_a/2abc", "zo_status": "firing", "zo_n": 2, "zo_silenced": 1}),
-            json!({"zo_bucket": 0, "zo_key": "rule_a/2abc", "zo_status": "completed", "zo_n": 3}),
-            json!({"zo_bucket": 0, "zo_key": "rule_a/2abc", "zo_status": "condition_not_satisfied", "zo_n": 4}),
-            json!({"zo_bucket": 0, "zo_key": "/2abc", "zo_status": "error", "zo_n": 9}),
-            json!({"zo_bucket": 60, "zo_key": "rule/with/slash/2def", "zo_status": "weird", "zo_n": 1}),
-        ];
-        let rows = summarize_hits(&hits);
-        assert_eq!(
-            rows,
-            vec![
-                AlertHistorySummaryRow {
-                    bucket: 0,
-                    alert_id: "2abc".into(),
-                    outcome: "firing".into(),
-                    n: 5,
-                    silenced: 1
-                },
-                AlertHistorySummaryRow {
-                    bucket: 0,
-                    alert_id: "2abc".into(),
-                    outcome: "normal".into(),
-                    n: 4,
-                    silenced: 0
-                },
-                AlertHistorySummaryRow {
-                    bucket: 60,
-                    alert_id: "2def".into(),
-                    outcome: "unknown".into(),
-                    n: 1,
-                    silenced: 0
-                },
-            ]
-        );
-    }
 }

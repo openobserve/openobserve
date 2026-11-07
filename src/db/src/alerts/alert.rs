@@ -532,6 +532,7 @@ pub async fn resolve_alert_ids_by_tags(org_id: &str, filter_tags: &[String]) -> 
 }
 
 /// Ids of the org's SIEM detections (`context_attributes.siem == "true"`), from the alert cache.
+#[cfg(feature = "enterprise")]
 pub async fn resolve_siem_alert_ids(org_id: &str) -> Vec<String> {
     let prefix = format!("{org_id}/");
     let alerts_cacher = ALERTS.read().await;

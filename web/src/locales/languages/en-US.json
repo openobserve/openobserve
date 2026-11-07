@@ -24395,8 +24395,6 @@
       "title": "Cases",
       "subtitle": "Correlated firings, triaged to a verdict",
       "eyebrow": "Case",
-      "unavailableTitle": "Cases are not available on this build",
-      "unavailableHint": "Case management uses incident correlation, which ships with OpenObserve Enterprise and Cloud. Detection firings are still on the Alerts page.",
       "search": "Filter this page by title, id, assignee or entity",
       "refresh": "Refresh",
       "loadError": "Could not load cases",
@@ -24478,7 +24476,6 @@
         "acknowledged": "Start investigating",
         "resolved": "Close case"
       },
-      "goToAlerts": "Go to Alerts",
       "notFound": "Case not found",
       "timelinePartial": "This timeline was rebuilt from the case record, so notes, acknowledgements and analysis activity from before the rebuild may be missing."
     },

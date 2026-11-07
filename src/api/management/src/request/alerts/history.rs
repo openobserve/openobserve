@@ -75,6 +75,7 @@ pub struct AlertHistoryQuery {
     /// Comma-separated run outcomes (`firing`, `normal`, `error`, ...), legacy values included.
     pub outcome: Option<String>,
     /// Only the org's SIEM detections, resolved server-side (ignored when ids are given).
+    #[cfg(feature = "enterprise")]
     pub siem: Option<bool>,
     /// Filter by anomaly detection config ID (mutually exclusive with alert_id).
     /// When set, queries the _anomalies stream instead of the triggers stream.
@@ -700,6 +701,18 @@ pub async fn get_alert_history(
             hits: vec![],
         })
     };
+    #[cfg(feature = "enterprise")]
+    let siem_ids =
+        if query.alert_id.is_none() && query.alert_ids.is_none() && query.siem == Some(true) {
+            Some(restrict_to_permitted(
+                db::alerts::alert::resolve_siem_alert_ids(&org_id).await,
+                permitted_alert_ids.as_deref(),
+            ))
+        } else {
+            None
+        };
+    #[cfg(not(feature = "enterprise"))]
+    let siem_ids: Option<Vec<String>> = None;
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
     if let Some(ref alert_id) = query.alert_id {
@@ -714,11 +727,7 @@ pub async fn get_alert_history(
             return empty();
         }
         where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
-    } else if cfg!(feature = "enterprise") && query.siem == Some(true) {
-        let ids = restrict_to_permitted(
-            db::alerts::alert::resolve_siem_alert_ids(&org_id).await,
-            permitted_alert_ids.as_deref(),
-        );
+    } else if let Some(ids) = siem_ids {
         if ids.is_empty() {
             return empty();
         }
@@ -1429,6 +1438,7 @@ mod tests {
             alert_id: None,
             alert_ids: None,
             outcome: None,
+            #[cfg(feature = "enterprise")]
             siem: None,
             anomaly_id: None,
             start_time: None,
@@ -1612,6 +1622,7 @@ mod tests {
             alert_id: None,
             alert_ids: None,
             outcome: None,
+            #[cfg(feature = "enterprise")]
             siem: None,
             anomaly_id: None,
             start_time: None,
@@ -1652,6 +1663,7 @@ mod tests {
                 alert_id: None,
                 alert_ids: None,
                 outcome: None,
+                #[cfg(feature = "enterprise")]
                 siem: None,
                 anomaly_id: None,
                 start_time: None,
@@ -1676,6 +1688,7 @@ mod tests {
             alert_id: None,
             alert_ids: None,
             outcome: None,
+            #[cfg(feature = "enterprise")]
             siem: None,
             anomaly_id: None,
             start_time: None,
@@ -1694,6 +1707,7 @@ mod tests {
             alert_id: None,
             alert_ids: None,
             outcome: None,
+            #[cfg(feature = "enterprise")]
             siem: None,
             anomaly_id: None,
             start_time: None,

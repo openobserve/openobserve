@@ -51,7 +51,6 @@ import { sourceHealth, type SourceHealth } from "@/utils/security/streams";
 import { securitySourceNames } from "@/utils/security/sourceSelection";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { formatEventCount } from "@/utils/formatters";
-import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -123,14 +122,7 @@ const loading = computed(
 
 const openCasesTotal = ref(0);
 
-// OSS answers case requests with an empty 200, which would read as "no open cases".
-const casesAvailable = config.isEnterprise === "true" || config.isCloud === "true";
-
 async function fetchCases(seq: number) {
-  if (!casesAvailable) {
-    casesUnsupported.value = true;
-    return;
-  }
   casesLoading.value = true;
   casesUnsupported.value = false;
   try {
