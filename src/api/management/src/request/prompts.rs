@@ -287,7 +287,12 @@ pub(crate) fn prompt_error_response(error: PromptError) -> Response {
 #[utoipa::path(
     get, path = "/{org_id}/prompts", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ListPromptsQuery),
-    responses((status = 200, body = inline(ListPromptsResponseBody)))
+    responses((status = 200, body = inline(ListPromptsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "list"}))
+    )
 )]
 pub async fn list_prompts(
     Path(org_id): Path<String>,
@@ -327,7 +332,12 @@ pub async fn list_prompts(
         ("folder" = Option<String>, Query, description = "Folder the permission check authorizes; must name the folder in the body. Defaults to the default folder."),
     ),
     request_body = inline(CreatePromptRequestBody),
-    responses((status = 200, body = inline(PromptMutationResponseBody)))
+    responses((status = 200, body = inline(PromptMutationResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "create"}))
+    )
 )]
 pub async fn create_prompt(
     Path(org_id): Path<String>,
@@ -383,7 +393,12 @@ pub async fn create_prompt(
         ("folder" = Option<String>, Query, description = "Folder the permission check authorizes. Defaults to the default folder."),
     ),
     request_body = inline(MatchPromptsRequestBody),
-    responses((status = 200, body = inline(MatchPromptsResponseBody)))
+    responses((status = 200, body = inline(MatchPromptsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "create"}))
+    )
 )]
 pub async fn match_prompts(
     Path(org_id): Path<String>,
@@ -448,6 +463,11 @@ pub async fn match_prompts(
             headers(("Warning" = String, description = "Folder assertion mismatch"))
         ),
         (status = 304)
+    ),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "list"}))
     )
 )]
 pub async fn resolve_prompt(
@@ -525,7 +545,12 @@ pub async fn resolve_prompt(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/settings", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path)),
-    responses((status = 200, body = inline(PromptSettingsResponseBody)))
+    responses((status = 200, body = inline(PromptSettingsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "list"}))
+    )
 )]
 pub async fn get_prompt_settings(Path(org_id): Path<String>) -> Response {
     match db::prompt_settings::get(&org_id).await {
@@ -540,7 +565,12 @@ pub async fn get_prompt_settings(Path(org_id): Path<String>) -> Response {
 #[utoipa::path(
     put, path = "/{org_id}/prompts/settings", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path)), request_body = inline(PromptSettingsRequestBody),
-    responses((status = 200, body = inline(PromptSettingsResponseBody)))
+    responses((status = 200, body = inline(PromptSettingsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "update"}))
+    )
 )]
 pub async fn update_prompt_settings(
     Path(org_id): Path<String>,
@@ -594,7 +624,12 @@ pub async fn update_prompt_settings(
 #[utoipa::path(
     put, path = "/{org_id}/prompts/settings/secret", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path)), request_body = inline(PromptSecretRequestBody),
-    responses((status = 200, body = inline(PromptSecretResponseBody)))
+    responses((status = 200, body = inline(PromptSecretResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "update"}))
+    )
 )]
 pub async fn update_prompt_secret(
     Path(org_id): Path<String>,
@@ -620,7 +655,12 @@ pub async fn update_prompt_secret(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/{entity_id}", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path)),
-    responses((status = 200, body = inline(PromptResponseBody)))
+    responses((status = 200, body = inline(PromptResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "get"}))
+    )
 )]
 pub async fn get_prompt(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match prompts::get_prompt(&org_id, &entity_id).await {
@@ -633,7 +673,12 @@ pub async fn get_prompt(Path((org_id, entity_id)): Path<(String, String)>) -> Re
     patch, path = "/{org_id}/prompts/{entity_id}", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path)),
     request_body = inline(UpdatePromptRequestBody),
-    responses((status = 200, body = inline(PromptResponseBody)))
+    responses((status = 200, body = inline(PromptResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "update"}))
+    )
 )]
 pub async fn update_prompt(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -686,7 +731,12 @@ pub async fn update_prompt(
 #[utoipa::path(
     post, path = "/{org_id}/prompts/{entity_id}/archive", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path)),
-    responses((status = 200, body = inline(PromptResponseBody)))
+    responses((status = 200, body = inline(PromptResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "create"}))
+    )
 )]
 pub async fn archive_prompt(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -701,7 +751,12 @@ pub async fn archive_prompt(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/{entity_id}/versions", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path)),
-    responses((status = 200, body = inline(ListPromptVersionsResponseBody)))
+    responses((status = 200, body = inline(ListPromptVersionsResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "list"}))
+    )
 )]
 pub async fn list_prompt_versions(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match prompts::list_versions(&org_id, &entity_id).await {
@@ -717,7 +772,12 @@ pub async fn list_prompt_versions(Path((org_id, entity_id)): Path<(String, Strin
     post, path = "/{org_id}/prompts/{entity_id}/versions", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path), AppendPromptVersionQuery),
     request_body = inline(CreatePromptVersionRequestBody),
-    responses((status = 200, body = inline(PromptMutationResponseBody)))
+    responses((status = 200, body = inline(PromptMutationResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "create"}))
+    )
 )]
 pub async fn create_prompt_version(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -752,7 +812,12 @@ pub async fn create_prompt_version(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/{entity_id}/versions/{version}", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path), ("version" = i32, Path)),
-    responses((status = 200, body = inline(PromptVersionResponseBody)))
+    responses((status = 200, body = inline(PromptVersionResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "get"}))
+    )
 )]
 pub async fn get_prompt_version(
     Path((org_id, entity_id, version)): Path<(String, String, i32)>,
@@ -766,7 +831,12 @@ pub async fn get_prompt_version(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/{entity_id}/activity", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path)),
-    responses((status = 200, body = inline(ListPromptActivityResponseBody)))
+    responses((status = 200, body = inline(ListPromptActivityResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "list"}))
+    )
 )]
 pub async fn list_prompt_activity(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match prompts::list_label_activity(&org_id, &entity_id).await {
@@ -785,7 +855,12 @@ pub async fn list_prompt_activity(Path((org_id, entity_id)): Path<(String, Strin
     put, path = "/{org_id}/prompts/{entity_id}/labels/{label}", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path), ("label" = String, Path)),
     request_body = inline(MovePromptLabelRequestBody),
-    responses((status = 200, body = inline(PromptLabelResponseBody)))
+    responses((status = 200, body = inline(PromptLabelResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "update"}))
+    )
 )]
 pub async fn move_prompt_label(
     Path((org_id, entity_id, label)): Path<(String, String, String)>,
@@ -814,7 +889,12 @@ pub async fn move_prompt_label(
 #[utoipa::path(
     delete, path = "/{org_id}/prompts/{entity_id}/labels/{label}", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ("entity_id" = String, Path), ("label" = String, Path), DeletePromptLabelQuery),
-    responses((status = 200, body = inline(PromptLabelResponseBody)))
+    responses((status = 200, body = inline(PromptLabelResponseBody))),
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Prompts", "operation": "delete"}))
+    )
 )]
 pub async fn delete_prompt_label(
     Path((org_id, entity_id, label)): Path<(String, String, String)>,

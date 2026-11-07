@@ -16,7 +16,7 @@
 use std::sync::atomic::Ordering;
 
 use config::{
-    cluster::{LOCAL_NODE, LOCAL_NODE_STATUS},
+    cluster::{LOCAL_NODE, LOCAL_NODE_SCHEDULED, LOCAL_NODE_STATUS},
     get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
@@ -95,6 +95,8 @@ pub async fn set_offline() -> Result<()> {
 }
 
 pub async fn update_local_node(node: &Node) -> Result<()> {
+    LOCAL_NODE_SCHEDULED.store(node.scheduled, Ordering::Release);
+
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -111,6 +113,11 @@ pub async fn set_schedulable() -> Result<()> {
     if let Some(mut node) = get_node_by_uuid(&node_id).await {
         node.scheduled = true;
         update_local_node(&node).await?;
+    } else {
+        LOCAL_NODE_SCHEDULED.store(true, Ordering::Release);
+        log::warn!(
+            "[CLUSTER] node {node_id} is not in its own cache, the next heartbeat publishes scheduled=true"
+        );
     };
     Ok(())
 }

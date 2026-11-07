@@ -1948,6 +1948,7 @@
     "billings": "Faturalandırma",
     "rum": "RUM",
     "settings": "Ayarlar",
+    "allSettings": "Tüm ayarlar",
     "iam": "IAM",
     "report": "Raporlar",
     "pipeline": "İşlem hatları",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "Yalnızca ZIP dosyalarına izin verilir"
     },
     "emptyState": {
-      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
-      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "webApp": "Bir web uygulaması düzenleyin",
       "webAppDesc": "OpenObserve RUM SDK'sını herhangi bir {product} uygulamasına ekleyin",
       "sessionReplay": "Oturum Tekrarını Etkinleştir",
       "sessionReplayDesc": "UX sorunlarında hata ayıklamak için kullanıcı oturumlarını kaydedin ve tekrarlayın",
+      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
+      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "learnMore": "Daha fazla bilgi edinin:",
       "quickImpl": "Hızlı uygulama kılavuzu",
       "blogPost": "Ön uç izleme temelleri"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "Lisans ve Kullanım",
     "copyLicenseId": "Lisans kimliğini kopyala",
     "editionLbl": "Sürüm",
-    "limitPrefix": "· sınır",
     "gbPerDay": "GB / gün",
     "ofDailyLimitUsedToday": "bugün kullanılan günlük limit",
     "gbToday": "Bugünkü GB",
@@ -3580,6 +3580,7 @@
     "usage_limits": "Kullanım Sınırları",
     "feature_comparison_lbl": "Özellik Karşılaştırması",
     "feature_comparision_ent_msg": "Aşağıda listelenen tüm gelişmiş özelliklere erişebilen OpenObserve Enterprise Edition'ı kullanıyorsunuz.",
+    "feature_comparision_ent_partial_msg": "OpenObserve Enterprise Edition kullanıyorsunuz. Bazı özellikler lisansınıza dahil değil; yukarıdaki listeye bakın.",
     "feature_comparision_plan_detail": "Planınız: Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için ücretsizdir.",
     "feature_comparision_os_msg": "Şu anda OpenObserve Open Source Edition kullanıyorsunuz. Aşağıdaki karşılaştırma tablosunda listelenen gelişmiş özelliklerin kilidini açmak için Enterprise Edition'a yükseltin.",
     "feature_comparision_good_news": "İyi haber: OpenObserve Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için tamamen ücretsizdir.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "Aramanızla eşleşen özellik yok",
     "features_none": "Bu grupta özellik yok",
     "features_free_heading": "Ücretsiz, her lisansa dahil",
+    "features_free_not_included": "Ücretsiz, lisansınıza dahil değil",
     "features_new": "Lisansınızdan sonra eklenen",
     "features_filter_new": "Yeni",
     "request_new_license": "Yeni Lisans isteyin",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "Lisansınız hala aktif. Yeni lisans anahtarıyla güncellemek ister misiniz?",
     "yes_update_license": "Evet, lisansı güncelle",
     "no_keep_current": "Hayır, güncel tut",
+    "license_downgrade_title": "Bu lisans anahtarı uygulansın mı?",
+    "license_downgrade_intro": "Bu anahtar mevcut lisansınızın yerine geçer.",
+    "license_downgrade_expired": "Bu anahtarın süresi {date} tarihinde doldu. 50 GB/gün ücretsiz limiti uygulanacak.",
+    "license_downgrade_lose": "Şunları kaybedeceksiniz: {names}",
+    "license_downgrade_limit": "Günlük limit {old} değerinden {new} değerine geçer",
+    "license_downgrade_expiry": "Son kullanma tarihi {old} tarihinden {new} tarihine taşınır",
+    "license_limit_per_day": "{gb} GB/gün",
     "header_button": {
       "cloud_features": "{product} Özellikleri",
       "enterprise_edition": "Baskı: Kurumsal",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "Daha verimli ve performanslı gözlemlenebilirlik için bugün OpenObserve'i deneyin.",
     "getStartedBannerAlt": "Başlarken Banner",
     "getStartedHeading": "Başlamadan önce son bir şey",
-    "hearAboutUsLabel": "Bizi nereden duydunuz?",
     "hearAboutUsPlaceholder": "Örn. Bir arkadaştan",
-    "whereDoYouWorkLabel": "Nerede çalışıyorsunuz?",
     "whereDoYouWorkPlaceholder": "Şirket Adı",
-    "agreeToTermsPrefix": "Okudum ve kabul ediyorum",
     "termsOfUse": "Kullanım Koşulları",
-    "and": "ve",
     "privacyPolicyStar": "Gizlilik Politikası*",
     "startTrialButton": "14 günlük denemenizi başlatın",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "E-posta zorunludur",
     "emailInvalid": "Lütfen geçerli bir e-posta adresi girin",
     "passwordRequired": "Şifre zorunludur",
-    "mustAcceptTerms": "Devam etmek için şartları kabul etmelisiniz",
     "getStarted": {
       "title": "OpenObserve'ye Hoş Geldiniz",
-      "subtitle": "14 günlük deneme süreniz başladı. İki kısa soru, ardından sizi kuruluma yönlendireceğiz.",
-      "sourceLabel": "İlk olarak ne göndermek istiyorsunuz?",
-      "optional": "(isteğe bağlı)",
-      "skip": "Soruları atla",
-      "continue": "Devam et",
-      "hearAboutUsPlaceholder": "Örneğin, bir iş arkadaşı veya bir blog yazısı",
-      "whereDoYouWorkPlaceholder": "Şirket veya ekip",
-      "termsOfService": "Hizmet koşulları",
-      "privacyPolicy": "Gizlilik politikası",
-      "agreeHint": "Soruları atlasanız bile devam etmek için gereklidir.",
+      "skipForNow": "Şimdilik Atla",
+      "heard": {
+        "label": "Bizi nasıl duydunuz?",
+        "placeholder": "Bir Seçenek Belirleyin",
+        "thanks": "Teşekkürler!"
+      },
+      "connect": {
+        "title": "Verilerinizi Bağlayın",
+        "point1": "Her kaynak için adım adım kurulum",
+        "point2": "Günlükler, metrikler ve izler tek bir yerde",
+        "point3": "İlk olaylarınızı dakikalar içinde görün",
+        "cta": "Diğer Veri Kaynaklarını Keşfedin"
+      },
+      "sample": {
+        "title": "Örnek Verilerle Keşfedin",
+        "point1": "Örnek hizmetlerden günlükler, izler ve metrikler",
+        "point2": "Gösterge panoları, uyarılar, bir işlem hattı ve VRL fonksiyonları",
+        "point3": "Rehberli bir tur ve tümünü kaldırmak için tek tık",
+        "cta": "Örnek Verilerle Keşfedin"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux veya VM ana bilgisayarı",
@@ -4094,7 +4108,28 @@
         "llm": "LLM veya yapay zeka uygulaması",
         "agent": "Bir yapay zeka aracısının kurmasına izin verin",
         "unsure": "Henüz emin değilim"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Web Sunucusu",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Tarayıcı (RUM)",
+        "llm": "LLM veya Yapay Zeka Uygulaması",
+        "agent": "Yapay Zeka Aracısı"
       }
+    },
+    "heardFrom": {
+      "question": "Bizi nasıl buldunuz?",
+      "quickQuestion": "Kısa bir soru: bizi nasıl buldunuz?",
+      "skip": "Atla",
+      "searchEngine": "Arama motoru",
+      "friendOrColleague": "Arkadaş veya meslektaş",
+      "aiAssistant": "Yapay zeka asistanı",
+      "other": "Diğer",
+      "thanks": "Bize söylediğiniz için teşekkürler!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Diğer alanlar, akışın kullanıcı tanımlı bir şema kullanacak şekilde yapılandırılmasından önce var olan şema alanlarını gösterir.",
     "addFieldsTitle": "Alan Ekle",
     "dataRetentionDaysLabel": "Veri Saklama (gün)",
-    "globalRetentionDays": "Genel saklama {days} gündür",
-    "retentionMinOneDay": "Saklama süresi en az 1 gün olmalıdır",
+    "retentionDefaultDays": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: {days} gün",
+    "retentionDefaultForever": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: sonsuza kadar sakla",
     "maxQueryRangeHoursLabel": "Maksimum Sorgu Aralığı (saat)",
     "maxQueryRangeHelp": "Sorgular için izin verilen maksimum zaman aralığı. Sınırsız aralık için 0 ayarlayın.",
     "globalFlattenLevel": "Genel seviye {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
-  "connectDataSourcePopup": {
-    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
-    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
-    "connectButton": "Bir veri kaynağı bağla",
-    "slackLink": "Ayrıca Slack topluluğumuza katılın"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "Hangi iş yüklerinin birbiriyle konuştuğunu görün: eBPF ağ akışları",
       "k8sInstallerNote": "Bu, cert-manager'ı, OpenTelemetry operatörünü ve OpenObserve toplayıcısını otomatik olarak kurar.",
       "k8sInternalEndpointNote": "Bunu, OpenObserve aynı kümede çalışıyorsa kullanın — trafik asla kümeden dışarı çıkmaz.",
+      "k8sTraceAppsTitle": "Uygulamalarınızı izleyin",
+      "k8sTraceEbpfDesc": "Toplayıcıda eBPF izlemeyi açın, ardından izlenecek uygulamaları bağlantı noktası, çalıştırılabilir dosya yolu veya komut satırına göre seçin.",
+      "k8sTraceLibraryDesc": "Her dilin ad alanına not ekleyin, böylece operatör kütüphanesini oradaki pod'lara ekler. Ardından bu uygulamaları bir kez yeniden başlatın.",
       "k8sTroubleAnnotationA": "Enjeksiyon pod oluşturulurken gerçekleşir, bu nedenle mevcut podlar yeniden başlatılana kadar etkilenmez — `kubectl rollout restart deployment -n my-namespace` komutunu çalıştırın. Notun yerleştiğini `kubectl get ns my-namespace -o yaml` ile doğrulayın ve değerin `openobserve-collector/openobserve-<language>` ile eşleştiğini kontrol edin.",
       "k8sTroubleAnnotationQ": "Bir namespace'e annotasyon ekledim ama hiç iz görünmüyor",
       "k8sTroubleEndpointA": "**Dahili uç noktayı** yalnızca OpenObserve'ün kendisi bu kümede çalışıyorsa kullanın; bu durumda trafik kümenin içinde kalır ve ağı hiç geçmez. URL `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` şeklindedir — varsayılan, `openobserve` ad alanında `o2` sürümünü varsayar, farklıysa düzenleyin. Diğer herkes harici uç noktayı kullanır.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "Oturumlar görünüyor ancak ekranların tümü aynı adla adlandırılmış",
       "androidTroubleScreenNamesA": "Görünüm izleme bağlanmamış. `RumConfiguration` oluştururken bir `useViewTrackingStrategy(...)` iletin — örn. Etkinlikler için `ActivityViewTrackingStrategy(trackExtras = true)` veya AndroidX Navigation kullanıyorsanız `NavigationViewTrackingStrategy(...)` —.",
       "setupTime5Min": "~5 dakika",
+      "showStepInstructions": "Talimatları göster",
       "snowflakeCollectorVersionNote": "Snowflake, collector v0.92.0 gerektirir — daha yeni sürümlerde bilinen bir hata vardır.",
       "snowflakeTagline": "Snowflake hesap metriklerini OpenTelemetry Collector ile toplayın ve OpenObserve'e gönderin.",
       "sqlClientGuiVariant": "SQL İstemcisi (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da `cassandra_*` metrikleri için Akışlar'a bakın.",
       "verifyDatabricksLogsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da Günlükler'i açıp `source:databricks` araması yapın.",
       "verifyDataTitle": "OpenObserve'de verileri doğrulayın",
+      "checkYourDataTitle": "Verilerinizi Kontrol Edin",
       "verifyDynamodbLogsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da öğeler değiştiğinde `dynamodb` akışı için Günlükler'i açın.",
       "verifyGcpLogsDesc": "Projede biraz etkinlik oluşturun (ya da sink'in bir günlükle eşleşmesini bekleyin); veri geldiğinde aşağıdaki kontrol yeşile döner.",
       "verifyK8sDataDesc": "Toplayıcının başlaması için birkaç saniye bekleyin; veri geldiğinde aşağıdaki kontrol yeşile döner — küme günlükleri `default` akışına düşer.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "Faturalandırma sözleşmeniz üzerinden yapılır — değişiklikler için hesap yöneticinizle iletişime geçin.",
     "upgradeToPlanMessage": "OpenObserve hizmetlerinden yararlanmaya devam etmek için bir plana yükseltin.",
     "creditsUsedLabel": "kullanılan krediler",
-    "licenseExpiryContactAdmin": "Lütfen yöneticinizle iletişime geçerek lisansınızı güncelleyin.",
+    "licenseExpiredOn": "Lisansınızın süresi {date} tarihinde doldu. Özellikleriniz açık kalır.",
+    "licenseExpiredLimit": "{limit} GB/gün ücretsiz limiti artık geçerli: bir ayda {allowed} günden fazla aşılırsa, yenileyene kadar arama duraklatılır.",
+    "licenseAskAdminToRenew": "Lisans yöneticinizden yenilemesini isteyin.",
+    "renewLicense": "Lisansı yenile",
     "subscribed": "Abone",
     "invoiceHistory": "Fatura Geçmişi",
     "amount": "Miktar",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "AWS aboneliği bağlanamadı",
     "failedToLinkAzureSubscription": "Azure aboneliği bağlanamadı",
     "last15Minutes": "Son 15 dakika",
-    "licenseHasExpired": "Lisansınızın süresi doldu",
     "numberOfPipelines": "İşlem Hattı Sayısı",
     "oneDayUntilLicenseExpires": "Lisansınızın süresinin dolmasına 1 gün kaldı",
     "pleaseWaitProcessingRequest": "İsteğiniz işlenirken lütfen bekleyin...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "İsteğe bağlı. Uyarı yine çalışır ve geçmişini kaydeder, ancak hiçbir hedefe bildirim gönderilmez.",
       "sendsToStatus": "Uyarı her tetiklendiğinde {targets} adresine gönderir.",
       "oncallTeamTarget": "bir nöbet ekibi",
+      "lockedWorkflowFallback": "Kilitli iş akışı",
+      "lockedTargetBadge": "Kilitli",
       "createsIncident": "Vaka Oluşturur",
       "createsIncidentTooltip": "Bir uyarı vaka oluşturabiliyorsa, ayrı bir bildirim göndermez. Bunun yerine, yeni bir vaka oluşturulduğunda veya mevcut bir vakaya yeni bir uyarı türü katıldığında vakaya ilişkin bir bildirim gönderilir.",
       "incidentTitleTemplate": "Vaka Başlığı",
@@ -12901,6 +12939,9 @@
       "lastTrained": "Son eğitim",
       "level": "Seviye",
       "lookBackWindow": "Pencereye Bakın",
+      "scheduleIntervalFloor": "Kontrol Sıklığı en az {min} olmalıdır.",
+      "lookBackWindowCap": "Geriye Bakış Penceresi bu Algılama Çözünürlüğünde en fazla {max} olabilir: daha uzun bir pencere 100.000'den fazla kova içerir. Pencereyi kısaltın veya daha uzun bir Algılama Çözünürlüğü kullanın.",
+      "retrainOnEditNote": "Sorguyu, fonksiyonu veya Algılama Çözünürlüğünü değiştirmek bu dedektörü yeniden eğitir. Eğitim bitene kadar algılama duraklatılır.",
       "lookBackWindowFloor": "Geriye Bakış Penceresi en az {min} olmalıdır — Kontrol Sıklığı artı bir Algılama Çözünürlüğü. Daha kısa bir pencere, ilk çalıştırma tetiklendiğinde tam bir aralığı tutamaz, bu nedenle o çalıştırma aralıkları atlar.",
       "lookBackWindowLegacy": "Kaydedilen bu pencere {min} minimumunun altında (Kontrol Sıklığı artı bir Algılama Çözünürlüğü). Değiştirilmeden kaydedilir, ancak pencere yükseltilene kadar ilk çalıştırma aralıkları atlayabilir.",
       "lookBackWindowMinimum": "En az {min}; bu ayarlar için {recommended} veya daha fazlası önerilir.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "Hedef bulunamadı",
       "noDetectionResults": "Bu aralıkta henüz algılama sonucu yok",
       "noFieldsFound": "Alan bulunamadı",
+      "checkDataNow": "Şimdi kontrol et",
+      "checkDataNowTooltip": "Sonraki otomatik kontrolü beklemeden mevcut verileri şimdi yeniden değerlendirin.",
+      "dataReadinessReason": "Neden",
       "noticeRetrain": "Otomatik yeniden eğitme",
       "noticeRetrainTooltip": "Kaydedilen model bir yükseltmeden sonra okunamadı, bu nedenle atıldı ve yapılandırma otomatik olarak yeniden eğitim için kuyruğa alındı. Herhangi bir işlem gerekmez; eğitim tamamlandığında algılama devam eder.",
       "noticeSkipAbsence": "Yokluk değerlendirmesi Geriye Bakış Penceresinin gerisinde kaldı; artık getirilemeyen span atlandı ve kaydedildi.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "Otomatik, geçmişinizden bir seviye öğrenecek.",
       "autoTrainingHelp": "Eğitim tamamlandığında seviye görünecek.",
       "autoFailedHelp": "Eğitim başarısız oldu. Henüz öğrenilmiş seviye yok. Yukarıdaki eğitim hatasını inceleyin.",
+      "autoWaitingForDataHelp": "Henüz yeterli uygun eğitim verisi yok. O zamana kadar öğrenilmiş seviye yok. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
+      "autoNotApplicableHelp": "Mevcut veriler bir anomali modelini desteklemiyor. Bu bir hata değildir. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
       "autoRetrainingHelp": "Yeniden eğitiliyor. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı.",
       "autoRetrainFailedHelp": "Yeniden eğitim başarısız oldu. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı. Yukarıdaki eğitim hatasını inceleyin.",
       "autoUnconfirmedHelp": "Son öğrenilen seviye gösteriliyor; etkin bir model doğrulanmadı.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "Sahiplik kurallarından yönlendir",
     "oncallTeamTooltip": "Bu uyarının çağrı yapacağı ekip. Normal durumda, ekip uyarının kimlik boyutlarına göre belirlenir; bu yüzden boş bırakın. Yalnızca bu boyutlar sahibi ifade edemediğinde bir ekip ayarlayın.",
     "oncallTeamNoTeams": "Henüz nöbetçi ekip yok. Nöbetçi Ekipler altında bir tane oluşturun.",
+    "lockedTeamFallback": "Kilitli ekip",
     "oncallTeamAtFireTime": "Sahiplikten",
     "oncallTeamFromRules": "Bu uyarıda herhangi bir ekip ayarlanmamış; bu nedenle sorumlu, tetiklenen satırın kimlik boyutlarından belirlenir. Bunlar, tetiklenene kadar bilinmez.",
     "tags": "Etiketler",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "Ayırıcı girin (ör. {'|'}, \\n, \\t, boşluk)",
     "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
     "templateDefaultOption": "Varsayılan ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Standart {type} şablonunu ({name}) kullanmak için varsayılan olarak bırakın veya özel bir şablon seçin.",
     "loadingData": "Hedef verileri yükleniyor...",
     "noEmailTemplates": "Henüz hiçbir E-posta Şablonu oluşturmamışsınız gibi görünüyor.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Azure Kimlik Bilgileri",
       "awsRoleArn": "AWS Rol ARN'si"
     },
+    "dataRetentionDefaults": {
+      "title": "Veri saklama varsayılanları",
+      "about": "Kendi saklama ayarı olmayan akışlar için. Boş veya 0, genel değeri kullanır; aksi takdirde en az 3 gün.",
+      "defaultDays": "Varsayılan (gün)",
+      "streamType": "Akış türü",
+      "days": "Gün",
+      "addType": "Akış türü ekle",
+      "removeType": "Bu akış türünü kaldır",
+      "globalDefault": "Genel: {value}",
+      "globalType": "Genel {type}: {value}",
+      "daysValue": "{days} gün",
+      "forever": "sonsuza kadar sakla",
+      "invalid": "0 veya en az 3 gün kullanın"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluk olmadan.",
       "settingsUpdated": "Kuruluş ayarları başarıyla güncellendi",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "beklenmeyen hata",
-      "daysRemaining": "Lisansınızın süresi dolana kadar {days} gün kaldı",
-      "oneDayRemaining": "Lisansınızın süresi dolana kadar 1 gün kaldı",
-      "licenseExpired": "Lisansınızın süresi doldu"
+      "daysRemaining": "Lisansınızın süresi dolana kadar {days} gün kaldı"
     },
     "nodesPage": {
       "subtitle": "Küme düğümleri ve sağlık durumları",
@@ -23025,7 +23085,9 @@
         "ready": "Hazır",
         "running": "Çalışıyor",
         "training": "Eğitim",
-        "waiting": "Bekliyor"
+        "waiting": "Bekliyor",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "anomalyStatus": {
         "active": "Etkin",
@@ -23033,7 +23095,9 @@
         "training": "Eğitim",
         "failed": "Başarısız",
         "waiting": "Bekliyor",
-        "disabled": "Devre Dışı"
+        "disabled": "Devre Dışı",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "aiToolsetKind": {
         "skill": "Beceri",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "Bir şeyler ters gitti",
-      "thankYouForYourFeedback": "Geri bildiriminiz için teşekkürler",
       "selectedSuggestion": "Seçilen öneri \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Lütfen tüm alanları doldurun ve tekrar deneyin.",
       "invalidUsernameOrPassword": "Geçersiz kullanıcı adı veya şifre",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Başlayın",
     "reportDetail": "Rapor",
     "sharedChat": "Paylaşılan sohbet",
     "passwordPolicy": "Parola Politikası",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "Zamanlama kaydedilemedi",
     "policy": "Eskalasyon politikası",
     "policyIfNoAck": "Kimse onaylamazsa,",
-    "policyRepeatTimes": "Merdiveni bir kez çalıştır | Merdiveni {count} kez çalıştır",
-    "policyFinalStop": "sonra dur",
-    "policyFinalNotifyDefault": "sonra varsayılan takımı bilgilendir",
-    "policyNoDefaultTeam": "Varsayılan takım belirlenmemiş, bu yüzden bu durdurmakla aynıdır. Birini Yönlendirme sekmesinde belirleyin.",
     "policyPrioritySilent": "{priority} kimseyi aramaz. Bunu değiştirmek için bir basamak ekleyin — buradaki sessizlik bir ihmal değil, bir karardır.",
     "policyDoneEditing": "Düzenlemeyi bitir",
     "policyHint": "Her öncelikte kimin çağrılacağı ve ne kadar sonra çağrılacağı. Bunlar varsayılanlardır - istediğinizi değiştirin.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "Kimse sitenin çöktüğünü öğrenmek için beş dakika beklemez.",
     "policyP4Pages": "Bu öncelik için de çağrı gönder",
     "policyP4PagesHint": "Varsayılan olarak kapalı — birini uyandıran P4, önem derecesi hatasıdır.",
-    "policyFinalAction": "Kimse onaylamazsa",
-    "policyFinal_notifyDefaultTeam": "Varsayılan ekibi bilgilendir",
-    "policyFinal_stop": "Durdur",
     "policySummaryTitle": "Bu politikanın şu anda ne yaptığı",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tümü aynı anda",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "Yapay Zeka SRE yok",
     "ladderStaleDefaultTag": "Merdiven rotasyonları hiç öğrenmedi",
     "ladderStaleDefaultHint": "Her seviye tüm ekibi çağırır, ancak bu ekibin rotasyonları var — merdiven, rotasyonlar oluşturulmadan önce oluşturulmuş. Üye eklemek veya çıkarmak varsayılanı yeniden çalıştırır, ya da merdiveni elle bir kez düzenleyin.",
-    "ladderEndsHandsOff": "Çağrı devredilir",
     "reachShortNoSmtp": "yalnızca e-posta · SMTP aktarımı yok",
     "reachShortNoFromAddress": "yalnızca e-posta · gönderen adresi yok",
     "reachShortNoAddress": "Kayıtlarda adres yok",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· her {duration}",
     "ladderEnd": "Son",
     "ladderEndUnknown": "Başka bir planlanmış çağrı yok.",
-    "ladderEndsDefaultTeam": "Basamaklar tükendi — varsayılan ekip bilgilendirildi.",
     "rungLost": "başarısız",
     "rungLostTimes": "başarısız ×{count}",
     "routingDetails": "Yönlendirme detayları",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "Eskalasyon adımları",
     "policyChipSteps": "{count} adım | {count} adım",
     "policyAddStep": "Adım ekle",
-    "policyWhenStepsRunOut": "Adımlar tükendiğinde",
     "policyAppliesToNewPages": "Değişiklikler yalnızca yeni çağrılar için geçerlidir.",
     "policySave": "Kaydet",
     "policyFix": "Düzelt",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "E-posta, Slack ile açık kalır: bağlı Slack hesabı olmayan kişiler yine de e-postayı alır.",
     "policyNoProvider": "Telefon sağlayıcısı bağlı değil, bu nedenle SMS ve Ses atlanır ve bu bildirimler e-postayla gönderilir.",
     "policyNoProviderLink": "Ayarlar → Telefon bölümünden bir sağlayıcı bağlayın",
-    "policyEndOptionStop": "Bir kez çalıştır, sonra dur | {count} kez çalıştır, sonra dur",
-    "policyEndOptionHandOff": "Bir kez çalıştır, sonra catch-all ekibine devret | {count} kez çalıştır, sonra catch-all ekibine devret",
-    "policyEndOptionHandOffTo": "Bir kez çalıştır, sonra {team} ekibine devret | {count} kez çalıştır, sonra {team} ekibine devret",
     "policyDeliveryTitle": "Teslimat",
     "policyTodayIs": "bugün: {who}",
     "policyPeopleCount": "{count} kişi | {count} kişi",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "{team} ekibinden uyarıları devralır",
     "ruleEditorKeptBy": "{team} bu uyarıları korur: kuralı daha özgüldür",
     "ruleEditorContends": "{team} için bir kuralla yarışıyor: daha özgül olan kazanır",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} daha",
+    "ruleEditorFieldsHelp": "Alanlar korelasyon alan gruplarınızdan gelir. {link}",
+    "ruleEditorFieldsSource": "Alanlar korelasyon alan gruplarınızdan gelir.",
+    "ruleEditorManageFieldGroups": "Alan gruplarını yönet",
+    "ruleEditorDuplicatePath": "{team} tam olarak bu koşullar için zaten bir kurala sahip. Bunun yerine o kuralı düzenleyin.",
+    "ruleEditorDuplicatePathSameTeam": "Bu ekip tam olarak bu koşullar için zaten bir kurala sahip.",
     "routingTestRouting": "Yönlendirmeyi test et",
     "routingTabNeedsOwnerPlain": "Bir sahip gerekiyor",
     "simulatorStartFrom": "Şununla başla",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Herhangi bir Linux sunucusundan günlükler, metrikler ve izler.",
+      "windows": "Windows sunucularından olay günlükleri ve metrikler.",
+      "macos": "Mac makinelerinden günlükler ve metrikler.",
+      "aws": "AWS hizmetlerinizden günlükler ve metrikler.",
+      "googleCloud": "{gcp} projelerinizden, bir {pubSub} push aboneliği aracılığıyla günlükler.",
+      "azure": "{azure} aboneliğinizden, {eventHub} aracılığıyla etkinlik günlükleri.",
+      "postgresql": "Sorgu, bağlantı ve çoğaltma metrikleri.",
+      "mysql": "Sorgu, bağlantı ve InnoDB metrikleri.",
+      "mongodb": "İşlem, bağlantı ve önbellek metrikleri.",
+      "redis": "Bellek, komut ve anahtar alanı metrikleri.",
+      "sqlServer": "Sorgu, bekleme ve tampon metrikleri.",
+      "oracle": "Oturum, tablo alanı ve kaynak sınırı metrikleri.",
+      "mariadb": "Sorgu, bağlantı ve InnoDB metrikleri.",
+      "elasticsearch": "Küme, indeks ve düğüm sağlığı.",
+      "cassandra": "Okuma, yazma ve compaction metrikleri.",
+      "dynamodb": "Öğe değişiklikleri (ekleme, güncelleme, silme) {kinesisFirehose} aracılığıyla günlük olarak.",
+      "snowflake": "Warehouse, sorgu ve kredi kullanımı.",
+      "databricks": "Günlükler API'si üzerinden gönderilen Notebook günlükleri.",
+      "couchdb": "İstek, veritabanı ve çoğaltma metrikleri.",
+      "aerospike": "Ad alanı, düğüm, bellek ve bağlantı metrikleri.",
+      "sapHana": "Bellek, CPU ve hizmet metrikleri.",
+      "zookeeper": "Gecikme, bağlantı ve düğüm metrikleri.",
+      "nginx": "Erişim ve hata günlükleri, {fluentBit} ile izlenir.",
+      "apache": "Erişim ve hata günlükleri, {fluentBit} ile izlenir.",
+      "iis": "İstek günlükleri, {fluentBit} ile izlenir.",
+      "kafka": "Broker, konu ve tüketici gecikmesi metrikleri.",
+      "rabbitmq": "Kuyruk derinliği, mesaj hızı ve düğüm metrikleri.",
+      "nats": "Bağlantı, mesaj ve akış metrikleri.",
+      "prometheus": "Zaten topladığınız metrikleri uzaktan yazma ile gönderin.",
+      "telegraf": "Zaten çalıştırdığınız bir aracıdan metrik gönderin.",
+      "opentelemetryCollector": "Zaten çalıştırdığınız bir toplayıcıyı buraya yönlendirin.",
+      "cloudwatch": "AWS hesabınızdan metrikleri akış olarak gönderin.",
+      "gpu": "{nvidia} GPU başına kullanım, bellek ve sıcaklık.",
+      "networkFlows": "Ana bilgisayarlarınız ve ağlarınız arasındaki trafik akışları.",
+      "fluentBit": "Ana bilgisayarlar ve Kubernetes için hafif günlük ileticisi.",
+      "fluentd": "Geniş eklenti setine sahip günlük toplayıcısı.",
+      "vector": "Günlükler ve metrikler için hızlı işlem hattı.",
+      "filebeat": "Hafif bir aracıyla günlük dosyalarını gönderin.",
+      "logstash": "Mevcut bir işlem hattından günlük gönderin.",
+      "syslogNg": "Sunucularınızdan syslog iletin.",
+      "loongcollector": "Ana bilgisayarlar ve konteynerler için günlük ve metrik aracısı.",
+      "splunkHec": "HTTP Event Collector göndericilerinizi olduğu gibi koruyun.",
+      "cribl": "Zaten çalıştırdığınız işlem hatlarından veri yönlendirin.",
+      "kinesisFirehose": "AWS'deki bir teslimat akışından günlükleri akıtın.",
+      "googleCloudLogs": "Günlükleri projelerinizden bir günlük havuzu aracılığıyla dışa aktarın.",
+      "okta": "Oturum açma ve yönetici denetim olayları.",
+      "office365": "Posta, dosya ve yönetici denetim günlükleri.",
+      "googleWorkspace": "Oturum açma ve yönetici denetim günlükleri.",
+      "falco": "Konteynerlerden çalışma zamanı güvenlik uyarıları.",
+      "osquery": "Sorgulayabileceğiniz günlükler olarak uç nokta durumu.",
+      "jumpcloud": "Dizin ve oturum açma olayları.",
+      "openvpn": "VPN bağlantı ve oturum günlükleri.",
+      "githubActions": "İş akışı çalıştırma ve iş günlükleri.",
+      "jenkins": "Derleme günlükleri ve işlem hattı olayları.",
+      "terraform": "Çalıştırmalarınızdan plan ve uygulama günlükleri.",
+      "ansible": "Playbook çalıştırma günlükleri ve sonuçları.",
+      "vercel": "Dağıtım ve fonksiyon günlükleri.",
+      "heroku": "Bir log drain'den uygulama ve yönlendirici günlükleri.",
+      "airflow": "DAG çalıştırma günlükleri ve görev metrikleri.",
+      "airbyte": "Eşitleme işi günlükleri ve durumu.",
+      "languageTile": "Dilinizde otomatik enstrümantasyon varsa, {otel} SDK'sı ile izler.",
+      "aiIntegration": "Yapay zeka uygulamanızın çağrılarının izleri, model çağrıları için token ve maliyetle birlikte."
+    },
+    "skipToApp": "Uygulamaya Geç",
+    "chooseTitle": "İlk olarak neyi izlemek istiyorsunuz?",
+    "back": "Geri",
+    "searchGuides": "{count} kılavuzda ara | {count} kılavuzda ara",
+    "showMore": "{count} tane daha göster | {count} tane daha göster",
+    "noMatch": "Burada \"{query}\" ile eşleşen kılavuz yok.",
+    "foundElsewhere": "Diğer seçeneklerde bulundu:",
+    "inChoice": "{choice} içinde",
+    "tryShorter": "Daha kısa bir ad deneyin. Her araç ayrıca {link}.",
+    "sendOverHttp": "HTTP üzerinden günlük gönderebilir",
+    "clearSearch": "Aramayı temizle",
+    "othersTitle": "Başlamanın diğer yolları",
+    "whatYouGet": "Neler elde edersiniz",
+    "signals": {
+      "metrics": "Metrikler",
+      "logs": "Günlükler",
+      "traces": "İzler",
+      "profiles": "Profiller",
+      "sessions": "Oturumlar",
+      "errors": "Hatalar",
+      "webVitals": "Web hayati göstergeleri (web)",
+      "replays": "Oturum tekrarları",
+      "tokens": "Tokenlar",
+      "cost": "Maliyet",
+      "latency": "Gecikme",
+      "uptime": "Çalışma süresi",
+      "certificates": "Sertifikalar"
+    },
+    "example": {
+      "caption": {
+        "row": "Örnek ekran: {name} için {product} tarafından gösterilenler.",
+        "infrastructure": "Örnek ekran: CPU, bellek ve pod sağlığı ile {k8s} kümesine genel bakış.",
+        "backend": "Örnek ekran: 9 hizmette 21 span içeren başarısız bir ödeme işlemi izinin şelalesi.",
+        "frontend": "Örnek ekran: gerçek kullanıcı oturumlarından {rum} web hayati göstergeleri.",
+        "logs": "Örnek ekran: histogram ve eşleşen günlük satırlarıyla bir günlük araması.",
+        "llm": "Örnek ekran: model bazında maliyet, tokenlar ve gecikme ile zaman içindeki izler ve hataları içeren {insights}.",
+        "agent": "Örnek ekran: kodlama ajanınızın bağlandığı {mcp} sunucu sayfası.",
+        "synthetics": "Örnek ekran: 3 konumda bir {http} kontrolünün sonuçları."
+      }
+    },
+    "guide": {
+      "agentTitle": "Kodlama ajanını mı tercih edersiniz?",
+      "agentSteps": "Bunu terminalinizde çalıştırın, ardından {claudeCode}, {cursor} veya {codex} uygulamasına istemi ya da dosyayı verin.",
+      "copyPrompt": "İstemi kopyala",
+      "downloadFile": ".md indir",
+      "inviteTitle": "Erişiminiz yok mu?",
+      "inviteText": "Komutu çalıştırabilecek bir ekip arkadaşınızı davet edin.",
+      "inviteAction": "Ekip Arkadaşı Davet Et",
+      "loadFailed": "Bu kılavuz yüklenemedi.",
+      "openInApp": "Veri kaynaklarında aç",
+      "languageText": "{language} için {otelSdk} ekleyin; {language} için otomatik enstrümantasyon mevcutsa onu kullanın, ardından aşağıdaki ayarlarla {product} ürününe yönlendirin.",
+      "languageLink": "{otel} {language} Kılavuzu"
+    },
+    "rail": {
+      "label": "Kurulum İlerlemesi",
+      "check": "Verilerinizi Kontrol Edin",
+      "received": "Veri alındı",
+      "attention": "Dikkat gerekiyor",
+      "waitingShort": "Veri bekleniyor",
+      "title": "{name} Kur",
+      "run": "Kurulum komutunu çalıştır",
+      "explore": "Verilerinizi keşfedin"
+    },
+    "firstData": {
+      "title": "Verileriniz geliyor",
+      "count": "{count} kayıt {stream} akışına ulaştı | {count} kayıt {stream} akışına ulaştı",
+      "exploreLogs": "Günlüklerinizi keşfedin",
+      "exploreMetrics": "Metriklerinizi keşfedin",
+      "exploreTraces": "İzlerinizi keşfedin",
+      "exploreProfiles": "Profillerinizi keşfedin",
+      "addAnother": "Başka bir kaynak ekle"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Sentetik kontroller",
+        "description": "Bir web sitesini, API'yi, portu veya sertifikayı kontrol edin. Kurulum gerekmez.",
+        "gets": "Ağınızın dışından bir zamanlamayla kontroller çalıştırın."
+      },
+      "invite": {
+        "name": "Kurulum yapması için bir ekip arkadaşını davet et",
+        "description": "Kuruluşunuza davet edilirler."
+      },
+      "agent": {
+        "name": "Kodlama ajanınızla kurulum yapın",
+        "description": "{claudeCode}, {cursor} veya {codex}'e tek bir istem verin.",
+        "gets": "Kodlama ajanınız kurulumu ekler ve verilerin ulaştığını kontrol eder."
+      }
+    },
+    "agentLink": "Ya da kodlama ajanınıza yaptırın",
+    "stepDone": "(tamamlandı)",
+    "agent": {
+      "crumb": "Kodlama ajanı",
+      "title": "Kodlama ajanınızla kurulum yapın",
+      "lead": "{claudeCode}, {cursor}, {codex} veya herhangi bir kodlama ajanı projenizi okur, kurulumu ekler ve verilerin ulaştığını kontrol eder. Herhangi bir şey kurmadan veya dağıtım dosyalarını değiştirmeden önce size sorar.",
+      "tokenTitle": "Tokeninizi kaydedin",
+      "tokenText": "Bunu, kodlama ajanınızı başlatacağınız terminalde, başlatmadan önce çalıştırın.",
+      "powerShell": "{powerShell} içinde:",
+      "copyPowerShell": "{powerShell} komutunu kopyala",
+      "promptTitle": "İstemi kopyala",
+      "focusLabel": "Kurulum",
+      "focus": {
+        "kubernetes": "{k8s} kümesi",
+        "host": "{linux}, {macos} veya {windows} ana bilgisayarı",
+        "backend": "Arka uç hizmeti ({otel})",
+        "llm": "LLM uygulaması",
+        "frontend": "Web ön ucu",
+        "logs": "Yalnızca günlükler"
+      },
+      "copyPrompt": "İstemi kopyala",
+      "promptCopied": "İstem kopyalandı",
+      "download": ".md indir",
+      "preview": "İstemi önizle",
+      "previewLines": "{count} satır | {count} satır",
+      "pasteTitle": "Kodlama ajanınıza yapıştırın",
+      "other": "Diğer",
+      "hint": {
+        "claudeCode": "Aynı terminalde, proje klasörünüzde {command} komutunu çalıştırın, ardından istemi yapıştırın.",
+        "cursor": "{product} uygulamasını aynı terminalden {command} ile başlatın, böylece tokeni okuyabilir. Ardından istemi sohbetine yapıştırın.",
+        "codex": "Aynı terminalde, proje klasörünüzde {command} komutunu çalıştırın, ardından istemi yapıştırın.",
+        "other": "Kodlama ajanınızı aynı terminalden başlatın, böylece tokeni okuyabilir. Ardından istemi yapıştırın veya ona {file} dosyasını verin."
+      },
+      "mcp": "{mcp} sunucusunu bağlayın, böylece kodlama ajanınız verilerinizi okuyabilir.",
+      "aside": {
+        "eyebrow": "İstemin kodlama ajanınıza söyledikleri",
+        "title": "Küçük, güvenli değişiklikler",
+        "line1": "Projenin ne çalıştırdığını bulun",
+        "line2": "İşe yarayan en küçük değişikliği yapın",
+        "line3": "Token'ı ortam değişkeninde tutun",
+        "line4": "{stream} akışına bir test olayı gönderin",
+        "line5": "Hangi dosyaların değiştiğini bildirin"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Kuruluma Devam Et",
+      "languages": "Diller",
+      "languagesRequired": "En az bir dil seçin.",
+      "kubernetesCluster": {
+        "question": "Kümenizden nelerin toplanacağını seçin",
+        "off": {
+          "name": "Günlükler ve Metrikler",
+          "description": "Küme sağlığı ve konteyner günlükleri. Tek komut.",
+          "about": "Tek bir kurulum komutuyla her düğüm ve pod için konteyner günlükleri, CPU ve bellek kullanımı ve günlük olarak {k8s} olayları."
+        },
+        "ebpf": {
+          "name": "eBPF ile İzler Ekleyin",
+          "description": "Kod değişikliği yok, her dil. Düğümlerinizde Linux çekirdeği 5.8+ gerekir.",
+          "about": "Aynı kurulum, artı izler. Toplayıcı istekleri Linux çekirdeğinden görür; bu nedenle uygulamalarınız değişmez. Bir isteği hizmetler arasında yalnızca düz HTTP üzerinden bağlar."
+        },
+        "library": {
+          "name": "Dil Kütüphaneleriyle İzler Ekleyin",
+          "description": "Uygulama başına daha fazla ayrıntı. Dillerinizi seçin, ardından uygulamalarınızı bir kez yeniden başlatın.",
+          "about": "Aynı kurulum, artı izler. {otelOperator}, seçtiğiniz ad alanlarındaki podlara her dil için {otelLibrary} ekler. Kodunuz değişmez."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Web sunucuları",
+      "messageQueues": "Mesaj kuyrukları",
+      "metricsYouCollect": "Zaten topladığınız metrikler",
+      "gpuAndNetwork": "GPU ve ağ akışları",
+      "movingFromAnotherTool": "Başka bir araçtan geçiş",
+      "cloudLogs": "Bulut günlükleri",
+      "securityTools": "Güvenlik araçları",
+      "cicdAndPlatforms": "CI/CD ve platformlar"
+    },
+    "infrastructure": {
+      "name": "Altyapı",
+      "description": "Sunucular, {k8s}, bulut hesapları ve veritabanları",
+      "gets": "Tüm ana bilgisayarları, podları ve bulut hizmetlerini tek bir yerde görün.",
+      "question": "Altyapınızı nasıl izlemek istiyorsunuz?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} kümesi",
+          "description": "Tek kurulumla günlükler, metrikler ve {k8s} olayları. Bir komut daha ile izler.",
+          "about": "{productCollector} bileşenini kümenize tek komutla kurar. Konteyner günlükleri, {k8s} olayları ve küme metrikleri elde edersiniz."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}, {windows} veya {macos} ana bilgisayarı",
+          "description": "{productAgent} bileşenini hizmet olarak kurun",
+          "about": "Tek bir ajan ana bilgisayardan günlükleri ve metrikleri toplar. {linux} üzerinde ayrıca programları kod değişikliği olmadan izleyebilir.",
+          "question": "Ana bilgisayarınızın işletim sistemi hangisi?"
+        },
+        "cloudAccount": {
+          "name": "Bulut hesabı",
+          "description": "{aws}, {gcp} veya {azure}",
+          "about": "Bulut hesabınızdan günlükleri, {aws} üzerinden de metrikleri akış olarak alır. Sunucularınızda hiçbir şey çalışmaz.",
+          "question": "Hesabınız hangi bulutta?"
+        },
+        "databases": {
+          "name": "Veritabanları",
+          "description": "{examples} ve {count} tane daha",
+          "about": "Çoğunlukla {otelCollector} aracılığıyla veritabanı metriklerini toplar.",
+          "question": "Hangi veritabanını izlemek istiyorsunuz?"
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "Web sunucuları, mesaj kuyrukları, {prometheus}, GPU ve ağ akışları",
+          "about": "Web sunucuları, mesaj kuyrukları, zaten topladığınız metrikler, GPU kullanımı ve ağ akışları.",
+          "question": "Başka neleri izlemek istiyorsunuz?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Arka uç uygulamaları",
+      "description": "Hizmetlerinizden izler ve SDK'nızın gönderdiği yerlerden günlükler",
+      "gets": "Her isteğin hizmetleriniz arasında nasıl ilerlediğini görün.",
+      "question": "Hizmetlerinizi nasıl izlemek istersiniz?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Kodunuza bir kütüphane ekleyin",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} veya {fastapi}",
+          "about": "Diliniz için {otelLibrary} ekler. İzler {product} ürününe gider.",
+          "question": "Hizmetiniz hangi dilde yazıldı?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} iş yükleri, kod değişikliği yok",
+          "description": "Kümenizin içinde otomatik enstrümantasyon",
+          "about": "{otelOperator}, tek bir ad alanındaki podlara enstrümantasyon ekler. Kod veya imaj değişikliği gerekmez."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "{otel} ile herhangi bir dil",
+          "description": "Kendi kurulumunuzdan OTLP gönderin",
+          "about": "Herhangi bir {otelSdk} veya toplayıcıyı {product} uç noktanıza yönlendirin."
+        },
+        "continuousProfiling": {
+          "name": "Sürekli profilleme",
+          "description": "CPU ve bellek profilleri",
+          "about": "Profilleyicilerinizden ({go}, {java}, {rust} veya eBPF profilleyici) gelen profilleri {otelCollector} aracılığıyla iletir."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Ön yüz ve mobil uygulamalar",
+      "description": "Web ve mobil için gerçek kullanıcı izleme",
+      "gets": "Gerçek kullanıcıların web ve mobil uygulamalarınızda neler deneyimlediğini görün.",
+      "question": "Uygulamanız nerede çalışıyor?",
+      "rows": {
+        "browser": {
+          "name": "Tarayıcı",
+          "description": "Web siteleri ve web uygulamaları",
+          "about": "Web uygulamanıza {sdk} ekler. Gerçek tarayıcılardan sayfa yüklemeleri, hatalar ve oturumlar alırsınız."
+        },
+        "reactNative": {
+          "description": "Tek bir kod tabanından {ios} ve {android}",
+          "about": "{platform} uygulamanıza {sdk} ekler."
+        },
+        "android": {
+          "description": "Yerel {android} uygulamaları",
+          "about": "{platform} uygulamanıza {sdk} ekler. Oturumlar, ekran görüntülemeleri, hatalar ve çökmeler alırsınız."
+        },
+        "ios": {
+          "description": "Yerel {ios} uygulamaları",
+          "about": "{platform} uygulamanıza {sdk} ekler. Oturumlar, ekran görüntülemeleri, hatalar ve çökmeler alırsınız."
+        }
+      }
+    },
+    "logs": {
+      "name": "Herhangi bir kaynaktan günlükler",
+      "description": "Herhangi bir günlük göndericisinden, hizmetten veya araçtan günlük gönderin",
+      "gets": "Her günlük satırını, onu ne gönderirse göndersin arayın ve filtreleyin.",
+      "question": "Günlüklerinizi nasıl göndermek istiyorsunuz?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Çalıştırdığınız bir günlük göndericisinden",
+          "description": "{examples} ve {count} tane daha",
+          "about": "Zaten çalıştırdığınız göndericiyi {product} ürününe yönlendirir. Yeni bir aracı gerekmez.",
+          "question": "Hangi günlük göndericisini çalıştırıyorsunuz?"
+        },
+        "overHttpWithCurl": {
+          "name": "{curl} ile HTTP üzerinden",
+          "description": "Herhangi bir betikten tek istek. Kurulum gerekmez.",
+          "about": "Herhangi bir betik veya hizmetten tek bir HTTP isteğiyle JSON günlükleri gönderin."
+        },
+        "fromOpentelemetry": {
+          "name": "{otel} üzerinden",
+          "description": "Bir SDK veya toplayıcıdan OTLP günlükleri",
+          "about": "Bir {otelSdk} veya toplayıcıdan OTLP üzerinden günlük gönderin."
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "{splunk} veya {cribl}, bulut günlükleri, güvenlik araçları ve CI/CD",
+          "about": "{splunk} veya {cribl} ürününden geçin ya da bulutunuzdan, güvenlik araçlarınızdan ve CI/CD'nizden günlükleri toplayın.",
+          "question": "Günlükleriniz başka nereden geliyor?"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM ve yapay zeka uygulamaları",
+      "description": "LLM çağrılarını, ajanları ve araçları izleyin",
+      "gets": "Her LLM çağrısını, araç çağrısını ve ajan adımını görün.",
+      "question": "Yapay zeka uygulamanız ne kullanıyor?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents veya {assistantsApi}",
+          "about": "{openaiSdk} üzerinden yapılan her çağrıyı token, maliyet ve gecikme ile izler.",
+          "question": "Hangi {openai} kütüphanesini kullanıyorsunuz?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} veya {claudeAgentSdk}",
+          "about": "{anthropicSdk} üzerinden yapılan her çağrıyı token, maliyet ve gecikme ile izler.",
+          "question": "Hangi {anthropic} kütüphanesini kullanıyorsunuz?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Zincirler, ajanlar ve grafikler",
+          "about": "Her zinciri, ajan adımını ve araç çağrısını izler.",
+          "question": "Hangi {langchain} kütüphanesini kullanıyorsunuz?"
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "Diğer çerçeveler, model sağlayıcıları, ağ geçitleri ve araçlar",
+          "about": "Çerçeveler, model sağlayıcıları, ağ geçitleri, kod gerektirmeyen araçlar, analitik ve araçlar.",
+          "question": "Yapay zeka uygulamanız ne kullanıyor?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Filo yönetimi",
     "subtitle": "OpenTelemetry toplayıcılarını kaydedin, yapılandırmalarını sürümleyin ve değişiklikleri güvenle dağıtın",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "{receiver} alıcısı tarafından reddedildi",
       "legend": "İşlem hattı durumu",
       "legendToggle": "Bu durumu haritada göster veya gizle"
+    }
+  },
+  "sampleData": {
+    "delete": "Örnek Verileri Sil",
+    "loadForbidden": "Örnek verileri yüklemek için bu kuruluşa yazma erişiminiz olmalı.",
+    "steps": {
+      "functions": "Fonksiyonlar oluşturuluyor",
+      "pipeline": "Gerçek zamanlı bir işlem hattı oluşturuluyor",
+      "telemetry": "Günlükler, izler ve metrikler oluşturulup gönderiliyor",
+      "dashboards": "Gösterge panoları oluşturuluyor",
+      "alerts": "Uyarılar oluşturuluyor",
+      "enrichment": "Hizmet sahipleri tablosu yükleniyor"
+    },
+    "progress": {
+      "loading": "Örnek veriler yükleniyor…",
+      "done": "Örnek veriler yüklendi",
+      "counts": "{logs} günlük kaydı · {spans} span · {metrics} metrik noktası",
+      "skipped": "Atlandı",
+      "logs": "Günlükler",
+      "spans": "Span'ler",
+      "metrics": "Metrik Noktaları"
+    },
+    "removeSteps": {
+      "alerts": "Uyarılar",
+      "alertDelivery": "Uyarı şablonu ve webhook",
+      "dashboards": "Gösterge panoları",
+      "pipeline": "İşlem hattı",
+      "functions": "Fonksiyonlar",
+      "streams": "Akışlar"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Örnek veriler kaldırılıyor",
+        "body": "Bu birkaç saniye sürer. Bu iletişim kutusunu kapatabilirsiniz, ancak işlem bitene kadar bu sekmeyi açık tutun.",
+        "label": "Örnek veriler kaldırılıyor…"
+      },
+      "done": {
+        "title": "Örnek veriler kaldırıldı",
+        "body": "Sunucu, depolanan verileri birkaç dakika içinde silmeyi tamamlar. Bundan sonra örnek verileri yeniden yükleyebilirsiniz.",
+        "label": "Kaldırma tamamlandı",
+        "done": "Tamam",
+        "keptLabel": "Korundu, çünkü başka bir şey bunları kullanıyor:"
+      },
+      "failed": {
+        "title": "Tüm örnek veriler kaldırılamadı",
+        "body": "Yeniden deneyin: zaten kaldırılmış öğeler atlanır.",
+        "label": "Kaldırma durduruldu",
+        "close": "Kapat",
+        "tryAgain": "Yeniden Dene"
+      }
+    },
+    "removeConfirm": {
+      "title": "Örnek veriler silinsin mi?",
+      "message": "Bu işlem örnek akışları, gösterge panolarını, uyarıları, fonksiyonları ve zenginleştirme tablosunu siler. Kendi verilerinize dokunulmaz."
+    },
+    "toast": {
+      "loaded": "Örnek veriler yüklendi. İyi keşifler!",
+      "loadFailed": "Örnek veriler yüklenemedi",
+      "removed": "Örnek veriler kaldırıldı",
+      "removedWithKept": "Örnek veriler kaldırıldı. Başka bir şey tarafından kullanıldığı için {count} örnek öğe kalıyor. | Örnek veriler kaldırıldı. Başka bir şey tarafından kullanıldığı için {count} örnek öğe kalıyor.",
+      "removeFailed": "Tüm örnek veriler kaldırılamadı",
+      "removeWhileLoading": "Örnek verilerin yüklenmesi bitene kadar bekleyin."
+    },
+    "entry": {
+      "onboardingSource": "Örnek verileri keşfet"
+    },
+    "callout": {
+      "title": "Henüz veri göndermeye hazır değil misiniz?",
+      "body": "Önce örnek bir çevrimiçi mağazayla {product} ürününü keşfedin: devam eden bir vaka ve gösterge panoları, uyarılar, günlükler, izler, metrikler ve işlem hatları arasında rehberli bir tur.",
+      "cta": "Örnek Verilerle Keşfet"
+    },
+    "header": {
+      "label": "Örnek Veri",
+      "try": "Örnek Veriyi Dene",
+      "finish": "Yüklemeyi Bitir"
+    },
+    "dock": {
+      "details": "Ayrıntıları Göster"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "Kendi verileriniz geliyor. Gösterge panolarınıza, uyarılarınıza ve aramalarınıza karışmaması için örnek verileri silin.",
+        "keep": "Şimdilik Sakla",
+        "remove": "Örnek Verileri Sil"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Arka Planda Devam Et",
+      "progress": {
+        "title": "Örnek mağazanız oluşturuluyor",
+        "body": "Bu yaklaşık bir dakika sürer. Bu iletişim kutusunu kapatabilirsiniz, ancak yükleme bitene kadar bu sekmeyi açık tutun."
+      },
+      "ready": {
+        "title": "Örnek mağazanız canlı",
+        "startTour": "Rehberli Turu Başlat",
+        "ownWay": "Kendi Başıma Keşfet"
+      },
+      "errorBody": "Yükleme sırasında bir sorun oluştu. Tekrar deneyin: mevcut gösterge panoları ve uyarılar yeniden kullanılır, çoğaltılmaz."
+    },
+    "tour": {
+      "label": "Rehberli tur",
+      "position": "Rehberli tur · adım {current}/{total}",
+      "pill": "Tur {current}/{total}",
+      "done": "Tur tamamlandı",
+      "stepFailed": "Bu adım açılamadı. Tekrar deneyin.",
+      "minimize": "Turu küçült",
+      "close": "Turu bitir",
+      "next": "İleri",
+      "capabilities": {
+        "dashboards": "Gösterge panoları",
+        "alerts": "Uyarılar",
+        "logs": "Günlük araması",
+        "traces": "İzleme",
+        "metrics": "Metrikler ve PromQL",
+        "pipelines": "İşlem hatları"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Sorunu tespit edin",
+          "body": "Bu, mağaza vitrininin hizmet özetidir. Hata oranı ve ödeme gecikmesi son 35 dakikada birlikte arttı.",
+          "look": "Her panel bir SQL sorgusudur. Serileri karşılaştırmak için bir grafiğin üzerine gelin, yakınlaştırmak için üzerinde sürükleyin veya sorgusunu düzenlemek için bir panelin menüsünü açın."
+        },
+        "alert": {
+          "title": "Uyarı zaten tetiklendi",
+          "body": "Ödeme hatalarına ilişkin bir uyarı, günlükler üzerinde bir SQL sorgusunu belirli bir zamanlamayla çalıştırır ve hatalar eşiğini aştığı anda tetiklendi.",
+          "look": "Bir uyarıyı açarak sorgusunu, eşiğini ve zamanlamasını görün. Örnek hedef bir yer tutucu webhook'tur; bu nedenle teslimatlar başarısız görünür: gerçek bildirimler almak için onu Slack, e-posta veya PagerDuty'ye yönlendirin."
+        },
+        "logs": {
+          "title": "Hataları arayın",
+          "body": "Günlükler ödeme hatalarına göre filtrelendi. Neredeyse hepsi aynı şeyi söylüyor: havuzdan bağlantı alınırken zaman aşımı.",
+          "look": "Her alanı görmek için bir kaydı genişletin. Bu alana göre filtrelemek için bir alan değerine tıklayın veya gruplamak ve toplamak için SQL moduna geçin."
+        },
+        "deploy": {
+          "title": "Neyin değiştiğini bulun",
+          "body": "Ödeme v2.15.0, hatalar başlamadan bir dakika önce kullanıma sunuldu ve sürüm notları bağlantı havuzunu 20'ye düşürdü.",
+          "look": "Aynı günlükler üzerinde tek bir aramayla bulunan kök neden budur. Tam metin ve SQL araması aynı veriler üzerinde çalışır."
+        },
+        "traces": {
+          "title": "Başarısız bir isteği izleyin",
+          "body": "Her iz, hizmetler arasında bir ödeme işlemini takip eder. Birini açın: şelale görünümü, ödeme hizmetinin bir veritabanı bağlantısı için 3 saniye beklediğini gösterir.",
+          "look": "Günlükler aynı iz ID'sini taşır; böylece bir span ile günlükleri arasında her iki yönde geçiş yapabilirsiniz."
+        },
+        "metrics": {
+          "title": "PromQL ile doğrulayın",
+          "body": "Her hizmetin p95 gecikmesi PromQL ile sorgulanır. Payment ve checkout birlikte yükseliyor.",
+          "look": "Metrikler günlükler ve izlerle aynı motorda bulunur; bu nedenle Altyapı gösterge panosu tamamen PromQL ile oluşturulmuştur."
+        },
+        "pipeline": {
+          "title": "Veriyi geldiği anda işleyin",
+          "body": "Gerçek zamanlı bir işlem hattı her erişim günlüğünde bir VRL fonksiyonu çalıştırarak kayıt saklanmadan önce client_os ve is_mobile alanlarını ekler.",
+          "look": "Grafiğini görmek için işlem hattını açın. İşlem hatları uygulamalarınıza dokunmadan verileri filtreleyebilir, zenginleştirebilir, yönlendirebilir ve maskeleyebilir."
+        },
+        "business": {
+          "title": "İş etkisini ölçün",
+          "body": "Aynı günlükler iş gösterge panolarını besler: başarısız ödeme işlemleri, gelir ve ödeme yöntemine göre siparişler.",
+          "look": "Ayrı bir analiz aracına gerek yok. Günlüklerinizdeki her şey bir KPI'ya dönüşebilir."
+        }
+      },
+      "finale": {
+        "title": "Kök nedeni buldunuz",
+        "body": "Birkaç dakika içinde gösterge panosundaki ani artıştan buna neden olan dağıtıma ulaştınız; tüm sinyaller tek bir yerde.",
+        "connect": "Kendi Verinizi Bağlayın",
+        "restart": "Turu Yeniden Başlat",
+        "finish": "Turu Bitir"
+      }
     }
   },
   "recentSearches": {

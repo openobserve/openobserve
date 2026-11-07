@@ -1948,6 +1948,7 @@
     "billings": "Thanh toán",
     "rum": "RUM",
     "settings": "Cài đặt",
+    "allSettings": "Tất cả cài đặt",
     "iam": "IAM",
     "report": "Báo cáo",
     "pipeline": "Pipeline",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "Chỉ cho phép tệp ZIP"
     },
     "emptyState": {
-      "title": "Giám sát người dùng của bạn với Giám sát người dùng thực",
-      "description": "RUM theo dõi các tương tác thực của người dùng — tải trang, lỗi, gọi API và phát lại phiên — để bạn thấy chính xác cách người dùng trải nghiệm ứng dụng của bạn.",
       "webApp": "Cài đặt ứng dụng web",
       "webAppDesc": "Thêm OpenObserve RUM SDK vào bất kỳ ứng dụng {product} nào",
       "sessionReplay": "Bật phát lại phiên",
       "sessionReplayDesc": "Ghi và phát lại phiên người dùng để gỡ lỗi vấn đề UX",
+      "title": "Giám sát người dùng của bạn với Giám sát người dùng thực",
+      "description": "RUM theo dõi các tương tác thực của người dùng — tải trang, lỗi, gọi API và phát lại phiên — để bạn thấy chính xác cách người dùng trải nghiệm ứng dụng của bạn.",
       "learnMore": "Tìm hiểu thêm:",
       "quickImpl": "Hướng dẫn triển khai nhanh",
       "blogPost": "Kiến thức cơ bản về giám sát frontend"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "Giấy phép & Sử dụng",
     "copyLicenseId": "Sao chép ID giấy phép",
     "editionLbl": "Phiên bản",
-    "limitPrefix": "· giới hạn",
     "gbPerDay": "GB / ngày",
     "ofDailyLimitUsedToday": "của hạn mức hàng ngày đã sử dụng hôm nay",
     "gbToday": "GB hôm nay",
@@ -3580,6 +3580,7 @@
     "usage_limits": "Giới hạn sử dụng",
     "feature_comparison_lbl": "So sánh tính năng",
     "feature_comparision_ent_msg": "Bạn đang sử dụng OpenObserve Enterprise Edition với quyền truy cập tất cả các tính năng nâng cao được liệt kê bên dưới.",
+    "feature_comparision_ent_partial_msg": "Bạn đang sử dụng OpenObserve Enterprise Edition. Một số tính năng không có trong giấy phép của bạn; xem danh sách ở trên.",
     "feature_comparision_plan_detail": "Gói của bạn: Enterprise Edition miễn phí cho tối đa 50 GB/ngày (~1.5 TB/tháng) dữ liệu tiếp nhận.",
     "feature_comparision_os_msg": "Bạn hiện đang sử dụng OpenObserve Open Source Edition. Nâng cấp lên Enterprise Edition để mở khóa các tính năng nâng cao được liệt kê trong bảng so sánh bên dưới.",
     "feature_comparision_good_news": "Tin tốt: OpenObserve Enterprise Edition hoàn toàn miễn phí cho tối đa 50 GB/ngày (~1.5 TB/tháng) dữ liệu tiếp nhận.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "Không có tính năng nào khớp với tìm kiếm của bạn",
     "features_none": "Không có tính năng nào trong nhóm này",
     "features_free_heading": "Miễn phí, được bao gồm trong mọi giấy phép",
+    "features_free_not_included": "Miễn phí, không có trong giấy phép của bạn",
     "features_new": "Mới sau giấy phép của bạn",
     "features_filter_new": "Mới",
     "request_new_license": "Yêu cầu giấy phép mới",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "Giấy phép của bạn vẫn còn hiệu lực. Bạn có muốn cập nhật nó với khóa giấy phép mới không?",
     "yes_update_license": "Có, cập nhật giấy phép",
     "no_keep_current": "Không, giữ nguyên",
+    "license_downgrade_title": "Áp dụng khóa giấy phép này?",
+    "license_downgrade_intro": "Khóa này thay thế giấy phép hiện tại của bạn.",
+    "license_downgrade_expired": "Khóa này đã hết hạn vào {date}. Giới hạn miễn phí 50 GB/ngày sẽ được áp dụng.",
+    "license_downgrade_lose": "Bạn sẽ mất: {names}",
+    "license_downgrade_limit": "Giới hạn hàng ngày thay đổi từ {old} thành {new}",
+    "license_downgrade_expiry": "Ngày hết hạn thay đổi từ {old} thành {new}",
+    "license_limit_per_day": "{gb} GB/ngày",
     "header_button": {
       "cloud_features": "Tính năng {product}",
       "enterprise_edition": "Phiên bản: Enterprise",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "Dùng thử OpenObserve ngay hôm nay để có khả năng quan sát hiệu quả và hiệu suất cao hơn.",
     "getStartedBannerAlt": "Banner Bắt đầu",
     "getStartedHeading": "Một điều cuối cùng trước khi chúng ta bắt đầu",
-    "hearAboutUsLabel": "Bạn biết đến chúng tôi qua đâu?",
     "hearAboutUsPlaceholder": "Ví dụ: Từ một người bạn",
-    "whereDoYouWorkLabel": "Bạn làm việc ở đâu?",
     "whereDoYouWorkPlaceholder": "Tên công ty",
-    "agreeToTermsPrefix": "Tôi đã đọc và đồng ý với",
     "termsOfUse": "Điều khoản sử dụng",
-    "and": "và",
     "privacyPolicyStar": "Chính sách bảo mật*",
     "startTrialButton": "Bắt đầu dùng thử 14 ngày",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "Email là bắt buộc",
     "emailInvalid": "Vui lòng nhập email hợp lệ",
     "passwordRequired": "Mật khẩu là bắt buộc",
-    "mustAcceptTerms": "Bạn phải chấp nhận điều khoản để tiếp tục",
     "getStarted": {
       "title": "Chào mừng bạn đến với OpenObserve",
-      "subtitle": "Bản dùng thử 14 ngày của bạn đã bắt đầu. Hai câu hỏi nhanh, sau đó chúng tôi sẽ đưa bạn đến phần thiết lập.",
-      "sourceLabel": "Bạn muốn gửi dữ liệu gì trước?",
-      "optional": "(không bắt buộc)",
-      "skip": "Bỏ qua câu hỏi",
-      "continue": "Tiếp tục",
-      "hearAboutUsPlaceholder": "Ví dụ: một đồng nghiệp hoặc một bài blog",
-      "whereDoYouWorkPlaceholder": "Công ty hoặc nhóm",
-      "termsOfService": "Điều khoản dịch vụ",
-      "privacyPolicy": "Chính sách bảo mật",
-      "agreeHint": "Cần thiết để tiếp tục, ngay cả khi bạn bỏ qua các câu hỏi.",
+      "skipForNow": "Bỏ qua bây giờ",
+      "heard": {
+        "label": "Bạn biết đến chúng tôi qua đâu?",
+        "placeholder": "Chọn một tùy chọn",
+        "thanks": "Cảm ơn!"
+      },
+      "connect": {
+        "title": "Kết nối dữ liệu của bạn",
+        "point1": "Thiết lập từng bước cho mỗi nguồn",
+        "point2": "Nhật ký, chỉ số và trace ở cùng một nơi",
+        "point3": "Xem những sự kiện đầu tiên của bạn trong vài phút",
+        "cta": "Khám phá các nguồn dữ liệu khác"
+      },
+      "sample": {
+        "title": "Khám phá với dữ liệu mẫu",
+        "point1": "Nhật ký, trace và chỉ số từ các dịch vụ mẫu",
+        "point2": "Bảng điều khiển, cảnh báo, một pipeline và các hàm VRL",
+        "point3": "Hướng dẫn tham quan, và một cú nhấp để xóa tất cả",
+        "cta": "Khám phá với dữ liệu mẫu"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Máy chủ Linux hoặc VM",
@@ -4094,7 +4108,28 @@
         "llm": "Ứng dụng LLM hoặc AI",
         "agent": "Để một AI agent thiết lập",
         "unsure": "Chưa chắc chắn"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Máy chủ web",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Trình duyệt (RUM)",
+        "llm": "LLM hoặc ứng dụng AI",
+        "agent": "AI Agent"
       }
+    },
+    "heardFrom": {
+      "question": "Bạn đã tìm thấy chúng tôi bằng cách nào?",
+      "quickQuestion": "Câu hỏi nhanh: bạn đã tìm thấy chúng tôi bằng cách nào?",
+      "skip": "Bỏ qua",
+      "searchEngine": "Công cụ tìm kiếm",
+      "friendOrColleague": "Bạn bè hoặc đồng nghiệp",
+      "aiAssistant": "Trợ lý AI",
+      "other": "Khác",
+      "thanks": "Cảm ơn bạn đã cho chúng tôi biết!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Các trường khác chỉ hiển thị các trường lược đồ đã tồn tại trước khi stream được cấu hình để sử dụng lược đồ do người dùng xác định.",
     "addFieldsTitle": "Thêm trường",
     "dataRetentionDaysLabel": "Thời gian lưu trữ dữ liệu (ngày)",
-    "globalRetentionDays": "Thời gian lưu trữ toàn cầu là {days} ngày",
-    "retentionMinOneDay": "Thời gian lưu trữ phải ít nhất 1 ngày",
+    "retentionDefaultDays": "Để trống để dùng mặc định cho loại stream này: {days} ngày",
+    "retentionDefaultForever": "Để trống để dùng mặc định cho loại stream này: lưu giữ vĩnh viễn",
     "maxQueryRangeHoursLabel": "Phạm vi truy vấn tối đa (giờ)",
     "maxQueryRangeHelp": "Khoảng thời gian tối đa được phép cho truy vấn. Đặt 0 để không giới hạn.",
     "globalFlattenLevel": "Toàn cầu là {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Tham gia Slack",
     "maybeLater": "Để sau"
   },
-  "connectDataSourcePopup": {
-    "title": "Để bắt đầu, hãy kết nối nguồn dữ liệu đầu tiên của bạn.",
-    "description": "Chúng tôi có rất nhiều điều để cho bạn xem, nhưng trước tiên chúng tôi cần kết nối dữ liệu của bạn. Hầu hết các nhóm thấy nhật ký đầu tiên của họ trong khoảng một phút.",
-    "connectButton": "Kết nối nguồn dữ liệu",
-    "slackLink": "Ngoài ra, hãy tham gia cộng đồng Slack của chúng tôi"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Tiếp tục từ nơi đã tạm dừng",
     "startFromNow": "Bắt đầu từ bây giờ.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "Xem những workload nào giao tiếp với nhau: luồng mạng eBPF",
       "k8sInstallerNote": "Thao tác này tự động cài đặt cert-manager, operator OpenTelemetry và collector OpenObserve.",
       "k8sInternalEndpointNote": "Sử dụng tùy chọn này khi OpenObserve chạy trong chính cụm này — lưu lượng không bao giờ rời khỏi cụm.",
+      "k8sTraceAppsTitle": "Trace các ứng dụng của bạn",
+      "k8sTraceEbpfDesc": "Bật trace eBPF trong collector, sau đó chọn các ứng dụng cần trace theo cổng, đường dẫn tệp thực thi hoặc dòng lệnh.",
+      "k8sTraceLibraryDesc": "Gắn chú thích vào namespace của từng ngôn ngữ để operator thêm thư viện tương ứng vào các pod ở đó. Sau đó khởi động lại các ứng dụng đó một lần.",
       "k8sTroubleAnnotationA": "Việc tiêm xảy ra khi tạo pod, vì vậy các pod hiện tại không bị ảnh hưởng cho đến khi chúng khởi động lại — chạy `kubectl rollout restart deployment -n my-namespace`. Xác nhận chú thích đã được áp dụng bằng `kubectl get ns my-namespace -o yaml`, và kiểm tra giá trị khớp với `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Tôi đã chú thích một namespace nhưng không có trace nào xuất hiện",
       "k8sTroubleEndpointA": "Chỉ dùng **Endpoint bên trong** khi chính OpenObserve chạy trong cluster này; khi đó lưu lượng ở lại bên trong và không bao giờ đi ra ngoài mạng. URL là `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — mặc định giả định release `o2` trong namespace `openobserve`, nên hãy sửa nếu của bạn khác. Mọi trường hợp khác đều dùng endpoint bên ngoài.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "Phiên xuất hiện nhưng tất cả màn hình đều có tên giống nhau",
       "androidTroubleScreenNamesA": "Theo dõi View chưa được thiết lập. Truyền `useViewTrackingStrategy(...)` — ví dụ: `ActivityViewTrackingStrategy(trackExtras = true)` cho Activity, hoặc `NavigationViewTrackingStrategy(...)` nếu bạn dùng AndroidX Navigation — khi xây dựng `RumConfiguration`.",
       "setupTime5Min": "~5 phút",
+      "showStepInstructions": "Hiện hướng dẫn",
       "snowflakeCollectorVersionNote": "Snowflake cần collector v0.92.0 — các bản mới hơn có lỗi đã biết.",
       "snowflakeTagline": "Thu thập chỉ số tài khoản Snowflake bằng OpenTelemetry Collector và gửi chúng đến OpenObserve.",
       "sqlClientGuiVariant": "SQL Client (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "Mục kiểm tra bên dưới sẽ chuyển xanh khi dữ liệu đến, hoặc kiểm tra Stream để tìm các chỉ số `cassandra_*`.",
       "verifyDatabricksLogsDesc": "Mục kiểm tra bên dưới sẽ chuyển xanh khi dữ liệu đến, hoặc mở Nhật ký và tìm `source:databricks`.",
       "verifyDataTitle": "Xác minh dữ liệu trong OpenObserve",
+      "checkYourDataTitle": "Kiểm tra dữ liệu của bạn",
       "verifyDynamodbLogsDesc": "Mục kiểm tra bên dưới sẽ chuyển xanh khi dữ liệu đến, hoặc mở Nhật ký cho stream `dynamodb` khi các mục thay đổi.",
       "verifyGcpLogsDesc": "Tạo một số hoạt động trong dự án (hoặc chờ sink khớp với một nhật ký); mục kiểm tra bên dưới sẽ chuyển xanh khi dữ liệu đến.",
       "verifyK8sDataDesc": "Hãy đợi collector khởi động trong vài giây; mục kiểm tra bên dưới sẽ chuyển xanh khi dữ liệu đến — nhật ký cụm sẽ vào stream `default`.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "Việc thanh toán được xử lý qua hợp đồng của bạn — liên hệ với người quản lý tài khoản để thay đổi",
     "upgradeToPlanMessage": "Nâng cấp lên gói để tiếp tục sử dụng các dịch vụ của OpenObserve.",
     "creditsUsedLabel": "tín dụng đã sử dụng",
-    "licenseExpiryContactAdmin": "Vui lòng cập nhật giấy phép của bạn bằng cách liên hệ với quản trị viên.",
+    "licenseExpiredOn": "Giấy phép của bạn đã hết hạn vào {date}. Các tính năng của bạn vẫn được bật.",
+    "licenseExpiredLimit": "Giới hạn miễn phí {limit} GB/ngày hiện đã áp dụng: nếu vượt quá giới hạn này hơn {allowed} ngày trong một tháng, tìm kiếm sẽ tạm dừng cho đến khi bạn gia hạn.",
+    "licenseAskAdminToRenew": "Hãy yêu cầu quản trị viên giấy phép gia hạn.",
+    "renewLicense": "Gia hạn giấy phép",
     "subscribed": "Đã đăng ký",
     "invoiceHistory": "Lịch sử hóa đơn",
     "amount": "Số tiền",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "Liên kết gói đăng ký AWS thất bại",
     "failedToLinkAzureSubscription": "Liên kết gói đăng ký Azure thất bại",
     "last15Minutes": "15 phút qua",
-    "licenseHasExpired": "Giấy phép của bạn đã hết hạn",
     "numberOfPipelines": "Số lượng pipeline",
     "oneDayUntilLicenseExpires": "Còn 1 ngày trước khi giấy phép của bạn hết hạn",
     "pleaseWaitProcessingRequest": "Vui lòng đợi trong khi chúng tôi xử lý yêu cầu của bạn...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "Tùy chọn. Cảnh báo vẫn chạy và ghi lại lịch sử, nhưng không có đích nào được thông báo.",
       "sendsToStatus": "Gửi đến {targets} mỗi khi cảnh báo kích hoạt.",
       "oncallTeamTarget": "một nhóm trực",
+      "lockedWorkflowFallback": "Quy trình làm việc bị khóa",
+      "lockedTargetBadge": "Đã khóa",
       "createsIncident": "Tạo sự cố",
       "createsIncidentTooltip": "Nếu cảnh báo có thể tạo sự cố, nó sẽ không gửi thông báo riêng. Thay vào đó, thông báo về sự cố được gửi khi sự cố mới được tạo hoặc loại cảnh báo mới tham gia vào sự cố hiện có.",
       "incidentTitleTemplate": "Tiêu đề sự cố",
@@ -12901,6 +12939,9 @@
       "lastTrained": "Lần huấn luyện cuối",
       "level": "Mức",
       "lookBackWindow": "Cửa sổ nhìn lại",
+      "scheduleIntervalFloor": "Tần suất kiểm tra phải tối thiểu là {min}.",
+      "lookBackWindowCap": "Khoảng thời gian nhìn lại có thể tối đa là {max} ở Độ phân giải phát hiện này: khoảng thời gian dài hơn chứa hơn 100.000 nhóm. Hãy rút ngắn khoảng thời gian hoặc dùng Độ phân giải phát hiện dài hơn.",
+      "retrainOnEditNote": "Thay đổi truy vấn, hàm hoặc Độ phân giải phát hiện sẽ huấn luyện lại bộ phát hiện này. Việc phát hiện sẽ tạm dừng cho đến khi quá trình huấn luyện kết thúc.",
       "lookBackWindowFloor": "Cửa sổ nhìn lại phải tối thiểu {min} — Kiểm tra mỗi cộng một Độ phân giải phát hiện. Cửa sổ ngắn hơn không thể chứa trọn một bucket khi lần chạy đầu tiên kích hoạt, nên lần chạy đó sẽ bỏ qua các bucket.",
       "lookBackWindowLegacy": "Cửa sổ đã lưu này thấp hơn mức tối thiểu {min} (Kiểm tra mỗi cộng một Độ phân giải phát hiện). Nó vẫn được lưu nguyên trạng, nhưng lần chạy đầu tiên có thể bỏ qua các bucket cho đến khi cửa sổ được tăng lên.",
       "lookBackWindowMinimum": "Tối thiểu {min}; nên dùng {recommended} trở lên cho các cài đặt này.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "Không tìm thấy đích nào",
       "noDetectionResults": "Chưa có kết quả phát hiện trong khoảng này",
       "noFieldsFound": "Không tìm thấy trường nào",
+      "checkDataNow": "Kiểm tra ngay",
+      "checkDataNowTooltip": "Đánh giá lại dữ liệu hiện tại ngay thay vì chờ lần kiểm tra tự động tiếp theo.",
+      "dataReadinessReason": "Lý do",
       "noticeRetrain": "Tự động huấn luyện lại",
       "noticeRetrainTooltip": "Không thể đọc mô hình đã lưu sau khi nâng cấp, nên nó đã bị loại bỏ và cấu hình được tự động xếp hàng để huấn luyện lại. Không cần thực hiện thao tác nào; quá trình phát hiện sẽ tiếp tục sau khi huấn luyện hoàn tất.",
       "noticeSkipAbsence": "Việc chấm điểm vắng mặt bị chậm hơn Cửa sổ nhìn lại; span không còn có thể truy xuất đã bị bỏ qua và được ghi lại.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "Chế độ tự động sẽ học một mức từ lịch sử của bạn.",
       "autoTrainingHelp": "Mức sẽ xuất hiện khi quá trình huấn luyện hoàn tất.",
       "autoFailedHelp": "Huấn luyện thất bại. Chưa có mức nào được học. Hãy xem lỗi huấn luyện ở trên.",
+      "autoWaitingForDataHelp": "Chưa có đủ dữ liệu huấn luyện phù hợp. Cho đến lúc đó chưa có mức đã học. Bộ phát hiện vẫn được bật và được kiểm tra lại tự động.",
+      "autoNotApplicableHelp": "Dữ liệu hiện tại không thể hỗ trợ mô hình bất thường. Đây không phải là lỗi. Bộ phát hiện vẫn được bật và được kiểm tra lại tự động.",
       "autoRetrainingHelp": "Đang huấn luyện lại. Mức đã học gần nhất được hiển thị; tính khả dụng của mô hình chưa được xác nhận.",
       "autoRetrainFailedHelp": "Huấn luyện lại thất bại. Mức đã học gần nhất được hiển thị; tính khả dụng của mô hình chưa được xác nhận. Hãy xem lỗi huấn luyện ở trên.",
       "autoUnconfirmedHelp": "Mức đã học gần nhất được hiển thị; mô hình đang hoạt động chưa được xác nhận.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "Định tuyến từ quy tắc sở hữu",
     "oncallTeamTooltip": "Nhóm trực nào mà cảnh báo này gọi. Để trống để hệ thống xác định nhóm từ các chiều nhận dạng của cảnh báo — đây là trường hợp thông thường — chỉ đặt khi các chiều đó không thể biểu diễn chủ sở hữu.",
     "oncallTeamNoTeams": "Chưa có nhóm trực nào. Hãy tạo một nhóm trong mục Nhóm trực.",
+    "lockedTeamFallback": "Nhóm bị khóa",
     "oncallTeamAtFireTime": "Từ quyền sở hữu",
     "oncallTeamFromRules": "Không có nhóm nào được đặt trên cảnh báo này, vì vậy chủ sở hữu được xác định từ các chiều danh tính của dòng kích hoạt. Những chiều đó chỉ được biết khi cảnh báo kích hoạt.",
     "tags": "Thẻ",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "Nhập dấu phân cách (ví dụ: {'|'}, \\n, \\t, dấu cách)",
     "separator_hint": "Chuỗi phân cách dùng giữa các bản ghi (cho phép khoảng trắng)",
     "templateDefaultOption": "Mặc định ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Để mặc định để sử dụng mẫu {type} tiêu chuẩn ({name}), hoặc chọn mẫu tùy chỉnh.",
     "loadingData": "Đang tải dữ liệu đích...",
     "noEmailTemplates": "Có vẻ như bạn chưa tạo Mẫu Email nào.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Thông tin xác thực Azure",
       "awsRoleArn": "ARN vai trò AWS"
     },
+    "dataRetentionDefaults": {
+      "title": "Mặc định lưu giữ dữ liệu",
+      "about": "Áp dụng cho các stream không có thời hạn lưu riêng. Để trống hoặc 0 sẽ dùng giá trị toàn cục; nếu không, tối thiểu 3 ngày.",
+      "defaultDays": "Mặc định (ngày)",
+      "streamType": "Loại stream",
+      "days": "Ngày",
+      "addType": "Thêm loại stream",
+      "removeType": "Xóa loại stream này",
+      "globalDefault": "Toàn cục: {value}",
+      "globalType": "Toàn cục {type}: {value}",
+      "daysValue": "{days} ngày",
+      "forever": "lưu giữ vĩnh viễn",
+      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",
       "settingsUpdated": "Đã cập nhật cài đặt tổ chức thành công",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "lỗi không mong đợi",
-      "daysRemaining": "Còn {days} ngày cho đến khi giấy phép hết hạn",
-      "oneDayRemaining": "Còn 1 ngày cho đến khi giấy phép hết hạn",
-      "licenseExpired": "Giấy phép của bạn đã hết hạn"
+      "daysRemaining": "Còn {days} ngày cho đến khi giấy phép hết hạn"
     },
     "nodesPage": {
       "subtitle": "Các nút cụm và trạng thái của chúng",
@@ -23025,7 +23085,9 @@
         "ready": "Sẵn sàng",
         "running": "Đang chạy",
         "training": "Đang huấn luyện",
-        "waiting": "Đang chờ"
+        "waiting": "Đang chờ",
+        "waitingForData": "Đang chờ dữ liệu",
+        "notApplicable": "Không áp dụng"
       },
       "anomalyStatus": {
         "active": "Hoạt động",
@@ -23033,7 +23095,9 @@
         "training": "Đang huấn luyện",
         "failed": "Thất bại",
         "waiting": "Đang chờ",
-        "disabled": "Đã tắt"
+        "disabled": "Đã tắt",
+        "waitingForData": "Đang chờ dữ liệu",
+        "notApplicable": "Không áp dụng"
       },
       "aiToolsetKind": {
         "skill": "Kỹ năng",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "Đã xảy ra lỗi",
-      "thankYouForYourFeedback": "Cảm ơn bạn đã phản hồi",
       "selectedSuggestion": "Đã chọn gợi ý \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Vui lòng điền tất cả các trường và thử lại.",
       "invalidUsernameOrPassword": "Tên đăng nhập hoặc mật khẩu không hợp lệ",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Bắt đầu",
     "reportDetail": "Báo cáo",
     "sharedChat": "Cuộc trò chuyện được chia sẻ",
     "passwordPolicy": "Chính sách mật khẩu",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "Không thể lưu lịch",
     "policy": "Chính sách leo thang",
     "policyIfNoAck": "Nếu không ai xác nhận, sau",
-    "policyRepeatTimes": "Chạy bậc thang một lần | Chạy bậc thang {count} lần",
-    "policyFinalStop": "sau đó dừng",
-    "policyFinalNotifyDefault": "sau đó thông báo cho nhóm bao quát",
-    "policyNoDefaultTeam": "Chưa chỉ định nhóm mặc định, nên điều này giống như dừng lại. Hãy chỉ định một nhóm trong tab Định tuyến.",
     "policyPrioritySilent": "{priority} không gọi cho ai cả. Hãy thêm một bậc để thay đổi điều đó — im lặng ở đây là một quyết định, không phải sự thiếu sót.",
     "policyDoneEditing": "Xong chỉnh sửa",
     "policyHint": "Ai được gọi ở mỗi mức ưu tiên, và sau bao lâu. Đây là các giá trị mặc định - bạn có thể thay đổi bất kỳ mục nào.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "Không ai phải đợi năm phút mới biết hệ thống đã sập.",
     "policyP4Pages": "Gọi trực cho cả mức ưu tiên này",
     "policyP4PagesHint": "Mặc định tắt — một P4 đánh thức ai đó là một lỗi phân loại mức độ nghiêm trọng.",
-    "policyFinalAction": "Nếu không ai xác nhận",
-    "policyFinal_notifyDefaultTeam": "Thông báo cho nhóm mặc định",
-    "policyFinal_stop": "Dừng",
     "policySummaryTitle": "Chính sách này đang làm gì ngay lúc này",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tất cả cùng lúc",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "Không có AI SRE",
     "ladderStaleDefaultTag": "Thang leo thang chưa từng biết các ca trực",
     "ladderStaleDefaultHint": "Mọi cấp đều gọi toàn bộ nhóm, nhưng nhóm này có ca trực — thang leo thang được tạo trước khi chúng ra đời. Thêm hoặc xóa thành viên sẽ chạy lại mặc định, hoặc chỉnh sửa thang leo thang một lần bằng tay.",
-    "ladderEndsHandsOff": "Thông báo trực được bàn giao",
     "reachShortNoSmtp": "chỉ email · không có kênh SMTP",
     "reachShortNoFromAddress": "chỉ email · không có địa chỉ From",
     "reachShortNoAddress": "không có địa chỉ trong hồ sơ",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· mỗi {duration}",
     "ladderEnd": "kết thúc",
     "ladderEndUnknown": "Không còn gì tiếp theo.",
-    "ladderEndsDefaultTeam": "Đã hết các bậc — nhóm mặc định đã được thông báo.",
     "rungLost": "thất bại",
     "rungLostTimes": "thất bại ×{count}",
     "routingDetails": "Chi tiết định tuyến",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "Các bước leo thang",
     "policyChipSteps": "{count} bước | {count} bước",
     "policyAddStep": "Thêm bước",
-    "policyWhenStepsRunOut": "Khi hết các bước",
     "policyAppliesToNewPages": "Thay đổi chỉ áp dụng cho các thông báo trực mới.",
     "policySave": "Lưu",
     "policyFix": "Sửa",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "Email vẫn bật cùng Slack: những người chưa liên kết tài khoản Slack vẫn nhận được email.",
     "policyNoProvider": "Chưa kết nối nhà cung cấp điện thoại, nên SMS và Thoại bị bỏ qua và các thông báo trực này sẽ được gửi qua email.",
     "policyNoProviderLink": "Kết nối một nhà cung cấp trong Cài đặt → Telephony",
-    "policyEndOptionStop": "Chạy một lần, rồi dừng | Chạy {count} lần, rồi dừng",
-    "policyEndOptionHandOff": "Chạy một lần, rồi chuyển giao cho nhóm tiếp nhận tất cả | Chạy {count} lần, rồi chuyển giao cho nhóm tiếp nhận tất cả",
-    "policyEndOptionHandOffTo": "Chạy một lần, rồi chuyển giao cho {team} | Chạy {count} lần, rồi chuyển giao cho {team}",
     "policyDeliveryTitle": "Gửi thông báo",
     "policyTodayIs": "hôm nay: {who}",
     "policyPeopleCount": "{count} người | {count} người",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "Nhận cảnh báo từ {team}",
     "ruleEditorKeptBy": "{team} giữ các cảnh báo này: quy tắc của đội này cụ thể hơn",
     "ruleEditorContends": "Cạnh tranh với một quy tắc cho {team}: quy tắc cụ thể hơn sẽ thắng",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} khác",
+    "ruleEditorFieldsHelp": "Các trường đến từ nhóm trường tương quan của bạn. {link}",
+    "ruleEditorFieldsSource": "Các trường đến từ nhóm trường tương quan của bạn.",
+    "ruleEditorManageFieldGroups": "Quản lý nhóm trường",
+    "ruleEditorDuplicatePath": "{team} đã có quy tắc cho đúng các điều kiện này. Hãy chỉnh sửa quy tắc đó.",
+    "ruleEditorDuplicatePathSameTeam": "Nhóm này đã có quy tắc cho đúng các điều kiện này.",
     "routingTestRouting": "Kiểm tra định tuyến",
     "routingTabNeedsOwnerPlain": "Cần người phụ trách",
     "simulatorStartFrom": "Bắt đầu từ",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Nhật ký, chỉ số và trace từ bất kỳ máy chủ Linux nào.",
+      "windows": "Nhật ký sự kiện và chỉ số từ máy chủ Windows.",
+      "macos": "Nhật ký và chỉ số từ máy Mac.",
+      "aws": "Nhật ký và chỉ số từ các dịch vụ AWS của bạn.",
+      "googleCloud": "Nhật ký từ các dự án {gcp} của bạn, thông qua đăng ký push {pubSub}.",
+      "azure": "Nhật ký hoạt động từ đăng ký {azure} của bạn, thông qua {eventHub}.",
+      "postgresql": "Chỉ số truy vấn, kết nối và sao chép.",
+      "mysql": "Chỉ số truy vấn, kết nối và InnoDB.",
+      "mongodb": "Chỉ số thao tác, kết nối và bộ nhớ đệm.",
+      "redis": "Chỉ số bộ nhớ, lệnh và keyspace.",
+      "sqlServer": "Chỉ số truy vấn, chờ và bộ đệm.",
+      "oracle": "Chỉ số phiên, tablespace và giới hạn tài nguyên.",
+      "mariadb": "Chỉ số truy vấn, kết nối và InnoDB.",
+      "elasticsearch": "Tình trạng cụm, chỉ mục và node.",
+      "cassandra": "Chỉ số đọc, ghi và nén gộp.",
+      "dynamodb": "Thay đổi mục (chèn, cập nhật, xóa) dưới dạng nhật ký, thông qua {kinesisFirehose}.",
+      "snowflake": "Mức sử dụng warehouse, truy vấn và credit.",
+      "databricks": "Nhật ký notebook, được gửi qua API nhật ký.",
+      "couchdb": "Chỉ số yêu cầu, cơ sở dữ liệu và sao chép.",
+      "aerospike": "Chỉ số namespace, node, bộ nhớ và kết nối.",
+      "sapHana": "Chỉ số bộ nhớ, CPU và dịch vụ.",
+      "zookeeper": "Chỉ số độ trễ, kết nối và node.",
+      "nginx": "Nhật ký truy cập và lỗi, được theo dõi bởi {fluentBit}.",
+      "apache": "Nhật ký truy cập và lỗi, được theo dõi bởi {fluentBit}.",
+      "iis": "Nhật ký yêu cầu, được theo dõi bởi {fluentBit}.",
+      "kafka": "Chỉ số broker, topic và độ trễ consumer.",
+      "rabbitmq": "Chỉ số độ sâu hàng đợi, tốc độ tin nhắn và node.",
+      "nats": "Chỉ số kết nối, tin nhắn và stream.",
+      "prometheus": "Gửi các chỉ số bạn đã thu thập sẵn, qua remote write.",
+      "telegraf": "Gửi chỉ số từ agent bạn đang chạy.",
+      "opentelemetryCollector": "Trỏ collector bạn đang chạy vào đây.",
+      "cloudwatch": "Truyền chỉ số ra khỏi tài khoản AWS của bạn.",
+      "gpu": "Mức sử dụng, bộ nhớ và nhiệt độ trên mỗi GPU {nvidia}.",
+      "networkFlows": "Các luồng lưu lượng giữa máy chủ và mạng của bạn.",
+      "fluentBit": "Bộ chuyển tiếp nhật ký nhẹ cho máy chủ và Kubernetes.",
+      "fluentd": "Bộ thu thập nhật ký với kho plugin phong phú.",
+      "vector": "Pipeline nhanh cho nhật ký và chỉ số.",
+      "filebeat": "Gửi tệp nhật ký bằng agent nhẹ.",
+      "logstash": "Gửi nhật ký từ pipeline hiện có.",
+      "syslogNg": "Chuyển tiếp syslog từ máy chủ của bạn.",
+      "loongcollector": "Agent nhật ký và chỉ số cho máy chủ và container.",
+      "splunkHec": "Giữ nguyên các nguồn gửi HTTP Event Collector của bạn.",
+      "cribl": "Định tuyến dữ liệu từ các pipeline bạn đang chạy.",
+      "kinesisFirehose": "Truyền nhật ký từ một delivery stream trong AWS.",
+      "googleCloudLogs": "Xuất nhật ký từ các dự án của bạn qua log sink.",
+      "okta": "Sự kiện đăng nhập và kiểm toán quản trị.",
+      "office365": "Nhật ký kiểm toán thư, tệp và quản trị.",
+      "googleWorkspace": "Nhật ký kiểm toán đăng nhập và quản trị.",
+      "falco": "Cảnh báo bảo mật thời gian chạy từ container.",
+      "osquery": "Trạng thái endpoint dưới dạng nhật ký bạn có thể truy vấn.",
+      "jumpcloud": "Sự kiện directory và đăng nhập.",
+      "openvpn": "Nhật ký kết nối và phiên VPN.",
+      "githubActions": "Nhật ký lần chạy workflow và job.",
+      "jenkins": "Nhật ký build và sự kiện pipeline.",
+      "terraform": "Nhật ký plan và apply từ các lần chạy của bạn.",
+      "ansible": "Nhật ký và kết quả chạy playbook.",
+      "vercel": "Nhật ký triển khai và hàm.",
+      "heroku": "Nhật ký ứng dụng và router từ log drain.",
+      "airflow": "Nhật ký chạy DAG và chỉ số tác vụ.",
+      "airbyte": "Nhật ký và trạng thái job đồng bộ.",
+      "languageTile": "Trace với SDK {otel}, kèm tự động instrumentation ở những ngôn ngữ hỗ trợ.",
+      "aiIntegration": "Trace các lần gọi của ứng dụng AI, kèm token và chi phí cho các lần gọi mô hình."
+    },
+    "skipToApp": "Chuyển đến ứng dụng",
+    "chooseTitle": "Bạn muốn giám sát gì trước?",
+    "back": "Quay lại",
+    "searchGuides": "Tìm kiếm {count} hướng dẫn | Tìm kiếm {count} hướng dẫn",
+    "showMore": "Hiển thị thêm {count} | Hiển thị thêm {count}",
+    "noMatch": "Không có hướng dẫn nào khớp với \"{query}\" ở đây.",
+    "foundElsewhere": "Tìm thấy trong các lựa chọn khác:",
+    "inChoice": "trong {choice}",
+    "tryShorter": "Hãy thử tên ngắn hơn. Bất kỳ công cụ nào cũng có thể {link}.",
+    "sendOverHttp": "gửi nhật ký qua HTTP",
+    "clearSearch": "Xóa tìm kiếm",
+    "othersTitle": "Các cách khác để bắt đầu",
+    "whatYouGet": "Bạn nhận được gì",
+    "signals": {
+      "metrics": "Chỉ số",
+      "logs": "Nhật ký",
+      "traces": "Trace",
+      "profiles": "Profiles",
+      "sessions": "Phiên",
+      "errors": "Lỗi",
+      "webVitals": "Web vitals (web)",
+      "replays": "Phát lại phiên",
+      "tokens": "Token",
+      "cost": "Chi phí",
+      "latency": "Độ trễ",
+      "uptime": "Thời gian hoạt động",
+      "certificates": "Chứng chỉ"
+    },
+    "example": {
+      "caption": {
+        "row": "Màn hình ví dụ: những gì {product} hiển thị cho {name}.",
+        "infrastructure": "Màn hình ví dụ: tổng quan cụm {k8s} với CPU, bộ nhớ và tình trạng pod.",
+        "backend": "Màn hình ví dụ: waterfall của một trace thanh toán thất bại, với 21 span trải khắp 9 dịch vụ.",
+        "frontend": "Màn hình ví dụ: web vitals {rum} từ các phiên người dùng thực.",
+        "logs": "Màn hình ví dụ: tìm kiếm nhật ký với biểu đồ tần suất và các dòng nhật ký khớp.",
+        "llm": "Màn hình ví dụ: {insights} với chi phí, token và độ trễ theo mô hình, cùng trace và lỗi theo thời gian.",
+        "agent": "Màn hình ví dụ: trang máy chủ {mcp} mà agent lập trình của bạn kết nối tới.",
+        "synthetics": "Màn hình ví dụ: kết quả của một check {http} trên 3 vị trí."
+      }
+    },
+    "guide": {
+      "agentTitle": "Bạn thích dùng agent lập trình hơn?",
+      "agentSteps": "Chạy lệnh này trong terminal, sau đó đưa {claudeCode}, {cursor} hoặc {codex} prompt hoặc tệp.",
+      "copyPrompt": "Sao chép prompt",
+      "downloadFile": "Tải .md",
+      "inviteTitle": "Không có quyền truy cập?",
+      "inviteText": "Mời một đồng nghiệp có thể chạy lệnh.",
+      "inviteAction": "Mời đồng nghiệp",
+      "loadFailed": "Hướng dẫn này không tải được.",
+      "openInApp": "Mở trong Nguồn dữ liệu",
+      "languageText": "Với {language}, hãy thêm {otelSdk}, bật tự động instrumentation ở nơi {language} hỗ trợ, sau đó trỏ nó tới {product} với các cài đặt bên dưới.",
+      "languageLink": "Hướng dẫn {otel} {language}"
+    },
+    "rail": {
+      "label": "Tiến trình thiết lập",
+      "check": "Kiểm tra dữ liệu của bạn",
+      "received": "Đã nhận dữ liệu",
+      "attention": "Cần chú ý",
+      "waitingShort": "Đang chờ dữ liệu",
+      "title": "Thiết lập {name}",
+      "run": "Chạy lệnh thiết lập",
+      "explore": "Khám phá dữ liệu của bạn"
+    },
+    "firstData": {
+      "title": "Dữ liệu của bạn đang đến",
+      "count": "{count} bản ghi đã đến trong {stream} | {count} bản ghi đã đến trong {stream}",
+      "exploreLogs": "Khám phá Nhật ký của bạn",
+      "exploreMetrics": "Khám phá Chỉ số của bạn",
+      "exploreTraces": "Khám phá Trace của bạn",
+      "exploreProfiles": "Khám phá Profiles của bạn",
+      "addAnother": "Thêm nguồn khác"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Kiểm tra tổng hợp",
+        "description": "Kiểm tra một trang web, API, cổng hoặc chứng chỉ. Không cần cài đặt.",
+        "gets": "Chạy kiểm tra theo lịch từ bên ngoài mạng của bạn."
+      },
+      "invite": {
+        "name": "Mời đồng nghiệp thiết lập",
+        "description": "Họ sẽ nhận được lời mời vào tổ chức của bạn."
+      },
+      "agent": {
+        "name": "Thiết lập với coding agent của bạn",
+        "description": "Cung cấp cho {claudeCode}, {cursor} hoặc {codex} một prompt.",
+        "gets": "Coding agent của bạn thêm phần thiết lập và kiểm tra rằng dữ liệu đã đến."
+      }
+    },
+    "agentLink": "Hoặc để coding agent của bạn làm việc đó",
+    "stepDone": "(xong)",
+    "agent": {
+      "crumb": "Coding agent",
+      "title": "Thiết lập với coding agent của bạn",
+      "lead": "{claudeCode}, {cursor}, {codex} hoặc bất kỳ coding agent nào đọc dự án của bạn, thêm phần thiết lập và kiểm tra rằng dữ liệu đã đến. Nó sẽ hỏi bạn trước khi cài đặt bất cứ thứ gì hoặc thay đổi tệp triển khai.",
+      "tokenTitle": "Lưu token của bạn",
+      "tokenText": "Chạy lệnh này trong terminal nơi bạn sẽ khởi động coding agent, trước khi bạn khởi động nó.",
+      "powerShell": "Trong {powerShell}:",
+      "copyPowerShell": "Sao chép lệnh {powerShell}",
+      "promptTitle": "Sao chép prompt",
+      "focusLabel": "Thiết lập",
+      "focus": {
+        "kubernetes": "Cụm {k8s}",
+        "host": "Máy chủ {linux}, {macos} hoặc {windows}",
+        "backend": "Dịch vụ backend ({otel})",
+        "llm": "Ứng dụng LLM",
+        "frontend": "Frontend web",
+        "logs": "Chỉ Nhật ký"
+      },
+      "copyPrompt": "Sao chép prompt",
+      "promptCopied": "Đã sao chép prompt",
+      "download": "Tải xuống .md",
+      "preview": "Xem trước prompt",
+      "previewLines": "{count} dòng | {count} dòng",
+      "pasteTitle": "Dán vào coding agent của bạn",
+      "other": "Khác",
+      "hint": {
+        "claudeCode": "Trong cùng terminal, chạy {command} trong thư mục dự án của bạn, sau đó dán prompt.",
+        "cursor": "Khởi động {product} từ cùng terminal bằng {command}, để nó có thể đọc token. Sau đó dán prompt vào cửa sổ chat của nó.",
+        "codex": "Trong cùng terminal, chạy {command} trong thư mục dự án của bạn, sau đó dán prompt.",
+        "other": "Khởi động coding agent của bạn từ cùng terminal, để nó có thể đọc token. Sau đó dán prompt, hoặc đưa cho nó {file}."
+      },
+      "mcp": "Kết nối máy chủ {mcp} để coding agent của bạn có thể đọc dữ liệu của bạn",
+      "aside": {
+        "eyebrow": "Những gì prompt nói với coding agent của bạn",
+        "title": "Thay đổi nhỏ, an toàn",
+        "line1": "Tìm hiểu dự án chạy gì",
+        "line2": "Thực hiện thay đổi nhỏ nhất có thể hoạt động",
+        "line3": "Giữ token trong biến môi trường",
+        "line4": "Gửi một sự kiện kiểm thử đến stream {stream}",
+        "line5": "Báo cáo những tệp đã thay đổi"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Tiếp tục đến Thiết lập",
+      "languages": "Ngôn ngữ",
+      "languagesRequired": "Chọn ít nhất một ngôn ngữ.",
+      "kubernetesCluster": {
+        "question": "Chọn nội dung cần thu thập từ cluster của bạn",
+        "off": {
+          "name": "Nhật ký và chỉ số",
+          "description": "Tình trạng cluster và nhật ký container. Một lệnh duy nhất.",
+          "about": "Nhật ký container, CPU và bộ nhớ của mọi node và pod, cùng các sự kiện {k8s} dưới dạng nhật ký, chỉ với một lệnh cài đặt."
+        },
+        "ebpf": {
+          "name": "Thêm trace bằng eBPF",
+          "description": "Không cần thay đổi mã, mọi ngôn ngữ. Cần kernel Linux 5.8+ trên các node của bạn.",
+          "about": "Cùng một cách cài đặt, thêm trace. Collector quan sát yêu cầu từ kernel Linux, nên ứng dụng của bạn không cần thay đổi. Nó chỉ liên kết một yêu cầu giữa các dịch vụ qua HTTP thường."
+        },
+        "library": {
+          "name": "Thêm trace bằng thư viện ngôn ngữ",
+          "description": "Chi tiết hơn cho mỗi ứng dụng. Chọn ngôn ngữ của bạn, sau đó khởi động lại ứng dụng một lần.",
+          "about": "Cùng một cách cài đặt, thêm trace. {otelOperator} thêm {otelLibrary} cho từng ngôn ngữ vào các pod trong namespace bạn chọn. Mã của bạn không cần thay đổi."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Máy chủ web",
+      "messageQueues": "Hàng đợi tin nhắn",
+      "metricsYouCollect": "Các chỉ số bạn đã thu thập",
+      "gpuAndNetwork": "GPU và luồng mạng",
+      "movingFromAnotherTool": "Chuyển từ công cụ khác",
+      "cloudLogs": "Nhật ký đám mây",
+      "securityTools": "Công cụ bảo mật",
+      "cicdAndPlatforms": "CI/CD và nền tảng"
+    },
+    "infrastructure": {
+      "name": "Hạ tầng",
+      "description": "Máy chủ, {k8s}, tài khoản đám mây và cơ sở dữ liệu",
+      "gets": "Xem mọi máy chủ, pod và dịch vụ đám mây ở một nơi.",
+      "question": "Bạn muốn giám sát hạ tầng của mình như thế nào?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "Cluster {k8s}",
+          "description": "Nhật ký, chỉ số và sự kiện {k8s} từ một lần cài đặt. Thêm trace với một lệnh nữa.",
+          "about": "Cài đặt {productCollector} trong cluster của bạn chỉ với một lệnh. Bạn nhận được nhật ký container, sự kiện {k8s} và chỉ số cluster."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "Máy chủ {linux}, {windows} hoặc {macos}",
+          "description": "Cài đặt {productAgent} dưới dạng dịch vụ",
+          "about": "Một agent thu thập nhật ký và chỉ số từ máy chủ. Trên {linux}, nó cũng có thể trace các chương trình mà không cần thay đổi mã.",
+          "question": "Máy chủ của bạn dùng hệ điều hành nào?"
+        },
+        "cloudAccount": {
+          "name": "Tài khoản đám mây",
+          "description": "{aws}, {gcp} hoặc {azure}",
+          "about": "Truyền nhật ký từ tài khoản đám mây của bạn và chỉ số từ {aws}. Không cần chạy gì trên máy chủ của bạn.",
+          "question": "Tài khoản của bạn thuộc đám mây nào?"
+        },
+        "databases": {
+          "name": "Cơ sở dữ liệu",
+          "description": "{examples} và {count} mục khác",
+          "about": "Thu thập chỉ số cơ sở dữ liệu, chủ yếu thông qua {otelCollector}.",
+          "question": "Bạn muốn giám sát cơ sở dữ liệu nào?"
+        },
+        "somethingElse": {
+          "name": "Thứ khác",
+          "description": "Máy chủ web, hàng đợi tin nhắn, {prometheus}, GPU và luồng mạng",
+          "about": "Máy chủ web, hàng đợi tin nhắn, chỉ số bạn đã thu thập, mức sử dụng GPU và luồng mạng.",
+          "question": "Bạn còn muốn giám sát điều gì khác?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Ứng dụng backend",
+      "description": "Trace từ các dịch vụ của bạn và nhật ký do SDK của bạn gửi đến",
+      "gets": "Xem cách mỗi yêu cầu di chuyển qua các dịch vụ của bạn.",
+      "question": "Bạn muốn trace các dịch vụ của mình như thế nào?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Thêm thư viện vào mã của bạn",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} hoặc {fastapi}",
+          "about": "Thêm {otelLibrary} cho ngôn ngữ của bạn. Trace được gửi đến {product}.",
+          "question": "Dịch vụ của bạn được viết bằng ngôn ngữ nào?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "Các workload {k8s}, không cần thay đổi mã",
+          "description": "Tự động instrumentation trong cụm của bạn",
+          "about": "{otelOperator} thêm instrumentation cho các pod trong một namespace. Không thay đổi mã hoặc image."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Mọi ngôn ngữ với {otel}",
+          "description": "Gửi OTLP từ thiết lập của riêng bạn",
+          "about": "Trỏ bất kỳ {otelSdk} hoặc collector nào đến endpoint {product} của bạn."
+        },
+        "continuousProfiling": {
+          "name": "Profiling liên tục",
+          "description": "Profile CPU và bộ nhớ",
+          "about": "Chuyển tiếp profile từ các profiler của bạn ({go}, {java}, {rust} hoặc profiler eBPF) qua {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Ứng dụng frontend và di động",
+      "description": "Giám sát người dùng thực cho web và di động",
+      "gets": "Xem trải nghiệm của người dùng thực trong ứng dụng web và di động của bạn.",
+      "question": "Ứng dụng của bạn chạy ở đâu?",
+      "rows": {
+        "browser": {
+          "name": "Trình duyệt",
+          "description": "Trang web và ứng dụng web",
+          "about": "Thêm {sdk} vào ứng dụng web của bạn. Bạn nhận được lượt tải trang, lỗi và phiên từ trình duyệt thực."
+        },
+        "reactNative": {
+          "description": "{ios} và {android} từ một codebase",
+          "about": "Thêm {sdk} vào ứng dụng {platform} của bạn."
+        },
+        "android": {
+          "description": "Ứng dụng {android} native",
+          "about": "Thêm {sdk} vào ứng dụng {platform} của bạn. Bạn nhận được phiên, lượt xem màn hình, lỗi và crash."
+        },
+        "ios": {
+          "description": "Ứng dụng {ios} native",
+          "about": "Thêm {sdk} vào ứng dụng {platform} của bạn. Bạn nhận được phiên, lượt xem màn hình, lỗi và crash."
+        }
+      }
+    },
+    "logs": {
+      "name": "Nhật ký từ mọi nguồn",
+      "description": "Gửi nhật ký từ mọi log shipper, dịch vụ hoặc công cụ",
+      "gets": "Tìm kiếm và lọc từng dòng nhật ký, bất kể nguồn gửi.",
+      "question": "Bạn muốn gửi nhật ký của mình như thế nào?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Từ log shipper bạn tự vận hành",
+          "description": "{examples} và {count} mục khác",
+          "about": "Trỏ shipper bạn đang chạy đến {product}. Không cần agent mới.",
+          "question": "Bạn đang chạy log shipper nào?"
+        },
+        "overHttpWithCurl": {
+          "name": "Qua HTTP với {curl}",
+          "description": "Một yêu cầu từ bất kỳ script nào. Không cần cài đặt.",
+          "about": "Gửi nhật ký JSON từ bất kỳ script hoặc dịch vụ nào bằng một yêu cầu HTTP."
+        },
+        "fromOpentelemetry": {
+          "name": "Từ {otel}",
+          "description": "Nhật ký OTLP từ SDK hoặc collector",
+          "about": "Gửi nhật ký qua OTLP từ {otelSdk} hoặc collector."
+        },
+        "somethingElse": {
+          "name": "Nguồn khác",
+          "description": "{splunk} hoặc {cribl}, nhật ký đám mây, công cụ bảo mật và CI/CD",
+          "about": "Chuyển từ {splunk} hoặc {cribl}, hoặc thu thập nhật ký từ đám mây, công cụ bảo mật và CI/CD của bạn.",
+          "question": "Nhật ký của bạn còn đến từ đâu nữa?"
+        }
+      }
+    },
+    "llm": {
+      "name": "Ứng dụng LLM và AI",
+      "description": "Trace các lệnh gọi LLM, agent và công cụ",
+      "gets": "Xem từng lệnh gọi LLM, lệnh gọi công cụ và bước agent.",
+      "question": "Ứng dụng AI của bạn dùng gì?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents hoặc {assistantsApi}",
+          "about": "Theo dõi mọi cuộc gọi qua {openaiSdk}, kèm token, chi phí và độ trễ.",
+          "question": "Bạn dùng thư viện {openai} nào?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} hoặc {claudeAgentSdk}",
+          "about": "Theo dõi mọi cuộc gọi qua {anthropicSdk}, kèm token, chi phí và độ trễ.",
+          "question": "Bạn dùng thư viện {anthropic} nào?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chuỗi, agent và đồ thị",
+          "about": "Theo dõi từng chuỗi, bước agent và lệnh gọi công cụ.",
+          "question": "Bạn dùng thư viện {langchain} nào?"
+        },
+        "somethingElse": {
+          "name": "Thứ khác",
+          "description": "Framework, nhà cung cấp model, gateway và công cụ khác",
+          "about": "Framework, nhà cung cấp model, gateway, công cụ no-code, phân tích và công cụ.",
+          "question": "Ứng dụng AI của bạn dùng gì?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Quản lý fleet",
     "subtitle": "Đăng ký collector OpenTelemetry, quản lý phiên bản cấu hình và triển khai thay đổi an toàn",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "Bị receiver {receiver} từ chối",
       "legend": "Trạng thái pipeline",
       "legendToggle": "Hiện hoặc ẩn trạng thái này trên bản đồ"
+    }
+  },
+  "sampleData": {
+    "delete": "Xóa dữ liệu mẫu",
+    "loadForbidden": "Bạn cần quyền ghi vào organization này để tải dữ liệu mẫu.",
+    "steps": {
+      "functions": "Đang tạo hàm",
+      "pipeline": "Đang tạo pipeline thời gian thực",
+      "telemetry": "Đang tạo và gửi nhật ký, trace và chỉ số",
+      "dashboards": "Đang tạo bảng điều khiển",
+      "alerts": "Đang tạo cảnh báo",
+      "enrichment": "Đang tải lên bảng chủ sở hữu dịch vụ"
+    },
+    "progress": {
+      "loading": "Đang tải dữ liệu mẫu…",
+      "done": "Đã tải dữ liệu mẫu",
+      "counts": "{logs} bản ghi nhật ký · {spans} span · {metrics} điểm chỉ số",
+      "skipped": "Đã bỏ qua",
+      "logs": "Nhật ký",
+      "spans": "Span",
+      "metrics": "Điểm chỉ số"
+    },
+    "removeSteps": {
+      "alerts": "Cảnh báo",
+      "alertDelivery": "Template cảnh báo và webhook",
+      "dashboards": "Bảng điều khiển",
+      "pipeline": "Pipeline",
+      "functions": "Hàm",
+      "streams": "Stream"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Đang xóa dữ liệu mẫu",
+        "body": "Việc này mất vài giây. Bạn có thể đóng hộp thoại này, nhưng hãy giữ tab này mở cho đến khi hoàn tất.",
+        "label": "Đang xóa dữ liệu mẫu…"
+      },
+      "done": {
+        "title": "Đã xóa dữ liệu mẫu",
+        "body": "Máy chủ sẽ xóa xong dữ liệu đã lưu trong vài phút. Sau đó bạn có thể tải lại dữ liệu mẫu.",
+        "label": "Đã xóa xong",
+        "done": "Xong",
+        "keptLabel": "Được giữ lại vì có thứ khác đang dùng chúng:"
+      },
+      "failed": {
+        "title": "Không thể xóa toàn bộ dữ liệu mẫu",
+        "body": "Hãy thử lại: những mục đã bị xóa sẽ được bỏ qua.",
+        "label": "Đã dừng xóa",
+        "close": "Đóng",
+        "tryAgain": "Thử lại"
+      }
+    },
+    "removeConfirm": {
+      "title": "Xóa dữ liệu mẫu?",
+      "message": "Thao tác này xóa các stream, bảng điều khiển, cảnh báo, hàm và bảng làm giàu dữ liệu mẫu. Dữ liệu của bạn không bị ảnh hưởng."
+    },
+    "toast": {
+      "loaded": "Đã tải dữ liệu mẫu. Chúc bạn khám phá vui vẻ!",
+      "loadFailed": "Không thể tải dữ liệu mẫu",
+      "removed": "Đã xóa dữ liệu mẫu",
+      "removedWithKept": "Đã xóa dữ liệu mẫu. {count} mục dữ liệu mẫu vẫn được giữ lại vì có thành phần khác đang dùng. | Đã xóa dữ liệu mẫu. {count} mục dữ liệu mẫu vẫn được giữ lại vì có thành phần khác đang dùng.",
+      "removeFailed": "Không thể xóa toàn bộ dữ liệu mẫu",
+      "removeWhileLoading": "Đợi dữ liệu mẫu tải xong."
+    },
+    "entry": {
+      "onboardingSource": "Khám phá dữ liệu mẫu"
+    },
+    "callout": {
+      "title": "Chưa sẵn sàng gửi dữ liệu?",
+      "body": "Hãy khám phá {product} với một cửa hàng mẫu trực tuyến trước: một sự cố đang diễn ra và chuyến tham quan có hướng dẫn qua bảng điều khiển, cảnh báo, nhật ký, trace, chỉ số và pipeline.",
+      "cta": "Khám phá với dữ liệu mẫu"
+    },
+    "header": {
+      "label": "Dữ liệu mẫu",
+      "try": "Dùng thử dữ liệu mẫu",
+      "finish": "Hoàn tất tải"
+    },
+    "dock": {
+      "details": "Xem chi tiết"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "Dữ liệu của bạn đang đến. Hãy xóa dữ liệu mẫu để nó không bị trộn vào bảng điều khiển, cảnh báo và tìm kiếm của bạn.",
+        "keep": "Tạm giữ lại",
+        "remove": "Xóa dữ liệu mẫu"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Tiếp tục ở chế độ nền",
+      "progress": {
+        "title": "Đang tạo cửa hàng mẫu của bạn",
+        "body": "Quá trình này mất khoảng một phút. Bạn có thể đóng hộp thoại này, nhưng hãy giữ tab này mở cho đến khi tải xong."
+      },
+      "ready": {
+        "title": "Cửa hàng mẫu của bạn đã hoạt động",
+        "startTour": "Bắt đầu chuyến tham quan có hướng dẫn",
+        "ownWay": "Tự mình khám phá"
+      },
+      "errorBody": "Đã xảy ra lỗi trong khi tải. Hãy thử lại: các bảng điều khiển và cảnh báo đã tồn tại sẽ được tái sử dụng, không bị nhân bản."
+    },
+    "tour": {
+      "label": "Tham quan có hướng dẫn",
+      "position": "Tham quan có hướng dẫn · bước {current} trên {total}",
+      "pill": "Tham quan {current}/{total}",
+      "done": "Hoàn tất tham quan",
+      "stepFailed": "Không thể mở bước này. Hãy thử lại.",
+      "minimize": "Thu nhỏ tham quan",
+      "close": "Kết thúc tham quan",
+      "next": "Tiếp theo",
+      "capabilities": {
+        "dashboards": "Bảng điều khiển",
+        "alerts": "Cảnh báo",
+        "logs": "Tìm kiếm nhật ký",
+        "traces": "Theo dõi trace",
+        "metrics": "Chỉ số và PromQL",
+        "pipelines": "Pipeline"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Phát hiện vấn đề",
+          "body": "Đây là tổng quan dịch vụ của cửa hàng. Tỷ lệ lỗi và độ trễ thanh toán đều tăng vọt trong 35 phút qua.",
+          "look": "Mỗi panel là một truy vấn SQL. Di chuột qua biểu đồ để so sánh các chuỗi, kéo ngang qua biểu đồ để thu phóng, hoặc mở menu của panel để sửa truy vấn."
+        },
+        "alert": {
+          "title": "Cảnh báo đã kích hoạt",
+          "body": "Một cảnh báo về lỗi thanh toán chạy truy vấn SQL trên nhật ký theo lịch và đã kích hoạt ngay khi số lỗi vượt ngưỡng.",
+          "look": "Mở một cảnh báo để xem truy vấn, ngưỡng và lịch của cảnh báo. Đích mẫu là một webhook giữ chỗ, nên các lần gửi sẽ hiển thị là thất bại: hãy trỏ nó đến Slack, email hoặc PagerDuty để nhận thông báo thật."
+        },
+        "logs": {
+          "title": "Tìm kiếm các lỗi",
+          "body": "Nhật ký được lọc theo lỗi thanh toán. Gần như tất cả đều nói cùng một điều: hết thời gian chờ lấy kết nối từ pool.",
+          "look": "Mở rộng một bản ghi để xem mọi trường. Nhấp vào giá trị của trường để lọc theo giá trị đó, hoặc chuyển sang chế độ SQL để nhóm và tổng hợp."
+        },
+        "deploy": {
+          "title": "Tìm xem điều gì đã thay đổi",
+          "body": "Thanh toán v2.15.0 được triển khai một phút trước khi các lỗi bắt đầu, và ghi chú phát hành của nó giảm pool kết nối xuống 20.",
+          "look": "Đó là nguyên nhân gốc, được tìm thấy chỉ với một lần tìm kiếm trên cùng nhật ký. Tìm kiếm toàn văn và SQL chạy trên cùng dữ liệu."
+        },
+        "traces": {
+          "title": "Theo dõi một yêu cầu đang lỗi",
+          "body": "Mỗi trace theo dõi một lần thanh toán xuyên qua các dịch vụ. Mở một trace: biểu đồ thác nước cho thấy dịch vụ thanh toán đang chờ 3 giây để lấy kết nối cơ sở dữ liệu.",
+          "look": "Nhật ký mang cùng trace ID, nên bạn có thể chuyển qua lại giữa một span và nhật ký của nó theo cả hai chiều."
+        },
+        "metrics": {
+          "title": "Xác nhận bằng PromQL",
+          "body": "Độ trễ p95 của mọi dịch vụ, được truy vấn bằng PromQL. Payment và checkout cùng tăng.",
+          "look": "Chỉ số nằm trong cùng engine với nhật ký và trace, vì vậy bảng điều khiển Hạ tầng được xây dựng hoàn toàn bằng PromQL."
+        },
+        "pipeline": {
+          "title": "Xử lý dữ liệu ngay khi đến",
+          "body": "Một pipeline thời gian thực chạy một hàm VRL trên mỗi nhật ký truy cập, thêm client_os và is_mobile trước khi bản ghi được lưu.",
+          "look": "Mở pipeline để xem đồ thị của nó. Pipeline có thể lọc, làm giàu, định tuyến và che giấu dữ liệu mà không cần chạm vào ứng dụng của bạn."
+        },
+        "business": {
+          "title": "Đo lường tác động kinh doanh",
+          "body": "Cùng những nhật ký này cung cấp dữ liệu cho các bảng điều khiển kinh doanh: các giao dịch thanh toán thất bại, doanh thu và đơn hàng theo phương thức thanh toán.",
+          "look": "Không cần công cụ phân tích riêng. Bất kỳ điều gì trong nhật ký của bạn đều có thể trở thành KPI."
+        }
+      },
+      "finale": {
+        "title": "Bạn đã tìm ra nguyên nhân gốc",
+        "body": "Chỉ trong vài phút, bạn đã đi từ một đỉnh tăng đột biến trên bảng điều khiển đến bản triển khai gây ra nó, với mọi tín hiệu ở cùng một nơi.",
+        "connect": "Kết nối dữ liệu của bạn",
+        "restart": "Khởi động lại tour",
+        "finish": "Kết thúc tour"
+      }
     }
   },
   "recentSearches": {

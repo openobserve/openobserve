@@ -142,7 +142,6 @@ export class OnCallTeamDetailPage {
       policySave: '[data-test="oncall-policy-save"]',
       policyTabs: '[data-test="oncall-policy-tabs"]',
       policySilent: '[data-test="oncall-policy-silent"]',
-      policyNoDefaultWarning: '[data-test="oncall-policy-no-default-warning"]',
       policyDestinations: '[data-test="oncall-policy-destinations"]',
       policyDestinationsWarning: '[data-test="oncall-policy-destinations-warning"]',
 

@@ -1948,6 +1948,7 @@
     "billings": "الفوترة",
     "rum": "RUM",
     "settings": "الإعدادات",
+    "allSettings": "جميع الإعدادات",
     "iam": "IAM",
     "report": "التقارير",
     "pipeline": "مسارات المعالجة",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "يسمح فقط بملفات ZIP"
     },
     "emptyState": {
-      "title": "راقب مستخدميك من خلال مراقبة المستخدمين الحقيقية",
-      "description": "RUM يتتبع التفاعلات الحقيقية مع المستخدمين — تحميل الصفحات، الأخطاء، استدعاءات API، وإعادة تشغيل الجلسات — حتى تتمكن من رؤية كيف يختبر المستخدمون تطبيقك بالضبط.",
       "webApp": "إعداد تطبيق ويب للمراقبة",
       "webAppDesc": "أضف OpenObserve RUM SDK إلى أي تطبيق {product}",
       "sessionReplay": "تمكين إعادة تشغيل الجلسة",
       "sessionReplayDesc": "تسجيل وإعادة تشغيل جلسات المستخدم لتصحيح مشاكل تجربة المستخدم",
+      "title": "راقب مستخدميك من خلال مراقبة المستخدمين الحقيقية",
+      "description": "RUM يتتبع التفاعلات الحقيقية مع المستخدمين — تحميل الصفحات، الأخطاء، استدعاءات API، وإعادة تشغيل الجلسات — حتى تتمكن من رؤية كيف يختبر المستخدمون تطبيقك بالضبط.",
       "learnMore": "تعرف على المزيد:",
       "quickImpl": "دليل تنفيذ سريع",
       "blogPost": "أساسيات مراقبة الواجهة الأمامية"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "الترخيص والاستخدام",
     "copyLicenseId": "نسخة معرف الرخصة",
     "editionLbl": "الطبعة",
-    "limitPrefix": "· الحد",
     "gbPerDay": "GB / يوم",
     "ofDailyLimitUsedToday": "الحد اليومي المستخدم اليوم",
     "gbToday": "بريطانيا العظمى اليوم",
@@ -3580,6 +3580,7 @@
     "usage_limits": "حدود الاستخدام",
     "feature_comparison_lbl": "مقارنة الميزات",
     "feature_comparision_ent_msg": "أنت تستخدم OpenObserve إصدار المؤسسات مع إمكانية الوصول إلى جميع الميزات المتقدمة المذكورة أدناه.",
+    "feature_comparision_ent_partial_msg": "أنت تستخدم OpenObserve Enterprise Edition. بعض الميزات غير مشمولة في ترخيصك؛ راجع القائمة أعلاه.",
     "feature_comparision_plan_detail": "خطتك: إصدار المؤسسات مجاني لما يصل إلى 50 جيجابايت/يوم (~1.5 تيرابايت/شهر) من استيعاب البيانات.",
     "feature_comparision_os_msg": "أنت تستخدم حاليا OpenObserve الإصدار مفتوح المصدر. قم بالترقية إلى إصدار المؤسسات لفتح الميزات المتقدمة المدرجة في جدول المقارنة أدناه.",
     "feature_comparision_good_news": "خبر جيد: إصدار OpenObserve Enterprise Edition مجاني تماما لما يصل إلى 50 جيجابايت/يوم (~1.5 تيرابايت/شهر) من استيعاب البيانات.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "لا توجد ميزات تطابق بحثك",
     "features_none": "لا توجد ميزات في هذه المجموعة",
     "features_free_heading": "مجانية، ومشمولة مع كل ترخيص",
+    "features_free_not_included": "مجانية، وغير مشمولة في ترخيصك",
     "features_new": "جديدة بعد ترخيصك",
     "features_filter_new": "جديدة",
     "request_new_license": "طلب رخصة جديدة",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "رخصتك لا تزال نشطة. هل تريد تحديثها بمفتاح الرخصة الجديد؟",
     "yes_update_license": "نعم، تحديث الترخيص",
     "no_keep_current": "لا، ابق على اطلاع",
+    "license_downgrade_title": "هل تريد تطبيق مفتاح الترخيص هذا؟",
+    "license_downgrade_intro": "سيحل هذا المفتاح محل ترخيصك الحالي.",
+    "license_downgrade_expired": "انتهت صلاحية هذا المفتاح بتاريخ {date}. سيُطبَّق الحد المجاني البالغ 50 GB/يوم.",
+    "license_downgrade_lose": "ستفقد: {names}",
+    "license_downgrade_limit": "سينتقل الحد اليومي من {old} إلى {new}",
+    "license_downgrade_expiry": "سينتقل تاريخ الانتهاء من {old} إلى {new}",
+    "license_limit_per_day": "{gb} GB/يوم",
     "header_button": {
       "cloud_features": "{product} الميزات",
       "enterprise_edition": "الطبعة: إنتربرايز",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "جرب OpenObserve اليوم للحصول على ملاحظة أكثر كفاءة وأداء.",
     "getStartedBannerAlt": "راية ابدأ",
     "getStartedHeading": "شيء أخير قبل أن نبدأ",
-    "hearAboutUsLabel": "كيف سمعت عنا؟",
     "hearAboutUsPlaceholder": "مثلا. من صديق",
-    "whereDoYouWorkLabel": "أين تعمل؟",
     "whereDoYouWorkPlaceholder": "اسم الشركة",
-    "agreeToTermsPrefix": "قرأت وأتفق مع",
     "termsOfUse": "شروط الاستخدام",
-    "and": "و",
     "privacyPolicyStar": "سياسة الخصوصية*",
     "startTrialButton": "ابدأ فترة التجربة التي تستمر 14 يوما",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "البريد الإلكتروني مطلوب",
     "emailInvalid": "يرجى إدخال بريد إلكتروني صالح",
     "passwordRequired": "كلمة المرور مطلوبة",
-    "mustAcceptTerms": "يجب أن تقبل الشروط للاستمرار",
     "getStarted": {
       "title": "مرحبًا بك في OpenObserve",
-      "subtitle": "بدأت فترة التجربة لمدة 14 يومًا. سؤالان سريعان، ثم سنأخذك إلى الإعداد.",
-      "sourceLabel": "ما الذي تريد إرساله أولاً؟",
-      "optional": "(اختياري)",
-      "skip": "تخطي الأسئلة",
-      "continue": "متابعة",
-      "hearAboutUsPlaceholder": "على سبيل المثال، زميل أو منشور مدونة",
-      "whereDoYouWorkPlaceholder": "شركة أو فريق",
-      "termsOfService": "شروط الخدمة",
-      "privacyPolicy": "سياسة الخصوصية",
-      "agreeHint": "مطلوب للمتابعة، حتى إذا تخطيت الأسئلة.",
+      "skipForNow": "تخطي الآن",
+      "heard": {
+        "label": "كيف سمعت عنا؟",
+        "placeholder": "اختر خيارًا",
+        "thanks": "شكرًا!"
+      },
+      "connect": {
+        "title": "اربط بياناتك",
+        "point1": "إعداد خطوة بخطوة لكل مصدر",
+        "point2": "السجلات والمقاييس والتتبعات في مكان واحد",
+        "point3": "شاهد أحداثك الأولى في غضون دقائق",
+        "cta": "استكشف مصادر البيانات الأخرى"
+      },
+      "sample": {
+        "title": "استكشف باستخدام بيانات نموذجية",
+        "point1": "السجلات والتتبعات والمقاييس من خدمات نموذجية",
+        "point2": "لوحات معلومات وتنبيهات ومسار معالجة ودوال VRL",
+        "point3": "جولة إرشادية، ونقرة واحدة لإزالة كل شيء",
+        "cta": "استكشف باستخدام بيانات نموذجية"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "مضيف Linux أو جهاز ظاهري",
@@ -4094,7 +4108,28 @@
         "llm": "تطبيق LLM أو الذكاء الاصطناعي",
         "agent": "دع وكيل ذكاء اصطناعي يقوم بإعداده",
         "unsure": "لست متأكدًا بعد"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "خادم ويب",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "المتصفح (RUM)",
+        "llm": "LLM أو تطبيق ذكاء اصطناعي",
+        "agent": "وكيل ذكاء اصطناعي"
       }
+    },
+    "heardFrom": {
+      "question": "كيف وجدتنا؟",
+      "quickQuestion": "سؤال سريع: كيف وجدتنا؟",
+      "skip": "تخطي",
+      "searchEngine": "محرك بحث",
+      "friendOrColleague": "صديق أو زميل",
+      "aiAssistant": "مساعد الذكاء الاصطناعي",
+      "other": "أخرى",
+      "thanks": "شكرًا لإخبارنا!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "تظهر الحقول الأخرى فقط حقول المخطط التي كانت موجودة قبل تكوين التدفق لاستخدام مخطط محدد من قبل المستخدم.",
     "addFieldsTitle": "إضافة الحقول",
     "dataRetentionDaysLabel": "الاحتفاظ بالبيانات (الأيام)",
-    "globalRetentionDays": "مدة الاحتفاظ العامة بالأيام: {days}",
-    "retentionMinOneDay": "يجب أن تكون فترة الاحتفاظ يوما واحدا على الأقل",
+    "retentionDefaultDays": "اتركه فارغًا لاستخدام الافتراضي لنوع التدفق هذا: {days} يومًا",
+    "retentionDefaultForever": "اتركه فارغًا لاستخدام الافتراضي لنوع التدفق هذا: الاحتفاظ إلى الأبد",
     "maxQueryRangeHoursLabel": "الحد الأقصى لنطاق الاستعلامات (الساعات)",
     "maxQueryRangeHelp": "الحد الأقصى للزمن المسموح به للاستعلامات. اضبط 0 لمدى غير محدود.",
     "globalFlattenLevel": "العالم {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "انضم إلى السلاك",
     "maybeLater": "ربما لاحقا"
   },
-  "connectDataSourcePopup": {
-    "title": "للبدء، لنقم بتوصيل مصدر البيانات الأول الخاص بك.",
-    "description": "لدينا الكثير لنعرضه لك، لكننا نحتاج أولاً إلى توصيل بياناتك. تشاهد معظم الفرق أول سجلاتها خلال حوالي دقيقة واحدة.",
-    "connectButton": "توصيل مصدر بيانات",
-    "slackLink": "انضم أيضًا إلى مجتمعنا على Slack"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "تابع من حيث توقف",
     "startFromNow": "ابدأ من الآن.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "اطّلع على أحمال العمل التي تتواصل فيما بينها: تدفقات شبكة eBPF",
       "k8sInstallerNote": "يثبّت هذا cert-manager وOpenTelemetry operator ومجمّع OpenObserve تلقائيًا.",
       "k8sInternalEndpointNote": "استخدم هذا عندما يعمل OpenObserve في نفس المجموعة — لا تغادر حركة المرور أبدا.",
+      "k8sTraceAppsTitle": "تتبع تطبيقاتك",
+      "k8sTraceEbpfDesc": "فعّل تتبع eBPF في جامع البيانات، ثم اختر التطبيقات التي تريد تتبعها حسب المنفذ أو مسار الملف التنفيذي أو سطر الأوامر.",
+      "k8sTraceLibraryDesc": "أضف تعليقات توضيحية إلى مساحة الاسم الخاصة بكل لغة، حتى يضيف المشغّل مكتبتها إلى البودات الموجودة هناك. ثم أعد تشغيل تلك التطبيقات مرة واحدة.",
       "k8sTroubleAnnotationA": "يحدث الحقن عند إنشاء الكبسة، لذا لا تتأثر الكبسولات الموجودة حتى تعيد التشغيل — شغل `kubectl rollout restart deployment -n my-namespace`. تأكد من أن التعليق وصل إلى `kubectl get ns my-namespace -o yaml`، وتحقق من أن القيمة تطابق `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "قمت بتعليق على مساحة أسماء لكن لم تظهر أي تتبعات",
       "k8sTroubleEndpointA": "استخدم **نقطة النهاية الداخلية** فقط عندما يعمل OpenObserve نفسه في هذا العنقود؛ فتبقى حركة البيانات داخله ولا تعبر الشبكة أبدًا. الرابط هو `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — يفترض الإعداد الافتراضي الإصدار `o2` في مساحة الأسماء `openobserve`، لذا عدّله إذا اختلف لديك. أما الجميع الآخرون فيستخدمون نقطة النهاية الخارجية.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "تظهر الجلسات ولكن جميع الشاشات تحمل نفس الاسم",
       "androidTroubleScreenNamesA": "تعقب العرض غير متصل. مرّر `useViewTrackingStrategy(...)` — مثل `ActivityViewTrackingStrategy(trackExtras = true)` للأنشطة، أو `NavigationViewTrackingStrategy(...)` إذا كنت تستخدم AndroidX Navigation — عند بناء `RumConfiguration`.",
       "setupTime5Min": "~5 دقائق",
+      "showStepInstructions": "عرض التعليمات",
       "snowflakeCollectorVersionNote": "تحتاج Snowflake إلى جامع الإصدار v0.92.0 — الإصدارات الأحدث تحتوي على خطأ معروف.",
       "snowflakeTagline": "اجمع مقاييس حساب Snowflake باستخدام جامع OpenTelemetry وأرسلها إلى OpenObserve.",
       "sqlClientGuiVariant": "عميل SQL (واجهة المستخدم الرسومية)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "يتحول الفحص أدناه إلى الأخضر عند وصول البيانات، أو تحقق من التدفقات بحثًا عن مقاييس `cassandra_*`.",
       "verifyDatabricksLogsDesc": "يتحول الفحص أدناه إلى الأخضر عند وصول البيانات، أو افتح السجلات وابحث عن `source:databricks`.",
       "verifyDataTitle": "تحقّق من البيانات في OpenObserve",
+      "checkYourDataTitle": "تحقق من بياناتك",
       "verifyDynamodbLogsDesc": "يتحول الفحص أدناه إلى الأخضر عند وصول البيانات، أو افتح السجلات بحثًا عن التدفق `dynamodb` بمجرد تغيّر العناصر.",
       "verifyGcpLogsDesc": "أنشئ بعض النشاط في المشروع (أو انتظر حتى يطابق المصب أحد السجلات)؛ يتحول الفحص أدناه إلى الأخضر عند وصول البيانات.",
       "verifyK8sDataDesc": "امنح المجمّع بضع ثوانٍ ليبدأ؛ يتحول الفحص أدناه إلى الأخضر عند وصول البيانات — تصل سجلات العنقود إلى التدفق `default`.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "يتم التعامل مع الفوترة من خلال عقدك — تواصل مع مدير حسابك للتغييرات",
     "upgradeToPlanMessage": "ترقية إلى خطة للاستمرار في الاستمتاع بالخدمات بحلول OpenObserve.",
     "creditsUsedLabel": "الاعتمادات المستخدمة",
-    "licenseExpiryContactAdmin": "يرجى تحديث رخصتك بالتواصل مع المسؤول الخاص بك.",
+    "licenseExpiredOn": "انتهت صلاحية ترخيصك في {date}. تبقى ميزاتك مفعّلة.",
+    "licenseExpiredLimit": "يُطبَّق الآن الحد المجاني البالغ {limit} GB/يوم: إن تجاوزت هذا الحد في أكثر من {allowed} يومًا خلال الشهر، فسيتوقف البحث حتى تجدد الترخيص.",
+    "licenseAskAdminToRenew": "اطلب من مسؤول الترخيص لديك تجديده.",
+    "renewLicense": "جدّد الترخيص",
     "subscribed": "مشترك",
     "invoiceHistory": "تاريخ الفواتير",
     "amount": "المبلغ",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "فشل ربط اشتراك AWS",
     "failedToLinkAzureSubscription": "فشل ربط اشتراك Azure",
     "last15Minutes": "آخر 15 دقيقة",
-    "licenseHasExpired": "انتهت صلاحية الترخيص الخاص بك",
     "numberOfPipelines": "عدد مسارات المعالجة",
     "oneDayUntilLicenseExpires": "يوم واحد متبقي لانتهاء صلاحية الترخيص",
     "pleaseWaitProcessingRequest": "يرجى الانتظار بينما نقوم بمعالجة طلبك...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "اختياري. سيظل التنبيه يعمل ويسجل سجله، ولكن لن يتم إخطار أي وجهة.",
       "sendsToStatus": "يُرسل إلى {targets} في كل مرة يتم فيها إطلاق التنبيه.",
       "oncallTeamTarget": "فريق مناوبة",
+      "lockedWorkflowFallback": "سير عمل مقفل",
+      "lockedTargetBadge": "مقفل",
       "createsIncident": "يُنشئ حادثًا",
       "createsIncidentTooltip": "إذا كان بإمكان تنبيه إنشاء حادث، فإنه لا يرسل إشعارا مخصصا. بدلا من ذلك، يتم إرسال إشعار بالحادث عند إنشاء حادث جديد أو انضمام نوع تنبيه جديد إلى حادث قائم.",
       "incidentTitleTemplate": "عنوان الحادث",
@@ -12901,6 +12939,9 @@
       "lastTrained": "آخر تدريب",
       "level": "المستوى",
       "lookBackWindow": "نافذة الرجوع",
+      "scheduleIntervalFloor": "يجب ألا تقل قيمة «الفحص كل» عن {min}.",
+      "lookBackWindowCap": "يمكن أن تصل نافذة الرجوع إلى {max} كحد أقصى عند دقة الكشف هذه: فالنافذة الأطول تضم أكثر من 100,000 حاوية. قصّر النافذة أو استخدم دقة كشف أطول.",
+      "retrainOnEditNote": "يؤدي تغيير الاستعلام أو الدالة أو دقة الكشف إلى إعادة تدريب هذا الكاشف. وتتوقف عملية الكشف حتى ينتهي التدريب.",
       "lookBackWindowFloor": "يجب ألا تقل نافذة الرجوع عن {min} — الفحص كل زائد دقة كشف واحدة. النافذة الأقصر لا تتسع لحزمة كاملة عند تشغيل التشغيل الأول، لذا سيتخطى ذلك التشغيل حزمًا.",
       "lookBackWindowLegacy": "هذه النافذة المحفوظة أقل من الحد الأدنى {min} (الفحص كل زائد دقة كشف واحدة). ستُحفظ دون تغيير، لكن التشغيل الأول قد يتخطى حزمًا حتى تُرفع النافذة.",
       "lookBackWindowMinimum": "{min} على الأقل؛ ويُوصى بـ {recommended} أو أكثر لهذه الإعدادات.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "لم يتم العثور على وجهات",
       "noDetectionResults": "لا توجد نتائج كشف في هذا النطاق بعد",
       "noFieldsFound": "لم يتم العثور على حقول",
+      "checkDataNow": "التحقق الآن",
+      "checkDataNowTooltip": "أعد تقييم البيانات الحالية الآن بدلاً من انتظار التحقق التلقائي التالي.",
+      "dataReadinessReason": "السبب",
       "noticeRetrain": "إعادة تدريب تلقائية",
       "noticeRetrainTooltip": "تعذّرت قراءة النموذج المحفوظ بعد ترقية، لذا تم تجاهله وجُدول الإعداد لإعادة التدريب تلقائيًا. لا يلزم أي إجراء؛ يُستأنف الكشف بمجرد اكتمال التدريب.",
       "noticeSkipAbsence": "تأخر تقييم الغياب عن نافذة الرجوع؛ تم تخطي الفترة التي لم يعد بالإمكان جلبها وتسجيلها.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "سيتعلم الوضع التلقائي مستوىً من بياناتك السابقة.",
       "autoTrainingHelp": "سيظهر المستوى عند اكتمال التدريب.",
       "autoFailedHelp": "فشل التدريب. لم يتم تعلم أي مستوى بعد. راجع خطأ التدريب أعلاه.",
+      "autoWaitingForDataHelp": "لا توجد بعد بيانات تدريب مناسبة كافية. لا يوجد مستوى مُتعلَّم حتى ذلك الحين. يبقى الكاشف مفعّلاً ويُعاد التحقق منه تلقائيًا.",
+      "autoNotApplicableHelp": "لا يمكن للبيانات الحالية دعم نموذج للحالات الشاذة. هذا ليس فشلاً. يبقى الكاشف مفعّلاً ويُعاد التحقق منه تلقائيًا.",
       "autoRetrainingHelp": "جارٍ إعادة التدريب. يُعرض آخر مستوى تم تعلمه؛ توفّر النموذج غير مؤكد.",
       "autoRetrainFailedHelp": "فشلت إعادة التدريب. يُعرض آخر مستوى تم تعلمه؛ توفّر النموذج غير مؤكد. راجع خطأ التدريب أعلاه.",
       "autoUnconfirmedHelp": "يُعرض آخر مستوى تم تعلمه؛ لم يتم تأكيد وجود نموذج نشط.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "التوجيه وفقًا لقواعد الملكية",
     "oncallTeamTooltip": "أي فريق يستدعيه هذا التنبيه. اتركه غير محدد لاستنتاج الفريق من أبعاد هوية التنبيه، وهو الوضع الطبيعي — لا تحدده إلا عندما لا يمكن لهذه الأبعاد التعبير عن المالك.",
     "oncallTeamNoTeams": "لا توجد فرق مناوبة بعد. أنشئ فريقًا من قسم فرق المناوبة.",
+    "lockedTeamFallback": "فريق مقفل",
     "oncallTeamAtFireTime": "من الملكية",
     "oncallTeamFromRules": "لا يوجد فريق محدد على هذا التنبيه، لذلك يُستنتج المالك من أبعاد هوية الصف الذي يُطلق التنبيه. ولا تُعرف هذه الأبعاد حتى يُطلق التنبيه.",
     "tags": "الوسوم",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "دخل الفاصلة (مثلا، {'|'}، \\n، \\t، المساحة)",
     "separator_hint": "سلسلة فاصل للاستخدام بين السجلات (المسافات مسموح بها)",
     "templateDefaultOption": "الافتراضي ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "اترك كخيار افتراضي لاستخدام قالب {type} القياسي ({name})، أو اختر قالب مخصص.",
     "loadingData": "جاري تحميل بيانات الوجهة...",
     "noEmailTemplates": "يبدو أنك لم تنشئ أي قوالب بريد إلكتروني بعد.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Azure المؤهلات",
       "awsRoleArn": "AWS الدور ARN"
     },
+    "dataRetentionDefaults": {
+      "title": "الإعدادات الافتراضية للاحتفاظ بالبيانات",
+      "about": "للتدفقات التي ليس لها مدة احتفاظ خاصة بها. القيمة الفارغة أو 0 تستخدم القيمة العامة؛ وإلا فثلاثة أيام على الأقل.",
+      "defaultDays": "الافتراضي (أيام)",
+      "streamType": "نوع التدفق",
+      "days": "الأيام",
+      "addType": "إضافة نوع تدفق",
+      "removeType": "إزالة نوع التدفق هذا",
+      "globalDefault": "القيمة العامة: {value}",
+      "globalType": "القيمة العامة لـ {type}: {value}",
+      "daysValue": "{days} يومًا",
+      "forever": "الاحتفاظ إلى الأبد",
+      "invalid": "استخدم 0 أو 3 أيام على الأقل"
+    },
     "organizationSettings": {
       "fieldNameHelp": "استخدم الأحرف الأبجدية الرقمية و'+=,.{'@'}-_' فقط، بدون مسافات.",
       "settingsUpdated": "تم تحديث إعدادات المؤسسة بنجاح",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "خطأ غير متوقع",
-      "daysRemaining": "الأيام المتبقية حتى تنتهي صلاحية رخصتك: {days}",
-      "oneDayRemaining": "يوم واحد متبقي لانتهاء صلاحية الترخيص",
-      "licenseExpired": "انتهت صلاحية الترخيص الخاص بك"
+      "daysRemaining": "الأيام المتبقية حتى تنتهي صلاحية رخصتك: {days}"
     },
     "nodesPage": {
       "subtitle": "عقد العنقود وصحتها",
@@ -23025,7 +23085,9 @@
         "ready": "جاهز",
         "running": "تشغيل",
         "training": "التدريب",
-        "waiting": "الانتظار"
+        "waiting": "الانتظار",
+        "waitingForData": "في انتظار البيانات",
+        "notApplicable": "غير قابل للتطبيق"
       },
       "anomalyStatus": {
         "active": "نشط",
@@ -23033,7 +23095,9 @@
         "training": "التدريب",
         "failed": "فشل",
         "waiting": "الانتظار",
-        "disabled": "معاق"
+        "disabled": "معاق",
+        "waitingForData": "في انتظار البيانات",
+        "notApplicable": "غير قابل للتطبيق"
       },
       "aiToolsetKind": {
         "skill": "المهارة",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "حدث خطأ ما",
-      "thankYouForYourFeedback": "شكرا على ملاحظاتك",
       "selectedSuggestion": "اقتراح مختارة \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "يرجى ملء جميع الحقول والمحاولة مرة أخرى.",
       "invalidUsernameOrPassword": "اسم المستخدم أو كلمة المرور غير صالحة",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "ابدأ الآن",
     "reportDetail": "تقرير",
     "sharedChat": "محادثة مشتركة",
     "passwordPolicy": "سياسة كلمة المرور",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "تعذّر حفظ الجدول",
     "policy": "سياسة التصعيد",
     "policyIfNoAck": "إذا لم يؤكّد أحد الاستلام، بعد",
-    "policyRepeatTimes": "شغّل السلّم مرة واحدة | شغّل السلّم (عدد المرات: {count})",
-    "policyFinalStop": "ثم يتوقف",
-    "policyFinalNotifyDefault": "ثم يُخطِر الفريق الشامل",
-    "policyNoDefaultTeam": "لا يوجد فريق افتراضي معيّن، لذا فإن هذا يعادل التوقف. عيِّن واحدًا في تبويب التوجيه.",
     "policyPrioritySilent": "أولوية {priority} لا تُنبّه أحدًا. أضف درجةً لتغيير ذلك — الصمت هنا قرار وليس إهمالًا.",
     "policyDoneEditing": "تم التعديل",
     "policyHint": "من يُستدعى عند كل أولوية، وبعد كم من الوقت. هذه قيم افتراضية — يمكنك تغيير أيٍّ منها.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "لن ينتظر أحد خمس دقائق ليكتشف أن الموقع متعطل.",
     "policyP4Pages": "استدعِ لهذه الأولوية أيضًا",
     "policyP4PagesHint": "معطّل افتراضيًا — أي P4 تُوقظ شخصًا تعني خللًا في تصنيف الخطورة.",
-    "policyFinalAction": "إذا لم يقرّ أي شخص بالتنبيه",
-    "policyFinal_notifyDefaultTeam": "إخطار الفريق الافتراضي",
-    "policyFinal_stop": "إيقاف",
     "policySummaryTitle": "ماذا تفعل هذه السياسة الآن",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "الكل دفعة واحدة",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "بدون SRE الذكاء الاصطناعي",
     "ladderStaleDefaultTag": "لم يتعرف السلم على النوبات",
     "ladderStaleDefaultHint": "كل مستوى يستدعي الفريق بأكمله، لكن هذا الفريق لديه تناوبات — تم إنشاء السلم قبل وجودها. إضافة أو إزالة عضو تعيد تشغيل الوضع الافتراضي، أو عدّل السلم يدويًا مرة واحدة.",
-    "ladderEndsHandsOff": "يتم تسليم النداء",
     "reachShortNoSmtp": "بريد إلكتروني فقط · لا يوجد SMTP",
     "reachShortNoFromAddress": "بريد إلكتروني فقط · لا يوجد عنوان From",
     "reachShortNoAddress": "لا يوجد عنوان مُسجل",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· كل {duration}",
     "ladderEnd": "نهاية",
     "ladderEndUnknown": "لا يوجد استدعاء قادم بعد الآن",
-    "ladderEndsDefaultTeam": "نفدت خطوات السلم — تم إخطار الفريق الافتراضي",
     "rungLost": "فشل",
     "rungLostTimes": "فشل ×{count}",
     "routingDetails": "تفاصيل التوجيه",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "خطوات التصعيد",
     "policyChipSteps": "{count} خطوة | الخطوات: {count}",
     "policyAddStep": "إضافة خطوة",
-    "policyWhenStepsRunOut": "عند نفاد الخطوات",
     "policyAppliesToNewPages": "تنطبق التغييرات على النداءات الجديدة فقط",
     "policySave": "حفظ",
     "policyFix": "إصلاح",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "يبقى البريد الإلكتروني مفعّلًا مع Slack: سيظل الأشخاص الذين ليس لديهم حساب Slack مرتبط يتلقون البريد الإلكتروني.",
     "policyNoProvider": "لا يوجد مزود هاتف متصل، لذا يتم تخطي SMS والمكالمات الصوتية وتصل هذه النداءات عبر البريد الإلكتروني.",
     "policyNoProviderLink": "اربط مزودًا في الإعدادات → الاتصال الهاتفي",
-    "policyEndOptionStop": "يعمل مرة واحدة ثم يتوقف | يعمل (عدد المرات: {count}) ثم يتوقف",
-    "policyEndOptionHandOff": "يعمل مرة واحدة ثم يسلّم إلى الفريق الشامل | يعمل (عدد المرات: {count}) ثم يسلّم إلى الفريق الشامل",
-    "policyEndOptionHandOffTo": "التشغيل مرة واحدة، ثم التسليم إلى {team} | التشغيل {count} مرات، ثم التسليم إلى {team}",
     "policyDeliveryTitle": "التسليم",
     "policyTodayIs": "اليوم: {who}",
     "policyPeopleCount": "{count} شخص | الأشخاص: {count}",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "يستلم التنبيهات من {team}",
     "ruleEditorKeptBy": "يحتفظ {team} بهذه التنبيهات: قاعدته أكثر تحديدًا",
     "ruleEditorContends": "ينافس قاعدة خاصة بـ {team}: الأكثر تحديدًا يفوز",
+    "ruleEditorFieldSourcesMore": "{fields} و{count} أخرى",
+    "ruleEditorFieldsHelp": "تأتي الحقول من مجموعات حقول الارتباط لديك. {link}",
+    "ruleEditorFieldsSource": "تأتي الحقول من مجموعات حقول الارتباط لديك.",
+    "ruleEditorManageFieldGroups": "إدارة مجموعات الحقول",
+    "ruleEditorDuplicatePath": "لدى {team} بالفعل قاعدة لهذه الشروط تمامًا. عدّل تلك القاعدة بدلاً من ذلك.",
+    "ruleEditorDuplicatePathSameTeam": "لدى هذا الفريق بالفعل قاعدة لهذه الشروط تمامًا.",
     "routingTestRouting": "اختبر التوجيه",
     "routingTabNeedsOwnerPlain": "بحاجة إلى مالك",
     "simulatorStartFrom": "ابدأ من",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "السجلات والمقاييس والتتبعات من أي خادم Linux.",
+      "windows": "سجلات الأحداث والمقاييس من خوادم Windows.",
+      "macos": "السجلات والمقاييس من أجهزة Mac.",
+      "aws": "السجلات والمقاييس من خدمات AWS الخاصة بك.",
+      "googleCloud": "السجلات من مشاريع {gcp} الخاصة بك، عبر اشتراك Push في {pubSub}.",
+      "azure": "سجلات النشاط من اشتراك {azure} الخاص بك، عبر {eventHub}.",
+      "postgresql": "مقاييس الاستعلام والاتصال والنسخ المتماثل.",
+      "mysql": "مقاييس الاستعلام والاتصال وInnoDB.",
+      "mongodb": "مقاييس العمليات والاتصال وذاكرة التخزين المؤقت.",
+      "redis": "مقاييس الذاكرة والأوامر ومساحة المفاتيح.",
+      "sqlServer": "مقاييس الاستعلام والانتظار والمخزن المؤقت.",
+      "oracle": "مقاييس الجلسات ومساحات الجداول وحدود الموارد.",
+      "mariadb": "مقاييس الاستعلام والاتصال وInnoDB.",
+      "elasticsearch": "صحة الكتلة والفهرس والعقدة.",
+      "cassandra": "مقاييس القراءة والكتابة والدمج.",
+      "dynamodb": "تغييرات العناصر (الإدراج والتحديث والحذف) كسجلات، عبر {kinesisFirehose}.",
+      "snowflake": "استخدام المستودع والاستعلام والاعتمادات.",
+      "databricks": "سجلات دفاتر الملاحظات، تُرسل عبر واجهة برمجة تطبيقات السجلات.",
+      "couchdb": "مقاييس الطلبات وقاعدة البيانات والنسخ المتماثل.",
+      "aerospike": "مقاييس مساحة الأسماء والعقدة والذاكرة والاتصالات.",
+      "sapHana": "مقاييس الذاكرة ووحدة المعالجة المركزية والخدمة.",
+      "zookeeper": "مقاييس زمن الاستجابة والاتصال والعقدة.",
+      "nginx": "سجلات الوصول والأخطاء، يتابعها {fluentBit}.",
+      "apache": "سجلات الوصول والأخطاء، يتابعها {fluentBit}.",
+      "iis": "سجلات الطلبات، يتابعها {fluentBit}.",
+      "kafka": "مقاييس الوسيط والموضوع وتأخر المستهلك.",
+      "rabbitmq": "عمق قائمة الانتظار ومعدل الرسائل ومقاييس العقدة.",
+      "nats": "مقاييس الاتصال والرسائل والتدفق.",
+      "prometheus": "أرسل المقاييس التي تجمعها بالفعل عبر الكتابة البعيدة.",
+      "telegraf": "أرسل المقاييس من وكيل تشغله بالفعل.",
+      "opentelemetryCollector": "وجّه جامعًا تشغله بالفعل إلى هنا.",
+      "cloudwatch": "أرسل المقاييس من حساب AWS الخاص بك.",
+      "gpu": "الاستخدام والذاكرة ودرجة الحرارة لكل وحدة GPU من {nvidia}.",
+      "networkFlows": "تدفقات حركة المرور بين مضيفيك وشبكاتك.",
+      "fluentBit": "ممرّر سجلات خفيف للمضيفين وKubernetes.",
+      "fluentd": "جامع سجلات يتضمن مجموعة كبيرة من الإضافات.",
+      "vector": "مسار معالجة سريع للسجلات والمقاييس.",
+      "filebeat": "أرسل ملفات السجلات عبر وكيل خفيف.",
+      "logstash": "أرسل السجلات من مسار معالجة موجود.",
+      "syslogNg": "مرّر syslog من خوادمك.",
+      "loongcollector": "وكيل السجلات والمقاييس للمضيفين والحاويات.",
+      "splunkHec": "أبقِ مرسلات HTTP Event Collector كما هي.",
+      "cribl": "وجّه البيانات من مسارات المعالجة التي تشغلها بالفعل.",
+      "kinesisFirehose": "أرسل السجلات من تدفق تسليم في AWS.",
+      "googleCloudLogs": "صدّر السجلات من مشاريعك عبر حوض سجلات.",
+      "okta": "أحداث تدقيق تسجيل الدخول والإدارة.",
+      "office365": "سجلات تدقيق البريد والملفات والإدارة.",
+      "googleWorkspace": "سجلات تدقيق تسجيل الدخول والإدارة.",
+      "falco": "تنبيهات الأمان في وقت التشغيل من الحاويات.",
+      "osquery": "حالة نقطة النهاية كسجلات يمكنك الاستعلام عنها.",
+      "jumpcloud": "أحداث الدليل وتسجيل الدخول.",
+      "openvpn": "سجلات اتصال VPN والجلسات.",
+      "githubActions": "سجلات تشغيل سير العمل والمهام.",
+      "jenkins": "سجلات البناء وأحداث مسار المعالجة.",
+      "terraform": "سجلات الخطة والتطبيق من عمليات التشغيل الخاصة بك.",
+      "ansible": "سجلات تشغيل دليل التشغيل والنتائج.",
+      "vercel": "سجلات النشر والدوال.",
+      "heroku": "سجلات التطبيق والموجّه من مصرف السجلات.",
+      "airflow": "سجلات تشغيل DAG ومقاييس المهام.",
+      "airbyte": "سجلات مهمة المزامنة وحالتها.",
+      "languageTile": "التتبعات باستخدام SDK الخاص بـ {otel}، مع استشعار تلقائي حيث تدعمه لغتك.",
+      "aiIntegration": "التتبعات الخاصة باستدعاءات تطبيق الذكاء الاصطناعي لديك، مع الرموز والتكلفة لاستدعاءات النموذج."
+    },
+    "skipToApp": "تخطَّ إلى التطبيق",
+    "chooseTitle": "ما الذي تريد مراقبته أولًا؟",
+    "back": "رجوع",
+    "searchGuides": "ابحث في {count} دليل | ابحث في {count} دليل",
+    "showMore": "عرض {count} إضافي | عرض {count} إضافي",
+    "noMatch": "لا يوجد دليل يطابق \"{query}\" هنا.",
+    "foundElsewhere": "تم العثور عليه في خيارات أخرى:",
+    "inChoice": "في {choice}",
+    "tryShorter": "جرّب اسمًا أقصر. يمكن لأي أداة أيضًا {link}.",
+    "sendOverHttp": "إرسال السجلات عبر HTTP",
+    "clearSearch": "مسح البحث",
+    "othersTitle": "طرق أخرى للبدء",
+    "whatYouGet": "ما ستحصل عليه",
+    "signals": {
+      "metrics": "المقاييس",
+      "logs": "السجلات",
+      "traces": "التتبعات",
+      "profiles": "ملفات تعريف الأداء",
+      "sessions": "الجلسات",
+      "errors": "الأخطاء",
+      "webVitals": "مؤشرات الويب الحيوية (ويب)",
+      "replays": "إعادة تشغيل الجلسات",
+      "tokens": "الرموز",
+      "cost": "التكلفة",
+      "latency": "زمن الاستجابة",
+      "uptime": "وقت التشغيل",
+      "certificates": "الشهادات"
+    },
+    "example": {
+      "caption": {
+        "row": "شاشة مثال: ما يعرضه {product} لـ{name}.",
+        "infrastructure": "شاشة مثال: نظرة عامة على عنقود {k8s} مع وحدة المعالجة المركزية والذاكرة وصحة الـ pods.",
+        "backend": "شاشة مثال: المخطط الشلالي لتتبع عملية شراء فاشلة، مع 21 امتدادًا عبر 9 خدمات.",
+        "frontend": "شاشة مثال: مؤشرات الويب الحيوية من {rum} لجلسات مستخدمين حقيقيين.",
+        "logs": "شاشة مثال: بحث في السجلات مع مدرج تكراري وأسطر السجلات المطابقة.",
+        "llm": "شاشة مثال: {insights} مع التكلفة والرموز وزمن الاستجابة حسب النموذج، إضافة إلى التتبعات والأخطاء عبر الزمن.",
+        "agent": "شاشة مثال: صفحة خادم {mcp} التي يتصل بها وكيل البرمجة الخاص بك.",
+        "synthetics": "شاشة مثال: نتائج فحص {http} واحد عبر 3 مواقع."
+      }
+    },
+    "guide": {
+      "agentTitle": "تفضّل وكيل برمجة؟",
+      "agentSteps": "شغّل هذا في الطرفية، ثم أعطِ {claudeCode} أو {cursor} أو {codex} الموجّه أو الملف.",
+      "copyPrompt": "نسخ الموجّه",
+      "downloadFile": "تنزيل .md",
+      "inviteTitle": "لا تملك صلاحية الوصول؟",
+      "inviteText": "ادعُ زميلًا يمكنه تشغيل الأمر.",
+      "inviteAction": "دعوة زميل",
+      "loadFailed": "لم يتم تحميل هذا الدليل.",
+      "openInApp": "افتحه في مصادر البيانات",
+      "languageText": "بالنسبة إلى {language}، أضف {otelSdk} مع القياس التلقائي حيث يتوفر في {language}، ثم وجّهه إلى {product} باستخدام الإعدادات أدناه.",
+      "languageLink": "دليل {otel} {language}"
+    },
+    "rail": {
+      "label": "تقدم الإعداد",
+      "check": "تحقق من بياناتك",
+      "received": "تم استلام البيانات",
+      "attention": "يحتاج إلى انتباه",
+      "waitingShort": "في انتظار البيانات",
+      "title": "إعداد {name}",
+      "run": "تشغيل أمر الإعداد",
+      "explore": "استكشاف بياناتك"
+    },
+    "firstData": {
+      "title": "بياناتك تصل الآن",
+      "count": "وصل {count} سجل إلى {stream} | وصلت {count} سجلات إلى {stream}",
+      "exploreLogs": "استكشاف سجلاتك",
+      "exploreMetrics": "استكشاف مقاييسك",
+      "exploreTraces": "استكشاف تتبعاتك",
+      "exploreProfiles": "استكشاف ملفات تعريف الأداء",
+      "addAnother": "إضافة مصدر آخر"
+    },
+    "others": {
+      "synthetics": {
+        "name": "الفحوصات الاصطناعية",
+        "description": "افحص موقع ويب أو API أو منفذًا أو شهادة. دون تثبيت.",
+        "gets": "شغّل الفحوصات وفق جدول من خارج شبكتك."
+      },
+      "invite": {
+        "name": "دعوة زميل للإعداد",
+        "description": "يتلقون دعوة إلى مؤسستك."
+      },
+      "agent": {
+        "name": "الإعداد باستخدام وكيل البرمجة الخاص بك",
+        "description": "أعطِ {claudeCode} أو {cursor} أو {codex} موجهًا واحدًا.",
+        "gets": "يضيف وكيل البرمجة الخاص بك الإعداد ويتحقق من وصول البيانات."
+      }
+    },
+    "agentLink": "أو دع وكيل البرمجة الخاص بك يقوم بذلك",
+    "stepDone": "(تم)",
+    "agent": {
+      "crumb": "وكيل البرمجة",
+      "title": "الإعداد باستخدام وكيل البرمجة الخاص بك",
+      "lead": "{claudeCode} أو {cursor} أو {codex} أو أي وكيل برمجة يقرأ مشروعك، ويضيف الإعداد، ويتحقق من وصول البيانات. يسألك قبل تثبيت أي شيء أو تغيير ملفات النشر.",
+      "tokenTitle": "احفظ رمزك المميز",
+      "tokenText": "شغّل هذا في الطرفية نفسها التي ستبدأ منها وكيل البرمجة، قبل أن تبدأه.",
+      "powerShell": "في {powerShell}:",
+      "copyPowerShell": "انسخ أمر {powerShell}",
+      "promptTitle": "انسخ الموجّه",
+      "focusLabel": "الإعداد",
+      "focus": {
+        "kubernetes": "عنقود {k8s}",
+        "host": "مضيف {linux} أو {macos} أو {windows}",
+        "backend": "خدمة الواجهة الخلفية ({otel})",
+        "llm": "تطبيق LLM",
+        "frontend": "واجهة أمامية للويب",
+        "logs": "السجلات فقط"
+      },
+      "copyPrompt": "نسخ الموجّه",
+      "promptCopied": "تم نسخ الموجّه",
+      "download": "تنزيل .md",
+      "preview": "معاينة الموجّه",
+      "previewLines": "{count} سطر | {count} أسطر",
+      "pasteTitle": "الصقه في وكيل البرمجة الخاص بك",
+      "other": "أخرى",
+      "hint": {
+        "claudeCode": "في الطرفية نفسها، شغّل {command} في مجلد مشروعك، ثم الصق الموجّه.",
+        "cursor": "شغّل {product} من الطرفية نفسها باستخدام {command}، حتى يتمكن من قراءة الرمز المميز. ثم الصق الموجّه في محادثته.",
+        "codex": "في الطرفية نفسها، شغّل {command} في مجلد مشروعك، ثم الصق الموجّه.",
+        "other": "شغّل وكيل البرمجة الخاص بك من الطرفية نفسها، ليتمكن من قراءة الرمز المميز. ثم الصق الموجّه، أو أعطه {file}."
+      },
+      "mcp": "اربط خادم {mcp} ليتمكن وكيل البرمجة الخاص بك من قراءة بياناتك",
+      "aside": {
+        "eyebrow": "ما يطلبه الموجّه من وكيل البرمجة الخاص بك",
+        "title": "تغييرات صغيرة وآمنة",
+        "line1": "العثور على ما يشغّله المشروع",
+        "line2": "إجراء أصغر تغيير فعّال",
+        "line3": "احتفظ بالرمز في متغيرات البيئة",
+        "line4": "أرسل حدثًا تجريبيًا واحدًا إلى التدفق {stream}",
+        "line5": "أبلغ عن الملفات التي تغيّرت"
+      }
+    },
+    "collect": {
+      "continueToSetup": "المتابعة إلى الإعداد",
+      "languages": "اللغات",
+      "languagesRequired": "اختر لغة واحدة على الأقل.",
+      "kubernetesCluster": {
+        "question": "اختر ما تريد جمعه من عنقودك",
+        "off": {
+          "name": "السجلات والمقاييس",
+          "description": "صحة العنقود وسجلات الحاويات. أمر واحد.",
+          "about": "سجلات الحاويات، وCPU وذاكرة كل عقدة وبود، وأحداث {k8s} كسجلات، من أمر تثبيت واحد."
+        },
+        "ebpf": {
+          "name": "أضف التتبعات باستخدام eBPF",
+          "description": "دون تغيير الشيفرة، وبأي لغة. يتطلب نواة Linux 5.8+ على عقدك.",
+          "about": "نفس التثبيت، مع التتبعات. يرى المجمّع الطلبات من نواة Linux، لذا لا تتغير تطبيقاتك. يربط الطلب عبر الخدمات عبر HTTP العادي فقط."
+        },
+        "library": {
+          "name": "أضف التتبعات باستخدام مكتبات اللغة",
+          "description": "تفاصيل أكثر لكل تطبيق. اختر لغاتك، ثم أعد تشغيل تطبيقاتك مرة واحدة.",
+          "about": "نفس التثبيت، مع التتبعات. يضيف {otelOperator} الـ {otelLibrary} لكل لغة إلى البودات في مساحات الأسماء التي تختارها. لا تتغير شيفرتك."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "خوادم الويب",
+      "messageQueues": "قوائم انتظار الرسائل",
+      "metricsYouCollect": "المقاييس التي تجمعها بالفعل",
+      "gpuAndNetwork": "تدفقات GPU والشبكة",
+      "movingFromAnotherTool": "الانتقال من أداة أخرى",
+      "cloudLogs": "سجلات السحابة",
+      "securityTools": "أدوات الأمان",
+      "cicdAndPlatforms": "CI/CD والمنصات"
+    },
+    "infrastructure": {
+      "name": "البنية التحتية",
+      "description": "الخوادم و{k8s} وحسابات السحابة وقواعد البيانات",
+      "gets": "شاهد كل مضيف وبود وخدمة سحابية في مكان واحد.",
+      "question": "كيف تريد مراقبة بنيتك التحتية؟",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "عنقود {k8s}",
+          "description": "السجلات والمقاييس وأحداث {k8s} من تثبيت واحد. والتتبعات بأمر إضافي واحد.",
+          "about": "يثبّت {productCollector} في عنقودك بأمر واحد. تحصل على سجلات الحاويات وأحداث {k8s} ومقاييس العنقود."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "مضيف {linux} أو {windows} أو {macos}",
+          "description": "ثبّت {productAgent} كخدمة",
+          "about": "يجمع وكيل واحد السجلات والمقاييس من المضيف. وعلى {linux} يمكنه أيضًا تتبع البرامج دون تغيير الشيفرة.",
+          "question": "ما نظام التشغيل الخاص بمضيفك؟"
+        },
+        "cloudAccount": {
+          "name": "حساب السحابة",
+          "description": "{aws} أو {gcp} أو {azure}",
+          "about": "يبثّ السجلات من حساب السحابة لديك، والمقاييس من {aws}. لا شيء يعمل على خوادمك.",
+          "question": "على أي سحابة يوجد حسابك؟"
+        },
+        "databases": {
+          "name": "قواعد البيانات",
+          "description": "{examples} و{count} أخرى",
+          "about": "يجمع مقاييس قواعد البيانات، غالبًا عبر {otelCollector}.",
+          "question": "أي قاعدة بيانات تريد مراقبتها؟"
+        },
+        "somethingElse": {
+          "name": "شيء آخر",
+          "description": "خوادم الويب وقوائم انتظار الرسائل و{prometheus} وتدفقات GPU والشبكة",
+          "about": "خوادم الويب، وقوائم انتظار الرسائل، والمقاييس التي تجمعها بالفعل، واستخدام GPU، وتدفقات الشبكة.",
+          "question": "ما الذي تريد مراقبته أيضًا؟"
+        }
+      }
+    },
+    "backend": {
+      "name": "تطبيقات الواجهة الخلفية",
+      "description": "التتبعات من خدماتك، والسجلات إلى حيث يرسلها SDK الخاص بك",
+      "gets": "شاهد كيف ينتقل كل طلب عبر خدماتك.",
+      "question": "كيف تريد تتبّع خدماتك؟",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "أضف مكتبة إلى الكود الخاص بك",
+          "description": "{nodejs} أو {python} أو {java} أو {go} أو {dotnet} أو {rust} أو {fastapi}",
+          "about": "يضيف {otelLibrary} للغتك. تذهب التتبعات إلى {product}.",
+          "question": "بأي لغة كُتبت خدمتك؟"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "أحمال عمل {k8s}، دون تغييرات في الكود",
+          "description": "القياس التلقائي داخل عنقودك",
+          "about": "يضيف {otelOperator} أدوات القياس إلى الحِزم في مساحة أسماء واحدة. دون تغيير الكود أو الصورة."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "أي لغة مع {otel}",
+          "description": "أرسل OTLP من إعدادك الخاص",
+          "about": "وجّه أي {otelSdk} أو جامع إلى نقطة نهاية {product} الخاصة بك."
+        },
+        "continuousProfiling": {
+          "name": "التوصيف المستمر",
+          "description": "ملفات تعريف أداء المعالج والذاكرة",
+          "about": "يمرّر ملفات تعريف الأداء من أدوات التوصيف لديك ({go} أو {java} أو {rust} أو أداة توصيف eBPF) عبر {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "تطبيقات الواجهة الأمامية والجوال",
+      "description": "مراقبة المستخدمين الحقيقيين للويب والجوال",
+      "gets": "اطّلع على ما يختبره المستخدمون الحقيقيون في تطبيقات الويب والجوال لديك.",
+      "question": "أين يعمل تطبيقك؟",
+      "rows": {
+        "browser": {
+          "name": "المتصفح",
+          "description": "المواقع وتطبيقات الويب",
+          "about": "يضيف {sdk} إلى تطبيق الويب لديك. تحصل على أحمال الصفحات والأخطاء والجلسات من متصفحات حقيقية."
+        },
+        "reactNative": {
+          "description": "{ios} و{android} من قاعدة شفرة واحدة",
+          "about": "يضيف {sdk} إلى تطبيق {platform} لديك."
+        },
+        "android": {
+          "description": "تطبيقات {android} الأصلية",
+          "about": "يضيف {sdk} إلى تطبيق {platform} لديك. تحصل على الجلسات ومشاهدات الشاشة والأخطاء والأعطال."
+        },
+        "ios": {
+          "description": "تطبيقات {ios} الأصلية",
+          "about": "يضيف {sdk} إلى تطبيق {platform} لديك. تحصل على الجلسات ومشاهدات الشاشة والأخطاء والأعطال."
+        }
+      }
+    },
+    "logs": {
+      "name": "السجلات من أي مصدر",
+      "description": "أرسل السجلات من أي مُرسِل سجلات أو خدمة أو أداة",
+      "gets": "ابحث وفلتر كل سطر سجل، أيًا كان ما يرسله.",
+      "question": "كيف تريد إرسال سجلاتك؟",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "من مُرسِل سجلات تشغّله",
+          "description": "{examples} و{count} أخرى",
+          "about": "يوجّه مُرسِل السجلات الذي تشغّله بالفعل إلى {product}. دون وكيل جديد.",
+          "question": "أي مُرسِل سجلات تشغّل؟"
+        },
+        "overHttpWithCurl": {
+          "name": "عبر HTTP باستخدام {curl}",
+          "description": "طلب واحد من أي سكربت. دون تثبيت.",
+          "about": "أرسل سجلات JSON من أي سكربت أو خدمة بطلب HTTP واحد."
+        },
+        "fromOpentelemetry": {
+          "name": "من {otel}",
+          "description": "سجلات OTLP من SDK أو جامع",
+          "about": "أرسل السجلات عبر OTLP من {otelSdk} أو جامع."
+        },
+        "somethingElse": {
+          "name": "شيء آخر",
+          "description": "{splunk} أو {cribl}، وسجلات السحابة، وأدوات الأمان وCI/CD",
+          "about": "انتقل من {splunk} أو {cribl}، أو اجمع السجلات من سحابتك وأدوات الأمان وCI/CD.",
+          "question": "من أين تأتي سجلاتك أيضًا؟"
+        }
+      }
+    },
+    "llm": {
+      "name": "تطبيقات LLM والذكاء الاصطناعي",
+      "description": "تتبّع استدعاءات LLM والوكلاء والأدوات",
+      "gets": "اطّلع على كل استدعاء LLM واستدعاء أداة وخطوة وكيل.",
+      "question": "ماذا يستخدم تطبيق الذكاء الاصطناعي لديك؟",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk} أو Agents أو {assistantsApi}",
+          "about": "يتتبع كل استدعاء يتم عبر {openaiSdk}، مع الرموز والتكلفة وزمن الاستجابة.",
+          "question": "ما مكتبة {openai} التي تستخدمها؟"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} أو {claudeAgentSdk}",
+          "about": "يتتبع كل استدعاء يتم عبر {anthropicSdk}، مع الرموز والتكلفة وزمن الاستجابة.",
+          "question": "ما مكتبة {anthropic} التي تستخدمها؟"
+        },
+        "langchainOrLanggraph": {
+          "description": "السلاسل والوكلاء والرسوم البيانية",
+          "about": "يتتبع كل سلسلة وخطوة وكيل واستدعاء أداة.",
+          "question": "ما مكتبة {langchain} التي تستخدمها؟"
+        },
+        "somethingElse": {
+          "name": "شيء آخر",
+          "description": "أطر عمل أخرى ومزودو نماذج وبوابات وأدوات أخرى",
+          "about": "أطر العمل ومزودو النماذج والبوابات وأدوات بدون كود والتحليلات والأدوات.",
+          "question": "ماذا يستخدم تطبيق الذكاء الاصطناعي لديك؟"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "إدارة الأساطيل",
     "subtitle": "سجّل OpenTelemetry Collectors، وأصدِر نسخًا من تكويناتها، واطرح التغييرات بأمان",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "رفضها المستقبِل {receiver}",
       "legend": "حالة خط المعالجة",
       "legendToggle": "إظهار هذه الحالة على الخريطة أو إخفاؤها"
+    }
+  },
+  "sampleData": {
+    "delete": "حذف البيانات النموذجية",
+    "loadForbidden": "تحتاج إلى صلاحية الكتابة في هذه المؤسسة لتحميل البيانات النموذجية.",
+    "steps": {
+      "functions": "إنشاء الدوال",
+      "pipeline": "إنشاء مسار معالجة في الوقت الفعلي",
+      "telemetry": "إنشاء السجلات والتتبعات والمقاييس وإرسالها",
+      "dashboards": "إنشاء لوحات المعلومات",
+      "alerts": "إنشاء التنبيهات",
+      "enrichment": "رفع جدول مالكي الخدمات"
+    },
+    "progress": {
+      "loading": "جارٍ تحميل البيانات النموذجية…",
+      "done": "تم تحميل البيانات النموذجية",
+      "counts": "{logs} سجلات · {spans} امتدادات · {metrics} نقاط مقاييس",
+      "skipped": "تم التخطي",
+      "logs": "السجلات",
+      "spans": "الامتدادات",
+      "metrics": "نقاط المقاييس"
+    },
+    "removeSteps": {
+      "alerts": "التنبيهات",
+      "alertDelivery": "قالب التنبيه وويب هوك",
+      "dashboards": "لوحات المعلومات",
+      "pipeline": "مسار المعالجة",
+      "functions": "الدوال",
+      "streams": "التدفقات"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "إزالة البيانات النموذجية",
+        "body": "يستغرق هذا بضع ثوانٍ. يمكنك إغلاق هذا المربع الحواري، لكن أبقِ علامة التبويب هذه مفتوحة حتى ينتهي.",
+        "label": "جارٍ إزالة البيانات النموذجية…"
+      },
+      "done": {
+        "title": "تمت إزالة البيانات النموذجية",
+        "body": "سينتهي الخادم من حذف البيانات المخزنة خلال بضع دقائق. يمكنك تحميل البيانات النموذجية مجددًا بعد ذلك.",
+        "label": "اكتملت الإزالة",
+        "done": "تم",
+        "keptLabel": "تم الاحتفاظ بها لأن شيئًا آخر يستخدمها:"
+      },
+      "failed": {
+        "title": "تعذر إزالة كل البيانات النموذجية",
+        "body": "أعد المحاولة: يتم تخطي العناصر التي لم تعد موجودة.",
+        "label": "توقفت الإزالة",
+        "close": "إغلاق",
+        "tryAgain": "إعادة المحاولة"
+      }
+    },
+    "removeConfirm": {
+      "title": "هل تريد حذف البيانات النموذجية؟",
+      "message": "يؤدي هذا إلى حذف التدفقات ولوحات المعلومات والتنبيهات والدوال وجدول الإثراء النموذجية. لن تُمس بياناتك الخاصة."
+    },
+    "toast": {
+      "loaded": "تم تحميل البيانات النموذجية. استمتع بالاستكشاف!",
+      "loadFailed": "تعذر تحميل البيانات النموذجية",
+      "removed": "تمت إزالة بيانات العينة",
+      "removedWithKept": "تمت إزالة بيانات العينة. بقي {count} من عناصر بيانات العينة لأن شيئًا آخر يستخدمه. | تمت إزالة بيانات العينة. بقيت {count} من عناصر بيانات العينة لأن شيئًا آخر يستخدمها.",
+      "removeFailed": "تعذر حذف كل بيانات العينة",
+      "removeWhileLoading": "انتظر حتى ينتهي تحميل بيانات العينة."
+    },
+    "entry": {
+      "onboardingSource": "استكشف بيانات العينة"
+    },
+    "callout": {
+      "title": "ألست مستعدًا لإرسال البيانات بعد؟",
+      "body": "استكشف {product} أولًا عبر متجر إلكتروني تجريبي: حادث قيد المعالجة، وجولة إرشادية عبر لوحات المعلومات والتنبيهات والسجلات والتتبع والمقاييس ومسارات المعالجة.",
+      "cta": "استكشف باستخدام بيانات العينة"
+    },
+    "header": {
+      "label": "بيانات العينة",
+      "try": "جرّب بيانات العينة",
+      "finish": "إنهاء التحميل"
+    },
+    "dock": {
+      "details": "عرض التفاصيل"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "بياناتك الخاصة تصل الآن. احذف بيانات العينة حتى لا تختلط بلوحات المعلومات والتنبيهات وعمليات البحث.",
+        "keep": "احتفظ بها مؤقتًا",
+        "remove": "احذف بيانات العينة"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "تابع في الخلفية",
+      "progress": {
+        "title": "جارٍ إنشاء متجر العينة الخاص بك",
+        "body": "يستغرق هذا حوالي دقيقة. يمكنك إغلاق هذا الحوار، لكن أبقِ هذا التبويب مفتوحًا حتى ينتهي التحميل."
+      },
+      "ready": {
+        "title": "أصبح متجر العينة الخاص بك مباشرًا",
+        "startTour": "ابدأ الجولة الإرشادية",
+        "ownWay": "استكشف بنفسي"
+      },
+      "errorBody": "حدث خطأ ما أثناء التحميل. أعد المحاولة: يُعاد استخدام لوحات المعلومات والتنبيهات الموجودة بالفعل، ولا تُكرَّر."
+    },
+    "tour": {
+      "label": "جولة إرشادية",
+      "position": "جولة إرشادية · الخطوة {current} من {total}",
+      "pill": "الجولة {current}/{total}",
+      "done": "اكتملت الجولة",
+      "stepFailed": "تعذر فتح هذه الخطوة. حاول مرة أخرى.",
+      "minimize": "تصغير الجولة",
+      "close": "إنهاء الجولة",
+      "next": "التالي",
+      "capabilities": {
+        "dashboards": "لوحات المعلومات",
+        "alerts": "التنبيهات",
+        "logs": "بحث السجلات",
+        "traces": "التتبع",
+        "metrics": "المقاييس وPromQL",
+        "pipelines": "مسارات المعالجة"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "اكتشف المشكلة",
+          "body": "هذه نظرة عامة على خدمة واجهة المتجر. قفز كل من معدل الأخطاء وزمن استجابة إتمام الشراء خلال آخر 35 دقيقة.",
+          "look": "كل لوحة هي استعلام SQL. مرّر المؤشر فوق رسم بياني لمقارنة السلاسل، أو اسحب عبره للتكبير، أو افتح قائمة اللوحة لتحرير استعلامها."
+        },
+        "alert": {
+          "title": "أُطلق التنبيه بالفعل",
+          "body": "يشغّل تنبيه على أخطاء الدفع استعلام SQL على السجلات وفق جدول زمني، وأُطلق بمجرد أن تجاوزت الأخطاء حدّه.",
+          "look": "افتح تنبيهًا لعرض استعلامه وحدّه وجدوله الزمني. الوجهة التجريبية هي خطاف ويب بديل، لذا تظهر عمليات التسليم فاشلة: وجّهها إلى Slack أو البريد الإلكتروني أو PagerDuty للحصول على إشعارات حقيقية."
+        },
+        "logs": {
+          "title": "ابحث في الأخطاء",
+          "body": "السجلات مفلترة إلى أخطاء الدفع. تقول جميعها تقريبًا الشيء نفسه: انتهت المهلة أثناء الحصول على اتصال من التجمع.",
+          "look": "وسّع سجلًا لعرض كل حقل. انقر على قيمة حقل للتصفية بها، أو بدّل إلى وضع SQL للتجميع والتجميع الإحصائي."
+        },
+        "deploy": {
+          "title": "اكتشف ما الذي تغيّر",
+          "body": "طُرح Payment v2.15.0 قبل دقيقة واحدة من بدء الأخطاء، وقلّصت ملاحظات الإصدار الخاصة به تجمع الاتصالات إلى 20.",
+          "look": "هذا هو السبب الجذري، وقد وُجد بعملية بحث واحدة على السجلات نفسها. يعمل البحث النصي الكامل وبحث SQL على البيانات نفسها."
+        },
+        "traces": {
+          "title": "تتبّع طلبًا فاشلًا",
+          "body": "يتتبع كل تتبع عملية إتمام شراء واحدة عبر الخدمات. افتح واحدًا: يُظهر المخطط الشلالي خدمة الدفع وهي تنتظر 3 ثوانٍ للحصول على اتصال بقاعدة البيانات.",
+          "look": "تحمل السجلات معرّف التتبع نفسه، لذا يمكنك التنقل بين الامتداد وسجلاته في أي من الاتجاهين."
+        },
+        "metrics": {
+          "title": "أكّد باستخدام PromQL",
+          "body": "كمون p95 لكل خدمة، يُستعلم عنه باستخدام PromQL. يرتفع الدفع وإتمام الشراء معًا.",
+          "look": "توجد المقاييس في المحرك نفسه الذي توجد فيه السجلات والتتبعات، لذا فإن لوحة معلومات البنية التحتية مبنية بالكامل باستخدام PromQL."
+        },
+        "pipeline": {
+          "title": "عالج البيانات فور وصولها",
+          "body": "يشغّل مسار معالجة في الوقت الفعلي دالة VRL على كل سجل وصول، ويضيف client_os وis_mobile قبل تخزين السجل.",
+          "look": "افتح مسار المعالجة لعرض رسمه. يمكن لمسارات المعالجة تصفية البيانات وإثراؤها وتوجيهها وتنقيحها دون المساس بتطبيقاتك."
+        },
+        "business": {
+          "title": "قِس الأثر على الأعمال",
+          "body": "تغذّي السجلات نفسها لوحات معلومات الأعمال: عمليات الدفع الفاشلة، والإيرادات، والطلبات حسب طريقة الدفع.",
+          "look": "لا حاجة إلى أداة تحليلات منفصلة. يمكن لأي شيء في سجلاتك أن يصبح مؤشر أداء رئيسيًا (KPI)."
+        }
+      },
+      "finale": {
+        "title": "لقد وجدت السبب الجذري",
+        "body": "في غضون دقائق، انتقلت من ارتفاع مفاجئ على لوحة المعلومات إلى عملية النشر التي تسببت فيه، مع وجود كل الإشارات في مكان واحد.",
+        "connect": "اربط بياناتك الخاصة",
+        "restart": "أعد تشغيل الجولة",
+        "finish": "أنهِ الجولة"
+      }
     }
   },
   "recentSearches": {

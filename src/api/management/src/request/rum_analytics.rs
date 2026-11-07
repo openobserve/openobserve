@@ -226,7 +226,7 @@ pub async fn update_named_event(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RUM Product Analytics", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a RUM named event", "category": "rum"}))
+        ("x-o2-mcp" = json!({"description": "Delete a RUM named event", "category": "rum", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_named_event(Path((org_id, id)): Path<(String, String)>, query: Q) -> Response {
@@ -494,7 +494,7 @@ pub async fn update_funnel(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RUM Product Analytics", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a RUM saved funnel", "category": "rum"}))
+        ("x-o2-mcp" = json!({"description": "Delete a RUM saved funnel", "category": "rum", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_funnel(Path((org_id, id)): Path<(String, String)>, query: Q) -> Response {

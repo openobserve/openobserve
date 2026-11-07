@@ -1948,6 +1948,7 @@
     "billings": "การเรียกเก็บเงิน",
     "rum": "RUM",
     "settings": "การตั้งค่า",
+    "allSettings": "การตั้งค่าทั้งหมด",
     "iam": "การจัดการสิทธิ์ (IAM)",
     "report": "รายงาน",
     "pipeline": "ไปป์ไลน์ (Pipelines)",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "Only ZIP files are allowed"
     },
     "emptyState": {
-      "title": "Monitor your users with Real User Monitoring",
-      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
       "webApp": "Instrument a web app",
       "webAppDesc": "Add the OpenObserve RUM SDK to any {product} app",
       "sessionReplay": "Enable Session Replay",
       "sessionReplayDesc": "Record and replay user sessions to debug UX issues",
+      "title": "Monitor your users with Real User Monitoring",
+      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
       "learnMore": "Learn more:",
       "quickImpl": "Quick implementation guide",
       "blogPost": "Frontend monitoring basics"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "License & Usage",
     "copyLicenseId": "Copy license ID",
     "editionLbl": "Edition",
-    "limitPrefix": "· limit",
     "gbPerDay": "GB / day",
     "ofDailyLimitUsedToday": "of daily limit used today",
     "gbToday": "GB today",
@@ -3580,6 +3580,7 @@
     "usage_limits": "Usage Limits",
     "feature_comparison_lbl": "Feature Comparison",
     "feature_comparision_ent_msg": "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
+    "feature_comparision_ent_partial_msg": "คุณกำลังใช้ OpenObserve Enterprise Edition ฟีเจอร์บางรายการไม่อยู่ในไลเซนส์ของคุณ โปรดดูรายการด้านบน",
     "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
     "feature_comparision_os_msg": "You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.",
     "feature_comparision_good_news": "Good news: OpenObserve Enterprise Edition is completely free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "ไม่พบฟีเจอร์ที่ตรงกับการค้นหาของคุณ",
     "features_none": "ไม่มีฟีเจอร์ในกลุ่มนี้",
     "features_free_heading": "ฟรี รวมอยู่ในทุกสิทธิ์การใช้งาน",
+    "features_free_not_included": "ฟรี ไม่อยู่ในไลเซนส์ของคุณ",
     "features_new": "ใหม่ภายหลังสิทธิ์การใช้งานของคุณ",
     "features_filter_new": "ใหม่",
     "request_new_license": "Request new License",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "Your license is still active. Do you want to update it with the new license key?",
     "yes_update_license": "Yes, update license",
     "no_keep_current": "No, keep current",
+    "license_downgrade_title": "นำไปใช้คีย์ไลเซนส์นี้หรือไม่",
+    "license_downgrade_intro": "คีย์นี้จะแทนที่ไลเซนส์ปัจจุบันของคุณ",
+    "license_downgrade_expired": "คีย์นี้หมดอายุเมื่อ {date} ขีดจำกัดฟรี 50 GB/วันจะมีผล",
+    "license_downgrade_lose": "คุณจะสูญเสีย: {names}",
+    "license_downgrade_limit": "ขีดจำกัดรายวันเปลี่ยนจาก {old} เป็น {new}",
+    "license_downgrade_expiry": "วันหมดอายุเปลี่ยนจาก {old} เป็น {new}",
+    "license_limit_per_day": "{gb} GB/วัน",
     "header_button": {
       "cloud_features": "{product} Features",
       "enterprise_edition": "Edition: Enterprise",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "Try OpenObserve today for more efficient and performant observability.",
     "getStartedBannerAlt": "Get Started Banner",
     "getStartedHeading": "One last thing before we begin",
-    "hearAboutUsLabel": "How did you hear about us?",
     "hearAboutUsPlaceholder": "Eg. From a friend",
-    "whereDoYouWorkLabel": "Where do you work?",
     "whereDoYouWorkPlaceholder": "Company Name",
-    "agreeToTermsPrefix": "I have read and agree with the",
     "termsOfUse": "Terms of use",
-    "and": "and",
     "privacyPolicyStar": "Privacy policy*",
     "startTrialButton": "Start your 14-day Trial",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "Email is required",
     "emailInvalid": "Please enter a valid email",
     "passwordRequired": "Password is required",
-    "mustAcceptTerms": "You must accept the terms to continue",
     "getStarted": {
       "title": "Welcome to OpenObserve",
-      "subtitle": "Your 14-day trial has started. Two quick questions, then we'll take you to setup.",
-      "sourceLabel": "What do you want to send first?",
-      "optional": "(optional)",
-      "skip": "Skip questions",
-      "continue": "Continue",
-      "hearAboutUsPlaceholder": "For example, a colleague or a blog post",
-      "whereDoYouWorkPlaceholder": "Company or team",
-      "termsOfService": "Terms of service",
-      "privacyPolicy": "Privacy policy",
-      "agreeHint": "Needed to continue, even if you skip the questions.",
+      "skipForNow": "ข้ามไปก่อน",
+      "heard": {
+        "label": "คุณรู้จักเราจากที่ไหน?",
+        "placeholder": "เลือกตัวเลือก",
+        "thanks": "ขอบคุณ!"
+      },
+      "connect": {
+        "title": "เชื่อมต่อข้อมูลของคุณ",
+        "point1": "ขั้นตอนการตั้งค่าทีละขั้นสำหรับแต่ละแหล่งข้อมูล",
+        "point2": "ล็อก เมทริกซ์ และเทรซในที่เดียว",
+        "point3": "ดูเหตุการณ์แรกของคุณได้ภายในไม่กี่นาที",
+        "cta": "สำรวจแหล่งข้อมูล (Data Sources) อื่น ๆ"
+      },
+      "sample": {
+        "title": "สำรวจด้วยข้อมูลตัวอย่าง",
+        "point1": "ล็อก เทรซ และเมทริกซ์จากบริการตัวอย่าง",
+        "point2": "แดชบอร์ด การแจ้งเตือน ไปป์ไลน์ และฟังก์ชัน VRL",
+        "point3": "ทัวร์แนะนำ และคลิกเดียวเพื่อลบทั้งหมด",
+        "cta": "สำรวจด้วยข้อมูลตัวอย่าง"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux or VM host",
@@ -4094,7 +4108,28 @@
         "llm": "LLM or AI app",
         "agent": "Let an AI agent set it up",
         "unsure": "Not sure yet"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "เว็บเซิร์ฟเวอร์",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "เบราว์เซอร์ (RUM)",
+        "llm": "LLM หรือแอป AI",
+        "agent": "เอเจนต์ AI"
       }
+    },
+    "heardFrom": {
+      "question": "คุณพบเราได้อย่างไร?",
+      "quickQuestion": "คำถามสั้น ๆ: คุณพบเราได้อย่างไร?",
+      "skip": "ข้าม",
+      "searchEngine": "เครื่องมือค้นหา",
+      "friendOrColleague": "เพื่อนหรือเพื่อนร่วมงาน",
+      "aiAssistant": "ผู้ช่วย AI",
+      "other": "อื่น ๆ",
+      "thanks": "ขอบคุณที่บอกเรา!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.",
     "addFieldsTitle": "Add Fields",
     "dataRetentionDaysLabel": "Data Retention (days)",
-    "globalRetentionDays": "Global retention is {days} days",
-    "retentionMinOneDay": "Retention period must be at least 1 day",
+    "retentionDefaultDays": "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นสำหรับสตรีมประเภทนี้: {days} วัน",
+    "retentionDefaultForever": "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นสำหรับสตรีมประเภทนี้: เก็บไว้ตลอดไป",
     "maxQueryRangeHoursLabel": "Max Query Range (hours)",
     "maxQueryRangeHelp": "Maximum time range allowed for queries. Set 0 for unlimited range.",
     "globalFlattenLevel": "Global is {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
-  "connectDataSourcePopup": {
-    "title": "To get started, let's connect your first data source.",
-    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
-    "connectButton": "Connect a data source",
-    "slackLink": "Also join our Slack community"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "ดูว่าเวิร์กโหลดใดสื่อสารกัน: โฟลว์เครือข่าย eBPF",
       "k8sInstallerNote": "This installs cert-manager, the OpenTelemetry operator and the OpenObserve collector automatically.",
       "k8sInternalEndpointNote": "Use this when OpenObserve runs in this same cluster — traffic never leaves it.",
+      "k8sTraceAppsTitle": "สร้างเทรซสำหรับแอปของคุณ",
+      "k8sTraceEbpfDesc": "เปิดใช้การติดตามด้วย eBPF ใน collector แล้วเลือกแอปที่จะติดตามตามพอร์ต พาธไฟล์เรียกทำงาน หรือบรรทัดคำสั่ง",
+      "k8sTraceLibraryDesc": "ใส่คำอธิบาย (annotation) ให้เนมสเปซของแต่ละภาษา เพื่อให้ operator เพิ่มไลบรารีให้กับพอดในนั้น จากนั้นรีสตาร์ตแอปเหล่านั้นหนึ่งครั้ง",
       "k8sTroubleAnnotationA": "Injection happens at pod creation, so existing pods are unaffected until they restart — run `kubectl rollout restart deployment -n my-namespace`. Confirm the annotation landed with `kubectl get ns my-namespace -o yaml`, and check that the value matches `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "I annotated a namespace but no traces appear",
       "k8sTroubleEndpointA": "Use the **Internal endpoint** only when OpenObserve itself runs in this cluster; traffic then stays inside it and never crosses the network. The URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — the default assumes release `o2` in namespace `openobserve`, so edit it if yours differ. Everyone else uses the external endpoint.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "Sessions appear but screens are all named the same",
       "androidTroubleScreenNamesA": "View tracking is not wired up. Pass a `useViewTrackingStrategy(...)` — e.g. `ActivityViewTrackingStrategy(trackExtras = true)` for Activities, or `NavigationViewTrackingStrategy(...)` if you use AndroidX Navigation — when building the `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "แสดงคำแนะนำ",
       "snowflakeCollectorVersionNote": "Snowflake needs collector v0.92.0 — newer builds have a known bug.",
       "snowflakeTagline": "Collect Snowflake account metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
       "sqlClientGuiVariant": "SQL Client (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "The check below turns green when data arrives, or check Streams for the `cassandra_*` metrics.",
       "verifyDatabricksLogsDesc": "The check below turns green when data arrives, or open Logs and search `source:databricks`.",
       "verifyDataTitle": "Verify data in OpenObserve",
+      "checkYourDataTitle": "ตรวจสอบข้อมูลของคุณ",
       "verifyDynamodbLogsDesc": "The check below turns green when data arrives, or open Logs for the `dynamodb` stream once items change.",
       "verifyGcpLogsDesc": "Generate some activity in the project (or wait for the sink to match a log); the check below turns green when data arrives.",
       "verifyK8sDataDesc": "Give the collector a few seconds to start; the check below turns green when data arrives — cluster logs land in the `default` stream.",
@@ -10789,7 +10823,10 @@
     "contractManagedMessage": "Billing is handled through your contract — contact your account manager for changes",
     "upgradeToPlanMessage": "Upgrade to a plan to continue enjoying the services by OpenObserve.",
     "creditsUsedLabel": "credits used",
-    "licenseExpiryContactAdmin": "Please update your license by contacting your administrator.",
+    "licenseExpiredOn": "ไลเซนส์ของคุณหมดอายุเมื่อ {date} ฟีเจอร์ของคุณยังใช้งานได้",
+    "licenseExpiredLimit": "ขีดจำกัดฟรี {limit} GB/วันจะมีผลแล้ว: หากใช้เกินขีดจำกัดเกิน {allowed} วันในหนึ่งเดือน การค้นหาจะหยุดชั่วคราวจนกว่าคุณจะต่ออายุ",
+    "licenseAskAdminToRenew": "โปรดขอให้ผู้ดูแลไลเซนส์ของคุณต่ออายุ",
+    "renewLicense": "ต่ออายุไลเซนส์",
     "subscribed": "Subscribed",
     "invoiceHistory": "Invoice History",
     "amount": "Amount",
@@ -10933,7 +10970,6 @@
     "failedToLinkAwsSubscription": "Failed to link AWS subscription",
     "failedToLinkAzureSubscription": "Failed to link Azure subscription",
     "last15Minutes": "Last 15 minutes",
-    "licenseHasExpired": "Your license has expired",
     "numberOfPipelines": "Number of Pipelines",
     "oneDayUntilLicenseExpires": "1 day remaining until your license expires",
     "pleaseWaitProcessingRequest": "Please wait while we process your request...",
@@ -12658,6 +12694,8 @@
       "noDestinationNote": "Optional. The alert still runs and records its history, but no destination is notified.",
       "sendsToStatus": "Sends to {targets} each time the alert fires.",
       "oncallTeamTarget": "an on-call team",
+      "lockedWorkflowFallback": "เวิร์กโฟลว์ที่ถูกล็อก",
+      "lockedTargetBadge": "ถูกล็อก",
       "createsIncident": "Creates Incident",
       "createsIncidentTooltip": "If an alert can create an incident, it does not send a dedicated notification. Instead, a notification for the incident is sent when a new incident is created or a new alert type joins an existing incident.",
       "incidentTitleTemplate": "ชื่อเรื่องเหตุการณ์ขัดข้อง",
@@ -12899,6 +12937,9 @@
       "lastTrained": "Last trained",
       "level": "Level",
       "lookBackWindow": "Look Back Window",
+      "scheduleIntervalFloor": "ช่วงเวลาตรวจสอบทุกครั้งต้องมีค่าอย่างน้อย {min}",
+      "lookBackWindowCap": "หน้าต่างย้อนหลังต้องไม่เกิน {max} ที่ความละเอียดการตรวจจับนี้: หน้าต่างที่ยาวกว่านี้จะบรรจุมากกว่า 100,000 บักเก็ต โปรดย่อหน้าต่างให้สั้นลง หรือใช้ความละเอียดการตรวจจับที่ยาวขึ้น",
+      "retrainOnEditNote": "การเปลี่ยนคิวรี ฟังก์ชัน หรือความละเอียดการตรวจจับจะฝึกสอนตัวตรวจจับนี้ใหม่ การตรวจจับจะหยุดชั่วคราวจนกว่าการฝึกสอนโมเดลจะสิ้นสุด",
       "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket when the first run fires, so that run would skip buckets.",
       "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but a first run can skip buckets until the window is raised.",
       "lookBackWindowMinimum": "At least {min}; {recommended} or more recommended for these settings.",
@@ -12911,6 +12952,9 @@
       "noDestinationsFound": "No destinations found",
       "noDetectionResults": "No detection results in this range yet",
       "noFieldsFound": "No fields found",
+      "checkDataNow": "ตรวจสอบตอนนี้",
+      "checkDataNowTooltip": "ประเมินข้อมูลปัจจุบันอีกครั้งตอนนี้โดยไม่ต้องรอการตรวจสอบอัตโนมัติครั้งถัดไป",
+      "dataReadinessReason": "เหตุผล",
       "noticeRetrain": "Auto-retraining",
       "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
       "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
@@ -12945,6 +12989,8 @@
       "autoUntrainedHelp": "Auto will learn a level from your history.",
       "autoTrainingHelp": "The level will appear when training completes.",
       "autoFailedHelp": "Training failed. No learned level yet. Review the training error above.",
+      "autoWaitingForDataHelp": "ยังมีข้อมูลการฝึกที่เหมาะสมไม่เพียงพอ จนกว่าจะถึงตอนนั้นจะไม่มีระดับที่เรียนรู้ ตัวตรวจจับยังคงเปิดใช้งานและจะตรวจสอบอีกครั้งโดยอัตโนมัติ",
+      "autoNotApplicableHelp": "ข้อมูลปัจจุบันไม่สามารถรองรับโมเดลความผิดปกติได้ นี่ไม่ใช่ความล้มเหลว ตัวตรวจจับยังคงเปิดใช้งานและจะตรวจสอบอีกครั้งโดยอัตโนมัติ",
       "autoRetrainingHelp": "Retraining. The last learned level is shown; model availability is unconfirmed.",
       "autoRetrainFailedHelp": "Retraining failed. The last learned level is shown; model availability is unconfirmed. Review the training error above.",
       "autoUnconfirmedHelp": "The last learned level is shown; an active model has not been confirmed.",
@@ -13182,6 +13228,7 @@
     "oncallTeamPlaceholder": "Route from ownership rules",
     "oncallTeamTooltip": "Which team this alert pages. Leave unset to work the team out from the alert's identity dimensions, which is the normal case — set one only when those dimensions cannot express the owner.",
     "oncallTeamNoTeams": "No on-call teams yet. Create one under On-Call Teams.",
+    "lockedTeamFallback": "ทีมที่ถูกล็อก",
     "oncallTeamAtFireTime": "From ownership",
     "oncallTeamFromRules": "No team is set on this alert, so the owner is worked out from the identity dimensions of the row that fires. Those are not known until it does.",
     "tags": "Tags",
@@ -14547,6 +14594,7 @@
     "separator_placeholder": "Enter separator (e.g., {'|'}, \\n, \\t, space)",
     "separator_hint": "Separator string to use between records (spaces allowed)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
     "loadingData": "Loading destination data...",
     "noEmailTemplates": "It looks like you haven't created any Email Templates yet.",
@@ -15483,6 +15531,20 @@
       "azureCredentials": "Azure Credentials",
       "awsRoleArn": "AWS Role ARN"
     },
+    "dataRetentionDefaults": {
+      "title": "ค่าเริ่มต้นการเก็บข้อมูล",
+      "about": "สำหรับสตรีมที่ไม่ได้กำหนดระยะเวลาเก็บรักษาข้อมูลของตัวเอง หากเว้นว่างหรือเป็น 0 จะใช้ค่าส่วนกลาง มิฉะนั้นต้องมีอย่างน้อย 3 วัน",
+      "defaultDays": "ค่าเริ่มต้น (วัน)",
+      "streamType": "ประเภทสตรีม",
+      "days": "วัน",
+      "addType": "เพิ่มประเภทสตรีม",
+      "removeType": "ลบประเภทสตรีมนี้",
+      "globalDefault": "ส่วนกลาง: {value}",
+      "globalType": "ส่วนกลาง {type}: {value}",
+      "daysValue": "{days} วัน",
+      "forever": "เก็บไว้ตลอดไป",
+      "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
       "settingsUpdated": "Organization settings updated successfully",
@@ -15512,9 +15574,7 @@
     },
     "licensePage": {
       "unexpectedError": "unexpected error",
-      "daysRemaining": "{days} days remaining until your license expires",
-      "oneDayRemaining": "1 day remaining until your license expires",
-      "licenseExpired": "Your license has expired"
+      "daysRemaining": "{days} days remaining until your license expires"
     },
     "nodesPage": {
       "subtitle": "Cluster nodes and their health",
@@ -23023,7 +23083,9 @@
         "ready": "Ready",
         "running": "Running",
         "training": "Training",
-        "waiting": "Waiting"
+        "waiting": "Waiting",
+        "waitingForData": "กำลังรอข้อมูล",
+        "notApplicable": "ไม่สามารถใช้ได้"
       },
       "anomalyStatus": {
         "active": "Active",
@@ -23031,7 +23093,9 @@
         "training": "Training",
         "failed": "Failed",
         "waiting": "Waiting",
-        "disabled": "ปิดใช้งาน"
+        "disabled": "ปิดใช้งาน",
+        "waitingForData": "กำลังรอข้อมูล",
+        "notApplicable": "ไม่สามารถใช้ได้"
       },
       "aiToolsetKind": {
         "skill": "Skill",
@@ -23394,7 +23458,6 @@
     },
     "login": {
       "somethingWentWrong": "Something went wrong",
-      "thankYouForYourFeedback": "Thank you for your feedback",
       "selectedSuggestion": "Selected suggestion \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Please fill all the fields and try again.",
       "invalidUsernameOrPassword": "Invalid username or password",
@@ -24128,6 +24191,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "เริ่มต้นใช้งาน",
     "reportDetail": "Report",
     "sharedChat": "Shared chat",
     "passwordPolicy": "Password Policy",
@@ -26853,10 +26917,6 @@
     "saveScheduleFailed": "Could not save the schedule",
     "policy": "Escalation policy",
     "policyIfNoAck": "If nobody acknowledges, after",
-    "policyRepeatTimes": "Run the ladder once | Run the ladder {count} times",
-    "policyFinalStop": "then stop",
-    "policyFinalNotifyDefault": "then notify the catch-all team",
-    "policyNoDefaultTeam": "No default team is nominated, so this is the same as stopping. Nominate one on the Routing tab.",
     "policyPrioritySilent": "{priority} pages nobody. Add a rung to change that — silence here is a decision, not an omission.",
     "policyDoneEditing": "Done editing",
     "policyHint": "Who gets paged at each priority, and how long after. These are defaults - change any of them.",
@@ -27336,9 +27396,6 @@
     "policyP1ParallelHint": "Nobody waits five minutes to find out the site is down.",
     "policyP4Pages": "Page for this priority as well",
     "policyP4PagesHint": "Off by default — a P4 that wakes someone is a severity bug.",
-    "policyFinalAction": "If nobody acknowledges",
-    "policyFinal_notifyDefaultTeam": "Notify the default team",
-    "policyFinal_stop": "Stop",
     "policySummaryTitle": "What this policy does right now",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "all at once",
@@ -27591,7 +27648,6 @@
     "ladderL0Off": "No AI SRE",
     "ladderStaleDefaultTag": "Ladder never learned the rotations",
     "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations — the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
-    "ladderEndsHandsOff": "The page hands off",
     "reachShortNoSmtp": "email only · no SMTP transport",
     "reachShortNoFromAddress": "อีเมลเท่านั้น · ไม่มีที่อยู่ผู้ส่ง",
     "reachShortNoAddress": "no address on file",
@@ -27717,7 +27773,6 @@
     "ladderEvery": "· every {duration}",
     "ladderEnd": "end",
     "ladderEndUnknown": "Nothing further is due.",
-    "ladderEndsDefaultTeam": "The rungs ran out — the default team was notified.",
     "rungLost": "failed",
     "rungLostTimes": "failed ×{count}",
     "routingDetails": "Routing details",
@@ -27732,7 +27787,6 @@
     "policyStepsSection": "Escalation steps",
     "policyChipSteps": "{count} step | {count} steps",
     "policyAddStep": "Add step",
-    "policyWhenStepsRunOut": "When the steps run out",
     "policyAppliesToNewPages": "Changes apply to new pages only.",
     "policySave": "บันทึก",
     "policyFix": "Fix",
@@ -27742,9 +27796,6 @@
     "policyEmailLockedBySlack": "อีเมลยังคงเปิดอยู่คู่กับ Slack: ผู้ที่ไม่มีบัญชี Slack ที่เชื่อมโยงไว้ยังคงได้รับอีเมล",
     "policyNoProvider": "No phone provider is connected, so SMS and Voice are skipped and these pages go by email.",
     "policyNoProviderLink": "Connect one in Settings → Telephony",
-    "policyEndOptionStop": "Run once, then stop | Run {count} times, then stop",
-    "policyEndOptionHandOff": "Run once, then hand off to the catch-all team | Run {count} times, then hand off to the catch-all team",
-    "policyEndOptionHandOffTo": "ทำงานหนึ่งครั้ง แล้วส่งต่อให้ {team} | ทำงาน {count} ครั้ง แล้วส่งต่อให้ {team}",
     "policyDeliveryTitle": "Delivery",
     "policyTodayIs": "today: {who}",
     "policyPeopleCount": "{count} person | {count} people",
@@ -27866,6 +27917,12 @@
     "ruleEditorTakesFrom": "รับการแจ้งเตือนจาก {team}",
     "ruleEditorKeptBy": "{team} ยังคงได้รับการแจ้งเตือนเหล่านี้: กฎของทีมมีความเฉพาะเจาะจงมากกว่า",
     "ruleEditorContends": "แข่งขันกับกฎของ {team}: กฎที่เฉพาะเจาะจงกว่าจะชนะ",
+    "ruleEditorFieldSourcesMore": "{fields} และอีก {count} รายการ",
+    "ruleEditorFieldsHelp": "ฟิลด์มาจากกลุ่มฟิลด์ความสัมพันธ์ของคุณ {link}",
+    "ruleEditorFieldsSource": "ฟิลด์มาจากกลุ่มฟิลด์ความสัมพันธ์ของคุณ",
+    "ruleEditorManageFieldGroups": "จัดการกลุ่มฟิลด์",
+    "ruleEditorDuplicatePath": "{team} มีกฎสำหรับเงื่อนไขเหล่านี้อยู่แล้ว โปรดแก้ไขกฎนั้นแทน",
+    "ruleEditorDuplicatePathSameTeam": "ทีมนี้มีกฎสำหรับเงื่อนไขเหล่านี้อยู่แล้ว",
     "routingTestRouting": "ทดสอบการกำหนดเส้นทาง",
     "routingTabNeedsOwnerPlain": "ต้องมีผู้รับผิดชอบ",
     "simulatorStartFrom": "เริ่มจาก",
@@ -29648,6 +29705,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "ล็อก เมทริกซ์ และเทรซจากเซิร์ฟเวอร์ Linux ใดก็ได้",
+      "windows": "ล็อกเหตุการณ์และเมทริกซ์จากเซิร์ฟเวอร์ Windows",
+      "macos": "ล็อกและเมทริกซ์จากเครื่อง Mac",
+      "aws": "ล็อกและเมทริกซ์จากบริการ AWS ของคุณ",
+      "googleCloud": "ล็อกจากโปรเจกต์ {gcp} ของคุณ ผ่านการสมัครรับแบบ push ของ {pubSub}",
+      "azure": "ล็อกกิจกรรมจากการสมัครรับ {azure} ของคุณ ผ่าน {eventHub}",
+      "postgresql": "เมทริกซ์การคิวรี การเชื่อมต่อ และการจำลองแบบ",
+      "mysql": "เมทริกซ์การคิวรี การเชื่อมต่อ และ InnoDB",
+      "mongodb": "เมทริกซ์การดำเนินงาน การเชื่อมต่อ และแคช",
+      "redis": "เมทริกซ์หน่วยความจำ คำสั่ง และคีย์สเปซ",
+      "sqlServer": "เมทริกซ์การคิวรี การรอ และบัฟเฟอร์",
+      "oracle": "เมทริกซ์เซสชัน สเปซตาราง และขีดจำกัดทรัพยากร",
+      "mariadb": "เมทริกซ์การคิวรี การเชื่อมต่อ และ InnoDB",
+      "elasticsearch": "สถานะสุขภาพของคลัสเตอร์ อินเด็กซ์ และโหนด",
+      "cassandra": "เมทริกซ์การอ่าน การเขียน และการคอมแพกชัน",
+      "dynamodb": "การเปลี่ยนแปลงของไอเท็ม (การแทรก การอัปเดต การลบ) เป็นล็อก ผ่าน {kinesisFirehose}",
+      "snowflake": "การใช้แวร์เฮาส์ การคิวรี และเครดิต",
+      "databricks": "ล็อกของโน้ตบุ๊ก ซึ่งส่งผ่าน API ของล็อก",
+      "couchdb": "เมทริกซ์คำขอ ฐานข้อมูล และรีพลิเคชัน",
+      "aerospike": "เมทริกซ์เนมสเปซ โหนด หน่วยความจำ และการเชื่อมต่อ",
+      "sapHana": "เมทริกซ์หน่วยความจำ CPU และบริการ",
+      "zookeeper": "เมทริกซ์ความหน่วง การเชื่อมต่อ และโหนด",
+      "nginx": "ล็อกการเข้าถึงและข้อผิดพลาด โดยมี {fluentBit} คอยอ่านตาม",
+      "apache": "ล็อกการเข้าถึงและข้อผิดพลาด โดยมี {fluentBit} คอยอ่านตาม",
+      "iis": "ล็อกคำขอ โดยมี {fluentBit} คอยอ่านตาม",
+      "kafka": "เมทริกซ์บรอเกอร์ ท็อปิก และแล็กของคอนซูเมอร์",
+      "rabbitmq": "ความลึกของคิว อัตราข้อความ และเมทริกซ์โหนด",
+      "nats": "เมทริกซ์การเชื่อมต่อ ข้อความ และสตรีม",
+      "prometheus": "ส่งเมทริกซ์ที่คุณเก็บอยู่แล้วผ่าน remote write",
+      "telegraf": "ส่งเมทริกซ์จากเอเจนต์ที่คุณรันอยู่แล้ว",
+      "opentelemetryCollector": "ชี้คอลเลกเตอร์ที่คุณรันอยู่แล้วมาที่นี่",
+      "cloudwatch": "สตรีมเมทริกซ์ออกจากบัญชี AWS ของคุณ",
+      "gpu": "การใช้งาน หน่วยความจำ และอุณหภูมิต่อ GPU ของ {nvidia}",
+      "networkFlows": "โฟลว์ทราฟฟิกระหว่างโฮสต์และเครือข่ายของคุณ",
+      "fluentBit": "ตัวส่งต่อล็อกน้ำหนักเบาสำหรับโฮสต์และ Kubernetes",
+      "fluentd": "ตัวเก็บล็อกที่มีชุดปลั๊กอินจำนวนมาก",
+      "vector": "ไปป์ไลน์ความเร็วสูงสำหรับล็อกและเมทริกซ์",
+      "filebeat": "ส่งไฟล์ล็อกด้วยเอเจนต์น้ำหนักเบา",
+      "logstash": "ส่งล็อกจากไปป์ไลน์ที่มีอยู่แล้ว",
+      "syslogNg": "ส่งต่อ syslog จากเซิร์ฟเวอร์ของคุณ",
+      "loongcollector": "เอเจนต์ล็อกและเมทริกซ์สำหรับโฮสต์และคอนเทนเนอร์",
+      "splunkHec": "คงผู้ส่ง HTTP Event Collector ของคุณไว้ตามเดิม",
+      "cribl": "กำหนดเส้นทางข้อมูลจากไปป์ไลน์ที่คุณรันอยู่แล้ว",
+      "kinesisFirehose": "สตรีมล็อกจาก delivery stream ใน AWS",
+      "googleCloudLogs": "ส่งออกล็อกจากโปรเจกต์ของคุณผ่าน log sink",
+      "okta": "เหตุการณ์การลงชื่อเข้าใช้และเหตุการณ์ตรวจสอบของผู้ดูแลระบบ",
+      "office365": "ล็อกการตรวจสอบอีเมล ไฟล์ และผู้ดูแลระบบ",
+      "googleWorkspace": "ล็อกการตรวจสอบการเข้าสู่ระบบและผู้ดูแลระบบ",
+      "falco": "การแจ้งเตือนความปลอดภัยขณะรันจากคอนเทนเนอร์",
+      "osquery": "สถานะเอนด์พอยต์ในรูปแบบล็อกที่คุณคิวรีได้",
+      "jumpcloud": "เหตุการณ์ไดเรกทอรีและการเข้าสู่ระบบ",
+      "openvpn": "ล็อกการเชื่อมต่อ VPN และเซสชัน",
+      "githubActions": "ล็อกการทำงานของเวิร์กโฟลว์และงานประมวลผล",
+      "jenkins": "ล็อกการบิลด์และเหตุการณ์ในไปป์ไลน์",
+      "terraform": "ล็อกการวางแผนและการนำไปใช้จากการรันของคุณ",
+      "ansible": "ล็อกการทำงานของเพลย์บุ๊กและผลลัพธ์",
+      "vercel": "ล็อกการดีพลอยและล็อกฟังก์ชัน",
+      "heroku": "ล็อกแอปและเราเตอร์จาก log drain",
+      "airflow": "ล็อกการทำงานของ DAG และเมทริกซ์ของทาสก์",
+      "airbyte": "ล็อกและสถานะของงานประมวลผลซิงก์",
+      "languageTile": "เทรซด้วย SDK {otel} พร้อมการทำ instrumentation อัตโนมัติในภาษาที่รองรับ",
+      "aiIntegration": "เทรซของการเรียกในแอป AI ของคุณ พร้อมโทเค็นและค่าใช้จ่ายสำหรับการเรียกโมเดล"
+    },
+    "skipToApp": "ข้ามไปที่แอป",
+    "chooseTitle": "คุณต้องการตรวจสอบอะไรก่อน",
+    "back": "ย้อนกลับ",
+    "searchGuides": "ค้นหา {count} คู่มือ | ค้นหา {count} คู่มือ",
+    "showMore": "แสดง {count} รายการเพิ่มเติม | แสดง {count} รายการเพิ่มเติม",
+    "noMatch": "ไม่พบคู่มือที่ตรงกับ \"{query}\" ที่นี่",
+    "foundElsewhere": "พบในตัวเลือกอื่น:",
+    "inChoice": "ใน {choice}",
+    "tryShorter": "ลองใช้ชื่อที่สั้นลง เครื่องมือใดก็สามารถ {link} ได้เช่นกัน",
+    "sendOverHttp": "ส่งล็อกผ่าน HTTP",
+    "clearSearch": "ล้างการค้นหา",
+    "othersTitle": "วิธีอื่นในการเริ่มต้น",
+    "whatYouGet": "สิ่งที่คุณจะได้รับ",
+    "signals": {
+      "metrics": "เมทริกซ์",
+      "logs": "ล็อก",
+      "traces": "เทรซ",
+      "profiles": "โพรไฟล์",
+      "sessions": "เซสชัน",
+      "errors": "ข้อผิดพลาด",
+      "webVitals": "Web vitals (เว็บ)",
+      "replays": "การรีเพลย์เซสชัน",
+      "tokens": "โทเค็น",
+      "cost": "ค่าใช้จ่าย",
+      "latency": "ความหน่วง",
+      "uptime": "อัปไทม์",
+      "certificates": "ใบรับรอง"
+    },
+    "example": {
+      "caption": {
+        "row": "ตัวอย่างหน้าจอ: สิ่งที่ {product} แสดงสำหรับ {name}",
+        "infrastructure": "ตัวอย่างหน้าจอ: ภาพรวมคลัสเตอร์ {k8s} พร้อม CPU หน่วยความจำ และสุขภาพของพอด",
+        "backend": "ตัวอย่างหน้าจอ: แผนภาพน้ำตกของเทรซการชำระเงินที่ล้มเหลว พร้อม 21 สแปนใน 9 บริการ",
+        "frontend": "ตัวอย่างหน้าจอ: Web vitals ของ {rum} จากเซสชันผู้ใช้จริง",
+        "logs": "ตัวอย่างหน้าจอ: การค้นหาล็อกพร้อมฮิสโตแกรมและบรรทัดล็อกที่ตรงกัน",
+        "llm": "ตัวอย่างหน้าจอ: {insights} พร้อมค่าใช้จ่าย โทเค็น และความหน่วงตามโมเดล รวมถึงเทรซและข้อผิดพลาดเมื่อเวลาผ่านไป",
+        "agent": "ตัวอย่างหน้าจอ: หน้าเซิร์ฟเวอร์ {mcp} ที่เอเจนต์เขียนโค้ดของคุณเชื่อมต่อ",
+        "synthetics": "ตัวอย่างหน้าจอ: ผลลัพธ์ของการตรวจสอบ {http} หนึ่งรายการใน 3 ตำแหน่ง"
+      }
+    },
+    "guide": {
+      "agentTitle": "อยากใช้เอเจนต์เขียนโค้ดแทนไหม",
+      "agentSteps": "รันคำสั่งนี้ในเทอร์มินัลของคุณ จากนั้นส่งพรอมป์ต์หรือไฟล์ให้ {claudeCode}, {cursor} หรือ {codex}",
+      "copyPrompt": "คัดลอกพรอมป์ต์",
+      "downloadFile": "ดาวน์โหลด .md",
+      "inviteTitle": "ไม่มีสิทธิ์เข้าถึง?",
+      "inviteText": "เชิญเพื่อนร่วมทีมที่สามารถรันคำสั่งได้",
+      "inviteAction": "เชิญเพื่อนร่วมทีม",
+      "loadFailed": "คู่มือนี้โหลดไม่สำเร็จ",
+      "openInApp": "เปิดในแหล่งข้อมูล (Data Sources)",
+      "languageText": "สำหรับ {language} ให้เพิ่ม {otelSdk} พร้อมการทำ instrumentation อัตโนมัติในกรณีที่ {language} มี จากนั้นชี้ไปที่ {product} ด้วยการตั้งค่าด้านล่าง",
+      "languageLink": "{otel} คู่มือ {language}"
+    },
+    "rail": {
+      "label": "ความคืบหน้าการตั้งค่า",
+      "check": "ตรวจสอบข้อมูลของคุณ",
+      "received": "ได้รับข้อมูลแล้ว",
+      "attention": "ต้องได้รับการดูแล",
+      "waitingShort": "กำลังรอข้อมูล",
+      "title": "ตั้งค่า {name}",
+      "run": "เรียกใช้คำสั่งตั้งค่า",
+      "explore": "สำรวจข้อมูลของคุณ"
+    },
+    "firstData": {
+      "title": "ข้อมูลของคุณกำลังมาถึง",
+      "count": "{count} รายการมาถึงใน {stream} | {count} รายการมาถึงใน {stream}",
+      "exploreLogs": "สำรวจล็อกของคุณ",
+      "exploreMetrics": "สำรวจเมทริกซ์ของคุณ",
+      "exploreTraces": "สำรวจเทรซของคุณ",
+      "exploreProfiles": "สำรวจโพรไฟล์ของคุณ",
+      "addAnother": "เพิ่มแหล่งข้อมูลอื่น"
+    },
+    "others": {
+      "synthetics": {
+        "name": "การตรวจสอบสังเคราะห์",
+        "description": "ตรวจสอบเว็บไซต์ API พอร์ต หรือใบรับรอง ไม่ต้องติดตั้ง.",
+        "gets": "เรียกใช้การตรวจสอบตามกำหนดเวลาจากภายนอกเครือข่ายของคุณ."
+      },
+      "invite": {
+        "name": "เชิญเพื่อนร่วมทีมมาตั้งค่า",
+        "description": "พวกเขาจะได้รับคำเชิญให้เข้าร่วมองค์กรของคุณ."
+      },
+      "agent": {
+        "name": "ตั้งค่าด้วยเอเจนต์เขียนโค้ดของคุณ",
+        "description": "ป้อนพรอมป์ต์เดียวให้ {claudeCode}, {cursor} หรือ {codex}.",
+        "gets": "เอเจนต์เขียนโค้ดของคุณจะเพิ่มการตั้งค่าและตรวจสอบว่าข้อมูลมาถึงแล้ว."
+      }
+    },
+    "agentLink": "หรือให้เอเจนต์เขียนโค้ดของคุณจัดการ",
+    "stepDone": "(เสร็จแล้ว)",
+    "agent": {
+      "crumb": "เอเจนต์เขียนโค้ด",
+      "title": "ตั้งค่าด้วยเอเจนต์เขียนโค้ดของคุณ",
+      "lead": "{claudeCode}, {cursor}, {codex} หรือเอเจนต์เขียนโค้ดใด ๆ จะอ่านโปรเจกต์ของคุณ เพิ่มการตั้งค่า และตรวจสอบว่าข้อมูลมาถึงแล้ว โดยจะถามคุณก่อนติดตั้งสิ่งใดหรือแก้ไขไฟล์การดีพลอย.",
+      "tokenTitle": "บันทึกโทเค็นของคุณ",
+      "tokenText": "เรียกใช้คำสั่งนี้ในเทอร์มินัลที่คุณจะเริ่มเอเจนต์เขียนโค้ด ก่อนเริ่มใช้งาน.",
+      "powerShell": "ใน {powerShell}:",
+      "copyPowerShell": "คัดลอกคำสั่ง {powerShell}",
+      "promptTitle": "คัดลอกพรอมป์ต์",
+      "focusLabel": "ตั้งค่า",
+      "focus": {
+        "kubernetes": "คลัสเตอร์ {k8s}",
+        "host": "โฮสต์ {linux}, {macos} หรือ {windows}",
+        "backend": "บริการแบ็กเอนด์ ({otel})",
+        "llm": "แอป LLM",
+        "frontend": "ฟรอนต์เอนด์เว็บ",
+        "logs": "เฉพาะล็อก"
+      },
+      "copyPrompt": "คัดลอกพรอมป์ต์",
+      "promptCopied": "คัดลอกพรอมป์ต์แล้ว",
+      "download": "ดาวน์โหลด .md",
+      "preview": "ดูตัวอย่างพรอมป์ต์",
+      "previewLines": "{count} บรรทัด | {count} บรรทัด",
+      "pasteTitle": "วางลงในเอเจนต์เขียนโค้ดของคุณ",
+      "other": "อื่น ๆ",
+      "hint": {
+        "claudeCode": "ในเทอร์มินัลเดียวกัน เรียกใช้ {command} ในโฟลเดอร์โปรเจกต์ของคุณ แล้ววางพรอมป์ต์.",
+        "cursor": "เริ่ม {product} จากเทอร์มินัลเดียวกันด้วย {command} เพื่อให้อ่านโทเค็นได้ จากนั้นวางพรอมป์ต์ลงในแชตของมัน.",
+        "codex": "ในเทอร์มินัลเดียวกัน เรียกใช้ {command} ในโฟลเดอร์โปรเจกต์ของคุณ แล้ววางพรอมป์ต์.",
+        "other": "เริ่มเอเจนต์เขียนโค้ดของคุณจากเทอร์มินัลเดียวกัน เพื่อให้อ่านโทเค็นได้ จากนั้นวางพรอมป์ต์ หรือให้ {file} แก่มัน."
+      },
+      "mcp": "เชื่อมต่อเซิร์ฟเวอร์ {mcp} เพื่อให้เอเจนต์เขียนโค้ดของคุณอ่านข้อมูลได้",
+      "aside": {
+        "eyebrow": "สิ่งที่พรอมป์ต์บอกเอเจนต์เขียนโค้ดของคุณ",
+        "title": "การเปลี่ยนแปลงเล็ก ๆ ที่ปลอดภัย",
+        "line1": "ค้นหาว่าโปรเจกต์รันอะไรอยู่",
+        "line2": "ทำการเปลี่ยนแปลงที่เล็กที่สุดที่ใช้งานได้",
+        "line3": "เก็บโทเค็นไว้ในสภาพแวดล้อม",
+        "line4": "ส่งเหตุการณ์ทดสอบหนึ่งรายการไปยังสตรีม {stream}",
+        "line5": "รายงานว่าไฟล์ใดมีการเปลี่ยนแปลง"
+      }
+    },
+    "collect": {
+      "continueToSetup": "ดำเนินการต่อเพื่อตั้งค่า",
+      "languages": "ภาษา",
+      "languagesRequired": "เลือกอย่างน้อยหนึ่งภาษา.",
+      "kubernetesCluster": {
+        "question": "เลือกสิ่งที่ต้องการเก็บจากคลัสเตอร์ของคุณ",
+        "off": {
+          "name": "ล็อกและเมทริกซ์",
+          "description": "สถานะสุขภาพของคลัสเตอร์และล็อกคอนเทนเนอร์ ใช้คำสั่งเดียว.",
+          "about": "ล็อกคอนเทนเนอร์ CPU และหน่วยความจำของทุกโหนดและพอด และเหตุการณ์ {k8s} ในรูปแบบล็อก จากคำสั่งติดตั้งเดียว."
+        },
+        "ebpf": {
+          "name": "เพิ่มเทรซด้วย eBPF",
+          "description": "ไม่ต้องแก้ไขโค้ด ใช้ได้กับทุกภาษา ต้องใช้เคอร์เนล Linux 5.8+ บนโหนดของคุณ.",
+          "about": "การติดตั้งแบบเดียวกัน พร้อมเพิ่มเทรซ คอลเลกเตอร์จะมองเห็นคำขอจากเคอร์เนล Linux แอปของคุณจึงไม่ต้องเปลี่ยนแปลง โดยจะเชื่อมโยงคำขอหนึ่งรายการข้ามบริการผ่าน HTTP แบบธรรมดาเท่านั้น."
+        },
+        "library": {
+          "name": "เพิ่มเทรซด้วยไลบรารีภาษา",
+          "description": "รายละเอียดต่อแอปมากขึ้น เลือกภาษาของคุณ แล้วรีสตาร์ตแอปหนึ่งครั้ง.",
+          "about": "การติดตั้งแบบเดียวกัน พร้อมเพิ่มเทรซ {otelOperator} จะเพิ่ม {otelLibrary} สำหรับแต่ละภาษาให้กับพอดในเนมสเปซที่คุณเลือก โค้ดของคุณไม่ต้องเปลี่ยนแปลง."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "เว็บเซิร์ฟเวอร์",
+      "messageQueues": "คิวข้อความ",
+      "metricsYouCollect": "เมทริกซ์ที่คุณเก็บอยู่แล้ว",
+      "gpuAndNetwork": "GPU และโฟลว์เครือข่าย",
+      "movingFromAnotherTool": "ย้ายจากเครื่องมืออื่น",
+      "cloudLogs": "ล็อกคลาวด์",
+      "securityTools": "เครื่องมือความปลอดภัย",
+      "cicdAndPlatforms": "CI/CD และแพลตฟอร์ม"
+    },
+    "infrastructure": {
+      "name": "โครงสร้างพื้นฐาน",
+      "description": "เซิร์ฟเวอร์, {k8s}, บัญชีคลาวด์ และฐานข้อมูล",
+      "gets": "ดูโฮสต์ พอด และบริการคลาวด์ทั้งหมดได้ในที่เดียว.",
+      "question": "คุณต้องการตรวจสอบโครงสร้างพื้นฐานอย่างไร?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "คลัสเตอร์ {k8s}",
+          "description": "ล็อก เมทริกซ์ และเหตุการณ์ {k8s} จากคำสั่งติดตั้งเดียว เพิ่มเทรซได้ด้วยอีกคำสั่งเดียว.",
+          "about": "ติดตั้ง {productCollector} ในคลัสเตอร์ของคุณด้วยคำสั่งเดียว คุณจะได้รับล็อกคอนเทนเนอร์ เหตุการณ์ {k8s} และเมทริกซ์ของคลัสเตอร์."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "โฮสต์ {linux}, {windows} หรือ {macos}",
+          "description": "ติดตั้ง {productAgent} เป็นบริการ",
+          "about": "เอเจนต์ตัวเดียวเก็บล็อกและเมทริกซ์จากโฮสต์ บน {linux} ยังสามารถเทรซโปรแกรมได้โดยไม่ต้องแก้ไขโค้ด.",
+          "question": "โฮสต์ของคุณใช้ระบบปฏิบัติการใด?"
+        },
+        "cloudAccount": {
+          "name": "บัญชีคลาวด์",
+          "description": "{aws}, {gcp} หรือ {azure}",
+          "about": "สตรีมล็อกจากบัญชีคลาวด์ของคุณ และเมทริกซ์จาก {aws} ไม่มีการรันสิ่งใดบนเซิร์ฟเวอร์ของคุณ.",
+          "question": "บัญชีของคุณอยู่บนคลาวด์ใด?"
+        },
+        "databases": {
+          "name": "ฐานข้อมูล",
+          "description": "{examples} และอีก {count} รายการ",
+          "about": "เก็บเมทริกซ์ของฐานข้อมูล โดยส่วนใหญ่ผ่าน {otelCollector}.",
+          "question": "คุณต้องการตรวจสอบฐานข้อมูลใด?"
+        },
+        "somethingElse": {
+          "name": "อย่างอื่น",
+          "description": "เว็บเซิร์ฟเวอร์, คิวข้อความ, {prometheus}, GPU และโฟลว์เครือข่าย",
+          "about": "เว็บเซิร์ฟเวอร์, คิวข้อความ, เมทริกซ์ที่คุณเก็บอยู่แล้ว, การใช้ GPU และโฟลว์เครือข่าย.",
+          "question": "คุณต้องการตรวจสอบอะไรอีก?"
+        }
+      }
+    },
+    "backend": {
+      "name": "แอปพลิเคชันแบ็กเอนด์",
+      "description": "เทรซจากบริการของคุณ และล็อกที่ SDK ของคุณส่งเข้ามา",
+      "gets": "ดูว่าคำขอแต่ละรายการเคลื่อนผ่านบริการของคุณอย่างไร.",
+      "question": "คุณต้องการเทรซบริการของคุณอย่างไร",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "เพิ่มไลบรารีลงในโค้ดของคุณ",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} หรือ {fastapi}",
+          "about": "เพิ่ม {otelLibrary} สำหรับภาษาของคุณ เทรซจะถูกส่งไปยัง {product}",
+          "question": "บริการของคุณเขียนด้วยภาษาใด"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "เวิร์กโหลด {k8s} โดยไม่ต้องแก้โค้ด",
+          "description": "การทำ instrumentation อัตโนมัติภายในคลัสเตอร์ของคุณ",
+          "about": "{otelOperator} จะเพิ่ม instrumentation ให้พอดในหนึ่งเนมสเปซ โดยไม่ต้องแก้โค้ดหรืออิมเมจ"
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "ภาษาใดก็ได้ด้วย {otel}",
+          "description": "ส่ง OTLP จากระบบที่คุณตั้งค่าเอง",
+          "about": "ชี้ {otelSdk} หรือคอลเลกเตอร์ใดก็ได้ไปยังเอนด์พอยต์ {product} ของคุณ"
+        },
+        "continuousProfiling": {
+          "name": "การทำโปรไฟล์ต่อเนื่อง",
+          "description": "โปรไฟล์ CPU และหน่วยความจำ",
+          "about": "ส่งต่อโปรไฟล์จากโปรไฟเลอร์ของคุณ ({go}, {java}, {rust} หรือโปรไฟเลอร์ eBPF) ผ่าน {otelCollector}"
+        }
+      }
+    },
+    "frontend": {
+      "name": "ฟรอนต์เอนด์และแอปมือถือ",
+      "description": "การตรวจสอบผู้ใช้จริงสำหรับเว็บและมือถือ",
+      "gets": "ดูประสบการณ์ใช้งานของผู้ใช้จริงในเว็บและแอปมือถือของคุณ",
+      "question": "แอปของคุณทำงานอยู่ที่ใด",
+      "rows": {
+        "browser": {
+          "name": "เบราว์เซอร์",
+          "description": "เว็บไซต์และเว็บแอป",
+          "about": "เพิ่ม {sdk} ลงในเว็บแอปของคุณ คุณจะได้รับข้อมูลการโหลดหน้า ข้อผิดพลาด และเซสชันจากเบราว์เซอร์จริง"
+        },
+        "reactNative": {
+          "description": "{ios} และ {android} จากโค้ดเบสเดียว",
+          "about": "เพิ่ม {sdk} ลงในแอป {platform} ของคุณ"
+        },
+        "android": {
+          "description": "แอป {android} แบบเนทีฟ",
+          "about": "เพิ่ม {sdk} ลงในแอป {platform} ของคุณ คุณจะได้รับข้อมูลเซสชัน การดูหน้าจอ ข้อผิดพลาด และการแครช"
+        },
+        "ios": {
+          "description": "แอป {ios} แบบเนทีฟ",
+          "about": "เพิ่ม {sdk} ลงในแอป {platform} ของคุณ คุณจะได้รับข้อมูลเซสชัน การดูหน้าจอ ข้อผิดพลาด และการแครช"
+        }
+      }
+    },
+    "logs": {
+      "name": "ล็อกจากแหล่งใดก็ได้",
+      "description": "ส่งล็อกจากตัวส่งล็อก บริการ หรือเครื่องมือใดก็ได้",
+      "gets": "ค้นหาและกรองทุกบรรทัดล็อก ไม่ว่าจะส่งมาจากที่ใด",
+      "question": "คุณต้องการส่งล็อกของคุณอย่างไร",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "จากตัวส่งล็อกที่คุณรันอยู่",
+          "description": "{examples} และอีก {count} รายการ",
+          "about": "ชี้ตัวส่งล็อกที่คุณรันอยู่แล้วไปยัง {product} โดยไม่ต้องมีเอเจนต์ใหม่",
+          "question": "คุณใช้ตัวส่งล็อกใดอยู่"
+        },
+        "overHttpWithCurl": {
+          "name": "ผ่าน HTTP ด้วย {curl}",
+          "description": "คำขอเดียวจากสคริปต์ใดก็ได้ ไม่ต้องติดตั้ง",
+          "about": "ส่งล็อก JSON จากสคริปต์หรือบริการใดก็ได้ด้วยคำขอ HTTP เพียงหนึ่งครั้ง"
+        },
+        "fromOpentelemetry": {
+          "name": "จาก {otel}",
+          "description": "ล็อก OTLP จาก SDK หรือคอลเลกเตอร์",
+          "about": "ส่งล็อกผ่าน OTLP จาก {otelSdk} หรือคอลเลกเตอร์"
+        },
+        "somethingElse": {
+          "name": "อย่างอื่น",
+          "description": "{splunk} หรือ {cribl}, ล็อกบนคลาวด์, เครื่องมือความปลอดภัย และ CI/CD",
+          "about": "ย้ายจาก {splunk} หรือ {cribl} หรือรวบรวมล็อกจากคลาวด์ เครื่องมือความปลอดภัย และ CI/CD ของคุณ",
+          "question": "ล็อกของคุณมาจากแหล่งอื่นใดอีกบ้าง"
+        }
+      }
+    },
+    "llm": {
+      "name": "แอป LLM และ AI",
+      "description": "เทรซการเรียก LLM, เอเจนต์ และเครื่องมือ",
+      "gets": "ดูการเรียก LLM การเรียกเครื่องมือ และขั้นตอนของเอเจนต์ทั้งหมด",
+      "question": "แอป AI ของคุณใช้อะไร",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents หรือ {assistantsApi}",
+          "about": "ติดตามทุกการเรียกที่ทำผ่าน {openaiSdk} พร้อมโทเค็น ต้นทุน และความหน่วง",
+          "question": "คุณใช้ไลบรารี {openai} ตัวใด"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} หรือ {claudeAgentSdk}",
+          "about": "ติดตามทุกการเรียกที่ทำผ่าน {anthropicSdk} พร้อมโทเค็น ต้นทุน และความหน่วง",
+          "question": "คุณใช้ไลบรารี {anthropic} ตัวใด"
+        },
+        "langchainOrLanggraph": {
+          "description": "เชน เอเจนต์ และกราฟ",
+          "about": "ติดตามแต่ละเชน ขั้นตอนของเอเจนต์ และการเรียกใช้เครื่องมือ",
+          "question": "คุณใช้ไลบรารี {langchain} ตัวใด"
+        },
+        "somethingElse": {
+          "name": "อื่น ๆ",
+          "description": "เฟรมเวิร์ก ผู้ให้บริการโมเดล เกตเวย์ และเครื่องมืออื่น ๆ",
+          "about": "เฟรมเวิร์ก ผู้ให้บริการโมเดล เกตเวย์ เครื่องมือแบบไม่ต้องเขียนโค้ด การวิเคราะห์ และเครื่องมือต่าง ๆ",
+          "question": "แอป AI ของคุณใช้อะไร"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Fleet management",
     "subtitle": "Enroll OpenTelemetry collectors, version their configurations and roll changes out safely",
@@ -30310,6 +30748,171 @@
       "receiverEvidence": "Refused by the {receiver} receiver",
       "legend": "Pipeline status",
       "legendToggle": "Show or hide this status on the map"
+    }
+  },
+  "sampleData": {
+    "delete": "ลบข้อมูลตัวอย่าง",
+    "loadForbidden": "คุณต้องมีสิทธิ์การเขียนในองค์กรนี้เพื่อโหลดข้อมูลตัวอย่าง",
+    "steps": {
+      "functions": "สร้างฟังก์ชัน",
+      "pipeline": "สร้างไปป์ไลน์แบบเรียลไทม์",
+      "telemetry": "สร้างและส่งล็อก เทรซ และเมทริกซ์",
+      "dashboards": "สร้างแดชบอร์ด",
+      "alerts": "สร้างการแจ้งเตือน",
+      "enrichment": "อัปโหลดตารางเจ้าของบริการ"
+    },
+    "progress": {
+      "loading": "กำลังโหลดข้อมูลตัวอย่าง…",
+      "done": "โหลดข้อมูลตัวอย่างแล้ว",
+      "counts": "{logs} รายการล็อก · {spans} สแปน · {metrics} จุดเมทริกซ์",
+      "skipped": "ข้าม",
+      "logs": "ล็อก",
+      "spans": "สแปน",
+      "metrics": "จุดเมทริกซ์"
+    },
+    "removeSteps": {
+      "alerts": "การแจ้งเตือน",
+      "alertDelivery": "เทมเพลตการแจ้งเตือนและเว็บฮุก",
+      "dashboards": "แดชบอร์ด",
+      "pipeline": "ไปป์ไลน์",
+      "functions": "ฟังก์ชัน",
+      "streams": "สตรีม"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "กำลังลบข้อมูลตัวอย่าง",
+        "body": "ขั้นตอนนี้ใช้เวลาสองสามวินาที คุณปิดกล่องโต้ตอบนี้ได้ แต่โปรดเปิดแท็บนี้ไว้จนกว่าจะเสร็จสิ้น",
+        "label": "กำลังลบข้อมูลตัวอย่าง…"
+      },
+      "done": {
+        "title": "ลบข้อมูลตัวอย่างแล้ว",
+        "body": "เซิร์ฟเวอร์จะลบข้อมูลที่จัดเก็บไว้เสร็จภายในไม่กี่นาที หลังจากนั้นคุณสามารถโหลดข้อมูลตัวอย่างได้อีกครั้ง",
+        "label": "ลบเสร็จสมบูรณ์",
+        "done": "เสร็จสิ้น",
+        "keptLabel": "เก็บไว้ เนื่องจากมีอย่างอื่นใช้งานอยู่:"
+      },
+      "failed": {
+        "title": "ไม่สามารถลบข้อมูลตัวอย่างได้ทั้งหมด",
+        "body": "ลองอีกครั้ง: รายการที่ถูกลบไปแล้วจะถูกข้าม",
+        "label": "การลบถูกหยุด",
+        "close": "ปิด",
+        "tryAgain": "ลองอีกครั้ง"
+      }
+    },
+    "removeConfirm": {
+      "title": "ลบข้อมูลตัวอย่างหรือไม่?",
+      "message": "การดำเนินการนี้จะลบสตรีมตัวอย่าง แดชบอร์ด การแจ้งเตือน ฟังก์ชัน และตารางเสริมข้อมูล ข้อมูลของคุณเองจะไม่ได้รับผลกระทบ"
+    },
+    "toast": {
+      "loaded": "โหลดข้อมูลตัวอย่างแล้ว ขอให้สนุกกับการสำรวจ!",
+      "loadFailed": "ไม่สามารถโหลดข้อมูลตัวอย่างได้",
+      "removed": "ลบข้อมูลตัวอย่างแล้ว",
+      "removedWithKept": "ลบข้อมูลตัวอย่างแล้ว {count} รายการตัวอย่างยังคงอยู่เนื่องจากมีสิ่งอื่นใช้งานอยู่. | ลบข้อมูลตัวอย่างแล้ว {count} รายการตัวอย่างยังคงอยู่เนื่องจากมีสิ่งอื่นใช้งานอยู่.",
+      "removeFailed": "ไม่สามารถลบข้อมูลตัวอย่างได้ทั้งหมด",
+      "removeWhileLoading": "โปรดรอให้ข้อมูลตัวอย่างโหลดเสร็จสิ้น."
+    },
+    "entry": {
+      "onboardingSource": "สำรวจข้อมูลตัวอย่าง"
+    },
+    "callout": {
+      "title": "ยังไม่พร้อมส่งข้อมูลใช่ไหม?",
+      "body": "สำรวจ {product} ด้วยร้านค้าออนไลน์ตัวอย่างก่อน: เหตุการณ์ขัดข้องที่กำลังเกิดขึ้น และทัวร์แนะนำผ่านแดชบอร์ด การแจ้งเตือน ล็อก เทรซ เมทริกซ์ และไปป์ไลน์.",
+      "cta": "สำรวจด้วยข้อมูลตัวอย่าง"
+    },
+    "header": {
+      "label": "ข้อมูลตัวอย่าง",
+      "try": "ลองใช้ข้อมูลตัวอย่าง",
+      "finish": "โหลดให้เสร็จสิ้น"
+    },
+    "dock": {
+      "details": "แสดงรายละเอียด"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "ข้อมูลของคุณกำลังเข้ามา ลบข้อมูลตัวอย่างเพื่อไม่ให้ปะปนเข้าไปในแดชบอร์ด การแจ้งเตือน และการค้นหาของคุณ.",
+        "keep": "เก็บไว้ก่อน",
+        "remove": "ลบข้อมูลตัวอย่าง"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "ดำเนินการต่อในเบื้องหลัง",
+      "progress": {
+        "title": "กำลังสร้างร้านค้าตัวอย่างของคุณ",
+        "body": "ใช้เวลาประมาณหนึ่งนาที คุณสามารถปิดกล่องโต้ตอบนี้ได้ แต่โปรดเปิดแท็บนี้ไว้จนกว่าการโหลดจะสิ้นสุด."
+      },
+      "ready": {
+        "title": "ร้านค้าตัวอย่างของคุณพร้อมใช้งานแล้ว",
+        "startTour": "เริ่มทัวร์แนะนำ",
+        "ownWay": "สำรวจด้วยตัวเอง"
+      },
+      "errorBody": "เกิดข้อผิดพลาดระหว่างการโหลด ลองอีกครั้ง: แดชบอร์ดและการแจ้งเตือนที่มีอยู่แล้วจะถูกนำกลับมาใช้ ไม่สร้างซ้ำ."
+    },
+    "tour": {
+      "label": "ทัวร์แนะนำ",
+      "position": "ทัวร์แนะนำ · ขั้นตอนที่ {current} จาก {total}",
+      "pill": "ทัวร์ {current}/{total}",
+      "done": "ทัวร์เสร็จสมบูรณ์",
+      "stepFailed": "ไม่สามารถเปิดขั้นตอนนี้ได้ ลองอีกครั้ง.",
+      "minimize": "ย่อทัวร์",
+      "close": "จบทัวร์",
+      "next": "ถัดไป",
+      "capabilities": {
+        "dashboards": "แดชบอร์ด",
+        "alerts": "การแจ้งเตือน",
+        "logs": "ค้นหาล็อก",
+        "traces": "การติดตามเทรซ",
+        "metrics": "เมทริกซ์และ PromQL",
+        "pipelines": "ไปป์ไลน์"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "ระบุปัญหา",
+          "body": "นี่คือภาพรวมบริการของหน้าร้าน อัตราข้อผิดพลาดและความหน่วงของขั้นตอนชำระเงินต่างพุ่งสูงขึ้นในช่วง 35 นาทีที่ผ่านมา.",
+          "look": "ทุกพาเนลเป็นคิวรี SQL วางเมาส์เหนือแผนภูมิเพื่อเปรียบเทียบชุดข้อมูล ลากผ่านแผนภูมิเพื่อซูม หรือเปิดเมนูของพาเนลเพื่อแก้ไขคิวรี."
+        },
+        "alert": {
+          "title": "การแจ้งเตือนถูกทริกเกอร์ไปแล้ว",
+          "body": "การแจ้งเตือนเกี่ยวกับข้อผิดพลาดในการชำระเงินจะรันคิวรี SQL กับล็อกตามกำหนดเวลา และแจ้งเตือนทันทีที่ข้อผิดพลาดเกินเกณฑ์ที่กำหนด.",
+          "look": "เปิดการแจ้งเตือนเพื่อดูคิวรี เกณฑ์ และกำหนดเวลา ปลายทางตัวอย่างเป็นเว็บฮุกชั่วคราว ดังนั้นการจัดส่งจะแสดงว่าล้มเหลว: ชี้ไปที่ Slack อีเมล หรือ PagerDuty เพื่อรับการแจ้งเตือนจริง."
+        },
+        "logs": {
+          "title": "ค้นหาข้อผิดพลาด",
+          "body": "ล็อกที่ถูกกรองให้เหลือเฉพาะข้อผิดพลาดในการชำระเงิน เกือบทั้งหมดระบุข้อความเดียวกัน: หมดเวลาในการขอเชื่อมต่อจากพูล.",
+          "look": "ขยายเรกคอร์ดเพื่อดูทุกฟิลด์ คลิกที่ค่าฟิลด์เพื่อใช้ค่านั้นเป็นตัวกรอง หรือสลับไปยังโหมด SQL เพื่อจัดกลุ่มและรวมข้อมูล."
+        },
+        "deploy": {
+          "title": "ค้นหาสิ่งที่เปลี่ยนแปลง",
+          "body": "Payment v2.15.0 ถูกปล่อยใช้งานหนึ่งนาทีก่อนที่ข้อผิดพลาดจะเริ่มขึ้น และบันทึกประจำรุ่นระบุว่าลดพูลการเชื่อมต่อเหลือ 20.",
+          "look": "นั่นคือสาเหตุรากที่พบได้ด้วยการค้นหาครั้งเดียวบนล็อกชุดเดียวกัน การค้นหาแบบเต็มข้อความและ SQL ทำงานบนข้อมูลชุดเดียวกัน."
+        },
+        "traces": {
+          "title": "ติดตามคำขอที่ล้มเหลว",
+          "body": "แต่ละเทรซจะติดตามการชำระเงินหนึ่งครั้งข้ามบริการต่างๆ เปิดเทรซหนึ่งรายการ: มุมมองวอเตอร์ฟอลล์แสดงให้เห็นบริการชำระเงินที่รอการเชื่อมต่อฐานข้อมูลเป็นเวลา 3 วินาที.",
+          "look": "ล็อกมี Trace ID เดียวกัน ดังนั้นคุณจึงสลับไปมาระหว่างสแปนกับล็อกของสแปนนั้นได้ทั้งสองทิศทาง"
+        },
+        "metrics": {
+          "title": "ยืนยันด้วย PromQL",
+          "body": "ความหน่วง p95 ของทุกบริการซึ่งคิวรีด้วย PromQL โดย payment และ checkout เพิ่มสูงขึ้นพร้อมกัน",
+          "look": "เมทริกซ์อยู่ในเอนจินเดียวกับล็อกและเทรซ ดังนั้นแดชบอร์ด Infrastructure จึงสร้างขึ้นจาก PromQL ทั้งหมด"
+        },
+        "pipeline": {
+          "title": "ประมวลผลข้อมูลเมื่อมาถึง",
+          "body": "ไปป์ไลน์เรียลไทม์เรียกใช้ฟังก์ชัน VRL กับล็อกการเข้าถึงทุกรายการ โดยเพิ่ม client_os และ is_mobile ก่อนจัดเก็บระเบียน",
+          "look": "เปิดไปป์ไลน์เพื่อดูกราฟ ไปป์ไลน์สามารถกรอง เสริมข้อมูล กำหนดเส้นทาง และปกปิดข้อมูล โดยไม่ต้องแตะแอปของคุณ"
+        },
+        "business": {
+          "title": "วัดผลกระทบต่อธุรกิจ",
+          "body": "ล็อกชุดเดียวกันขับเคลื่อนแดชบอร์ดธุรกิจ: การเช็กเอาต์ที่ล้มเหลว รายได้ และคำสั่งซื้อตามวิธีการชำระเงิน",
+          "look": "ไม่ต้องใช้เครื่องมือวิเคราะห์แยกต่างหาก สิ่งใดก็ตามในล็อกของคุณสามารถกลายเป็น KPI ได้"
+        }
+      },
+      "finale": {
+        "title": "คุณพบต้นตอของปัญหาแล้ว",
+        "body": "ภายในไม่กี่นาที คุณไล่จากการพุ่งขึ้นบนแดชบอร์ดไปจนถึงดีพลอยที่ก่อให้เกิดเหตุ โดยมีทุกสัญญาณรวมอยู่ในที่เดียว",
+        "connect": "เชื่อมต่อข้อมูลของคุณเอง",
+        "restart": "เริ่มทัวร์อีกครั้ง",
+        "finish": "จบทัวร์"
+      }
     }
   },
   "recentSearches": {

@@ -61,12 +61,7 @@ import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
 import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
-import {
-  applyDevicePixelRatio,
-  currentDevicePixelRatio,
-  isFractionalDevicePixelRatio,
-  useDevicePixelRatioChange,
-} from "@/composables/useDevicePixelRatio";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 
 echarts.use([
   TitleComponent,
@@ -163,11 +158,9 @@ export default defineComponent({
       appliedView = view;
     };
 
-    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
-    useDevicePixelRatioChange((ratio) => {
-      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
-      applyDevicePixelRatio(chart, ratio);
-    });
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     onMounted(async () => {
       await nextTick();
@@ -181,6 +174,7 @@ export default defineComponent({
         chart = echarts.init(chartRef.value, undefined, {
           devicePixelRatio: currentDevicePixelRatio(),
         });
+        syncPixelRatio();
       }
       applyOptions();
       window.addEventListener("resize", windowResizeEventCallback);

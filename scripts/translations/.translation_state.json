@@ -224,6 +224,7 @@
     "feature_audit_trail": "c1ada08ce13857e4",
     "feature_column_name": "3d377ae910dce03a",
     "feature_comparision_ent_msg": "a233d5a48cdf786c",
+    "feature_comparision_ent_partial_msg": "097c6d3d8a4292e2",
     "feature_comparision_good_news": "2b20ba986ad04bbf",
     "feature_comparision_os_msg": "85a6533db7a055eb",
     "feature_comparision_plan_detail": "bdbf096f89e5c908",
@@ -262,6 +263,7 @@
     "features_filter_free": "f411a1fb62758b4c",
     "features_filter_new": "18fdd549b2ed367a",
     "features_free_heading": "5892004a2a606ee5",
+    "features_free_not_included": "3fa15fd890e8b8fc",
     "features_group_heading": "98bb11ae86a0c557",
     "features_missing": "694943b3db420a2e",
     "features_new": "d9fe8aa562864fe0",
@@ -307,6 +309,12 @@
     "license_already_active_msg": "680d658396e707bf",
     "license_already_active_title": "e5ddbff09f6379d9",
     "license_auto_filled": "0b155fcabeddf346",
+    "license_downgrade_expired": "48762cffcf48a738",
+    "license_downgrade_expiry": "aa7bf530f07d86da",
+    "license_downgrade_intro": "cb5287b00f96971d",
+    "license_downgrade_limit": "22b29adb8b868729",
+    "license_downgrade_lose": "0b9a9a06e2f38057",
+    "license_downgrade_title": "90df81021b331f8c",
     "license_id": "ac7664e9f7e48c8c",
     "license_info": "11dee3c5430b3a5d",
     "license_info_msg": "b679ae33d7c65dbd",
@@ -315,6 +323,7 @@
     "license_key": "71fd251dc9380fc3",
     "license_key_copied": "d8e288a753f09597",
     "license_key_required": "6163938f018b1845",
+    "license_limit_per_day": "de5d21a3909bee3b",
     "license_refresh_success": "0f2cd83771c3bea6",
     "license_status_allowed_days": "353883968a5c0845",
     "license_status_allowed_days_value": "c8ccbb5560e6652b",
@@ -343,7 +352,6 @@
     "license_status_title": "c00d7707896afcf8",
     "license_status_unlimited": "11dde17d6c3e2098",
     "license_updated_success": "e78d60d84c14791e",
-    "limitPrefix": "e214add65f204153",
     "limit_exceeded_days": "011d824195927fec",
     "limit_exceeded_info": "f424f883d7106d64",
     "limit_exceeded_warning": "4a00b0cbca44c1fd",
@@ -3099,6 +3107,7 @@
     "templateDefaultBadge": "21b111cbfe6e8fca",
     "templateDefaultOption": "e438d9d6cfef95b1",
     "templateHelp": "e3ec081754554f55",
+    "templateUnifiedDefaultOption": "a1695b3cfcbe62b1",
     "test": "532eaabd9574880d",
     "updateTitle": "b32d4af613abab93",
     "url": "e7a241debad56609",
@@ -3650,6 +3659,8 @@
       "keepFiringForInvalid": "ee97626965c6f227",
       "keepFiringForTooLong": "6b51bedf93e498e7",
       "keepFiringForTooltip": "4cdffc5e5e35194b",
+      "lockedTargetBadge": "a424e33d90931d1e",
+      "lockedWorkflowFallback": "01f5d0826fdbb111",
       "noDestinationNote": "5c8e44b3a2068c1f",
       "noDestinationsAvailable": "acf8511c739a996b",
       "noTargetsAvailable": "52751fbdf6fbcd79",
@@ -3690,12 +3701,14 @@
       "autoLearnedHelp": "abcf514ddd277aec",
       "autoLearning": "6acaed647241a1bf",
       "autoLevel": "aafd72683ffefb9a",
+      "autoNotApplicableHelp": "9cf52e03b0d1d354",
       "autoRetrainFailedHelp": "f65ca03fc635bad3",
       "autoRetrainingHelp": "6fbe8776ac7c311f",
       "autoTrainingHelp": "9040e5eec64367a9",
       "autoUnavailable": "ca184496974204a0",
       "autoUnconfirmedHelp": "2ef3f29df5a7d862",
       "autoUntrainedHelp": "e79d03d7bac7bf12",
+      "autoWaitingForDataHelp": "47cc7706a33f1a81",
       "bandCaption": "100aeebd42b7f4af",
       "bandGrouping": "b3c6e63fa9679a23",
       "bandGroupingGlobal": "8001c27439650c5c",
@@ -3713,10 +3726,13 @@
       "budgetPeriod": "42f97902a8bd9e5c",
       "budgetRange": "179a79c296b0534d",
       "chartsTab": "f91cf6c6263dc004",
+      "checkDataNow": "2937cffb37abce97",
+      "checkDataNowTooltip": "bd00ac6a3b1331c8",
       "checkEvery": "4415b9ab79abee43",
       "checkEveryTooltip": "1d060aeac4423111",
       "currentLevel": "5918a52c57299daa",
       "customSensitivity": "44b3ed67ced1c69b",
+      "dataReadinessReason": "f81ab834de5f8491",
       "daysUnit": "ab51004e9d71a485",
       "detectionAlreadyRunning": "2789eb3a6fa86845",
       "detectionCharts": "bff6c2f71314f27d",
@@ -3741,6 +3757,7 @@
       "lastTrainedLevel": "e4ec1314134b5e95",
       "level": "1709305c9fa966d1",
       "lookBackWindow": "0e531159fda4205c",
+      "lookBackWindowCap": "90e30aa22d9cf1d3",
       "lookBackWindowFloor": "333ab13bfdd62c66",
       "lookBackWindowLegacy": "8b9af8a2a7faf8a9",
       "lookBackWindowMinimum": "193d805ada6a2214",
@@ -3771,8 +3788,10 @@
       "retrainEveryTooltip": "58f3d7ff0d271b4a",
       "retrainFourteenDays": "60acc36e5d51315d",
       "retrainNever": "6300ef800bb88429",
+      "retrainOnEditNote": "596cf4b4186b3ac8",
       "retrainOneDay": "fa665d95d29e83bc",
       "retrainSevenDays": "7f920bb639c93075",
+      "scheduleIntervalFloor": "c5b38e55864d12b1",
       "scoreChart": "813a7387c2c4c2f5",
       "scoreChartHint": "2cbda904b032a3ac",
       "scrollToBottom": "6a36c1b26f1c1ab7",
@@ -5375,6 +5394,7 @@
     "lastSuccessfulAt": "71df2f4d7df31454",
     "lastTriggered": "4bf20af9f685a903",
     "loadFailed": "90d9ff3754b18f8a",
+    "lockedTeamFallback": "fda0df917808eadc",
     "matchingMetricsFound": "e46dc18af800c66a",
     "matchingTypeFound": "7be30bb45261c401",
     "messages": {
@@ -7521,8 +7541,9 @@
     "invoiceHistoryLabel": "8f74e5015dd26f64",
     "invoiceStartDate": "8362c6a89137a8d0",
     "last15Minutes": "ab8bc7a0ff4bc54c",
-    "licenseExpiryContactAdmin": "324e5db725fb6df4",
-    "licenseHasExpired": "c026d44925dcd629",
+    "licenseAskAdminToRenew": "bfc69dd7961f46a2",
+    "licenseExpiredLimit": "7ab13112c12074e1",
+    "licenseExpiredOn": "d3c2b2f27db2626c",
     "manageSubscription": "cbc4ef9225a090f7",
     "memberSubscription": {
       "errorProcessing": "99f615a033ddbfc8",
@@ -7542,6 +7563,7 @@
     "proPlanLabel": "0ee0cdef83e013b7",
     "proPlanSubtitle": "e3bae0b2364cfce0",
     "remotePipelines": "b3b7f5179a96739b",
+    "renewLicense": "1ee87464761c2756",
     "search": "49c266baaaa70981",
     "status": "920e413c7d411b61",
     "subscribe": "cc0e38da9c41790b",
@@ -8405,11 +8427,13 @@
         "active": "92340695899bd2d8",
         "disabled": "75081b593d15cf6e",
         "failed": "031a8f0f659df890",
+        "notApplicable": "5237c96ac1a23b98",
         "paused": "e159b06187d369a0",
         "ready": "5fa7aac5375c5815",
         "running": "f4ccae29e1bb0c20",
         "training": "36a798e3f39239cc",
-        "waiting": "6e293a8c009e0011"
+        "waiting": "6e293a8c009e0011",
+        "waitingForData": "f5e39f01aef1aa42"
       },
       "alertType": {
         "anomalydetection": "71b2f039a57ca6f0",
@@ -8422,9 +8446,11 @@
         "active": "92340695899bd2d8",
         "disabled": "75081b593d15cf6e",
         "failed": "031a8f0f659df890",
+        "notApplicable": "5237c96ac1a23b98",
         "ready": "5fa7aac5375c5815",
         "training": "36a798e3f39239cc",
-        "waiting": "6e293a8c009e0011"
+        "waiting": "6e293a8c009e0011",
+        "waitingForData": "f5e39f01aef1aa42"
       },
       "authType": {
         "native": "d509e493885298a2"
@@ -8886,12 +8912,6 @@
     "ok": "565339bc4d33d728",
     "startFromNow": "b51cf273d8b6649a",
     "typeToConfirm": "4303fa70995f17f0"
-  },
-  "connectDataSourcePopup": {
-    "connectButton": "6f9ce9f34879bb33",
-    "description": "e3bfcb60996b7b1d",
-    "slackLink": "3a37b5feb4984ec3",
-    "title": "9c5541789be6984d"
   },
   "correlation": {
     "addCustomGroup": "460770f6d1bdad26",
@@ -16039,6 +16059,7 @@
       "autoInstrumentTracesTitle": "e1ba31a6608d38bc",
       "cassandraJmxNote": "95fdf11bd096b610",
       "cassandraTagline": "5f0c67946d5a4681",
+      "checkYourDataTitle": "47de4ba0d9285ec7",
       "checking": "ec963ffc911b8401",
       "checkingForLogs": "83024e4540298b9d",
       "checkingForMetrics": "c36921fb3f33302f",
@@ -16249,6 +16270,9 @@
       "k8sNetworkFlowsDesc": "ff40fa4596abcb07",
       "k8sNetworkFlowsNote": "f317e2bba99a032f",
       "k8sNetworkFlowsTitle": "78e2b5cf58d2ef0d",
+      "k8sTraceAppsTitle": "8a54d4564542c0e6",
+      "k8sTraceEbpfDesc": "5f4388530bde5f75",
+      "k8sTraceLibraryDesc": "fdd3ce9584672490",
       "k8sTroubleAnnotationA": "aaedaf1ae3dca70c",
       "k8sTroubleAnnotationQ": "f1d7d6ac036d9fd4",
       "k8sTroubleEndpointA": "9a233ffcb5cb08e9",
@@ -16490,6 +16514,7 @@
       "setupTime2Min": "836b4b943cfb95b1",
       "setupTime3Min": "77b80a94be77092a",
       "setupTime5Min": "c2801049aace0676",
+      "showStepInstructions": "4a0e4d79a5d85d7e",
       "snowflakeCollectorVersionNote": "963169becec2a1f9",
       "snowflakeTagline": "edde8b8bdff515da",
       "sqlClientGuiVariant": "c1032e99f707cc5a",
@@ -16841,7 +16866,6 @@
     "fieldsSelected": "2a289bb1a1510463",
     "flattenLevel": "2a10fffa401d015b",
     "globalFlattenLevel": "07967929eb2d64b2",
-    "globalRetentionDays": "df095f11f7b3cabd",
     "header": "bfd297afbf9e7430",
     "indexSize": "46c15729345abec3",
     "indexSizeIcon": "7d933f3139df1850",
@@ -16886,7 +16910,8 @@
     "refreshStats": "b6527ba62812e706",
     "removeFromInterestingFields": "69eee3d0e959621c",
     "removeSchemaField": "f02fab26d26ac2ab",
-    "retentionMinOneDay": "abeba0249c4388a5",
+    "retentionDefaultDays": "146603380308d815",
+    "retentionDefaultForever": "5270e9be55e5f952",
     "schemaHeader": "65f6e2b8ccdbe4e8",
     "schemaSettingsTab": "3a7e31290db900ec",
     "search": "60316f28d265a254",
@@ -16911,21 +16936,43 @@
     "waitLoading": "8bcb9e33c966ec82"
   },
   "login": {
-    "agreeToTermsPrefix": "e50432b1341c8f37",
-    "and": "6201111b83a0cb5b",
     "clickHere": "9e1e4d61655690fd",
     "copyrightNotice": "4377bed549e1ee1e",
     "email": "969ccbd3cf6300ec",
     "emailInvalid": "845babfef685e521",
     "emailRequired": "aae9291101244de9",
     "getStarted": {
-      "agreeHint": "20fffcd682fc43b7",
-      "continue": "31fbef162594de01",
-      "hearAboutUsPlaceholder": "0a65846feda8ab5e",
-      "optional": "0059798b7f7023e4",
-      "privacyPolicy": "ba445cff3898a3f2",
-      "skip": "83c68c12f780e498",
-      "sourceLabel": "ad844df99a44e3af",
+      "chips": {
+        "agent": "b48c8be327b363ef",
+        "cloud": "c068a878fe612f49",
+        "kubernetes": "a37d07fe30048d3a",
+        "linux": "002b6aabfbf385a4",
+        "llm": "e21ab1db771f9039",
+        "otel": "ccc542051b196db0",
+        "rum": "7d548a91e28a7d67",
+        "webserver": "fc0480b126ed3b2f",
+        "windows": "d598026a9cbc6050"
+      },
+      "connect": {
+        "cta": "1221b052aa0b6fae",
+        "point1": "38e1cc742305c02c",
+        "point2": "a1c92a1264dded53",
+        "point3": "bc271ca81069d27b",
+        "title": "ce7827c8aabd38f9"
+      },
+      "heard": {
+        "label": "9e19a4c422a4a3e8",
+        "placeholder": "0c15d491aff91155",
+        "thanks": "1aa7b1c1d5fb1fd6"
+      },
+      "sample": {
+        "cta": "b61129f303e74224",
+        "point1": "8f9e9d72429672dd",
+        "point2": "a0257a3645a69fe3",
+        "point3": "6a0988b53a129286",
+        "title": "b61129f303e74224"
+      },
+      "skipForNow": "1e157fdf03881392",
       "sources": {
         "agent": "4c67cf671fa306cc",
         "cloud": "9d0ec7f8d5b214e2",
@@ -16939,21 +16986,26 @@
         "webserver": "4184bb22d2814ec8",
         "windows": "5ffe0d489332a710"
       },
-      "subtitle": "07f3722715c6a83c",
-      "termsOfService": "e69e06144877d81c",
-      "title": "d0d442e9dbefd089",
-      "whereDoYouWorkPlaceholder": "b93f1bba9d050808"
+      "title": "d0d442e9dbefd089"
     },
     "getStartedBannerAlt": "82e80956a232b84f",
     "getStartedBannerMessage": "9da5d9ef987341fd",
     "getStartedHeading": "1b5da3f87ac69571",
-    "hearAboutUsLabel": "9e19a4c422a4a3e8",
     "hearAboutUsPlaceholder": "c469844a403f50e8",
+    "heardFrom": {
+      "aiAssistant": "ab6eb4ac63b58418",
+      "friendOrColleague": "268956898c79c0dd",
+      "other": "f97e9da0e3b879f0",
+      "question": "a70d12ed322c7bb0",
+      "quickQuestion": "2b3222d4f8c46d89",
+      "searchEngine": "39c05e0065bff21a",
+      "skip": "28d03596d24eeb4e",
+      "thanks": "dca0b3f8d8504384"
+    },
     "lockedOut": "1060caa91c04760a",
     "login": "9d6322c1f4d9d3f3",
     "loginAsInternalUser": "3d7f06d8cac9fdbf",
     "loginWithSso": "b31e8d76180ffb20",
-    "mustAcceptTerms": "0c6f13e880eb5cd2",
     "openObserveLogoAlt": "837a58c4dfa17277",
     "password": "e7cf3ef4f17c3999",
     "passwordRequired": "7aeae1412484f637",
@@ -16963,7 +17015,6 @@
     "startTrialButton": "3c01d91334e4b45b",
     "termsOfUse": "8c45a486e4b1cad8",
     "userEmail": "5809bbd8a352b6e8",
-    "whereDoYouWorkLabel": "0201d4d8b5a55714",
     "whereDoYouWorkPlaceholder": "b48362246239a266"
   },
   "logs": {
@@ -17290,6 +17341,7 @@
     "aiObservability": "207a795d37dc4181",
     "alertCalibration": "7eaddf684d3764dc",
     "alerts": "f62e9267d196c761",
+    "allSettings": "04d2e8f940a5c79c",
     "ariaCurrentPage": "2d08785a69ca2665",
     "ariaWithNotifications": "7fc82c75d66711e7",
     "autoobserve": "ad20fc33990fe784",
@@ -18082,6 +18134,387 @@
     "version": "dd167905de0defca",
     "waittimeLabel": "d14416729a751521"
   },
+  "onboarding": {
+    "agent": {
+      "aside": {
+        "eyebrow": "a9903d0896164486",
+        "line1": "a75e115d53e0c2e1",
+        "line2": "8d805061a9dc67ee",
+        "line3": "3c42dc4d686e011c",
+        "line4": "d8fd3142b4c045fd",
+        "line5": "fea6281f689f1829",
+        "title": "cf8436ae254c6b88"
+      },
+      "copyPowerShell": "0fdfb5bd60a54b26",
+      "copyPrompt": "ffc64b8bb8c4532d",
+      "crumb": "fcaf9f0203172c25",
+      "download": "4e8536851767647d",
+      "focus": {
+        "backend": "d690537797b32b3b",
+        "frontend": "5b30024c54b1db56",
+        "host": "69029e3f95e77a9b",
+        "kubernetes": "77a39ba2c8b38478",
+        "llm": "738620baedf8b620",
+        "logs": "2ce62e4022f69339"
+      },
+      "focusLabel": "4da10f1fbb17cac2",
+      "hint": {
+        "claudeCode": "2292bd517bc61b19",
+        "codex": "2292bd517bc61b19",
+        "cursor": "3d639792472ca7a5",
+        "other": "5df36ddd0a6718d5"
+      },
+      "lead": "e33e696693be8eb3",
+      "mcp": "010f413d5d5edd53",
+      "other": "f97e9da0e3b879f0",
+      "pasteTitle": "d20119e2cb6d04da",
+      "powerShell": "b2aa6e5eb592c05e",
+      "preview": "2c5deca7064ee9f2",
+      "previewLines": "e7b8886bd3dbee6c",
+      "promptCopied": "c55394776b1492cf",
+      "promptTitle": "9dfecf502304b626",
+      "title": "b4f38bebbdf958dd",
+      "tokenText": "80262167a0611abf",
+      "tokenTitle": "ad39e21bc2003b69"
+    },
+    "agentLink": "fa9e0c2779044655",
+    "back": "76900f1bfd16c8d4",
+    "backend": {
+      "description": "66853ea9d8ac530f",
+      "gets": "fc9260ea2e7a73f2",
+      "name": "37876a392d336b81",
+      "question": "43ed3ca5eca5299a",
+      "rows": {
+        "addALibraryToYourCode": {
+          "about": "895d0937d081712d",
+          "description": "56dbaaf669ac0119",
+          "name": "cc3e3972bb99b291",
+          "question": "4a2342c371530cfe"
+        },
+        "anyLanguageWithOpentelemetry": {
+          "about": "d39dad04236c69dd",
+          "description": "d3da24eb716028fb",
+          "name": "c5f76cac82f991bc"
+        },
+        "continuousProfiling": {
+          "about": "00535e1968ad45ea",
+          "description": "339270764c79690e",
+          "name": "a14da7311c1d0a0b"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "about": "80817a3778543ed1",
+          "description": "521d96a57e8b4c70",
+          "name": "fec88e899458e267"
+        }
+      }
+    },
+    "chooseTitle": "9590486bf9012d57",
+    "clearSearch": "81c2c4f30a4bec68",
+    "collect": {
+      "continueToSetup": "4f47dcc406434511",
+      "kubernetesCluster": {
+        "ebpf": {
+          "about": "4ba2021c65bf5e5d",
+          "description": "bc96458d64000ec0",
+          "name": "71e5f8ce2265cf52"
+        },
+        "library": {
+          "about": "b0b319232b42a10f",
+          "description": "5d8c3e73aeb67958",
+          "name": "d3caacceac9767de"
+        },
+        "off": {
+          "about": "2098714726feda43",
+          "description": "f47c9367d87f2e93",
+          "name": "c5ee4678f2011320"
+        },
+        "question": "b06fb0e77fec55f8"
+      },
+      "languages": "318655cea4bd2096",
+      "languagesRequired": "872cda5ab2af1b62"
+    },
+    "example": {
+      "caption": {
+        "agent": "82b0cfef8c96fd4f",
+        "backend": "2e6febd843655aaf",
+        "frontend": "950a185d9de4b3ca",
+        "infrastructure": "b3f2f9dea322e397",
+        "llm": "832feb67c54ddca2",
+        "logs": "151fe4b0ab1542dd",
+        "row": "d1195113cdd18970",
+        "synthetics": "44c51931624d6d51"
+      }
+    },
+    "firstData": {
+      "addAnother": "e34936d8ca0383a9",
+      "count": "3e3f8273c00d8f34",
+      "exploreLogs": "d249661ab4e7fb29",
+      "exploreMetrics": "6c94ca2aa069d6ed",
+      "exploreProfiles": "ae3211e05538d91e",
+      "exploreTraces": "72e2c991a0e1ec5d",
+      "title": "11b76cee1d92f1ab"
+    },
+    "foundElsewhere": "0653b799d206e698",
+    "frontend": {
+      "description": "c9913a9d989a827c",
+      "gets": "e273f393a7cfca2d",
+      "name": "4a525ea63d39a3cc",
+      "question": "e05721074220af38",
+      "rows": {
+        "android": {
+          "about": "85cec61ceab724fa",
+          "description": "bbdefd336a42b392"
+        },
+        "browser": {
+          "about": "253dad362a22f143",
+          "description": "e2b27ca4ba5d6e9b",
+          "name": "d31de1a5c5c8ba2a"
+        },
+        "ios": {
+          "about": "85cec61ceab724fa",
+          "description": "a02d45d4c32757bb"
+        },
+        "reactNative": {
+          "about": "f40d91f56e1a997c",
+          "description": "8c17ffd479eb645a"
+        }
+      }
+    },
+    "groups": {
+      "cicdAndPlatforms": "225bc7cfedb12b44",
+      "cloudLogs": "75821eb633d3ebe6",
+      "gpuAndNetwork": "713d964cf554fae9",
+      "messageQueues": "7982ed03d95f9c0e",
+      "metricsYouCollect": "d01e2f6221cc5f78",
+      "movingFromAnotherTool": "91282d77dc560e89",
+      "securityTools": "4488a7ad6c7760c4",
+      "webServers": "5a476143e01296ab"
+    },
+    "guide": {
+      "agentSteps": "3103e1b9864e3a6c",
+      "agentTitle": "6d906900dfbe3ace",
+      "copyPrompt": "80e0d17325ca6fd4",
+      "downloadFile": "4e8536851767647d",
+      "inviteAction": "22e3d3f01803d630",
+      "inviteText": "fd8b8609e0148a05",
+      "inviteTitle": "55d2a73bbd30d340",
+      "languageLink": "8ba175fff3d1b84d",
+      "languageText": "9f9fc2a8015365ad",
+      "loadFailed": "ffbb970a74a6b67a",
+      "openInApp": "675448e523f11f1c"
+    },
+    "guideAbout": {
+      "aerospike": "e8327dca41a891c2",
+      "aiIntegration": "5c106512abda1f0c",
+      "airbyte": "756f393a0a359d04",
+      "airflow": "25c080d4c91c774e",
+      "ansible": "2bbca098ab4c69ab",
+      "apache": "e0131d9db717d987",
+      "aws": "1d881779e5858ad8",
+      "azure": "2f0385d0d068043f",
+      "cassandra": "788c907a148c521b",
+      "cloudwatch": "71239290550fd494",
+      "couchdb": "147516d16cc49690",
+      "cribl": "79c34d745a073ab2",
+      "databricks": "89fdf8eed8e18791",
+      "dynamodb": "66940a3baed3231a",
+      "elasticsearch": "2d619bbed2b8ca8b",
+      "falco": "dd486e8588693dc8",
+      "filebeat": "b09c73f663820723",
+      "fluentBit": "c8678c6610dff13e",
+      "fluentd": "f0e7b781f236d7a6",
+      "githubActions": "d9d66176a9426c7c",
+      "googleCloud": "1ec53bdcecb980b8",
+      "googleCloudLogs": "8945ed4d4a34efcf",
+      "googleWorkspace": "172ed8b167693979",
+      "gpu": "f11f2b5e3ed8896b",
+      "heroku": "d7f942788fb0addc",
+      "iis": "2c7f720c881bf254",
+      "jenkins": "adebcb9cd0bada71",
+      "jumpcloud": "930da38dc76bf332",
+      "kafka": "f7a6c4769ff81a41",
+      "kinesisFirehose": "f88d16b4d571a4c8",
+      "languageTile": "90ec6323b5beee71",
+      "linux": "e0b276f922ed4b3c",
+      "logstash": "b8877d5c02945d4d",
+      "loongcollector": "3e873dcb08c9936c",
+      "macos": "de7438eb3ee8aed2",
+      "mariadb": "b7b39672d262d337",
+      "mongodb": "c4949b0bac0f8485",
+      "mysql": "b7b39672d262d337",
+      "nats": "3690aa41381b5930",
+      "networkFlows": "4693693af41db979",
+      "nginx": "e0131d9db717d987",
+      "office365": "5b8df59f33e09fc4",
+      "okta": "e54892421bbfe709",
+      "opentelemetryCollector": "494e8906c09a4bf7",
+      "openvpn": "145690d8b93b8d4f",
+      "oracle": "33bfb318a2efd84c",
+      "osquery": "2228838489e77cbe",
+      "postgresql": "d76cac489fa6ea0a",
+      "prometheus": "0afcf9dfb5f6ad4c",
+      "rabbitmq": "9a7bbf50f44a640f",
+      "redis": "713162f2fccaa4f5",
+      "sapHana": "3f0a21b0516fd0a7",
+      "snowflake": "106ab44de2a716c5",
+      "splunkHec": "39fafda4954a0851",
+      "sqlServer": "1ec33424f2065545",
+      "syslogNg": "3722927f4701503e",
+      "telegraf": "b13310e2ca27dced",
+      "terraform": "c8cf7aae21487514",
+      "vector": "bca96049566baed3",
+      "vercel": "ba4b733243118526",
+      "windows": "92c45a58b10627cd",
+      "zookeeper": "dd8a3dd9dadb0b06"
+    },
+    "inChoice": "96636cce92a65cb2",
+    "infrastructure": {
+      "description": "28c7153dcd8a2469",
+      "gets": "d234127f6af573d3",
+      "name": "ce0cff719a947476",
+      "question": "d944429f1c4cd196",
+      "rows": {
+        "cloudAccount": {
+          "about": "94ff49724b50137a",
+          "description": "6834d81ee575ef6d",
+          "name": "91c286f1948fa35a",
+          "question": "2b7d237fbca8b8ff"
+        },
+        "databases": {
+          "about": "386ea25b7b9bad13",
+          "description": "cad1d0b0a4f8a18a",
+          "name": "61d2afe2349913ce",
+          "question": "3548113c96bf6e92"
+        },
+        "kubernetesCluster": {
+          "about": "9774882a627e769f",
+          "description": "ef4f37f6fbfeac2a",
+          "name": "77a39ba2c8b38478"
+        },
+        "linuxWindowsOrMacosHost": {
+          "about": "84da05f18d7dd342",
+          "description": "5047a1d6f398c8a7",
+          "name": "49cf2a6461b8f92d",
+          "question": "86971d4f775170f9"
+        },
+        "somethingElse": {
+          "about": "c3485d6b44fc03a5",
+          "description": "2225e462c3ddb3c4",
+          "name": "cc72843144841a6f",
+          "question": "ef3374343310f888"
+        }
+      }
+    },
+    "llm": {
+      "description": "953dc41d1163aa86",
+      "gets": "4492786c692f4c0b",
+      "name": "bc6fcce11a66e958",
+      "question": "2496b5b9439e5f1f",
+      "rows": {
+        "anthropic": {
+          "about": "749745de0132d5ac",
+          "description": "688bd2eac8984144",
+          "question": "4ddf2bdb3dd16b39"
+        },
+        "langchainOrLanggraph": {
+          "about": "01a004ac7a42499a",
+          "description": "10d218b76355bf5e",
+          "question": "c7fb344dcd07f94f"
+        },
+        "openai": {
+          "about": "909571a9458e2726",
+          "description": "dd63b74504cd980b",
+          "question": "115515abd47640b2"
+        },
+        "somethingElse": {
+          "about": "59c7b1ff3ef4749f",
+          "description": "3f7b00386c24e098",
+          "name": "cc72843144841a6f",
+          "question": "2496b5b9439e5f1f"
+        }
+      }
+    },
+    "logs": {
+      "description": "13ad246567e111ba",
+      "gets": "36e60a72d4eabfd2",
+      "name": "18941d4645689369",
+      "question": "afe3931036294ad7",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "about": "833073a4a840a124",
+          "description": "cad1d0b0a4f8a18a",
+          "name": "8c7cfe53a905ba1c",
+          "question": "2606c97decd12082"
+        },
+        "fromOpentelemetry": {
+          "about": "13b2bb6c892b5d06",
+          "description": "e55693cc9f80c4b8",
+          "name": "b79b8b11bed54e2e"
+        },
+        "overHttpWithCurl": {
+          "about": "f4cfa959b8e0d7d7",
+          "description": "171ce39df9187360",
+          "name": "f7f4c0b3005088b5"
+        },
+        "somethingElse": {
+          "about": "6606589bb77e43a4",
+          "description": "94575e15050b2da0",
+          "name": "cc72843144841a6f",
+          "question": "91f704904ea22a77"
+        }
+      }
+    },
+    "noMatch": "838424464cbf7e1a",
+    "others": {
+      "agent": {
+        "description": "57e75de765e625db",
+        "gets": "ec1bc4361d70b1ff",
+        "name": "b4f38bebbdf958dd"
+      },
+      "invite": {
+        "description": "13462ec4b90134a3",
+        "name": "da1286fd24eebc68"
+      },
+      "synthetics": {
+        "description": "64bc974d65d972e2",
+        "gets": "bea7b5b567ad9ab8",
+        "name": "fe7120bc3b396719"
+      }
+    },
+    "othersTitle": "992ec34791cce262",
+    "rail": {
+      "attention": "c1ebc7817870e5be",
+      "check": "47de4ba0d9285ec7",
+      "explore": "1bc59e49d474b331",
+      "label": "c4b08e4f4a165394",
+      "received": "06aa4e02fc3177c0",
+      "run": "795f869dc0058e98",
+      "title": "870ebe285f74f020",
+      "waitingShort": "f5e39f01aef1aa42"
+    },
+    "searchGuides": "4e48ce0e16bfda03",
+    "sendOverHttp": "1b124f0f28e82132",
+    "showMore": "8d78bf407f1ddc54",
+    "signals": {
+      "certificates": "16f637921eba69b0",
+      "cost": "204a5eb2cd28bcfd",
+      "errors": "cb702378f31507ef",
+      "latency": "e0e7d293043c8cf6",
+      "logs": "ea2100dc89ae9fe2",
+      "metrics": "a58da793c7250f1b",
+      "profiles": "535e52e4a2616ebe",
+      "replays": "37c1ca4740ef8fe7",
+      "sessions": "6fa3cbf451b2a1d5",
+      "tokens": "a039dfb9628b53dd",
+      "traces": "998741a58ed2b411",
+      "uptime": "d63ab4711473b039",
+      "webVitals": "2095fab7cfc1b307"
+    },
+    "skipToApp": "8bb39b04d9d50197",
+    "stepDone": "891db1376d8029bf",
+    "tryShorter": "27bf9832670d7b3d",
+    "whatYouGet": "41a1acbef2962368"
+  },
   "oncall": {
     "ackedBy": "53199860ec69846a",
     "acknowledge": "f9236d9e87b6235e",
@@ -18529,8 +18962,6 @@
     "ladderAddStep": "e45a4474b464a35f",
     "ladderEnd": "361e48d0308f20e3",
     "ladderEndUnknown": "a14a22c91f32b9b9",
-    "ladderEndsDefaultTeam": "c53be53ee5f4a822",
-    "ladderEndsHandsOff": "e29f88ad8e9bafda",
     "ladderEndsNobodyAnswered": "78941fba0b63d5b1",
     "ladderEndsThen": "0597f441dcca7c9b",
     "ladderEvery": "187751feedfac3ed",
@@ -18817,20 +19248,11 @@
     "policyDoneEditing": "058f24ef2d7c4513",
     "policyEditingRung": "fab4539d26e078ca",
     "policyEmailLockedBySlack": "3ea0a84ed14e29f3",
-    "policyEndOptionHandOff": "73a7c80bc95ff72f",
-    "policyEndOptionHandOffTo": "4dbd13ed08ea9300",
-    "policyEndOptionStop": "338a8bc8150d26bf",
-    "policyFinalAction": "0d73957c837a0dbb",
-    "policyFinalNotifyDefault": "b53efc7cde907b14",
-    "policyFinalStop": "c87973074d8b248e",
-    "policyFinal_notifyDefaultTeam": "4c718c9c3b0df1b3",
-    "policyFinal_stop": "cae7d57bc067a514",
     "policyFix": "21f1595b614ffc31",
     "policyHint": "8d8e8833d7ee31ae",
     "policyIfNoAck": "7a5eb9ed14493cc5",
     "policyMailBanner": "f0232decc4aaab3d",
     "policyMainTabPolicy": "e1a8e3b1dca1c59a",
-    "policyNoDefaultTeam": "ef87b2ed4b1bfa71",
     "policyNoDestinationWarning": "5a72c2c10ad7c3d8",
     "policyNoProvider": "3502c53300ff7340",
     "policyNoProviderLink": "88de9cc10aec5f8d",
@@ -18846,7 +19268,6 @@
     "policyPrioritySilent": "6ac67ce767309e2f",
     "policyProblemCount": "b0099a0f8872d24a",
     "policyReachesNobody": "2bf67d0299e99132",
-    "policyRepeatTimes": "73640bb0040fe4b5",
     "policyRungNeedsChannel": "4ca0b4be1ddf8083",
     "policySave": "1509f561f2416598",
     "policySaved": "ce26d73887af792a",
@@ -18862,7 +19283,6 @@
     "policyTitle": "14848f4497611304",
     "policyTodayIs": "60ae63baa2c4b202",
     "policyTriageTitle": "3b392fa4722baae9",
-    "policyWhenStepsRunOut": "2739b061c93670c1",
     "presetApplied": "ab2e2ae0bb0004b7",
     "presetCatchAllDefault": "0ffec811e787c7e7",
     "presetCoverageCell": "352660d9446decd4",
@@ -19180,9 +19600,15 @@
     "ruleEditorConditions": "97d4be8960698f97",
     "ruleEditorConflictSameTeam": "884d0e10ac781669",
     "ruleEditorContends": "1fa3ab13b0fda3e2",
+    "ruleEditorDuplicatePath": "fa7aef46668a1578",
+    "ruleEditorDuplicatePathSameTeam": "ac7a1b490182cbf7",
     "ruleEditorFieldPlaceholder": "f9e3e7edd8bdc918",
+    "ruleEditorFieldSourcesMore": "9737d06269e340d1",
+    "ruleEditorFieldsHelp": "7b61396af19a715a",
+    "ruleEditorFieldsSource": "71743a31abd9fd8b",
     "ruleEditorGoesTo": "73cb13a0691b6154",
     "ruleEditorKeptBy": "10cb60674180b855",
+    "ruleEditorManageFieldGroups": "09f1e836f0ac6d28",
     "ruleEditorMatches": "64f8133898e27706",
     "ruleEditorOnCallNow": "5f7ca4629d67419e",
     "ruleEditorOpIs": "fa51fd49abf67705",
@@ -22287,6 +22713,7 @@
     "loginCallback": "abc3ccb8b27e3974",
     "modelPricingEditor": "bcb792875fefde91",
     "notFound": "2d857a3660e0240b",
+    "onboarding": "61e8d44ad423a4a0",
     "orgDomainMapping": "91537c30fffb01dc",
     "passwordPolicy": "11831de5b6d62b7c",
     "pipelineBackfillJobs": "54a8767a761a58e0",
@@ -23758,6 +24185,171 @@
     "withErrors": "b5bd75920f4806d6",
     "zipFilesOnly": "e81c52f6dc41c8d1"
   },
+  "sampleData": {
+    "callout": {
+      "body": "2d9d8dcdc15a6ad1",
+      "cta": "b61129f303e74224",
+      "title": "9046e6d2e880ed80"
+    },
+    "delete": "2db28b5aad8345bc",
+    "dock": {
+      "details": "a525be98c4abc148"
+    },
+    "entry": {
+      "onboardingSource": "a1b76e5a4216cea9"
+    },
+    "header": {
+      "finish": "085a5accf4e1ea8f",
+      "label": "f4c51197ed3863a9",
+      "try": "1eebcd9289ecb983"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "keep": "5f87ce1b12221b5d",
+        "message": "c7742dfb489530be",
+        "remove": "2db28b5aad8345bc"
+      }
+    },
+    "loadForbidden": "ec95fcade239feab",
+    "progress": {
+      "counts": "4f48065f4e7c6cb4",
+      "done": "73a205b0839ab63c",
+      "loading": "3ab28415b347abe5",
+      "logs": "ea2100dc89ae9fe2",
+      "metrics": "866d9661bc239d2c",
+      "skipped": "12698ce1ea5cd4ab",
+      "spans": "b3393bfb2a55adff"
+    },
+    "removeConfirm": {
+      "message": "2abe90e6967652d1",
+      "title": "f3b9b6250acfd618"
+    },
+    "removeDialog": {
+      "done": {
+        "body": "b26d1afd2343cf67",
+        "done": "11a6767d5674c7e4",
+        "keptLabel": "feca5751435371dc",
+        "label": "b2834eaca475b3c2",
+        "title": "39fc5c25b375b7fa"
+      },
+      "failed": {
+        "body": "10f21e42815a109f",
+        "close": "7d9eb7acb13e2462",
+        "label": "8fd366dffea13a03",
+        "title": "1e0d47b5566fb61c",
+        "tryAgain": "df0fe9e00d354b01"
+      },
+      "removing": {
+        "body": "56cdff48004461fa",
+        "label": "369a8a2f72cd17dc",
+        "title": "92088ff3bbac8649"
+      }
+    },
+    "removeSteps": {
+      "alertDelivery": "c432cbed54bac141",
+      "alerts": "f62e9267d196c761",
+      "dashboards": "a53bcafb67d960df",
+      "functions": "75e942e5b366227e",
+      "pipeline": "37e1c775f452d695",
+      "streams": "bfd297afbf9e7430"
+    },
+    "steps": {
+      "alerts": "99d356de38a764a2",
+      "dashboards": "f6838c9a9828ec7b",
+      "enrichment": "fa46a191ee0c25b1",
+      "functions": "014c595aa07b5ad2",
+      "pipeline": "95d696d2de02a83b",
+      "telemetry": "6202a008d501e14a"
+    },
+    "toast": {
+      "loadFailed": "6bf6631db225eaac",
+      "loaded": "9b98e3804ee53ef6",
+      "removeFailed": "1e0d47b5566fb61c",
+      "removeWhileLoading": "cc815279fc13ab70",
+      "removed": "39fc5c25b375b7fa",
+      "removedWithKept": "89d2a7107a3f014e"
+    },
+    "tour": {
+      "capabilities": {
+        "alerts": "f62e9267d196c761",
+        "dashboards": "a53bcafb67d960df",
+        "logs": "1ca0bd240d3288dd",
+        "metrics": "89c5532ce6a24365",
+        "pipelines": "d1a8fffeb935847e",
+        "traces": "69e561abfb584b5e"
+      },
+      "close": "b4faa12d8508c4ec",
+      "done": "cb3d537d6c598ba7",
+      "finale": {
+        "body": "2171cee991c4f290",
+        "connect": "26fcce8dd89b0c31",
+        "finish": "7521e8c680dec966",
+        "restart": "fb7ea06293ab2eb0",
+        "title": "9cd82f407602c916"
+      },
+      "label": "06938153048d6d00",
+      "minimize": "125b2c361e991770",
+      "next": "1ff57a29d7c9d11b",
+      "pill": "cb794969cc63e93d",
+      "position": "3adf75e39175abe2",
+      "stepFailed": "ead5d934d35e4de1",
+      "steps": {
+        "alert": {
+          "body": "188b0c8775df0c9c",
+          "look": "e3c584d940892be9",
+          "title": "029966bad87f51f7"
+        },
+        "business": {
+          "body": "f6c216622102f9f2",
+          "look": "69648e8abf6621f2",
+          "title": "f64bbf788cd50205"
+        },
+        "dashboard": {
+          "body": "48a4a6855fe0a757",
+          "look": "ea424d5bfae27e3e",
+          "title": "8f73d76a96031ca4"
+        },
+        "deploy": {
+          "body": "feb436a084f5f9d8",
+          "look": "40cff63a593beca6",
+          "title": "5b6b740c698def54"
+        },
+        "logs": {
+          "body": "e747830f8ae9acff",
+          "look": "b617e4fccc727a89",
+          "title": "ebaedf113a851c40"
+        },
+        "metrics": {
+          "body": "4f7d1e5c58ca3eaf",
+          "look": "f80f79627c5fc1e3",
+          "title": "964aacea03b22be1"
+        },
+        "pipeline": {
+          "body": "7234acd4916e774d",
+          "look": "ba46003dacf5e68f",
+          "title": "d2c9b1b623f82cfa"
+        },
+        "traces": {
+          "body": "540495ffe86e53ba",
+          "look": "5b5a34a2d27ef08d",
+          "title": "3b5d701e90e6010c"
+        }
+      }
+    },
+    "welcome": {
+      "continueInBackground": "5e1a5a57b58613f4",
+      "errorBody": "d28b8650827f0b74",
+      "progress": {
+        "body": "0540c02910ddde56",
+        "title": "d4f521f91875aff6"
+      },
+      "ready": {
+        "ownWay": "5b75874bb27be4cb",
+        "startTour": "c690abe3a3ff19e5",
+        "title": "60f389bc93be80cb"
+      }
+    }
+  },
   "search": {
     "addFieldToTable": "739f7c5706b900b0",
     "addToDashboard": "7f53541f23366e47",
@@ -24696,6 +25288,20 @@
     "dangerZone": "3c1c01b405853556",
     "dark": "60acc53f13a5d1bf",
     "darkMode": "df8c7c89b3e4cfb1",
+    "dataRetentionDefaults": {
+      "about": "1996eccff438280a",
+      "addType": "c216e360c52ba9ed",
+      "days": "e08c0aa8f558f39f",
+      "daysValue": "a2246fbc2542d1dd",
+      "defaultDays": "0eec590e0b8fe28c",
+      "forever": "07d86f02a4e8bb97",
+      "globalDefault": "afb42207512d895d",
+      "globalType": "c320e283c0860409",
+      "invalid": "31ed2dc50450bd75",
+      "removeType": "9d25b402289b84dc",
+      "streamType": "74e61e305b5bd502",
+      "title": "4073199b7615de7f"
+    },
     "deleteFactEverything": "a27086d505bd25e9",
     "deleteFactEverythingDetail": "c94fea7c7322af80",
     "deleteFactGracePeriod": "b0a901558b707185",
@@ -24846,8 +25452,6 @@
     "licenseDesc": "b33cda4f8d34e506",
     "licensePage": {
       "daysRemaining": "20ae4340d52913aa",
-      "licenseExpired": "c026d44925dcd629",
-      "oneDayRemaining": "93e2b3b764e95d38",
       "unexpectedError": "5e3176197f53ec3e"
     },
     "light": "dbcd5e7bb7a0f538",
@@ -28589,8 +29193,7 @@
       "pleaseFillAllTheFieldsAnd": "0480613a64d908e5",
       "pleaseInputValidUsernameOrPassword": "fd01402d0e485838",
       "selectedSuggestion": "728ceab9643f6cf7",
-      "somethingWentWrong": "ab827e3fe17da220",
-      "thankYouForYourFeedback": "16e17e5e2905de33"
+      "somethingWentWrong": "ab827e3fe17da220"
     },
     "logstream": {
       "cannotAddFieldsMaximumAllowedFields": "dfa2ad74ffab9041",

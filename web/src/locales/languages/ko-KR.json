@@ -1948,6 +1948,7 @@
     "billings": "요금 청구",
     "rum": "RUM",
     "settings": "설정",
+    "allSettings": "모든 설정",
     "iam": "IAM",
     "report": "보고서",
     "pipeline": "파이프라인",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "ZIP 파일만 허용됩니다"
     },
     "emptyState": {
-      "title": "실제 사용자 모니터링으로 사용자 경험 모니터링",
-      "description": "RUM은 페이지 로드, 오류, API 호출 및 세션 재생과 같은 실제 사용자 상호 작용을 추적하므로 사용자가 애플리케이션을 어떻게 경험하는지 정확히 확인할 수 있습니다.",
       "webApp": "웹 앱 인스트루먼트",
       "webAppDesc": "어떤 {product} 앱에든 OpenObserve RUM SDK를 추가하세요.",
       "sessionReplay": "세션 리플레이 활성화",
       "sessionReplayDesc": "사용자 세션을 기록하고 재생하여 UX 문제를 디버깅합니다.",
+      "title": "실제 사용자 모니터링으로 사용자 경험 모니터링",
+      "description": "RUM은 페이지 로드, 오류, API 호출 및 세션 재생과 같은 실제 사용자 상호 작용을 추적하므로 사용자가 애플리케이션을 어떻게 경험하는지 정확히 확인할 수 있습니다.",
       "learnMore": "자세히 알아보기:",
       "quickImpl": "빠른 구현 가이드",
       "blogPost": "프런트엔드 모니터링 기본 사항"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "라이선스 및 사용",
     "copyLicenseId": "라이선스 ID 복사",
     "editionLbl": "에디션",
-    "limitPrefix": "· 제한",
     "gbPerDay": "GB / 일",
     "ofDailyLimitUsedToday": "오늘 사용한 일일 제한",
     "gbToday": "오늘 GB",
@@ -3580,6 +3580,7 @@
     "usage_limits": "사용 제한",
     "feature_comparison_lbl": "기능 비교",
     "feature_comparision_ent_msg": "아래 나열된 모든 고급 기능에 액세스할 수 있는 OpenObserve 엔터프라이즈 에디션을 사용하고 있습니다.",
+    "feature_comparision_ent_partial_msg": "OpenObserve Enterprise Edition을 사용 중입니다. 일부 기능은 라이선스에 포함되어 있지 않습니다. 위 목록을 참고하세요.",
     "feature_comparision_plan_detail": "요금제: 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 통합에 대해 무료입니다.",
     "feature_comparision_os_msg": "현재 OpenObserve 오픈 소스 에디션을 사용하고 있습니다.엔터프라이즈 에디션으로 업그레이드하여 아래 비교표에 나열된 고급 기능을 잠금 해제하세요.",
     "feature_comparision_good_news": "좋은 소식: OpenObserve 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 수집을 완전히 무료로 제공합니다.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "검색과 일치하는 기능이 없습니다",
     "features_none": "이 그룹에 기능이 없습니다",
     "features_free_heading": "무료, 모든 라이선스에 포함",
+    "features_free_not_included": "무료, 라이선스에 포함되지 않음",
     "features_new": "라이선스 이후 신규",
     "features_filter_new": "신규",
     "request_new_license": "새 라이선스 요청",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "라이선스가 아직 활성 상태입니다.새 라이선스 키로 업데이트하시겠습니까?",
     "yes_update_license": "예, 라이선스 업데이트",
     "no_keep_current": "아니요, 최신 상태로 유지",
+    "license_downgrade_title": "이 라이선스 키를 적용하시겠습니까?",
+    "license_downgrade_intro": "이 키는 현재 라이선스를 대체합니다.",
+    "license_downgrade_expired": "이 키는 {date}에 만료되었습니다. 50 GB/일의 무료 한도가 적용됩니다.",
+    "license_downgrade_lose": "다음 항목을 사용할 수 없게 됩니다: {names}",
+    "license_downgrade_limit": "일일 한도가 {old}에서 {new}(으)로 변경됩니다",
+    "license_downgrade_expiry": "만료일이 {old}에서 {new}(으)로 변경됩니다",
+    "license_limit_per_day": "{gb} GB/일",
     "header_button": {
       "cloud_features": "{product} 기능",
       "enterprise_edition": "에디션: 엔터프라이즈",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "더 효율적이고 성능이 뛰어난 옵저버빌리티를 위해 지금 OpenObserve를 사용해 보세요.",
     "getStartedBannerAlt": "시작하기 배너",
     "getStartedHeading": "시작하기 전에 마지막으로 한 가지만",
-    "hearAboutUsLabel": "저희를 어떻게 알게 되셨나요?",
     "hearAboutUsPlaceholder": "예: 친구를 통해",
-    "whereDoYouWorkLabel": "어디에서 일하시나요?",
     "whereDoYouWorkPlaceholder": "회사 이름",
-    "agreeToTermsPrefix": "다음을 읽고 동의합니다:",
     "termsOfUse": "이용약관",
-    "and": "및",
     "privacyPolicyStar": "개인정보 보호정책*",
     "startTrialButton": "14일 무료 평가판 시작",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "이메일은 필수입니다",
     "emailInvalid": "유효한 이메일을 입력하세요",
     "passwordRequired": "비밀번호는 필수입니다",
-    "mustAcceptTerms": "계속하려면 약관에 동의해야 합니다",
     "getStarted": {
       "title": "OpenObserve에 오신 것을 환영합니다",
-      "subtitle": "14일 체험판이 시작되었습니다. 두 가지 간단한 질문 후 설정으로 안내해 드리겠습니다.",
-      "sourceLabel": "무엇을 먼저 전송하시겠습니까?",
-      "optional": "(선택 사항)",
-      "skip": "질문 건너뛰기",
-      "continue": "계속",
-      "hearAboutUsPlaceholder": "예: 동료 또는 블로그 게시물",
-      "whereDoYouWorkPlaceholder": "회사 또는 팀",
-      "termsOfService": "서비스 약관",
-      "privacyPolicy": "개인정보 처리방침",
-      "agreeHint": "질문을 건너뛰더라도 계속하려면 필요합니다.",
+      "skipForNow": "지금은 건너뛰기",
+      "heard": {
+        "label": "저희를 어떻게 알게 되셨나요?",
+        "placeholder": "옵션 선택",
+        "thanks": "감사합니다!"
+      },
+      "connect": {
+        "title": "데이터 연결",
+        "point1": "각 소스에 대한 단계별 설정",
+        "point2": "로그, 메트릭, 트레이스를 한곳에서",
+        "point3": "몇 분 안에 첫 이벤트를 확인하세요",
+        "cta": "다른 데이터 소스 살펴보기"
+      },
+      "sample": {
+        "title": "샘플 데이터로 살펴보기",
+        "point1": "샘플 서비스의 로그, 트레이스, 메트릭",
+        "point2": "대시보드, 알림, 파이프라인, VRL 함수",
+        "point3": "가이드 투어, 클릭 한 번으로 모두 제거",
+        "cta": "샘플 데이터로 살펴보기"
+      },
       "sources": {
         "kubernetes": "쿠버네티스",
         "linux": "Linux 또는 VM 호스트",
@@ -4094,7 +4108,28 @@
         "llm": "LLM 또는 AI 앱",
         "agent": "AI 에이전트가 설정하도록 하기",
         "unsure": "아직 잘 모르겠음"
+      },
+      "chips": {
+        "kubernetes": "쿠버네티스",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "웹 서버",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "브라우저 (RUM)",
+        "llm": "LLM 또는 AI 앱",
+        "agent": "AI 에이전트"
       }
+    },
+    "heardFrom": {
+      "question": "저희를 어떻게 찾으셨나요?",
+      "quickQuestion": "간단한 질문: 저희를 어떻게 찾으셨나요?",
+      "skip": "건너뛰기",
+      "searchEngine": "검색 엔진",
+      "friendOrColleague": "친구 또는 동료",
+      "aiAssistant": "AI 어시스턴트",
+      "other": "기타",
+      "thanks": "알려주셔서 감사합니다!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "다른 필드에는 스트림이 사용자 정의 스키마를 사용하도록 구성되기 전에 존재했던 스키마 필드만 표시됩니다.",
     "addFieldsTitle": "필드 추가",
     "dataRetentionDaysLabel": "데이터 보존(일)",
-    "globalRetentionDays": "전역 보존은 {days}일입니다",
-    "retentionMinOneDay": "보존 기간은 최소 1일이어야 합니다",
+    "retentionDefaultDays": "비워 두면 이 스트림 유형의 기본값({days}일)을 사용합니다.",
+    "retentionDefaultForever": "비워 두면 이 스트림 유형의 기본값(영구 보존)을 사용합니다.",
     "maxQueryRangeHoursLabel": "최대 쿼리 범위(시간)",
     "maxQueryRangeHelp": "쿼리에 허용되는 최대 시간 범위입니다. 무제한 범위를 원하면 0으로 설정하세요.",
     "globalFlattenLevel": "전역은 {level}입니다",
@@ -6476,12 +6511,6 @@
     "joinSlack": "슬랙에 가입하세요",
     "maybeLater": "아마 나중에"
   },
-  "connectDataSourcePopup": {
-    "title": "시작하려면 먼저 첫 번째 데이터 소스를 연결하세요.",
-    "description": "보여드릴 것이 많지만, 먼저 데이터를 연결해야 합니다. 대부분의 팀은 약 1분 안에 첫 로그를 확인합니다.",
-    "connectButton": "데이터 소스 연결",
-    "slackLink": "저희 Slack 커뮤니티에도 참여해 주세요"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "일시 중지된 위치에서 계속",
     "startFromNow": "지금부터 시작합니다.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "워크로드 간 통신 확인: eBPF 네트워크 흐름",
       "k8sInstallerNote": "이것은 cert-manager, OpenTelemetry 운영자 및 OpenObserve 수집기를 자동으로 설치합니다.",
       "k8sInternalEndpointNote": "OpenObserve가 동일한 클러스터에서 실행될 때 이 옵션을 사용하세요 — 트래픽이 클러스터를 벗어나지 않습니다.",
+      "k8sTraceAppsTitle": "앱 트레이스하기",
+      "k8sTraceEbpfDesc": "컬렉터에서 eBPF 트레이싱을 켠 다음, 포트, 실행 파일 경로 또는 명령줄을 기준으로 트레이스할 앱을 선택하세요.",
+      "k8sTraceLibraryDesc": "각 언어의 네임스페이스에 주석을 달면 오퍼레이터가 해당 네임스페이스의 파드에 라이브러리를 추가합니다. 그런 다음 해당 앱을 한 번 재시작하세요.",
       "k8sTroubleAnnotationA": "주입은 파드 생성 시 발생하므로 기존 파드는 재시작할 때까지 영향을 받지 않습니다 — `kubectl rollout restart deployment -n my-namespace`를 실행하세요. `kubectl get ns my-namespace -o yaml`로 주석이 적용되었는지 확인하고, 값이 `openobserve-collector/openobserve-<language>`와 일치하는지 확인하세요.",
       "k8sTroubleAnnotationQ": "네임스페이스에 어노테이션을 지정했지만 트레이스가 나타나지 않습니다",
       "k8sTroubleEndpointA": "OpenObserve 자체가 이 클러스터에서 실행되는 경우에만 **내부 엔드포인트**를 사용하세요. 그러면 트래픽이 클러스터 내부에 머물고 네트워크를 가로지르지 않습니다. URL은 `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080`입니다 — 기본값은 네임스페이스 `openobserve`의 릴리스 `o2`를 가정하므로, 다르면 수정하세요. 그 외의 경우에는 외부 엔드포인트를 사용합니다.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "세션은 나타나지만 화면 이름이 모두 동일합니다",
       "androidTroubleScreenNamesA": "보기 추적이 연결되어 있지 않습니다. `RumConfiguration`을 빌드할 때 `useViewTrackingStrategy(...)`를 전달하세요 — 예: Activities의 경우 `ActivityViewTrackingStrategy(trackExtras = true)`, AndroidX Navigation을 사용하는 경우 `NavigationViewTrackingStrategy(...)`.",
       "setupTime5Min": "~5분",
+      "showStepInstructions": "지침 보기",
       "snowflakeCollectorVersionNote": "Snowflake에는 collector v0.92.0이 필요합니다 — 최신 빌드에는 알려진 버그가 있습니다.",
       "snowflakeTagline": "OpenTelemetry Collector로 Snowflake 계정 메트릭을 수집하여 OpenObserve로 전송하세요.",
       "sqlClientGuiVariant": "SQL 클라이언트 (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "데이터가 도착하면 아래 확인 표시가 녹색으로 바뀝니다. 또는 스트림에서 `cassandra_*` 메트릭을 확인하세요.",
       "verifyDatabricksLogsDesc": "데이터가 도착하면 아래 확인 표시가 녹색으로 바뀝니다. 또는 로그를 열고 `source:databricks`를 검색하세요.",
       "verifyDataTitle": "OpenObserve에서 데이터 확인",
+      "checkYourDataTitle": "데이터 확인",
       "verifyDynamodbLogsDesc": "데이터가 도착하면 아래 확인 표시가 녹색으로 바뀝니다. 또는 항목이 변경된 후 `dynamodb` 스트림의 로그를 여세요.",
       "verifyGcpLogsDesc": "프로젝트에서 활동을 생성하세요(또는 싱크가 로그와 일치할 때까지 기다리세요). 데이터가 도착하면 아래 확인 표시가 녹색으로 바뀝니다.",
       "verifyK8sDataDesc": "수집기가 시작될 때까지 몇 초 기다리세요. 데이터가 도착하면 아래 확인 표시가 녹색으로 바뀝니다. 클러스터 로그는 `default` 스트림에 들어갑니다.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "청구는 계약을 통해 처리됩니다 — 변경 사항은 계정 관리자에게 문의하세요.",
     "upgradeToPlanMessage": "OpenObserve 서비스를 계속 이용하려면 요금제를 업그레이드하세요.",
     "creditsUsedLabel": "사용된 크레딧",
-    "licenseExpiryContactAdmin": "관리자에게 문의하여 라이선스를 업데이트하세요.",
+    "licenseExpiredOn": "라이선스가 {date}에 만료되었습니다. 기능은 계속 사용할 수 있습니다.",
+    "licenseExpiredLimit": "이제 {limit} GB/일의 무료 한도가 적용됩니다. 한 달에 한도를 초과하는 날이 {allowed}일을 넘으면 갱신할 때까지 검색이 일시 중지됩니다.",
+    "licenseAskAdminToRenew": "라이선스 관리자에게 갱신을 요청하세요.",
+    "renewLicense": "라이선스 갱신",
     "subscribed": "구독됨",
     "invoiceHistory": "인보이스 내역",
     "amount": "금액",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "AWS 구독을 연결하지 못했습니다.",
     "failedToLinkAzureSubscription": "Azure 구독을 연결하지 못했습니다.",
     "last15Minutes": "지난 15분",
-    "licenseHasExpired": "라이선스가 만료되었습니다.",
     "numberOfPipelines": "파이프라인 수",
     "oneDayUntilLicenseExpires": "라이선스가 만료되기까지 1일 남았습니다.",
     "pleaseWaitProcessingRequest": "요청을 처리하는 동안 잠시 기다려 주세요...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "선택 사항입니다. 알림은 계속 실행되고 기록을 남기지만, 어떤 대상에도 알림이 전송되지 않습니다.",
       "sendsToStatus": "알림이 발생할 때마다 {targets}(으)로 전송합니다.",
       "oncallTeamTarget": "온콜 팀",
+      "lockedWorkflowFallback": "잠긴 워크플로우",
+      "lockedTargetBadge": "잠김",
       "createsIncident": "인시던트 생성",
       "createsIncidentTooltip": "알림이 인시던트를 생성할 수 있는 경우, 전용 알림을 보내지 않습니다. 대신 새 인시던트가 생성되거나 새 알림 유형이 기존 인시던트에 추가될 때 인시던트에 대한 알림이 전송됩니다.",
       "incidentTitleTemplate": "인시던트 제목",
@@ -12901,6 +12939,9 @@
       "lastTrained": "마지막 학습",
       "level": "레벨",
       "lookBackWindow": "룩 백 윈도우",
+      "scheduleIntervalFloor": "검사 주기는 최소 {min}이어야 합니다.",
+      "lookBackWindowCap": "이 감지 해상도에서 조회 기간은 최대 {max}까지 가능합니다. 더 긴 기간은 100,000개가 넘는 버킷을 보관합니다. 기간을 줄이거나 감지 해상도를 더 길게 설정하세요.",
+      "retrainOnEditNote": "쿼리, 함수 또는 감지 해상도를 변경하면 이 탐지기가 재학습됩니다. 학습이 끝날 때까지 탐지가 일시 중지됩니다.",
       "lookBackWindowFloor": "룩백 윈도우는 최소 {min} 이상이어야 합니다 — 확인 주기에 감지 해상도 1개를 더한 값입니다. 더 짧은 윈도우는 첫 실행이 트리거될 때 완전한 버킷을 담을 수 없으므로, 해당 실행은 버킷을 건너뛰게 됩니다.",
       "lookBackWindowLegacy": "저장된 이 윈도우는 최소값 {min}(확인 주기 + 감지 해상도 1개)보다 작습니다. 변경 없이 저장되지만, 윈도우를 늘리기 전까지 첫 실행에서 버킷을 건너뛸 수 있습니다.",
       "lookBackWindowMinimum": "최소 {min}, 이 설정에서는 {recommended} 이상을 권장합니다.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "대상을 찾을 수 없습니다.",
       "noDetectionResults": "이 범위에 아직 탐지 결과가 없습니다",
       "noFieldsFound": "필드를 찾을 수 없음",
+      "checkDataNow": "지금 확인",
+      "checkDataNowTooltip": "다음 자동 확인을 기다리지 않고 현재 데이터를 지금 다시 평가합니다.",
+      "dataReadinessReason": "사유",
       "noticeRetrain": "자동 재훈련",
       "noticeRetrainTooltip": "업그레이드 후 저장된 모델을 읽을 수 없어 모델이 삭제되고 구성이 자동으로 재훈련 대기열에 추가되었습니다. 필요한 작업은 없으며, 훈련이 완료되면 탐지가 재개됩니다.",
       "noticeSkipAbsence": "결측 등급 산정이 조회 기간보다 뒤처져, 더 이상 가져올 수 없는 구간을 건너뛰고 기록했습니다.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "자동 모드는 기록에서 레벨을 학습합니다.",
       "autoTrainingHelp": "학습이 완료되면 레벨이 표시됩니다.",
       "autoFailedHelp": "학습에 실패했습니다. 아직 학습된 레벨이 없습니다. 위의 학습 오류를 확인하세요.",
+      "autoWaitingForDataHelp": "적합한 학습 데이터가 아직 부족합니다. 그때까지 학습된 수준은 없습니다. 탐지기는 활성화된 상태로 유지되며 자동으로 다시 확인됩니다.",
+      "autoNotApplicableHelp": "현재 데이터로는 이상 모델을 만들 수 없습니다. 이는 실패가 아닙니다. 탐지기는 활성화된 상태로 유지되며 자동으로 다시 확인됩니다.",
       "autoRetrainingHelp": "재학습 중입니다. 마지막으로 학습된 레벨이 표시되며, 모델 사용 가능 여부는 확인되지 않았습니다.",
       "autoRetrainFailedHelp": "재학습에 실패했습니다. 마지막으로 학습된 레벨이 표시되며, 모델 사용 가능 여부는 확인되지 않았습니다. 위의 학습 오류를 확인하세요.",
       "autoUnconfirmedHelp": "마지막으로 학습된 레벨이 표시되며, 활성 모델은 확인되지 않았습니다.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "소유권 규칙에 따라 라우팅",
     "oncallTeamTooltip": "이 알림이 호출할 팀입니다. 일반적으로는 설정하지 않으면 알림의 식별 차원에서 팀이 결정됩니다. 해당 차원으로 소유자를 표현할 수 없는 경우에만 설정하세요.",
     "oncallTeamNoTeams": "아직 온콜 팀이 없습니다. 온콜 팀에서 하나를 만드세요.",
+    "lockedTeamFallback": "잠긴 팀",
     "oncallTeamAtFireTime": "소유권 기준",
     "oncallTeamFromRules": "이 알림에는 설정된 팀이 없으므로 소유자는 트리거되는 행의 식별 차원에서 결정됩니다. 해당 차원은 트리거되기 전까지는 알 수 없습니다.",
     "tags": "태그",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "구분자 입력 (예: {'|'}, \\n, \\t, 공백)",
     "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
     "templateDefaultOption": "기본값 ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "기본값으로 두면 표준 {type} 템플릿({name})을 사용하고, 아니면 사용자 지정 템플릿을 선택하세요.",
     "loadingData": "대상 데이터를 불러오는 중...",
     "noEmailTemplates": "아직 이메일 템플릿을 생성하지 않은 것 같습니다.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Azure 자격 증명",
       "awsRoleArn": "AWS 역할 ARN"
     },
+    "dataRetentionDefaults": {
+      "title": "데이터 보존 기본값",
+      "about": "자체 보존 기간이 없는 스트림의 경우. 비어 있거나 0이면 전역 값을 사용하며, 그렇지 않으면 최소 3일입니다.",
+      "defaultDays": "기본값(일)",
+      "streamType": "스트림 유형",
+      "days": "일",
+      "addType": "스트림 유형 추가",
+      "removeType": "이 스트림 유형 제거",
+      "globalDefault": "전역: {value}",
+      "globalType": "전역 {type}: {value}",
+      "daysValue": "{days}일",
+      "forever": "영구 보존",
+      "invalid": "0 또는 최소 3일을 사용하세요"
+    },
     "organizationSettings": {
       "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",
       "settingsUpdated": "조직 설정이 성공적으로 업데이트되었습니다.",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "예상치 못한 오류",
-      "daysRemaining": "라이선스 만료까지 {days}일 남았습니다.",
-      "oneDayRemaining": "라이선스 만료까지 1일 남았습니다.",
-      "licenseExpired": "라이선스가 만료되었습니다."
+      "daysRemaining": "라이선스 만료까지 {days}일 남았습니다."
     },
     "nodesPage": {
       "subtitle": "클러스터 노드 및 상태",
@@ -23025,7 +23085,9 @@
         "ready": "준비",
         "running": "실행 중",
         "training": "학습 중",
-        "waiting": "대기 중"
+        "waiting": "대기 중",
+        "waitingForData": "데이터 대기 중",
+        "notApplicable": "해당 없음"
       },
       "anomalyStatus": {
         "active": "활성",
@@ -23033,7 +23095,9 @@
         "training": "학습 중",
         "failed": "실패",
         "waiting": "대기 중",
-        "disabled": "비활성화됨"
+        "disabled": "비활성화됨",
+        "waitingForData": "데이터 대기 중",
+        "notApplicable": "해당 없음"
       },
       "aiToolsetKind": {
         "skill": "스킬",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "문제가 발생했습니다.",
-      "thankYouForYourFeedback": "피드백을 보내주셔서 감사합니다.",
       "selectedSuggestion": "선택한 제안 \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "모든 필드를 입력한 후 다시 시도하세요.",
       "invalidUsernameOrPassword": "잘못된 사용자 이름 또는 비밀번호입니다.",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "시작하기",
     "reportDetail": "보고서",
     "sharedChat": "공유 채팅",
     "passwordPolicy": "비밀번호 정책",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "일정을 저장할 수 없습니다",
     "policy": "에스컬레이션 정책",
     "policyIfNoAck": "아무도 확인하지 않으면, 이후",
-    "policyRepeatTimes": "사다리를 1회 실행합니다 | 사다리를 {count}회 실행합니다",
-    "policyFinalStop": "그런 다음 중지",
-    "policyFinalNotifyDefault": "그런 다음 기본 팀에 알립니다",
-    "policyNoDefaultTeam": "기본 팀이 지정되지 않았으므로 중지와 동일합니다. 라우팅 탭에서 팀을 지정하세요.",
     "policyPrioritySilent": "{priority}는 아무도 호출하지 않습니다. 변경하려면 단계를 추가하세요 — 여기서의 침묵은 결정이며 누락이 아닙니다.",
     "policyDoneEditing": "편집 완료",
     "policyHint": "각 우선순위에서 누가 호출되는지와 얼마나 후에 호출되는지를 정의합니다. 기본값이므로 변경할 수 있습니다.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "누구도 사이트가 다운되었는지 확인하려고 5분을 기다리지 않습니다.",
     "policyP4Pages": "이 우선순위에서도 호출합니다",
     "policyP4PagesHint": "기본적으로 꺼져 있습니다. 누군가를 깨우는 P4는 심각도 버그입니다.",
-    "policyFinalAction": "아무도 확인하지 않으면",
-    "policyFinal_notifyDefaultTeam": "기본 팀에 알림",
-    "policyFinal_stop": "중지",
     "policySummaryTitle": "이 정책이 지금 수행하는 작업",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "한 번에 모두",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "AI SRE 없음",
     "ladderStaleDefaultTag": "래더가 로테이션을 한 번도 반영하지 못했습니다",
     "ladderStaleDefaultHint": "모든 단계에서 팀 전체를 호출하지만, 이 팀에는 로테이션이 있습니다. 이 래더는 로테이션이 생기기 전에 만들어진 것입니다. 멤버를 추가하거나 삭제하면 기본값이 다시 실행되고, 아니면 래더를 직접 한 번 편집하세요.",
-    "ladderEndsHandsOff": "알림 인계",
     "reachShortNoSmtp": "이메일만 · SMTP 미구성",
     "reachShortNoFromAddress": "이메일 전용 · From 주소 없음",
     "reachShortNoAddress": "등록된 주소 없음",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· {duration}마다",
     "ladderEnd": "종료",
     "ladderEndUnknown": "더 이상 예정된 것이 없습니다.",
-    "ladderEndsDefaultTeam": "모든 단계가 소진됨 — 기본 팀에 알림이 전송되었습니다.",
     "rungLost": "실패",
     "rungLostTimes": "실패 ×{count}",
     "routingDetails": "라우팅 세부정보",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "에스컬레이션 단계",
     "policyChipSteps": "{count}단계 | {count}단계",
     "policyAddStep": "단계 추가",
-    "policyWhenStepsRunOut": "단계가 모두 소진된 경우",
     "policyAppliesToNewPages": "변경 사항은 새 호출에만 적용됩니다.",
     "policySave": "저장",
     "policyFix": "해결",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "Slack을 사용해도 이메일은 계속 발송됩니다. Slack 계정이 연결되지 않은 사람도 이메일을 받습니다.",
     "policyNoProvider": "전화 제공업체가 연결되어 있지 않아 SMS와 음성 통화를 건너뛰고 이 호출은 이메일로 전송됩니다.",
     "policyNoProviderLink": "설정 → 전화 통신에서 연결하세요",
-    "policyEndOptionStop": "한 번 실행 후 중지 | {count}회 실행 후 중지",
-    "policyEndOptionHandOff": "한 번 실행 후 기본 팀으로 인계 | {count}회 실행 후 기본 팀으로 인계",
-    "policyEndOptionHandOffTo": "한 번 실행한 후 {team}에 인계 | {count}회 실행한 후 {team}에 인계",
     "policyDeliveryTitle": "전달",
     "policyTodayIs": "오늘: {who}",
     "policyPeopleCount": "{count}명 | {count}명",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "{team}의 알림을 가져옵니다",
     "ruleEditorKeptBy": "{team}이(가) 이 알림을 계속 수신합니다: 해당 규칙이 더 구체적입니다",
     "ruleEditorContends": "{team}의 규칙과 경쟁합니다: 더 구체적인 쪽이 우선합니다",
+    "ruleEditorFieldSourcesMore": "{fields} 외 {count}개",
+    "ruleEditorFieldsHelp": "필드는 상관관계 필드 그룹에서 가져옵니다. {link}",
+    "ruleEditorFieldsSource": "필드는 상관관계 필드 그룹에서 가져옵니다.",
+    "ruleEditorManageFieldGroups": "필드 그룹 관리",
+    "ruleEditorDuplicatePath": "{team}에 이미 정확히 이 조건에 대한 규칙이 있습니다. 대신 해당 규칙을 편집하세요.",
+    "ruleEditorDuplicatePathSameTeam": "이 팀에 이미 정확히 이 조건에 대한 규칙이 있습니다.",
     "routingTestRouting": "라우팅 테스트",
     "routingTabNeedsOwnerPlain": "소유자 필요",
     "simulatorStartFrom": "시작 기준",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "모든 Linux 서버의 로그, 메트릭, 트레이스.",
+      "windows": "Windows 서버의 이벤트 로그와 메트릭.",
+      "macos": "Mac 머신의 로그와 메트릭.",
+      "aws": "AWS 서비스의 로그와 메트릭.",
+      "googleCloud": "{gcp} 프로젝트의 로그를 {pubSub} 푸시 구독을 통해 수집합니다.",
+      "azure": "{azure} 구독의 활동 로그를 {eventHub}를 통해 수집합니다.",
+      "postgresql": "쿼리, 연결 및 복제 메트릭.",
+      "mysql": "쿼리, 연결 및 InnoDB 메트릭.",
+      "mongodb": "작업, 연결 및 캐시 메트릭.",
+      "redis": "메모리, 명령 및 키스페이스 메트릭.",
+      "sqlServer": "쿼리, 대기 및 버퍼 메트릭.",
+      "oracle": "세션, 테이블스페이스 및 리소스 한도 메트릭.",
+      "mariadb": "쿼리, 연결 및 InnoDB 메트릭.",
+      "elasticsearch": "클러스터, 인덱스 및 노드 상태.",
+      "cassandra": "읽기, 쓰기 및 컴팩션 메트릭.",
+      "dynamodb": "{kinesisFirehose}를 통해 항목 변경(삽입, 업데이트, 삭제)을 로그로 전송합니다.",
+      "snowflake": "웨어하우스, 쿼리 및 크레딧 사용량.",
+      "databricks": "로그 API를 통해 전송되는 노트북 로그.",
+      "couchdb": "요청, 데이터베이스 및 복제 메트릭.",
+      "aerospike": "네임스페이스, 노드, 메모리 및 연결 메트릭.",
+      "sapHana": "메모리, CPU 및 서비스 메트릭.",
+      "zookeeper": "지연 시간, 연결 및 노드 메트릭.",
+      "nginx": "{fluentBit}에서 테일링하는 액세스 및 오류 로그.",
+      "apache": "{fluentBit}에서 테일링하는 액세스 및 오류 로그.",
+      "iis": "{fluentBit}에서 테일링하는 요청 로그.",
+      "kafka": "브로커, 토픽 및 컨슈머 랙 메트릭.",
+      "rabbitmq": "큐 깊이, 메시지 속도 및 노드 메트릭.",
+      "nats": "연결, 메시지 및 스트림 메트릭.",
+      "prometheus": "이미 스크레이프하는 메트릭을 원격 쓰기로 전송하세요.",
+      "telegraf": "이미 실행 중인 에이전트에서 메트릭을 전송하세요.",
+      "opentelemetryCollector": "이미 실행 중인 수집기를 이곳으로 연결하세요.",
+      "cloudwatch": "AWS 계정에서 메트릭을 스트리밍하세요.",
+      "gpu": "{nvidia} GPU별 사용률, 메모리 및 온도.",
+      "networkFlows": "호스트와 네트워크 간 트래픽 흐름.",
+      "fluentBit": "호스트 및 쿠버네티스를 위한 경량 로그 전송 에이전트.",
+      "fluentd": "다양한 플러그인을 갖춘 로그 수집기.",
+      "vector": "로그 및 메트릭을 위한 빠른 파이프라인.",
+      "filebeat": "경량 에이전트로 로그 파일을 전송하세요.",
+      "logstash": "기존 파이프라인에서 로그를 전송하세요.",
+      "syslogNg": "서버에서 syslog를 전달하세요.",
+      "loongcollector": "호스트 및 컨테이너를 위한 로그 및 메트릭 에이전트.",
+      "splunkHec": "HTTP 이벤트 수집기 전송자를 그대로 유지하세요.",
+      "cribl": "이미 실행 중인 파이프라인에서 데이터를 라우팅하세요.",
+      "kinesisFirehose": "AWS의 전송 스트림에서 로그를 스트리밍하세요.",
+      "googleCloudLogs": "로그 싱크를 통해 프로젝트에서 로그를 내보내세요.",
+      "okta": "로그인 및 관리자 감사 이벤트.",
+      "office365": "메일, 파일 및 관리자 감사 로그.",
+      "googleWorkspace": "로그인 및 관리자 감사 로그.",
+      "falco": "컨테이너의 런타임 보안 알림.",
+      "osquery": "엔드포인트 상태를 쿼리 가능한 로그로 수집합니다.",
+      "jumpcloud": "디렉터리 및 로그인 이벤트.",
+      "openvpn": "VPN 연결 및 세션 로그.",
+      "githubActions": "워크플로우 실행 및 작업 로그.",
+      "jenkins": "빌드 로그 및 파이프라인 이벤트.",
+      "terraform": "실행 시 생성되는 plan 및 apply 로그.",
+      "ansible": "플레이북 실행 로그 및 결과.",
+      "vercel": "배포 및 함수 로그.",
+      "heroku": "로그 드레인에서 수집한 앱 및 라우터 로그.",
+      "airflow": "DAG 실행 로그 및 태스크 메트릭.",
+      "airbyte": "동기화 작업 로그 및 상태.",
+      "languageTile": "{otel} SDK로 트레이스를 수집하며, 사용 중인 언어에서 지원되면 자동 계측을 사용합니다.",
+      "aiIntegration": "AI 앱 호출의 트레이스와 모델 호출의 토큰 및 비용."
+    },
+    "skipToApp": "앱으로 건너뛰기",
+    "chooseTitle": "무엇을 먼저 모니터링하시겠습니까?",
+    "back": "뒤로",
+    "searchGuides": "가이드 {count}개 검색 | 가이드 {count}개 검색",
+    "showMore": "{count}개 더 보기 | {count}개 더 보기",
+    "noMatch": "여기서 \"{query}\"와 일치하는 가이드가 없습니다.",
+    "foundElsewhere": "다른 선택 항목에서 찾음:",
+    "inChoice": "{choice}에서",
+    "tryShorter": "더 짧은 이름을 입력해 보세요. 어떤 도구든 {link}할 수도 있습니다.",
+    "sendOverHttp": "HTTP로 로그 전송",
+    "clearSearch": "검색 지우기",
+    "othersTitle": "다른 시작 방법",
+    "whatYouGet": "제공되는 항목",
+    "signals": {
+      "metrics": "메트릭",
+      "logs": "로그",
+      "traces": "트레이스",
+      "profiles": "프로파일",
+      "sessions": "세션",
+      "errors": "오류",
+      "webVitals": "웹 바이탈(웹)",
+      "replays": "세션 리플레이",
+      "tokens": "토큰",
+      "cost": "비용",
+      "latency": "지연 시간",
+      "uptime": "가동 시간",
+      "certificates": "인증서"
+    },
+    "example": {
+      "caption": {
+        "row": "예시 화면: {name}에 대해 {product}가 표시하는 내용.",
+        "infrastructure": "예시 화면: CPU, 메모리, 파드 상태를 보여주는 {k8s} 클러스터 개요.",
+        "backend": "예시 화면: 9개 서비스에 걸친 21개 스팬이 포함된 실패한 체크아웃 트레이스의 워터폴.",
+        "frontend": "예시 화면: 실제 사용자 세션의 {rum} 웹 바이탈.",
+        "logs": "예시 화면: 히스토그램과 일치하는 로그 라인이 있는 로그 검색.",
+        "llm": "예시 화면: 모델별 비용, 토큰, 지연 시간과 시간 경과에 따른 트레이스 및 오류를 보여주는 {insights}.",
+        "agent": "예시 화면: 코딩 에이전트가 연결하는 {mcp} 서버 페이지.",
+        "synthetics": "예시 화면: 3개 위치에서 수행한 하나의 {http} 검사 결과."
+      }
+    },
+    "guide": {
+      "agentTitle": "코딩 에이전트를 선호하시나요?",
+      "agentSteps": "터미널에서 다음을 실행한 다음 {claudeCode}, {cursor} 또는 {codex}에 프롬프트나 파일을 제공하세요.",
+      "copyPrompt": "프롬프트 복사",
+      "downloadFile": ".md 다운로드",
+      "inviteTitle": "접근 권한이 없으신가요?",
+      "inviteText": "명령을 실행할 수 있는 팀원을 초대하세요.",
+      "inviteAction": "팀원 초대",
+      "loadFailed": "이 가이드를 불러오지 못했습니다.",
+      "openInApp": "데이터 소스에서 열기",
+      "languageText": "{language}의 경우 {otelSdk}를 추가하고, {language}에서 지원하는 경우 자동 계측을 사용한 다음, 아래 설정으로 {product}를 가리키도록 설정하세요.",
+      "languageLink": "{otel} {language} 가이드"
+    },
+    "rail": {
+      "label": "설정 진행 상황",
+      "check": "데이터 확인",
+      "received": "데이터 수신됨",
+      "attention": "주의 필요",
+      "waitingShort": "데이터 대기 중",
+      "title": "{name} 설정",
+      "run": "설정 명령 실행",
+      "explore": "데이터 탐색"
+    },
+    "firstData": {
+      "title": "데이터가 도착하고 있습니다",
+      "count": "{count}개 레코드가 {stream}에 도착했습니다 | {count}개 레코드가 {stream}에 도착했습니다",
+      "exploreLogs": "로그 탐색",
+      "exploreMetrics": "메트릭 탐색",
+      "exploreTraces": "트레이스 탐색",
+      "exploreProfiles": "프로파일 탐색",
+      "addAnother": "다른 소스 추가"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Synthetics 검사",
+        "description": "웹사이트, API, 포트 또는 인증서를 검사합니다. 설치가 필요하지 않습니다.",
+        "gets": "네트워크 외부에서 일정에 따라 검사를 실행합니다."
+      },
+      "invite": {
+        "name": "팀원을 초대해 설정",
+        "description": "해당 팀원에게 조직 초대가 전송됩니다."
+      },
+      "agent": {
+        "name": "코딩 에이전트로 설정",
+        "description": "{claudeCode}, {cursor} 또는 {codex}에 프롬프트 하나를 전달하세요.",
+        "gets": "코딩 에이전트가 설정을 추가하고 데이터가 도착하는지 확인합니다."
+      }
+    },
+    "agentLink": "또는 코딩 에이전트가 수행하도록 하세요",
+    "stepDone": "(완료)",
+    "agent": {
+      "crumb": "코딩 에이전트",
+      "title": "코딩 에이전트로 설정",
+      "lead": "{claudeCode}, {cursor}, {codex} 또는 어떤 코딩 에이전트든 프로젝트를 읽고, 설정을 추가하고, 데이터가 도착했는지 확인합니다. 설치하거나 배포 파일을 변경하기 전에 먼저 물어봅니다.",
+      "tokenTitle": "토큰 저장",
+      "tokenText": "코딩 에이전트를 시작할 터미널에서 시작하기 전에 이 명령을 실행하세요.",
+      "powerShell": "{powerShell}에서:",
+      "copyPowerShell": "{powerShell} 명령 복사",
+      "promptTitle": "프롬프트 복사",
+      "focusLabel": "설정",
+      "focus": {
+        "kubernetes": "{k8s} 클러스터",
+        "host": "{linux}, {macos} 또는 {windows} 호스트",
+        "backend": "백엔드 서비스 ({otel})",
+        "llm": "LLM 앱",
+        "frontend": "웹 프런트엔드",
+        "logs": "로그만"
+      },
+      "copyPrompt": "프롬프트 복사",
+      "promptCopied": "프롬프트 복사됨",
+      "download": ".md 다운로드",
+      "preview": "프롬프트 미리 보기",
+      "previewLines": "{count}줄 | {count}줄",
+      "pasteTitle": "코딩 에이전트에 붙여넣기",
+      "other": "기타",
+      "hint": {
+        "claudeCode": "같은 터미널의 프로젝트 폴더에서 {command}를 실행한 다음 프롬프트를 붙여넣으세요.",
+        "cursor": "토큰을 읽을 수 있도록 같은 터미널에서 {command}로 {product}를 시작하세요. 그런 다음 해당 채팅에 프롬프트를 붙여넣으세요.",
+        "codex": "같은 터미널의 프로젝트 폴더에서 {command}를 실행한 다음 프롬프트를 붙여넣으세요.",
+        "other": "토큰을 읽을 수 있도록 같은 터미널에서 코딩 에이전트를 시작하세요. 그런 다음 프롬프트를 붙여넣거나 {file}을(를) 전달하세요."
+      },
+      "mcp": "코딩 에이전트가 데이터를 읽을 수 있도록 {mcp} 서버에 연결하세요",
+      "aside": {
+        "eyebrow": "프롬프트가 코딩 에이전트에 지시하는 내용",
+        "title": "작고 안전한 변경",
+        "line1": "프로젝트가 무엇을 실행하는지 찾기",
+        "line2": "작동하는 최소한의 변경 수행",
+        "line3": "토큰을 환경 변수에 보관하세요",
+        "line4": "{stream} 스트림에 테스트 이벤트 하나를 전송하세요",
+        "line5": "변경된 파일을 보고하세요"
+      }
+    },
+    "collect": {
+      "continueToSetup": "설정으로 계속",
+      "languages": "언어",
+      "languagesRequired": "언어를 하나 이상 선택하세요.",
+      "kubernetesCluster": {
+        "question": "클러스터에서 수집할 항목을 선택하세요",
+        "off": {
+          "name": "로그 및 메트릭",
+          "description": "클러스터 상태 및 컨테이너 로그. 명령 하나면 됩니다.",
+          "about": "설치 명령 하나로 모든 노드와 파드의 컨테이너 로그, CPU 및 메모리, {k8s} 이벤트를 로그로 수집합니다."
+        },
+        "ebpf": {
+          "name": "eBPF로 트레이스 추가",
+          "description": "코드 변경 없이 모든 언어에서 사용할 수 있습니다. 노드에 Linux 커널 5.8+가 필요합니다.",
+          "about": "동일한 설치에 트레이스를 더합니다. 수집기가 Linux 커널에서 요청을 확인하므로 앱은 변경할 필요가 없습니다. 일반 HTTP를 통해서만 서비스 간 요청을 연결합니다."
+        },
+        "library": {
+          "name": "언어 라이브러리로 트레이스 추가",
+          "description": "앱별로 더 자세한 정보를 제공합니다. 언어를 선택한 후 앱을 한 번 재시작하세요.",
+          "about": "동일한 설치에 트레이스를 더합니다. {otelOperator}가 선택한 네임스페이스의 파드에 언어별 {otelLibrary}를 추가합니다. 코드는 변경할 필요가 없습니다."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "웹 서버",
+      "messageQueues": "메시지 큐",
+      "metricsYouCollect": "이미 수집 중인 메트릭",
+      "gpuAndNetwork": "GPU 및 네트워크 플로",
+      "movingFromAnotherTool": "다른 도구에서 이전",
+      "cloudLogs": "클라우드 로그",
+      "securityTools": "보안 도구",
+      "cicdAndPlatforms": "CI/CD 및 플랫폼"
+    },
+    "infrastructure": {
+      "name": "인프라",
+      "description": "서버, {k8s}, 클라우드 계정 및 데이터베이스",
+      "gets": "모든 호스트, 파드, 클라우드 서비스를 한곳에서 확인하세요.",
+      "question": "인프라를 어떻게 모니터링하시겠습니까?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} 클러스터",
+          "description": "설치 한 번으로 로그, 메트릭 및 {k8s} 이벤트를 수집합니다. 명령 하나를 더하면 트레이스도 수집합니다.",
+          "about": "명령 하나로 클러스터에 {productCollector}를 설치합니다. 컨테이너 로그, {k8s} 이벤트, 클러스터 메트릭을 얻을 수 있습니다."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}, {windows} 또는 {macos} 호스트",
+          "description": "{productAgent}를 서비스로 설치",
+          "about": "에이전트 하나가 호스트의 로그와 메트릭을 수집합니다. {linux}에서는 코드 변경 없이 프로그램을 트레이스할 수도 있습니다.",
+          "question": "호스트의 운영 체제는 무엇입니까?"
+        },
+        "cloudAccount": {
+          "name": "클라우드 계정",
+          "description": "{aws}, {gcp} 또는 {azure}",
+          "about": "클라우드 계정에서 로그를, {aws}에서 메트릭을 스트리밍합니다. 서버에서 실행되는 항목은 없습니다.",
+          "question": "계정이 있는 클라우드는 무엇입니까?"
+        },
+        "databases": {
+          "name": "데이터베이스",
+          "description": "{examples} 외 {count}개",
+          "about": "주로 {otelCollector}를 통해 데이터베이스 메트릭을 수집합니다.",
+          "question": "모니터링할 데이터베이스는 무엇입니까?"
+        },
+        "somethingElse": {
+          "name": "기타",
+          "description": "웹 서버, 메시지 큐, {prometheus}, GPU 및 네트워크 플로",
+          "about": "웹 서버, 메시지 큐, 이미 수집 중인 메트릭, GPU 사용량 및 네트워크 플로.",
+          "question": "그 밖에 무엇을 모니터링하시겠습니까?"
+        }
+      }
+    },
+    "backend": {
+      "name": "백엔드 애플리케이션",
+      "description": "서비스의 트레이스와 SDK가 전송하는 로그",
+      "gets": "각 요청이 서비스를 거쳐 이동하는 방식을 확인하세요.",
+      "question": "서비스를 어떻게 트레이스하시겠습니까?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "코드에 라이브러리 추가",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} 또는 {fastapi}",
+          "about": "사용 중인 언어에 {otelLibrary}를 추가합니다. 트레이스는 {product}로 전송됩니다.",
+          "question": "서비스는 어떤 언어로 작성되었나요?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} 워크로드, 코드 변경 없음",
+          "description": "클러스터 내 자동 계측",
+          "about": "{otelOperator}가 하나의 네임스페이스에 있는 파드에 계측을 추가합니다. 코드나 이미지 변경이 없습니다."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "{otel}를 사용하는 모든 언어",
+          "description": "자체 설정에서 OTLP 전송",
+          "about": "모든 {otelSdk} 또는 컬렉터가 {product} 엔드포인트를 가리키도록 설정합니다."
+        },
+        "continuousProfiling": {
+          "name": "지속적 프로파일링",
+          "description": "CPU 및 메모리 프로파일",
+          "about": "프로파일러({go}, {java}, {rust} 또는 eBPF 프로파일러)의 프로파일을 {otelCollector}를 통해 전달합니다."
+        }
+      }
+    },
+    "frontend": {
+      "name": "프런트엔드 및 모바일 앱",
+      "description": "웹 및 모바일용 RUM",
+      "gets": "웹 및 모바일 앱에서 실제 사용자가 겪는 경험을 확인합니다.",
+      "question": "앱은 어디에서 실행되나요?",
+      "rows": {
+        "browser": {
+          "name": "브라우저",
+          "description": "웹사이트 및 웹 앱",
+          "about": "웹 앱에 {sdk}를 추가합니다. 실제 브라우저의 페이지 로드, 오류 및 세션을 확인할 수 있습니다."
+        },
+        "reactNative": {
+          "description": "하나의 코드베이스에서 {ios} 및 {android}",
+          "about": "{platform} 앱에 {sdk}를 추가합니다."
+        },
+        "android": {
+          "description": "네이티브 {android} 앱",
+          "about": "{platform} 앱에 {sdk}를 추가합니다. 세션, 화면 조회, 오류 및 크래시를 확인할 수 있습니다."
+        },
+        "ios": {
+          "description": "네이티브 {ios} 앱",
+          "about": "{platform} 앱에 {sdk}를 추가합니다. 세션, 화면 조회, 오류 및 크래시를 확인할 수 있습니다."
+        }
+      }
+    },
+    "logs": {
+      "name": "모든 소스의 로그",
+      "description": "모든 전송 에이전트, 서비스 또는 도구에서 로그 전송",
+      "gets": "보내는 주체와 관계없이 모든 로그 라인을 검색하고 필터링합니다.",
+      "question": "로그를 어떻게 전송하시겠습니까?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "직접 운영하는 로그 전송 에이전트에서",
+          "description": "{examples} 및 {count}개 더",
+          "about": "이미 운영 중인 전송 에이전트가 {product}를 가리키도록 설정합니다. 새 에이전트가 필요 없습니다.",
+          "question": "어떤 로그 전송 에이전트를 운영하나요?"
+        },
+        "overHttpWithCurl": {
+          "name": "{curl}을 사용한 HTTP",
+          "description": "모든 스크립트에서 요청 한 번. 설치 불필요.",
+          "about": "모든 스크립트 또는 서비스에서 HTTP 요청 한 번으로 JSON 로그를 전송합니다."
+        },
+        "fromOpentelemetry": {
+          "name": "{otel}에서",
+          "description": "SDK 또는 컬렉터의 OTLP 로그",
+          "about": "{otelSdk} 또는 컬렉터에서 OTLP로 로그를 전송합니다."
+        },
+        "somethingElse": {
+          "name": "기타",
+          "description": "{splunk} 또는 {cribl}, 클라우드 로그, 보안 도구 및 CI/CD",
+          "about": "{splunk} 또는 {cribl}에서 이전하거나 클라우드, 보안 도구 및 CI/CD에서 로그를 수집합니다.",
+          "question": "로그는 또 어디에서 오나요?"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM 및 AI 앱",
+      "description": "LLM 호출, 에이전트 및 도구를 트레이스합니다.",
+      "gets": "모든 LLM 호출, 도구 호출 및 에이전트 단계를 확인합니다.",
+      "question": "AI 앱은 무엇을 사용하나요?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, 에이전트 또는 {assistantsApi}",
+          "about": "{openaiSdk}를 통해 이루어지는 모든 호출을 토큰, 비용, 지연 시간과 함께 트레이스합니다.",
+          "question": "어떤 {openai} 라이브러리를 사용하시나요?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} 또는 {claudeAgentSdk}",
+          "about": "{anthropicSdk}를 통해 이루어지는 모든 호출을 토큰, 비용, 지연 시간과 함께 트레이스합니다.",
+          "question": "어떤 {anthropic} 라이브러리를 사용하시나요?"
+        },
+        "langchainOrLanggraph": {
+          "description": "체인, 에이전트, 그래프",
+          "about": "각 체인, 에이전트 단계, 도구 호출을 트레이스합니다.",
+          "question": "어떤 {langchain} 라이브러리를 사용하시나요?"
+        },
+        "somethingElse": {
+          "name": "기타",
+          "description": "기타 프레임워크, 모델 제공자, 게이트웨이 및 도구",
+          "about": "프레임워크, 모델 제공자, 게이트웨이, 노코드 도구, 분석 도구 등",
+          "question": "AI 앱에서 무엇을 사용하나요?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "플릿 관리",
     "subtitle": "OpenTelemetry 수집기를 등록하고, 구성을 버전으로 관리하며, 변경 사항을 안전하게 롤아웃하세요",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "{receiver} 리시버가 거부함",
       "legend": "파이프라인 상태",
       "legendToggle": "맵에서 이 상태 표시 또는 숨기기"
+    }
+  },
+  "sampleData": {
+    "delete": "샘플 데이터 삭제",
+    "loadForbidden": "샘플 데이터를 로드하려면 이 조직에 대한 쓰기 권한이 필요합니다.",
+    "steps": {
+      "functions": "함수 생성 중",
+      "pipeline": "실시간 파이프라인 생성 중",
+      "telemetry": "로그, 트레이스, 메트릭 생성 및 전송 중",
+      "dashboards": "대시보드 생성 중",
+      "alerts": "알림 생성 중",
+      "enrichment": "서비스 소유자 테이블 업로드 중"
+    },
+    "progress": {
+      "loading": "샘플 데이터 로드 중…",
+      "done": "샘플 데이터 로드됨",
+      "counts": "{logs}개 로그 레코드 · {spans}개 스팬 · {metrics}개 메트릭 포인트",
+      "skipped": "건너뜀",
+      "logs": "로그",
+      "spans": "스팬",
+      "metrics": "메트릭 포인트"
+    },
+    "removeSteps": {
+      "alerts": "알림",
+      "alertDelivery": "알림 템플릿 및 웹훅",
+      "dashboards": "대시보드",
+      "pipeline": "파이프라인",
+      "functions": "함수",
+      "streams": "스트림"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "샘플 데이터 제거 중",
+        "body": "몇 초 정도 걸립니다. 이 대화상자를 닫아도 되지만, 끝날 때까지 이 탭은 열어 두세요.",
+        "label": "샘플 데이터 제거 중…"
+      },
+      "done": {
+        "title": "샘플 데이터 제거됨",
+        "body": "서버가 저장된 데이터 삭제를 몇 분 내에 완료합니다. 그 후 샘플 데이터를 다시 로드할 수 있습니다.",
+        "label": "제거 완료",
+        "done": "완료",
+        "keptLabel": "다른 곳에서 사용 중이므로 유지됨:"
+      },
+      "failed": {
+        "title": "모든 샘플 데이터를 제거하지 못했습니다",
+        "body": "다시 시도하세요. 이미 제거된 항목은 건너뜁니다.",
+        "label": "제거 중단됨",
+        "close": "닫기",
+        "tryAgain": "다시 시도"
+      }
+    },
+    "removeConfirm": {
+      "title": "샘플 데이터를 삭제할까요?",
+      "message": "샘플 스트림, 대시보드, 알림, 함수 및 보강 테이블이 삭제됩니다. 직접 만든 데이터는 영향을 받지 않습니다."
+    },
+    "toast": {
+      "loaded": "샘플 데이터가 로드되었습니다. 즐겁게 탐색해 보세요!",
+      "loadFailed": "샘플 데이터를 로드하지 못했습니다",
+      "removed": "샘플 데이터가 제거되었습니다",
+      "removedWithKept": "샘플 데이터가 제거되었습니다. 다른 항목에서 사용 중이므로 샘플 항목 {count}개가 유지됩니다. | 샘플 데이터가 제거되었습니다. 다른 항목에서 사용 중이므로 샘플 항목 {count}개가 유지됩니다.",
+      "removeFailed": "샘플 데이터를 모두 제거하지 못했습니다",
+      "removeWhileLoading": "샘플 데이터 로드가 완료될 때까지 기다리세요."
+    },
+    "entry": {
+      "onboardingSource": "샘플 데이터 살펴보기"
+    },
+    "callout": {
+      "title": "아직 데이터를 보낼 준비가 되지 않았나요?",
+      "body": "샘플 온라인 스토어에서 {product}를 먼저 살펴보세요: 진행 중인 인시던트와 대시보드, 알림, 로그, 트레이스, 메트릭 및 파이프라인을 둘러보는 가이드 투어가 제공됩니다.",
+      "cta": "샘플 데이터로 살펴보기"
+    },
+    "header": {
+      "label": "샘플 데이터",
+      "try": "샘플 데이터 체험하기",
+      "finish": "로딩 완료"
+    },
+    "dock": {
+      "details": "세부 정보 표시"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "사용자 데이터가 들어오고 있습니다. 샘플 데이터가 대시보드, 알림 및 검색에 섞이지 않도록 삭제하세요.",
+        "keep": "지금은 유지",
+        "remove": "샘플 데이터 삭제"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "백그라운드에서 계속",
+      "progress": {
+        "title": "샘플 스토어 생성 중",
+        "body": "약 1분 정도 걸립니다. 이 대화상자를 닫아도 되지만, 로딩이 끝날 때까지 이 탭은 열어 두세요."
+      },
+      "ready": {
+        "title": "샘플 스토어가 실시간 운영 중입니다",
+        "startTour": "가이드 투어 시작",
+        "ownWay": "직접 살펴보기"
+      },
+      "errorBody": "로딩 중 문제가 발생했습니다. 다시 시도하세요. 이미 존재하는 대시보드와 알림은 복제되지 않고 재사용됩니다."
+    },
+    "tour": {
+      "label": "가이드 투어",
+      "position": "가이드 투어 · {total}단계 중 {current}단계",
+      "pill": "투어 {current}/{total}",
+      "done": "투어 완료",
+      "stepFailed": "이 단계를 열 수 없습니다. 다시 시도하세요.",
+      "minimize": "투어 최소화",
+      "close": "투어 종료",
+      "next": "다음",
+      "capabilities": {
+        "dashboards": "대시보드",
+        "alerts": "알림",
+        "logs": "로그 검색",
+        "traces": "트레이싱",
+        "metrics": "메트릭 및 PromQL",
+        "pipelines": "파이프라인"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "문제 파악하기",
+          "body": "스토어프론트의 서비스 개요입니다. 지난 35분 동안 오류율과 결제 지연 시간이 모두 급증했습니다.",
+          "look": "모든 패널은 SQL 쿼리입니다. 차트 위에 마우스를 올려 시리즈를 비교하고, 차트를 가로질러 드래그하여 확대하거나, 패널 메뉴를 열어 쿼리를 편집하세요."
+        },
+        "alert": {
+          "title": "알림이 이미 발생했습니다",
+          "body": "결제 오류에 대한 알림은 일정에 따라 로그에 SQL 쿼리를 실행하며, 오류가 임계값을 넘는 즉시 발생했습니다.",
+          "look": "알림을 열어 쿼리, 임계값, 일정을 확인하세요. 샘플 대상은 자리 표시자 웹훅이므로 전송이 실패로 표시됩니다. 실제 알림을 받으려면 Slack, 이메일 또는 PagerDuty를 대상으로 지정하세요."
+        },
+        "logs": {
+          "title": "오류 검색",
+          "body": "결제 오류로 필터링된 로그입니다. 거의 모두 같은 내용을 말합니다: 풀에서 연결을 가져오는 중 타임아웃.",
+          "look": "레코드를 펼쳐 모든 필드를 확인하세요. 필드 값을 클릭해 해당 값으로 필터링하거나, SQL 모드로 전환해 그룹화 및 집계하세요."
+        },
+        "deploy": {
+          "title": "변경 사항 찾기",
+          "body": "결제 v2.15.0이 오류가 시작되기 1분 전에 배포되었고, 릴리스 노트에 연결 풀을 20으로 줄였다고 나와 있습니다.",
+          "look": "같은 로그에서 한 번의 검색으로 찾은 근본 원인입니다. 전체 텍스트 검색과 SQL 검색은 동일한 데이터에서 실행됩니다."
+        },
+        "traces": {
+          "title": "실패한 요청 따라가기",
+          "body": "각 트레이스는 서비스 전반의 결제 한 건을 추적합니다. 하나를 열어 보세요. 워터폴에는 결제 서비스가 데이터베이스 연결을 기다리며 3초 동안 대기하는 모습이 표시됩니다.",
+          "look": "로그에는 동일한 트레이스 ID가 포함되어 있어 스팬과 해당 로그를 양방향으로 오갈 수 있습니다."
+        },
+        "metrics": {
+          "title": "PromQL로 확인",
+          "body": "PromQL로 조회한 모든 서비스의 p95 지연 시간입니다. 결제와 체크아웃이 함께 상승합니다.",
+          "look": "메트릭은 로그 및 트레이스와 동일한 엔진에 있으므로 인프라 대시보드는 전적으로 PromQL로 구성됩니다."
+        },
+        "pipeline": {
+          "title": "데이터가 도착하는 즉시 처리",
+          "body": "실시간 파이프라인이 모든 액세스 로그에 VRL 함수를 실행하여 레코드가 저장되기 전에 client_os와 is_mobile을 추가합니다.",
+          "look": "파이프라인을 열어 그래프를 확인하세요. 파이프라인은 앱을 건드리지 않고도 데이터를 필터링, 보강, 라우팅, 마스킹할 수 있습니다."
+        },
+        "business": {
+          "title": "비즈니스 영향 측정",
+          "body": "동일한 로그로 비즈니스 대시보드를 구성합니다: 실패한 체크아웃, 매출, 결제 수단별 주문.",
+          "look": "별도의 분석 도구가 필요하지 않습니다. 로그에 있는 모든 것이 KPI가 될 수 있습니다."
+        }
+      },
+      "finale": {
+        "title": "근본 원인을 찾았습니다",
+        "body": "몇 분 만에 대시보드의 급증에서 원인이 된 배포까지, 모든 시그널을 한곳에서 확인했습니다.",
+        "connect": "내 데이터 연결하기",
+        "restart": "투어 다시 시작",
+        "finish": "투어 마치기"
+      }
     }
   },
   "recentSearches": {

@@ -235,19 +235,19 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
     Ok(())
 }
 
-/// Stores the account, or logs and skips it with no AES key. [weak: as `org_telephony::put`]
+/// Stores the account, or logs and skips it without on-call secrets. [weak: as `put`]
 async fn put_telephony_account(
     org_id: &str,
     account: &table::org_telephony::StoredAccount,
 ) -> Result<()> {
-    match telephony_put_action(table::cipher::is_encrypting()) {
+    match telephony_put_action(table::cipher::oncall_secrets_on()) {
         TelephonyPutAction::Store => {
             log::debug!("[SUPER_CLUSTER:oncall] Put telephony account org={org_id}");
             table::org_telephony::put(org_id, account, config::utils::time::now_micros()).await?;
         }
         // Erroring would block the queue forever; the source region keeps the account.
         TelephonyPutAction::SkipNoKey => log::error!(
-            "[SUPER_CLUSTER:oncall] telephony account for org={org_id} not stored: O2_MASTER_ENCRYPTION_KEY is not set in AES mode"
+            "[SUPER_CLUSTER:oncall] telephony account for org={org_id} not stored: neither O2_MASTER_ENCRYPTION_KEY (AES mode) nor O2_ONCALL_MASTER_KEY is set"
         ),
     }
     Ok(())

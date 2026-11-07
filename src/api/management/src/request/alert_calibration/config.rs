@@ -34,10 +34,14 @@ use super::{deployment_disabled, error_response};
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::entity::alert_calibration_configs::Model),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
 pub async fn get_alert_calibration_config(Path(org_id): Path<String>) -> Response {
@@ -64,11 +68,15 @@ pub async fn get_alert_calibration_config(Path(org_id): Path<String>) -> Respons
     ),
     request_body(content = inline(Object), description = "Any of enabled, frequency_minutes and window_minutes", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::entity::alert_calibration_configs::Model),
         (status = 400, description = "A cadence or window outside its accepted bounds, or an unknown field", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "update"}))
     )
 )]
 pub async fn update_alert_calibration_config(

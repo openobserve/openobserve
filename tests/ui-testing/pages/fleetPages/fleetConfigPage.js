@@ -56,6 +56,14 @@ class FleetConfigPage {
     await expect(this.page.locator(this.validateBtn)).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
   }
 
+  async expectOpenedFor(configId) {
+    await expect(this.page).toHaveURL(new RegExp(`/fleet/configurations/${encodeURIComponent(configId)}(\\?|$)`), {
+      timeout: PAGE_TIMEOUT_MS,
+    });
+    await expect(this.page.locator(this.editorPage)).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+    await expect(this.page.locator(this.validateBtn)).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
+  }
+
   async expectTitle(configId) {
     await expect(this.page.locator(this.editorPage).getByRole('heading', { name: configId })).toBeVisible();
   }
@@ -165,6 +173,12 @@ class FleetConfigPage {
     await expect(dialog).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
     await dialog.locator(this.publishMessageField).fill(message);
     await dialog.locator(this.dialogPrimaryBtn).click();
+  }
+
+  async expectPublishEnabled(enabled) {
+    const publish = this.page.locator(this.publishBtn);
+    if (enabled) await expect(publish).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
+    else await expect(publish).toBeDisabled({ timeout: PAGE_TIMEOUT_MS });
   }
 
   async expectModeChip(text) {

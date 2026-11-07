@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
+        v-if="!focusMode"
         variant="ghost"
         size="icon-toolbar"
         class="md:hidden"
@@ -153,6 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
+      <!-- SAMPLE DATA: stays visible while the org holds sample data -->
+      <SampleDataHeaderChip class="me-2" />
+
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
         class="me-4 flex items-center gap-1 max-md:hidden"
@@ -258,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
-              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" />
+              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 v-if="aiAccess.allowed"
                 side="bottom"
@@ -522,6 +526,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -539,6 +544,7 @@ export default defineComponent({
     EnterpriseUpgradeDialog,
     OrganizationSelector,
     SolutionSwitcher,
+    SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OIcon,
@@ -738,6 +744,8 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
+    // A focus-mode route has no side menu and no AI panel, so their buttons go too.
+    const focusMode = computed(() => props.router?.currentRoute?.value?.meta?.focusMode === true);
     // The license map applies once the edition allows the assistant.
     const aiAssistantState = computed(() =>
       menuState(
@@ -747,13 +755,13 @@ export default defineComponent({
       ),
     );
     const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || aiAssistantState.value === "enabled",
+      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
     );
     const aiSlotPending = computed(
       () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
     );
     const aiLicenseLocked = computed(
-      () => aiAccess.value.allowed && aiAssistantState.value === "locked",
+      () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -889,6 +897,7 @@ export default defineComponent({
       openLockedAiAssistant,
       aiAccess,
       aiButtonVisible,
+      focusMode,
       aiLicenseLocked,
       linkedAccountsVisible,
       showLinkedAccounts,

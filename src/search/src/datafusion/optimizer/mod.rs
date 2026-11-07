@@ -13,6 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod add_sort_and_limit;
+pub mod analyzer;
+#[cfg(feature = "enterprise")]
+pub mod cipher;
+pub mod like_to_str_match;
+pub mod limit_join_right_side;
+pub mod rewrite_histogram;
+pub mod shared_subplan;
+pub mod utils;
+
 use std::{collections::HashMap, sync::Arc};
 
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
@@ -65,37 +75,32 @@ use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
 
 #[cfg(feature = "enterprise")]
-use crate::datafusion::optimizer::logical_optimizer::cipher::{
-    RewriteCipherCall, RewriteCipherKey,
-};
+use crate::datafusion::optimizer::cipher::{RewriteCipherCall, RewriteCipherKey};
 use crate::{
-    datafusion::optimizer::{
-        analyze::{
-            remove_index_fields::RemoveIndexFieldsRule, shared_subplan::MarkSharedSubplanRule,
-        },
-        context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
-        eliminate_aggregate::EliminateAggregateRule,
-        logical_optimizer::{
-            add_sort_and_limit::AddSortAndLimitRule, like_to_str_match::RewriteLikeToStrMatch,
-            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+    datafusion::{
+        optimizer::{
+            add_sort_and_limit::AddSortAndLimitRule,
+            analyzer::{
+                remove_index_fields::RemoveIndexFieldsRule, shared_subplan::MarkSharedSubplanRule,
+            },
+            like_to_str_match::RewriteLikeToStrMatch,
+            limit_join_right_side::LimitJoinRightSide,
+            rewrite_histogram::RewriteHistogram,
             shared_subplan::StripDivergedSharedSubplanRule,
         },
         physical_optimizer::{
-            aggregate_topk::AggregateTopkRule, distribute_analyze::optimize_distribute_analyze,
-            index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
-            remote_scan::generate_remote_scan_rules, shared_subplan::SharedSubplanRule,
+            aggregate_topk::AggregateTopkRule,
+            context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
+            distribute_analyze::optimize_distribute_analyze,
+            eliminate_aggregate::EliminateAggregateRule,
+            index_optimizer::LeaderIndexOptimizerRule,
+            join_reorder::JoinReorderRule,
+            remote_scan::generate_remote_scan_rules,
+            shared_subplan::SharedSubplanRule,
         },
     },
     sql::Sql,
 };
-
-pub mod analyze;
-pub mod context;
-pub mod eliminate_aggregate;
-pub mod logical_optimizer;
-pub mod physical_optimizer;
-pub mod stream_aggregate;
-pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
     let mut rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
@@ -344,12 +349,12 @@ mod tests {
     use super::*;
     use crate::datafusion::{
         context::SearchContextBuilder,
-        distributed_plan::{codec::get_physical_extension_codec, remote_scan_exec::RemoteScanExec},
-        optimizer::{
-            context::RemoteScanContext, logical_optimizer::rewrite_histogram::RewriteHistogram,
-            physical_optimizer::remote_scan::RemoteScanRule,
+        datasource::empty_table::NewEmptyTable,
+        distributed::{
+            codec::get_physical_extension_codec, remote_scan::remote_scan_exec::RemoteScanExec,
         },
-        table_provider::empty_table::NewEmptyTable,
+        optimizer::rewrite_histogram::RewriteHistogram,
+        physical_optimizer::{context::RemoteScanContext, remote_scan::RemoteScanRule},
         udf::time::histogram,
     };
 

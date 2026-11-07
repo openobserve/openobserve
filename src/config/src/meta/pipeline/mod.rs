@@ -272,6 +272,12 @@ impl Pipeline {
         }
     }
 
+    /// The full key of this pipeline's scheduler trigger; realtime pipelines have none.
+    pub fn scheduler_module_key(&self) -> Option<String> {
+        self.get_derived_stream()
+            .map(|source| source.get_scheduler_module_key(&self.name, &self.id))
+    }
+
     /// The first Stream/Query/RemoteStream node, else the source, naming another org. [pure]
     pub fn cross_org(&self) -> Option<CrossOrg<'_>> {
         let foreign = |org: &str| !org.is_empty() && org != self.org;
@@ -752,6 +758,31 @@ pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_ty
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
+
+    #[test]
+    fn scheduler_module_key_keeps_a_name_with_a_slash_whole() {
+        let mut pipeline = Pipeline {
+            id: "pl_id".to_string(),
+            name: "team/nightly".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "org".to_string(),
+                ..Default::default()
+            }),
+            version: 1,
+            enabled: true,
+            org: "org".to_string(),
+            description: String::new(),
+            nodes: vec![],
+            edges: vec![],
+            kind: Default::default(),
+        };
+        assert_eq!(
+            pipeline.scheduler_module_key().as_deref(),
+            Some("logs/org/team/nightly/pl_id")
+        );
+        pipeline.source = PipelineSource::Realtime(Default::default());
+        assert_eq!(pipeline.scheduler_module_key(), None);
+    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {

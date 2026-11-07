@@ -1948,6 +1948,7 @@
     "billings": "Fatturazione",
     "rum": "RUM",
     "settings": "Impostazioni",
+    "allSettings": "Tutte le impostazioni",
     "iam": "IAM",
     "report": "Report",
     "pipeline": "Pipeline",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "Sono consentiti solo file ZIP"
     },
     "emptyState": {
-      "title": "Monitora i tuoi utenti con Real User Monitoring",
-      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
       "webApp": "Strumenta un'app web",
       "webAppDesc": "Aggiungi l'SDK RUM di OpenObserve a qualsiasi app {product}",
       "sessionReplay": "Abilita la riproduzione della sessione",
       "sessionReplayDesc": "Registra e riproduci le sessioni utente per eseguire il debug dei problemi di UX",
+      "title": "Monitora i tuoi utenti con Real User Monitoring",
+      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
       "learnMore": "Per saperne di più:",
       "quickImpl": "Guida rapida all'implementazione",
       "blogPost": "Nozioni di base sul monitoraggio frontend"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "Licenza e utilizzo",
     "copyLicenseId": "Copia ID licenza",
     "editionLbl": "Edizione",
-    "limitPrefix": "· limite",
     "gbPerDay": "GB / giorno",
     "ofDailyLimitUsedToday": "del limite giornaliero utilizzato oggi",
     "gbToday": "GB oggi",
@@ -3580,6 +3580,7 @@
     "usage_limits": "Limiti di utilizzo",
     "feature_comparison_lbl": "Confronto delle funzionalità",
     "feature_comparision_ent_msg": "Stai utilizzando OpenObserve Enterprise Edition con accesso a tutte le funzionalità avanzate elencate di seguito.",
+    "feature_comparision_ent_partial_msg": "Stai usando OpenObserve Enterprise Edition. Alcune funzionalità non sono incluse nella tua licenza; consulta l'elenco sopra.",
     "feature_comparision_plan_detail": "Il tuo piano: Enterprise Edition è gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
     "feature_comparision_os_msg": "Al momento stai utilizzando OpenObserve Open Source Edition. Effettua l'upgrade a Enterprise Edition per sbloccare le funzionalità avanzate elencate nella tabella di confronto riportata di seguito.",
     "feature_comparision_good_news": "Buone notizie: OpenObserve Enterprise Edition è completamente gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "Nessuna funzionalità corrisponde alla tua ricerca",
     "features_none": "Nessuna funzionalità in questo gruppo",
     "features_free_heading": "Gratuite, incluse in ogni licenza",
+    "features_free_not_included": "Gratuita, non inclusa nella tua licenza",
     "features_new": "Nuove dopo la tua licenza",
     "features_filter_new": "Nuove",
     "request_new_license": "Richiedi una nuova licenza",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "La tua licenza è ancora attiva. Vuoi aggiornarla con la nuova chiave di licenza?",
     "yes_update_license": "Sì, aggiorna la licenza",
     "no_keep_current": "No, tieniti aggiornato",
+    "license_downgrade_title": "Applicare questa chiave di licenza?",
+    "license_downgrade_intro": "Questa chiave sostituisce la licenza corrente.",
+    "license_downgrade_expired": "Questa chiave è scaduta il {date}. Si applicherà il limite gratuito di 50 GB/giorno.",
+    "license_downgrade_lose": "Perderai: {names}",
+    "license_downgrade_limit": "Il limite giornaliero passa da {old} a {new}",
+    "license_downgrade_expiry": "La scadenza passa da {old} a {new}",
+    "license_limit_per_day": "{gb} GB/giorno",
     "header_button": {
       "cloud_features": "Funzionalità di {product}",
       "enterprise_edition": "Edizione: Enterprise",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "Prova OpenObserve oggi per un'osservabilità più efficiente e performante.",
     "getStartedBannerAlt": "Banner Inizia",
     "getStartedHeading": "Un'ultima cosa prima di iniziare",
-    "hearAboutUsLabel": "Come hai saputo di noi?",
     "hearAboutUsPlaceholder": "Es. Da un amico",
-    "whereDoYouWorkLabel": "Dove lavori?",
     "whereDoYouWorkPlaceholder": "Nome azienda",
-    "agreeToTermsPrefix": "Ho letto e accetto i",
     "termsOfUse": "Termini di utilizzo",
-    "and": "e",
     "privacyPolicyStar": "Informativa sulla privacy*",
     "startTrialButton": "Inizia la tua prova di 14 giorni",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "L'email è obbligatoria",
     "emailInvalid": "Inserisci un'email valida",
     "passwordRequired": "La password è obbligatoria",
-    "mustAcceptTerms": "Devi accettare i termini per continuare",
     "getStarted": {
       "title": "Benvenuto in OpenObserve",
-      "subtitle": "La tua prova di 14 giorni è iniziata. Due rapide domande e poi ti portiamo alla configurazione.",
-      "sourceLabel": "Cosa vuoi inviare per primo?",
-      "optional": "(facoltativo)",
-      "skip": "Salta le domande",
-      "continue": "Continua",
-      "hearAboutUsPlaceholder": "Ad esempio, un collega o un post di blog",
-      "whereDoYouWorkPlaceholder": "Azienda o team",
-      "termsOfService": "Termini di servizio",
-      "privacyPolicy": "Informativa sulla privacy",
-      "agreeHint": "Necessario per continuare, anche se salti le domande.",
+      "skipForNow": "Salta per ora",
+      "heard": {
+        "label": "Come hai saputo di noi?",
+        "placeholder": "Seleziona un'opzione",
+        "thanks": "Grazie!"
+      },
+      "connect": {
+        "title": "Connetti i tuoi dati",
+        "point1": "Configurazione passo passo per ogni origine",
+        "point2": "Log, metriche e tracce in un unico posto",
+        "point3": "Visualizza i tuoi primi eventi in pochi minuti",
+        "cta": "Esplora altre origini dei dati"
+      },
+      "sample": {
+        "title": "Esplora con dati di esempio",
+        "point1": "Log, tracce e metriche da servizi di esempio",
+        "point2": "Dashboard, avvisi, una pipeline e funzioni VRL",
+        "point3": "Una visita guidata e un clic per rimuovere tutto",
+        "cta": "Esplora con dati di esempio"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Host Linux o VM",
@@ -4094,7 +4108,28 @@
         "llm": "App LLM o IA",
         "agent": "Lascia che un agente AI lo configuri",
         "unsure": "Non sono ancora sicuro"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Server web",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Browser (RUM)",
+        "llm": "LLM o app AI",
+        "agent": "Agente AI"
       }
+    },
+    "heardFrom": {
+      "question": "Come ci hai trovato?",
+      "quickQuestion": "Una domanda veloce: come ci hai trovato?",
+      "skip": "Salta",
+      "searchEngine": "Motore di ricerca",
+      "friendOrColleague": "Amico o collega",
+      "aiAssistant": "Assistente AI",
+      "other": "Altro",
+      "thanks": "Grazie per avercelo detto!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Gli altri campi mostrano solo i campi dello schema che esistevano prima che lo stream fosse configurato per utilizzare uno schema definito dall'utente.",
     "addFieldsTitle": "Aggiungi campi",
     "dataRetentionDaysLabel": "Conservazione dei dati (giorni)",
-    "globalRetentionDays": "La conservazione globale è di {days} giorni",
-    "retentionMinOneDay": "Il periodo di conservazione deve essere di almeno 1 giorno",
+    "retentionDefaultDays": "Lascia vuoto per usare il valore predefinito per questo tipo di stream: {days} giorni",
+    "retentionDefaultForever": "Lascia vuoto per usare il valore predefinito per questo tipo di stream: conserva per sempre",
     "maxQueryRangeHoursLabel": "Intervallo massimo di query (ore)",
     "maxQueryRangeHelp": "Intervallo di tempo massimo consentito per le query. Imposta 0 per un intervallo illimitato.",
     "globalFlattenLevel": "Il valore globale è {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Unisciti a Slack",
     "maybeLater": "Forse più tardi"
   },
-  "connectDataSourcePopup": {
-    "title": "Per iniziare, colleghiamo la tua prima fonte di dati.",
-    "description": "Abbiamo molto da mostrarti, ma dobbiamo prima collegare i tuoi dati. La maggior parte dei team vede i primi log in circa un minuto.",
-    "connectButton": "Collega una fonte di dati",
-    "slackLink": "Unisciti anche alla nostra community Slack"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Continua da dove si era fermato",
     "startFromNow": "Inizia da ora.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "Scopri quali workload comunicano tra loro: flussi di rete eBPF",
       "k8sInstallerNote": "Questo installa automaticamente cert-manager, l'operatore OpenTelemetry e il collector OpenObserve.",
       "k8sInternalEndpointNote": "Usa questa opzione quando OpenObserve è in esecuzione nello stesso cluster — il traffico non lo lascia mai.",
+      "k8sTraceAppsTitle": "Traccia le tue app",
+      "k8sTraceEbpfDesc": "Attiva il tracciamento eBPF nel collector, poi scegli le app da tracciare per porta, percorso dell'eseguibile o riga di comando.",
+      "k8sTraceLibraryDesc": "Annota il namespace di ogni linguaggio, così l'operatore aggiunge la sua libreria ai pod presenti. Poi riavvia quelle app una volta.",
       "k8sTroubleAnnotationA": "L'iniezione avviene alla creazione del pod, quindi i pod esistenti non vengono influenzati fino al riavvio — esegui `kubectl rollout restart deployment -n my-namespace`. Conferma che l'annotazione sia stata applicata con `kubectl get ns my-namespace -o yaml` e verifica che il valore corrisponda a `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Ho annotato un namespace ma non appaiono tracce",
       "k8sTroubleEndpointA": "Usa l'**Endpoint interno** solo quando OpenObserve stesso viene eseguito in questo cluster; il traffico rimane allora al suo interno e non attraversa mai la rete. L'URL è `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — il valore predefinito presuppone la release `o2` nel namespace `openobserve`, quindi modificalo se i tuoi sono diversi. Tutti gli altri usano l'endpoint esterno.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "Le sessioni appaiono ma gli schermi hanno tutti lo stesso nome",
       "androidTroubleScreenNamesA": "Il tracciamento delle viste non è collegato. Passa un `useViewTrackingStrategy(...)` — ad esempio `ActivityViewTrackingStrategy(trackExtras = true)` per le Activity, o `NavigationViewTrackingStrategy(...)` se usi AndroidX Navigation — quando crei la `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Mostra istruzioni",
       "snowflakeCollectorVersionNote": "Snowflake necessita del collector v0.92.0 — le versioni più recenti hanno un bug noto.",
       "snowflakeTagline": "Raccogli le metriche dell'account Snowflake con l'OpenTelemetry Collector e inviale a OpenObserve.",
       "sqlClientGuiVariant": "Client SQL (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure controlla Stream per le metriche `cassandra_*`.",
       "verifyDatabricksLogsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure apri Log e cerca `source:databricks`.",
       "verifyDataTitle": "Verifica i dati in OpenObserve",
+      "checkYourDataTitle": "Verifica i tuoi dati",
       "verifyDynamodbLogsDesc": "Il controllo qui sotto diventa verde quando i dati arrivano, oppure apri Log per lo stream `dynamodb` quando gli elementi cambiano.",
       "verifyGcpLogsDesc": "Genera un po' di attività nel progetto (oppure attendi che il sink trovi un log); il controllo qui sotto diventa verde quando i dati arrivano.",
       "verifyK8sDataDesc": "Lascia al collector qualche secondo per avviarsi; il controllo qui sotto diventa verde quando i dati arrivano — i log del cluster finiscono nello stream `default`.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "La fatturazione è gestita tramite il tuo contratto — contatta il tuo account manager per modifiche",
     "upgradeToPlanMessage": "Passa a un piano per continuare a usufruire dei servizi di OpenObserve.",
     "creditsUsedLabel": "crediti usati",
-    "licenseExpiryContactAdmin": "Aggiorna la tua licenza contattando il tuo amministratore.",
+    "licenseExpiredOn": "La tua licenza è scaduta il {date}. Le tue funzionalità restano attive.",
+    "licenseExpiredLimit": "Ora si applica il limite gratuito di {limit} GB/giorno: superarlo per più di {allowed} giorni in un mese sospende la ricerca fino al rinnovo.",
+    "licenseAskAdminToRenew": "Chiedi all'amministratore della licenza di rinnovarla.",
+    "renewLicense": "Rinnova licenza",
     "subscribed": "Sottoscritto",
     "invoiceHistory": "Cronologia fatture",
     "amount": "Importo",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "Impossibile collegare l'abbonamento AWS",
     "failedToLinkAzureSubscription": "Impossibile collegare l'abbonamento Azure",
     "last15Minutes": "Ultimi 15 minuti",
-    "licenseHasExpired": "La tua licenza è scaduta",
     "numberOfPipelines": "Numero di pipeline",
     "oneDayUntilLicenseExpires": "Manca 1 giorno alla scadenza della tua licenza",
     "pleaseWaitProcessingRequest": "Attendi mentre elaboriamo la tua richiesta...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "Opzionale. L'avviso viene comunque eseguito e ne registra la cronologia, ma nessuna destinazione viene notificata.",
       "sendsToStatus": "Invia a {targets} ogni volta che l'avviso si attiva.",
       "oncallTeamTarget": "un team di reperibilità",
+      "lockedWorkflowFallback": "Workflow bloccato",
+      "lockedTargetBadge": "Bloccato",
       "createsIncident": "Crea incidente",
       "createsIncidentTooltip": "Se un avviso può creare un incidente, non invia una notifica dedicata. Al suo posto, viene inviata una notifica per l'incidente quando viene creato un nuovo incidente o quando un nuovo tipo di avviso si unisce a un incidente esistente.",
       "incidentTitleTemplate": "Titolo dell'incidente",
@@ -12901,6 +12939,9 @@
       "lastTrained": "Ultimo addestramento",
       "level": "Livello",
       "lookBackWindow": "Finestra di lookback",
+      "scheduleIntervalFloor": "L'intervallo di controllo deve essere almeno {min}.",
+      "lookBackWindowCap": "La finestra di analisi può essere al massimo {max} con questa risoluzione di rilevamento: una finestra più lunga contiene più di 100.000 bucket. Accorcia la finestra o usa una risoluzione di rilevamento più lunga.",
+      "retrainOnEditNote": "La modifica della query, della funzione o della risoluzione di rilevamento riaddestra questo rilevatore. Il rilevamento si mette in pausa finché l'addestramento non termina.",
       "lookBackWindowFloor": "La finestra di lookback deve essere di almeno {min} — Controlla ogni più una Risoluzione di rilevamento. Una finestra più breve non può contenere un bucket completo quando la prima esecuzione viene avviata, quindi quell'esecuzione salterebbe dei bucket.",
       "lookBackWindowLegacy": "Questa finestra salvata è inferiore al minimo di {min} (Controlla ogni più una Risoluzione di rilevamento). Verrà salvata invariata, ma una prima esecuzione può saltare dei bucket finché la finestra non viene aumentata.",
       "lookBackWindowMinimum": "Almeno {min}; per queste impostazioni si consiglia {recommended} o più.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "Nessuna destinazione trovata",
       "noDetectionResults": "Ancora nessun risultato di rilevamento in questo intervallo",
       "noFieldsFound": "Nessun campo trovato",
+      "checkDataNow": "Controlla ora",
+      "checkDataNowTooltip": "Valuta di nuovo i dati attuali ora invece di attendere il prossimo controllo automatico.",
+      "dataReadinessReason": "Motivo",
       "noticeRetrain": "Riaddestramento automatico",
       "noticeRetrainTooltip": "Impossibile leggere il modello salvato dopo un aggiornamento, quindi è stato eliminato e la configurazione è stata messa in coda per il riaddestramento automatico. Non è richiesta alcuna azione; il rilevamento riprende al termine dell'addestramento.",
       "noticeSkipAbsence": "La valutazione dell'assenza è rimasta indietro rispetto alla finestra di lookback; lo span che non poteva più essere recuperato è stato saltato e registrato.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "Auto apprenderà un livello dalla tua cronologia.",
       "autoTrainingHelp": "Il livello apparirà al termine dell'addestramento.",
       "autoFailedHelp": "Addestramento non riuscito. Nessun livello appreso finora. Controlla l'errore di addestramento sopra.",
+      "autoWaitingForDataHelp": "Dati di addestramento adatti ancora insufficienti. Fino ad allora nessun livello appreso. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
+      "autoNotApplicableHelp": "I dati attuali non supportano un modello di anomalie. Non è un errore. Il rilevatore resta abilitato e viene ricontrollato automaticamente.",
       "autoRetrainingHelp": "Riaddestramento. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata.",
       "autoRetrainFailedHelp": "Riaddestramento non riuscito. Viene mostrato l'ultimo livello appreso; la disponibilità del modello non è confermata. Controlla l'errore di addestramento sopra.",
       "autoUnconfirmedHelp": "Viene mostrato l'ultimo livello appreso; un modello attivo non è stato confermato.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "Instrada in base alle regole di proprietà",
     "oncallTeamTooltip": "Quale team viene contattato da questo avviso. Lascialo non impostato per ricavare il team dalle dimensioni di identità dell'avviso, che è il caso normale — imposta un solo team quando queste dimensioni non possono esprimere il proprietario.",
     "oncallTeamNoTeams": "Non ci sono ancora team di reperibilità. Creane uno nella sezione Reperibilità.",
+    "lockedTeamFallback": "Team bloccato",
     "oncallTeamAtFireTime": "Dalle regole di proprietà",
     "oncallTeamFromRules": "Per questo avviso non è impostato alcun team: il proprietario viene determinato dalle dimensioni di identità della riga che lo attiva. Queste non sono note fino all'attivazione.",
     "tags": "Tag",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "Inserisci il separatore (es., {'|'}, \\n, \\t, spazio)",
     "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
     "templateDefaultOption": "Predefinito ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Lascia il valore predefinito per usare il template {type} standard ({name}), oppure scegline uno personalizzato.",
     "loadingData": "Caricamento dei dati della destinazione...",
     "noEmailTemplates": "Sembra che tu non abbia ancora creato alcun template email.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Credenziali Azure",
       "awsRoleArn": "ARN del ruolo AWS"
     },
+    "dataRetentionDefaults": {
+      "title": "Valori predefiniti di conservazione dei dati",
+      "about": "Per gli stream che non hanno una conservazione propria. Vuoto o 0 utilizza il valore globale; altrimenti almeno 3 giorni.",
+      "defaultDays": "Predefinito (giorni)",
+      "streamType": "Tipo di stream",
+      "days": "Giorni",
+      "addType": "Aggiungi tipo di stream",
+      "removeType": "Rimuovi questo tipo di stream",
+      "globalDefault": "Globale: {value}",
+      "globalType": "Globale {type}: {value}",
+      "daysValue": "{days} giorni",
+      "forever": "conserva per sempre",
+      "invalid": "Usa 0 o almeno 3 giorni"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Usa solo caratteri alfanumerici e '+=,.{'@'}-_', senza spazi.",
       "settingsUpdated": "Impostazioni organizzazione aggiornate con successo",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "errore imprevisto",
-      "daysRemaining": "{days} giorni rimanenti alla scadenza della licenza",
-      "oneDayRemaining": "1 giorno rimanente alla scadenza della licenza",
-      "licenseExpired": "La tua licenza è scaduta"
+      "daysRemaining": "{days} giorni rimanenti alla scadenza della licenza"
     },
     "nodesPage": {
       "subtitle": "Nodi del cluster e loro stato",
@@ -23025,7 +23085,9 @@
         "ready": "Pronto",
         "running": "In esecuzione",
         "training": "In addestramento",
-        "waiting": "In attesa"
+        "waiting": "In attesa",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "anomalyStatus": {
         "active": "Attivo",
@@ -23033,7 +23095,9 @@
         "training": "In addestramento",
         "failed": "Fallito",
         "waiting": "In attesa",
-        "disabled": "Disabilitato"
+        "disabled": "Disabilitato",
+        "waitingForData": "In attesa di dati",
+        "notApplicable": "Non applicabile"
       },
       "aiToolsetKind": {
         "skill": "Abilità",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "Qualcosa è andato storto",
-      "thankYouForYourFeedback": "Grazie per il tuo feedback",
       "selectedSuggestion": "Suggerimento selezionato \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Compila tutti i campi e riprova.",
       "invalidUsernameOrPassword": "Nome utente o password non validi.",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Inizia",
     "reportDetail": "Report",
     "sharedChat": "Chat condivisa",
     "passwordPolicy": "Criteri password",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "Impossibile salvare la pianificazione",
     "policy": "Politica di escalation",
     "policyIfNoAck": "Se nessuno prende in carico, dopo",
-    "policyRepeatTimes": "Esegui la scala una volta | Esegui la scala {count} volte",
-    "policyFinalStop": "poi interrompi",
-    "policyFinalNotifyDefault": "poi avvisa il team di ultima istanza",
-    "policyNoDefaultTeam": "Nessun team predefinito è stato designato, quindi equivale a interrompere. Designane uno nella scheda Instradamento.",
     "policyPrioritySilent": "{priority} non avvisa nessuno. Aggiungi un gradino per cambiare le cose — il silenzio qui è una decisione, non un'omissione.",
     "policyDoneEditing": "Termina modifica",
     "policyHint": "Chi viene avvisato a ogni priorità e dopo quanto tempo. Questi sono valori predefiniti — puoi modificarli.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "Nessuno deve aspettare cinque minuti per scoprire che il sito è irraggiungibile.",
     "policyP4Pages": "Avvisa anche per questa priorità",
     "policyP4PagesHint": "Disattivato per impostazione predefinita — una P4 che sveglia qualcuno è un errore di gravità.",
-    "policyFinalAction": "Se nessuno prende in carico",
-    "policyFinal_notifyDefaultTeam": "Notifica il team predefinito",
-    "policyFinal_stop": "Interrompi",
     "policySummaryTitle": "Cosa fa questa policy in questo momento",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tutti insieme",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "Nessun SRE AI",
     "ladderStaleDefaultTag": "La scala non ha mai appreso le rotazioni",
     "ladderStaleDefaultHint": "Ogni livello contatta l'intero team, ma questo team ha delle rotazioni: la scala è stata creata prima che esistessero. L'aggiunta o la rimozione di un membro riesegue l'impostazione predefinita, oppure modifica la scala una volta a mano.",
-    "ladderEndsHandsOff": "La notifica passa di mano",
     "reachShortNoSmtp": "solo email · nessun trasporto SMTP",
     "reachShortNoFromAddress": "solo email · nessun indirizzo From",
     "reachShortNoAddress": "nessun indirizzo in archivio",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· ogni {duration}",
     "ladderEnd": "fine",
     "ladderEndUnknown": "Non è previsto altro.",
-    "ladderEndsDefaultTeam": "I passi di escalation sono terminati — il team predefinito è stato notificato.",
     "rungLost": "fallito",
     "rungLostTimes": "fallito ×{count}",
     "routingDetails": "Dettagli di routing",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "Passi di escalation",
     "policyChipSteps": "{count} passo | {count} passi",
     "policyAddStep": "Aggiungi passo",
-    "policyWhenStepsRunOut": "Quando i passi finiscono",
     "policyAppliesToNewPages": "Le modifiche si applicano solo alle nuove notifiche.",
     "policySave": "Salva",
     "policyFix": "Correggi",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "L'email resta attiva con Slack: chi non ha un account Slack collegato riceve comunque l'email.",
     "policyNoProvider": "Nessun provider telefonico è connesso, quindi SMS e Voce vengono saltati e queste notifiche arrivano via email.",
     "policyNoProviderLink": "Connettine uno in Impostazioni → Telefonia",
-    "policyEndOptionStop": "Esegui una volta, poi termina | Esegui {count} volte, poi termina",
-    "policyEndOptionHandOff": "Esegui una volta, poi passa al team catch-all | Esegui {count} volte, poi passa al team catch-all",
-    "policyEndOptionHandOffTo": "Esegui una volta, poi passa a {team} | Esegui {count} volte, poi passa a {team}",
     "policyDeliveryTitle": "Invio",
     "policyTodayIs": "oggi: {who}",
     "policyPeopleCount": "{count} persona | {count} persone",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "Prende gli avvisi da {team}",
     "ruleEditorKeptBy": "{team} mantiene questi avvisi: la sua regola è più specifica",
     "ruleEditorContends": "Concorre con una regola per {team}: vince quella più specifica",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} altri",
+    "ruleEditorFieldsHelp": "I campi provengono dai tuoi gruppi di campi di correlazione. {link}",
+    "ruleEditorFieldsSource": "I campi provengono dai tuoi gruppi di campi di correlazione.",
+    "ruleEditorManageFieldGroups": "Gestisci gruppi di campi",
+    "ruleEditorDuplicatePath": "{team} ha già una regola per esattamente queste condizioni. Modifica invece quella regola.",
+    "ruleEditorDuplicatePathSameTeam": "Questo team ha già una regola per esattamente queste condizioni.",
     "routingTestRouting": "Testa il routing",
     "routingTabNeedsOwnerPlain": "Richiede un proprietario",
     "simulatorStartFrom": "Parti da",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Log, metriche e tracce da qualsiasi server Linux.",
+      "windows": "Log eventi e metriche da server Windows.",
+      "macos": "Log e metriche da macchine Mac.",
+      "aws": "Log e metriche dai tuoi servizi AWS.",
+      "googleCloud": "Log dai tuoi progetti {gcp}, tramite una sottoscrizione push {pubSub}.",
+      "azure": "Log attività dalla tua sottoscrizione {azure}, tramite {eventHub}.",
+      "postgresql": "Metriche di query, connessione e replica.",
+      "mysql": "Metriche di query, connessione e InnoDB.",
+      "mongodb": "Metriche di operazione, connessione e cache.",
+      "redis": "Metriche di memoria, comandi e keyspace.",
+      "sqlServer": "Metriche di query, attesa e buffer.",
+      "oracle": "Metriche di sessione, tablespace e limiti di risorse.",
+      "mariadb": "Metriche di query, connessione e InnoDB.",
+      "elasticsearch": "Integrità di cluster, indici e nodi.",
+      "cassandra": "Metriche di lettura, scrittura e compattazione.",
+      "dynamodb": "Modifiche agli elementi (inserimenti, aggiornamenti, eliminazioni) come log, tramite {kinesisFirehose}.",
+      "snowflake": "Utilizzo di warehouse, query e crediti.",
+      "databricks": "Log dei notebook, inviati tramite l'API dei log.",
+      "couchdb": "Metriche di richieste, database e replica.",
+      "aerospike": "Metriche di namespace, nodo, memoria e connessioni.",
+      "sapHana": "Metriche di memoria, CPU e servizi.",
+      "zookeeper": "Metriche di latenza, connessioni e nodi.",
+      "nginx": "Log di accesso ed errori, raccolti in tempo reale da {fluentBit}.",
+      "apache": "Log di accesso ed errori, raccolti in tempo reale da {fluentBit}.",
+      "iis": "Log delle richieste, raccolti in tempo reale da {fluentBit}.",
+      "kafka": "Metriche di broker, topic e lag dei consumer.",
+      "rabbitmq": "Metriche di profondità delle code, frequenza dei messaggi e nodi.",
+      "nats": "Metriche di connessioni, messaggi e stream.",
+      "prometheus": "Invia le metriche che già raccogli, tramite remote write.",
+      "telegraf": "Invia metriche da un agent che già esegui.",
+      "opentelemetryCollector": "Punta qui un collector che già esegui.",
+      "cloudwatch": "Invia le metriche in streaming dal tuo account AWS.",
+      "gpu": "Utilizzo, memoria e temperatura per GPU {nvidia}.",
+      "networkFlows": "Flussi di traffico tra i tuoi host e le tue reti.",
+      "fluentBit": "Forwarder di log leggero per host e Kubernetes.",
+      "fluentd": "Collector di log con un ampio set di plugin.",
+      "vector": "Pipeline veloce per log e metriche.",
+      "filebeat": "Invia file di log con un agent leggero.",
+      "logstash": "Invia log da una pipeline esistente.",
+      "syslogNg": "Inoltra syslog dai tuoi server.",
+      "loongcollector": "Agent per log e metriche per host e container.",
+      "splunkHec": "Mantieni invariati i tuoi sender HTTP Event Collector.",
+      "cribl": "Instrada i dati dalle pipeline che già esegui.",
+      "kinesisFirehose": "Invia log in streaming da un delivery stream in AWS.",
+      "googleCloudLogs": "Esporta i log dai tuoi progetti tramite un log sink.",
+      "okta": "Eventi di accesso e di audit amministrativo.",
+      "office365": "Log di audit di posta, file e amministrazione.",
+      "googleWorkspace": "Log di audit di accesso e amministrazione.",
+      "falco": "Avvisi di sicurezza runtime dai container.",
+      "osquery": "Stato degli endpoint come log interrogabili.",
+      "jumpcloud": "Eventi di directory e di accesso.",
+      "openvpn": "Log di connessione e sessione VPN.",
+      "githubActions": "Log delle esecuzioni dei workflow e dei job.",
+      "jenkins": "Log di build ed eventi delle pipeline.",
+      "terraform": "Log di plan e apply delle tue esecuzioni.",
+      "ansible": "Log e risultati delle esecuzioni dei playbook.",
+      "vercel": "Log di deployment e delle funzioni.",
+      "heroku": "Log di app e router da un log drain.",
+      "airflow": "Log delle esecuzioni dei DAG e metriche dei task.",
+      "airbyte": "Log e stato dei job di sincronizzazione.",
+      "languageTile": "Tracce con l'SDK {otel}, con strumentazione automatica dove il tuo linguaggio la supporta.",
+      "aiIntegration": "Tracce delle chiamate della tua app AI, con token e costo per le chiamate ai modelli."
+    },
+    "skipToApp": "Vai all'app",
+    "chooseTitle": "Cosa vuoi monitorare per prima cosa?",
+    "back": "Indietro",
+    "searchGuides": "Cerca in {count} guida | Cerca in {count} guide",
+    "showMore": "Mostra altri {count} | Mostra altri {count}",
+    "noMatch": "Nessuna guida corrisponde a \"{query}\" qui.",
+    "foundElsewhere": "Trovato in altre scelte:",
+    "inChoice": "in {choice}",
+    "tryShorter": "Prova un nome più breve. Qualsiasi strumento può anche {link}.",
+    "sendOverHttp": "inviare log via HTTP",
+    "clearSearch": "Cancella ricerca",
+    "othersTitle": "Altri modi per iniziare",
+    "whatYouGet": "Cosa ottieni",
+    "signals": {
+      "metrics": "Metriche",
+      "logs": "Log",
+      "traces": "Tracce",
+      "profiles": "Profili",
+      "sessions": "Sessioni",
+      "errors": "Errori",
+      "webVitals": "Web vitals (web)",
+      "replays": "Replay delle sessioni",
+      "tokens": "Token",
+      "cost": "Costo",
+      "latency": "Latenza",
+      "uptime": "Uptime",
+      "certificates": "Certificati"
+    },
+    "example": {
+      "caption": {
+        "row": "Schermata di esempio: cosa mostra {product} per {name}.",
+        "infrastructure": "Schermata di esempio: una panoramica del cluster {k8s} con CPU, memoria e stato dei pod.",
+        "backend": "Schermata di esempio: il waterfall di una traccia di checkout non riuscita, con 21 span su 9 servizi.",
+        "frontend": "Schermata di esempio: web vitals {rum} dalle sessioni degli utenti reali.",
+        "logs": "Schermata di esempio: una ricerca nei log con un istogramma e le righe di log corrispondenti.",
+        "llm": "Schermata di esempio: {insights} con costo, token e latenza per modello, più tracce ed errori nel tempo.",
+        "agent": "Schermata di esempio: la pagina del server {mcp} a cui si connette il tuo agente di codifica.",
+        "synthetics": "Schermata di esempio: risultati di un check {http} su 3 località."
+      }
+    },
+    "guide": {
+      "agentTitle": "Preferisci un agente di codifica?",
+      "agentSteps": "Esegui questo nel terminale, poi passa a {claudeCode}, {cursor} o {codex} il prompt o il file.",
+      "copyPrompt": "Copia prompt",
+      "downloadFile": "Scarica .md",
+      "inviteTitle": "Nessun accesso?",
+      "inviteText": "Invita un collega che possa eseguire il comando.",
+      "inviteAction": "Invita un collega",
+      "loadFailed": "Impossibile caricare questa guida.",
+      "openInApp": "Apri in Origini dei dati",
+      "languageText": "Per {language}, aggiungi {otelSdk}, con strumentazione automatica dove {language} la supporta, poi puntalo a {product} con le impostazioni riportate sotto.",
+      "languageLink": "Guida {otel} per {language}"
+    },
+    "rail": {
+      "label": "Avanzamento configurazione",
+      "check": "Verifica i tuoi dati",
+      "received": "Dati ricevuti",
+      "attention": "Richiede attenzione",
+      "waitingShort": "In attesa di dati",
+      "title": "Configura {name}",
+      "run": "Esegui il comando di configurazione",
+      "explore": "Esplora i tuoi dati"
+    },
+    "firstData": {
+      "title": "I tuoi dati stanno arrivando",
+      "count": "{count} record è arrivato in {stream} | {count} record sono arrivati in {stream}",
+      "exploreLogs": "Esplora i tuoi log",
+      "exploreMetrics": "Esplora le tue metriche",
+      "exploreTraces": "Esplora le tue tracce",
+      "exploreProfiles": "Esplora i tuoi profili",
+      "addAnother": "Aggiungi un'altra origine"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Controlli sintetici",
+        "description": "Controlla un sito web, un'API, una porta o un certificato. Nessuna installazione.",
+        "gets": "Esegui controlli pianificati dall'esterno della tua rete."
+      },
+      "invite": {
+        "name": "Invita un collega a configurare",
+        "description": "Riceverà un invito alla tua organizzazione."
+      },
+      "agent": {
+        "name": "Configura con il tuo agente di programmazione",
+        "description": "Dai a {claudeCode}, {cursor} o {codex} un solo prompt.",
+        "gets": "Il tuo agente di programmazione aggiunge la configurazione e verifica che i dati arrivino."
+      }
+    },
+    "agentLink": "Oppure lascia che lo faccia il tuo agente di programmazione",
+    "stepDone": "(fatto)",
+    "agent": {
+      "crumb": "Agente di programmazione",
+      "title": "Configura con il tuo agente di programmazione",
+      "lead": "{claudeCode}, {cursor}, {codex} o qualsiasi agente di programmazione legge il tuo progetto, aggiunge la configurazione e verifica che i dati siano arrivati. Ti chiede prima di installare qualcosa o modificare i file di deployment.",
+      "tokenTitle": "Salva il tuo token",
+      "tokenText": "Esegui questo comando nel terminale da cui avvierai il tuo agente di programmazione, prima di avviarlo.",
+      "powerShell": "In {powerShell}:",
+      "copyPowerShell": "Copia il comando {powerShell}",
+      "promptTitle": "Copia il prompt",
+      "focusLabel": "Configura",
+      "focus": {
+        "kubernetes": "Cluster {k8s}",
+        "host": "Host {linux}, {macos} o {windows}",
+        "backend": "Servizio backend ({otel})",
+        "llm": "App LLM",
+        "frontend": "Frontend web",
+        "logs": "Solo log"
+      },
+      "copyPrompt": "Copia prompt",
+      "promptCopied": "Prompt copiato",
+      "download": "Scarica .md",
+      "preview": "Anteprima del prompt",
+      "previewLines": "{count} riga | {count} righe",
+      "pasteTitle": "Incollalo nel tuo agente di programmazione",
+      "other": "Altro",
+      "hint": {
+        "claudeCode": "Nello stesso terminale, esegui {command} nella cartella del progetto, poi incolla il prompt.",
+        "cursor": "Avvia {product} dallo stesso terminale con {command}, così può leggere il token. Poi incolla il prompt nella sua chat.",
+        "codex": "Nello stesso terminale, esegui {command} nella cartella del progetto, poi incolla il prompt.",
+        "other": "Avvia il tuo agente di programmazione dallo stesso terminale, così può leggere il token. Poi incolla il prompt, oppure passagli {file}."
+      },
+      "mcp": "Connetti il server {mcp} così il tuo agente di programmazione può leggere i tuoi dati",
+      "aside": {
+        "eyebrow": "Cosa dice il prompt al tuo agente di programmazione",
+        "title": "Modifiche piccole e sicure",
+        "line1": "Trova cosa esegue il progetto",
+        "line2": "Fai la modifica più piccola che funziona",
+        "line3": "Mantieni il token nell'ambiente",
+        "line4": "Invia un evento di test allo stream {stream}",
+        "line5": "Segnala quali file sono cambiati"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Continua con la configurazione",
+      "languages": "Lingue",
+      "languagesRequired": "Scegli almeno una lingua.",
+      "kubernetesCluster": {
+        "question": "Scegli cosa raccogliere dal tuo cluster",
+        "off": {
+          "name": "Log e metriche",
+          "description": "Integrità del cluster e log dei container. Un solo comando.",
+          "about": "Log dei container, CPU e memoria di ogni nodo e pod, e gli eventi {k8s} come log, con un solo comando di installazione."
+        },
+        "ebpf": {
+          "name": "Aggiungi tracce con eBPF",
+          "description": "Nessuna modifica al codice, qualsiasi linguaggio. Richiede kernel Linux 5.8+ sui tuoi nodi.",
+          "about": "La stessa installazione, più le tracce. Il collector vede le richieste dal kernel Linux, quindi le tue app non cambiano. Collega una richiesta tra i servizi solo tramite HTTP in chiaro."
+        },
+        "library": {
+          "name": "Aggiungi tracce con le librerie per linguaggio",
+          "description": "Più dettagli per app. Scegli i tuoi linguaggi, poi riavvia le app una volta.",
+          "about": "La stessa installazione, più le tracce. Il {otelOperator} aggiunge la {otelLibrary} per ogni linguaggio ai pod nei namespace che scegli. Il tuo codice non cambia."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Server web",
+      "messageQueues": "Code di messaggi",
+      "metricsYouCollect": "Metriche che già raccogli",
+      "gpuAndNetwork": "GPU e flussi di rete",
+      "movingFromAnotherTool": "Passaggio da un altro strumento",
+      "cloudLogs": "Log cloud",
+      "securityTools": "Strumenti di sicurezza",
+      "cicdAndPlatforms": "CI/CD e piattaforme"
+    },
+    "infrastructure": {
+      "name": "Infrastruttura",
+      "description": "Server, {k8s}, account cloud e database",
+      "gets": "Visualizza ogni host, pod e servizio cloud in un unico posto.",
+      "question": "Come vuoi monitorare la tua infrastruttura?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "Cluster {k8s}",
+          "description": "Log, metriche ed eventi {k8s} da una sola installazione. Tracce con un comando in più.",
+          "about": "Installa il {productCollector} nel tuo cluster con un solo comando. Ottieni log dei container, eventi {k8s} e metriche del cluster."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "Host {linux}, {windows} o {macos}",
+          "description": "Installa il {productAgent} come servizio",
+          "about": "Un solo agente raccoglie log e metriche dall'host. Su {linux} può anche tracciare i programmi senza modifiche al codice.",
+          "question": "Qual è il sistema operativo del tuo host?"
+        },
+        "cloudAccount": {
+          "name": "Account cloud",
+          "description": "{aws}, {gcp} o {azure}",
+          "about": "Trasmette log dal tuo account cloud e metriche da {aws}. Nulla viene eseguito sui tuoi server.",
+          "question": "Su quale cloud si trova il tuo account?"
+        },
+        "databases": {
+          "name": "Database",
+          "description": "{examples} e altri {count}",
+          "about": "Raccoglie metriche dei database, principalmente tramite il {otelCollector}.",
+          "question": "Quale database vuoi monitorare?"
+        },
+        "somethingElse": {
+          "name": "Altro",
+          "description": "Server web, code di messaggi, {prometheus}, GPU e flussi di rete",
+          "about": "Server web, code di messaggi, metriche che già raccogli, utilizzo della GPU e flussi di rete.",
+          "question": "Cos'altro vuoi monitorare?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Applicazioni backend",
+      "description": "Tracce dai tuoi servizi e log dove il tuo SDK li invia",
+      "gets": "Scopri come ogni richiesta si sposta tra i tuoi servizi.",
+      "question": "Come vuoi tracciare i tuoi servizi?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Aggiungi una libreria al tuo codice",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} o {fastapi}",
+          "about": "Aggiunge {otelLibrary} per il tuo linguaggio. Le tracce vengono inviate a {product}.",
+          "question": "In quale linguaggio è scritto il tuo servizio?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "Carichi di lavoro {k8s}, nessuna modifica al codice",
+          "description": "Strumentazione automatica nel tuo cluster",
+          "about": "L'{otelOperator} aggiunge strumentazione ai pod in un namespace. Nessuna modifica al codice o all'immagine."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Qualsiasi linguaggio con {otel}",
+          "description": "Invia OTLP dalla tua configurazione",
+          "about": "Punta qualsiasi {otelSdk} o collector al tuo endpoint {product}."
+        },
+        "continuousProfiling": {
+          "name": "Profilazione continua",
+          "description": "Profili CPU e memoria",
+          "about": "Inoltra i profili dai tuoi profiler ({go}, {java}, {rust} o il profiler eBPF) tramite {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "App frontend e mobile",
+      "description": "Monitoraggio degli utenti reali per web e mobile",
+      "gets": "Scopri l'esperienza reale degli utenti nelle tue app web e mobile.",
+      "question": "Dove viene eseguita la tua app?",
+      "rows": {
+        "browser": {
+          "name": "Browser",
+          "description": "Siti web e app web",
+          "about": "Aggiunge {sdk} alla tua app web. Ottieni caricamenti di pagina, errori e sessioni da browser reali."
+        },
+        "reactNative": {
+          "description": "{ios} e {android} da un'unica base di codice",
+          "about": "Aggiunge {sdk} alla tua app {platform}."
+        },
+        "android": {
+          "description": "App native {android}",
+          "about": "Aggiunge {sdk} alla tua app {platform}. Ottieni sessioni, visualizzazioni di schermata, errori e crash."
+        },
+        "ios": {
+          "description": "App native {ios}",
+          "about": "Aggiunge {sdk} alla tua app {platform}. Ottieni sessioni, visualizzazioni di schermata, errori e crash."
+        }
+      }
+    },
+    "logs": {
+      "name": "Log da qualsiasi origine",
+      "description": "Invia log da qualsiasi agente di inoltro, servizio o strumento",
+      "gets": "Cerca e filtra ogni riga di log, indipendentemente da chi la invia.",
+      "question": "Come vuoi inviare i tuoi log?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Da un agente di inoltro dei log che esegui",
+          "description": "{examples} e altri {count}",
+          "about": "Indirizza l'agente di inoltro che già esegui verso {product}. Nessun nuovo agente.",
+          "question": "Quale agente di inoltro dei log esegui?"
+        },
+        "overHttpWithCurl": {
+          "name": "Tramite HTTP con {curl}",
+          "description": "Una richiesta da qualsiasi script. Nessuna installazione.",
+          "about": "Invia log JSON da qualsiasi script o servizio con una singola richiesta HTTP."
+        },
+        "fromOpentelemetry": {
+          "name": "Da {otel}",
+          "description": "Log OTLP da un SDK o da un collector",
+          "about": "Invia log tramite OTLP da un {otelSdk} o da un collector."
+        },
+        "somethingElse": {
+          "name": "Qualcos'altro",
+          "description": "{splunk} o {cribl}, log cloud, strumenti di sicurezza e CI/CD",
+          "about": "Passa da {splunk} o {cribl}, oppure raccogli log dal tuo cloud, dai tuoi strumenti di sicurezza e dalla CI/CD.",
+          "question": "Da dove altro provengono i tuoi log?"
+        }
+      }
+    },
+    "llm": {
+      "name": "App LLM e AI",
+      "description": "Traccia chiamate LLM, agenti e strumenti",
+      "gets": "Visualizza ogni chiamata LLM, chiamata a strumento e passaggio dell'agente.",
+      "question": "Cosa usa la tua app AI?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents o {assistantsApi}",
+          "about": "Traccia ogni chiamata effettuata tramite {openaiSdk}, con token, costo e latenza.",
+          "question": "Quale libreria {openai} usi?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} o {claudeAgentSdk}",
+          "about": "Traccia ogni chiamata effettuata tramite {anthropicSdk}, con token, costo e latenza.",
+          "question": "Quale libreria {anthropic} usi?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chain, agent e grafi",
+          "about": "Traccia ogni chain, ogni passaggio dell'agente e ogni chiamata agli strumenti.",
+          "question": "Quale libreria {langchain} usi?"
+        },
+        "somethingElse": {
+          "name": "Qualcos'altro",
+          "description": "Altri framework, provider di modelli, gateway e strumenti",
+          "about": "Framework, provider di modelli, gateway, strumenti no-code, analytics e strumenti.",
+          "question": "Cosa usa la tua app AI?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Gestione fleet",
     "subtitle": "Registra i collector OpenTelemetry, versiona le loro configurazioni e distribuisci le modifiche in sicurezza",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "Rifiutato dal receiver {receiver}",
       "legend": "Stato della pipeline",
       "legendToggle": "Mostra o nascondi questo stato sulla mappa"
+    }
+  },
+  "sampleData": {
+    "delete": "Elimina dati di esempio",
+    "loadForbidden": "Per caricare i dati di esempio serve l'accesso in scrittura a questa organizzazione.",
+    "steps": {
+      "functions": "Creazione di funzioni",
+      "pipeline": "Creazione di una pipeline in tempo reale",
+      "telemetry": "Generazione e invio di log, tracce e metriche",
+      "dashboards": "Creazione di dashboard",
+      "alerts": "Creazione di avvisi",
+      "enrichment": "Caricamento della tabella dei proprietari dei servizi"
+    },
+    "progress": {
+      "loading": "Caricamento dei dati di esempio…",
+      "done": "Dati di esempio caricati",
+      "counts": "{logs} record di log · {spans} span · {metrics} punti metrici",
+      "skipped": "Ignorati",
+      "logs": "Log",
+      "spans": "Span",
+      "metrics": "Punti metrici"
+    },
+    "removeSteps": {
+      "alerts": "Avvisi",
+      "alertDelivery": "Template di avviso e webhook",
+      "dashboards": "Dashboard",
+      "pipeline": "Pipeline",
+      "functions": "Funzioni",
+      "streams": "Stream"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Rimozione dei dati di esempio",
+        "body": "L'operazione richiede qualche secondo. Puoi chiudere questa finestra, ma lascia aperta questa scheda fino al termine.",
+        "label": "Rimozione dei dati di esempio…"
+      },
+      "done": {
+        "title": "Dati di esempio rimossi",
+        "body": "Il server completa l'eliminazione dei dati memorizzati in pochi minuti. Dopodiché potrai caricare di nuovo i dati di esempio.",
+        "label": "Rimozione completata",
+        "done": "Fatto",
+        "keptLabel": "Mantenuti, perché qualcos'altro li utilizza:"
+      },
+      "failed": {
+        "title": "Impossibile rimuovere tutti i dati di esempio",
+        "body": "Riprova: gli elementi già rimossi vengono ignorati.",
+        "label": "Rimozione interrotta",
+        "close": "Chiudi",
+        "tryAgain": "Riprova"
+      }
+    },
+    "removeConfirm": {
+      "title": "Eliminare i dati di esempio?",
+      "message": "Vengono eliminati gli stream, le dashboard, gli avvisi, le funzioni e la tabella di arricchimento di esempio. I tuoi dati non vengono toccati."
+    },
+    "toast": {
+      "loaded": "Dati di esempio caricati. Buona esplorazione!",
+      "loadFailed": "Impossibile caricare i dati di esempio",
+      "removed": "Dati di esempio rimossi",
+      "removedWithKept": "Dati di esempio rimossi. {count} elemento di esempio rimane perché qualcos'altro lo utilizza. | Dati di esempio rimossi. {count} elementi di esempio rimangono perché qualcos'altro li utilizza.",
+      "removeFailed": "Impossibile rimuovere tutti i dati di esempio",
+      "removeWhileLoading": "Attendi il completamento del caricamento dei dati di esempio."
+    },
+    "entry": {
+      "onboardingSource": "Esplora i dati di esempio"
+    },
+    "callout": {
+      "title": "Non sei ancora pronto a inviare dati?",
+      "body": "Esplora {product} con un negozio online di esempio: un incidente in corso e un tour guidato tra dashboard, avvisi, log, tracce, metriche e pipeline.",
+      "cta": "Esplora con i dati di esempio"
+    },
+    "header": {
+      "label": "Dati di esempio",
+      "try": "Prova i dati di esempio",
+      "finish": "Completa il caricamento"
+    },
+    "dock": {
+      "details": "Mostra dettagli"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "I tuoi dati stanno arrivando. Elimina i dati di esempio affinché non si mescolino con dashboard, avvisi e ricerche.",
+        "keep": "Mantieni per ora",
+        "remove": "Elimina i dati di esempio"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Continua in background",
+      "progress": {
+        "title": "Creazione del tuo negozio di esempio",
+        "body": "Richiede circa un minuto. Puoi chiudere questa finestra di dialogo, ma mantieni questa scheda aperta fino al termine del caricamento."
+      },
+      "ready": {
+        "title": "Il tuo negozio di esempio è live",
+        "startTour": "Avvia il tour guidato",
+        "ownWay": "Esplora in autonomia"
+      },
+      "errorBody": "Si è verificato un problema durante il caricamento. Riprova: le dashboard e gli avvisi già esistenti vengono riutilizzati, non duplicati."
+    },
+    "tour": {
+      "label": "Tour guidato",
+      "position": "Tour guidato · passo {current} di {total}",
+      "pill": "Tour {current}/{total}",
+      "done": "Tour completato",
+      "stepFailed": "Impossibile aprire questo passo. Riprova.",
+      "minimize": "Riduci a icona il tour",
+      "close": "Termina il tour",
+      "next": "Avanti",
+      "capabilities": {
+        "dashboards": "Dashboard",
+        "alerts": "Avvisi",
+        "logs": "Ricerca log",
+        "traces": "Tracciamento",
+        "metrics": "Metriche e PromQL",
+        "pipelines": "Pipeline"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Individua il problema",
+          "body": "Questa è la panoramica dei servizi della vetrina. Il tasso di errore e la latenza del checkout sono entrambi aumentati bruscamente negli ultimi 35 minuti.",
+          "look": "Ogni pannello è una query SQL. Passa il mouse su un grafico per confrontare le serie, trascina sul grafico per ingrandire oppure apri il menu di un pannello per modificarne la query."
+        },
+        "alert": {
+          "title": "L'avviso si è già attivato",
+          "body": "Un avviso sugli errori di pagamento esegue una query SQL sui log in base a una pianificazione e si è attivato non appena gli errori hanno superato la soglia.",
+          "look": "Apri un avviso per visualizzarne la query, la soglia e la pianificazione. La destinazione di esempio è un webhook segnaposto, quindi le consegne risultano non riuscite: indirizzala a Slack, email o PagerDuty per ricevere notifiche reali."
+        },
+        "logs": {
+          "title": "Cerca gli errori",
+          "body": "Log filtrati per gli errori di pagamento. Quasi tutti riportano la stessa cosa: timeout durante l'acquisizione di una connessione dal pool.",
+          "look": "Espandi un record per visualizzare tutti i campi. Fai clic su un valore di campo per filtrarlo, oppure passa alla modalità SQL per raggruppare e aggregare."
+        },
+        "deploy": {
+          "title": "Scopri cosa è cambiato",
+          "body": "Payment v2.15.0 è stato distribuito un minuto prima che iniziassero gli errori, e le sue note di rilascio hanno ridotto il pool di connessioni a 20.",
+          "look": "Questa è la causa principale, trovata con una sola ricerca sugli stessi log. La ricerca full-text e SQL viene eseguita sugli stessi dati."
+        },
+        "traces": {
+          "title": "Segui una richiesta in errore",
+          "body": "Ogni traccia segue un checkout attraverso i servizi. Aprine una: il diagramma a cascata mostra il servizio di pagamento in attesa per 3 secondi di una connessione al database.",
+          "look": "I log riportano lo stesso trace ID, così puoi passare da uno span ai suoi log in entrambe le direzioni."
+        },
+        "metrics": {
+          "title": "Conferma con PromQL",
+          "body": "La latenza p95 di ogni servizio, interrogata con PromQL. Payment e checkout crescono insieme.",
+          "look": "Le metriche risiedono nello stesso motore di log e tracce, quindi la dashboard Infrastructure è costruita interamente con PromQL."
+        },
+        "pipeline": {
+          "title": "Elabora i dati mentre arrivano",
+          "body": "Una pipeline in tempo reale esegue una funzione VRL su ogni log di accesso, aggiungendo client_os e is_mobile prima che il record venga memorizzato.",
+          "look": "Apri la pipeline per vedere il suo grafico. Le pipeline possono filtrare, arricchire, instradare e oscurare i dati senza toccare le tue applicazioni."
+        },
+        "business": {
+          "title": "Misura l'impatto sul business",
+          "body": "Gli stessi log alimentano le dashboard di business: checkout falliti, ricavi e ordini per metodo di pagamento.",
+          "look": "Non serve uno strumento di analisi separato. Qualsiasi dato nei tuoi log può diventare un KPI."
+        }
+      },
+      "finale": {
+        "title": "Hai trovato la causa principale",
+        "body": "In pochi minuti sei passato da un picco su una dashboard al deploy che l'ha causato, con ogni segnale in un unico posto.",
+        "connect": "Collega i tuoi dati",
+        "restart": "Ricomincia il tour",
+        "finish": "Termina il tour"
+      }
     }
   },
   "recentSearches": {

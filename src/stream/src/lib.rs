@@ -229,6 +229,7 @@ pub fn stream_res(
         pattern_associations,
         is_derived,
         is_internal: is_system_stream(org_id, stream_name),
+        inherited_retention_days: None,
     }
 }
 

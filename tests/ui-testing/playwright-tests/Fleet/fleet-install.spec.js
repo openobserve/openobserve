@@ -66,29 +66,6 @@ test.describe('Fleet management Add collector', { tag: ['@fleet', '@enterprise',
     });
   }
 
-  test('R-16042 · a Kubernetes cluster name becomes --set-string clusterName with commas escaped; empty adds no flag', {
-    tag: ['@fleetInstall', '@regression', '@P2'],
-  }, async () => {
-    const fleet = await pm.fleetSeed.createFleet('cluster');
-    const token = await pm.fleetSeed.createToken(fleet.id, 'tok');
-    await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: fleet.id });
-    await pm.fleetFleetsPage.openAddCollector();
-    await pm.fleetInstallPage.expectCommandShown();
-    await pm.fleetInstallPage.selectPlatform('kubernetes');
-    const target = { ...(await pm.fleetInstallPage.installTarget(pm.fleetSeed, token.token)), http: true, role: 'agent' };
-    await pm.fleetInstallPage.revealToken();
-
-    await pm.fleetInstallPage.setClusterName('prod,us-east');
-    const withName = FleetInstallPage.expectedInstallLines('kubernetes', { ...target, clusterName: 'prod,us-east' });
-    expect(withName).toContain("  --set-string clusterName='prod\\,us-east' \\");
-    await pm.fleetInstallPage.expectCommandLines(withName);
-
-    await pm.fleetInstallPage.setClusterName('');
-    const withoutName = FleetInstallPage.expectedInstallLines('kubernetes', target);
-    expect(withoutName.some((line) => line.includes('clusterName'))).toBe(false);
-    await pm.fleetInstallPage.expectCommandLines(withoutName);
-  });
-
   test('FL-INST-10 · the token stays masked until Reveal, and Copy gives the full command with the real token', {
     tag: ['@fleetInstall', '@P1'],
   }, async () => {

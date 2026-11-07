@@ -483,19 +483,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="max-w-55"
                             @update:model-value="markFormDirty"
                           />
-                          <!-- casts: number input can hold "" at runtime while cleared -->
-                          <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
+                          <small data-test="stream-details-inherited-retention">
                             {{
-                              t("logStream.globalRetentionDays", {
-                                days: store.state.zoConfig.data_retention_days,
-                              })
+                              inheritedRetention > 0
+                                ? t("logStream.retentionDefaultDays", { days: inheritedRetention })
+                                : t("logStream.retentionDefaultForever")
                             }}
-                          </small>
-                          <small
-                            v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''"
-                            class="text-status-error-text"
-                          >
-                            {{ t("logStream.retentionMinOneDay") }}
                           </small>
                         </div>
 
@@ -917,6 +910,7 @@ import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
 import type { AcceptableValue } from "reka-ui";
 
 const defaultValue: any = () => {
@@ -1016,7 +1010,8 @@ export default defineComponent({
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
-    const dataRetentionDays = ref(0);
+    // Empty means the stream inherits; a default must never be saved as the stream's own value.
+    const dataRetentionDays = ref<number | "">("");
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
     const maxQueryRange = ref(0);
@@ -1277,7 +1272,7 @@ export default defineComponent({
     const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
-      dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
+      dataRetentionDays.value = "";
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
       enableDistinctFields.value = false;
@@ -1485,9 +1480,9 @@ export default defineComponent({
       // Populate stream-level cross-links
       streamCrossLinks.value = streamResponse.settings?.cross_links || [];
 
+      serverInheritedRetention.value = streamResponse.inherited_retention_days;
       if (showDataRetention.value)
-        dataRetentionDays.value =
-          streamResponse.settings.data_retention || store.state.zoConfig.data_retention_days;
+        dataRetentionDays.value = streamResponse.settings.data_retention || "";
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
@@ -1604,7 +1599,7 @@ export default defineComponent({
         pattern_associations: [...patternAssociations.value],
       };
 
-      if (showDataRetention.value && dataRetentionDays.value < 1) {
+      if (showDataRetention.value && Number(dataRetentionDays.value) < 0) {
         toast({
           message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
           variant: "error",
@@ -1835,10 +1830,15 @@ export default defineComponent({
 
     const showFullTextSearchColumn = computed(() => modelValue.stream_type !== "enrichment_tables");
 
-    const showDataRetention = computed(
+    const showDataRetention = computed(() => modelValue.stream_type !== "enrichment_tables");
+
+    const serverInheritedRetention = ref<number | undefined>();
+
+    // A metadata stream follows its source stream's own value, which only the backend can see.
+    const inheritedRetention = computed(
       () =>
-        !!(store.state.zoConfig.data_retention_days || false) &&
-        modelValue.stream_type !== "enrichment_tables",
+        serverInheritedRetention.value ??
+        inheritedRetentionDays(store.state, String(modelValue.stream_type)),
     );
 
     const disableOptions = (schema: any, option: any) => {
@@ -2353,14 +2353,15 @@ export default defineComponent({
       }
     };
     const calculateDateRange = () => {
-      if (dataRetentionDays.value <= 0) {
+      const retentionDays = Number(dataRetentionDays.value) || inheritedRetention.value;
+      if (retentionDays <= 0) {
         minDate.value = null;
         return;
       }
 
       const today = new Date();
       const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
+      currentDate.setDate(today.getDate() - (retentionDays - 1)); // Adjust to the desired number of days (retentionDays of days in this case)
 
       // Format minDate using timestampToTimezoneDate for a custom format
       minDate.value = timestampToTimezoneDate(
@@ -2594,6 +2595,8 @@ export default defineComponent({
       showFullTextSearchColumn,
       getImageURL,
       dataRetentionDays,
+      inheritedRetention,
+      serverInheritedRetention,
       storeOriginalData,
       enableDistinctFields,
       approxPartition,

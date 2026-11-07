@@ -85,12 +85,7 @@ import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
-import {
-  applyDevicePixelRatio,
-  currentDevicePixelRatio,
-  isFractionalDevicePixelRatio,
-  useDevicePixelRatioChange,
-} from "@/composables/useDevicePixelRatio";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
 import {
@@ -941,6 +936,7 @@ export default defineComponent({
         renderer: props.renderType,
         devicePixelRatio: currentDevicePixelRatio(),
       });
+      syncPixelRatio();
       trackPointer();
       const options = props.data.options || {};
 
@@ -975,11 +971,9 @@ export default defineComponent({
       (newTheme) => rebuildChart(newTheme === "dark" ? "dark" : "light"),
     );
 
-    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
-    useDevicePixelRatioChange((ratio) => {
-      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
-      applyDevicePixelRatio(chart, ratio);
-    });
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     // Repairs a chart that ECharts initialized while the element had no
     // layout size (e.g. mounted mid-splitter/flex settle). In that state
@@ -1005,6 +999,7 @@ export default defineComponent({
             renderer: props.renderType,
             devicePixelRatio: currentDevicePixelRatio(),
           });
+          syncPixelRatio();
           trackPointer();
           chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
@@ -1061,6 +1056,7 @@ export default defineComponent({
             renderer: props.renderType,
             devicePixelRatio: currentDevicePixelRatio(),
           });
+          syncPixelRatio();
           trackPointer();
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
@@ -1158,6 +1154,7 @@ export default defineComponent({
             renderer: props.renderType,
             devicePixelRatio: currentDevicePixelRatio(),
           });
+          syncPixelRatio();
           trackPointer();
         }
         chart?.setOption(chartOptions(props?.data?.options || {}), {

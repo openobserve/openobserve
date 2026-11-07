@@ -1948,6 +1948,7 @@
     "billings": "請求",
     "rum": "RUM",
     "settings": "設定",
+    "allSettings": "すべての設定",
     "iam": "IAM",
     "report": "レポート",
     "pipeline": "パイプライン",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "ZIPファイルのみ許可されています"
     },
     "emptyState": {
-      "title": "リアルユーザーモニタリングでユーザーを監視する",
-      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
       "webApp": "Web アプリをインストゥルメントする",
       "webAppDesc": "OpenObserve RUM SDK を任意の {product} アプリに追加",
       "sessionReplay": "セッションリプレイを有効にする",
       "sessionReplayDesc": "ユーザーセッションを記録および再生して、UX の問題をデバッグする",
+      "title": "リアルユーザーモニタリングでユーザーを監視する",
+      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
       "learnMore": "さらに詳しく:",
       "quickImpl": "クイック実装ガイド",
       "blogPost": "フロントエンド監視の基本"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "ライセンスと利用",
     "copyLicenseId": "ライセンスIDをコピー",
     "editionLbl": "エディション",
-    "limitPrefix": "· 制限",
     "gbPerDay": "GB / 日",
     "ofDailyLimitUsedToday": "本日の日次制限の使用量",
     "gbToday": "本日のGB",
@@ -3580,6 +3580,7 @@
     "usage_limits": "使用量の上限",
     "feature_comparison_lbl": "機能比較",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
+    "feature_comparision_ent_partial_msg": "OpenObserve Enterprise Edition を使用しています。一部の機能はライセンスに含まれていません。上記のリストを参照してください。",
     "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 50 GB (最大 1.5 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
     "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大50 GB（最大1.5 TB/月）のデータインジェストが可能です。",
@@ -3660,6 +3661,7 @@
     "features_no_match": "検索に一致する機能はありません",
     "features_none": "このグループに機能はありません",
     "features_free_heading": "無料、すべてのライセンスに含まれます",
+    "features_free_not_included": "無料（ライセンスに含まれていません）",
     "features_new": "ライセンス以降の新機能",
     "features_filter_new": "新規",
     "request_new_license": "新しいライセンスをリクエスト",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "ライセンスはまだ有効です。新しいライセンスキーで更新しますか?",
     "yes_update_license": "はい、ライセンスを更新してください",
     "no_keep_current": "いいえ、最新の状態に保つ",
+    "license_downgrade_title": "このライセンスキーを適用しますか？",
+    "license_downgrade_intro": "このキーは現在のライセンスを置き換えます。",
+    "license_downgrade_expired": "このキーは {date} に期限切れになりました。50 GB/日の無料上限が適用されます。",
+    "license_downgrade_lose": "次のものを失います: {names}",
+    "license_downgrade_limit": "1 日あたりの上限が {old} から {new} に変わります",
+    "license_downgrade_expiry": "有効期限が {old} から {new} に変わります",
+    "license_limit_per_day": "{gb} GB/日",
     "header_button": {
       "cloud_features": "{product} の機能",
       "enterprise_edition": "エディション:エンタープライズ",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "より効率的で高性能な可観測性を実現するには、今すぐOpenObserveをお試しください。",
     "getStartedBannerAlt": "はじめようバナー",
     "getStartedHeading": "始める前に最後に1つだけ",
-    "hearAboutUsLabel": "どのようにして当社を知りましたか？",
     "hearAboutUsPlaceholder": "例：友人から",
-    "whereDoYouWorkLabel": "勤務先はどこですか？",
     "whereDoYouWorkPlaceholder": "会社名",
-    "agreeToTermsPrefix": "以下の規約を読み、同意します",
     "termsOfUse": "利用規約",
-    "and": "および",
     "privacyPolicyStar": "プライバシーポリシー*",
     "startTrialButton": "14日間のトライアルを開始",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "メールアドレスは必須です",
     "emailInvalid": "有効なメールアドレスを入力してください",
     "passwordRequired": "パスワードは必須です",
-    "mustAcceptTerms": "続行するには利用規約に同意する必要があります",
     "getStarted": {
       "title": "OpenObserve へようこそ",
-      "subtitle": "14日間のトライアルが開始されました。2つだけ簡単な質問にお答えいただくと、セットアップに進みます。",
-      "sourceLabel": "最初に送信するのはどれですか？",
-      "optional": "（任意）",
-      "skip": "質問をスキップ",
-      "continue": "続行",
-      "hearAboutUsPlaceholder": "例：同僚やブログ記事",
-      "whereDoYouWorkPlaceholder": "会社名またはチーム名",
-      "termsOfService": "利用規約",
-      "privacyPolicy": "プライバシーポリシー",
-      "agreeHint": "質問をスキップする場合でも、続行するには同意が必要です。",
+      "skipForNow": "今はスキップ",
+      "heard": {
+        "label": "当社をどこで知りましたか？",
+        "placeholder": "オプションを選択",
+        "thanks": "ありがとうございます！"
+      },
+      "connect": {
+        "title": "データを接続",
+        "point1": "ソースごとのステップバイステップ設定",
+        "point2": "ログ、メトリクス、トレースを一元管理",
+        "point3": "数分で最初のイベントを確認",
+        "cta": "他のデータソースを試す"
+      },
+      "sample": {
+        "title": "サンプルデータで試す",
+        "point1": "サンプルサービスからのログ、トレース、メトリクス",
+        "point2": "ダッシュボード、アラート、パイプライン、VRL 関数",
+        "point3": "ガイド付きツアー、ワンクリックですべて削除",
+        "cta": "サンプルデータで試す"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux または VM ホスト",
@@ -4094,7 +4108,28 @@
         "llm": "LLM または AI アプリ",
         "agent": "AI エージェントにセットアップさせる",
         "unsure": "まだわからない"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Web サーバー",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "ブラウザ (RUM)",
+        "llm": "LLM または AI アプリ",
+        "agent": "AI エージェント"
       }
+    },
+    "heardFrom": {
+      "question": "どこで当社を見つけましたか？",
+      "quickQuestion": "簡単な質問です：どこで当社を見つけましたか？",
+      "skip": "スキップ",
+      "searchEngine": "検索エンジン",
+      "friendOrColleague": "友人または同僚",
+      "aiAssistant": "AI アシスタント",
+      "other": "その他",
+      "thanks": "教えていただきありがとうございます！"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "その他のフィールドには、ストリームがユーザー定義スキーマを使用するように設定される前に存在していたスキーマフィールドのみが表示されます。",
     "addFieldsTitle": "フィールドを追加",
     "dataRetentionDaysLabel": "データ保持期間 (日)",
-    "globalRetentionDays": "グローバル保持期間は {days} 日です",
-    "retentionMinOneDay": "保持期間は少なくとも 1 日必要です",
+    "retentionDefaultDays": "空欄にすると、このストリームタイプのデフォルト（{days} 日）が使用されます",
+    "retentionDefaultForever": "空欄にすると、このストリームタイプのデフォルト（無期限に保持）が使用されます",
     "maxQueryRangeHoursLabel": "最大クエリ範囲 (時間)",
     "maxQueryRangeHelp": "クエリに許可される最大時間範囲。制限なしにするには 0 に設定します。",
     "globalFlattenLevel": "グローバルは {level} です",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Slack に参加しよう",
     "maybeLater": "たぶん後で"
   },
-  "connectDataSourcePopup": {
-    "title": "始めるには、まず最初のデータソースを接続しましょう。",
-    "description": "お見せしたいことがたくさんありますが、まずデータを接続する必要があります。ほとんどのチームは約1分で最初のログを確認できます。",
-    "connectButton": "データソースを接続",
-    "slackLink": "Slackコミュニティにもご参加ください"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "一時停止した場所から続行",
     "startFromNow": "今から開始します。",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "どのワークロードが相互に通信しているかを確認: eBPF ネットワークフロー",
       "k8sInstallerNote": "これにより、cert-manager、OpenTelemetryオペレーター、OpenObserveコレクターが自動的にインストールされます。",
       "k8sInternalEndpointNote": "OpenObserveがこの同じクラスター内で実行される場合にこれを使用してください — トラフィックはクラスター外に出ることはありません。",
+      "k8sTraceAppsTitle": "アプリをトレース",
+      "k8sTraceEbpfDesc": "コレクターで eBPF トレーシングを有効にし、ポート、実行ファイルパス、またはコマンドラインでトレースするアプリを選択します。",
+      "k8sTraceLibraryDesc": "各言語の名前空間にアノテーションを付けると、オペレーターがそのライブラリをそこのポッドに追加します。その後、それらのアプリを一度再起動します。",
       "k8sTroubleAnnotationA": "インジェクションはポッド作成時に行われるため、既存のポッドは再起動するまで影響を受けません — `kubectl rollout restart deployment -n my-namespace`を実行してください。アノテーションが適用されたことを`kubectl get ns my-namespace -o yaml`で確認し、値が`openobserve-collector/openobserve-<language>`と一致することを確認してください。",
       "k8sTroubleAnnotationQ": "ネームスペースに注釈を付けたのにトレースが表示されません",
       "k8sTroubleEndpointA": "OpenObserve 自体がこのクラスタで実行されている場合にのみ **内部エンドポイント** を使用してください。その場合トラフィックはクラスタ内にとどまり、ネットワークを越えることはありません。URL は `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` です。デフォルトでは名前空間 `openobserve` のリリース `o2` を想定しているため、異なる場合は編集してください。それ以外の場合は外部エンドポイントを使用します。",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "セッションは表示されるが、画面名がすべて同じ",
       "androidTroubleScreenNamesA": "ビュートラッキングが設定されていません。`RumConfiguration` をビルドするときに `useViewTrackingStrategy(...)` を渡してください。例: Activity では `ActivityViewTrackingStrategy(trackExtras = true)`、AndroidX Navigation を使用している場合は `NavigationViewTrackingStrategy(...)`。",
       "setupTime5Min": "約5分",
+      "showStepInstructions": "手順を表示",
       "snowflakeCollectorVersionNote": "Snowflake には collector v0.92.0 が必要です — 新しいビルドには既知のバグがあります。",
       "snowflakeTagline": "OpenTelemetry Collector を使用して Snowflake アカウントメトリクスを収集し、OpenObserve に送信します。",
       "sqlClientGuiVariant": "SQL クライアント（GUI）",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "データが到着すると以下のチェックが緑になります。または、ストリームで `cassandra_*` メトリクスを確認してください。",
       "verifyDatabricksLogsDesc": "データが到着すると以下のチェックが緑になります。または、ログを開いて `source:databricks` を検索してください。",
       "verifyDataTitle": "OpenObserve でデータを確認",
+      "checkYourDataTitle": "データを確認",
       "verifyDynamodbLogsDesc": "データが到着すると以下のチェックが緑になります。または、項目が変更されたら `dynamodb` ストリームのログを開いてください。",
       "verifyGcpLogsDesc": "プロジェクトで何らかのアクティビティを生成してください（またはシンクがログに一致するのを待ちます）。データが到着すると以下のチェックが緑になります。",
       "verifyK8sDataDesc": "コレクターが起動するまで数秒待ってください。データが到着すると以下のチェックが緑になります — クラスターログは `default` ストリームに格納されます。",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "請求は契約に基づいて処理されます — 変更についてはアカウントマネージャーにお問い合わせください",
     "upgradeToPlanMessage": "OpenObserveのサービスを引き続きご利用いただくには、プランをアップグレードしてください。",
     "creditsUsedLabel": "使用済みクレジット",
-    "licenseExpiryContactAdmin": "管理者に連絡してライセンスを更新してください。",
+    "licenseExpiredOn": "ライセンスは {date} に期限切れになりました。機能は引き続き有効です。",
+    "licenseExpiredLimit": "無料上限の {limit} GB/日が適用されるようになりました。1 か月のうち上限を超える日が {allowed} 日を超えると、更新するまで検索が一時停止します。",
+    "licenseAskAdminToRenew": "ライセンス管理者に更新を依頼してください。",
+    "renewLicense": "ライセンスを更新",
     "subscribed": "購読済み",
     "invoiceHistory": "請求書履歴",
     "amount": "金額",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "AWS サブスクリプションをリンクできませんでした",
     "failedToLinkAzureSubscription": "Azure サブスクリプションをリンクできませんでした",
     "last15Minutes": "過去15分",
-    "licenseHasExpired": "ライセンスが期限切れです",
     "numberOfPipelines": "パイプライン数",
     "oneDayUntilLicenseExpires": "ライセンスの有効期限まで残り1日",
     "pleaseWaitProcessingRequest": "リクエストを処理しています。しばらくお待ちください...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "任意です。アラートは引き続き実行され履歴も記録されますが、宛先への通知は行われません。",
       "sendsToStatus": "アラートが発火するたびに {targets} に送信します。",
       "oncallTeamTarget": "オンコールチーム",
+      "lockedWorkflowFallback": "ロックされたワークフロー",
+      "lockedTargetBadge": "ロック済み",
       "createsIncident": "インシデントを作成",
       "createsIncidentTooltip": "アラートがインシデントを作成できる場合、専用の通知は送信されません。代わりに、新しいインシデントが作成されたとき、または新しいアラートタイプが既存のインシデントに加わったときに、インシデントの通知が送信されます。",
       "incidentTitleTemplate": "インシデントタイトル",
@@ -12901,6 +12939,9 @@
       "lastTrained": "最終トレーニング",
       "level": "レベル",
       "lookBackWindow": "ルックバックウィンドウ",
+      "scheduleIntervalFloor": "チェック間隔は {min} 以上である必要があります。",
+      "lookBackWindowCap": "この検出解像度では、ルックバックウィンドウは最大 {max} です。より長いウィンドウでは 100,000 を超えるバケットが保持されます。ウィンドウを短くするか、検出解像度をより長くしてください。",
+      "retrainOnEditNote": "クエリ、関数、または検出解像度を変更すると、この検出器が再トレーニングされます。トレーニングが終了するまで検出は一時停止します。",
       "lookBackWindowFloor": "ルックバックウィンドウは少なくとも{min}（チェック間隔 + 検出解像度1つ分）である必要があります。これより短いウィンドウでは、最初の実行が発火した時点で完全なバケットを保持できないため、その実行はバケットをスキップします。",
       "lookBackWindowLegacy": "この保存済みウィンドウは{min}の最小値（チェック間隔 + 検出解像度1つ分）を下回っています。変更されずに保存されますが、ウィンドウを引き上げるまで最初の実行でバケットがスキップされる可能性があります。",
       "lookBackWindowMinimum": "最低 {min}。この設定では {recommended} 以上を推奨します。",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "宛先が見つかりません",
       "noDetectionResults": "この期間の検出結果はまだありません",
       "noFieldsFound": "フィールドが見つかりません",
+      "checkDataNow": "今すぐ確認",
+      "checkDataNowTooltip": "次回の自動確認を待たずに、現在のデータを今すぐ再評価します。",
+      "dataReadinessReason": "理由",
       "noticeRetrain": "自動再トレーニング",
       "noticeRetrainTooltip": "アップグレード後に保存済みモデルを読み取れなかったため、モデルは破棄され、設定は自動的に再トレーニングのキューに追加されました。操作は不要です。トレーニングが完了すると検出が再開されます。",
       "noticeSkipAbsence": "欠落の評価がルックバックウィンドウに間に合わなくなり、取得できなくなったスパンはスキップされ、記録されました。",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "自動モードでは履歴からレベルを学習します。",
       "autoTrainingHelp": "トレーニングが完了するとレベルが表示されます。",
       "autoFailedHelp": "トレーニングに失敗しました。学習済みレベルはまだありません。上記のトレーニングエラーを確認してください。",
+      "autoWaitingForDataHelp": "適切なトレーニングデータがまだ不足しています。それまで学習済みレベルはありません。検出器は有効のままで、自動的に再確認されます。",
+      "autoNotApplicableHelp": "現在のデータでは異常モデルを作成できません。これは失敗ではありません。検出器は有効のままで、自動的に再確認されます。",
       "autoRetrainingHelp": "再トレーニング中です。最後に学習したレベルを表示していますが、モデルの可用性は未確認です。",
       "autoRetrainFailedHelp": "再トレーニングに失敗しました。最後に学習したレベルを表示していますが、モデルの可用性は未確認です。上記のトレーニングエラーを確認してください。",
       "autoUnconfirmedHelp": "最後に学習したレベルを表示していますが、アクティブなモデルは確認されていません。",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "所有権ルールからルーティング",
     "oncallTeamTooltip": "このアラートが呼び出すチーム。通常は未設定のままにして、アラートのアイデンティティディメンションからチームを判定します。ディメンションで所有者を表すことができない場合のみ設定してください。",
     "oncallTeamNoTeams": "まだオンコールチームがありません。オンコールチームのページから作成してください。",
+    "lockedTeamFallback": "ロックされたチーム",
     "oncallTeamAtFireTime": "所有権から",
     "oncallTeamFromRules": "このアラートにはチームが設定されていないため、担当者は発火する行の識別ディメンションから導出されます。それらは発火するまで不明です。",
     "tags": "タグ",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "セパレータを入力 (例: {'|'}, \\n, \\t, スペース)",
     "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "デフォルトのままにすると標準の {type} テンプレート ({name}) が使用されます。カスタムテンプレートを選択することもできます。",
     "loadingData": "宛先データを読み込んでいます...",
     "noEmailTemplates": "まだメールテンプレートを作成していないようです。",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Azure認証情報",
       "awsRoleArn": "AWSロールARN"
     },
+    "dataRetentionDefaults": {
+      "title": "データ保持のデフォルト",
+      "about": "独自の保持期間を持たないストリームに適用されます。空または 0 の場合はグローバル値を使用します。それ以外の場合は最低 3 日です。",
+      "defaultDays": "デフォルト（日）",
+      "streamType": "ストリームタイプ",
+      "days": "日数",
+      "addType": "ストリームタイプを追加",
+      "removeType": "このストリームタイプを削除",
+      "globalDefault": "グローバル: {value}",
+      "globalType": "グローバル {type}: {value}",
+      "daysValue": "{days} 日",
+      "forever": "無期限に保持",
+      "invalid": "0 または 3 日以上を指定してください"
+    },
     "organizationSettings": {
       "fieldNameHelp": "英数字と'+=,.{'@'}-_'文字のみを使用し、スペースは使用しないでください。",
       "settingsUpdated": "組織設定が正常に更新されました",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "予期しないエラー",
-      "daysRemaining": "ライセンスの期限まであと{days}日",
-      "oneDayRemaining": "ライセンスの期限まであと1日",
-      "licenseExpired": "ライセンスの有効期限が切れました"
+      "daysRemaining": "ライセンスの期限まであと{days}日"
     },
     "nodesPage": {
       "subtitle": "クラスターノードとそのヘルス状態",
@@ -23025,7 +23085,9 @@
         "ready": "準備完了",
         "running": "実行中",
         "training": "トレーニング",
-        "waiting": "待機中"
+        "waiting": "待機中",
+        "waitingForData": "データ待ち",
+        "notApplicable": "適用不可"
       },
       "anomalyStatus": {
         "active": "アクティブ",
@@ -23033,7 +23095,9 @@
         "training": "トレーニング中",
         "failed": "失敗",
         "waiting": "待機中",
-        "disabled": "無効"
+        "disabled": "無効",
+        "waitingForData": "データ待ち",
+        "notApplicable": "適用不可"
       },
       "aiToolsetKind": {
         "skill": "スキル",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "問題が発生しました",
-      "thankYouForYourFeedback": "フィードバックをお寄せいただきありがとうございます",
       "selectedSuggestion": "選択された提案 \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "すべてのフィールドに入力して、もう一度お試しください。",
       "invalidUsernameOrPassword": "ユーザー名またはパスワードが無効です",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "はじめに",
     "reportDetail": "レポート",
     "sharedChat": "共有チャット",
     "passwordPolicy": "パスワードポリシー",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "スケジュールを保存できませんでした",
     "policy": "エスカレーションポリシー",
     "policyIfNoAck": "誰も確認しない場合の待機時間",
-    "policyRepeatTimes": "ラダーを1回実行 | ラダーを{count}回実行",
-    "policyFinalStop": "その後停止",
-    "policyFinalNotifyDefault": "その後キャッチオールチームに通知します。",
-    "policyNoDefaultTeam": "デフォルトチームが指定されていないため、これは停止と同じです。ルーティングタブで指定してください。",
     "policyPrioritySilent": "{priority} は誰も呼び出しません。変更するには段を追加してください — ここでの沈黙は省略ではなく決定です。",
     "policyDoneEditing": "編集完了",
     "policyHint": "各優先度で誰が呼び出されるかと、その待機時間を設定します。これらはデフォルトです。必要に応じて変更できます。",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "サイトが停止していることを知るために5分待つ人はいません。",
     "policyP4Pages": "この優先度でも呼び出す",
     "policyP4PagesHint": "デフォルトではオフ。P4で誰かを起こすのは重大度のバグです。",
-    "policyFinalAction": "誰も確認しない場合",
-    "policyFinal_notifyDefaultTeam": "デフォルトチームに通知",
-    "policyFinal_stop": "停止",
     "policySummaryTitle": "このポリシーの現在の動作",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "すべて同時に",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "AI SRE なし",
     "ladderStaleDefaultTag": "ローテーション未反映",
     "ladderStaleDefaultHint": "すべてのレベルがチーム全体を呼び出しますが、このチームにはローテーションがあります。このラダーはローテーションが存在する前に作成されました。メンバーを追加/削除するとデフォルトが再実行されるか、ラダーを一度手動で編集してください。",
-    "ladderEndsHandsOff": "呼び出しが引き継がれます",
     "reachShortNoSmtp": "メールのみ・SMTPトランスポートなし",
     "reachShortNoFromAddress": "メールのみ · From アドレスなし",
     "reachShortNoAddress": "アドレス未登録",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· {duration}ごと",
     "ladderEnd": "終了",
     "ladderEndUnknown": "この先に予定はありません。",
-    "ladderEndsDefaultTeam": "ラダーの段が尽きました — デフォルトチームに通知しました。",
     "rungLost": "失敗",
     "rungLostTimes": "失敗 ×{count}",
     "routingDetails": "ルーティング詳細",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "エスカレーション手順",
     "policyChipSteps": "{count} ステップ | {count} ステップ",
     "policyAddStep": "ステップを追加",
-    "policyWhenStepsRunOut": "ステップが尽きた場合",
     "policyAppliesToNewPages": "変更は新しい呼び出しにのみ適用されます。",
     "policySave": "保存",
     "policyFix": "修正",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "Slack と併用してもメールは有効です。Slack アカウントを連携していない人にも引き続きメールが届きます。",
     "policyNoProvider": "電話プロバイダーが接続されていないため、SMS と音声通話はスキップされ、これらの呼び出しはメールで送信されます。",
     "policyNoProviderLink": "設定 → 電話で接続してください",
-    "policyEndOptionStop": "1 回実行して、その後停止 | {count} 回実行して、その後停止",
-    "policyEndOptionHandOff": "1 回実行して、その後キャッチオールチームに引き継ぐ | {count} 回実行して、その後キャッチオールチームに引き継ぐ",
-    "policyEndOptionHandOffTo": "1 回実行してから {team} に引き継ぎ | {count} 回実行してから {team} に引き継ぎ",
     "policyDeliveryTitle": "配信",
     "policyTodayIs": "今日: {who}",
     "policyPeopleCount": "{count} 人 | {count} 人",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "{team} からアラートを受け取ります",
     "ruleEditorKeptBy": "{team} がこれらのアラートを保持します：そのルールの方がより具体的です",
     "ruleEditorContends": "{team} のルールと競合します：より具体的な方が優先されます",
+    "ruleEditorFieldSourcesMore": "{fields} 他 {count} 件",
+    "ruleEditorFieldsHelp": "フィールドは相関フィールドグループから取得されます。{link}",
+    "ruleEditorFieldsSource": "フィールドは相関フィールドグループから取得されます。",
+    "ruleEditorManageFieldGroups": "フィールドグループを管理",
+    "ruleEditorDuplicatePath": "{team} にはすでにこの条件とまったく同じルールがあります。そのルールを編集してください。",
+    "ruleEditorDuplicatePathSameTeam": "このチームにはすでにこの条件とまったく同じルールがあります。",
     "routingTestRouting": "ルーティングをテスト",
     "routingTabNeedsOwnerPlain": "オーナーが必要",
     "simulatorStartFrom": "起点",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "任意の Linux サーバーからのログ、メトリクス、トレース。",
+      "windows": "Windows サーバーからのイベントログとメトリクス。",
+      "macos": "Mac マシンからのログとメトリクス。",
+      "aws": "AWS サービスからのログとメトリクス。",
+      "googleCloud": "{gcp} プロジェクトからのログを、{pubSub} プッシュサブスクリプション経由で取得します。",
+      "azure": "{azure} サブスクリプションからのアクティビティログを、{eventHub} 経由で取得します。",
+      "postgresql": "クエリ、接続、レプリケーションのメトリクス。",
+      "mysql": "クエリ、接続、InnoDB のメトリクス。",
+      "mongodb": "操作、接続、キャッシュのメトリクス。",
+      "redis": "メモリ、コマンド、キースペースのメトリクス。",
+      "sqlServer": "クエリ、待機、バッファのメトリクス。",
+      "oracle": "セッション、テーブルスペース、リソース制限のメトリクス。",
+      "mariadb": "クエリ、接続、InnoDB のメトリクス。",
+      "elasticsearch": "クラスター、インデックス、ノードのヘルス。",
+      "cassandra": "読み取り、書き込み、コンパクションのメトリクス。",
+      "dynamodb": "項目の変更（挿入、更新、削除）を {kinesisFirehose} 経由でログとして取り込みます。",
+      "snowflake": "ウェアハウス、クエリ、クレジットの使用状況。",
+      "databricks": "ログ API 経由で送信されるノートブックログ。",
+      "couchdb": "リクエスト、データベース、レプリケーションのメトリクス。",
+      "aerospike": "名前空間、ノード、メモリ、接続のメトリクス。",
+      "sapHana": "メモリ、CPU、サービスのメトリクス。",
+      "zookeeper": "レイテンシ、接続、ノードのメトリクス。",
+      "nginx": "アクセスログとエラーログ（{fluentBit} で tail）。",
+      "apache": "アクセスログとエラーログ（{fluentBit} で tail）。",
+      "iis": "リクエストログ（{fluentBit} で tail）。",
+      "kafka": "ブローカー、トピック、コンシューマーラグのメトリクス。",
+      "rabbitmq": "キューの深さ、メッセージレート、ノードのメトリクス。",
+      "nats": "接続、メッセージ、ストリームのメトリクス。",
+      "prometheus": "すでにスクレイプしているメトリクスをリモートライトで送信します。",
+      "telegraf": "すでに実行しているエージェントからメトリクスを送信します。",
+      "opentelemetryCollector": "すでに実行しているコレクターの送信先をここに設定します。",
+      "cloudwatch": "AWS アカウントからメトリクスをストリーミング出力します。",
+      "gpu": "{nvidia} GPU ごとの使用率、メモリ、温度。",
+      "networkFlows": "ホストとネットワーク間のトラフィックフロー。",
+      "fluentBit": "ホストと Kubernetes 向けの軽量ログフォワーダー。",
+      "fluentd": "豊富なプラグインを備えたログコレクター。",
+      "vector": "ログとメトリクス向けの高速パイプライン。",
+      "filebeat": "軽量エージェントでログファイルを送信します。",
+      "logstash": "既存のパイプラインからログを送信します。",
+      "syslogNg": "サーバーから syslog を転送します。",
+      "loongcollector": "ホストとコンテナ向けのログ・メトリクスエージェント。",
+      "splunkHec": "HTTP Event Collector の送信側はそのまま利用できます。",
+      "cribl": "すでに実行しているパイプラインからデータをルーティングします。",
+      "kinesisFirehose": "AWS の配信ストリームからログをストリーミングします。",
+      "googleCloudLogs": "ログシンク経由でプロジェクトからログをエクスポートします。",
+      "okta": "サインインと管理者監査イベント。",
+      "office365": "メール、ファイル、管理者の監査ログ。",
+      "googleWorkspace": "ログインと管理者の監査ログ。",
+      "falco": "コンテナからのランタイムセキュリティアラート。",
+      "osquery": "クエリ可能なログとしてのエンドポイント状態。",
+      "jumpcloud": "ディレクトリとログインのイベント。",
+      "openvpn": "VPN 接続とセッションのログ。",
+      "githubActions": "ワークフロー実行とジョブのログ。",
+      "jenkins": "ビルドログとパイプラインイベント。",
+      "terraform": "実行時の plan と apply のログ。",
+      "ansible": "Playbook 実行ログと結果。",
+      "vercel": "デプロイと関数のログ。",
+      "heroku": "ログドレインからのアプリログとルーターログ。",
+      "airflow": "DAG 実行ログとタスクメトリクス。",
+      "airbyte": "同期ジョブのログとステータス。",
+      "languageTile": "お使いの言語で自動計装が利用できる場合は、自動計装付きの {otel} SDK によるトレース。",
+      "aiIntegration": "AI アプリの呼び出しのトレース（モデル呼び出しのトークンとコスト付き）。"
+    },
+    "skipToApp": "アプリへスキップ",
+    "chooseTitle": "最初に何を監視しますか？",
+    "back": "戻る",
+    "searchGuides": "{count} 件のガイドを検索 | {count} 件のガイドを検索",
+    "showMore": "さらに {count} 件表示 | さらに {count} 件表示",
+    "noMatch": "ここでは \"{query}\" に一致するガイドはありません。",
+    "foundElsewhere": "他の選択肢で見つかりました：",
+    "inChoice": "{choice} 内",
+    "tryShorter": "短い名前でお試しください。どのツールでも{link}ことができます。",
+    "sendOverHttp": "ログを HTTP 経由で送信する",
+    "clearSearch": "検索をクリア",
+    "othersTitle": "その他の開始方法",
+    "whatYouGet": "得られるもの",
+    "signals": {
+      "metrics": "メトリクス",
+      "logs": "ログ",
+      "traces": "トレース",
+      "profiles": "プロファイル",
+      "sessions": "セッション",
+      "errors": "エラー",
+      "webVitals": "Web Vitals（Web）",
+      "replays": "セッションリプレイ",
+      "tokens": "トークン",
+      "cost": "コスト",
+      "latency": "レイテンシー",
+      "uptime": "稼働時間",
+      "certificates": "証明書"
+    },
+    "example": {
+      "caption": {
+        "row": "画面例：{product} が {name} に対して表示する内容。",
+        "infrastructure": "画面例：CPU、メモリ、Pod の状態を示す {k8s} クラスターの概要。",
+        "backend": "画面例：失敗したチェックアウトのトレースのウォーターフォール。9 つのサービスにまたがる 21 個のスパン。",
+        "frontend": "画面例：実際のユーザーセッションから取得した {rum} の Web Vitals。",
+        "logs": "画面例：ヒストグラムと一致したログ行を含むログ検索。",
+        "llm": "画面例：モデル別のコスト、トークン、レイテンシーに加え、時間経過に伴うトレースとエラーを示す {insights}。",
+        "agent": "画面例：コーディングエージェントが接続する {mcp} サーバーページ。",
+        "synthetics": "画面例：3 つのロケーションで実行した 1 つの {http} チェックの結果。"
+      }
+    },
+    "guide": {
+      "agentTitle": "コーディングエージェントのほうがよいですか？",
+      "agentSteps": "ターミナルでこれを実行し、{claudeCode}、{cursor}、または {codex} にプロンプトまたはファイルを渡します。",
+      "copyPrompt": "プロンプトをコピー",
+      "downloadFile": ".md をダウンロード",
+      "inviteTitle": "アクセス権がありませんか？",
+      "inviteText": "コマンドを実行できるチームメンバーを招待してください。",
+      "inviteAction": "チームメンバーを招待",
+      "loadFailed": "このガイドを読み込めませんでした。",
+      "openInApp": "データソースで開く",
+      "languageText": "{language} の場合は {otelSdk} を追加し、{language} で自動計測が利用できる場合はそれを有効にしたうえで、以下の設定で送信先を {product} に指定します。",
+      "languageLink": "{otel} {language} ガイド"
+    },
+    "rail": {
+      "label": "セットアップの進行状況",
+      "check": "データを確認",
+      "received": "データを受信済み",
+      "attention": "要確認",
+      "waitingShort": "データを待機中",
+      "title": "{name} をセットアップ",
+      "run": "セットアップコマンドを実行",
+      "explore": "データを探索"
+    },
+    "firstData": {
+      "title": "データが届いています",
+      "count": "{count} 件のレコードが {stream} に届きました | {count} 件のレコードが {stream} に届きました",
+      "exploreLogs": "ログを探索",
+      "exploreMetrics": "メトリクスを探索",
+      "exploreTraces": "トレースを探索",
+      "exploreProfiles": "プロファイルを探索",
+      "addAnother": "別のソースを追加"
+    },
+    "others": {
+      "synthetics": {
+        "name": "合成モニタリングチェック",
+        "description": "ウェブサイト、API、ポート、証明書をチェックします。インストール不要。",
+        "gets": "ネットワークの外部からスケジュールに従ってチェックを実行します。"
+      },
+      "invite": {
+        "name": "チームメイトを招待してセットアップ",
+        "description": "相手に組織への招待が届きます。"
+      },
+      "agent": {
+        "name": "コーディングエージェントでセットアップ",
+        "description": "{claudeCode}、{cursor}、または {codex} に 1 つのプロンプトを渡します。",
+        "gets": "コーディングエージェントがセットアップを追加し、データが届くことを確認します。"
+      }
+    },
+    "agentLink": "またはコーディングエージェントに任せる",
+    "stepDone": "（完了）",
+    "agent": {
+      "crumb": "コーディングエージェント",
+      "title": "コーディングエージェントでセットアップ",
+      "lead": "{claudeCode}、{cursor}、{codex}、または任意のコーディングエージェントがプロジェクトを読み取り、セットアップを追加し、データが届いたことを確認します。何かをインストールしたりデプロイメントファイルを変更したりする前に、確認を求めます。",
+      "tokenTitle": "トークンを保存",
+      "tokenText": "コーディングエージェントを起動する予定のターミナルで、起動する前にこれを実行します。",
+      "powerShell": "{powerShell} の場合:",
+      "copyPowerShell": "{powerShell} コマンドをコピー",
+      "promptTitle": "プロンプトをコピー",
+      "focusLabel": "セットアップ",
+      "focus": {
+        "kubernetes": "{k8s} クラスター",
+        "host": "{linux}、{macos}、または {windows} ホスト",
+        "backend": "バックエンドサービス（{otel}）",
+        "llm": "LLM アプリ",
+        "frontend": "Web フロントエンド",
+        "logs": "ログのみ"
+      },
+      "copyPrompt": "プロンプトをコピー",
+      "promptCopied": "プロンプトをコピーしました",
+      "download": ".md をダウンロード",
+      "preview": "プロンプトをプレビュー",
+      "previewLines": "{count} 行 | {count} 行",
+      "pasteTitle": "コーディングエージェントに貼り付け",
+      "other": "その他",
+      "hint": {
+        "claudeCode": "同じターミナルで、プロジェクトフォルダー内で {command} を実行し、プロンプトを貼り付けます。",
+        "cursor": "同じターミナルから {command} で {product} を起動すると、トークンを読み取れます。その後、チャットにプロンプトを貼り付けます。",
+        "codex": "同じターミナルで、プロジェクトフォルダー内で {command} を実行し、プロンプトを貼り付けます。",
+        "other": "同じターミナルからコーディングエージェントを起動すると、トークンを読み取れます。その後、プロンプトを貼り付けるか、{file} を渡します。"
+      },
+      "mcp": "{mcp} サーバーを接続して、コーディングエージェントがデータを読み取れるようにします",
+      "aside": {
+        "eyebrow": "プロンプトがコーディングエージェントに伝える内容",
+        "title": "小さく安全な変更",
+        "line1": "プロジェクトが実行しているものを特定",
+        "line2": "動作する最小限の変更を行う",
+        "line3": "トークンは環境変数に保持してください",
+        "line4": "テストイベントを1件、ストリーム {stream} に送信してください",
+        "line5": "変更されたファイルを報告してください"
+      }
+    },
+    "collect": {
+      "continueToSetup": "セットアップに進む",
+      "languages": "言語",
+      "languagesRequired": "少なくとも1つの言語を選択してください。",
+      "kubernetesCluster": {
+        "question": "クラスターから収集する内容を選択してください",
+        "off": {
+          "name": "ログとメトリクス",
+          "description": "クラスターのヘルスとコンテナログ。1コマンドで。",
+          "about": "1つのインストールコマンドで、コンテナログ、すべてのノードと Pod の CPU とメモリ、{k8s} イベントをログとして収集します。"
+        },
+        "ebpf": {
+          "name": "eBPF でトレースを追加",
+          "description": "コード変更は不要で、あらゆる言語に対応。ノードに Linux カーネル 5.8+ が必要です。",
+          "about": "同じインストールにトレースを追加します。コレクターは Linux カーネルからリクエストを観測するため、アプリ側の変更は不要です。プレーン HTTP のみで、リクエストをサービス間で関連付けます。"
+        },
+        "library": {
+          "name": "言語ライブラリでトレースを追加",
+          "description": "アプリごとに詳細を取得できます。言語を選択し、アプリを一度再起動してください。",
+          "about": "同じインストールにトレースを追加します。{otelOperator} が、選択した名前空間の Pod に言語ごとの {otelLibrary} を追加します。コードの変更は不要です。"
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Web サーバー",
+      "messageQueues": "メッセージキュー",
+      "metricsYouCollect": "すでに収集しているメトリクス",
+      "gpuAndNetwork": "GPU とネットワークフロー",
+      "movingFromAnotherTool": "別のツールからの移行",
+      "cloudLogs": "クラウドログ",
+      "securityTools": "セキュリティツール",
+      "cicdAndPlatforms": "CI/CD とプラットフォーム"
+    },
+    "infrastructure": {
+      "name": "インフラストラクチャ",
+      "description": "サーバー、{k8s}、クラウドアカウント、データベース",
+      "gets": "すべてのホスト、Pod、クラウドサービスを一元的に確認できます。",
+      "question": "インフラストラクチャをどのように監視しますか？",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} クラスター",
+          "description": "1つのインストールでログ、メトリクス、{k8s} イベントを収集。トレースは追加のコマンド1つで有効になります。",
+          "about": "1つのコマンドでクラスターに {productCollector} をインストールします。コンテナログ、{k8s} イベント、クラスターメトリクスを取得できます。"
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}、{windows}、または {macos} ホスト",
+          "description": "{productAgent} をサービスとしてインストール",
+          "about": "1つのエージェントがホストからログとメトリクスを収集します。{linux} では、コード変更なしでプログラムをトレースすることもできます。",
+          "question": "ホストのオペレーティングシステムはどれですか？"
+        },
+        "cloudAccount": {
+          "name": "クラウドアカウント",
+          "description": "{aws}、{gcp}、または {azure}",
+          "about": "クラウドアカウントからログを、{aws} からメトリクスをストリーミングします。サーバー上では何も実行されません。",
+          "question": "アカウントはどのクラウドにありますか？"
+        },
+        "databases": {
+          "name": "データベース",
+          "description": "{examples}、ほか {count} 件",
+          "about": "主に {otelCollector} を介してデータベースのメトリクスを収集します。",
+          "question": "どのデータベースを監視しますか？"
+        },
+        "somethingElse": {
+          "name": "その他",
+          "description": "Web サーバー、メッセージキュー、{prometheus}、GPU、ネットワークフロー",
+          "about": "Web サーバー、メッセージキュー、すでに収集しているメトリクス、GPU 使用状況、ネットワークフロー。",
+          "question": "ほかに何を監視しますか？"
+        }
+      }
+    },
+    "backend": {
+      "name": "バックエンドアプリケーション",
+      "description": "サービスからのトレースと、SDK が送信するログ",
+      "gets": "各リクエストがサービス間をどのように流れるかを確認できます。",
+      "question": "サービスをどのようにトレースしますか？",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "コードにライブラリを追加する",
+          "description": "{nodejs}、{python}、{java}、{go}、{dotnet}、{rust} または {fastapi}",
+          "about": "{otelLibrary} をお使いの言語に合わせて追加します。トレースは {product} に送信されます。",
+          "question": "サービスはどの言語で書かれていますか？"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} ワークロード、コード変更なし",
+          "description": "クラスター内での自動インストルメンテーション",
+          "about": "{otelOperator} が 1 つの名前空間内の Pod にインストルメンテーションを追加します。コードやイメージの変更は不要です。"
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "{otel} を使う任意の言語",
+          "description": "独自のセットアップから OTLP を送信",
+          "about": "任意の {otelSdk} またはコレクターを {product} のエンドポイントに向けます。"
+        },
+        "continuousProfiling": {
+          "name": "継続的プロファイリング",
+          "description": "CPU とメモリのプロファイル",
+          "about": "プロファイラー（{go}、{java}、{rust} または eBPF プロファイラー）から {otelCollector} 経由でプロファイルを転送します。"
+        }
+      }
+    },
+    "frontend": {
+      "name": "フロントエンドとモバイルアプリ",
+      "description": "Web とモバイル向けのリアルユーザーモニタリング",
+      "gets": "Web およびモバイルアプリで実際のユーザーが体験していることを確認できます。",
+      "question": "アプリはどこで動作していますか？",
+      "rows": {
+        "browser": {
+          "name": "ブラウザ",
+          "description": "Web サイトと Web アプリ",
+          "about": "{sdk} を Web アプリに追加します。実際のブラウザからページロード、エラー、セッションを取得できます。"
+        },
+        "reactNative": {
+          "description": "1 つのコードベースから {ios} と {android}",
+          "about": "{sdk} を {platform} アプリに追加します。"
+        },
+        "android": {
+          "description": "ネイティブ {android} アプリ",
+          "about": "{sdk} を {platform} アプリに追加します。セッション、画面ビュー、エラー、クラッシュを取得できます。"
+        },
+        "ios": {
+          "description": "ネイティブ {ios} アプリ",
+          "about": "{sdk} を {platform} アプリに追加します。セッション、画面ビュー、エラー、クラッシュを取得できます。"
+        }
+      }
+    },
+    "logs": {
+      "name": "あらゆるソースからのログ",
+      "description": "任意のシッパー、サービス、ツールからログを送信",
+      "gets": "送信元を問わず、すべてのログ行を検索・フィルターできます。",
+      "question": "ログをどのように送信しますか？",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "実行中のログシッパーから",
+          "description": "{examples} など {count} 件",
+          "about": "既に実行中のシッパーを {product} に向けます。新しいエージェントは不要です。",
+          "question": "どのログシッパーを実行していますか？"
+        },
+        "overHttpWithCurl": {
+          "name": "{curl} を使った HTTP 経由",
+          "description": "任意のスクリプトから 1 回のリクエスト。インストール不要。",
+          "about": "任意のスクリプトやサービスから 1 回の HTTP リクエストで JSON ログを送信します。"
+        },
+        "fromOpentelemetry": {
+          "name": "{otel} から",
+          "description": "SDK またはコレクターからの OTLP ログ",
+          "about": "{otelSdk} またはコレクターから OTLP 経由でログを送信します。"
+        },
+        "somethingElse": {
+          "name": "その他",
+          "description": "{splunk} または {cribl}、クラウドログ、セキュリティツール、CI/CD",
+          "about": "{splunk} または {cribl} から移行するか、クラウド、セキュリティツール、CI/CD からログを収集します。",
+          "question": "他にどこからログが届きますか？"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM と AI アプリ",
+      "description": "LLM 呼び出し、エージェント、ツールをトレース",
+      "gets": "すべての LLM 呼び出し、ツール呼び出し、エージェントのステップを確認できます。",
+      "question": "AI アプリは何を使用していますか？",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}、Agents または {assistantsApi}",
+          "about": "{openaiSdk} を介したすべての呼び出しを、トークン、コスト、レイテンシとともにトレースします。",
+          "question": "どの {openai} ライブラリを使用していますか？"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} または {claudeAgentSdk}",
+          "about": "{anthropicSdk} を介したすべての呼び出しを、トークン、コスト、レイテンシとともにトレースします。",
+          "question": "どの {anthropic} ライブラリを使用していますか？"
+        },
+        "langchainOrLanggraph": {
+          "description": "チェーン、エージェント、グラフ",
+          "about": "各チェーン、エージェントのステップ、ツール呼び出しをトレースします。",
+          "question": "どの {langchain} ライブラリを使用していますか？"
+        },
+        "somethingElse": {
+          "name": "その他",
+          "description": "その他のフレームワーク、モデルプロバイダー、ゲートウェイ、ツール",
+          "about": "フレームワーク、モデルプロバイダー、ゲートウェイ、ノーコードツール、分析、ツール。",
+          "question": "AI アプリでは何を使用していますか？"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "フリート管理",
     "subtitle": "OpenTelemetry コレクターを登録し、構成をバージョン管理して、変更を安全にロールアウトします",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "{receiver} レシーバーが拒否",
       "legend": "パイプラインのステータス",
       "legendToggle": "このステータスをマップ上で表示または非表示にする"
+    }
+  },
+  "sampleData": {
+    "delete": "サンプルデータを削除",
+    "loadForbidden": "サンプルデータを読み込むには、この組織への書き込みアクセスが必要です。",
+    "steps": {
+      "functions": "関数を作成中",
+      "pipeline": "リアルタイムパイプラインを作成中",
+      "telemetry": "ログ、トレース、メトリクスを生成して送信中",
+      "dashboards": "ダッシュボードを作成中",
+      "alerts": "アラートを作成中",
+      "enrichment": "サービスオーナーテーブルをアップロード中"
+    },
+    "progress": {
+      "loading": "サンプルデータを読み込み中…",
+      "done": "サンプルデータを読み込みました",
+      "counts": "{logs} 件のログレコード · {spans} スパン · {metrics} メトリクスポイント",
+      "skipped": "スキップ",
+      "logs": "ログ",
+      "spans": "スパン",
+      "metrics": "メトリクスポイント"
+    },
+    "removeSteps": {
+      "alerts": "アラート",
+      "alertDelivery": "アラートテンプレートとウェブフック",
+      "dashboards": "ダッシュボード",
+      "pipeline": "パイプライン",
+      "functions": "関数",
+      "streams": "ストリーム"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "サンプルデータを削除中",
+        "body": "数秒かかります。このダイアログは閉じてもかまいませんが、完了するまでこのタブは開いたままにしてください。",
+        "label": "サンプルデータを削除中…"
+      },
+      "done": {
+        "title": "サンプルデータを削除しました",
+        "body": "サーバーが保存データを削除するまで数分かかります。その後、サンプルデータを再度読み込めます。",
+        "label": "削除完了",
+        "done": "完了",
+        "keptLabel": "他のものが使用しているため保持:"
+      },
+      "failed": {
+        "title": "サンプルデータをすべて削除できませんでした",
+        "body": "再試行してください。すでに削除済みの項目はスキップされます。",
+        "label": "削除を停止しました",
+        "close": "閉じる",
+        "tryAgain": "再試行"
+      }
+    },
+    "removeConfirm": {
+      "title": "サンプルデータを削除しますか？",
+      "message": "サンプルのストリーム、ダッシュボード、アラート、関数、エンリッチメントテーブルが削除されます。お客様ご自身のデータは影響を受けません。"
+    },
+    "toast": {
+      "loaded": "サンプルデータを読み込みました。ぜひ探索してみてください！",
+      "loadFailed": "サンプルデータを読み込めませんでした",
+      "removed": "サンプルデータを削除しました",
+      "removedWithKept": "サンプルデータを削除しました。他の機能で使用されているため、{count} 件のサンプル項目は残ります。 | サンプルデータを削除しました。他の機能で使用されているため、{count} 件のサンプル項目は残ります。",
+      "removeFailed": "サンプルデータをすべて削除できませんでした",
+      "removeWhileLoading": "サンプルデータの読み込みが完了するまでお待ちください。"
+    },
+    "entry": {
+      "onboardingSource": "サンプルデータを試す"
+    },
+    "callout": {
+      "title": "まだデータを送信する準備ができていませんか？",
+      "body": "{product} をサンプルのオンラインストアでお試しいただけます。進行中のインシデントと、ダッシュボード、アラート、ログ、トレース、メトリクス、パイプラインを巡るガイド付きツアーをご用意しています。",
+      "cta": "サンプルデータで試す"
+    },
+    "header": {
+      "label": "サンプルデータ",
+      "try": "サンプルデータを試す",
+      "finish": "読み込みを完了"
+    },
+    "dock": {
+      "details": "詳細を表示"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "独自のデータが届いています。ダッシュボード、アラート、検索に混ざらないよう、サンプルデータを削除してください。",
+        "keep": "今は保持する",
+        "remove": "サンプルデータを削除"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "バックグラウンドで続行",
+      "progress": {
+        "title": "サンプルストアを作成中",
+        "body": "約 1 分かかります。このダイアログは閉じてもかまいませんが、読み込みが終わるまでこのタブは開いたままにしてください。"
+      },
+      "ready": {
+        "title": "サンプルストアが利用可能になりました",
+        "startTour": "ガイド付きツアーを開始",
+        "ownWay": "自分で探索する"
+      },
+      "errorBody": "読み込み中に問題が発生しました。もう一度お試しください。既に存在するダッシュボードとアラートは再利用され、重複して作成されることはありません。"
+    },
+    "tour": {
+      "label": "ガイド付きツアー",
+      "position": "ガイド付きツアー · ステップ {current}/{total}",
+      "pill": "ツアー {current}/{total}",
+      "done": "ツアー完了",
+      "stepFailed": "このステップを開けませんでした。もう一度お試しください。",
+      "minimize": "ツアーを最小化",
+      "close": "ツアーを終了",
+      "next": "次へ",
+      "capabilities": {
+        "dashboards": "ダッシュボード",
+        "alerts": "アラート",
+        "logs": "ログ検索",
+        "traces": "トレース",
+        "metrics": "メトリクスと PromQL",
+        "pipelines": "パイプライン"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "問題を特定する",
+          "body": "これはストアフロントのサービス概要です。直近 35 分間でエラー率とチェックアウトのレイテンシーがともに急上昇しています。",
+          "look": "すべてのパネルは SQL クエリです。グラフにカーソルを合わせて系列を比較したり、ドラッグしてズームしたり、パネルのメニューを開いてクエリを編集できます。"
+        },
+        "alert": {
+          "title": "アラートはすでに発火しています",
+          "body": "決済エラーに関するアラートは、スケジュールに従ってログに対して SQL クエリを実行し、エラーがしきい値を超えるとすぐに発火しました。",
+          "look": "アラートを開くと、そのクエリ、しきい値、スケジュールを確認できます。サンプルの宛先はプレースホルダーの Webhook のため、配信は失敗として表示されます。実際の通知を受け取るには、Slack、メール、PagerDuty を指定してください。"
+        },
+        "logs": {
+          "title": "エラーを検索する",
+          "body": "決済エラーに絞り込んだログです。ほぼすべてが同じ内容を示しています: プールから接続を取得する際のタイムアウト。",
+          "look": "レコードを展開すると、すべてのフィールドを確認できます。フィールドの値をクリックするとその値で絞り込まれ、SQL モードに切り替えるとグループ化と集計ができます。"
+        },
+        "deploy": {
+          "title": "何が変わったかを特定する",
+          "body": "Payment v2.15.0 はエラーが始まる 1 分前に展開され、そのリリースノートでは接続プールが 20 に削減されていました。",
+          "look": "これが根本原因で、同じログを 1 回検索するだけで見つかりました。全文検索と SQL 検索は同じデータに対して実行されます。"
+        },
+        "traces": {
+          "title": "失敗したリクエストを追跡する",
+          "body": "各トレースは、サービスをまたぐ 1 回のチェックアウトを追跡します。1 つ開いてみてください。ウォーターフォールには、決済サービスがデータベース接続を 3 秒間待っている様子が表示されます。",
+          "look": "ログには同じトレース ID が含まれているため、スパンとそのログの間を双方向に移動できます。"
+        },
+        "metrics": {
+          "title": "PromQL で確認",
+          "body": "すべてのサービスの p95 レイテンシーを PromQL でクエリします。Payment と checkout はともに上昇します。",
+          "look": "メトリクスはログやトレースと同じエンジンにあるため、インフラダッシュボードは完全に PromQL で構築されています。"
+        },
+        "pipeline": {
+          "title": "到着するデータを処理",
+          "body": "リアルタイムパイプラインがすべてのアクセスログに VRL 関数を実行し、レコードが保存される前に client_os と is_mobile を追加します。",
+          "look": "パイプラインを開いてグラフを確認します。パイプラインはアプリに手を加えることなく、データのフィルター、エンリッチ、ルーティング、秘匿化を行えます。"
+        },
+        "business": {
+          "title": "ビジネスへの影響を測定",
+          "body": "同じログがビジネスダッシュボードを支えます。失敗したチェックアウト、売上、支払い方法別の注文などです。",
+          "look": "別途の分析ツールは不要です。ログ内のあらゆるデータが KPI になります。"
+        }
+      },
+      "finale": {
+        "title": "根本原因を特定しました",
+        "body": "数分で、ダッシュボードのスパイクから原因となったデプロイまでたどり着き、すべてのシグナルを一か所で確認できました。",
+        "connect": "自分のデータを接続",
+        "restart": "ツアーをやり直す",
+        "finish": "ツアーを終了"
+      }
     }
   },
   "recentSearches": {

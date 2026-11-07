@@ -1948,6 +1948,7 @@
     "billings": "Facturatie",
     "rum": "RUM",
     "settings": "Instellingen",
+    "allSettings": "Alle instellingen",
     "iam": "IAM",
     "report": "Rapporten",
     "pipeline": "Pipelines",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "Alleen ZIP-bestanden zijn toegestaan"
     },
     "emptyState": {
-      "title": "Bewaak uw gebruikers met Real User Monitoring",
-      "description": "RUM volgt echte gebruikersinteracties — het laden van pagina's, fouten, API-aanroepen en sessie-replays — zodat u precies ziet hoe gebruikers uw applicatie ervaren.",
       "webApp": "Instrument: een webapp",
       "webAppDesc": "Voeg de OpenObserve RUM SDK toe aan elke {product}-app",
       "sessionReplay": "Sessie opnieuw afspelen inschakelen",
       "sessionReplayDesc": "Gebruikerssessies opnemen en opnieuw afspelen om UX-problemen op te lossen",
+      "title": "Bewaak uw gebruikers met Real User Monitoring",
+      "description": "RUM volgt echte gebruikersinteracties — het laden van pagina's, fouten, API-aanroepen en sessie-replays — zodat u precies ziet hoe gebruikers uw applicatie ervaren.",
       "learnMore": "Meer informatie:",
       "quickImpl": "Beknopte implementatiegids",
       "blogPost": "Basisprincipes van frontend-monitoring"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "Licentie en gebruik",
     "copyLicenseId": "Licentie-ID kopiëren",
     "editionLbl": "Editie",
-    "limitPrefix": "· limiet",
     "gbPerDay": "GB / dag",
     "ofDailyLimitUsedToday": "van de dagelijkse limiet vandaag gebruikt",
     "gbToday": "GB vandaag",
@@ -3580,6 +3580,7 @@
     "usage_limits": "Gebruikslimieten",
     "feature_comparison_lbl": "Vergelijking van functies",
     "feature_comparision_ent_msg": "U gebruikt OpenObserve Enterprise Edition met toegang tot alle geavanceerde functies die hieronder worden vermeld.",
+    "feature_comparision_ent_partial_msg": "Je gebruikt OpenObserve Enterprise Edition. Sommige functies vallen niet onder je licentie; zie de lijst hierboven.",
     "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 50 GB/dag (~1.5 TB per maand) aan gegevensinvoer.",
     "feature_comparision_os_msg": "U gebruikt momenteel OpenObserve Open Source Edition. Upgrade naar Enterprise Edition om geavanceerde functies te ontgrendelen die in de vergelijkingstabel hieronder worden vermeld.",
     "feature_comparision_good_news": "Goed nieuws: OpenObserve Enterprise Edition is volledig gratis voor maximaal 50 GB/dag (~1.5 TB/maand) aan gegevensinvoer.",
@@ -3660,6 +3661,7 @@
     "features_no_match": "Geen functies gevonden voor je zoekopdracht",
     "features_none": "Geen functies in deze groep",
     "features_free_heading": "Gratis, inbegrepen bij elke licentie",
+    "features_free_not_included": "Gratis, niet inbegrepen in je licentie",
     "features_new": "Nieuw na je licentie",
     "features_filter_new": "Nieuw",
     "request_new_license": "Nieuwe licentie aanvragen",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "Je licentie is nog steeds actief. Wil je het updaten met de nieuwe licentiesleutel?",
     "yes_update_license": "Ja, licentie bijwerken",
     "no_keep_current": "Nee, blijf op de hoogte",
+    "license_downgrade_title": "Deze licentiesleutel toepassen?",
+    "license_downgrade_intro": "Deze sleutel vervangt je huidige licentie.",
+    "license_downgrade_expired": "Deze sleutel is verlopen op {date}. De gratis limiet van 50 GB/dag gaat gelden.",
+    "license_downgrade_lose": "Je verliest: {names}",
+    "license_downgrade_limit": "Daglimiet gaat van {old} naar {new}",
+    "license_downgrade_expiry": "Vervaldatum verschuift van {old} naar {new}",
+    "license_limit_per_day": "{gb} GB/dag",
     "header_button": {
       "cloud_features": "{product} functies",
       "enterprise_edition": "Editie: Enterprise",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "Probeer OpenObserve vandaag nog voor efficiëntere en performantere observability.",
     "getStartedBannerAlt": "Aan de slag-banner",
     "getStartedHeading": "Nog één ding voordat we beginnen",
-    "hearAboutUsLabel": "Hoe heb je over ons gehoord?",
     "hearAboutUsPlaceholder": "Bijv. Van een vriend",
-    "whereDoYouWorkLabel": "Waar werk je?",
     "whereDoYouWorkPlaceholder": "Bedrijfsnaam",
-    "agreeToTermsPrefix": "Ik heb gelezen en ga akkoord met de",
     "termsOfUse": "gebruiksvoorwaarden",
-    "and": "en",
     "privacyPolicyStar": "privacybeleid*",
     "startTrialButton": "Start je 14-daagse proefperiode",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "E-mail is verplicht",
     "emailInvalid": "Voer een geldig e-mailadres in",
     "passwordRequired": "Wachtwoord is verplicht",
-    "mustAcceptTerms": "U moet de voorwaarden accepteren om verder te gaan",
     "getStarted": {
       "title": "Welkom bij OpenObserve",
-      "subtitle": "Je proefperiode van 14 dagen is begonnen. Twee korte vragen, daarna brengen we je naar de installatie.",
-      "sourceLabel": "Wat wil je eerst verzenden?",
-      "optional": "(optioneel)",
-      "skip": "Vragen overslaan",
-      "continue": "Doorgaan",
-      "hearAboutUsPlaceholder": "Bijvoorbeeld een collega of een blogbericht",
-      "whereDoYouWorkPlaceholder": "Bedrijf of team",
-      "termsOfService": "Servicevoorwaarden",
-      "privacyPolicy": "Privacybeleid",
-      "agreeHint": "Nodig om door te gaan, ook als je de vragen overslaat.",
+      "skipForNow": "Nu overslaan",
+      "heard": {
+        "label": "Hoe heb je over ons gehoord?",
+        "placeholder": "Selecteer een optie",
+        "thanks": "Bedankt!"
+      },
+      "connect": {
+        "title": "Je gegevens verbinden",
+        "point1": "Stapsgewijze configuratie voor elke bron",
+        "point2": "Logs, metrieken en traces op één plek",
+        "point3": "Bekijk je eerste gebeurtenissen binnen enkele minuten",
+        "cta": "Andere gegevensbronnen verkennen"
+      },
+      "sample": {
+        "title": "Verken met voorbeeldgegevens",
+        "point1": "Logs, traces en metrieken van voorbeeldservices",
+        "point2": "Dashboards, alarmen, een pipeline en VRL-functies",
+        "point3": "Een rondleiding en alles met één klik verwijderen",
+        "cta": "Verken met voorbeeldgegevens"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux- of VM-host",
@@ -4094,7 +4108,28 @@
         "llm": "LLM- of AI-app",
         "agent": "Laat een AI-agent het instellen",
         "unsure": "Nog niet zeker"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Webserver",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Browser (RUM)",
+        "llm": "LLM of AI-app",
+        "agent": "AI-agent"
       }
+    },
+    "heardFrom": {
+      "question": "Hoe heb je ons gevonden?",
+      "quickQuestion": "Korte vraag: hoe heb je ons gevonden?",
+      "skip": "Overslaan",
+      "searchEngine": "Zoekmachine",
+      "friendOrColleague": "Vriend of collega",
+      "aiAssistant": "AI-assistent",
+      "other": "Anders",
+      "thanks": "Bedankt dat je het ons hebt verteld!"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "Andere velden tonen alleen de schema-velden die bestonden voordat de stream werd geconfigureerd om een gebruikersgedefinieerd schema te gebruiken.",
     "addFieldsTitle": "Velden toevoegen",
     "dataRetentionDaysLabel": "Dataretentie (dagen)",
-    "globalRetentionDays": "Globale retentie is {days} dagen",
-    "retentionMinOneDay": "Retentieperiode moet minimaal 1 dag zijn",
+    "retentionDefaultDays": "Laat leeg om de standaard voor dit streamtype te gebruiken: {days} dagen",
+    "retentionDefaultForever": "Laat leeg om de standaard voor dit streamtype te gebruiken: voor altijd bewaren",
     "maxQueryRangeHoursLabel": "Max querybereik (uren)",
     "maxQueryRangeHelp": "Maximale tijdsperiode toegestaan voor query's. Zet 0 in voor onbeperkt bereik.",
     "globalFlattenLevel": "Globaal is {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
-  "connectDataSourcePopup": {
-    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
-    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
-    "connectButton": "Een gegevensbron verbinden",
-    "slackLink": "Sluit je ook aan bij onze Slack-community"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "Zie welke workloads met elkaar communiceren: eBPF-netwerkstromen",
       "k8sInstallerNote": "Dit installeert automatisch cert-manager, de OpenTelemetry-operator en de OpenObserve-collector.",
       "k8sInternalEndpointNote": "Gebruik dit wanneer OpenObserve in hetzelfde cluster draait — verkeer verlaat het dan nooit.",
+      "k8sTraceAppsTitle": "Traceer je apps",
+      "k8sTraceEbpfDesc": "Schakel eBPF-tracing in de collector in en kies vervolgens de apps die je wilt tracen op basis van poort, pad naar het uitvoerbare bestand of opdrachtregel.",
+      "k8sTraceLibraryDesc": "Voorzie de namespace van elke taal van een annotatie, zodat de operator de bijbehorende bibliotheek aan de pods daar toevoegt. Herstart die apps daarna één keer.",
       "k8sTroubleAnnotationA": "Injectie vindt plaats bij het aanmaken van de pod, dus bestaande pods worden niet beïnvloed tot ze opnieuw opstarten — voer `kubectl rollout restart deployment -n my-namespace` uit. Bevestig dat de annotatie is geplaatst met `kubectl get ns my-namespace -o yaml` en controleer dat de waarde overeenkomt met `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Ik heb een namespace geannoteerd, maar er verschijnen geen traces",
       "k8sTroubleEndpointA": "Gebruik het **interne eindpunt** alleen wanneer OpenObserve zelf in dit cluster draait; het verkeer blijft dan binnen het cluster en verlaat nooit het netwerk. De URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — de standaardwaarde gaat uit van release `o2` in namespace `openobserve`, dus pas die aan als die van jou afwijken. Alle anderen gebruiken het externe eindpunt.",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "Sessies verschijnen, maar schermen hebben allemaal dezelfde naam",
       "androidTroubleScreenNamesA": "Weergavetracking is niet aangesloten. Geef een `useViewTrackingStrategy(...)` door — bijv. `ActivityViewTrackingStrategy(trackExtras = true)` voor Activities, of `NavigationViewTrackingStrategy(...)` als u AndroidX Navigation gebruikt — bij het bouwen van de `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Instructies tonen",
       "snowflakeCollectorVersionNote": "Snowflake heeft collector v0.92.0 nodig — nieuwere builds hebben een bekende bug.",
       "snowflakeTagline": "Verzamel Snowflake-accountmetrieken met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "sqlClientGuiVariant": "SQL-client (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "De onderstaande controle wordt groen wanneer er gegevens binnenkomen, of controleer Streams op de `cassandra_*`-metrieken.",
       "verifyDatabricksLogsDesc": "De onderstaande controle wordt groen wanneer er gegevens binnenkomen, of open Logs en zoek op `source:databricks`.",
       "verifyDataTitle": "Gegevens verifiëren in OpenObserve",
+      "checkYourDataTitle": "Controleer je gegevens",
       "verifyDynamodbLogsDesc": "De onderstaande controle wordt groen wanneer er gegevens binnenkomen, of open Logs voor de `dynamodb`-stream zodra items veranderen.",
       "verifyGcpLogsDesc": "Genereer wat activiteit in het project (of wacht tot de sink overeenkomt met een log); de onderstaande controle wordt groen wanneer er gegevens binnenkomen.",
       "verifyK8sDataDesc": "Geef de collector een paar seconden om te starten; de onderstaande controle wordt groen wanneer er gegevens binnenkomen — clusterlogs belanden in de `default`-stream.",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "Facturering verloopt via uw contract — neem contact op met uw accountmanager voor wijzigingen",
     "upgradeToPlanMessage": "Upgrade naar een abonnement om te blijven genieten van de diensten van OpenObserve.",
     "creditsUsedLabel": "credits gebruikt",
-    "licenseExpiryContactAdmin": "Update uw licentie door contact op te nemen met uw beheerder.",
+    "licenseExpiredOn": "Je licentie is verlopen op {date}. Je functies blijven actief.",
+    "licenseExpiredLimit": "De gratis limiet van {limit} GB/dag geldt nu: als je in een maand meer dan {allowed} dagen erboven zit, wordt zoeken gepauzeerd tot je verlengt.",
+    "licenseAskAdminToRenew": "Vraag je licentiebeheerder om te verlengen.",
+    "renewLicense": "Licentie verlengen",
     "subscribed": "Geabonneerd",
     "invoiceHistory": "Factuurgeschiedenis",
     "amount": "Bedrag",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "AWS-abonnement koppelen mislukt.",
     "failedToLinkAzureSubscription": "Azure-abonnement koppelen mislukt.",
     "last15Minutes": "Laatste 15 minuten",
-    "licenseHasExpired": "Uw licentie is verlopen.",
     "numberOfPipelines": "Aantal pipelines",
     "oneDayUntilLicenseExpires": "Nog 1 dag voordat uw licentie verloopt.",
     "pleaseWaitProcessingRequest": "Even geduld terwijl we uw verzoek verwerken...",
@@ -12660,6 +12696,8 @@
       "noDestinationNote": "Optioneel. Het alarm wordt nog steeds uitgevoerd en de geschiedenis wordt vastgelegd, maar er wordt geen bestemming op de hoogte gebracht.",
       "sendsToStatus": "Stuurt naar {targets} elke keer dat het alarm afgaat.",
       "oncallTeamTarget": "een piketteam",
+      "lockedWorkflowFallback": "Vergrendelde workflow",
+      "lockedTargetBadge": "Vergrendeld",
       "createsIncident": "Maakt incident aan",
       "createsIncidentTooltip": "Als een alarm een incident kan aanmaken, verstuurt het geen aparte melding. In plaats daarvan wordt een melding voor het incident verzonden wanneer een nieuw incident wordt aangemaakt of wanneer een nieuw alarmtype zich bij een bestaand incident voegt.",
       "incidentTitleTemplate": "Incidenttitel",
@@ -12901,6 +12939,9 @@
       "lastTrained": "Laatst getraind",
       "level": "Niveau",
       "lookBackWindow": "Kijk terug naar het venster",
+      "scheduleIntervalFloor": "Het controle-interval moet minimaal {min} zijn.",
+      "lookBackWindowCap": "Het terugkijkvenster mag bij deze detectieresolutie maximaal {max} zijn: een langer venster bevat meer dan 100.000 buckets. Verkort het venster of gebruik een langere detectieresolutie.",
+      "retrainOnEditNote": "Als je de query, de functie of de detectieresolutie wijzigt, wordt deze detector opnieuw getraind. Detectie wordt gepauzeerd tot de training is afgerond.",
       "lookBackWindowFloor": "Terugkijkvenster moet minimaal {min} zijn — Controleer elke plus één Detectieresolutie. Een korter venster kan geen volledige bucket bevatten wanneer de eerste uitvoering afgaat, dus die uitvoering zou buckets overslaan.",
       "lookBackWindowLegacy": "Dit opgeslagen venster ligt onder het minimum van {min} (Controleer elke plus één Detectieresolutie). Het wordt ongewijzigd opgeslagen, maar een eerste uitvoering kan buckets overslaan totdat het venster wordt verhoogd.",
       "lookBackWindowMinimum": "Minstens {min}; voor deze instellingen wordt {recommended} of meer aanbevolen.",
@@ -12913,6 +12954,9 @@
       "noDestinationsFound": "Geen bestemmingen gevonden",
       "noDetectionResults": "Nog geen detectieresultaten in dit bereik",
       "noFieldsFound": "Geen velden gevonden",
+      "checkDataNow": "Nu controleren",
+      "checkDataNowTooltip": "De huidige gegevens nu opnieuw evalueren in plaats van te wachten op de volgende automatische controle.",
+      "dataReadinessReason": "Reden",
       "noticeRetrain": "Automatische hertraining",
       "noticeRetrainTooltip": "Het opgeslagen model kon na een upgrade niet worden gelezen, dus het is weggegooid en de configuratie is automatisch in de wachtrij voor hertraining geplaatst. Er is geen actie nodig; de detectie wordt hervat zodra de training is voltooid.",
       "noticeSkipAbsence": "De beoordeling van afwezigheid liep achter op het Terugkijkvenster; de span die niet meer kon worden opgehaald, is overgeslagen en vastgelegd.",
@@ -12947,6 +12991,8 @@
       "autoUntrainedHelp": "Automatisch wordt een niveau geleerd uit je geschiedenis.",
       "autoTrainingHelp": "Het niveau verschijnt zodra de training is voltooid.",
       "autoFailedHelp": "Training mislukt. Nog geen geleerd niveau. Bekijk de trainingsfout hierboven.",
+      "autoWaitingForDataHelp": "Nog niet genoeg geschikte trainingsgegevens. Tot die tijd geen geleerd niveau. De detector blijft ingeschakeld en wordt automatisch opnieuw gecontroleerd.",
+      "autoNotApplicableHelp": "De huidige gegevens ondersteunen geen anomaliemodel. Dit is geen fout. De detector blijft ingeschakeld en wordt automatisch opnieuw gecontroleerd.",
       "autoRetrainingHelp": "Opnieuw trainen. Het laatst geleerde niveau wordt getoond; de beschikbaarheid van het model is niet bevestigd.",
       "autoRetrainFailedHelp": "Opnieuw trainen mislukt. Het laatst geleerde niveau wordt getoond; de beschikbaarheid van het model is niet bevestigd. Bekijk de trainingsfout hierboven.",
       "autoUnconfirmedHelp": "Het laatst geleerde niveau wordt getoond; een actief model is niet bevestigd.",
@@ -13184,6 +13230,7 @@
     "oncallTeamPlaceholder": "Routeren vanuit eigenaarsregels",
     "oncallTeamTooltip": "Welk team dit alarm oproept. Laat dit leeg om het team af te leiden uit de identiteitsdimensies van het alarm — wat normaal is. Stel pas een team in als die dimensies de eigenaar niet kunnen uitdrukken.",
     "oncallTeamNoTeams": "Nog geen piket-teams. Maak er een aan onder Piket-teams.",
+    "lockedTeamFallback": "Vergrendeld team",
     "oncallTeamAtFireTime": "Vanuit eigenaarsregels",
     "oncallTeamFromRules": "Er is geen team ingesteld op dit alarm, dus de eigenaar wordt bepaald aan de hand van de identiteitsdimensies van de rij die afgaat. Die zijn pas bekend wanneer dat gebeurt.",
     "tags": "Labels",
@@ -14549,6 +14596,7 @@
     "separator_placeholder": "Voer scheidingsteken in (bijv. {'|'}, \\n, \\t, spatie)",
     "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Laat op standaard staan om het standaard {type}-sjabloon ({name}) te gebruiken, of kies een aangepast sjabloon.",
     "loadingData": "Bestemmingsgegevens laden...",
     "noEmailTemplates": "Het lijkt erop dat u nog geen e-mailsjablonen heeft aangemaakt.",
@@ -15485,6 +15533,20 @@
       "azureCredentials": "Azure-referenties",
       "awsRoleArn": "AWS Role ARN"
     },
+    "dataRetentionDefaults": {
+      "title": "Standaardwaarden voor gegevensretentie",
+      "about": "Voor streams zonder eigen retentie. Leeg of 0 gebruikt de globale waarde; anders ten minste 3 dagen.",
+      "defaultDays": "Standaard (dagen)",
+      "streamType": "Streamtype",
+      "days": "Dagen",
+      "addType": "Streamtype toevoegen",
+      "removeType": "Dit streamtype verwijderen",
+      "globalDefault": "Globaal: {value}",
+      "globalType": "Globaal {type}: {value}",
+      "daysValue": "{days} dagen",
+      "forever": "voor altijd bewaren",
+      "invalid": "Gebruik 0 of minimaal 3 dagen"
+    },
     "organizationSettings": {
       "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",
       "settingsUpdated": "Organisatie-instellingen succesvol bijgewerkt",
@@ -15514,9 +15576,7 @@
     },
     "licensePage": {
       "unexpectedError": "onverwachte fout",
-      "daysRemaining": "{days} dagen resterend tot uw licentie verloopt",
-      "oneDayRemaining": "1 dag resterend tot uw licentie verloopt",
-      "licenseExpired": "Uw licentie is verlopen"
+      "daysRemaining": "{days} dagen resterend tot uw licentie verloopt"
     },
     "nodesPage": {
       "subtitle": "Clusterknooppunten en hun status",
@@ -23025,7 +23085,9 @@
         "ready": "Gereed",
         "running": "Bezig",
         "training": "Training",
-        "waiting": "Wachtend"
+        "waiting": "Wachtend",
+        "waitingForData": "Wachten op gegevens",
+        "notApplicable": "Niet van toepassing"
       },
       "anomalyStatus": {
         "active": "Actief",
@@ -23033,7 +23095,9 @@
         "training": "Training",
         "failed": "Mislukt",
         "waiting": "Wachtend",
-        "disabled": "Uitgeschakeld"
+        "disabled": "Uitgeschakeld",
+        "waitingForData": "Wachten op gegevens",
+        "notApplicable": "Niet van toepassing"
       },
       "aiToolsetKind": {
         "skill": "Vaardigheid",
@@ -23396,7 +23460,6 @@
     },
     "login": {
       "somethingWentWrong": "Er is iets misgegaan",
-      "thankYouForYourFeedback": "Bedankt voor je feedback",
       "selectedSuggestion": "Geselecteerde suggestie \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Vul alle velden in en probeer het opnieuw.",
       "invalidUsernameOrPassword": "Ongeldige gebruikersnaam of wachtwoord",
@@ -24130,6 +24193,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Aan de slag",
     "reportDetail": "Rapport",
     "sharedChat": "Gedeelde chat",
     "passwordPolicy": "Wachtwoordbeleid",
@@ -26855,10 +26919,6 @@
     "saveScheduleFailed": "Kon het rooster niet opslaan",
     "policy": "Escalatiebeleid",
     "policyIfNoAck": "Als niemand bevestigt, na",
-    "policyRepeatTimes": "Voer de ladder één keer uit | Voer de ladder {count} keer uit",
-    "policyFinalStop": "en stop dan",
-    "policyFinalNotifyDefault": "en stel het standaardteam op de hoogte",
-    "policyNoDefaultTeam": "Er is geen standaardteam aangewezen, dus dit is hetzelfde als stoppen. Wijs er een aan op het tabblad Routering.",
     "policyPrioritySilent": "{priority} roept niemand op. Voeg een stap toe om dat te veranderen — stilte is hier een beslissing, geen omissie.",
     "policyDoneEditing": "Klaar met bewerken",
     "policyHint": "Wie er bij elke prioriteit wordt opgeroepen, en na hoe lang. Dit zijn standaardinstellingen - je kunt ze aanpassen.",
@@ -27338,9 +27398,6 @@
     "policyP1ParallelHint": "Niemand wacht vijf minuten om te ontdekken dat de site down is.",
     "policyP4Pages": "Stuur ook een oproep voor deze prioriteit",
     "policyP4PagesHint": "Standaard uit — een P4 die iemand wakker maakt is een bug in de ernstclassificatie.",
-    "policyFinalAction": "Als niemand bevestigt",
-    "policyFinal_notifyDefaultTeam": "Stel het standaardteam op de hoogte",
-    "policyFinal_stop": "Stoppen",
     "policySummaryTitle": "Wat dit beleid nu doet",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "allemaal tegelijk",
@@ -27593,7 +27650,6 @@
     "ladderL0Off": "Geen AI SRE",
     "ladderStaleDefaultTag": "Ladder heeft de rotaties niet overgenomen",
     "ladderStaleDefaultHint": "Elk niveau roept het hele team op, maar dit team heeft rotaties — de ladder is gemaakt vóórdat ze bestonden. Het toevoegen of verwijderen van een lid voert de standaard opnieuw uit, of bewerk de ladder een keer met de hand.",
-    "ladderEndsHandsOff": "De oproep wordt overgedragen",
     "reachShortNoSmtp": "alleen e-mail · geen SMTP-transport",
     "reachShortNoFromAddress": "alleen e-mail · geen afzenderadres",
     "reachShortNoAddress": "geen adres opgeslagen",
@@ -27719,7 +27775,6 @@
     "ladderEvery": "· elke {duration}",
     "ladderEnd": "einde",
     "ladderEndUnknown": "Er is niets meer gepland.",
-    "ladderEndsDefaultTeam": "De treden zijn op — het standaardteam is op de hoogte gesteld.",
     "rungLost": "mislukt",
     "rungLostTimes": "mislukt ×{count}",
     "routingDetails": "Routeringsdetails",
@@ -27734,7 +27789,6 @@
     "policyStepsSection": "Escalatiestappen",
     "policyChipSteps": "{count} stap | {count} stappen",
     "policyAddStep": "Stap toevoegen",
-    "policyWhenStepsRunOut": "Wanneer de stappen op zijn",
     "policyAppliesToNewPages": "Wijzigingen gelden alleen voor nieuwe oproepen.",
     "policySave": "Opslaan",
     "policyFix": "Herstellen",
@@ -27744,9 +27798,6 @@
     "policyEmailLockedBySlack": "E-mail blijft aan bij Slack: mensen zonder gekoppeld Slack-account krijgen de e-mail nog steeds.",
     "policyNoProvider": "Er is geen telefonieprovider verbonden, dus SMS en Spraak worden overgeslagen en deze piketoproepen gaan per e-mail.",
     "policyNoProviderLink": "Verbind er een via Instellingen → Telefonie",
-    "policyEndOptionStop": "Eenmalig uitvoeren, dan stoppen | {count} keer uitvoeren, dan stoppen",
-    "policyEndOptionHandOff": "Eenmalig uitvoeren, dan overdragen aan het catch-all-team | {count} keer uitvoeren, dan overdragen aan het catch-all-team",
-    "policyEndOptionHandOffTo": "Eén keer uitvoeren en daarna overdragen aan {team} | {count} keer uitvoeren en daarna overdragen aan {team}",
     "policyDeliveryTitle": "Bezorging",
     "policyTodayIs": "vandaag: {who}",
     "policyPeopleCount": "{count} persoon | {count} personen",
@@ -27868,6 +27919,12 @@
     "ruleEditorTakesFrom": "Neemt alarmen over van {team}",
     "ruleEditorKeptBy": "{team} houdt deze alarmen: de eigen regel is specifieker",
     "ruleEditorContends": "Concurreert met een regel voor {team}: de specifiekere wint",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} meer",
+    "ruleEditorFieldsHelp": "Velden komen uit je correlatie-veldgroepen. {link}",
+    "ruleEditorFieldsSource": "Velden komen uit je correlatie-veldgroepen.",
+    "ruleEditorManageFieldGroups": "Veldgroepen beheren",
+    "ruleEditorDuplicatePath": "{team} heeft al een regel voor precies deze voorwaarden. Bewerk in plaats daarvan die regel.",
+    "ruleEditorDuplicatePathSameTeam": "Dit team heeft al een regel voor precies deze voorwaarden.",
     "routingTestRouting": "Routering testen",
     "routingTabNeedsOwnerPlain": "Heeft een eigenaar nodig",
     "simulatorStartFrom": "Begin bij",
@@ -29650,6 +29707,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Logs, metrieken en traces van elke Linux-server.",
+      "windows": "Gebeurtenislogs en metrieken van Windows-servers.",
+      "macos": "Logs en metrieken van Mac-machines.",
+      "aws": "Logs en metrieken van je AWS-services.",
+      "googleCloud": "Logs van je {gcp}-projecten, via een {pubSub}-pushabonnement.",
+      "azure": "Activiteitenlogs van je {azure}-abonnement, via {eventHub}.",
+      "postgresql": "Metrieken voor query's, verbindingen en replicatie.",
+      "mysql": "Metrieken voor query's, verbindingen en InnoDB.",
+      "mongodb": "Metrieken voor bewerkingen, verbindingen en cache.",
+      "redis": "Metrieken voor geheugen, opdrachten en keyspace.",
+      "sqlServer": "Metrieken voor query's, wachttijden en buffers.",
+      "oracle": "Metrieken voor sessies, tablespaces en resource-limieten.",
+      "mariadb": "Metrieken voor query's, verbindingen en InnoDB.",
+      "elasticsearch": "Gezondheid van clusters, indexen en nodes.",
+      "cassandra": "Lees-, schrijf- en compactiemetrieken.",
+      "dynamodb": "Itemwijzigingen (inserts, updates, deletes) als logs, via {kinesisFirehose}.",
+      "snowflake": "Gebruik van warehouse, query's en credits.",
+      "databricks": "Notebooklogs, verzonden via de logs-API.",
+      "couchdb": "Request-, database- en replicatiemetrieken.",
+      "aerospike": "Namespace-, node-, geheugen- en verbindingsmetrieken.",
+      "sapHana": "Geheugen-, CPU- en servicemetrieken.",
+      "zookeeper": "Latentie-, verbindings- en nodemetrieken.",
+      "nginx": "Toegangs- en foutlogs, gevolgd door {fluentBit}.",
+      "apache": "Toegangs- en foutlogs, gevolgd door {fluentBit}.",
+      "iis": "Requestlogs, gevolgd door {fluentBit}.",
+      "kafka": "Broker-, topic- en consumer-lagmetrieken.",
+      "rabbitmq": "Wachtrijdiepte, berichtsnelheid en nodemetrieken.",
+      "nats": "Verbindings-, bericht- en streammetrieken.",
+      "prometheus": "Stuur de metrieken die je al scrapet, via remote write.",
+      "telegraf": "Stuur metrieken vanaf een agent die je al draait.",
+      "opentelemetryCollector": "Laat een collector die je al draait hierheen sturen.",
+      "cloudwatch": "Stuur metrieken vanuit je AWS-account.",
+      "gpu": "Gebruik, geheugen en temperatuur per {nvidia}-GPU.",
+      "networkFlows": "Verkeersstromen tussen je hosts en netwerken.",
+      "fluentBit": "Lichtgewicht logforwarder voor hosts en Kubernetes.",
+      "fluentd": "Logcollector met een uitgebreide set plug-ins.",
+      "vector": "Snelle pipeline voor logs en metrieken.",
+      "filebeat": "Verzend logbestanden met een lichte agent.",
+      "logstash": "Stuur logs vanuit een bestaande pipeline.",
+      "syslogNg": "Stuur syslog door vanaf je servers.",
+      "loongcollector": "Agent voor logs en metrieken voor hosts en containers.",
+      "splunkHec": "Laat je HTTP Event Collector-afzenders zoals ze zijn.",
+      "cribl": "Routeer gegevens vanuit de pipelines die je al draait.",
+      "kinesisFirehose": "Stuur logs door vanuit een delivery stream in AWS.",
+      "googleCloudLogs": "Exporteer logs uit je projecten via een log sink.",
+      "okta": "Aanmeld- en admin-auditgebeurtenissen.",
+      "office365": "Mail-, bestands- en admin-auditlogs.",
+      "googleWorkspace": "Login- en admin-auditlogs.",
+      "falco": "Runtime-beveiligingsalarmen uit containers.",
+      "osquery": "Endpointstatus als logs die je kunt doorzoeken.",
+      "jumpcloud": "Directory- en logingebeurtenissen.",
+      "openvpn": "VPN-verbindings- en sessielogs.",
+      "githubActions": "Logs van workflow-runs en taken.",
+      "jenkins": "Buildlogs en pipelinegebeurtenissen.",
+      "terraform": "Plan- en apply-logs van je runs.",
+      "ansible": "Logs en resultaten van playbook-runs.",
+      "vercel": "Deployment- en functielogs.",
+      "heroku": "App- en routerlogs uit een log drain.",
+      "airflow": "DAG-runlogs en taakmetrieken.",
+      "airbyte": "Logs en status van synchronisatietaken.",
+      "languageTile": "Traces met de {otel}-SDK, met automatische instrumentatie waar je taal dat ondersteunt.",
+      "aiIntegration": "Traces van de calls van je AI-app, met tokens en kosten voor modelaanroepen."
+    },
+    "skipToApp": "Naar de app",
+    "chooseTitle": "Wat wil je als eerste monitoren?",
+    "back": "Terug",
+    "searchGuides": "Zoek in {count} gids | Zoek in {count} gidsen",
+    "showMore": "Toon {count} meer | Toon {count} meer",
+    "noMatch": "Geen gids komt hier overeen met \"{query}\".",
+    "foundElsewhere": "Gevonden in andere keuzes:",
+    "inChoice": "in {choice}",
+    "tryShorter": "Probeer een kortere naam. Elke tool kan ook {link}.",
+    "sendOverHttp": "logs via HTTP verzenden",
+    "clearSearch": "Zoekopdracht wissen",
+    "othersTitle": "Andere manieren om te beginnen",
+    "whatYouGet": "Wat je krijgt",
+    "signals": {
+      "metrics": "Metrieken",
+      "logs": "Logs",
+      "traces": "Traces",
+      "profiles": "Profielen",
+      "sessions": "Sessies",
+      "errors": "Fouten",
+      "webVitals": "Web vitals (web)",
+      "replays": "Sessie-replays",
+      "tokens": "Tokens",
+      "cost": "Kosten",
+      "latency": "Latentie",
+      "uptime": "Uptime",
+      "certificates": "Certificaten"
+    },
+    "example": {
+      "caption": {
+        "row": "Voorbeeldscherm: wat {product} toont voor {name}.",
+        "infrastructure": "Voorbeeldscherm: een overzicht van een {k8s}-cluster met CPU, geheugen en podstatus.",
+        "backend": "Voorbeeldscherm: de waterfall van een mislukte checkout-trace, met 21 spans over 9 services.",
+        "frontend": "Voorbeeldscherm: {rum} web vitals uit echte gebruikerssessies.",
+        "logs": "Voorbeeldscherm: een logzoekopdracht met een histogram en de overeenkomende logregels.",
+        "llm": "Voorbeeldscherm: {insights} met kosten, tokens en latentie per model, plus traces en fouten in de tijd.",
+        "agent": "Voorbeeldscherm: de {mcp}-serverpagina waarmee je coding agent verbinding maakt.",
+        "synthetics": "Voorbeeldscherm: resultaten voor één {http}-check op 3 locaties."
+      }
+    },
+    "guide": {
+      "agentTitle": "Liever een coding agent?",
+      "agentSteps": "Voer dit uit in je terminal en geef {claudeCode}, {cursor} of {codex} vervolgens de prompt of het bestand.",
+      "copyPrompt": "Prompt kopiëren",
+      "downloadFile": "Download .md",
+      "inviteTitle": "Geen toegang?",
+      "inviteText": "Nodig een teamgenoot uit die het commando kan uitvoeren.",
+      "inviteAction": "Teamgenoot uitnodigen",
+      "loadFailed": "Deze gids is niet geladen.",
+      "openInApp": "Open het in Gegevensbronnen",
+      "languageText": "Voeg voor {language} de {otelSdk} toe, met automatische instrumentatie waar {language} die heeft, en richt hem vervolgens op {product} met de onderstaande instellingen.",
+      "languageLink": "{otel} {language}-gids"
+    },
+    "rail": {
+      "label": "Voortgang instellen",
+      "check": "Controleer je gegevens",
+      "received": "Gegevens ontvangen",
+      "attention": "Vraagt aandacht",
+      "waitingShort": "Wachten op gegevens",
+      "title": "{name} instellen",
+      "run": "Voer de installatieopdracht uit",
+      "explore": "Verken je gegevens"
+    },
+    "firstData": {
+      "title": "Je gegevens komen binnen",
+      "count": "{count} record is aangekomen in {stream} | {count} records zijn aangekomen in {stream}",
+      "exploreLogs": "Verken je logs",
+      "exploreMetrics": "Verken je metrieken",
+      "exploreTraces": "Verken je traces",
+      "exploreProfiles": "Verken je profielen",
+      "addAnother": "Nog een bron toevoegen"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Synthetische checks",
+        "description": "Controleer een website, API, poort of certificaat. Geen installatie.",
+        "gets": "Voer checks volgens schema uit van buiten je netwerk."
+      },
+      "invite": {
+        "name": "Nodig een teamgenoot uit om in te stellen",
+        "description": "Zij ontvangen een uitnodiging voor je organisatie."
+      },
+      "agent": {
+        "name": "Instellen met je coding agent",
+        "description": "Geef {claudeCode}, {cursor} of {codex} één prompt.",
+        "gets": "Je coding agent voegt de installatie toe en controleert of er gegevens binnenkomen."
+      }
+    },
+    "agentLink": "Of laat je coding agent het doen",
+    "stepDone": "(gereed)",
+    "agent": {
+      "crumb": "Coding agent",
+      "title": "Instellen met je coding agent",
+      "lead": "{claudeCode}, {cursor}, {codex} of een andere coding agent leest je project, voegt de installatie toe en controleert of er gegevens zijn aangekomen. Die vraagt je om toestemming voordat er iets wordt geïnstalleerd of deploymentbestanden worden gewijzigd.",
+      "tokenTitle": "Bewaar je token",
+      "tokenText": "Voer dit uit in de terminal waar je je coding agent start, voordat je die start.",
+      "powerShell": "In {powerShell}:",
+      "copyPowerShell": "Kopieer de {powerShell}-opdracht",
+      "promptTitle": "Kopieer de prompt",
+      "focusLabel": "Instellen",
+      "focus": {
+        "kubernetes": "{k8s}-cluster",
+        "host": "{linux}-, {macos}- of {windows}-host",
+        "backend": "Backendservice ({otel})",
+        "llm": "LLM-app",
+        "frontend": "Webfrontend",
+        "logs": "Alleen logs"
+      },
+      "copyPrompt": "Prompt kopiëren",
+      "promptCopied": "Prompt gekopieerd",
+      "download": "Download .md",
+      "preview": "Bekijk de prompt",
+      "previewLines": "{count} regel | {count} regels",
+      "pasteTitle": "Plak het in je coding agent",
+      "other": "Overig",
+      "hint": {
+        "claudeCode": "Voer in dezelfde terminal {command} uit in je projectmap en plak daarna de prompt.",
+        "cursor": "Start {product} vanuit dezelfde terminal met {command}, zodat het de token kan lezen. Plak daarna de prompt in de chat.",
+        "codex": "Voer in dezelfde terminal {command} uit in je projectmap en plak daarna de prompt.",
+        "other": "Start je coding agent vanuit dezelfde terminal, zodat die de token kan lezen. Plak daarna de prompt, of geef die {file}."
+      },
+      "mcp": "Verbind de {mcp}-server zodat je coding agent je gegevens kan lezen",
+      "aside": {
+        "eyebrow": "Wat de prompt je coding agent vertelt",
+        "title": "Kleine, veilige wijzigingen",
+        "line1": "Ontdek wat het project draait",
+        "line2": "Maak de kleinste werkende wijziging",
+        "line3": "Houd de token in de omgeving",
+        "line4": "Stuur één testgebeurtenis naar stream {stream}",
+        "line5": "Rapporteer welke bestanden zijn gewijzigd"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Doorgaan naar instellen",
+      "languages": "Talen",
+      "languagesRequired": "Kies minstens één taal.",
+      "kubernetesCluster": {
+        "question": "Kies wat je uit je cluster wilt verzamelen",
+        "off": {
+          "name": "Logs en metrieken",
+          "description": "Clusterstatus en containerlogs. Eén commando.",
+          "about": "Containerlogs, CPU en geheugen van elke node en pod, en {k8s}-gebeurtenissen als logs, met één installatiecommando."
+        },
+        "ebpf": {
+          "name": "Traces toevoegen met eBPF",
+          "description": "Geen codewijzigingen, elke taal. Vereist Linux-kernel 5.8+ op je nodes.",
+          "about": "Dezelfde installatie, plus traces. De collector ziet requests vanuit de Linux-kernel, dus je apps veranderen niet. Hij koppelt een request tussen services alleen via gewoon HTTP."
+        },
+        "library": {
+          "name": "Traces toevoegen met taalbibliotheken",
+          "description": "Meer detail per app. Kies je talen en herstart je apps één keer.",
+          "about": "Dezelfde installatie, plus traces. De {otelOperator} voegt de {otelLibrary} voor elke taal toe aan de pods in de naamruimten die je kiest. Je code verandert niet."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Webservers",
+      "messageQueues": "Berichtwachtrijen",
+      "metricsYouCollect": "Metrieken die je al verzamelt",
+      "gpuAndNetwork": "GPU en netwerkstromen",
+      "movingFromAnotherTool": "Overstappen van een andere tool",
+      "cloudLogs": "Cloudlogs",
+      "securityTools": "Beveiligingstools",
+      "cicdAndPlatforms": "CI/CD en platformen"
+    },
+    "infrastructure": {
+      "name": "Infrastructuur",
+      "description": "Servers, {k8s}, cloudaccounts en databases",
+      "gets": "Bekijk elke host, pod en cloudservice op één plek.",
+      "question": "Hoe wil je je infrastructuur monitoren?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s}-cluster",
+          "description": "Logs, metrieken en {k8s}-gebeurtenissen met één installatie. Traces met nog één commando.",
+          "about": "Installeert de {productCollector} in je cluster met één commando. Je krijgt containerlogs, {k8s}-gebeurtenissen en clustermetrieken."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}-, {windows}- of {macos}-host",
+          "description": "Installeer de {productAgent} als service",
+          "about": "Eén agent verzamelt logs en metrieken van de host. Op {linux} kan hij ook programma's tracen zonder codewijzigingen.",
+          "question": "Welk besturingssysteem heeft je host?"
+        },
+        "cloudAccount": {
+          "name": "Cloudaccount",
+          "description": "{aws}, {gcp} of {azure}",
+          "about": "Streamt logs uit je cloudaccount en metrieken uit {aws}. Er draait niets op je servers.",
+          "question": "In welke cloud staat je account?"
+        },
+        "databases": {
+          "name": "Databases",
+          "description": "{examples} en nog {count}",
+          "about": "Verzamelt databasemetrieken, meestal via de {otelCollector}.",
+          "question": "Welke database wil je monitoren?"
+        },
+        "somethingElse": {
+          "name": "Iets anders",
+          "description": "Webservers, berichtwachtrijen, {prometheus}, GPU en netwerkstromen",
+          "about": "Webservers, berichtwachtrijen, metrieken die je al verzamelt, GPU-gebruik en netwerkstromen.",
+          "question": "Wat wil je nog meer monitoren?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Backendapplicaties",
+      "description": "Traces van je services en logs waar je SDK ze naartoe stuurt",
+      "gets": "Zie hoe elk request door je services beweegt.",
+      "question": "Hoe wil je je services tracen?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Voeg een bibliotheek toe aan je code",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} of {fastapi}",
+          "about": "Voegt de {otelLibrary} toe voor je taal. Traces gaan naar {product}.",
+          "question": "In welke taal is je service geschreven?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s}-workloads, geen codewijzigingen",
+          "description": "Auto-instrumentatie binnen je cluster",
+          "about": "De {otelOperator} voegt instrumentatie toe aan de pods in één namespace. Geen wijziging aan code of image."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Elke taal met {otel}",
+          "description": "Verstuur OTLP vanuit je eigen setup",
+          "about": "Richt elke {otelSdk} of collector op je {product}-endpoint."
+        },
+        "continuousProfiling": {
+          "name": "Continue profilering",
+          "description": "CPU- en geheugenprofielen",
+          "about": "Stuurt profielen van je profilers ({go}, {java}, {rust} of de eBPF-profiler) door via de {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Frontend- en mobiele apps",
+      "description": "Real user monitoring voor web en mobiel",
+      "gets": "Zie wat echte gebruikers ervaren in je web- en mobiele apps.",
+      "question": "Waar draait je app?",
+      "rows": {
+        "browser": {
+          "name": "Browser",
+          "description": "Websites en webapps",
+          "about": "Voegt de {sdk} toe aan je webapp. Je krijgt paginaweergaven, fouten en sessies van echte browsers."
+        },
+        "reactNative": {
+          "description": "{ios} en {android} vanuit één codebase",
+          "about": "Voegt de {sdk} toe aan je {platform}-app."
+        },
+        "android": {
+          "description": "Native {android}-apps",
+          "about": "Voegt de {sdk} toe aan je {platform}-app. Je krijgt sessies, schermweergaven, fouten en crashes."
+        },
+        "ios": {
+          "description": "Native {ios}-apps",
+          "about": "Voegt de {sdk} toe aan je {platform}-app. Je krijgt sessies, schermweergaven, fouten en crashes."
+        }
+      }
+    },
+    "logs": {
+      "name": "Logs uit elke bron",
+      "description": "Verstuur logs vanuit elke logshipper, service of tool",
+      "gets": "Doorzoek en filter elke logregel, ongeacht wat die verstuurt.",
+      "question": "Hoe wil je je logs versturen?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Vanuit een logshipper die je draait",
+          "description": "{examples} en nog {count} meer",
+          "about": "Richt de logshipper die je al draait op {product}. Geen nieuwe agent.",
+          "question": "Welke logshipper draai je?"
+        },
+        "overHttpWithCurl": {
+          "name": "Via HTTP met {curl}",
+          "description": "Eén verzoek vanuit elk script. Geen installatie.",
+          "about": "Verstuur JSON-logs vanuit elk script of elke service met één HTTP-verzoek."
+        },
+        "fromOpentelemetry": {
+          "name": "Vanuit {otel}",
+          "description": "OTLP-logs van een SDK of een collector",
+          "about": "Verstuur logs via OTLP vanuit een {otelSdk} of collector."
+        },
+        "somethingElse": {
+          "name": "Iets anders",
+          "description": "{splunk} of {cribl}, cloudlogs, beveiligingstools en CI/CD",
+          "about": "Stap over van {splunk} of {cribl}, of verzamel logs uit je cloud, beveiligingstools en CI/CD.",
+          "question": "Waar komen je logs nog meer vandaan?"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM- en AI-apps",
+      "description": "Trace LLM-aanroepen, agents en tools",
+      "gets": "Zie elke LLM-aanroep, toolaanroep en agentstap.",
+      "question": "Wat gebruikt je AI-app?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents of {assistantsApi}",
+          "about": "Traceert elke aanroep via de {openaiSdk}, met tokens, kosten en latentie.",
+          "question": "Welke {openai}-bibliotheek gebruik je?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} of {claudeAgentSdk}",
+          "about": "Traceert elke aanroep via de {anthropicSdk}, met tokens, kosten en latentie.",
+          "question": "Welke {anthropic}-bibliotheek gebruik je?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chains, agents en graphs",
+          "about": "Traceert elke chain, agentstap en tool-aanroep.",
+          "question": "Welke {langchain}-bibliotheek gebruik je?"
+        },
+        "somethingElse": {
+          "name": "Iets anders",
+          "description": "Andere frameworks, modelproviders, gateways en tools",
+          "about": "Frameworks, modelproviders, gateways, no-code tools, analytics en tools.",
+          "question": "Wat gebruikt je AI-app?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Fleetbeheer",
     "subtitle": "Registreer OpenTelemetry-collectors, beheer versies van hun configuraties en rol wijzigingen veilig uit",
@@ -30312,6 +30750,171 @@
       "receiverEvidence": "Geweigerd door de receiver {receiver}",
       "legend": "Pipelinestatus",
       "legendToggle": "Deze status op de kaart tonen of verbergen"
+    }
+  },
+  "sampleData": {
+    "delete": "Voorbeeldgegevens verwijderen",
+    "loadForbidden": "Je hebt schrijftoegang tot deze organisatie nodig om voorbeeldgegevens te laden.",
+    "steps": {
+      "functions": "Functies maken",
+      "pipeline": "Een realtime pipeline maken",
+      "telemetry": "Logs, traces en metrieken genereren en verzenden",
+      "dashboards": "Dashboards maken",
+      "alerts": "Alarmen maken",
+      "enrichment": "De tabel met service-eigenaren uploaden"
+    },
+    "progress": {
+      "loading": "Voorbeeldgegevens laden…",
+      "done": "Voorbeeldgegevens geladen",
+      "counts": "{logs} logrecords · {spans} spans · {metrics} metriekpunten",
+      "skipped": "Overgeslagen",
+      "logs": "Logs",
+      "spans": "Spans",
+      "metrics": "Metriekpunten"
+    },
+    "removeSteps": {
+      "alerts": "Alarmen",
+      "alertDelivery": "Alarmsjabloon en webhook",
+      "dashboards": "Dashboards",
+      "pipeline": "Pipeline",
+      "functions": "Functies",
+      "streams": "Streams"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Voorbeeldgegevens verwijderen",
+        "body": "Dit duurt een paar seconden. Je kunt dit dialoogvenster sluiten, maar houd dit tabblad open tot het klaar is.",
+        "label": "Voorbeeldgegevens verwijderen…"
+      },
+      "done": {
+        "title": "Voorbeeldgegevens verwijderd",
+        "body": "De server is over een paar minuten klaar met het verwijderen van de opgeslagen gegevens. Daarna kun je weer voorbeeldgegevens laden.",
+        "label": "Verwijderen voltooid",
+        "done": "Klaar",
+        "keptLabel": "Behouden, omdat iets anders ze gebruikt:"
+      },
+      "failed": {
+        "title": "Kon niet alle voorbeeldgegevens verwijderen",
+        "body": "Probeer opnieuw: items die al weg zijn, worden overgeslagen.",
+        "label": "Verwijderen gestopt",
+        "close": "Sluiten",
+        "tryAgain": "Opnieuw proberen"
+      }
+    },
+    "removeConfirm": {
+      "title": "Voorbeeldgegevens verwijderen?",
+      "message": "Dit verwijdert de voorbeeldstreams, -dashboards, -alarmen, -functies en de verrijkingstabel. Je eigen gegevens worden niet aangeraakt."
+    },
+    "toast": {
+      "loaded": "Voorbeeldgegevens geladen. Veel plezier met verkennen!",
+      "loadFailed": "Kon voorbeeldgegevens niet laden",
+      "removed": "Voorbeeldgegevens verwijderd",
+      "removedWithKept": "Voorbeeldgegevens verwijderd. {count} voorbeelditem blijft omdat iets anders het gebruikt. | Voorbeeldgegevens verwijderd. {count} voorbeelditems blijven omdat iets anders ze gebruikt.",
+      "removeFailed": "Kon niet alle voorbeeldgegevens verwijderen",
+      "removeWhileLoading": "Wacht tot de voorbeeldgegevens klaar zijn met laden."
+    },
+    "entry": {
+      "onboardingSource": "Voorbeeldgegevens verkennen"
+    },
+    "callout": {
+      "title": "Nog niet klaar om gegevens te versturen?",
+      "body": "Verken {product} eerst met een voorbeeldwebwinkel: een incident dat gaande is, en een rondleiding langs dashboards, alarmen, logs, traces, metrieken en pipelines.",
+      "cta": "Verkennen met voorbeeldgegevens"
+    },
+    "header": {
+      "label": "Voorbeeldgegevens",
+      "try": "Voorbeeldgegevens proberen",
+      "finish": "Laden voltooien"
+    },
+    "dock": {
+      "details": "Details tonen"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "Je eigen gegevens komen binnen. Verwijder de voorbeeldgegevens zodat ze niet vermengd raken met je dashboards, alarmen en zoekopdrachten.",
+        "keep": "Voorlopig bewaren",
+        "remove": "Voorbeeldgegevens verwijderen"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Op de achtergrond doorgaan",
+      "progress": {
+        "title": "Je voorbeeldwinkel wordt opgebouwd",
+        "body": "Dit duurt ongeveer een minuut. Je kunt dit dialoogvenster sluiten, maar houd dit tabblad open tot het laden klaar is."
+      },
+      "ready": {
+        "title": "Je voorbeeldwinkel is live",
+        "startTour": "Start de rondleiding",
+        "ownWay": "Zelf verkennen"
+      },
+      "errorBody": "Er is iets misgegaan tijdens het laden. Probeer het opnieuw: dashboards en alarmen die al bestaan worden hergebruikt, niet gedupliceerd."
+    },
+    "tour": {
+      "label": "Rondleiding",
+      "position": "Rondleiding · stap {current} van {total}",
+      "pill": "Rondleiding {current}/{total}",
+      "done": "Rondleiding voltooid",
+      "stepFailed": "Kon deze stap niet openen. Probeer het opnieuw.",
+      "minimize": "Rondleiding minimaliseren",
+      "close": "Rondleiding beëindigen",
+      "next": "Volgende",
+      "capabilities": {
+        "dashboards": "Dashboards",
+        "alerts": "Alarmen",
+        "logs": "Logs zoeken",
+        "traces": "Tracing",
+        "metrics": "Metrieken en PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Het probleem opsporen",
+          "body": "Dit is het serviceoverzicht van de winkel. Het foutpercentage en de checkoutlatentie sprongen beide omhoog in de laatste 35 minuten.",
+          "look": "Elk paneel is een SQL-query. Beweeg over een grafiek om reeksen te vergelijken, sleep eroverheen om in te zoomen, of open het menu van een paneel om de query te bewerken."
+        },
+        "alert": {
+          "title": "Het alarm is al afgegaan",
+          "body": "Een alarm op betalingsfouten voert volgens een schema een SQL-query uit op de logs, en ging af zodra de fouten de drempel overschreden.",
+          "look": "Open een alarm om de query, drempel en het schema te zien. De voorbeeldbestemming is een plaatsvervangende webhook, dus leveringen verschijnen als mislukt: richt hem op Slack, e-mail of PagerDuty om echte meldingen te krijgen."
+        },
+        "logs": {
+          "title": "De fouten doorzoeken",
+          "body": "Logs gefilterd op betalingsfouten. Bijna allemaal zeggen ze hetzelfde: timeout bij het verkrijgen van een verbinding uit de pool.",
+          "look": "Klap een record open om elk veld te zien. Klik op een veldwaarde om erop te filteren, of schakel over naar de SQL-modus om te groeperen en aggregeren."
+        },
+        "deploy": {
+          "title": "Ontdek wat er is veranderd",
+          "body": "Payment v2.15.0 werd één minuut voor het begin van de fouten uitgerold, en de release notes verkleinden de connection pool tot 20.",
+          "look": "Dat is de grondoorzaak, gevonden met één zoekopdracht op dezelfde logs. Full-text- en SQL-zoekopdrachten werken op dezelfde gegevens."
+        },
+        "traces": {
+          "title": "Volg een mislukte aanvraag",
+          "body": "Elke trace volgt één checkout door de services heen. Open er een: de waterfall toont de betalingsservice die 3 seconden wacht op een databaseverbinding.",
+          "look": "Logs bevatten dezelfde trace-ID, zodat je in beide richtingen kunt springen tussen een span en de bijbehorende logs."
+        },
+        "metrics": {
+          "title": "Bevestig met PromQL",
+          "body": "De p95-latentie van elke service, opgevraagd met PromQL. Payment en checkout stijgen samen.",
+          "look": "Metrieken leven in dezelfde engine als logs en traces, dus het Infrastructure-dashboard is volledig gebouwd met PromQL."
+        },
+        "pipeline": {
+          "title": "Verwerk gegevens bij binnenkomst",
+          "body": "Een realtime pipeline voert een VRL-functie uit op elk accesslog en voegt client_os en is_mobile toe voordat de record wordt opgeslagen.",
+          "look": "Open de pipeline om de grafiek ervan te bekijken. Pipelines kunnen gegevens filteren, verrijken, routeren en redigeren zonder je apps aan te passen."
+        },
+        "business": {
+          "title": "Meet de zakelijke impact",
+          "body": "Dezelfde logs voeden zakelijke dashboards: mislukte checkouts, omzet en bestellingen per betaalmethode.",
+          "look": "Geen apart analysetool nodig. Alles in je logs kan een KPI worden."
+        }
+      },
+      "finale": {
+        "title": "Je hebt de oorzaak gevonden",
+        "body": "In een paar minuten ging je van een piek op een dashboard naar de deployment die deze veroorzaakte, met elk signaal op één plek.",
+        "connect": "Verbind je eigen gegevens",
+        "restart": "Tour opnieuw starten",
+        "finish": "Tour voltooien"
+      }
     }
   },
   "recentSearches": {
