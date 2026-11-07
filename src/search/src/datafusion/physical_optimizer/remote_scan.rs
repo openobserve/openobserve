@@ -34,7 +34,7 @@ use datafusion::{
     },
 };
 use datafusion_proto::protobuf::PhysicalPlanNode;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use prost::Message;
 use proto::cluster_rpc::{self, KvItem};
 
@@ -188,7 +188,8 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         // if not single node, rewrite physical plan to add remote scan
-        let mut rewrite = RemoteScanRewriter::new(self.remote_scan_nodes.clone());
+        let mut rewrite = RemoteScanRewriter::new(self.remote_scan_nodes.clone())
+            .with_order_dependencies(&plan)?;
         let mut plan = plan.rewrite(&mut rewrite)?.data;
         if !rewrite.is_changed {
             plan = remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone())?;
@@ -210,6 +211,7 @@ pub struct RemoteScanRewriter {
     pub remote_scan_nodes: Arc<RemoteScanNodes>,
     pub is_changed: bool,
     pub partial_reduce_enabled: bool,
+    order_dependent: HashSet<usize>,
 }
 
 impl RemoteScanRewriter {
@@ -219,7 +221,34 @@ impl RemoteScanRewriter {
             remote_scan_nodes,
             is_changed: false,
             partial_reduce_enabled: cfg.search.feature_partial_reduce_enabled,
+            order_dependent: HashSet::new(),
         }
+    }
+
+    /// Keeps the orderings that `plan`'s nodes depend on when their inputs move to followers.
+    pub fn with_order_dependencies(mut self, plan: &Arc<dyn ExecutionPlan>) -> Result<Self> {
+        self.order_dependent = order_dependent_nodes(plan)?;
+        Ok(self)
+    }
+
+    fn keeps_order(&self, child: &Arc<dyn ExecutionPlan>) -> bool {
+        self.order_dependent.contains(&node_addr(child))
+    }
+
+    fn remote_scan(
+        &self,
+        child: Arc<dyn ExecutionPlan>,
+        table_name: &TableReference,
+        keep_order: bool,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let child = if keep_order {
+            merge_sorted_partitions(child)
+        } else {
+            child
+        };
+        let remote_scan =
+            RemoteScanExec::new(child, self.remote_scan_nodes.get_remote_node(table_name))?;
+        Ok(Arc::new(remote_scan))
     }
 }
 
@@ -233,19 +262,22 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                let remote_scan_input =
-                    wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
-                let remote_scan_or_partial_reduce: Arc<dyn ExecutionPlan> =
-                    Arc::new(RemoteScanExec::new(
-                        remote_scan_input,
-                        self.remote_scan_nodes.get_remote_node(&table_name),
-                    )?);
+                let keep_order = self.keeps_order(input);
+                // A partial reduce regroups rows and would drop the needed order
+                let remote_scan_input = if keep_order {
+                    input.clone()
+                } else {
+                    wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?
+                };
+                let remote_scan_or_partial_reduce =
+                    self.remote_scan(remote_scan_input, &table_name, keep_order)?;
                 let output_partitioning =
                     Partitioning::RoundRobinBatch(input.output_partitioning().partition_count());
-                let repartition = Arc::new(RepartitionExec::try_new(
+                let repartition = round_robin(
                     remote_scan_or_partial_reduce,
                     output_partitioning,
-                )?);
+                    keep_order,
+                )?;
                 let new_node = node.replace_children(
                     vec![repartition],
                     ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
@@ -302,11 +334,12 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         new_children.push(remote_scan);
                     } else {
                         let table_name = visitor.table_name.clone().unwrap();
-                        let remote_scan = Arc::new(RemoteScanExec::new(
+                        let keep_order = self.keeps_order(child);
+                        new_children.push(self.remote_scan(
                             child.clone(),
-                            self.remote_scan_nodes.get_remote_node(&table_name),
+                            &table_name,
+                            keep_order,
                         )?);
-                        new_children.push(remote_scan);
                     }
                 }
                 let new_node = node.replace_children(
@@ -323,17 +356,13 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 child.visit(&mut visitor)?;
                 if !visitor.has_remote_scan {
                     let table_name = visitor.table_name.clone().unwrap();
-                    let remote_scan = Arc::new(RemoteScanExec::new(
-                        child.clone(),
-                        self.remote_scan_nodes.get_remote_node(&table_name),
-                    )?);
+                    let keep_order = self.keeps_order(child);
+                    let remote_scan = self.remote_scan(child.clone(), &table_name, keep_order)?;
                     // add repartition for better performance(imporve parallelism)
                     let output_partitioning = Partitioning::RoundRobinBatch(
                         child.output_partitioning().partition_count(),
                     );
-                    let repartition =
-                        Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
-                    new_children.push(repartition);
+                    new_children.push(round_robin(remote_scan, output_partitioning, keep_order)?);
                 } else {
                     new_children.push(child.clone());
                 }
@@ -425,6 +454,53 @@ pub fn wrap_partial_reduce_for_aggregate(
         reduce_input,
         agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
+}
+
+/// Addresses of the nodes whose output ordering an ancestor depends on.
+fn order_dependent_nodes(plan: &Arc<dyn ExecutionPlan>) -> Result<HashSet<usize>> {
+    let mut nodes = HashSet::new();
+    plan.apply(|node| {
+        let node_dependent = nodes.contains(&node_addr(node));
+        let required = node.required_input_ordering();
+        let maintained = node.maintains_input_order();
+        for (i, child) in node.children().into_iter().enumerate() {
+            let child_required = required.get(i).is_some_and(Option::is_some);
+            let child_maintained = node_dependent && maintained.get(i).copied().unwrap_or(false);
+            if child_required || child_maintained {
+                nodes.insert(node_addr(child));
+            }
+        }
+        Ok(TreeNodeRecursion::Continue)
+    })?;
+    Ok(nodes)
+}
+
+fn node_addr(plan: &Arc<dyn ExecutionPlan>) -> usize {
+    Arc::as_ptr(plan).cast::<()>() as usize
+}
+
+// Followers stream all partitions at once, so only a single partition arrives sorted.
+fn merge_sorted_partitions(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    match plan.output_ordering() {
+        Some(ordering) if plan.output_partitioning().partition_count() > 1 => {
+            let fetch = plan.fetch();
+            Arc::new(SortPreservingMergeExec::new(ordering.clone(), plan).with_fetch(fetch))
+        }
+        _ => plan,
+    }
+}
+
+fn round_robin(
+    input: Arc<dyn ExecutionPlan>,
+    partitioning: Partitioning,
+    keep_order: bool,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let repartition = RepartitionExec::try_new(input, partitioning)?;
+    Ok(Arc::new(if keep_order {
+        repartition.with_preserve_order()
+    } else {
+        repartition
+    }))
 }
 
 fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
@@ -1055,10 +1131,7 @@ mod tests {
                 .into_iter()
                 .zip(node.required_input_ordering())
             {
-                // A merge over a remote scan trusts each follower's stream to be sorted.
-                let Some(required) =
-                    required.filter(|_| child.downcast_ref::<RemoteScanExec>().is_none())
-                else {
+                let Some(required) = required else {
                     continue;
                 };
                 let (alternatives, _) = required.into_alternatives();
@@ -1071,5 +1144,59 @@ mod tests {
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();
+    }
+
+    async fn assert_cluster_plan_is_sane(sql: &str) {
+        let (ctx, plan) = cluster_plan(sql).await;
+        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
+        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+            panic!(
+                "{sql}: {e}\n{}",
+                datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_order_by_limit_plans_are_sane() {
+        for sql in [
+            "SELECT _timestamp, value FROM t ORDER BY value DESC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC, event_name LIMIT 15",
+            "SELECT _timestamp, event_name FROM t WHERE value IS NOT NULL ORDER BY value DESC",
+            "SELECT event_name, _timestamp FROM t WHERE substr(event_name, 0, 2) = 'ap' \
+                ORDER BY _timestamp DESC LIMIT 50000",
+            "SELECT event_name, count(*) AS c FROM t GROUP BY event_name ORDER BY c DESC LIMIT 10",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_order_by_plans_are_sane() {
+        for sql in [
+            "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
+                UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0 \
+                ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
+                UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
+                ORDER BY origin, value DESC LIMIT 15",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_subquery_order_by_plans_are_sane() {
+        for sql in [
+            "SELECT event_name, _timestamp FROM t WHERE event_name IN \
+                (SELECT event_name FROM t ORDER BY event_name LIMIT 5) \
+                ORDER BY _timestamp DESC LIMIT 100",
+            "SELECT a.event_name, a._timestamp FROM t a JOIN \
+                (SELECT k8s_cluster FROM t WHERE substr(k8s_cluster, 0, 2) = 'p') b \
+                ON a.k8s_cluster = b.k8s_cluster ORDER BY a._timestamp DESC LIMIT 100",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
     }
 }
