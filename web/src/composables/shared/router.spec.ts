@@ -267,6 +267,12 @@ describe("useRoutes (router.ts)", () => {
       expect(loginRoute).toBeDefined();
     });
 
+    it("should name the /login route so RUM gets a stable view name", () => {
+      const { parentRoutes } = useRoutes();
+      const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
+      expect(loginRoute.name).toBe("login");
+    });
+
     it("should have Login component for /login", () => {
       const { parentRoutes } = useRoutes();
       const loginRoute = parentRoutes.find((r: any) => r.path === "/login");

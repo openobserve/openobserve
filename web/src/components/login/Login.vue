@@ -330,6 +330,10 @@ export default defineComponent({
     };
 
     const loginWithSSo = async () => {
+      // index.html already asked for dex_login; a second request would overwrite the login-state cookie it set.
+      const fastPath = (window as any).__o2SsoFastPath;
+      delete (window as any).__o2SsoFastPath;
+      if (await fastPath) return;
       try {
         const res = await authService.get_dex_login();
         if (res) window.location.href = withSignupHint(res);
